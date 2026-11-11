@@ -15,7 +15,9 @@ Use [dageist-admin](.agents/skills/dageist-admin/SKILL.md) for issues and labels
 pull requests, local working material and pause/resume handoffs. PISCT owns
 engineering methods. Apply `$pisct:invariants` to engineering and
 `$pisct:rust-modeling` to Rust models and APIs. Dageist-owned Rust prohibits
-executable `unsafe` without exception.
+executable `unsafe` without exception. TypeScript follows the Pragmatic
+TypeScript Guidelines (`pragmatic-typescript`); its type check, lint and
+format check are required gates for every change under `ui/`.
 
 The coordinator owns issue and label updates, staging, commits, integration and
 publication within the authorized scope. Use `$pisct:holistic-review` for final
@@ -43,6 +45,7 @@ and current source establishes behavior.
 | Webview permissions | [crates/dageist-tauri/capabilities/](crates/dageist-tauri/capabilities/) |
 | IPC commands and their serialized views | [crates/dageist-tauri/src/main.rs](crates/dageist-tauri/src/main.rs) |
 | View toolchain, scripts and compiler settings | [ui/package.json](ui/package.json), [ui/package-lock.json](ui/package-lock.json), [ui/tsconfig.json](ui/tsconfig.json) |
+| View lint rules and formatter settings | [ui/.oxlintrc.json](ui/.oxlintrc.json), [ui/.oxfmtrc.json](ui/.oxfmtrc.json) |
 | Architecture and integration boundaries | [docs/explanation.md](docs/explanation.md) |
 | Documentation navigation and source locations | [README.md](README.md), [docs/reference.md](docs/reference.md) |
 | Licensing and dependency attribution | [LICENSE](LICENSE), [NOTICE.md](NOTICE.md) |
@@ -122,8 +125,13 @@ View checks from the repository root. `npm --prefix ui ci --offline` restores
 ```sh
 npm --prefix ui ci --offline
 npm --prefix ui run check
+npm --prefix ui run lint
+npm --prefix ui run format:check
 npm --prefix ui run build
 ```
+
+The lint denies warnings and reports unused suppressions.
+`npm --prefix ui run format` rewrites files; `format:check` only reports.
 
 Host checks embed `ui/dist/`, so build the view first:
 
