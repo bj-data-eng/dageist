@@ -197,15 +197,18 @@
   },
   "overrides": [
     {
-      // Node build scripts are plain JavaScript and Node's type declarations
-      // are not installed, so every Node API resolves to an error type.
+      // Build scripts run in Node, not in the webview.
       "files": ["scripts/**/*.mjs"],
+      "plugins": ["typescript", "import", "unicorn", "jsdoc", "oxc", "node"],
       "env": {
+        "browser": false,
         "node": true
       },
       "rules": {
-        "typescript/no-unsafe-assignment": "off",
-        "typescript/no-unsafe-call": "off"
+        "node/handle-callback-err": "error",
+        "node/no-exports-assign": "error",
+        "node/no-new-require": "error",
+        "node/no-path-concat": "error"
       }
     }
   ]

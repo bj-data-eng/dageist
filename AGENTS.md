@@ -44,7 +44,7 @@ and current source establishes behavior.
 | Window, bundle, view location and content security policy | [crates/dageist-tauri/tauri.conf.json](crates/dageist-tauri/tauri.conf.json) |
 | Webview permissions | [crates/dageist-tauri/capabilities/](crates/dageist-tauri/capabilities/) |
 | IPC commands and their serialized views | [crates/dageist-tauri/src/main.rs](crates/dageist-tauri/src/main.rs) |
-| View toolchain, scripts and compiler settings | [ui/package.json](ui/package.json), [ui/package-lock.json](ui/package-lock.json), [ui/tsconfig.json](ui/tsconfig.json) |
+| View toolchain, scripts and compiler settings | [ui/package.json](ui/package.json), [ui/package-lock.json](ui/package-lock.json), [ui/tsconfig.json](ui/tsconfig.json), [ui/scripts/tsconfig.json](ui/scripts/tsconfig.json) |
 | View lint rules and formatter settings | [ui/.oxlintrc.json](ui/.oxlintrc.json), [ui/.oxfmtrc.json](ui/.oxfmtrc.json) |
 | Architecture and integration boundaries | [docs/explanation.md](docs/explanation.md) |
 | Documentation navigation and source locations | [README.md](README.md), [docs/reference.md](docs/reference.md) |

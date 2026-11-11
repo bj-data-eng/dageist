@@ -18,7 +18,8 @@ The tests pass and Clippy reports no warnings. `-F unsafe-code` rejects any
 
 ## Check The View
 
-Type-check, lint and format-check the view, then compile it into `ui/dist/`:
+Type-check, lint and format-check the view and its build scripts, then compile
+the view into `ui/dist/`:
 
 ```sh
 npm --prefix ui run check

@@ -6,13 +6,14 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "check": "tsc -p . --noEmit",
+    "check": "tsc -p . --noEmit && tsc -p scripts",
     "lint": "oxlint --deny-warnings --report-unused-disable-directives",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "build": "tsc -p . && node scripts/copy-public.mjs"
   },
   "devDependencies": {
+    "@types/node": "20.19.43",
     "oxfmt": "0.78.0",
     "oxlint": "1.93.0",
     "oxlint-tsgolint": "7.0.2006",
