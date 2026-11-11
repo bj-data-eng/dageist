@@ -7,9 +7,18 @@
   "type": "module",
   "scripts": {
     "check": "tsc -p . --noEmit",
+    "lint": "oxlint --deny-warnings --report-unused-disable-directives",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
     "build": "tsc -p . && node scripts/copy-public.mjs"
   },
   "devDependencies": {
+    "oxfmt": "0.78.0",
+    "oxlint": "1.93.0",
+    "oxlint-tsgolint": "7.0.2006",
     "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
   }
 }

@@ -48,11 +48,11 @@ repository.
 
 The view compiles with `tsc` alone and reaches Tauri through the
 `window.__TAURI__` global that `app.withGlobalTauri` injects, instead of
-importing `@tauri-apps/api` through a bundler. This keeps the view's only
-development dependency at TypeScript and its runtime dependencies at none. The
-cost is that `ui/src/tauri.d.ts` declares the global's types by hand, covering
-only the members the view uses. A bundler becomes worthwhile when the view
-needs runtime npm packages.
+importing `@tauri-apps/api` through a bundler. This keeps the view's development
+dependencies to the compiler, the linter and the formatter, and its runtime
+dependencies at none. The cost is that `ui/src/tauri.d.ts` declares the
+global's types by hand, covering only the members the view uses. A bundler
+becomes worthwhile when the view needs runtime npm packages.
 
 ## Current Limitations
 
