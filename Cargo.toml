@@ -1,0 +1,36 @@
+[package]
+name = "dageist"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Rust-first visual DAG studio for dataframe pipelines."
+repository.workspace = true
+readme = "README.md"
+rust-version.workspace = true
+exclude = ["Cargo.lock"]
+
+[lib]
+name = "dageist"
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/bj-data-eng/dageist"
+rust-version = "1.99.1"
+
+[workspace]
+resolver = "3"
+default-members = ["."]
+members = [
+    "crates/dageist-tauri",
+]
+
+[workspace.dependencies]
+
+[workspace.lints.rust]
+unsafe_code = "forbid"

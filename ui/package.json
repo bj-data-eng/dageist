@@ -1,0 +1,15 @@
+{
+  "name": "dageist-ui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeScript view for the dageist Tauri host.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "check": "tsc -p . --noEmit",
+    "build": "tsc -p . && node scripts/copy-public.mjs"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}

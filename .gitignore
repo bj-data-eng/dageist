@@ -1,0 +1,9 @@
+/target
+/crates/*/Cargo.lock
+/crates/dageist-tauri/gen/
+/ui/node_modules/
+/ui/dist/
+.DS_Store
+tmp/
+/.claude/*
+!/.claude/skills/
