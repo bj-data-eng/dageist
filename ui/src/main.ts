@@ -9,18 +9,16 @@ interface IdentityView {
 
 async function showIdentity(target: HTMLElement): Promise<void> {
   try {
-    const identity = await window.__TAURI__.core.invoke<IdentityView>("core_identity");
+    const identity = await window.__TAURI__.core.invoke<IdentityView>('core_identity');
     target.textContent = `${identity.name} ${identity.version}`;
-    target.dataset["state"] = "ready";
+    target.dataset.state = 'ready';
   } catch (error) {
     target.textContent = `Core unavailable: ${String(error)}`;
-    target.dataset["state"] = "error";
+    target.dataset.state = 'error';
   }
 }
 
-const identity = document.getElementById("core-identity");
+const identity = document.getElementById('core-identity');
 if (identity !== null) {
   void showIdentity(identity);
 }
-
-export {};

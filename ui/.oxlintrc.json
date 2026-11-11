@@ -1,0 +1,212 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "import", "unicorn", "jsdoc", "oxc"],
+  "options": {
+    "typeAware": true
+  },
+  "env": {
+    "browser": true,
+    "es2022": true
+  },
+  "ignorePatterns": ["dist/"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
+  "rules": {
+    "eslint/curly": ["error", "multi-line"],
+    "eslint/default-case": "error",
+    "eslint/default-case-last": "error",
+    "eslint/eqeqeq": [
+      "error",
+      "always",
+      {
+        "null": "ignore"
+      }
+    ],
+    "eslint/func-style": [
+      "error",
+      "declaration",
+      {
+        "allowArrowFunctions": true
+      }
+    ],
+    "eslint/getter-return": "error",
+    "eslint/guard-for-in": "error",
+    "eslint/no-array-constructor": "error",
+    "eslint/no-cond-assign": ["error", "except-parens"],
+    "eslint/no-debugger": "error",
+    "eslint/no-empty": "error",
+    "eslint/no-eval": "error",
+    "eslint/no-extend-native": "error",
+    "eslint/no-extra-bind": "error",
+    "eslint/no-extra-boolean-cast": "error",
+    "eslint/no-fallthrough": "error",
+    "eslint/no-global-assign": "error",
+    "eslint/no-implicit-coercion": [
+      "error",
+      {
+        "allow": ["!!"]
+      }
+    ],
+    "eslint/no-irregular-whitespace": [
+      "error",
+      {
+        "skipStrings": false
+      }
+    ],
+    "eslint/no-multi-str": "error",
+    "eslint/no-new-func": "error",
+    "eslint/no-new-wrappers": "error",
+    "eslint/no-object-constructor": "error",
+    "eslint/no-proto": "error",
+    "eslint/no-restricted-globals": [
+      "error",
+      {
+        "name": "parseFloat",
+        "message": "Use Number() and check the result."
+      },
+      {
+        "name": "parseInt",
+        "message": "Use Number() and check the result; parseInt is only for a non-decimal radix."
+      }
+    ],
+    "eslint/no-setter-return": "error",
+    // The suspicious category enables this rule, but it rejects the leading
+    // underscore that marks a required but unused binding, such as a loop
+    // variable. Naming is reviewed instead.
+    "eslint/no-underscore-dangle": "off",
+    "eslint/no-unused-vars": [
+      "error",
+      {
+        "args": "after-used",
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "eslint/no-use-before-define": [
+      "error",
+      {
+        "functions": false,
+        "classes": false,
+        "variables": true
+      }
+    ],
+    "eslint/no-useless-constructor": "error",
+    "eslint/no-useless-rename": "error",
+    "eslint/no-var": "error",
+    "eslint/no-with": "error",
+    "eslint/one-var": ["error", "never"],
+    "eslint/prefer-arrow-callback": "error",
+    "eslint/prefer-const": "error",
+    "eslint/prefer-rest-params": "error",
+    "eslint/prefer-spread": "error",
+    "eslint/prefer-template": "error",
+    "eslint/preserve-caught-error": "error",
+    "import/first": "error",
+    "import/no-commonjs": "error",
+    "import/no-default-export": "error",
+    "import/no-mutable-exports": "error",
+    "jsdoc/check-tag-names": "error",
+    "jsdoc/no-blank-blocks": "error",
+    "oxc/no-const-enum": "error",
+    "typescript/array-type": [
+      "error",
+      {
+        "default": "array-simple"
+      }
+    ],
+    "typescript/ban-ts-comment": [
+      "error",
+      {
+        "ts-expect-error": true,
+        "ts-ignore": true,
+        "ts-nocheck": true
+      }
+    ],
+    "typescript/consistent-generic-constructors": "error",
+    "typescript/consistent-type-assertions": [
+      "error",
+      {
+        "assertionStyle": "as",
+        "objectLiteralTypeAssertions": "never"
+      }
+    ],
+    "typescript/consistent-type-definitions": ["error", "interface"],
+    "typescript/consistent-type-exports": "error",
+    "typescript/consistent-type-imports": [
+      "error",
+      {
+        "prefer": "type-imports",
+        "disallowTypeAnnotations": true
+      }
+    ],
+    "typescript/dot-notation": "error",
+    "typescript/explicit-member-accessibility": [
+      "error",
+      {
+        "accessibility": "no-public"
+      }
+    ],
+    "typescript/no-confusing-void-expression": "error",
+    "typescript/no-deprecated": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-extraneous-class": "error",
+    "typescript/no-for-in-array": "error",
+    "typescript/no-implied-eval": "error",
+    "typescript/no-import-type-side-effects": "error",
+    "typescript/no-inferrable-types": "error",
+    "typescript/no-misused-spread": "error",
+    "typescript/no-namespace": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/no-require-imports": "error",
+    "typescript/no-this-alias": "error",
+    "typescript/no-unnecessary-parameter-property-assignment": "error",
+    "typescript/no-unnecessary-type-arguments": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-unnecessary-type-parameters": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-enum-comparison": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/no-unsafe-type-assertion": "error",
+    "typescript/no-wrapper-object-types": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/parameter-properties": [
+      "error",
+      {
+        "prefer": "parameter-property"
+      }
+    ],
+    "typescript/prefer-for-of": "error",
+    "typescript/prefer-promise-reject-errors": "error",
+    "typescript/prefer-readonly": "error",
+    "typescript/restrict-plus-operands": "error",
+    "typescript/strict-boolean-expressions": "error",
+    "typescript/strict-void-return": "error",
+    "typescript/triple-slash-reference": "error",
+    "typescript/unbound-method": "error",
+    "typescript/use-unknown-in-catch-callback-variable": "error",
+    "unicorn/no-new-array": "error",
+    "unicorn/no-static-only-class": "error",
+    "unicorn/no-this-assignment": "error",
+    "unicorn/throw-new-error": "error"
+  },
+  "overrides": [
+    {
+      // Node build scripts are plain JavaScript and Node's type declarations
+      // are not installed, so every Node API resolves to an error type.
+      "files": ["scripts/**/*.mjs"],
+      "env": {
+        "node": true
+      },
+      "rules": {
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off"
+      }
+    }
+  ]
+}
