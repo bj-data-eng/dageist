@@ -96,7 +96,7 @@ complete, implemented, independently reviewed with the findings fixed on the
 branch, and verified against current `origin/main`. Complete implementation,
 required independent reviews, and local verification before creation. Keep
 implementation testing and independent engineering reviews local; GitHub's
-required hygiene and CodeQL checks supplement that evidence. Only checks that
+required hygiene checks supplement that evidence. Only checks that
 require an existing pull request may remain pending. This rule also applies to
 draft pull requests. With auto-merge enabled, assume the pull
 request can merge as soon as required platform checks pass; do not rely on time
@@ -139,8 +139,8 @@ After a rebase, re-run the verification the rebase invalidates.
 The default-branch ruleset requires a pull request, allows merge commits only,
 and requires the branch to be up to date with `main` with its required status
 checks passing: "Branch follows branch/<topic>", "One closing keyword per
-issue", "No tool names in text, commits or files", "Analyze (actions)", and
-"CodeQL". CodeQL currently scans Actions workflows. The ruleset rejects direct
+issue", and "No tool names in text, commits or files". Code scanning is not
+configured. The ruleset rejects direct
 pushes to `main`. Creating a ready pull request starts the required checks. Enable
 auto-merge for that pull request with the merge-commit method only after
 confirming its current branch head is ready to land, with all required local
