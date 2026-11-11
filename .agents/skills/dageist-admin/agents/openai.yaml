@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dageist Administration"
+  short_description: "Coordinate Dageist issues, labels and local handoffs"
+  default_prompt: "Use $dageist-admin to coordinate the current Dageist issue and its labels within the authorized scope."
