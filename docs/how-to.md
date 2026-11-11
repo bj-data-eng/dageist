@@ -18,16 +18,49 @@ The tests pass and Clippy reports no warnings. `-F unsafe-code` rejects any
 
 ## Check The View
 
-Type-check the TypeScript sources, then compile them into `ui/dist/`:
+Type-check, lint and format-check the view, then compile it into `ui/dist/`:
 
 ```sh
 npm --prefix ui run check
+npm --prefix ui run lint
+npm --prefix ui run format:check
 npm --prefix ui run build
 ```
 
-Both commands exit successfully. `ui/dist/` then holds `index.html`,
-`styles.css` and the compiled `main.js`. To restore `ui/node_modules/` from the
-local npm cache without network access, run `npm --prefix ui ci --offline`.
+All four commands exit successfully. The lint prints nothing when it finds no
+problems; it treats warnings as errors and also reports suppression comments
+that no longer suppress anything. `format:check` reports files whose formatting
+differs from the formatter's output without changing them. `ui/dist/` then
+holds `index.html`, `styles.css` and the compiled `main.js`.
+
+To restore `ui/node_modules/` from the local npm cache without network access,
+run `npm --prefix ui ci --offline`.
+
+## Format The View
+
+When `format:check` reports a file, let the formatter rewrite it:
+
+```sh
+npm --prefix ui run format
+```
+
+The formatter owns all layout in `ui/`, including the JSON, CSS and HTML
+files. Do not adjust its output by hand. Run `format:check` again to confirm
+that nothing is reported.
+
+## Suppress A Lint Finding
+
+Fix the code when the linter reports a problem. When a finding is a deliberate
+exception, suppress that one rule on that one line and state the reason:
+
+```ts
+// The menu opens only after the click handler has set `selection`.
+// oxlint-disable-next-line typescript/no-non-null-assertion
+const node = selection!;
+```
+
+Do not disable a rule for a whole file, and do not relax
+[ui/.oxlintrc.json](../ui/.oxlintrc.json) to clear a single finding.
 
 ## Check The Host
 

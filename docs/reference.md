@@ -55,11 +55,23 @@ grants the `main` window the `core:default` permission set.
 | [ui/public/](../ui/public/index.html) | `index.html` and `styles.css`, copied into `ui/dist/`. |
 | [ui/scripts/copy-public.mjs](../ui/scripts/copy-public.mjs) | Build step that copies `ui/public/` into `ui/dist/`. |
 | [ui/tsconfig.json](../ui/tsconfig.json) | Strict compiler settings; emits ES2022 modules into `ui/dist/`. |
+| [ui/.oxlintrc.json](../ui/.oxlintrc.json) | Lint rules: the `correctness` and `suspicious` categories plus the listed rules, all as errors, with type-aware rules enabled. |
+| [ui/.oxfmtrc.json](../ui/.oxfmtrc.json) | Formatter settings: 100-column lines, single quotes, semicolons. |
 
 | npm script | Action |
 | --- | --- |
 | `check` | Type-checks the view without emitting files. |
+| `lint` | Lints `ui/` with oxlint, denying warnings and reporting unused suppressions. |
+| `format` | Rewrites the files in `ui/` with oxfmt. |
+| `format:check` | Reports files that oxfmt would change, without writing. |
 | `build` | Compiles the view into `ui/dist/` and copies `ui/public/` beside it. |
 
-The view has no runtime npm dependencies and no bundler; TypeScript is its only
-development dependency.
+The view has no runtime npm dependencies and no bundler. Its development
+dependencies, pinned to exact versions in [ui/package.json](../ui/package.json),
+are TypeScript, the oxlint linter with its type-aware companion
+`oxlint-tsgolint`, and the oxfmt formatter.
+
+The lint configuration has one override: build scripts under `ui/scripts/` are
+plain JavaScript that uses Node APIs, and Node's type declarations are not
+installed, so the two rules that would report every Node call as untyped are
+off for those files.

@@ -8,9 +8,10 @@ versions resolved by [Cargo.lock](Cargo.lock). It does not enumerate their
 transitive, optional, platform, or compiled dependencies, and it is not a
 complete inventory for a distributed application bundle.
 
-TypeScript, declared in [ui/package.json](ui/package.json), is a build-only tool.
-The view in `ui/dist/` contains only this repository's compiled source, so
-TypeScript is not redistributed.
+TypeScript, oxlint, oxlint-tsgolint and oxfmt, declared in
+[ui/package.json](ui/package.json), are development-only tools. The view in
+`ui/dist/` contains only this repository's compiled source, so none of them is
+redistributed.
 
 ## Dependencies
 

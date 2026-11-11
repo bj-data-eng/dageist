@@ -9,7 +9,8 @@ shows the identity the Rust core reports.
 - Git.
 - Rust 1.99.1 or newer with Cargo, matching the compatibility floor in
   [Cargo.toml](../Cargo.toml).
-- Node.js with npm.
+- Node.js 20.19 or newer on the 20 line, or 22.12 or newer, with npm. The
+  linter and formatter in [ui/package.json](../ui/package.json) set this floor.
 - The platform's Tauri 2 system dependencies: on macOS, the Xcode Command Line
   Tools; on Linux and Windows, the WebView and build packages listed in the
   [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
