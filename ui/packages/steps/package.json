@@ -1,0 +1,18 @@
+{
+  "name": "@dageist/steps",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The step editor: a transformation built as a list of steps made of swappable parts.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@dageist/design": "0.1.0",
+    "@dnd-kit/abstract": "0.5.3",
+    "@dnd-kit/dom": "0.5.3",
+    "@dnd-kit/react": "0.5.3",
+    "react": "19.3.1"
+  }
+}

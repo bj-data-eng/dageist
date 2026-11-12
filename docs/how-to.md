@@ -18,8 +18,8 @@ The tests pass and Clippy reports no warnings. `-F unsafe-code` rejects any
 
 ## Check The View
 
-Type-check, lint and format-check the view and its build scripts, then compile
-the view into `ui/dist/`:
+Type-check, lint and format-check the view and its Vite configuration, then
+bundle the view into `ui/dist/`:
 
 ```sh
 npm --prefix ui run check
@@ -32,10 +32,24 @@ All four commands exit successfully. The lint prints nothing when it finds no
 problems; it treats warnings as errors and also reports suppression comments
 that no longer suppress anything. `format:check` reports files whose formatting
 differs from the formatter's output without changing them. `ui/dist/` then
-holds `index.html`, `styles.css` and the compiled `main.js`.
+holds `index.html` and an `assets/` folder with the bundled script and
+stylesheet.
 
 To restore `ui/node_modules/` from the local npm cache without network access,
 run `npm --prefix ui ci --offline`.
+
+## Work On The View In A Browser
+
+Start Vite's development server and open `http://localhost:5173`:
+
+```sh
+npm --prefix ui run dev
+```
+
+The page updates as files under `ui/` change, with no build of the application.
+Outside Tauri there is no engine, so the shell loads a stand-in host: the step
+editor works as usual, and the table shows made-up rows. The status badge reads
+`Browser preview made-up data`. Stop the server with Ctrl+C.
 
 ## Format The View
 
@@ -79,18 +93,28 @@ sample table generates it only when it is missing, and that `table_block`
 answers through Tauri's IPC layer with raw Arrow bytes, for a working window
 and for a stored result, or with a message. They do not open a window.
 
-## Time The Engine
+## Open The Sample Table
 
-Generate a claims table of about one million rows and 300 columns, then time
-loading a working window, slicing it and reading blocks straight from Parquet:
+The `Table` workspace shows a generated claims table of about two million rows
+and 300 columns. Build the view, then run the application optimised, because
+an unoptimised Polars is many times slower:
 
 ```sh
-cargo run --release --offline --locked -p dageist-engine --example measure
+npm --prefix ui run build
+cargo run --release --offline --locked -p dageist-tauri
 ```
 
-The program writes about 1 GB of Parquet under `tmp/sample-claims/`, which Git
-ignores, and prints one line per measurement. Run it optimised, because an
-unoptimised Polars is many times slower.
+The first time the workspace opens, the host writes the sample, about 2 GB of
+Parquet, into a `claims-…` folder in the application cache
+(`~/Library/Caches/io.github.bj-data-eng.dageist/` on macOS). Later runs reuse
+it. Delete the folder to reclaim the space; it is generated again when needed.
+
+The workspace has two modes. `Working window` loads every row of the first 500 keys
+into memory. `Whole result` leaves the table in its Parquet files and reads
+each block from disk as you scroll.
+
+To time the engine without the application, run
+`cargo run --release --offline --locked -p dageist-engine --example measure`.
 
 ## Check Formatting
 

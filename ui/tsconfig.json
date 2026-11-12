@@ -1,20 +1,25 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ES2022",
+    "module": "ESNext",
     "moduleResolution": "bundler",
     "moduleDetection": "force",
-    "lib": ["ES2022", "DOM"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
     "isolatedModules": true,
-    "rootDir": "src",
-    "outDir": "dist",
-    "types": [],
-    "noUnusedLocals": true
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "types": ["vite/client"],
+    // Several libraries publish declarations that fail strict checking on
+    // their own (flechette has an untyped member), so declaration files are
+    // not checked by themselves. Every use of them from our source still is.
+    "skipLibCheck": true
   },
-  "include": ["src"]
+  "include": ["apps/*/src", "packages/*/src"]
 }

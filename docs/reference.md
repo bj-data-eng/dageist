@@ -12,7 +12,7 @@ workspace member through `[workspace.lints.rust]`. The workspace uses
 | `dageist` | [src/](../src/lib.rs) | Host-independent core library. |
 | `dageist-engine` | [crates/dageist-engine/](../crates/dageist-engine/Cargo.toml) | Dataframe engine on Polars: sample data, working windows, stored results and Arrow output. Not published. |
 | `dageist-tauri` | [crates/dageist-tauri/](../crates/dageist-tauri/Cargo.toml) | Tauri 2 host; builds the `dageist` binary. Not published. |
-| `dageist-ui` | [ui/](../ui/package.json) | Private npm package for the TypeScript view. |
+| `dageist-ui` | [ui/](../ui/package.json) | Private npm workspace for the React view; see [View Packages](#view-packages). |
 
 ## Core API
 
@@ -26,9 +26,9 @@ workspace member through `[workspace.lints.rust]`. The workspace uses
 The host registers these commands in
 [crates/dageist-tauri/src/main.rs](../crates/dageist-tauri/src/main.rs) and
 defines the table commands in
-[sample_table.rs](../crates/dageist-tauri/src/sample_table.rs). They are called
-through `window.__TAURI__.core.invoke`. The view calls `core_identity`; it does
-not use the table commands yet.
+[sample_table.rs](../crates/dageist-tauri/src/sample_table.rs). The view calls
+them through the host bridge in
+[ui/packages/host/src/](../ui/packages/host/src/tauri.ts).
 
 | Command | Arguments | Result |
 | --- | --- | --- |
@@ -58,40 +58,55 @@ sets the following:
 | View | `../../ui/dist`, embedded at compile time; build it with `npm --prefix ui run build` first |
 | Global API | `app.withGlobalTauri` is `true`, which injects `window.__TAURI__` |
 | Main window | Label `main`, title `dageist`, 1440×900, minimum 960×600, dark theme |
+| Minimum macOS | 13.3, the first version whose system WebKit supports the CSS that Tailwind CSS 4 emits |
 | Content security policy | Same-origin scripts, styles and images, plus `data:` images and the IPC channel |
 
 [crates/dageist-tauri/capabilities/default.json](../crates/dageist-tauri/capabilities/default.json)
 grants the `main` window the `core:default` permission set.
 
-## View Files
+## View Packages
 
-| Path | Contents |
+The view is an npm workspace rooted at [ui/package.json](../ui/package.json).
+Every package is private and is consumed as TypeScript source.
+
+| Package | Path | Role | May depend on |
+| --- | --- | --- | --- |
+| `@dageist/desktop` | [ui/apps/desktop/](../ui/apps/desktop/src/App.tsx) | The shell: picks the host, composes the features, owns the page, the bundler configuration and the design tokens. | Every package below, React, and flechette for the stand-in host |
+| `@dageist/host` | [ui/packages/host/](../ui/packages/host/src/contract.ts) | The contract of every IPC command and its implementation over Tauri. | Nothing |
+| `@dageist/design` | [ui/packages/design/](../ui/packages/design/src/index.ts) | Primitive components: `Picker`, `CommitField`, `ToggleButton`, `Panel`. | React |
+| `@dageist/steps` | [ui/packages/steps/](../ui/packages/steps/src/StepEditor.tsx) | The step editor and its storyboard model. | `@dageist/design`, dnd kit, React |
+| `@dageist/table` | [ui/packages/table/](../ui/packages/table/src/TableViewer.tsx) | The table viewer: fetches blocks as Arrow bytes and draws only those. | `@dageist/design`, `@dageist/host`, flechette, React |
+
+| File | Contents |
 | --- | --- |
-| [ui/src/main.ts](../ui/src/main.ts) | Shell rendering and IPC calls. |
-| [ui/src/tauri.d.ts](../ui/src/tauri.d.ts) | Types for the injected `window.__TAURI__` members the view uses. |
-| [ui/public/](../ui/public/index.html) | `index.html` and `styles.css`, copied into `ui/dist/`. |
-| [ui/scripts/copy-public.mjs](../ui/scripts/copy-public.mjs) | Build step that copies `ui/public/` into `ui/dist/`. |
-| [ui/tsconfig.json](../ui/tsconfig.json) | Strict compiler settings; emits ES2022 modules into `ui/dist/`. |
-| [ui/scripts/tsconfig.json](../ui/scripts/tsconfig.json) | Strict type checking of the Node build scripts; emits nothing. |
-| [ui/.oxlintrc.json](../ui/.oxlintrc.json) | Lint rules: the `correctness` and `suspicious` categories plus the listed rules, all as errors, with type-aware rules enabled. |
+| [ui/apps/desktop/index.html](../ui/apps/desktop/index.html) | The page Vite builds from. |
+| [ui/apps/desktop/vite.config.ts](../ui/apps/desktop/vite.config.ts) | Bundler settings; the bundle is written to `ui/dist/`. |
+| [ui/apps/desktop/src/styles.css](../ui/apps/desktop/src/styles.css) | Tailwind entry and the colour and font tokens. |
+| [ui/apps/desktop/src/demo-host.ts](../ui/apps/desktop/src/demo-host.ts) | A stand-in host with made-up rows, loaded only when the page is open outside Tauri. |
+| [ui/tsconfig.json](../ui/tsconfig.json) | Strict compiler settings for every package's `src/`; emits nothing. |
+| [ui/tsconfig.node.json](../ui/tsconfig.node.json) | Strict type checking of the Vite configuration; emits nothing. |
+| [ui/.oxlintrc.json](../ui/.oxlintrc.json) | Lint rules: the `correctness` and `suspicious` categories plus the listed rules, all as errors, with type-aware, React and accessibility rules enabled. |
 | [ui/.oxfmtrc.json](../ui/.oxfmtrc.json) | Formatter settings: 100-column lines, single quotes, semicolons. |
 
 | npm script | Action |
 | --- | --- |
-| `check` | Type-checks the view and the build scripts without emitting files. |
+| `dev` | Serves the view at `http://localhost:5173` and updates the page as files change. |
+| `check` | Type-checks every package and the Vite configuration without emitting files. |
 | `lint` | Lints `ui/` with oxlint, denying warnings and reporting unused suppressions. |
 | `format` | Rewrites the files in `ui/` with oxfmt. |
 | `format:check` | Reports files that oxfmt would change, without writing. |
-| `build` | Compiles the view into `ui/dist/` and copies `ui/public/` beside it. |
+| `build` | Bundles the view into `ui/dist/` with Vite. |
 
-The view has no runtime npm dependencies and no bundler. Its development
-dependencies, pinned to exact versions in [ui/package.json](../ui/package.json),
-are TypeScript, the oxlint linter with its type-aware companion
-`oxlint-tsgolint`, the oxfmt formatter, and Node's type declarations
-(`@types/node`) for the build scripts.
+Runtime dependencies, bundled into `ui/dist/` and pinned to exact versions in
+the package that uses them: React 19.3.1 (`react`, `react-dom`),
+[dnd kit](https://dndkit.com) 0.5.3 (`@dnd-kit/react`, `@dnd-kit/dom`) for drag
+and drop, and [flechette](https://github.com/uwdata/flechette) 2.7.1 for
+reading Arrow data. Development dependencies, pinned in
+[ui/package.json](../ui/package.json), are Vite with its React plugin, Tailwind
+CSS with its Vite plugin, React's type declarations, TypeScript, the oxlint linter
+with its type-aware companion `oxlint-tsgolint`, the oxfmt formatter, and
+Node's type declarations (`@types/node`) for the Vite configuration.
 
-Build scripts under `ui/scripts/` are JavaScript that runs in Node. They are
-type-checked against Node's type declarations through
-[ui/scripts/tsconfig.json](../ui/scripts/tsconfig.json) and linted with the
-same rules as the view. One override in the lint configuration gives them the
-Node environment instead of the browser's and adds four Node-specific rules.
+The Vite configuration is TypeScript that runs in Node. It is type-checked
+against `@types/node` through [ui/tsconfig.node.json](../ui/tsconfig.node.json)
+and linted with the Node rules in [ui/.oxlintrc.json](../ui/.oxlintrc.json).

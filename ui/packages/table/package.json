@@ -1,0 +1,17 @@
+{
+  "name": "@dageist/table",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The table viewer: scrolls a table of any size by fetching Arrow blocks from the host.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@dageist/design": "0.1.0",
+    "@dageist/host": "0.1.0",
+    "@uwdata/flechette": "2.7.1",
+    "react": "19.3.1"
+  }
+}

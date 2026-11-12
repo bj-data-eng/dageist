@@ -1,7 +1,7 @@
 # Getting Started
 
 This guide prepares a dageist checkout and opens the application. A successful
-run compiles the TypeScript view and the Tauri host, opens the native window and
+run bundles the React view, compiles the Tauri host, opens the native window and
 shows the identity the Rust core reports.
 
 ## Prerequisites
@@ -34,7 +34,7 @@ packages.
    cargo fetch --locked
    ```
 
-3. Install the view's locked development dependencies into `ui/node_modules/`:
+3. Install the view's locked dependencies into `ui/node_modules/`:
 
    ```sh
    npm --prefix ui ci
@@ -56,9 +56,10 @@ packages.
    ```
 
 The first build compiles Tauri, Polars and their dependencies and takes several
-minutes.
-A dark window titled `dageist` then opens on an empty dotted canvas. Its status
-badge changes from `Connecting to core…` to `dageist 0.1.0`, which the view
+minutes. A dark window titled `dageist` then opens on the step editor, with a
+`Table` workspace beside it that
+[generates its sample](how-to.md#open-the-sample-table) when first opened. The
+status badge changes from `Connecting to core…` to `dageist 0.1.0`, which the view
 received from the Rust core through the `core_identity` IPC command. If the
 badge reads `Core unavailable: …`, the view loaded but the IPC call failed.
 

@@ -1,0 +1,21 @@
+{
+  "name": "@dageist/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The dageist shell: composes the features into the application window.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@dageist/design": "0.1.0",
+    "@dageist/host": "0.1.0",
+    "@dageist/steps": "0.1.0",
+    "@dageist/table": "0.1.0",
+    "@uwdata/flechette": "2.7.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  }
+}

@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "import", "unicorn", "jsdoc", "oxc"],
+  "plugins": ["typescript", "import", "unicorn", "jsdoc", "oxc", "react", "jsx-a11y"],
   "options": {
     "typeAware": true
   },
@@ -8,7 +8,7 @@
     "browser": true,
     "es2022": true
   },
-  "ignorePatterns": ["dist/"],
+  "ignorePatterns": ["dist/", "**/node_modules/"],
   "categories": {
     "correctness": "error",
     "suspicious": "error"
@@ -107,9 +107,18 @@
     "import/no-commonjs": "error",
     "import/no-default-export": "error",
     "import/no-mutable-exports": "error",
+    // A stylesheet is imported for its effect, not for a value.
+    "import/no-unassigned-import": [
+      "error",
+      {
+        "allow": ["**/*.css"]
+      }
+    ],
     "jsdoc/check-tag-names": "error",
     "jsdoc/no-blank-blocks": "error",
     "oxc/no-const-enum": "error",
+    // The automatic JSX runtime needs no `React` binding in scope.
+    "react/react-in-jsx-scope": "off",
     "typescript/array-type": [
       "error",
       {
@@ -197,8 +206,8 @@
   },
   "overrides": [
     {
-      // Build scripts run in Node, not in the webview.
-      "files": ["scripts/**/*.mjs"],
+      // The build configuration runs in Node, not in the webview.
+      "files": ["apps/*/vite.config.ts"],
       "plugins": ["typescript", "import", "unicorn", "jsdoc", "oxc", "node"],
       "env": {
         "browser": false,
