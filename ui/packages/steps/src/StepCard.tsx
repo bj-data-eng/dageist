@@ -14,7 +14,7 @@ import { SubListHost } from './SubList';
 import { columnChoices } from './choices';
 import { formatCell } from './format';
 import type { Frame } from './model/frame';
-import { distinctValues } from './model/frame';
+import { distinctValues, keysFit } from './model/frame';
 import type {
   ColumnsFrom,
   FilterStep,
@@ -221,7 +221,9 @@ function JoinSlots({ step, frame, onChange }: SlotsProps<JoinStep>): React.JSX.E
           label: `${column.name} · ${column.dtype}`,
           current: column.name === step.rightOn,
           reason:
-            leftDtype === undefined || column.dtype === leftDtype ? null : 'a different dtype',
+            leftDtype === undefined || keysFit(column.dtype, leftDtype)
+              ? null
+              : 'a different dtype',
           onPick: () => {
             onChange({ ...step, rightOn: column.name });
           },

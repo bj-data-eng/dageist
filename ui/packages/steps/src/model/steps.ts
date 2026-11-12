@@ -14,6 +14,7 @@ import {
   distinctValues,
   findColumn,
   isNumeric,
+  keysFit,
   quoted,
   reordered,
 } from './frame';
@@ -195,7 +196,7 @@ function join(frame: Frame, step: JoinStep): StepResult {
   if (rightKey === null) {
     return failed(frame, `"${step.table}" has no column "${step.rightOn}".`);
   }
-  if (leftKey.dtype !== rightKey.dtype) {
+  if (!keysFit(leftKey.dtype, rightKey.dtype)) {
     return failed(
       frame,
       `"${leftKey.name}" is ${leftKey.dtype}, but "${step.table}.${rightKey.name}" is ${rightKey.dtype}.`,
@@ -276,8 +277,11 @@ function pivot(frame: Frame, step: PivotStep): StepResult {
   if (index === null) return failed(frame, `There is no column "${step.index}".`);
   const values = findColumn(frame, step.values);
   if (values === null) return failed(frame, `There is no column "${step.values}".`);
-  if (step.aggregate === 'sum' && !isNumeric(values.dtype)) {
-    return failed(frame, `sum needs a numeric dtype, but "${values.name}" is ${values.dtype}.`);
+  if (step.aggregate === 'sum' && !isNumeric(values.dtype) && values.dtype !== 'Duration') {
+    return failed(
+      frame,
+      `sum needs a numeric dtype or Duration, but "${values.name}" is ${values.dtype}.`,
+    );
   }
   const headers = step.columnsFrom === 'pinned' ? step.pinned : distinctValues(frame, step.on);
   const keys = distinctValues(frame, step.index);

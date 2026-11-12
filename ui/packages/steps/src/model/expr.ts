@@ -7,14 +7,7 @@
  */
 
 import type { Cell, Dtype, Frame } from './frame';
-import {
-  assertNever,
-  compareCells,
-  findColumn,
-  isNumeric,
-  numericSupertype,
-  quoted,
-} from './frame';
+import { assertNever, compareCells, findColumn, isNumeric, quoted, supertype } from './frame';
 
 /** Every expression method the prototype knows, by its Polars name. */
 export type MethodName =
@@ -136,7 +129,28 @@ const DURATION = /^(?<amount>-?\d+)(?<unit>d|w|mo)$/;
 const INTEGER = /^-?\d+$/;
 
 function isTemporal(dtype: Dtype): boolean {
-  return dtype === 'Datetime' || dtype === 'Date' || dtype === 'Time';
+  return dtype === 'Datetime' || dtype === 'Date' || dtype === 'Time' || dtype === 'Duration';
+}
+
+/** Reports whether `dtype` is a point in time: a day, or a day and a time. */
+function isMoment(dtype: Dtype): boolean {
+  return dtype === 'Datetime' || dtype === 'Date';
+}
+
+/**
+ * Returns the dtype of a value of `input` dtype less a column of `operand`
+ * dtype, or null when Polars does not subtract the two. Numbers meet in
+ * their supertype. Two moments, two times or two durations give the Duration
+ * between them. A moment less a Duration is an earlier moment.
+ */
+function subtractedDtype(input: Dtype, operand: Dtype): Dtype | null {
+  if (isNumeric(input)) return isNumeric(operand) ? supertype(input, operand) : null;
+  if (isMoment(input)) {
+    if (isMoment(operand)) return 'Duration';
+    return operand === 'Duration' ? input : null;
+  }
+  if (input === 'Time' || input === 'Duration') return operand === input ? 'Duration' : null;
+  return null;
 }
 
 /**
@@ -155,13 +169,15 @@ export function methodDtype(name: MethodName, input: Dtype, operand: Dtype | nul
       return 'UInt32';
     case 'cum_sum':
       // Polars widens only integers narrower than 32 bits before summing.
-      return isNumeric(input) ? input : null;
+      return isNumeric(input) || input === 'Duration' ? input : null;
     case 'cum_max':
       return isNumeric(input) || isTemporal(input) ? input : null;
-    case 'sub':
-      if (input === 'Datetime' || input === 'Date') return 'Duration';
-      if (!isNumeric(input)) return null;
-      return operand !== null && isNumeric(operand) ? numericSupertype(input, operand) : input;
+    case 'sub': {
+      if (!isNumeric(input) && !isTemporal(input)) return null;
+      // Without a column that fits, the dtype is what a column like the input would give.
+      const fitting = operand === null ? null : subtractedDtype(input, operand);
+      return fitting ?? subtractedDtype(input, input);
+    }
     case 'dt.total_days':
       return input === 'Duration' ? 'Int64' : null;
     case 'dt.date':
@@ -186,11 +202,10 @@ export function methodRequirement(name: MethodName): string {
     case 'cum_count':
       return 'any dtype';
     case 'cum_sum':
-      return 'a numeric dtype';
+      return 'a numeric dtype or Duration';
     case 'cum_max':
-      return 'a numeric or temporal dtype';
     case 'sub':
-      return 'a numeric dtype, Datetime or Date';
+      return 'a numeric or temporal dtype';
     case 'dt.total_days':
       return 'Duration';
     case 'dt.date':
@@ -206,7 +221,7 @@ export function methodRequirement(name: MethodName): string {
 
 /** Reports whether a column of `operand` dtype can be combined with a value of `input` dtype. */
 export function operandFits(input: Dtype, operand: Dtype): boolean {
-  return isNumeric(input) ? isNumeric(operand) : operand === input;
+  return subtractedDtype(input, operand) !== null;
 }
 
 function operandProblem(method: Method, frame: Frame, input: Dtype): string | null {
@@ -284,17 +299,32 @@ function runningMaximum(values: readonly Cell[]): Cell[] {
   });
 }
 
-/** Returns minutes since the epoch for a date or a date and time kept as text. */
+/**
+ * Returns the minutes a time of day, a date or a date and time kept as text
+ * stands for: since midnight for a time, since the epoch for the others.
+ */
 function minutesOf(value: string): number {
+  if (value.length === 5) return Number(value.slice(0, 2)) * 60 + Number(value.slice(3, 5));
   const time = value.length > 10 ? `${value.slice(11, 16)}:00` : '00:00:00';
   return Date.parse(`${value.slice(0, 10)}T${time}Z`) / 60_000;
 }
 
-/** Subtracts one cell from another: numbers as numbers, dates and times as minutes apart. */
+/** Writes minutes since the epoch as a date, or as a date and time when `withTime` is set. */
+function momentText(minutes: number, withTime: boolean): string {
+  const text = new Date(minutes * 60_000).toISOString();
+  return withTime ? `${text.slice(0, 10)} ${text.slice(11, 16)}` : text.slice(0, 10);
+}
+
+/**
+ * Subtracts one cell from another. Numbers are subtracted as numbers. Two
+ * moments or two times are the minutes between them. A moment less a number
+ * of minutes is the moment that long before it.
+ */
 function difference(left: Cell, right: Cell): Cell {
   if (left === null || right === null) return null;
-  if (typeof left === 'number' && typeof right === 'number') return left - right;
-  return minutesOf(String(left)) - minutesOf(String(right));
+  if (typeof left === 'number') return typeof right === 'number' ? left - right : null;
+  if (typeof right === 'number') return momentText(minutesOf(left) - right, left.length > 10);
+  return minutesOf(left) - minutesOf(right);
 }
 
 function applyAcrossGroup(

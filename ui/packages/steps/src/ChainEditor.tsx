@@ -20,7 +20,7 @@ import { MethodPart, Seam, withMethodInserted, withMethodMoved } from './Parts';
 import { Expandable, SubRow } from './SubList';
 import { columnChoices } from './choices';
 import type { Cell, Dtype, Frame } from './model/frame';
-import { distinctValues, isNumeric } from './model/frame';
+import { distinctValues, isNumeric, keysFit } from './model/frame';
 import { nextId } from './model/ids';
 import { INPUTS, findInput } from './model/inputs';
 import type { Arm, Chain, Condition, Source, Value, WhenSource } from './model/source';
@@ -137,7 +137,10 @@ function ValueSlot({
   ).map((input) => ({
     label: `${input.name} · ${lists ? 'list of ' : ''}${input.dtype} · input`,
     current: value.kind === 'input' && value.name === input.name,
-    reason: expected === null || dtypesAgree(expected, input.dtype) ? null : 'a different dtype',
+    reason:
+      expected === null || (lists ? keysFit : dtypesAgree)(expected, input.dtype)
+        ? null
+        : 'a different dtype',
     onPick: () => {
       onChange({ kind: 'input', name: input.name });
     },
@@ -219,7 +222,9 @@ function ValueSlot({
           label={label}
           numeric
           code
-          accepts={(typed) => WHOLE_NUMBER.test(typed.trim())}
+          accepts={(typed) =>
+            WHOLE_NUMBER.test(typed.trim()) && Number.isSafeInteger(Number(typed.trim()))
+          }
           onCommit={(typed) => {
             onChange({ kind: 'literal', value: Number(typed.trim()) });
           }}
@@ -292,7 +297,7 @@ export function ConditionSlots({
               // Membership needs a list, so start from a connected one of the column's dtype.
               const lists = INPUTS.flatMap((input) => (input.kind === 'list' ? [input] : []));
               const list =
-                lists.find((input) => expected !== null && dtypesAgree(expected, input.dtype)) ??
+                lists.find((input) => expected !== null && keysFit(expected, input.dtype)) ??
                 lists[0];
               onChange({
                 ...condition,

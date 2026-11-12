@@ -18,7 +18,15 @@ import {
   rowGroups,
 } from './expr';
 import type { Cell, Dtype, Frame } from './frame';
-import { compareCells, findColumn, isNumeric, numericSupertype, quoted } from './frame';
+import {
+  castCells,
+  compareCells,
+  findColumn,
+  isNumeric,
+  keysFit,
+  quoted,
+  supertype,
+} from './frame';
 import { findInput } from './inputs';
 
 /** Returns `value` as Python would write it. */
@@ -127,6 +135,29 @@ function rowsOf(frame: Frame): number[] {
   return Array.from({ length: frame[0]?.cells.length ?? 0 }, (_unused, row) => row);
 }
 
+/** The largest whole number an Int32 and a UInt32 hold. */
+const INT32_MAX = 2_147_483_647;
+const UINT32_MAX = 4_294_967_295;
+
+/** Returns the dtype a whole number written on its own has: Int32, or Int64 when Int32 cannot hold it. */
+function literalDtype(value: number): Dtype {
+  return value >= -INT32_MAX - 1 && value <= INT32_MAX ? 'Int32' : 'Int64';
+}
+
+/**
+ * Returns the dtype a column of integer `dtype` and the whole number `value`
+ * meet in: the column's when it holds the number, and a wider one when it
+ * does not. Returns null for a number past a UInt32 column's range, which
+ * meets it in UInt64, a dtype this storyboard does not have.
+ */
+function withLiteral(dtype: Dtype, value: number): Dtype | null {
+  if (dtype === 'UInt32') {
+    if (value < 0) return 'Int64';
+    return value > UINT32_MAX ? null : dtype;
+  }
+  return dtype === 'Int32' ? literalDtype(value) : dtype;
+}
+
 function checkValue(value: Value, frame: Frame): SourceCheck {
   if (value.kind === 'input') {
     const input = findInput(value.name);
@@ -152,8 +183,10 @@ function checkValue(value: Value, frame: Frame): SourceCheck {
       : { dtype: column.dtype, problem: null };
   }
   if (value.value === null) return { dtype: null, problem: null };
-  // A whole number written on its own is Int32 in Polars.
-  return { dtype: typeof value.value === 'number' ? 'Int32' : 'String', problem: null };
+  return {
+    dtype: typeof value.value === 'number' ? literalDtype(value.value) : 'String',
+    problem: null,
+  };
 }
 
 /** Returns the Polars text of `value` where a column or expression is expected. */
@@ -177,7 +210,7 @@ function cellsOf(value: Value, frame: Frame): readonly Cell[] {
 
 /** Reports whether two dtypes can be compared or returned side by side. */
 export function dtypesAgree(left: Dtype, right: Dtype): boolean {
-  return left === right || (isNumeric(left) && isNumeric(right));
+  return supertype(left, right) !== null;
 }
 
 /** Returns why `condition` cannot be worked out on `frame`, or `null` when it can. */
@@ -187,7 +220,7 @@ export function conditionProblem(condition: Condition, frame: Frame): string | n
   if (condition.comparison === 'is_in') {
     const list = condition.value.kind === 'input' ? findInput(condition.value.name) : null;
     if (list?.kind !== 'list') return 'is_in needs a list to look in.';
-    return dtypesAgree(column.dtype, list.dtype)
+    return keysFit(column.dtype, list.dtype)
       ? null
       : `"${column.name}" is ${column.dtype}, but "${list.name}" holds ${list.dtype}.`;
   }
@@ -229,9 +262,14 @@ export function conditionRows(condition: Condition, frame: Frame): boolean[] {
     const members = list?.kind === 'list' ? list.values : [];
     return rowsOf(frame).map((row) => left[row] !== null && members.includes(left[row] ?? null));
   }
-  const right = cellsOf(condition.value, frame);
+  // Both sides are compared as the dtype they meet in.
+  const column = findColumn(frame, condition.column)?.dtype ?? null;
+  const value = checkValue(condition.value, frame).dtype;
+  const met = column !== null && value !== null ? supertype(column, value) : null;
+  const compared = castCells(left, column, met);
+  const right = castCells(cellsOf(condition.value, frame), value, met);
   return rowsOf(frame).map((row) =>
-    holds(condition.comparison, left[row] ?? null, right[row] ?? null),
+    holds(condition.comparison, compared[row] ?? null, right[row] ?? null),
   );
 }
 
@@ -251,41 +289,66 @@ function returnedText(value: Value): string {
     : valueText(value);
 }
 
+const STRING: SourceCheck = { dtype: 'String', problem: null };
+
+function differing(first: Dtype, second: Dtype): SourceCheck {
+  return {
+    dtype: null,
+    problem: `then and otherwise return different dtypes: ${first} and ${second}.`,
+  };
+}
+
 function checkWhen(source: WhenSource, frame: Frame): SourceCheck {
   for (const arm of source.arms) {
     const problem = conditionProblem(arm.condition, frame);
     if (problem !== null) return { dtype: null, problem };
   }
-  // A literal takes the dtype of the columns it is returned beside, so the
-  // dtypes of columns, subchains and inputs are kept apart from literals'.
-  const typed: Dtype[] = [];
-  const literal: Dtype[] = [];
-  let negative = false;
+  // A literal has no dtype of its own beside a column: it takes the column's,
+  // widened when it does not fit. So literals wait until the dtypes of the
+  // columns, subchains and inputs have met.
+  let typed: Dtype | null = null;
+  const numbers: number[] = [];
+  let text = false;
   for (const value of [...source.arms.map((arm) => arm.returns), source.otherwise]) {
+    if (value.kind === 'literal') {
+      if (typeof value.value === 'number') numbers.push(value.value);
+      else if (value.value !== null) text = true;
+      continue;
+    }
     const checked = checkValue(value, frame);
     if (checked.problem !== null) return checked;
-    if (checked.dtype !== null) (value.kind === 'literal' ? literal : typed).push(checked.dtype);
-    if (value.kind === 'literal' && typeof value.value === 'number' && value.value < 0) {
-      negative = true;
+    if (checked.dtype === null) continue;
+    if (typed === null) {
+      typed = checked.dtype;
+      continue;
     }
+    const met = supertype(typed, checked.dtype);
+    if (met === null) return differing(typed, checked.dtype);
+    typed = met;
   }
-  const all = [...typed, ...literal];
-  const [first] = all;
-  if (first === undefined) {
-    return { dtype: null, problem: 'when needs at least one value that is not None.' };
+  const widest: Dtype = numbers.some((number) => literalDtype(number) === 'Int64')
+    ? 'Int64'
+    : 'Int32';
+  if (typed === null) {
+    if (text) return numbers.length > 0 ? differing('String', widest) : STRING;
+    return numbers.length > 0
+      ? { dtype: widest, problem: null }
+      : { dtype: null, problem: 'when needs at least one value that is not None.' };
   }
-  const odd = all.find((dtype) => !dtypesAgree(first, dtype));
-  if (odd !== undefined) {
-    return {
-      dtype: null,
-      problem: `then and otherwise return different dtypes: ${first} and ${odd}.`,
-    };
+  if (text && typed !== 'String') return differing(typed, 'String');
+  let dtype = typed;
+  for (const number of numbers) {
+    if (!isNumeric(dtype)) return differing(dtype, widest);
+    const met = withLiteral(dtype, number);
+    if (met === null) {
+      return {
+        dtype: null,
+        problem: `${String(number)} beside ${dtype} is UInt64, which this storyboard does not show.`,
+      };
+    }
+    dtype = met;
   }
-  const dtype = (typed.length > 0 ? typed : literal).reduce((left, right) =>
-    numericSupertype(left, right),
-  );
-  // An unsigned column cannot hold a negative literal, so the two meet in Int64.
-  return { dtype: dtype === 'UInt32' && negative ? 'Int64' : dtype, problem: null };
+  return { dtype, problem: null };
 }
 
 /** Returns the dtype `source` gives on `frame`, or why it gives none. */
@@ -300,11 +363,15 @@ export function checkSource(source: Source, frame: Frame): SourceCheck {
 /** Works `source` out on the rows of `frame`. */
 function evaluateSource(source: Source, frame: Frame): readonly Cell[] {
   if (source.kind === 'column') return findColumn(frame, source.column)?.cells ?? [];
+  // Every value is returned as the dtype they all meet in.
+  const result = checkWhen(source, frame).dtype;
+  const returned = (value: Value): readonly Cell[] =>
+    castCells(cellsOf(value, frame), checkValue(value, frame).dtype, result);
   const arms = source.arms.map((arm) => ({
     holds: conditionRows(arm.condition, frame),
-    cells: cellsOf(arm.returns, frame),
+    cells: returned(arm.returns),
   }));
-  const otherwise = cellsOf(source.otherwise, frame);
+  const otherwise = returned(source.otherwise);
   return rowsOf(frame).map((row) => {
     const arm = arms.find((candidate) => candidate.holds[row] === true);
     return (arm === undefined ? otherwise[row] : arm.cells[row]) ?? null;
@@ -345,28 +412,40 @@ export function checkChain(chain: Chain, frame: Frame): ChainCheck {
   return { dtypes, problem: null };
 }
 
+/** The number of values a UInt32 holds: an unsigned subtraction below 0 wraps round by it. */
+const UINT32_SPAN = 4_294_967_296;
+
 /** Works `chain` out on the rows of `frame`, or returns null when it has a problem. */
 export function evaluateChain(chain: Chain, frame: Frame): readonly Cell[] | null {
-  if (checkChain(chain, frame).problem !== null) return null;
+  const check = checkChain(chain, frame);
+  if (check.problem !== null) return null;
   let values = evaluateSource(chain.source, frame);
-  let waiting: Method[] = [];
   const rowCount = frame[0]?.cells.length ?? 0;
-  for (const method of chain.methods) {
+  const apply = (index: number, groups: readonly number[][]): void => {
+    const method = chain.methods[index];
+    if (method === undefined) return;
+    values = applyWithin(method, values, groups, frame);
+    if (method.name === 'sub' && check.dtypes[index + 1] === 'UInt32') {
+      // Polars subtracts unsigned integers without widening them.
+      values = values.map((value) =>
+        typeof value === 'number' && value < 0 ? value + UINT32_SPAN : value,
+      );
+    }
+  };
+  // The methods before an `over` are worked out within its groups.
+  let waiting: number[] = [];
+  for (const [index, method] of chain.methods.entries()) {
     if (method.name === 'over') {
       const keys = findColumn(frame, method.argument ?? '')?.cells ?? null;
       const groups = rowGroups(keys, rowCount);
-      for (const earlier of waiting) {
-        values = applyWithin(earlier, values, groups, frame);
-      }
+      for (const earlier of waiting) apply(earlier, groups);
       waiting = [];
     } else {
-      waiting.push(method);
+      waiting.push(index);
     }
   }
   const wholeFrame = rowGroups(null, rowCount);
-  for (const earlier of waiting) {
-    values = applyWithin(earlier, values, wholeFrame, frame);
-  }
+  for (const earlier of waiting) apply(earlier, wholeFrame);
   return values;
 }
 
