@@ -81,3 +81,23 @@ fn generated_table_is_reported_only_where_it_was_written() {
     assert!(written.iter().all(|file| file.starts_with(&sample.path)));
     assert!(written.iter().all(|file| file.is_file()));
 }
+
+#[test]
+fn leftovers_of_an_interrupted_run_are_cleared_and_never_count_as_a_table() {
+    let sample = SampleDirectory::named("interrupted");
+    let mut staging = sample.path.clone().into_os_string();
+    staging.push(".partial");
+    let staging = PathBuf::from(staging);
+    fs::create_dir_all(&staging).expect("a staging folder is left behind");
+    fs::write(staging.join("claims-0000.parquet"), b"half written").expect("a partial file");
+    let spec = SampleSpec {
+        keys: 20,
+        filler_columns: 0,
+    };
+
+    assert!(!claims_generated(&sample.path));
+    generate_claims(&sample.path, spec).expect("the table is generated");
+
+    assert!(!staging.exists());
+    assert!(ParquetTable::open(&sample.path).is_ok());
+}

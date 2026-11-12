@@ -455,6 +455,32 @@ mod tests {
     }
 
     #[test]
+    fn window_command_refuses_more_keys_than_a_window_may_hold() {
+        let app = mock_builder()
+            .manage(SampleGate::default())
+            .manage(OpenTable::default())
+            .invoke_handler(tauri::generate_handler![super::open_sample_window])
+            .build(mock_context(noop_assets()))
+            .expect("the mock application builds");
+        let window = WebviewWindowBuilder::new(&app, "main", tauri::WebviewUrl::default())
+            .build()
+            .expect("the mock window builds");
+        let mut request = block_request(serde_json::json!({ "keys": 50_001 }));
+        request.cmd = "open_sample_window".into();
+
+        // The limit is checked before any sample is looked for or generated.
+        let response = tauri::test::get_ipc_response(&window, request);
+
+        match response {
+            Err(error) => assert_eq!(
+                error,
+                serde_json::json!({ "message": "a working window holds at most 50000 keys" })
+            ),
+            Ok(body) => panic!("expected an error, got {body:?}"),
+        }
+    }
+
+    #[test]
     fn block_command_refuses_more_rows_than_a_block_may_hold() {
         let sample = SampleDirectory::empty("too-long");
         let table =

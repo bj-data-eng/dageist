@@ -43,8 +43,9 @@ either open command generates the sample table, about two million rows of 300
 columns and 2 GB of Parquet, into a `claims-…` folder in the application cache
 (`~/Library/Caches/io.github.bj-data-eng.dageist/` on macOS). Later calls reuse
 it; delete the folder to reclaim the space. The sample is written beside that
-folder and moved into place when it is complete, and only one command
-generates it at a time.
+folder and moved into place when it is complete, and within one running
+application only one command generates it at a time. Two copies of the
+application generating at once are not guarded against.
 
 ## Host Configuration
 

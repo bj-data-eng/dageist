@@ -218,9 +218,9 @@ fn remove_directory(directory: &Path) -> Result<(), EngineError> {
 
 /// Reports whether `directory` holds a generated claims table.
 ///
-/// A table appears in `directory` only once it is complete, so this is never
-/// true for a table that is still being written or whose writing was
-/// interrupted.
+/// A new table appears in `directory` only once it is complete, so this is
+/// not true for a table that is still being written into an empty place or
+/// whose writing was interrupted.
 #[must_use]
 pub fn claims_generated(directory: &Path) -> bool {
     directory.join(file_name(0)).is_file()
@@ -230,8 +230,11 @@ pub fn claims_generated(directory: &Path) -> bool {
 /// returns their paths, in key order.
 ///
 /// The table is written beside `directory` and moved into place when it is
-/// complete, replacing whatever `directory` held. Keys are never split across
-/// files. Two calls for the same directory must not run at the same time.
+/// complete, replacing whatever `directory` held. Removing what was there and
+/// moving the new table in are two steps, so replacing a table is not safe
+/// against a crash between them. Keys are never split across files. Two
+/// calls for the same directory must not run at the same time, in this
+/// process or another.
 ///
 /// # Errors
 ///
