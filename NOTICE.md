@@ -3,7 +3,8 @@
 [Dageist](https://github.com/bj-data-eng/dageist) is licensed under its own
 [MIT License](LICENSE). This notice records attribution for the direct Rust
 dependencies declared in
-[crates/dageist-tauri/Cargo.toml](crates/dageist-tauri/Cargo.toml) at the
+[crates/dageist-tauri/Cargo.toml](crates/dageist-tauri/Cargo.toml) and
+[crates/dageist-engine/Cargo.toml](crates/dageist-engine/Cargo.toml) at the
 versions resolved by [Cargo.lock](Cargo.lock). It does not enumerate their
 transitive, optional, platform, or compiled dependencies, and it is not a
 complete inventory for a distributed application bundle.
@@ -14,6 +15,12 @@ The view in `ui/dist/` contains only this repository's compiled source, so
 none of them is redistributed.
 
 ## Dependencies
+
+This product depends on polars 0.55.2, distributed by Ritchie Vink, with some
+portions by NVIDIA Corporation and affiliates:
+
+* License: [MIT License](licenses/polars/LICENSE)
+* Homepage: [Polars](https://www.pola.rs/)
 
 This product depends on serde 1.0.229, distributed by Erick Tryzelaar and
 David Tolnay, under your choice of either license:
