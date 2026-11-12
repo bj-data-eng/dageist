@@ -22,7 +22,7 @@ import type { Cell, Dtype, Frame } from './model/frame';
 import { distinctValues, isNumeric } from './model/frame';
 import { nextId } from './model/ids';
 import type { Arm, Chain, Condition, Source, Value, WhenSource } from './model/source';
-import { COMPARISONS, chainText, checkChain, literalText } from './model/source';
+import { COMPARISONS, checkChain, literalText } from './model/source';
 
 /** How every drag-and-drop area in the editor is set up. */
 export interface DragSettings {
@@ -74,20 +74,6 @@ function conditionOn(source: Source, frame: Frame, dtype: Dtype | null): Source 
   };
 }
 
-/** Returns a short plain form of `value` for a collapsed summary. */
-function brief(value: Value): string {
-  if (value.kind === 'chain') return chainText(value.chain);
-  return value.kind === 'column' ? value.column : literalText(value.value);
-}
-
-function whenSummary(source: WhenSource): string {
-  const arms = source.arms.map(
-    (arm) =>
-      `${arm.condition.column} ${arm.condition.comparison} ${brief(arm.condition.value)} then ${brief(arm.returns)}`,
-  );
-  return `${arms.join(' · when ')} · otherwise ${brief(source.otherwise)}`;
-}
-
 /** Lists the kinds a value can be changed to. */
 function kindChoices(value: Value, frame: Frame, onChange: (value: Value) => void): Choice[] {
   const column = value.kind === 'column' ? value.column : (frame[0]?.name ?? '');
@@ -105,7 +91,7 @@ function kindChoices(value: Value, frame: Frame, onChange: (value: Value) => voi
     offer('a number', typeof literal === 'number', { kind: 'literal', value: 0 }),
     offer('None', literal === null, { kind: 'literal', value: null }),
     offer('a column', value.kind === 'column', { kind: 'column', column }),
-    offer('a sub-chain', value.kind === 'chain', {
+    offer('a subchain', value.kind === 'chain', {
       kind: 'chain',
       id: nextId('chain'),
       chain: { source: { kind: 'column', column }, methods: [] },
@@ -127,7 +113,7 @@ interface ValueSlotProps {
 /**
  * Draws a value. A column is a picker. A literal is a field with a small
  * marker in front that says what kind it is, so text needs no quotes typed
- * around it. A sub-chain is a collapsible row of its own.
+ * around it. A subchain is a collapsible row of its own.
  */
 function ValueSlot({
   value,
@@ -156,9 +142,9 @@ function ValueSlot({
 
   if (value.kind === 'chain') {
     return (
-      <Expandable label="chain" summary={chainText(value.chain)} className="text-muted">
+      <Expandable label="subchain" className="text-ink">
         <SubRow>
-          {marker('chain')}
+          {marker('subchain')}
           <ChainEditor
             chainId={value.id}
             chain={value.chain}
@@ -291,7 +277,7 @@ function WhenList({ source, frame, onChange, onUseColumn }: WhenListProps): Reac
     onChange({ ...source, arms: source.arms.map((arm) => (arm.id === next.id ? next : arm)) });
   };
   return (
-    <Expandable label="when" summary={whenSummary(source)} className="text-operator">
+    <Expandable label="subchain" className="text-ink">
       {source.arms.map((arm, position) => (
         <SubRow key={arm.id}>
           <Picker

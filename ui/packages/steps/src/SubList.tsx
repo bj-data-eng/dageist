@@ -1,7 +1,7 @@
 /**
  * @file Collapsible sub-lists. Anything in a step that can hold a chain of
  * its own is shown as a small toggle where it sits, with its rows listed
- * under the step it belongs to. Collapsed, it shows a one-line summary.
+ * under the step it belongs to. Collapsed, only the toggle remains.
  *
  * A row offers the place its sub-lists are drawn in. The toggle may be
  * anywhere inside the row, however deep, and its rows still land under it.
@@ -47,10 +47,8 @@ export function SubRow({ children }: { readonly children: React.ReactNode }): Re
 
 /** What an expandable slot shows. */
 export interface ExpandableProps {
-  /** What the sub-list is, such as `when`. */
+  /** What the toggle says. */
   readonly label: string;
-  /** One line that stands for the sub-list while it is collapsed. */
-  readonly summary: string;
   /** Extra classes for the toggle, such as a colour. */
   readonly className: string;
   /** The rows of the sub-list. */
@@ -58,12 +56,7 @@ export interface ExpandableProps {
 }
 
 /** Draws a toggle in place and, while it is open, `children` in the nearest row's sub-list area. */
-export function Expandable({
-  label,
-  summary,
-  className,
-  children,
-}: ExpandableProps): React.JSX.Element {
+export function Expandable({ label, className, children }: ExpandableProps): React.JSX.Element {
   const outlet = useContext(Outlet);
   const [open, setOpen] = useState(true);
   return (
@@ -86,11 +79,6 @@ export function Expandable({
         </span>
         {label}
       </button>
-      {!open && (
-        <span className="max-w-[28rem] truncate px-1 font-mono text-[12.5px] text-muted">
-          {summary}
-        </span>
-      )}
       {open && outlet !== null && createPortal(children, outlet)}
     </>
   );
