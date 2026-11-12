@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use polars::prelude::*;
 
-use crate::block::{ColumnInfo, column_infos, row_range, write_ipc};
+use crate::block::{ColumnInfo, check_columns, column_infos, slice_bounds, write_ipc};
 use crate::error::EngineError;
 
 /// A table kept in Parquet files, however large.
@@ -67,24 +67,16 @@ impl ParquetTable {
     ///
     /// # Errors
     ///
-    /// Returns an error when a named column does not exist or the files
-    /// cannot be read.
+    /// Returns an error when a named column does not exist or is named twice,
+    /// or when the files cannot be read.
     pub fn block_ipc(
         &self,
         offset: usize,
         length: usize,
         columns: &[String],
     ) -> Result<Vec<u8>, EngineError> {
-        if let Some(unknown) = columns
-            .iter()
-            .find(|name| !self.columns.iter().any(|column| &column.name == *name))
-        {
-            return Err(EngineError::request(
-                "selecting block columns",
-                format!("there is no column named {unknown}"),
-            ));
-        }
-        let (offset, length) = row_range(offset, length)?;
+        check_columns(columns, &self.columns)?;
+        let (offset, length) = slice_bounds(offset, length)?;
         let reading = |source| EngineError::polars("reading the block", source);
         let mut frame = scan(&self.pattern).map_err(reading)?;
         if !columns.is_empty() {

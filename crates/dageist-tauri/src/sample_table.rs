@@ -24,6 +24,11 @@ const SAMPLE: SampleSpec = SampleSpec {
 };
 /// The column whose values are kept whole in a working window.
 const KEY_COLUMN: &str = "dcn";
+/// The most keys a working window may hold. A window lives in memory, so it
+/// has to stay a sample.
+const MAX_WINDOW_KEYS: u32 = 50_000;
+/// The most rows one block may hold. A block is what is near the screen.
+const MAX_BLOCK_ROWS: usize = 10_000;
 
 /// The table the view is looking at.
 #[derive(Debug)]
@@ -37,7 +42,7 @@ enum Opened {
 impl Opened {
     fn view(&self) -> TableView {
         match self {
-            Self::Window(table) => TableView::new(table.height(), &table.columns()),
+            Self::Window(table) => TableView::new(table.height(), table.columns()),
             Self::Stored(table) => TableView::new(table.height(), table.columns()),
         }
     }
@@ -125,23 +130,45 @@ impl From<EngineError> for ErrorView {
     }
 }
 
-/// Generates the sample into `directory` unless it is already there.
-fn ensure_sample(directory: &Path, spec: SampleSpec) -> Result<(), EngineError> {
-    if !claims_generated(directory) {
-        generate_claims(directory, spec)?;
+/// Lets one command at a time check for the sample and generate it, so two
+/// commands arriving together never write it at once or read it half written.
+#[derive(Debug, Default)]
+pub struct SampleGate {
+    generating: Mutex<()>,
+}
+
+impl SampleGate {
+    /// Generates the sample into `directory` unless it is already there.
+    fn ensure(&self, directory: &Path, spec: SampleSpec) -> Result<(), EngineError> {
+        let _held = self
+            .generating
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        if !claims_generated(directory) {
+            generate_claims(directory, spec)?;
+        }
+        Ok(())
     }
-    Ok(())
 }
 
 /// Loads a working window of `keys` whole keys from the sample in `directory`.
-fn open_window(directory: &Path, spec: SampleSpec, keys: u32) -> Result<Opened, EngineError> {
-    ensure_sample(directory, spec)?;
+fn open_window(
+    gate: &SampleGate,
+    directory: &Path,
+    spec: SampleSpec,
+    keys: u32,
+) -> Result<Opened, EngineError> {
+    gate.ensure(directory, spec)?;
     Table::load_keys(directory, KEY_COLUMN, keys).map(Opened::Window)
 }
 
 /// Opens the whole sample in `directory` where it is stored.
-fn open_stored(directory: &Path, spec: SampleSpec) -> Result<Opened, EngineError> {
-    ensure_sample(directory, spec)?;
+fn open_stored(
+    gate: &SampleGate,
+    directory: &Path,
+    spec: SampleSpec,
+) -> Result<Opened, EngineError> {
+    gate.ensure(directory, spec)?;
     ParquetTable::open(directory).map(Opened::Stored)
 }
 
@@ -163,16 +190,22 @@ fn show(open: &OpenTable, table: Opened) -> TableView {
 }
 
 /// Opens a working window of `keys` whole keys of the sample table, held in
-/// memory, and reports its shape.
+/// memory, and reports its shape. A window holds at most `MAX_WINDOW_KEYS`.
 ///
 /// The first call generates the sample into the application cache.
 #[tauri::command(async)]
 pub fn open_sample_window<R: Runtime>(
     app: AppHandle<R>,
+    gate: State<'_, SampleGate>,
     open: State<'_, OpenTable>,
     keys: u32,
 ) -> Result<TableView, ErrorView> {
-    let table = open_window(&sample_directory(&app)?, SAMPLE, keys)?;
+    if keys > MAX_WINDOW_KEYS {
+        return Err(ErrorView::new(format!(
+            "a working window holds at most {MAX_WINDOW_KEYS} keys"
+        )));
+    }
+    let table = open_window(&gate, &sample_directory(&app)?, SAMPLE, keys)?;
     Ok(show(&open, table))
 }
 
@@ -183,14 +216,16 @@ pub fn open_sample_window<R: Runtime>(
 #[tauri::command(async)]
 pub fn open_sample_result<R: Runtime>(
     app: AppHandle<R>,
+    gate: State<'_, SampleGate>,
     open: State<'_, OpenTable>,
 ) -> Result<TableView, ErrorView> {
-    let table = open_stored(&sample_directory(&app)?, SAMPLE)?;
+    let table = open_stored(&gate, &sample_directory(&app)?, SAMPLE)?;
     Ok(show(&open, table))
 }
 
 /// Returns `length` rows of the open table starting at `offset`, limited to
-/// `columns`, as the raw bytes of an Arrow IPC stream.
+/// `columns`, as the raw bytes of an Arrow IPC stream. A block holds at most
+/// `MAX_BLOCK_ROWS` rows.
 #[tauri::command(async)]
 pub fn table_block(
     open: State<'_, OpenTable>,
@@ -198,6 +233,11 @@ pub fn table_block(
     length: usize,
     columns: Vec<String>,
 ) -> Result<Response, ErrorView> {
+    if length > MAX_BLOCK_ROWS {
+        return Err(ErrorView::new(format!(
+            "a block holds at most {MAX_BLOCK_ROWS} rows"
+        )));
+    }
     let table = open
         .current()
         .ok_or_else(|| ErrorView::new("no table is open"))?;
@@ -216,7 +256,7 @@ mod tests {
     use tauri::webview::InvokeRequest;
     use tauri::{WebviewWindow, WebviewWindowBuilder};
 
-    use super::{OpenTable, Opened, open_stored, open_window};
+    use super::{OpenTable, Opened, SampleGate, open_stored, open_window};
 
     const SMALL: SampleSpec = SampleSpec {
         keys: 40,
@@ -281,7 +321,8 @@ mod tests {
     fn empty_directory_gets_a_sample_and_a_window_of_whole_keys() {
         let sample = SampleDirectory::empty("generate");
 
-        let table = open_window(&sample.path, SMALL, 10).expect("the window opens");
+        let table =
+            open_window(&SampleGate::default(), &sample.path, SMALL, 10).expect("the window opens");
 
         let (rows, columns) = rows_and_columns(&table);
         assert_eq!(columns.len(), SMALL_COLUMNS);
@@ -297,7 +338,8 @@ mod tests {
     fn stored_result_reports_every_row_of_the_sample() {
         let sample = SampleDirectory::empty("stored");
 
-        let table = open_stored(&sample.path, SMALL).expect("the result opens");
+        let table =
+            open_stored(&SampleGate::default(), &sample.path, SMALL).expect("the result opens");
 
         let (rows, columns) = rows_and_columns(&table);
         assert_eq!(columns.len(), SMALL_COLUMNS);
@@ -308,7 +350,8 @@ mod tests {
     #[test]
     fn existing_sample_is_opened_without_being_rewritten() {
         let sample = SampleDirectory::empty("reuse");
-        open_window(&sample.path, SMALL, 5).expect("the sample is generated");
+        open_window(&SampleGate::default(), &sample.path, SMALL, 5)
+            .expect("the sample is generated");
         let file = sample.path.join("claims-0000.parquet");
         let written = fs::metadata(&file)
             .and_then(|metadata| metadata.modified())
@@ -319,7 +362,8 @@ mod tests {
             keys: 400,
             filler_columns: 9,
         };
-        let table = open_stored(&sample.path, bigger).expect("the sample reopens");
+        let table =
+            open_stored(&SampleGate::default(), &sample.path, bigger).expect("the sample reopens");
 
         let reopened = fs::metadata(&file)
             .and_then(|metadata| metadata.modified())
@@ -331,7 +375,8 @@ mod tests {
     #[test]
     fn block_command_answers_with_the_raw_arrow_bytes_of_a_window() {
         let sample = SampleDirectory::empty("window-block");
-        let table = open_window(&sample.path, SMALL, 10).expect("the window opens");
+        let table =
+            open_window(&SampleGate::default(), &sample.path, SMALL, 10).expect("the window opens");
         let columns = ["dcn".to_owned(), "timestamp".to_owned()];
         let expected = table.block_ipc(3, 7, &columns).expect("the engine slices");
 
@@ -353,7 +398,8 @@ mod tests {
     #[test]
     fn block_command_answers_with_the_raw_arrow_bytes_of_a_stored_result() {
         let sample = SampleDirectory::empty("stored-block");
-        let table = open_stored(&sample.path, SMALL).expect("the result opens");
+        let table =
+            open_stored(&SampleGate::default(), &sample.path, SMALL).expect("the result opens");
         let columns = ["dcn".to_owned(), "measure_002".to_owned()];
         let expected = table.block_ipc(50, 12, &columns).expect("the engine reads");
 
@@ -388,7 +434,8 @@ mod tests {
     #[test]
     fn block_command_with_an_unknown_column_reports_it() {
         let sample = SampleDirectory::empty("unknown");
-        let table = open_window(&sample.path, SMALL, 5).expect("the window opens");
+        let table =
+            open_window(&SampleGate::default(), &sample.path, SMALL, 5).expect("the window opens");
 
         let response = tauri::test::get_ipc_response(
             &webview(Some(table)),
@@ -404,6 +451,72 @@ mod tests {
         assert!(
             message.starts_with("selecting block columns"),
             "unexpected message: {message}"
+        );
+    }
+
+    #[test]
+    fn block_command_refuses_more_rows_than_a_block_may_hold() {
+        let sample = SampleDirectory::empty("too-long");
+        let table =
+            open_window(&SampleGate::default(), &sample.path, SMALL, 5).expect("the window opens");
+
+        let response = tauri::test::get_ipc_response(
+            &webview(Some(table)),
+            block_request(serde_json::json!({ "offset": 0, "length": 10_001, "columns": [] })),
+        );
+
+        match response {
+            Err(error) => assert_eq!(
+                error,
+                serde_json::json!({ "message": "a block holds at most 10000 rows" })
+            ),
+            Ok(body) => panic!("expected an error, got {body:?}"),
+        }
+    }
+
+    #[test]
+    fn commands_arriving_together_open_the_same_complete_sample() {
+        let sample = SampleDirectory::empty("together");
+        let gate = SampleGate::default();
+        let start = std::sync::Barrier::new(4);
+
+        let rows: Vec<u64> = std::thread::scope(|scope| {
+            let openers: Vec<_> = (0..4)
+                .map(|_| {
+                    scope.spawn(|| {
+                        start.wait();
+                        let table =
+                            open_stored(&gate, &sample.path, SMALL).expect("the result opens");
+                        rows_and_columns(&table).0
+                    })
+                })
+                .collect();
+            openers
+                .into_iter()
+                .map(|opener| opener.join().expect("an opener finishes"))
+                .collect()
+        });
+
+        // Read afterwards, alone, the sample holds what every opener saw.
+        let settled = open_stored(&gate, &sample.path, SMALL).expect("the result reopens");
+        let expected = rows_and_columns(&settled).0;
+        assert!(
+            (80..=320).contains(&expected),
+            "{expected} rows for forty keys"
+        );
+        assert_eq!(rows, [expected; 4]);
+        let left_over = fs::read_dir(sample.path.parent().expect("a parent directory"))
+            .expect("the parent is listed")
+            .filter_map(Result::ok)
+            .any(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with(&format!("dageist-tauri-{}-together.", std::process::id()))
+            });
+        assert!(
+            !left_over,
+            "no partly written sample is left beside the sample"
         );
     }
 }

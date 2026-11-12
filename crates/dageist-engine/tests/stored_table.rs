@@ -141,6 +141,18 @@ fn unknown_column_is_an_invalid_request() {
 }
 
 #[test]
+fn column_named_twice_is_an_invalid_request() {
+    let sample = StoredSample::generate("twice");
+    let table = ParquetTable::open(&sample.path).expect("the table opens");
+
+    let error = table
+        .block_ipc(0, 10, &["dcn".to_owned(), "dcn".to_owned()])
+        .expect_err("a repeated column is refused");
+
+    assert!(error.is_invalid_request());
+}
+
+#[test]
 fn directory_without_parquet_files_does_not_open() {
     let path = std::env::temp_dir().join(format!("dageist-stored-{}-empty", std::process::id()));
     fs::create_dir_all(&path).expect("an empty directory");

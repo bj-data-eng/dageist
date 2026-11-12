@@ -33,15 +33,18 @@ not use the table commands yet.
 | Command | Arguments | Result |
 | --- | --- | --- |
 | `core_identity` | None | `{ "name": string, "version": string }` from the core. |
-| `open_sample_window` | `keys`: how many whole keys to hold in memory | `{ "rows": number, "columns": [{ "name": string, "dataType": string }] }` for the working window. |
+| `open_sample_window` | `keys`: how many whole keys to hold in memory, at most 50,000 | `{ "rows": number, "columns": [{ "name": string, "dataType": string }] }` for the working window. |
 | `open_sample_result` | None | The same shape for the whole sample, opened where it is stored without loading it. |
-| `table_block` | `offset`, `length`: the rows; `columns`: the column names, or an empty list for all | That block of whichever table is open, as the raw bytes of an Arrow IPC stream, not JSON. Rows past the end are left out. |
+| `table_block` | `offset`, `length`: the rows, at most 10,000; `columns`: the column names, each once, or an empty list for all | That block of whichever table is open, as the raw bytes of an Arrow IPC stream, not JSON. Rows past the end are left out. |
 
-A failed table command rejects with `{ "message": string }`. The first call to
+A table command that fails rejects with `{ "message": string }`; arguments of
+the wrong type are rejected by Tauri with its own text. The first call to
 either open command generates the sample table, about two million rows of 300
 columns and 2 GB of Parquet, into a `claims-…` folder in the application cache
 (`~/Library/Caches/io.github.bj-data-eng.dageist/` on macOS). Later calls reuse
-it; delete the folder to reclaim the space.
+it; delete the folder to reclaim the space. The sample is written beside that
+folder and moved into place when it is complete, and only one command
+generates it at a time.
 
 ## Host Configuration
 

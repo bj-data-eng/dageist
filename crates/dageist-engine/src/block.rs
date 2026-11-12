@@ -24,9 +24,31 @@ pub(crate) fn column_infos(schema: &Schema) -> Vec<ColumnInfo> {
         .collect()
 }
 
+/// Checks that every requested column exists and is asked for once.
+pub(crate) fn check_columns(
+    requested: &[String],
+    available: &[ColumnInfo],
+) -> Result<(), EngineError> {
+    for (position, name) in requested.iter().enumerate() {
+        if !available.iter().any(|column| &column.name == name) {
+            return Err(EngineError::request(
+                "selecting block columns",
+                format!("there is no column named {name}"),
+            ));
+        }
+        if requested[..position].contains(name) {
+            return Err(EngineError::request(
+                "selecting block columns",
+                format!("the column {name} is asked for more than once"),
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Converts a requested row range into the offset and length Polars slices
 /// by. A length too large for Polars means "to the end".
-pub(crate) fn row_range(offset: usize, length: usize) -> Result<(i64, IdxSize), EngineError> {
+pub(crate) fn slice_bounds(offset: usize, length: usize) -> Result<(i64, IdxSize), EngineError> {
     let offset = i64::try_from(offset)
         .map_err(|_| EngineError::request("slicing the block", "the offset is too large"))?;
     Ok((offset, IdxSize::try_from(length).unwrap_or(IdxSize::MAX)))

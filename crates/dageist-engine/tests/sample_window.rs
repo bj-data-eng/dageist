@@ -47,10 +47,10 @@ fn generated_table_has_claim_columns_then_filler() {
     let sample = SampleDirectory::generate("columns");
     let table = Table::load_keys(&sample.path, "dcn", KEYS).expect("the table loads");
 
-    let names: Vec<String> = table
+    let names: Vec<&str> = table
         .columns()
-        .into_iter()
-        .map(|column| column.name)
+        .iter()
+        .map(|column| column.name.as_str())
         .collect();
 
     assert_eq!(
@@ -61,30 +61,71 @@ fn generated_table_has_claim_columns_then_filler() {
         names[..SampleSpec::CLAIM_COLUMNS.len()],
         SampleSpec::CLAIM_COLUMNS
     );
-    assert_eq!(names.last().map(String::as_str), Some("measure_012"));
+    assert_eq!(names.last().copied(), Some("measure_012"));
+}
+
+/// Reads every generated file whole, as Polars alone sees it.
+fn read_sample(sample: &SampleDirectory) -> DataFrame {
+    LazyFrame::scan_parquet(
+        PlRefPath::try_from_path(&sample.path.join("*.parquet")).expect("a path"),
+        ScanArgsParquet::default(),
+    )
+    .and_then(LazyFrame::collect)
+    .expect("the sample is read whole")
+}
+
+fn text_values(frame: &DataFrame, column: &str) -> Vec<String> {
+    let values = frame.column(column).expect("the column exists");
+    (0..frame.height())
+        .map(|row| values.get(row).expect("a value").to_string())
+        .collect()
 }
 
 #[test]
-fn window_holds_whole_keys_with_rising_timestamps() {
+fn window_holds_every_row_of_the_first_keys_and_nothing_else() {
     let sample = SampleDirectory::generate("keys");
     let wanted_keys = 30;
     let table = Table::load_keys(&sample.path, "dcn", wanted_keys).expect("the table loads");
-    let everything = read_ipc(
+    let window = read_ipc(
         table
             .block_ipc(0, table.height(), &[])
             .expect("the whole window is written"),
     );
 
-    let dcn_column = everything.column("dcn").expect("dcn");
-    let stamp_column = everything
+    // The sample is written in key order, so the first keys are the first
+    // distinct values, and their rows are a prefix of the whole table.
+    let whole = read_sample(&sample);
+    let keys = text_values(&whole, "dcn");
+    let mut first_keys: Vec<&str> = Vec::new();
+    for key in &keys {
+        if !first_keys.contains(&key.as_str()) {
+            if first_keys.len() == wanted_keys as usize {
+                break;
+            }
+            first_keys.push(key);
+        }
+    }
+    let expected_rows = keys
+        .iter()
+        .filter(|key| first_keys.contains(&key.as_str()))
+        .count();
+
+    assert_eq!(first_keys.len(), wanted_keys as usize);
+    assert_eq!(window.height(), expected_rows);
+    assert!(window.equals(&whole.slice(0, expected_rows)));
+}
+
+#[test]
+fn timestamps_rise_within_each_key() {
+    let sample = SampleDirectory::generate("rising");
+    let whole = read_sample(&sample);
+    let dcns = text_values(&whole, "dcn");
+    let stamp_column = whole
         .column("timestamp")
         .expect("timestamp")
         .cast(&DataType::Int64)
         .expect("timestamps as integers");
-    let dcns: Vec<String> = (0..everything.height())
-        .map(|row| dcn_column.get(row).expect("a key").to_string())
-        .collect();
-    let stamps: Vec<i64> = (0..everything.height())
+    let stamps: Vec<i64> = (0..whole.height())
         .map(|row| {
             stamp_column
                 .get(row)
@@ -98,9 +139,8 @@ fn window_holds_whole_keys_with_rising_timestamps() {
     for dcn in &dcns {
         *rows_per_key.entry(dcn.as_str()).or_insert(0usize) += 1;
     }
-    assert_eq!(rows_per_key.len(), wanted_keys as usize);
+    assert_eq!(rows_per_key.len(), KEYS as usize);
     assert!(rows_per_key.values().all(|count| (2..=8).contains(count)));
-
     for row in 1..dcns.len() {
         if dcns[row] == dcns[row - 1] {
             assert!(
@@ -153,6 +193,18 @@ fn unknown_column_is_an_invalid_request() {
     let error = table
         .block_ipc(0, 10, &["no_such_column".to_owned()])
         .expect_err("an unknown column is refused");
+
+    assert!(error.is_invalid_request());
+}
+
+#[test]
+fn column_named_twice_is_an_invalid_request() {
+    let sample = SampleDirectory::generate("twice");
+    let table = Table::load_keys(&sample.path, "dcn", 5).expect("the table loads");
+
+    let error = table
+        .block_ipc(0, 10, &["dcn".to_owned(), "dcn".to_owned()])
+        .expect_err("a repeated column is refused");
 
     assert!(error.is_invalid_request());
 }

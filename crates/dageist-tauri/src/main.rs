@@ -11,7 +11,7 @@ mod sample_table;
 
 use serde::Serialize;
 
-use sample_table::OpenTable;
+use sample_table::{OpenTable, SampleGate};
 
 /// Identity of the running dageist core, as presented to the view.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -31,6 +31,7 @@ fn core_identity() -> IdentityView {
 
 fn main() {
     tauri::Builder::default()
+        .manage(SampleGate::default())
         .manage(OpenTable::default())
         .invoke_handler(tauri::generate_handler![
             core_identity,

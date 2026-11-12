@@ -27,9 +27,9 @@ independent integration review.
 
 This repository owns the host-independent `dageist` core in `src/`, the
 dataframe engine and the host adapters under `crates/`, the TypeScript view in
-`ui/`, their contracts, manifests, tests, documentation and shared tooling. Root owns workspace wiring
-and the core. The Tauri host owns its window, webview configuration, IPC
-commands and the view it serves.
+`ui/`, their contracts, manifests, tests, documentation and shared tooling.
+Root owns workspace wiring and the core. The Tauri host owns its window,
+webview configuration, IPC commands and the view it serves.
 
 ## Discover The Current Structure
 

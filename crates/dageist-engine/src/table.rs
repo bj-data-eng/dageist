@@ -4,7 +4,7 @@ use std::path::Path;
 
 use polars::prelude::*;
 
-use crate::block::{ColumnInfo, column_infos, row_range, write_ipc};
+use crate::block::{ColumnInfo, check_columns, column_infos, slice_bounds, write_ipc};
 use crate::error::EngineError;
 
 /// Rows of a table held in memory so that blocks can be served instantly.
@@ -15,6 +15,7 @@ use crate::error::EngineError;
 #[derive(Debug, Clone)]
 pub struct Table {
     frame: DataFrame,
+    columns: Vec<ColumnInfo>,
 }
 
 impl Table {
@@ -48,7 +49,8 @@ impl Table {
             )
             .collect()
             .map_err(|source| EngineError::polars("loading the working window", source))?;
-        Ok(Self { frame })
+        let columns = column_infos(frame.schema());
+        Ok(Self { frame, columns })
     }
 
     /// Returns the number of rows held.
@@ -59,8 +61,8 @@ impl Table {
 
     /// Returns every column's name and type, in table order.
     #[must_use]
-    pub fn columns(&self) -> Vec<ColumnInfo> {
-        column_infos(self.frame.schema())
+    pub fn columns(&self) -> &[ColumnInfo] {
+        &self.columns
     }
 
     /// Returns `length` rows starting at `offset`, limited to `columns`, as an
@@ -71,24 +73,23 @@ impl Table {
     ///
     /// # Errors
     ///
-    /// Returns an error when a named column does not exist or the slice
-    /// cannot be written.
+    /// Returns an error when a named column does not exist or is named twice,
+    /// or when the block cannot be written.
     pub fn block_ipc(
         &self,
         offset: usize,
         length: usize,
         columns: &[String],
     ) -> Result<Vec<u8>, EngineError> {
+        check_columns(columns, &self.columns)?;
         let selected = if columns.is_empty() {
             self.frame.clone()
         } else {
             self.frame
                 .select(columns.iter().map(String::as_str))
-                .map_err(|source| {
-                    EngineError::request("selecting block columns", source.to_string())
-                })?
+                .map_err(|source| EngineError::polars("selecting block columns", source))?
         };
-        let (offset, _) = row_range(offset, length)?;
+        let (offset, _) = slice_bounds(offset, length)?;
         write_ipc(selected.slice(offset, length))
     }
 }

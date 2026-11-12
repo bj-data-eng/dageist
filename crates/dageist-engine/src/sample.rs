@@ -6,6 +6,7 @@
 //! with rising timestamps.
 
 use std::fs::{self, File};
+use std::io;
 use std::path::{Path, PathBuf};
 
 use polars::prelude::*;
@@ -193,26 +194,55 @@ fn file_name(index: usize) -> String {
     format!("claims-{index:04}.parquet")
 }
 
-/// Reports whether `directory` already holds a generated claims table.
+/// Returns the folder beside `directory` that a table is written into
+/// before it is moved into place.
+fn staging_directory(directory: &Path) -> Result<PathBuf, EngineError> {
+    let name = directory.file_name().ok_or_else(|| {
+        EngineError::request(
+            "generating sample claims",
+            "the sample directory has no name",
+        )
+    })?;
+    let mut staging = name.to_os_string();
+    staging.push(".partial");
+    Ok(directory.with_file_name(staging))
+}
+
+fn remove_directory(directory: &Path) -> Result<(), EngineError> {
+    match fs::remove_dir_all(directory) {
+        Ok(()) => Ok(()),
+        Err(source) if source.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(source) => Err(EngineError::io("clearing a sample directory", source)),
+    }
+}
+
+/// Reports whether `directory` holds a generated claims table.
+///
+/// A table appears in `directory` only once it is complete, so this is never
+/// true for a table that is still being written or whose writing was
+/// interrupted.
 #[must_use]
 pub fn claims_generated(directory: &Path) -> bool {
     directory.join(file_name(0)).is_file()
 }
 
-/// Writes a generated claims table into `directory` as Parquet files and
-/// returns the paths written, in key order.
+/// Writes a generated claims table as Parquet files in `directory` and
+/// returns their paths, in key order.
 ///
-/// Existing files with the same names are replaced. Keys are never split
-/// across files.
+/// The table is written beside `directory` and moved into place when it is
+/// complete, replacing whatever `directory` held. Keys are never split across
+/// files. Two calls for the same directory must not run at the same time.
 ///
 /// # Errors
 ///
-/// Returns an error when the directory or a file cannot be written, or when
-/// Polars cannot build or run the generating plan.
+/// Returns an error when `directory` has no name, when a directory or file
+/// cannot be written, or when Polars cannot build or run the generating plan.
 pub fn generate_claims(directory: &Path, spec: SampleSpec) -> Result<Vec<PathBuf>, EngineError> {
-    fs::create_dir_all(directory)
+    let staging = staging_directory(directory)?;
+    remove_directory(&staging)?;
+    fs::create_dir_all(&staging)
         .map_err(|source| EngineError::io("creating the sample directory", source))?;
-    let mut written = Vec::new();
+    let mut names = Vec::new();
     let mut first_key = 0i64;
     let total_keys = i64::from(spec.keys);
     while first_key < total_keys {
@@ -220,14 +250,17 @@ pub fn generate_claims(directory: &Path, spec: SampleSpec) -> Result<Vec<PathBuf
         let mut frame = claims_for_keys(first_key, key_count, spec.filler_columns)
             .and_then(LazyFrame::collect)
             .map_err(|source| EngineError::polars("generating sample claims", source))?;
-        let path = directory.join(file_name(written.len()));
-        let file = File::create(&path)
+        let name = file_name(names.len());
+        let file = File::create(staging.join(&name))
             .map_err(|source| EngineError::io("creating a sample file", source))?;
         ParquetWriter::new(file)
             .finish(&mut frame)
             .map_err(|source| EngineError::polars("writing a sample file", source))?;
-        written.push(path);
+        names.push(name);
         first_key += key_count;
     }
-    Ok(written)
+    remove_directory(directory)?;
+    fs::rename(&staging, directory)
+        .map_err(|source| EngineError::io("moving the sample into place", source))?;
+    Ok(names.iter().map(|name| directory.join(name)).collect())
 }
