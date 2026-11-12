@@ -5,17 +5,14 @@
 
 import { cx } from '@dageist/design';
 
-import type { Cell, Frame } from './model/frame';
-
-function formatCell(cell: Cell): string {
-  return cell === null ? '—' : String(cell);
-}
+import { formatCell } from './format';
+import type { Frame } from './model/frame';
 
 /** What the preview shows. */
 export interface RowsPreviewProps {
   readonly frame: Frame;
-  /** The column to mark as new, if the step added one. */
-  readonly added: string | null;
+  /** The columns to mark as new: the ones the step added. */
+  readonly added: readonly string[];
 }
 
 /** Draws `frame` as a table. */
@@ -31,7 +28,7 @@ export function RowsPreview({ frame, added }: RowsPreviewProps): React.JSX.Eleme
                 key={column.name}
                 className={cx(
                   'border-b border-line px-2.5 py-1.5 text-left whitespace-nowrap',
-                  column.name === added && 'bg-fresh',
+                  added.includes(column.name) && 'bg-fresh',
                 )}
               >
                 <span className="block text-muted">{column.name}</span>
@@ -50,10 +47,10 @@ export function RowsPreview({ frame, added }: RowsPreviewProps): React.JSX.Eleme
                   key={column.name}
                   className={cx(
                     'border-b border-line px-2.5 py-1.5 whitespace-nowrap',
-                    column.name === added && 'bg-fresh',
+                    added.includes(column.name) && 'bg-fresh',
                   )}
                 >
-                  {formatCell(column.cells[row] ?? null)}
+                  {formatCell(column.cells[row] ?? null, column.dtype)}
                 </td>
               ))}
             </tr>

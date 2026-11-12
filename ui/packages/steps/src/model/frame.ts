@@ -6,11 +6,19 @@
  * validation and previews; nothing here is meant to survive.
  */
 
-/** One sample value. Dates and times are kept as ISO-like text. */
+/** One sample value. Dates and times are kept as ISO-like text, durations as whole minutes. */
 export type Cell = string | number | null;
 
 /** The Polars dtypes the sample uses. */
-export type Dtype = 'String' | 'Int64' | 'UInt32' | 'Datetime' | 'Date' | 'Time';
+export type Dtype =
+  | 'String'
+  | 'Int32'
+  | 'Int64'
+  | 'UInt32'
+  | 'Datetime'
+  | 'Date'
+  | 'Time'
+  | 'Duration';
 
 /** One column of a frame. */
 export interface Column {
@@ -62,6 +70,50 @@ export const SOURCE_FRAME: Frame = [
   },
   { name: 'row_days', dtype: 'Int64', cells: [0, 2, 2, 0, 2, 2, 1] },
 ];
+
+/** Returns `text` as a Python string literal. */
+export function quoted(text: string): string {
+  return JSON.stringify(text);
+}
+
+/** Reports whether `dtype` holds numbers. */
+export function isNumeric(dtype: Dtype): boolean {
+  return dtype === 'Int32' || dtype === 'Int64' || dtype === 'UInt32';
+}
+
+/**
+ * Returns the dtype Polars gives two dtypes that meet, as in a comparison or
+ * the values of one `when`, or null when it gives none. Two different integer
+ * dtypes meet in `Int64`, the narrowest dtype here that holds both, and a
+ * Date meets a Datetime as a Datetime.
+ */
+export function supertype(left: Dtype, right: Dtype): Dtype | null {
+  if (left === right) return left;
+  if (isNumeric(left) && isNumeric(right)) return 'Int64';
+  const pair = [left, right];
+  return pair.includes('Date') && pair.includes('Datetime') ? 'Datetime' : null;
+}
+
+/**
+ * Reports whether Polars matches join keys, or a column against the members
+ * of a list, of these two dtypes: the same dtype, or any two integer dtypes.
+ */
+export function keysFit(left: Dtype, right: Dtype): boolean {
+  return left === right || (isNumeric(left) && isNumeric(right));
+}
+
+/**
+ * Returns `cells` of dtype `from` as dtype `to` holds them. Only a Date
+ * changes: as a Datetime it is that day's midnight.
+ */
+export function castCells(
+  cells: readonly Cell[],
+  from: Dtype | null,
+  to: Dtype | null,
+): readonly Cell[] {
+  if (from !== 'Date' || to !== 'Datetime') return cells;
+  return cells.map((cell) => (typeof cell === 'string' ? `${cell} 00:00` : cell));
+}
 
 /** Fails on a value the caller's `switch` was supposed to have covered. */
 export function assertNever(unexpected: never): never {
