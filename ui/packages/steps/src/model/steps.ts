@@ -6,13 +6,14 @@
  * validation and previews; nothing here is meant to survive.
  */
 
-import type { Column, Frame } from './frame';
+import type { Cell, Column, Frame } from './frame';
 import {
   SOURCE_FRAME,
   assertNever,
   compareCells,
   distinctValues,
   findColumn,
+  isNumeric,
   quoted,
   reordered,
 } from './frame';
@@ -29,10 +30,10 @@ import {
 import { TABLES, findTable } from './tables';
 
 /** The step verbs, by their Polars names. */
-export type Verb = 'with_columns' | 'sort' | 'filter' | 'join';
+export type Verb = 'with_columns' | 'sort' | 'filter' | 'join' | 'pivot';
 
 /** Every verb, in the order it is offered. */
-export const VERBS: readonly Verb[] = ['with_columns', 'sort', 'filter', 'join'];
+export const VERBS: readonly Verb[] = ['with_columns', 'sort', 'filter', 'join', 'pivot'];
 
 /** `.with_columns(expr)`: adds a column, or replaces one of the same name. */
 export interface WithColumnsStep {
@@ -77,8 +78,44 @@ export interface JoinStep {
   readonly how: How;
 }
 
+/** How a pivot combines the values that land in one cell, as Polars names it. */
+export type Aggregate = 'first' | 'sum' | 'max' | 'min' | 'len';
+
+/** Every aggregate, in the order it is offered. */
+export const AGGREGATES: readonly Aggregate[] = ['first', 'sum', 'max', 'min', 'len'];
+
+/**
+ * How a pivot finds out which columns it returns. They are the values of its
+ * `on` column, so Polars can only plan the step lazily when they are given up
+ * front. Otherwise the rows before it must exist first: loaded into memory
+ * with a collect, or written out by a sink.
+ */
+export type ColumnsFrom = 'collect' | 'sink' | 'pinned';
+
+/** Every way of finding a pivot's columns, in the order it is offered. */
+export const COLUMNS_FROM: readonly ColumnsFrom[] = ['collect', 'sink', 'pinned'];
+
+/** `.pivot(on, index=…, values=…, aggregate_function=…)`: turns the values of one column into columns. */
+export interface PivotStep {
+  /** Stays with the step while it is moved or edited. */
+  readonly id: string;
+  readonly verb: 'pivot';
+  readonly on: string;
+  readonly index: string;
+  readonly values: string;
+  readonly aggregate: Aggregate;
+  readonly columnsFrom: ColumnsFrom;
+  /** The values of `on` that become columns when the columns are pinned. */
+  readonly pinned: readonly Cell[];
+}
+
 /** One step of the list. */
-export type Step = WithColumnsStep | SortStep | FilterStep | JoinStep;
+export type Step = WithColumnsStep | SortStep | FilterStep | JoinStep | PivotStep;
+
+/** Where the lazy query has to stop before `step` can run, if it has to. */
+export function stepBreak(step: Step): 'collect' | 'sink' | null {
+  return step.verb === 'pivot' && step.columnsFrom !== 'pinned' ? step.columnsFrom : null;
+}
 
 /** What a step produced: its frame, or the frame it was given and why it failed. */
 export interface StepResult {
@@ -192,6 +229,58 @@ function join(frame: Frame, step: JoinStep): StepResult {
   };
 }
 
+function aggregated(aggregate: Aggregate, cells: readonly Cell[]): Cell {
+  const present = cells.filter((cell) => cell !== null);
+  if (aggregate === 'len') return cells.length;
+  const [first] = present;
+  if (first === undefined) return null;
+  switch (aggregate) {
+    case 'first':
+      return first;
+    case 'sum':
+      return present.reduce<number>(
+        (total, cell) => total + (typeof cell === 'number' ? cell : 0),
+        0,
+      );
+    case 'max':
+      return present.reduce((best, cell) => (compareCells(cell, best) > 0 ? cell : best), first);
+    case 'min':
+      return present.reduce((best, cell) => (compareCells(cell, best) < 0 ? cell : best), first);
+    default:
+      return assertNever(aggregate);
+  }
+}
+
+function pivot(frame: Frame, step: PivotStep): StepResult {
+  const on = findColumn(frame, step.on);
+  if (on === null) return failed(frame, `There is no column "${step.on}".`);
+  const index = findColumn(frame, step.index);
+  if (index === null) return failed(frame, `There is no column "${step.index}".`);
+  const values = findColumn(frame, step.values);
+  if (values === null) return failed(frame, `There is no column "${step.values}".`);
+  if (step.aggregate === 'sum' && !isNumeric(values.dtype)) {
+    return failed(frame, `sum needs a numeric dtype, but "${values.name}" is ${values.dtype}.`);
+  }
+  const headers = step.columnsFrom === 'pinned' ? step.pinned : distinctValues(frame, step.on);
+  const keys = distinctValues(frame, step.index);
+  const dtype = step.aggregate === 'len' ? 'UInt32' : values.dtype;
+  const pivoted: Column[] = headers.map((header) => ({
+    name: String(header),
+    dtype,
+    cells: keys.map((key) =>
+      aggregated(
+        step.aggregate,
+        values.cells.filter((_cell, row) => on.cells[row] === header && index.cells[row] === key),
+      ),
+    ),
+  }));
+  return {
+    frame: [{ name: index.name, dtype: index.dtype, cells: keys }, ...pivoted],
+    problem: null,
+    added: pivoted.map((column) => column.name),
+  };
+}
+
 function runStep(frame: Frame, step: Step): StepResult {
   switch (step.verb) {
     case 'with_columns':
@@ -202,6 +291,8 @@ function runStep(frame: Frame, step: Step): StepResult {
       return filter(frame, step);
     case 'join':
       return join(frame, step);
+    case 'pivot':
+      return pivot(frame, step);
     default:
       return assertNever(step);
   }
@@ -259,8 +350,39 @@ export function defaultStep(verb: Verb, frame: Frame): Step {
         how: 'left',
       };
     }
+    case 'pivot': {
+      const text = frame.filter((column) => column.dtype === 'String');
+      const number = frame.find((column) => isNumeric(column.dtype));
+      return {
+        id,
+        verb,
+        on: (text[1] ?? text[0])?.name ?? first,
+        index: first,
+        values: number?.name ?? first,
+        aggregate: 'first',
+        columnsFrom: 'collect',
+        pinned: [],
+      };
+    }
     default:
       return assertNever(verb);
+  }
+}
+
+/** Returns the Polars text of a pivot, with whatever has to come before it. */
+function pivotText(step: PivotStep): string {
+  const settings = `index=${quoted(step.index)}, values=${quoted(step.values)}, aggregate_function=${quoted(step.aggregate)}`;
+  switch (step.columnsFrom) {
+    case 'pinned': {
+      const columns = step.pinned.map((value) => quoted(String(value))).join(', ');
+      return `.pivot(${quoted(step.on)}, on_columns=[${columns}], ${settings})`;
+    }
+    case 'collect':
+      return `.collect().pivot(${quoted(step.on)}, ${settings}).lazy()`;
+    case 'sink':
+      return `.sink_parquet("scratch.parquet"); pl.read_parquet("scratch.parquet").pivot(${quoted(step.on)}, ${settings}).lazy()`;
+    default:
+      return assertNever(step.columnsFrom);
   }
 }
 
@@ -277,6 +399,8 @@ export function stepText(step: Step): string {
       return `.filter(${conditionText(step.condition)})`;
     case 'join':
       return `.join(${step.table}, left_on=${quoted(step.leftOn)}, right_on=${quoted(step.rightOn)}, how=${quoted(step.how)})`;
+    case 'pivot':
+      return pivotText(step);
     default:
       return assertNever(step);
   }

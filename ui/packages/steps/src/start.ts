@@ -119,4 +119,14 @@ export const START: readonly Step[] = [
       alias: 'sla_status',
     },
   },
+  {
+    id: nextId('step'),
+    verb: 'pivot',
+    on: 'step_to',
+    index: 'dcn',
+    values: 'row_days',
+    aggregate: 'sum',
+    columnsFrom: 'collect',
+    pinned: [],
+  },
 ];

@@ -14,16 +14,27 @@ import { SubListHost } from './SubList';
 import { columnChoices } from './choices';
 import { formatCell } from './format';
 import type { Frame } from './model/frame';
+import { distinctValues } from './model/frame';
 import type {
+  ColumnsFrom,
   FilterStep,
   JoinStep,
+  PivotStep,
   SortStep,
   Step,
   StepResult,
   Verb,
   WithColumnsStep,
 } from './model/steps';
-import { HOWS, VERBS, defaultStep, stepText } from './model/steps';
+import {
+  AGGREGATES,
+  COLUMNS_FROM,
+  HOWS,
+  VERBS,
+  defaultStep,
+  stepBreak,
+  stepText,
+} from './model/steps';
 import { checkChain } from './model/source';
 import { TABLES, findTable } from './model/tables';
 
@@ -36,6 +47,7 @@ const VERB_LABELS: Readonly<Record<Verb, string>> = {
   sort: 'Sort table',
   filter: 'Filter table',
   join: 'Join table',
+  pivot: 'Pivot table',
 };
 
 /** The colour each verb is written in, so the kind of a step shows at a glance. */
@@ -44,6 +56,7 @@ const VERB_COLOURS: Readonly<Record<Verb, string>> = {
   sort: 'text-ready',
   filter: 'text-column-ink',
   join: 'text-table-ink',
+  pivot: 'text-operator',
 };
 
 /** Lists the verbs as menu choices. */
@@ -231,6 +244,132 @@ function JoinSlots({ step, frame, onChange }: SlotsProps<JoinStep>): React.JSX.E
   );
 }
 
+function PivotSlots({ step, frame, onChange }: SlotsProps<PivotStep>): React.JSX.Element {
+  const column = (
+    label: string,
+    current: string,
+    update: (name: string) => PivotStep,
+  ): React.JSX.Element => (
+    <>
+      <SlotLabel>{label}</SlotLabel>
+      <Picker
+        label={current}
+        tone="column"
+        choices={columnChoices(frame, current, (name) => {
+          onChange(update(name));
+        })}
+      />
+    </>
+  );
+  return (
+    <>
+      {column('on', step.on, (on) => ({
+        ...step,
+        on,
+        // Pinned columns are values of the old column, so pin the new column's instead.
+        pinned: step.columnsFrom === 'pinned' ? distinctValues(frame, on) : [],
+      }))}
+      {column('index', step.index, (index) => ({ ...step, index }))}
+      {column('values', step.values, (values) => ({ ...step, values }))}
+      <SlotLabel>aggregate</SlotLabel>
+      <Picker
+        label={step.aggregate}
+        tone="term"
+        choices={AGGREGATES.map((aggregate) => ({
+          label: aggregate,
+          current: aggregate === step.aggregate,
+          reason: null,
+          onPick: () => {
+            onChange({ ...step, aggregate });
+          },
+        }))}
+      />
+      {step.columnsFrom === 'pinned' && (
+        <>
+          <SlotLabel>columns</SlotLabel>
+          <span className="font-mono text-[12.5px]">
+            {step.pinned.map((value) => String(value)).join(', ')}
+          </span>
+        </>
+      )}
+    </>
+  );
+}
+
+/** What each way of finding a pivot's columns is called in the row and in its menu. */
+const COLUMNS_FROM_LABELS: Readonly<Record<ColumnsFrom, readonly [string, string]>> = {
+  collect: ['needs a collect', 'Collect here'],
+  sink: ['sinks first', 'Sink first, in a node of its own'],
+  pinned: ['stays lazy', 'Pin the columns and stay lazy'],
+};
+
+/** What the band above a step says when the lazy query has to stop there. */
+const BREAK_NOTES: Readonly<Record<'collect' | 'sink', string>> = {
+  collect: 'The lazy query stops here. The rows so far are loaded into memory.',
+  sink: 'The rows so far are written to Parquet first. This step would move to a node of its own.',
+};
+
+interface PivotOutcomeProps {
+  readonly step: PivotStep;
+  readonly frame: Frame;
+  readonly result: StepResult;
+  readonly onChange: (step: Step) => void;
+}
+
+/** Draws what a pivot returns and how it finds its columns, with the choices for that. */
+function PivotOutcome({ step, frame, result, onChange }: PivotOutcomeProps): React.JSX.Element {
+  const fromData = step.columnsFrom !== 'pinned';
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 pl-2 text-xs text-muted">
+      <Hint
+        lines={[
+          `A pivot returns one column for each value of "${step.on}".`,
+          'Polars can plan that lazily only when those values are given up front.',
+        ]}
+        code={false}
+      >
+        <Picker
+          label={COLUMNS_FROM_LABELS[step.columnsFrom][0]}
+          tone="plain"
+          className={cx('text-xs', fromData ? 'text-operator' : 'text-ready')}
+          choices={COLUMNS_FROM.map((columnsFrom) => ({
+            label: COLUMNS_FROM_LABELS[columnsFrom][1],
+            current: columnsFrom === step.columnsFrom,
+            reason: null,
+            onPick: () => {
+              onChange({
+                ...step,
+                columnsFrom,
+                pinned: columnsFrom === 'pinned' ? distinctValues(frame, step.on) : [],
+              });
+            },
+          }))}
+        />
+      </Hint>
+      {result.problem === null && (
+        <Hint
+          lines={[
+            result.added.join(', '),
+            ...(fromData
+              ? [
+                  'These come from the data. Here they come from the sample rows, so a full run may return others.',
+                ]
+              : ['Only the pinned values become columns.']),
+          ]}
+          code={false}
+        >
+          <span>
+            returns{' '}
+            <span className="font-mono text-[12.5px] text-ready">
+              {String(result.frame.length)} columns
+            </span>
+          </span>
+        </Hint>
+      )}
+    </span>
+  );
+}
+
 function Slots({ step, frame, onChange }: SlotsProps<Step>): React.JSX.Element {
   switch (step.verb) {
     case 'with_columns':
@@ -241,6 +380,8 @@ function Slots({ step, frame, onChange }: SlotsProps<Step>): React.JSX.Element {
       return <FilterSlots step={step} frame={frame} onChange={onChange} />;
     case 'join':
       return <JoinSlots step={step} frame={frame} onChange={onChange} />;
+    case 'pivot':
+      return <PivotSlots step={step} frame={frame} onChange={onChange} />;
     default:
       return <></>;
   }
@@ -298,6 +439,7 @@ export function StepCard({
     accept: 'step',
   });
   const dtype = returnedDtype(step, frame, result);
+  const broken = stepBreak(step);
   const edge = result.problem === null ? 'var(--color-accent)' : 'var(--color-danger)';
   return (
     <div
@@ -314,6 +456,14 @@ export function StepCard({
       onPointerDownCapture={onSelect}
       onFocusCapture={onSelect}
     >
+      {broken !== null && (
+        <div className="flex items-center gap-2 border-b border-dashed border-operator px-2 py-0.5 text-[11px] text-muted">
+          <span className="rounded-sm bg-invalid px-1.5 font-mono font-semibold text-operator">
+            {broken}
+          </span>
+          {BREAK_NOTES[broken]}
+        </div>
+      )}
       <SubListHost outletClassName="mr-2 mb-1 ml-[132px] border-l-2 border-line-strong pl-2">
         <div className="flex min-h-9 items-center gap-1 py-1 pr-2 pl-1">
           <button
@@ -347,6 +497,9 @@ export function StepCard({
                 returns <span className="font-mono text-[12.5px] text-ready">{dtype}</span>
               </span>
             </Hint>
+          )}
+          {step.verb === 'pivot' && (
+            <PivotOutcome step={step} frame={frame} result={result} onChange={onChange} />
           )}
           {step.verb === 'join' && result.problem === null && (
             <Hint
