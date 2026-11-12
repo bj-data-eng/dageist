@@ -6,11 +6,11 @@
  * validation and previews; nothing here is meant to survive.
  */
 
-/** One sample value. Dates and times are kept as ISO-like text. */
+/** One sample value. Dates and times are kept as ISO-like text, durations as whole minutes. */
 export type Cell = string | number | null;
 
 /** The Polars dtypes the sample uses. */
-export type Dtype = 'String' | 'Int64' | 'UInt32' | 'Datetime' | 'Date' | 'Time';
+export type Dtype = 'String' | 'Int64' | 'UInt32' | 'Datetime' | 'Date' | 'Time' | 'Duration';
 
 /** One column of a frame. */
 export interface Column {

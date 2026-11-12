@@ -114,7 +114,7 @@ export function StepEditor({ styleNonce }: StepEditorProps): React.JSX.Element {
       mark="ƒx"
       title="Transform · Claim timing"
       details={[
-        'Point at a step or a part for its tools. A › between parts becomes a + to insert a method.',
+        'Point at a step or a part for its tools and what it returns. A › between parts becomes a + to insert a method.',
       ]}
     >
       <div className="flex min-h-0 flex-1 flex-col">
@@ -129,7 +129,7 @@ export function StepEditor({ styleNonce }: StepEditorProps): React.JSX.Element {
               }
             }}
           >
-            <div className="overflow-hidden rounded-lg border border-line">
+            <div className="rounded-lg border border-line">
               {steps.map((step, index) => {
                 const result = results[index];
                 if (result === undefined) return null;
@@ -147,6 +147,11 @@ export function StepEditor({ styleNonce }: StepEditorProps): React.JSX.Element {
                     onChange={replaceStep}
                     onRemove={() => {
                       setSteps(steps.filter((existing) => existing.id !== step.id));
+                    }}
+                    onInsertAfter={(verb) => {
+                      const added = defaultStep(verb, result.frame);
+                      setSteps([...steps.slice(0, index + 1), added, ...steps.slice(index + 1)]);
+                      setSelectedId(added.id);
                     }}
                   />
                 );

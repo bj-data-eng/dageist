@@ -12,7 +12,7 @@ import { useSortable } from '@dnd-kit/react/sortable';
 import { useCallback, useState } from 'react';
 
 import type { Choice } from '@dageist/design';
-import { CommitField, Picker, Popover, cx } from '@dageist/design';
+import { CommitField, Hint, Picker, Popover, cx } from '@dageist/design';
 
 import { MethodMenu } from './MethodMenu';
 import { columnChoices } from './choices';
@@ -20,13 +20,15 @@ import type { Expr, ExprCheck, Method, MethodName } from './model/expr';
 import {
   ARGUMENT_KINDS,
   METHOD_GROUPS,
+  METHOD_HINTS,
   METHOD_NAMES,
   checkExpr,
   defaultArgument,
   methodDtype,
   methodRequirement,
+  operandFits,
 } from './model/expr';
-import type { Frame } from './model/frame';
+import type { Dtype, Frame } from './model/frame';
 
 /**
  * A part is dragged by its name, which is also the button that opens its
@@ -67,10 +69,31 @@ function withoutMethod(expr: Expr, id: string): Expr {
 }
 
 /** Returns `method` exchanged for `name`, keeping its argument when both take the same kind. */
-function swapped(method: Method, name: MethodName): Method {
+function swapped(method: Method, name: MethodName, frame: Frame, input: Dtype | null): Method {
   const keeps =
     ARGUMENT_KINDS[name] !== null && ARGUMENT_KINDS[name] === ARGUMENT_KINDS[method.name];
-  return { id: method.id, name, argument: keeps ? method.argument : defaultArgument(name) };
+  return {
+    id: method.id,
+    name,
+    argument: keeps ? method.argument : defaultArgument(name, frame, input),
+  };
+}
+
+/** Lists the columns `input` can be combined with, and why the others cannot. */
+function operandChoices(
+  frame: Frame,
+  input: Dtype | null,
+  current: string,
+  onPick: (column: string) => void,
+): Choice[] {
+  return frame.map((column) => ({
+    label: `${column.name} · ${column.dtype}`,
+    current: column.name === current,
+    reason: input === null || operandFits(input, column.dtype) ? null : 'a different dtype',
+    onPick: () => {
+      onPick(column.name);
+    },
+  }));
 }
 
 /** Lists what the method at `index` can be swapped for, plus moving and removing it. */
@@ -78,6 +101,7 @@ function methodChoices(
   index: number,
   expr: Expr,
   check: ExprCheck,
+  frame: Frame,
   onChange: (expr: Expr) => void,
 ): Choice[] {
   const method = expr.methods[index];
@@ -97,7 +121,7 @@ function methodChoices(
           withMethods(
             expr,
             expr.methods.map((existing) =>
-              existing.id === method.id ? swapped(method, name) : existing,
+              existing.id === method.id ? swapped(method, name, frame, input ?? null) : existing,
             ),
           ),
         );
@@ -134,6 +158,8 @@ function methodChoices(
 }
 
 interface SeamProps {
+  /** The dtype that passes through the seam, or `null` when the chain before it is broken. */
+  readonly dtype: Dtype | null;
   /** Whether the seam sits after the last part, where it is a plus from the start. */
   readonly last: boolean;
   /** What the seam is for, for assistive technology. */
@@ -142,45 +168,48 @@ interface SeamProps {
 }
 
 /** The join between two parts. Pointing at it offers to insert a method there. */
-function Seam({ last, label, onOpen }: SeamProps): React.JSX.Element {
+function Seam({ dtype, last, label, onOpen }: SeamProps): React.JSX.Element {
   return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      className={cx(
-        'group/seam inline-flex h-[22px] w-4 cursor-pointer items-center justify-center rounded-sm text-[13px] text-muted',
-        'hover:bg-hover hover:text-accent focus-visible:text-accent focus-visible:outline-1 focus-visible:outline-accent',
-        // After the last part there is nothing to separate, so the plus shows
-        // only while its step is pointed at or holds focus.
-        last && 'opacity-0 group-focus-within/step:opacity-100 group-hover/step:opacity-100',
-      )}
-      onClick={(event) => {
-        onOpen(event.currentTarget);
-      }}
-    >
-      {!last && (
+    <Hint lines={dtype === null ? [label] : [`${dtype} passes here`, label]} code={false}>
+      <button
+        type="button"
+        aria-label={label}
+        className={cx(
+          'group/seam inline-flex h-[22px] w-4 cursor-pointer items-center justify-center rounded-sm text-[13px] text-muted',
+          'hover:bg-hover hover:text-accent focus-visible:text-accent focus-visible:outline-1 focus-visible:outline-accent',
+          // After the last part there is nothing to separate, so the plus shows
+          // only while its step is pointed at or holds focus.
+          last && 'opacity-0 group-focus-within/step:opacity-100 group-hover/step:opacity-100',
+        )}
+        onClick={(event) => {
+          onOpen(event.currentTarget);
+        }}
+      >
+        {!last && (
+          <span
+            aria-hidden="true"
+            className="group-hover/seam:hidden group-focus-visible/seam:hidden"
+          >
+            ›
+          </span>
+        )}
         <span
           aria-hidden="true"
-          className="group-hover/seam:hidden group-focus-visible/seam:hidden"
+          className={cx(
+            'font-bold',
+            !last && 'hidden group-hover/seam:inline group-focus-visible/seam:inline',
+          )}
         >
-          ›
+          +
         </span>
-      )}
-      <span
-        aria-hidden="true"
-        className={cx(
-          'font-bold',
-          !last && 'hidden group-hover/seam:inline group-focus-visible/seam:inline',
-        )}
-      >
-        +
-      </span>
-    </button>
+      </button>
+    </Hint>
   );
 }
 
 interface MethodPartProps {
+  /** The seam that joins this part to what comes before it. It moves with the part. */
+  readonly seam: React.ReactNode;
   readonly stepId: string;
   readonly index: number;
   readonly method: Method;
@@ -191,6 +220,7 @@ interface MethodPartProps {
 }
 
 function MethodPart({
+  seam,
   stepId,
   index,
   method,
@@ -201,6 +231,9 @@ function MethodPart({
 }: MethodPartProps): React.JSX.Element {
   const kind = ARGUMENT_KINDS[method.name];
   const argument = method.argument ?? '';
+  const input = check.dtypes[index] ?? null;
+  const output = check.dtypes[index + 1] ?? null;
+  const flow = input === null ? [] : [`${input} → ${output ?? 'does not fit'}`];
   const { ref, handleRef, isDragSource } = useSortable({
     id: method.id,
     index,
@@ -222,47 +255,57 @@ function MethodPart({
     );
   };
   return (
-    <span
-      ref={ref}
-      className={cx(
-        'group/part relative inline-flex items-center gap-0.5 rounded-md',
-        check.problem?.index === index && 'bg-invalid outline-1 outline-danger',
-        isDragSource && 'opacity-60',
-      )}
-    >
-      <Picker
-        label={method.name}
-        tone="term"
-        choices={methodChoices(index, expr, check, onChange)}
-        buttonRef={handleRef}
-      />
-      {kind === 'column' && (
-        <Picker label={argument} tone="column" choices={columnChoices(frame, argument, commit)} />
-      )}
-      {(kind === 'integer' || kind === 'duration') && (
-        <CommitField
-          value={argument}
-          label={`${method.name} argument`}
-          numeric={kind === 'integer'}
-          code
-          onCommit={commit}
-        />
-      )}
-      <button
-        type="button"
-        aria-label={`Remove ${method.name}`}
-        title={`Remove ${method.name}`}
+    <span ref={ref} className={cx('inline-flex items-center', isDragSource && 'opacity-60')}>
+      {seam}
+      <span
         className={cx(
-          'absolute -top-2 -right-1.5 hidden size-4 cursor-pointer items-center justify-center rounded-full',
-          'border border-line-strong bg-panel text-[9px] leading-none text-muted hover:border-danger hover:text-danger',
-          'group-hover/part:flex focus-visible:flex',
+          'group/part relative inline-flex items-center gap-0.5 rounded-md',
+          check.problem?.index === index && 'bg-invalid outline-1 outline-danger',
         )}
-        onClick={() => {
-          onChange(withoutMethod(expr, method.id));
-        }}
       >
-        ✕
-      </button>
+        <Hint lines={[`${method.name} · ${METHOD_HINTS[method.name]}`, ...flow]} code={false}>
+          <Picker
+            label={method.name}
+            tone="term"
+            choices={methodChoices(index, expr, check, frame, onChange)}
+            buttonRef={handleRef}
+          />
+        </Hint>
+        {kind === 'operand' && (
+          <Picker
+            label={argument === '' ? 'choose a column' : argument}
+            tone="column"
+            choices={operandChoices(frame, input, argument, commit)}
+          />
+        )}
+        {kind === 'column' && (
+          <Picker label={argument} tone="column" choices={columnChoices(frame, argument, commit)} />
+        )}
+        {(kind === 'integer' || kind === 'duration') && (
+          <CommitField
+            value={argument}
+            label={`${method.name} argument`}
+            numeric={kind === 'integer'}
+            code
+            onCommit={commit}
+          />
+        )}
+        <button
+          type="button"
+          aria-label={`Remove ${method.name}`}
+          title={`Remove ${method.name}`}
+          className={cx(
+            'absolute -top-2 -right-1.5 hidden size-4 cursor-pointer items-center justify-center rounded-full',
+            'border border-line-strong bg-panel text-[9px] leading-none text-muted hover:border-danger hover:text-danger',
+            'group-hover/part:flex focus-visible:flex',
+          )}
+          onClick={() => {
+            onChange(withoutMethod(expr, method.id));
+          }}
+        >
+          ✕
+        </button>
+      </span>
     </span>
   );
 }
@@ -292,6 +335,7 @@ export function ExprChain({ stepId, expr, frame, onChange }: ExprChainProps): Re
   }, []);
   const seam = (at: number): React.JSX.Element => (
     <Seam
+      dtype={check.dtypes[at] ?? null}
       last={at === expr.methods.length}
       label={at === expr.methods.length ? 'Add a method' : 'Insert a method here'}
       onOpen={(anchor) => {
@@ -317,24 +361,24 @@ export function ExprChain({ stepId, expr, frame, onChange }: ExprChainProps): Re
         />
       </span>
       {expr.methods.map((method, index) => (
-        <span key={method.id} className="inline-flex items-center">
-          {seam(index)}
-          <MethodPart
-            stepId={stepId}
-            index={index}
-            method={method}
-            expr={expr}
-            check={check}
-            frame={frame}
-            onChange={onChange}
-          />
-        </span>
+        <MethodPart
+          key={method.id}
+          seam={seam(index)}
+          stepId={stepId}
+          index={index}
+          method={method}
+          expr={expr}
+          check={check}
+          frame={frame}
+          onChange={onChange}
+        />
       ))}
       {seam(expr.methods.length)}
       {insertion !== null && (
         <Popover anchor={insertion.anchor} onDismiss={closeMenu}>
           <MethodMenu
             input={check.dtypes[insertion.at] ?? null}
+            frame={frame}
             onPick={(method) => {
               onChange(withMethodInserted(expr, insertion.at, method));
               setInsertion(null);

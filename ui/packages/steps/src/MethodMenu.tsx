@@ -19,13 +19,15 @@ import {
   methodDtype,
   methodRequirement,
 } from './model/expr';
-import type { Dtype } from './model/frame';
+import type { Dtype, Frame } from './model/frame';
 import { nextId } from './model/ids';
 
 /** What the menu needs to know and report. */
 export interface MethodMenuProps {
   /** The dtype the new method would be handed, or `null` when the chain before it is broken. */
   readonly input: Dtype | null;
+  /** The frame the chain works on, for a method that starts with one of its columns. */
+  readonly frame: Frame;
   readonly onPick: (method: Method) => void;
 }
 
@@ -34,7 +36,7 @@ function matches(name: MethodName, query: string): boolean {
 }
 
 /** Lists the methods that can be added, filtered by what is typed. */
-export function MethodMenu({ input, onPick }: MethodMenuProps): React.JSX.Element {
+export function MethodMenu({ input, frame, onPick }: MethodMenuProps): React.JSX.Element {
   const [typed, setTyped] = useState('');
   const field = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -45,7 +47,7 @@ export function MethodMenu({ input, onPick }: MethodMenuProps): React.JSX.Elemen
   const shown = METHOD_NAMES.filter((name) => matches(name, query));
   const fits = (name: MethodName): boolean => input !== null && methodDtype(name, input) !== null;
   const pick = (name: MethodName): void => {
-    onPick({ id: nextId('method'), name, argument: defaultArgument(name) });
+    onPick({ id: nextId('method'), name, argument: defaultArgument(name, frame, input) });
   };
   const note = (name: MethodName): string => {
     if (input === null) return 'fix the marked part first';

@@ -7,15 +7,16 @@
 import { useSortable } from '@dnd-kit/react/sortable';
 
 import type { Choice } from '@dageist/design';
-import { CommitField, Picker, cx } from '@dageist/design';
+import { CommitField, Hint, Picker, cx } from '@dageist/design';
 
 import { ExprChain } from './ExprChain';
 import { columnChoices } from './choices';
+import { formatCell } from './format';
 import { checkExpr } from './model/expr';
 import type { Frame } from './model/frame';
 import { distinctValues } from './model/frame';
 import type { FilterStep, SortStep, Step, StepResult, Verb, WithColumnsStep } from './model/steps';
-import { COMPARISONS, VERBS, defaultStep, literalText } from './model/steps';
+import { COMPARISONS, VERBS, defaultStep, literalText, stepText } from './model/steps';
 
 /** The sortable group every step row belongs to. */
 export const STEP_GROUP = 'steps';
@@ -193,6 +194,17 @@ function Slots({ step, frame, onChange }: SlotsProps<Step>): React.JSX.Element {
   }
 }
 
+/** How many values of a new column its hover note shows. */
+const PEEK = 4;
+
+/** Returns the first values of the column `result` added, as one line of text. */
+function peek(result: StepResult): string[] {
+  const column = result.frame.find((candidate) => candidate.name === result.added);
+  if (column === undefined) return [];
+  const values = column.cells.slice(0, PEEK).map((cell) => formatCell(cell, column.dtype));
+  return [`${values.join(', ')}${column.cells.length > PEEK ? ', …' : ''}`];
+}
+
 /** Returns the dtype an Add column step returns, or `null` for other steps and broken chains. */
 function returnedDtype(step: Step, frame: Frame, result: StepResult): string | null {
   if (step.verb !== 'with_columns' || result.problem !== null) return null;
@@ -210,6 +222,8 @@ export interface StepCardProps {
   readonly onSelect: () => void;
   readonly onChange: (step: Step) => void;
   readonly onRemove: () => void;
+  /** Adds a new step of the chosen verb directly after this one. */
+  readonly onInsertAfter: (verb: Verb) => void;
 }
 
 /** Draws one step as a row that can be edited, selected, dragged and removed. */
@@ -222,6 +236,7 @@ export function StepCard({
   onSelect,
   onChange,
   onRemove,
+  onInsertAfter,
 }: StepCardProps): React.JSX.Element {
   const { ref, handleRef, isDragSource } = useSortable({
     id: step.id,
@@ -236,7 +251,7 @@ export function StepCard({
     <div
       ref={ref}
       className={cx(
-        'group/step border-b border-line bg-panel last:border-b-0',
+        'group/step relative border-b border-line bg-panel first:rounded-t-lg last:rounded-b-lg last:border-b-0',
         selected && 'bg-row',
         !selected && 'hover:bg-row/50',
         isDragSource && 'opacity-60',
@@ -260,21 +275,25 @@ export function StepCard({
             ⠿
           </span>
         </button>
-        <Picker
-          label={VERB_LABELS[step.verb]}
-          tone="verb"
-          className={cx('w-[92px] shrink-0 justify-start', VERB_COLOURS[step.verb])}
-          choices={verbChoices(step.verb, (verb) => {
-            onChange({ ...defaultStep(verb, frame), id: step.id });
-          })}
-        />
+        <Hint lines={[stepText(step)]} code>
+          <Picker
+            label={VERB_LABELS[step.verb]}
+            tone="verb"
+            className={cx('w-[92px] shrink-0 justify-start', VERB_COLOURS[step.verb])}
+            choices={verbChoices(step.verb, (verb) => {
+              onChange({ ...defaultStep(verb, frame), id: step.id });
+            })}
+          />
+        </Hint>
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-0.5 gap-y-1">
           <Slots step={step} frame={frame} onChange={onChange} />
         </div>
         {dtype !== null && (
-          <span className="shrink-0 pl-2 text-xs text-muted">
-            returns <span className="font-mono text-[12.5px] text-ready">{dtype}</span>
-          </span>
+          <Hint lines={peek(result)} code>
+            <span className="shrink-0 pl-2 text-xs text-muted">
+              returns <span className="font-mono text-[12.5px] text-ready">{dtype}</span>
+            </span>
+          </Hint>
         )}
         <button
           type="button"
@@ -289,6 +308,15 @@ export function StepCard({
       {result.problem !== null && (
         <p className="m-0 pb-1.5 pl-[132px] text-[13px] text-danger">{result.problem}</p>
       )}
+      {/* Sits on the line under the row, where a new step would go. */}
+      <span className="absolute -bottom-[9px] left-[11px] z-10 opacity-0 group-focus-within/step:opacity-100 group-hover/step:opacity-100">
+        <Picker
+          label="+"
+          tone="plain"
+          className="size-[18px] justify-center rounded-full border border-line-strong bg-panel px-0 text-[12px] leading-none font-bold text-muted hover:text-accent"
+          choices={verbChoices(null, onInsertAfter)}
+        />
+      </span>
     </div>
   );
 }

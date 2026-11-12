@@ -18,10 +18,12 @@ export type MethodName =
   | 'cum_sum'
   | 'cum_count'
   | 'cum_max'
+  | 'sub'
   | 'dt.date'
   | 'dt.time'
   | 'dt.offset_by'
   | 'dt.month_start'
+  | 'dt.total_days'
   | 'over';
 
 /** Every method, in the order it is offered. */
@@ -32,23 +34,32 @@ export const METHOD_NAMES: readonly MethodName[] = [
   'cum_sum',
   'cum_count',
   'cum_max',
+  'sub',
   'dt.date',
   'dt.time',
   'dt.offset_by',
   'dt.month_start',
+  'dt.total_days',
   'over',
 ];
 
 /** A group of methods that can stand in for one another. */
-export type MethodGroup = 'rows' | 'cumulative' | 'dt' | 'window';
+export type MethodGroup = 'rows' | 'cumulative' | 'arithmetic' | 'dt' | 'window';
 
 /** Every group, in the order it is offered. */
-export const METHOD_GROUP_ORDER: readonly MethodGroup[] = ['rows', 'cumulative', 'dt', 'window'];
+export const METHOD_GROUP_ORDER: readonly MethodGroup[] = [
+  'rows',
+  'cumulative',
+  'arithmetic',
+  'dt',
+  'window',
+];
 
 /** Headings for the groups. */
 export const METHOD_GROUP_TITLES: Readonly<Record<MethodGroup, string>> = {
   rows: 'Rows',
   cumulative: 'Cumulative',
+  arithmetic: 'Arithmetic',
   dt: 'dt · dates and times',
   window: 'Window',
 };
@@ -61,10 +72,12 @@ export const METHOD_GROUPS: Readonly<Record<MethodName, MethodGroup>> = {
   cum_sum: 'cumulative',
   cum_count: 'cumulative',
   cum_max: 'cumulative',
+  sub: 'arithmetic',
   'dt.date': 'dt',
   'dt.time': 'dt',
   'dt.offset_by': 'dt',
   'dt.month_start': 'dt',
+  'dt.total_days': 'dt',
   over: 'window',
 };
 
@@ -76,15 +89,17 @@ export const METHOD_HINTS: Readonly<Record<MethodName, string>> = {
   cum_sum: 'running total',
   cum_count: 'running count',
   cum_max: 'running maximum',
+  sub: 'minus another column',
   'dt.date': 'the date part',
   'dt.time': 'the time part',
   'dt.offset_by': 'move by a duration',
   'dt.month_start': 'first of the month',
+  'dt.total_days': 'whole days in a duration',
   over: 'within each group',
 };
 
 /** What a method's one argument is, or `null` when it takes none. */
-export type ArgumentKind = 'integer' | 'duration' | 'column';
+export type ArgumentKind = 'integer' | 'duration' | 'column' | 'operand';
 
 /** The kind of argument each method takes. */
 export const ARGUMENT_KINDS: Readonly<Record<MethodName, ArgumentKind | null>> = {
@@ -94,10 +109,12 @@ export const ARGUMENT_KINDS: Readonly<Record<MethodName, ArgumentKind | null>> =
   cum_sum: null,
   cum_count: null,
   cum_max: null,
+  sub: 'operand',
   'dt.date': null,
   'dt.time': null,
   'dt.offset_by': 'duration',
   'dt.month_start': null,
+  'dt.total_days': null,
   over: 'column',
 };
 
@@ -154,6 +171,11 @@ export function methodDtype(name: MethodName, input: Dtype): Dtype | null {
       return isNumeric(input) ? input : null;
     case 'cum_max':
       return isNumeric(input) || isTemporal(input) ? input : null;
+    case 'sub':
+      if (input === 'Datetime' || input === 'Date') return 'Duration';
+      return isNumeric(input) ? 'Int64' : null;
+    case 'dt.total_days':
+      return input === 'Duration' ? 'Int64' : null;
     case 'dt.date':
       return input === 'Datetime' ? 'Date' : null;
     case 'dt.time':
@@ -179,6 +201,10 @@ export function methodRequirement(name: MethodName): string {
       return 'a numeric dtype';
     case 'cum_max':
       return 'a numeric or temporal dtype';
+    case 'sub':
+      return 'a numeric dtype, Datetime or Date';
+    case 'dt.total_days':
+      return 'Duration';
     case 'dt.date':
     case 'dt.time':
       return 'Datetime';
@@ -190,7 +216,20 @@ export function methodRequirement(name: MethodName): string {
   }
 }
 
-function argumentProblem(method: Method, frame: Frame): string | null {
+/** Reports whether a column of `operand` dtype can be combined with a value of `input` dtype. */
+export function operandFits(input: Dtype, operand: Dtype): boolean {
+  return isNumeric(input) ? isNumeric(operand) : operand === input;
+}
+
+function operandProblem(method: Method, frame: Frame, input: Dtype): string | null {
+  const column = findColumn(frame, method.argument ?? '');
+  if (column === null) return `${method.name} needs a column to work with.`;
+  return operandFits(input, column.dtype)
+    ? null
+    : `${method.name} is given ${input}, but "${column.name}" is ${column.dtype}.`;
+}
+
+function argumentProblem(method: Method, frame: Frame, input: Dtype): string | null {
   const kind = ARGUMENT_KINDS[method.name];
   const argument = method.argument ?? '';
   switch (kind) {
@@ -204,6 +243,8 @@ function argumentProblem(method: Method, frame: Frame): string | null {
         : `${method.name} takes a duration such as "-1d", "2w" or "1mo".`;
     case 'column':
       return findColumn(frame, argument) === null ? `There is no column "${argument}".` : null;
+    case 'operand':
+      return operandProblem(method, frame, input);
     default:
       return assertNever(kind);
   }
@@ -224,7 +265,7 @@ export function checkExpr(expr: Expr, frame: Frame): ExprCheck {
       const message = `${method.name} needs ${methodRequirement(method.name)}, but it is given ${current}.`;
       return { dtypes, problem: { index, message } };
     }
-    const wrongArgument = argumentProblem(method, frame);
+    const wrongArgument = argumentProblem(method, frame, current);
     if (wrongArgument !== null) return { dtypes, problem: { index, message: wrongArgument } };
     dtypes.push(next);
     current = next;
@@ -268,8 +309,29 @@ function runningMaximum(values: readonly Cell[]): Cell[] {
   });
 }
 
-function applyAcrossGroup(method: Method, values: readonly Cell[]): Cell[] {
+/** Returns minutes since the epoch for a date or a date and time kept as text. */
+function minutesOf(value: string): number {
+  const time = value.length > 10 ? `${value.slice(11, 16)}:00` : '00:00:00';
+  return Date.parse(`${value.slice(0, 10)}T${time}Z`) / 60_000;
+}
+
+/** Subtracts one cell from another: numbers as numbers, dates and times as minutes apart. */
+function difference(left: Cell, right: Cell): Cell {
+  if (left === null || right === null) return null;
+  if (typeof left === 'number' && typeof right === 'number') return left - right;
+  return minutesOf(String(left)) - minutesOf(String(right));
+}
+
+function applyAcrossGroup(
+  method: Method,
+  values: readonly Cell[],
+  operand: readonly Cell[],
+): Cell[] {
   switch (method.name) {
+    case 'sub':
+      return values.map((value, position) => difference(value, operand[position] ?? null));
+    case 'dt.total_days':
+      return values.map((value) => (typeof value === 'number' ? Math.trunc(value / 1440) : null));
     case 'shift': {
       const rows = Number(method.argument ?? 0);
       return values.map((_value, position) => values[position - rows] ?? null);
@@ -315,12 +377,23 @@ function rowGroups(keys: readonly Cell[] | null, rowCount: number): number[][] {
   return [...groups.values()];
 }
 
-function applyWithin(method: Method, values: readonly Cell[], groups: readonly number[][]): Cell[] {
+function applyWithin(
+  method: Method,
+  values: readonly Cell[],
+  groups: readonly number[][],
+  frame: Frame,
+): Cell[] {
   const result: Cell[] = values.map(() => null);
+  // The other column of a two-sided method, row for row.
+  const other =
+    ARGUMENT_KINDS[method.name] === 'operand'
+      ? (findColumn(frame, method.argument ?? '')?.cells ?? [])
+      : [];
   for (const members of groups) {
     const worked = applyAcrossGroup(
       method,
       members.map((index) => values[index] ?? null),
+      members.map((index) => other[index] ?? null),
     );
     for (const [position, index] of members.entries()) {
       result[index] = worked[position] ?? null;
@@ -341,7 +414,7 @@ export function evaluateExpr(expr: Expr, frame: Frame): readonly Cell[] | null {
       const keys = findColumn(frame, method.argument ?? '')?.cells ?? null;
       const groups = rowGroups(keys, rowCount);
       for (const earlier of waiting) {
-        values = applyWithin(earlier, values, groups);
+        values = applyWithin(earlier, values, groups, frame);
       }
       waiting = [];
     } else {
@@ -350,14 +423,23 @@ export function evaluateExpr(expr: Expr, frame: Frame): readonly Cell[] | null {
   }
   const wholeFrame = rowGroups(null, rowCount);
   for (const earlier of waiting) {
-    values = applyWithin(earlier, values, wholeFrame);
+    values = applyWithin(earlier, values, wholeFrame, frame);
   }
   return values;
 }
 
-/** Returns the argument `name` starts with when it is added to a chain. */
-export function defaultArgument(name: MethodName): string | null {
+/**
+ * Returns the argument `name` starts with when it is added to a chain that
+ * hands it `input` on `frame`.
+ */
+export function defaultArgument(
+  name: MethodName,
+  frame: Frame,
+  input: Dtype | null,
+): string | null {
   switch (ARGUMENT_KINDS[name]) {
+    case 'operand':
+      return frame.find((column) => input !== null && operandFits(input, column.dtype))?.name ?? '';
     case 'integer':
       return '1';
     case 'duration':
@@ -381,6 +463,8 @@ function methodText(method: Method): string {
     case 'duration':
     case 'column':
       return `.${method.name}(${quoted(method.argument ?? '')})`;
+    case 'operand':
+      return `.${method.name}(pl.col(${quoted(method.argument ?? '')}))`;
     default:
       return `.${method.name}()`;
   }

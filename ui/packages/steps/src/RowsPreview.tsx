@@ -5,11 +5,8 @@
 
 import { cx } from '@dageist/design';
 
-import type { Cell, Frame } from './model/frame';
-
-function formatCell(cell: Cell): string {
-  return cell === null ? '—' : String(cell);
-}
+import { formatCell } from './format';
+import type { Frame } from './model/frame';
 
 /** What the preview shows. */
 export interface RowsPreviewProps {
@@ -53,7 +50,7 @@ export function RowsPreview({ frame, added }: RowsPreviewProps): React.JSX.Eleme
                     column.name === added && 'bg-fresh',
                   )}
                 >
-                  {formatCell(column.cells[row] ?? null)}
+                  {formatCell(column.cells[row] ?? null, column.dtype)}
                 </td>
               ))}
             </tr>

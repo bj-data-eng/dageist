@@ -6,6 +6,8 @@
 
 export { CommitField } from './CommitField';
 export type { CommitFieldProps } from './CommitField';
+export { Hint } from './Hint';
+export type { HintProps } from './Hint';
 export { Panel } from './Panel';
 export type { PanelProps } from './Panel';
 export { Picker } from './Picker';
