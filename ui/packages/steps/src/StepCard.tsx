@@ -1,6 +1,7 @@
 /**
- * @file One step of the list: its verb, its slots and what it returns. The
- * card is dragged by its grip to another place in the list.
+ * @file One step of the list, drawn as a single row: its number, its verb,
+ * its slots and what it returns. Pointing at the row shows its tools: the
+ * number becomes a grip to drag the step by, and a cross removes it.
  */
 
 import { useSortable } from '@dnd-kit/react/sortable';
@@ -16,7 +17,7 @@ import { distinctValues } from './model/frame';
 import type { FilterStep, SortStep, Step, StepResult, Verb, WithColumnsStep } from './model/steps';
 import { COMPARISONS, VERBS, defaultStep, literalText } from './model/steps';
 
-/** The sortable group every step card belongs to. */
+/** The sortable group every step row belongs to. */
 export const STEP_GROUP = 'steps';
 
 /** What each step is called: Polars' own word where it has one, in a plain phrase. */
@@ -24,6 +25,13 @@ const VERB_LABELS: Readonly<Record<Verb, string>> = {
   with_columns: 'Add column',
   sort: 'Sort table',
   filter: 'Filter table',
+};
+
+/** The colour each verb is written in, so the kind of a step shows at a glance. */
+const VERB_COLOURS: Readonly<Record<Verb, string>> = {
+  with_columns: 'text-accent',
+  sort: 'text-ready',
+  filter: 'text-column-ink',
 };
 
 /** Lists the verbs as menu choices. */
@@ -39,7 +47,7 @@ export function verbChoices(current: Verb | null, onPick: (verb: Verb) => void):
 }
 
 function SlotLabel({ children }: { readonly children: string }): React.JSX.Element {
-  return <span className="text-xs text-muted">{children}</span>;
+  return <span className="px-0.5 text-xs text-muted">{children}</span>;
 }
 
 interface SlotsProps<S extends Step> {
@@ -89,41 +97,39 @@ function SortSlots({ step, frame, onChange }: SlotsProps<SortStep>): React.JSX.E
   }));
   return (
     <>
+      <SlotLabel>by</SlotLabel>
       {step.by.map((column, position) => (
-        <span
+        <Picker
           // The same column can be chosen twice, so its place is part of the key.
           key={`${String(position)}:${column}`}
-          className="inline-flex items-center gap-2"
-        >
-          <SlotLabel>{position === 0 ? 'by' : 'then by'}</SlotLabel>
-          <Picker
-            label={column}
-            tone="column"
-            choices={[
-              ...columnChoices(frame, column, (chosen) => {
-                withColumns(step.by.map((existing, at) => (at === position ? chosen : existing)));
-              }),
-              {
-                label: '✕ Remove',
-                current: false,
-                reason: step.by.length === 1 ? 'the only column' : null,
-                onPick: () => {
-                  withColumns(step.by.filter((_existing, at) => at !== position));
-                },
+          label={column}
+          tone="column"
+          choices={[
+            ...columnChoices(frame, column, (chosen) => {
+              withColumns(step.by.map((existing, at) => (at === position ? chosen : existing)));
+            }),
+            {
+              label: '✕ Remove',
+              current: false,
+              reason: step.by.length === 1 ? 'the only column' : null,
+              onPick: () => {
+                withColumns(step.by.filter((_existing, at) => at !== position));
               },
-            ]}
-          />
-        </span>
+            },
+          ]}
+        />
       ))}
       {unused !== undefined && (
         <button
           type="button"
-          className="cursor-pointer rounded-md px-1.5 text-[13px] leading-[22px] text-muted hover:bg-hover hover:text-ink"
+          aria-label="Sort by another column as well"
+          title="Sort by another column as well"
+          className="inline-flex h-[22px] w-4 cursor-pointer items-center justify-center rounded-sm text-[13px] font-bold text-muted opacity-0 group-focus-within/step:opacity-100 group-hover/step:opacity-100 hover:bg-hover hover:text-accent"
           onClick={() => {
             withColumns([...step.by, unused.name]);
           }}
         >
-          + then by
+          +
         </button>
       )}
       <Picker
@@ -187,30 +193,13 @@ function Slots({ step, frame, onChange }: SlotsProps<Step>): React.JSX.Element {
   }
 }
 
-function Outcome({
-  step,
-  frame,
-  result,
-}: {
-  readonly step: Step;
-  readonly frame: Frame;
-  readonly result: StepResult;
-}): React.JSX.Element | null {
-  if (result.problem !== null) {
-    return <p className="m-0 mt-1.5 ml-11 text-[13px] text-danger">{result.problem}</p>;
-  }
-  if (step.verb !== 'with_columns') return null;
-  const dtype = checkExpr(step.expr, frame).dtypes.at(-1);
-  if (dtype === undefined) return null;
-  return (
-    <p className="m-0 mt-1.5 ml-11 flex items-center gap-2 text-[13px]">
-      <SlotLabel>returns</SlotLabel>
-      <span className="font-mono text-[12.5px] text-ready">{dtype}</span>
-    </p>
-  );
+/** Returns the dtype an Add column step returns, or `null` for other steps and broken chains. */
+function returnedDtype(step: Step, frame: Frame, result: StepResult): string | null {
+  if (step.verb !== 'with_columns' || result.problem !== null) return null;
+  return checkExpr(step.expr, frame).dtypes.at(-1) ?? null;
 }
 
-/** What a step card shows and reports. */
+/** What a step row shows and reports. */
 export interface StepCardProps {
   readonly step: Step;
   readonly index: number;
@@ -223,7 +212,7 @@ export interface StepCardProps {
   readonly onRemove: () => void;
 }
 
-/** Draws one step as a card that can be edited, selected, dragged and removed. */
+/** Draws one step as a row that can be edited, selected, dragged and removed. */
 export function StepCard({
   step,
   index,
@@ -241,50 +230,65 @@ export function StepCard({
     type: 'step',
     accept: 'step',
   });
+  const dtype = returnedDtype(step, frame, result);
+  const edge = result.problem === null ? 'var(--color-accent)' : 'var(--color-danger)';
   return (
     <div
       ref={ref}
       className={cx(
-        'rounded-[10px] border bg-row px-3 py-2',
-        selected ? 'border-accent' : 'border-line',
-        result.problem !== null && 'border-danger',
+        'group/step border-b border-line bg-panel last:border-b-0',
+        selected && 'bg-row',
+        !selected && 'hover:bg-row/50',
         isDragSource && 'opacity-60',
       )}
+      style={
+        selected || result.problem !== null ? { boxShadow: `inset 2px 0 0 ${edge}` } : undefined
+      }
       onPointerDownCapture={onSelect}
       onFocusCapture={onSelect}
     >
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+      <div className="flex min-h-9 items-center gap-1 py-1 pr-2 pl-1">
         <button
           ref={handleRef}
           type="button"
           title="Drag to reorder"
           aria-label={`Step ${String(index + 1)}: drag to reorder`}
-          className="inline-flex cursor-grab touch-none items-center gap-0.5 rounded-md px-0.5 text-muted select-none hover:bg-hover hover:text-ink active:cursor-grabbing"
+          className="inline-flex h-7 w-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-xs text-muted select-none hover:bg-hover hover:text-ink active:cursor-grabbing"
         >
-          <span aria-hidden="true" className="text-sm leading-7">
+          <span className="group-hover/step:hidden">{index + 1}</span>
+          <span aria-hidden="true" className="hidden text-sm group-hover/step:inline">
             ⠿
           </span>
-          <span className="min-w-3 text-right text-xs leading-7">{index + 1}</span>
         </button>
         <Picker
           label={VERB_LABELS[step.verb]}
           tone="verb"
+          className={cx('w-[92px] shrink-0 justify-start', VERB_COLOURS[step.verb])}
           choices={verbChoices(step.verb, (verb) => {
             onChange({ ...defaultStep(verb, frame), id: step.id });
           })}
         />
-        <Slots step={step} frame={frame} onChange={onChange} />
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-0.5 gap-y-1">
+          <Slots step={step} frame={frame} onChange={onChange} />
+        </div>
+        {dtype !== null && (
+          <span className="shrink-0 pl-2 text-xs text-muted">
+            returns <span className="font-mono text-[12.5px] text-ready">{dtype}</span>
+          </span>
+        )}
         <button
           type="button"
           title="Remove this step"
           aria-label={`Remove step ${String(index + 1)}`}
-          className="ml-auto size-6 cursor-pointer rounded-md border border-transparent text-xs text-muted hover:border-line-strong hover:text-ink"
+          className="size-6 shrink-0 cursor-pointer rounded-md text-xs text-muted opacity-0 group-focus-within/step:opacity-100 group-hover/step:opacity-100 hover:bg-hover hover:text-danger"
           onClick={onRemove}
         >
           ✕
         </button>
       </div>
-      <Outcome step={step} frame={frame} result={result} />
+      {result.problem !== null && (
+        <p className="m-0 pb-1.5 pl-[132px] text-[13px] text-danger">{result.problem}</p>
+      )}
     </div>
   );
 }

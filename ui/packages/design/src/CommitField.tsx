@@ -28,16 +28,23 @@ export function CommitField({
     <input
       // Remounting on a new value discards any unfinished edit.
       key={value}
-      type={numeric ? 'number' : 'text'}
+      type="text"
+      inputMode={numeric ? 'numeric' : 'text'}
       aria-label={label}
       defaultValue={value}
-      size={Math.max(value.length, numeric ? 2 : 4)}
+      // The field is as wide as what it holds, so it takes no more room than text.
+      style={{ width: `calc(${String(Math.max(value.length, 1))}ch + 0.75rem)` }}
       className={cx(
-        'rounded-md border border-line-strong bg-canvas px-1.5 text-[13px] leading-[22px] text-ink',
-        'focus:border-accent focus:outline-none',
-        numeric && 'w-13',
+        // At rest a field is a dashed underline; it becomes a box when it is used.
+        'border-b border-dashed border-line-strong bg-transparent px-1 text-[13px] leading-[22px] text-ink',
+        'hover:border-solid hover:border-muted focus:rounded-sm focus:border-solid focus:border-accent focus:bg-canvas focus:outline-none',
         code && 'font-mono text-[12.5px]',
       )}
+      onInput={(event) => {
+        // Grow with the text while it is being typed.
+        const field = event.currentTarget;
+        field.style.width = `calc(${String(Math.max(field.value.length, 1))}ch + 0.75rem)`;
+      }}
       onBlur={(event) => {
         if (event.currentTarget.value !== value) onCommit(event.currentTarget.value);
       }}

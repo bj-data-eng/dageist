@@ -1,8 +1,9 @@
 /**
  * @file The step editor: a transformation built as an ordered list of steps.
- * Each step works on the rows of the step before it. The editor shows the
- * list, the Polars code it stands for, the rows after the chosen step and
- * the methods that can be added to it.
+ * Each step works on the rows of the step before it. The list is kept dense:
+ * one row per step, with tools that appear where the pointer is. Below it a
+ * dock shows either the rows after the chosen step or the Polars code the
+ * list stands for.
  */
 
 import type { Plugins } from '@dnd-kit/abstract';
@@ -11,19 +12,20 @@ import { DragDropProvider } from '@dnd-kit/react';
 import { isSortable } from '@dnd-kit/react/sortable';
 import { useMemo, useState } from 'react';
 
-import { Panel, Picker } from '@dageist/design';
+import { Panel, Picker, cx } from '@dageist/design';
 
 import { withMethodMoved } from './ExprChain';
-import { MethodPalette } from './MethodPalette';
 import { Pipeline } from './Pipeline';
 import { RowsPreview } from './RowsPreview';
 import { STEP_GROUP, StepCard, verbChoices } from './StepCard';
-import type { Method } from './model/expr';
 import type { Frame } from './model/frame';
 import { SOURCE_FRAME } from './model/frame';
 import type { Step } from './model/steps';
 import { defaultStep, runSteps } from './model/steps';
 import { START } from './start';
+
+/** What the dock under the list shows. */
+type Dock = 'rows' | 'polars';
 
 function moved<T>(items: readonly T[], from: number, to: number): readonly T[] {
   const next = [...items];
@@ -33,8 +35,26 @@ function moved<T>(items: readonly T[], from: number, to: number): readonly T[] {
   return next;
 }
 
-function SectionTitle({ children }: { readonly children: string }): React.JSX.Element {
-  return <h2 className="mt-4 mb-2 text-xs font-semibold tracking-wide text-muted">{children}</h2>;
+interface DockTabProps {
+  readonly active: boolean;
+  readonly onChoose: () => void;
+  readonly children: string;
+}
+
+function DockTab({ active, onChoose, children }: DockTabProps): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      className={cx(
+        '-mb-px cursor-pointer border-b-2 px-1 py-1.5 text-xs font-semibold tracking-wide',
+        active ? 'border-accent text-ink' : 'border-transparent text-muted hover:text-ink',
+      )}
+      onClick={onChoose}
+    >
+      {children}
+    </button>
+  );
 }
 
 /** What the step editor needs from the shell. */
@@ -50,6 +70,7 @@ export interface StepEditorProps {
 export function StepEditor({ styleNonce }: StepEditorProps): React.JSX.Element {
   const [steps, setSteps] = useState<readonly Step[]>(START);
   const [selectedId, setSelectedId] = useState<string | null>(START[2]?.id ?? null);
+  const [dock, setDock] = useState<Dock>('rows');
 
   // Dragging injects a few style rules; under a content security policy they
   // need the page's nonce. Without a policy dnd kit's defaults are right.
@@ -69,7 +90,6 @@ export function StepEditor({ styleNonce }: StepEditorProps): React.JSX.Element {
   const results = runSteps(steps);
   const frameBefore = (index: number): Frame => results[index - 1]?.frame ?? SOURCE_FRAME;
   const selectedIndex = steps.findIndex((step) => step.id === selectedId);
-  const selected = steps[selectedIndex] ?? null;
   const shown = results[selectedIndex];
   const last = results.at(-1)?.frame ?? SOURCE_FRAME;
 
@@ -94,11 +114,11 @@ export function StepEditor({ styleNonce }: StepEditorProps): React.JSX.Element {
       mark="ƒx"
       title="Transform · Claim timing"
       details={[
-        'Each step works on the rows of the step before it. Drag a step or a part to move it.',
+        'Point at a step or a part for its tools. A › between parts becomes a + to insert a method.',
       ]}
     >
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px]">
-        <div className="overflow-y-auto px-5 pt-5 pb-6">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
           <DragDropProvider
             {...dragOptions}
             onDragEnd={(event) => {
@@ -109,7 +129,7 @@ export function StepEditor({ styleNonce }: StepEditorProps): React.JSX.Element {
               }
             }}
           >
-            <div className="flex flex-col gap-1.5">
+            <div className="overflow-hidden rounded-lg border border-line">
               {steps.map((step, index) => {
                 const result = results[index];
                 if (result === undefined) return null;
@@ -133,10 +153,11 @@ export function StepEditor({ styleNonce }: StepEditorProps): React.JSX.Element {
               })}
             </div>
           </DragDropProvider>
-          <div className="mt-2">
+          <div className="mt-1.5 pl-8">
             <Picker
               label="+ Add step"
-              tone="verb"
+              tone="plain"
+              className="text-muted hover:text-ink"
               choices={verbChoices(null, (verb) => {
                 const added = defaultStep(verb, last);
                 setSteps([...steps, added]);
@@ -144,32 +165,41 @@ export function StepEditor({ styleNonce }: StepEditorProps): React.JSX.Element {
               })}
             />
           </div>
-          <SectionTitle>Polars</SectionTitle>
-          <Pipeline
-            source="claims"
-            steps={steps}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-          />
-          <SectionTitle>
-            {shown === undefined
-              ? 'Rows as they arrive'
-              : `Rows after step ${String(selectedIndex + 1)}`}
-          </SectionTitle>
-          <RowsPreview frame={shown?.frame ?? SOURCE_FRAME} added={shown?.added ?? null} />
         </div>
-        <MethodPalette
-          step={selected}
-          frame={frameBefore(selectedIndex)}
-          onAdd={(method: Method) => {
-            if (selected?.verb !== 'with_columns') return;
-            const { expr } = selected;
-            replaceStep({
-              ...selected,
-              expr: { column: expr.column, methods: [...expr.methods, method], alias: expr.alias },
-            });
-          }}
-        />
+        <div className="flex max-h-[48%] min-h-0 shrink-0 flex-col border-t border-line bg-raised">
+          <div className="flex gap-4 border-b border-line px-4">
+            <DockTab
+              active={dock === 'rows'}
+              onChoose={() => {
+                setDock('rows');
+              }}
+            >
+              {shown === undefined
+                ? 'Rows as they arrive'
+                : `Rows after step ${String(selectedIndex + 1)}`}
+            </DockTab>
+            <DockTab
+              active={dock === 'polars'}
+              onChoose={() => {
+                setDock('polars');
+              }}
+            >
+              Polars
+            </DockTab>
+          </div>
+          <div className="min-h-0 overflow-auto px-4 py-2">
+            {dock === 'rows' ? (
+              <RowsPreview frame={shown?.frame ?? SOURCE_FRAME} added={shown?.added ?? null} />
+            ) : (
+              <Pipeline
+                source="claims"
+                steps={steps}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+              />
+            )}
+          </div>
+        </div>
       </div>
     </Panel>
   );

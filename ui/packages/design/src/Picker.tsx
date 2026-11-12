@@ -4,8 +4,9 @@
  * drawn with it, so "this can be swapped" always looks the same.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 
+import { Popover } from './Popover';
 import { cx } from './cx';
 
 /** One entry of a picker's menu. A reason marks an entry that cannot be picked. */
@@ -20,7 +21,7 @@ export interface Choice {
 export type PickerTone = 'verb' | 'column' | 'term' | 'operator' | 'plain';
 
 const TONES: Readonly<Record<PickerTone, string>> = {
-  verb: 'border-line-strong bg-hover font-semibold',
+  verb: 'font-semibold',
   column: 'bg-column text-column-ink',
   term: 'font-mono text-[12.5px]',
   operator: 'font-mono text-[12.5px] font-semibold text-operator',
@@ -32,84 +33,84 @@ export interface PickerProps {
   readonly label: string;
   readonly tone: PickerTone;
   readonly choices: readonly Choice[];
+  /** Extra classes for the button, such as a colour for one particular choice. */
+  readonly className?: string;
   /** Receives the button, for a caller that also uses it as a drag handle. */
   readonly buttonRef?: (element: HTMLButtonElement | null) => void;
 }
 
-/** Shows `label` as a button that opens a menu of `choices`. */
-export function Picker({ label, tone, choices, buttonRef }: PickerProps): React.JSX.Element {
+/**
+ * Shows `label` as a button that opens a menu of `choices`. At rest it reads
+ * as plain text; pointing at it or focusing it shows that it can be pressed.
+ */
+export function Picker({
+  label,
+  tone,
+  choices,
+  className,
+  buttonRef,
+}: PickerProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
-  const host = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const closeOutside = (event: PointerEvent): void => {
-      if (event.target instanceof Node && host.current?.contains(event.target) !== true) {
-        setOpen(false);
-      }
-    };
-    const closeOnEscape = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('pointerdown', closeOutside);
-    document.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.removeEventListener('pointerdown', closeOutside);
-      document.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [open]);
+  const [button, setButton] = useState<HTMLButtonElement | null>(null);
+  const keepButton = useCallback(
+    (element: HTMLButtonElement | null) => {
+      setButton(element);
+      buttonRef?.(element);
+    },
+    [buttonRef],
+  );
+  const close = useCallback(() => {
+    setOpen(false);
+  }, []);
 
   return (
-    <span ref={host} className="relative inline-flex">
+    <>
       <button
-        ref={buttonRef}
+        ref={keepButton}
         type="button"
         aria-expanded={open}
         aria-haspopup="menu"
         className={cx(
-          'inline-flex cursor-pointer items-center gap-1 rounded-md border border-transparent px-1.5',
-          'text-[13px] leading-[22px] whitespace-nowrap hover:border-accent hover:bg-hover',
-          open && 'border-accent bg-hover',
+          'inline-flex cursor-pointer items-center rounded-md px-1.5 text-[13px] leading-[22px] whitespace-nowrap',
+          'outline-1 -outline-offset-1 outline-transparent hover:bg-hover hover:outline-line-strong focus-visible:outline-accent',
+          open && 'bg-hover outline-accent',
           TONES[tone],
+          className,
         )}
         onClick={() => {
           setOpen(!open);
         }}
       >
-        <span>{label}</span>
-        <span aria-hidden="true" className="text-[10px] text-accent">
-          ▾
-        </span>
+        {label}
       </button>
-      {open && (
-        <div
-          role="menu"
-          className="absolute top-[calc(100%+4px)] left-0 z-20 min-w-40 rounded-lg border border-line-strong bg-panel p-1 shadow-lg"
-        >
-          {choices.map((choice) => (
-            <button
-              key={choice.label}
-              type="button"
-              role="menuitem"
-              disabled={choice.reason !== null}
-              className={cx(
-                'flex w-full items-baseline gap-2.5 rounded-md px-2.5 py-0.5 text-left text-[13px] leading-[22px] whitespace-nowrap',
-                'enabled:cursor-pointer enabled:hover:bg-hover disabled:text-muted',
-                choice.current && 'text-accent',
-              )}
-              onClick={() => {
-                setOpen(false);
-                choice.onPick();
-              }}
-            >
-              <span>{choice.label}</span>
-              {choice.reason !== null && (
-                <span className="ml-auto text-[11px] text-muted">{choice.reason}</span>
-              )}
-            </button>
-          ))}
-        </div>
+      {open && button !== null && (
+        <Popover anchor={button} onDismiss={close}>
+          <div role="menu" className="min-w-40">
+            {choices.map((choice) => (
+              <button
+                key={choice.label}
+                type="button"
+                role="menuitem"
+                disabled={choice.reason !== null}
+                className={cx(
+                  'flex w-full items-baseline gap-2.5 rounded-md px-2.5 py-0.5 text-left text-[13px] leading-[22px] whitespace-nowrap',
+                  'enabled:cursor-pointer enabled:hover:bg-hover disabled:text-muted',
+                  choice.current && 'text-accent',
+                )}
+                onClick={() => {
+                  setOpen(false);
+                  choice.onPick();
+                }}
+              >
+                <span>{choice.label}</span>
+                {choice.reason !== null && (
+                  <span className="ml-auto text-[11px] text-muted">{choice.reason}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </Popover>
       )}
-    </span>
+    </>
   );
 }
