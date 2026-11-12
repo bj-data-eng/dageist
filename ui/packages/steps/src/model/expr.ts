@@ -1,16 +1,13 @@
 /**
- * @file Expressions in Polars' own vocabulary: `pl.col(…)` followed by method
- * calls and a final alias. Knows which dtype each method accepts and returns,
- * and works an expression out on a frame.
+ * @file The methods of an expression, in Polars' own vocabulary. Knows which
+ * dtype each method accepts and returns, and applies a method to values.
  *
  * This is storyboard code. In the real application the Rust core owns types,
  * validation and previews; nothing here is meant to survive.
  */
 
 import type { Cell, Dtype, Frame } from './frame';
-import { assertNever, compareCells, findColumn, isNumeric } from './frame';
-import type { Source } from './source';
-import { checkSource, evaluateSource, quoted, sourceText } from './source';
+import { assertNever, compareCells, findColumn, isNumeric, quoted } from './frame';
 
 /** Every expression method the prototype knows, by its Polars name. */
 export type MethodName =
@@ -128,25 +125,6 @@ export interface Method {
   readonly argument: string | null;
 }
 
-/** A source followed by method calls and a final `.alias(alias)`. */
-export interface Expr {
-  readonly source: Source;
-  readonly methods: readonly Method[];
-  readonly alias: string;
-}
-
-/** Why an expression cannot be worked out, and at which method. Index -1 is the source. */
-export interface ExprProblem {
-  readonly index: number;
-  readonly message: string;
-}
-
-/** The dtype after the source and after each method, plus the first problem. */
-export interface ExprCheck {
-  readonly dtypes: readonly Dtype[];
-  readonly problem: ExprProblem | null;
-}
-
 const DURATION = /^(?<amount>-?\d+)(?<unit>d|w|mo)$/;
 const INTEGER = /^-?\d+$/;
 
@@ -227,7 +205,8 @@ function operandProblem(method: Method, frame: Frame, input: Dtype): string | nu
     : `${method.name} is given ${input}, but "${column.name}" is ${column.dtype}.`;
 }
 
-function argumentProblem(method: Method, frame: Frame, input: Dtype): string | null {
+/** Returns why `method`'s argument is wrong for a value of `input` dtype, or `null` when it is right. */
+export function argumentProblem(method: Method, frame: Frame, input: Dtype): string | null {
   const kind = ARGUMENT_KINDS[method.name];
   const argument = method.argument ?? '';
   switch (kind) {
@@ -246,29 +225,6 @@ function argumentProblem(method: Method, frame: Frame, input: Dtype): string | n
     default:
       return assertNever(kind);
   }
-}
-
-/** Checks that every method of `expr` accepts the dtype handed to it. */
-export function checkExpr(expr: Expr, frame: Frame): ExprCheck {
-  const start = checkSource(expr.source, frame);
-  if (start.problem !== null || start.dtype === null) {
-    const message = start.problem ?? 'This expression has no dtype.';
-    return { dtypes: [], problem: { index: -1, message } };
-  }
-  const dtypes: Dtype[] = [start.dtype];
-  let current = start.dtype;
-  for (const [index, method] of expr.methods.entries()) {
-    const next = methodDtype(method.name, current);
-    if (next === null) {
-      const message = `${method.name} needs ${methodRequirement(method.name)}, but it is given ${current}.`;
-      return { dtypes, problem: { index, message } };
-    }
-    const wrongArgument = argumentProblem(method, frame, current);
-    if (wrongArgument !== null) return { dtypes, problem: { index, message: wrongArgument } };
-    dtypes.push(next);
-    current = next;
-  }
-  return { dtypes, problem: null };
 }
 
 function offsetBy(value: string, duration: string): string {
@@ -359,7 +315,8 @@ function applyAcrossGroup(
   }
 }
 
-function rowGroups(keys: readonly Cell[] | null, rowCount: number): number[][] {
+/** Returns the row numbers of each group of equal `keys`, or one group of every row. */
+export function rowGroups(keys: readonly Cell[] | null, rowCount: number): number[][] {
   const everyRow = Array.from({ length: rowCount }, (_unused, index) => index);
   if (keys === null) return [everyRow];
   const groups = new Map<Cell, number[]>();
@@ -375,7 +332,8 @@ function rowGroups(keys: readonly Cell[] | null, rowCount: number): number[][] {
   return [...groups.values()];
 }
 
-function applyWithin(
+/** Applies `method` to `values` separately within each of `groups`. */
+export function applyWithin(
   method: Method,
   values: readonly Cell[],
   groups: readonly number[][],
@@ -398,31 +356,6 @@ function applyWithin(
     }
   }
   return result;
-}
-
-/** Works `expr` out on the rows of `frame`, or returns null when it has a problem. */
-export function evaluateExpr(expr: Expr, frame: Frame): readonly Cell[] | null {
-  if (checkExpr(expr, frame).problem !== null) return null;
-  let values = evaluateSource(expr.source, frame);
-  let waiting: Method[] = [];
-  const rowCount = frame[0]?.cells.length ?? 0;
-  for (const method of expr.methods) {
-    if (method.name === 'over') {
-      const keys = findColumn(frame, method.argument ?? '')?.cells ?? null;
-      const groups = rowGroups(keys, rowCount);
-      for (const earlier of waiting) {
-        values = applyWithin(earlier, values, groups, frame);
-      }
-      waiting = [];
-    } else {
-      waiting.push(method);
-    }
-  }
-  const wholeFrame = rowGroups(null, rowCount);
-  for (const earlier of waiting) {
-    values = applyWithin(earlier, values, wholeFrame, frame);
-  }
-  return values;
 }
 
 /**
@@ -448,7 +381,8 @@ export function defaultArgument(
   }
 }
 
-function methodText(method: Method): string {
+/** Returns the Polars text of one method call. */
+export function methodText(method: Method): string {
   switch (ARGUMENT_KINDS[method.name]) {
     case 'integer':
       return `.${method.name}(${method.argument ?? ''})`;
@@ -460,10 +394,4 @@ function methodText(method: Method): string {
     default:
       return `.${method.name}()`;
   }
-}
-
-/** Returns the Polars text of `expr`. */
-export function exprText(expr: Expr): string {
-  const calls = expr.methods.map((method) => methodText(method)).join('');
-  return `${sourceText(expr.source)}${calls}.alias(${quoted(expr.alias)})`;
 }

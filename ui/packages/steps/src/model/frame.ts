@@ -63,6 +63,11 @@ export const SOURCE_FRAME: Frame = [
   { name: 'row_days', dtype: 'Int64', cells: [0, 2, 2, 0, 2, 2, 1] },
 ];
 
+/** Returns `text` as a Python string literal. */
+export function quoted(text: string): string {
+  return JSON.stringify(text);
+}
+
 /** Reports whether `dtype` holds numbers. */
 export function isNumeric(dtype: Dtype): boolean {
   return dtype === 'Int64' || dtype === 'UInt32';

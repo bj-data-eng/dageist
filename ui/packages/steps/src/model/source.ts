@@ -1,19 +1,24 @@
 /**
- * @file What an expression can start from: a column, or a condition that
- * picks between values (`when … then … otherwise`). Also the values and
- * conditions those are made of, which a filter uses too.
+ * @file Chains and what they are made of. A chain starts from a source, a
+ * column or a condition that picks between values (`when … then …
+ * otherwise`), and applies methods to it. A value inside a condition can
+ * itself be a chain, so chains nest.
  *
  * This is storyboard code. In the real application the Rust core owns types,
  * validation and previews; nothing here is meant to survive.
  */
 
+import type { Method } from './expr';
+import {
+  applyWithin,
+  argumentProblem,
+  methodDtype,
+  methodRequirement,
+  methodText,
+  rowGroups,
+} from './expr';
 import type { Cell, Dtype, Frame } from './frame';
-import { compareCells, findColumn, isNumeric } from './frame';
-
-/** Returns `text` as a Python string literal. */
-export function quoted(text: string): string {
-  return JSON.stringify(text);
-}
+import { compareCells, findColumn, isNumeric, quoted } from './frame';
 
 /** Returns `value` as Python would write it. */
 export function literalText(value: Cell): string {
@@ -33,8 +38,16 @@ export interface LiteralValue {
   readonly value: Cell;
 }
 
+/** A value worked out by a chain of its own. */
+export interface ChainValue {
+  readonly kind: 'chain';
+  /** Stays with the sub-chain while it is edited. */
+  readonly id: string;
+  readonly chain: Chain;
+}
+
 /** A value a condition compares with or returns. */
-export type Value = ColumnValue | LiteralValue;
+export type Value = ColumnValue | LiteralValue | ChainValue;
 
 /** The comparison operators, as Polars and Python spell them. */
 export type Comparison = '==' | '!=' | '>' | '>=' | '<' | '<=';
@@ -57,21 +70,44 @@ export interface Arm {
   readonly returns: Value;
 }
 
-/** An expression that starts from `pl.col(column)`. */
+/** A chain that starts from `pl.col(column)`. */
 export interface ColumnSource {
   readonly kind: 'column';
   readonly column: string;
 }
 
-/** An expression that starts from `pl.when(…).then(…)` pairs and a final `.otherwise(…)`. */
+/** A chain that starts from `pl.when(…).then(…)` pairs and a final `.otherwise(…)`. */
 export interface WhenSource {
   readonly kind: 'when';
   readonly arms: readonly Arm[];
   readonly otherwise: Value;
 }
 
-/** What an expression starts from. */
+/** What a chain starts from. */
 export type Source = ColumnSource | WhenSource;
+
+/** A source followed by method calls. */
+export interface Chain {
+  readonly source: Source;
+  readonly methods: readonly Method[];
+}
+
+/** A chain with a final `.alias(alias)`: what an Add column step holds. */
+export interface Expr extends Chain {
+  readonly alias: string;
+}
+
+/** Why a chain cannot be worked out, and at which method. Index -1 is the source. */
+export interface ChainProblem {
+  readonly index: number;
+  readonly message: string;
+}
+
+/** The dtype after the source and after each method, plus the first problem. */
+export interface ChainCheck {
+  readonly dtypes: readonly Dtype[];
+  readonly problem: ChainProblem | null;
+}
 
 /** The dtype a source or value has, or why it has none. */
 export interface SourceCheck {
@@ -80,7 +116,17 @@ export interface SourceCheck {
   readonly problem: string | null;
 }
 
+function rowsOf(frame: Frame): number[] {
+  return Array.from({ length: frame[0]?.cells.length ?? 0 }, (_unused, row) => row);
+}
+
 function checkValue(value: Value, frame: Frame): SourceCheck {
+  if (value.kind === 'chain') {
+    const check = checkChain(value.chain, frame);
+    return check.problem === null
+      ? { dtype: check.dtypes.at(-1) ?? null, problem: null }
+      : { dtype: null, problem: check.problem.message };
+  }
   if (value.kind === 'column') {
     const column = findColumn(frame, value.column);
     return column === null
@@ -91,8 +137,17 @@ function checkValue(value: Value, frame: Frame): SourceCheck {
   return { dtype: typeof value.value === 'number' ? 'Int64' : 'String', problem: null };
 }
 
-function describeValue(value: Value): string {
-  return value.kind === 'column' ? `"${value.column}"` : literalText(value.value);
+/** Returns the Polars text of `value` where a column or expression is expected. */
+export function valueText(value: Value): string {
+  if (value.kind === 'chain') return chainText(value.chain);
+  return value.kind === 'column' ? `pl.col(${quoted(value.column)})` : literalText(value.value);
+}
+
+/** Returns the cell `value` gives on every row of `frame`. */
+function cellsOf(value: Value, frame: Frame): readonly Cell[] {
+  if (value.kind === 'chain') return evaluateChain(value.chain, frame) ?? [];
+  if (value.kind === 'column') return findColumn(frame, value.column)?.cells ?? [];
+  return rowsOf(frame).map(() => value.value);
 }
 
 /** Reports whether two dtypes can be compared or returned side by side. */
@@ -107,23 +162,16 @@ export function conditionProblem(condition: Condition, frame: Frame): string | n
   const value = checkValue(condition.value, frame);
   if (value.problem !== null) return value.problem;
   if (value.dtype !== null && !agree(column.dtype, value.dtype)) {
-    return `"${column.name}" is ${column.dtype}, but ${describeValue(condition.value)} is ${value.dtype}.`;
+    return `"${column.name}" is ${column.dtype}, but ${valueText(condition.value)} is ${value.dtype}.`;
   }
   return null;
 }
 
-function cellOf(value: Value, frame: Frame, row: number): Cell {
-  if (value.kind === 'literal') return value.value;
-  return findColumn(frame, value.column)?.cells[row] ?? null;
-}
-
-/** Reports whether `condition` is true on `row`. A comparison with a null is not true. */
-export function conditionHolds(condition: Condition, frame: Frame, row: number): boolean {
-  const left = findColumn(frame, condition.column)?.cells[row] ?? null;
-  const right = cellOf(condition.value, frame, row);
+function holds(comparison: Comparison, left: Cell, right: Cell): boolean {
+  // A comparison with a null is not true.
   if (left === null || right === null) return false;
   const order = compareCells(left, right);
-  switch (condition.comparison) {
+  switch (comparison) {
     case '==':
       return order === 0;
     case '!=':
@@ -141,22 +189,26 @@ export function conditionHolds(condition: Condition, frame: Frame, row: number):
   }
 }
 
+/** Reports, for every row of `frame`, whether `condition` is true on it. */
+export function conditionRows(condition: Condition, frame: Frame): boolean[] {
+  const left = findColumn(frame, condition.column)?.cells ?? [];
+  const right = cellsOf(condition.value, frame);
+  return rowsOf(frame).map((row) =>
+    holds(condition.comparison, left[row] ?? null, right[row] ?? null),
+  );
+}
+
 /** Returns the Polars text of `condition`. */
 export function conditionText(condition: Condition): string {
-  const value =
-    condition.value.kind === 'column'
-      ? `pl.col(${quoted(condition.value.column)})`
-      : literalText(condition.value.value);
-  return `pl.col(${quoted(condition.column)}) ${condition.comparison} ${value}`;
+  return `pl.col(${quoted(condition.column)}) ${condition.comparison} ${valueText(condition.value)}`;
 }
 
 /** Returns the Polars text of a value passed to `then` or `otherwise`. */
 function returnedText(value: Value): string {
-  if (value.kind === 'column') return `pl.col(${quoted(value.column)})`;
   // A bare string there would be read as a column name.
-  return typeof value.value === 'string'
+  return value.kind === 'literal' && typeof value.value === 'string'
     ? `pl.lit(${quoted(value.value)})`
-    : literalText(value.value);
+    : valueText(value);
 }
 
 function checkWhen(source: WhenSource, frame: Frame): SourceCheck {
@@ -194,20 +246,82 @@ export function checkSource(source: Source, frame: Frame): SourceCheck {
 }
 
 /** Works `source` out on the rows of `frame`. */
-export function evaluateSource(source: Source, frame: Frame): readonly Cell[] {
+function evaluateSource(source: Source, frame: Frame): readonly Cell[] {
   if (source.kind === 'column') return findColumn(frame, source.column)?.cells ?? [];
-  const rows = Array.from({ length: frame[0]?.cells.length ?? 0 }, (_unused, row) => row);
-  return rows.map((row) => {
-    const arm = source.arms.find((candidate) => conditionHolds(candidate.condition, frame, row));
-    return cellOf(arm === undefined ? source.otherwise : arm.returns, frame, row);
+  const arms = source.arms.map((arm) => ({
+    holds: conditionRows(arm.condition, frame),
+    cells: cellsOf(arm.returns, frame),
+  }));
+  const otherwise = cellsOf(source.otherwise, frame);
+  return rowsOf(frame).map((row) => {
+    const arm = arms.find((candidate) => candidate.holds[row] === true);
+    return (arm === undefined ? otherwise[row] : arm.cells[row]) ?? null;
   });
 }
 
-/** Returns the Polars text `source` starts an expression with. */
-export function sourceText(source: Source): string {
+/** Returns the Polars text `source` starts a chain with. */
+function sourceText(source: Source): string {
   if (source.kind === 'column') return `pl.col(${quoted(source.column)})`;
   const arms = source.arms
     .map((arm) => `.when(${conditionText(arm.condition)}).then(${returnedText(arm.returns)})`)
     .join('');
   return `pl${arms}.otherwise(${returnedText(source.otherwise)})`;
+}
+
+/** Checks that the source of `chain` works and every method accepts the dtype handed to it. */
+export function checkChain(chain: Chain, frame: Frame): ChainCheck {
+  const start = checkSource(chain.source, frame);
+  if (start.problem !== null || start.dtype === null) {
+    const message = start.problem ?? 'This chain has no dtype.';
+    return { dtypes: [], problem: { index: -1, message } };
+  }
+  const dtypes: Dtype[] = [start.dtype];
+  let current = start.dtype;
+  for (const [index, method] of chain.methods.entries()) {
+    const next = methodDtype(method.name, current);
+    if (next === null) {
+      const message = `${method.name} needs ${methodRequirement(method.name)}, but it is given ${current}.`;
+      return { dtypes, problem: { index, message } };
+    }
+    const wrongArgument = argumentProblem(method, frame, current);
+    if (wrongArgument !== null) return { dtypes, problem: { index, message: wrongArgument } };
+    dtypes.push(next);
+    current = next;
+  }
+  return { dtypes, problem: null };
+}
+
+/** Works `chain` out on the rows of `frame`, or returns null when it has a problem. */
+export function evaluateChain(chain: Chain, frame: Frame): readonly Cell[] | null {
+  if (checkChain(chain, frame).problem !== null) return null;
+  let values = evaluateSource(chain.source, frame);
+  let waiting: Method[] = [];
+  const rowCount = frame[0]?.cells.length ?? 0;
+  for (const method of chain.methods) {
+    if (method.name === 'over') {
+      const keys = findColumn(frame, method.argument ?? '')?.cells ?? null;
+      const groups = rowGroups(keys, rowCount);
+      for (const earlier of waiting) {
+        values = applyWithin(earlier, values, groups, frame);
+      }
+      waiting = [];
+    } else {
+      waiting.push(method);
+    }
+  }
+  const wholeFrame = rowGroups(null, rowCount);
+  for (const earlier of waiting) {
+    values = applyWithin(earlier, values, wholeFrame, frame);
+  }
+  return values;
+}
+
+/** Returns the Polars text of `chain`. */
+export function chainText(chain: Chain): string {
+  return `${sourceText(chain.source)}${chain.methods.map((method) => methodText(method)).join('')}`;
+}
+
+/** Returns the Polars text of `expr`: its chain and its alias. */
+export function exprText(expr: Expr): string {
+  return `${chainText(expr)}.alias(${quoted(expr.alias)})`;
 }

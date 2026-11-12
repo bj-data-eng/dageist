@@ -9,11 +9,10 @@ import { useSortable } from '@dnd-kit/react/sortable';
 import type { Choice } from '@dageist/design';
 import { CommitField, Hint, Picker, cx } from '@dageist/design';
 
-import { ConditionSlots } from './ConditionSlots';
-import { ExprChain } from './ExprChain';
+import { ChainEditor, ConditionSlots } from './ChainEditor';
+import { SubListHost } from './SubList';
 import { columnChoices } from './choices';
 import { formatCell } from './format';
-import { checkExpr } from './model/expr';
 import type { Frame } from './model/frame';
 import type {
   FilterStep,
@@ -25,6 +24,7 @@ import type {
   WithColumnsStep,
 } from './model/steps';
 import { HOWS, VERBS, defaultStep, stepText } from './model/steps';
+import { checkChain } from './model/source';
 import { TABLES, findTable } from './model/tables';
 
 /** The sortable group every step row belongs to. */
@@ -82,12 +82,12 @@ function AddColumnSlots({ step, frame, onChange }: SlotsProps<WithColumnsStep>):
         }}
       />
       <SlotLabel>=</SlotLabel>
-      <ExprChain
-        stepId={step.id}
-        expr={expr}
+      <ChainEditor
+        chainId={step.id}
+        chain={expr}
         frame={frame}
-        onChange={(next) => {
-          onChange({ ...step, expr: next });
+        onChange={(chain) => {
+          onChange({ ...step, expr: { ...chain, alias: expr.alias } });
         }}
       />
     </>
@@ -260,7 +260,7 @@ function peek(result: StepResult, name: string): string[] {
 /** Returns the dtype an Add column step returns, or `null` for other steps and broken chains. */
 function returnedDtype(step: Step, frame: Frame, result: StepResult): string | null {
   if (step.verb !== 'with_columns' || result.problem !== null) return null;
-  return checkExpr(step.expr, frame).dtypes.at(-1) ?? null;
+  return checkChain(step.expr, frame).dtypes.at(-1) ?? null;
 }
 
 /** What a step row shows and reports. */
@@ -314,67 +314,69 @@ export function StepCard({
       onPointerDownCapture={onSelect}
       onFocusCapture={onSelect}
     >
-      <div className="flex min-h-9 items-center gap-1 py-1 pr-2 pl-1">
-        <button
-          ref={handleRef}
-          type="button"
-          title="Drag to reorder"
-          aria-label={`Step ${String(index + 1)}: drag to reorder`}
-          className="inline-flex h-7 w-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-xs text-muted select-none hover:bg-hover hover:text-ink active:cursor-grabbing"
-        >
-          <span className="group-hover/step:hidden">{index + 1}</span>
-          <span aria-hidden="true" className="hidden text-sm group-hover/step:inline">
-            ⠿
-          </span>
-        </button>
-        <Hint lines={[stepText(step)]} code>
-          <Picker
-            label={VERB_LABELS[step.verb]}
-            tone="verb"
-            className={cx('w-[92px] shrink-0 justify-start', VERB_COLOURS[step.verb])}
-            choices={verbChoices(step.verb, (verb) => {
-              onChange({ ...defaultStep(verb, frame), id: step.id });
-            })}
-          />
-        </Hint>
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-0.5 gap-y-1">
-          <Slots step={step} frame={frame} onChange={onChange} />
-        </div>
-        {dtype !== null && (
-          <Hint lines={peek(result, result.added[0] ?? '')} code>
-            <span className="shrink-0 pl-2 text-xs text-muted">
-              returns <span className="font-mono text-[12.5px] text-ready">{dtype}</span>
-            </span>
-          </Hint>
-        )}
-        {step.verb === 'join' && result.problem === null && (
-          <Hint
-            lines={result.added.flatMap((name) => [
-              `${name} · ${result.frame.find((column) => column.name === name)?.dtype ?? ''}`,
-              ...peek(result, name),
-            ])}
-            code
+      <SubListHost outletClassName="mr-2 mb-1 ml-[132px] border-l-2 border-line-strong pl-2">
+        <div className="flex min-h-9 items-center gap-1 py-1 pr-2 pl-1">
+          <button
+            ref={handleRef}
+            type="button"
+            title="Drag to reorder"
+            aria-label={`Step ${String(index + 1)}: drag to reorder`}
+            className="inline-flex h-7 w-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-xs text-muted select-none hover:bg-hover hover:text-ink active:cursor-grabbing"
           >
-            <span className="shrink-0 pl-2 text-xs text-muted">
-              adds{' '}
-              <span className="font-mono text-[12.5px] text-ready">
-                {result.added.length === 1
-                  ? result.added[0]
-                  : `${String(result.added.length)} columns`}
-              </span>
+            <span className="group-hover/step:hidden">{index + 1}</span>
+            <span aria-hidden="true" className="hidden text-sm group-hover/step:inline">
+              ⠿
             </span>
+          </button>
+          <Hint lines={[stepText(step)]} code>
+            <Picker
+              label={VERB_LABELS[step.verb]}
+              tone="verb"
+              className={cx('w-[92px] shrink-0 justify-start', VERB_COLOURS[step.verb])}
+              choices={verbChoices(step.verb, (verb) => {
+                onChange({ ...defaultStep(verb, frame), id: step.id });
+              })}
+            />
           </Hint>
-        )}
-        <button
-          type="button"
-          title="Remove this step"
-          aria-label={`Remove step ${String(index + 1)}`}
-          className="size-6 shrink-0 cursor-pointer rounded-md text-xs text-muted opacity-0 group-focus-within/step:opacity-100 group-hover/step:opacity-100 hover:bg-hover hover:text-danger"
-          onClick={onRemove}
-        >
-          ✕
-        </button>
-      </div>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-0.5 gap-y-1">
+            <Slots step={step} frame={frame} onChange={onChange} />
+          </div>
+          {dtype !== null && (
+            <Hint lines={peek(result, result.added[0] ?? '')} code>
+              <span className="shrink-0 pl-2 text-xs text-muted">
+                returns <span className="font-mono text-[12.5px] text-ready">{dtype}</span>
+              </span>
+            </Hint>
+          )}
+          {step.verb === 'join' && result.problem === null && (
+            <Hint
+              lines={result.added.flatMap((name) => [
+                `${name} · ${result.frame.find((column) => column.name === name)?.dtype ?? ''}`,
+                ...peek(result, name),
+              ])}
+              code
+            >
+              <span className="shrink-0 pl-2 text-xs text-muted">
+                adds{' '}
+                <span className="font-mono text-[12.5px] text-ready">
+                  {result.added.length === 1
+                    ? result.added[0]
+                    : `${String(result.added.length)} columns`}
+                </span>
+              </span>
+            </Hint>
+          )}
+          <button
+            type="button"
+            title="Remove this step"
+            aria-label={`Remove step ${String(index + 1)}`}
+            className="size-6 shrink-0 cursor-pointer rounded-md text-xs text-muted opacity-0 group-focus-within/step:opacity-100 group-hover/step:opacity-100 hover:bg-hover hover:text-danger"
+            onClick={onRemove}
+          >
+            ✕
+          </button>
+        </div>
+      </SubListHost>
       {result.problem !== null && (
         <p className="m-0 pb-1.5 pl-[132px] text-[13px] text-danger">{result.problem}</p>
       )}

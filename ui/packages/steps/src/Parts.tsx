@@ -1,7 +1,7 @@
 /**
- * @file An expression drawn as a chain: a column followed by method parts.
+ * @file The method parts of a chain and the seams between them.
  *
- * At rest the chain reads as plain text. Pointing at a part shows its tools:
+ * At rest a chain reads as plain text. Pointing at a part shows its tools:
  * its name opens a menu to swap it, the same name drags it to another place,
  * and a small cross removes it. Pointing at the seam between two parts turns
  * it into a plus that inserts a method there.
@@ -9,29 +9,24 @@
 
 import { PointerActivationConstraints, PointerSensor } from '@dnd-kit/dom';
 import { useSortable } from '@dnd-kit/react/sortable';
-import { useCallback, useState } from 'react';
 
 import type { Choice } from '@dageist/design';
-import { CommitField, Hint, Picker, Popover, cx } from '@dageist/design';
+import { CommitField, Hint, Picker, cx } from '@dageist/design';
 
-import { MethodMenu } from './MethodMenu';
-import { WhenChain, defaultArm } from './WhenChain';
 import { columnChoices } from './choices';
-import type { Expr, ExprCheck, Method, MethodName } from './model/expr';
+import type { Method, MethodName } from './model/expr';
 import {
   ARGUMENT_KINDS,
   METHOD_GROUPS,
   METHOD_HINTS,
   METHOD_NAMES,
-  checkExpr,
   defaultArgument,
   methodDtype,
   methodRequirement,
   operandFits,
 } from './model/expr';
 import type { Dtype, Frame } from './model/frame';
-import { isNumeric } from './model/frame';
-import type { Source } from './model/source';
+import type { Chain, ChainCheck } from './model/source';
 
 /**
  * A part is dragged by its name, which is also the button that opens its
@@ -45,12 +40,12 @@ const PART_SENSORS = [
   }),
 ];
 
-function withMethods(expr: Expr, methods: readonly Method[]): Expr {
-  return { source: expr.source, methods, alias: expr.alias };
+function withMethods(expr: Chain, methods: readonly Method[]): Chain {
+  return { source: expr.source, methods };
 }
 
 /** Returns `expr` with the method at `from` moved to position `to`. */
-export function withMethodMoved(expr: Expr, from: number, to: number): Expr {
+export function withMethodMoved(expr: Chain, from: number, to: number): Chain {
   const methods = [...expr.methods];
   const [method] = methods.splice(from, 1);
   if (method === undefined) return expr;
@@ -58,13 +53,14 @@ export function withMethodMoved(expr: Expr, from: number, to: number): Expr {
   return withMethods(expr, methods);
 }
 
-function withMethodInserted(expr: Expr, at: number, method: Method): Expr {
+/** Returns `expr` with `method` added at position `at`. */
+export function withMethodInserted(expr: Chain, at: number, method: Method): Chain {
   const methods = [...expr.methods];
   methods.splice(at, 0, method);
   return withMethods(expr, methods);
 }
 
-function withoutMethod(expr: Expr, id: string): Expr {
+function withoutMethod(expr: Chain, id: string): Chain {
   return withMethods(
     expr,
     expr.methods.filter((existing) => existing.id !== id),
@@ -102,10 +98,10 @@ function operandChoices(
 /** Lists what the method at `index` can be swapped for, plus moving and removing it. */
 function methodChoices(
   index: number,
-  expr: Expr,
-  check: ExprCheck,
+  expr: Chain,
+  check: ChainCheck,
   frame: Frame,
-  onChange: (expr: Expr) => void,
+  onChange: (expr: Chain) => void,
 ): Choice[] {
   const method = expr.methods[index];
   const input = check.dtypes[index];
@@ -160,7 +156,8 @@ function methodChoices(
   ];
 }
 
-interface SeamProps {
+/** What a seam shows and reports. */
+export interface SeamProps {
   /** The dtype that passes through the seam, or `null` when the chain before it is broken. */
   readonly dtype: Dtype | null;
   /** Whether the seam sits after the last part, where it is a plus from the start. */
@@ -171,7 +168,7 @@ interface SeamProps {
 }
 
 /** The join between two parts. Pointing at it offers to insert a method there. */
-function Seam({ dtype, last, label, onOpen }: SeamProps): React.JSX.Element {
+export function Seam({ dtype, last, label, onOpen }: SeamProps): React.JSX.Element {
   return (
     <Hint lines={dtype === null ? [label] : [`${dtype} passes here`, label]} code={false}>
       <button
@@ -210,21 +207,24 @@ function Seam({ dtype, last, label, onOpen }: SeamProps): React.JSX.Element {
   );
 }
 
-interface MethodPartProps {
+/** What a method part shows and reports. */
+export interface MethodPartProps {
   /** The seam that joins this part to what comes before it. It moves with the part. */
   readonly seam: React.ReactNode;
-  readonly stepId: string;
+  /** The chain the part belongs to; a part can only be dragged within it. */
+  readonly chainId: string;
   readonly index: number;
   readonly method: Method;
-  readonly expr: Expr;
-  readonly check: ExprCheck;
+  readonly expr: Chain;
+  readonly check: ChainCheck;
   readonly frame: Frame;
-  readonly onChange: (expr: Expr) => void;
+  readonly onChange: (expr: Chain) => void;
 }
 
-function MethodPart({
+/** Draws one method of a chain, with the seam that joins it to what comes before. */
+export function MethodPart({
   seam,
-  stepId,
+  chainId,
   index,
   method,
   expr,
@@ -240,9 +240,9 @@ function MethodPart({
   const { ref, handleRef, isDragSource } = useSortable({
     id: method.id,
     index,
-    group: stepId,
-    type: `part:${stepId}`,
-    accept: `part:${stepId}`,
+    group: chainId,
+    type: `part:${chainId}`,
+    accept: `part:${chainId}`,
     sensors: PART_SENSORS,
   });
   const commit = (value: string): void => {
@@ -309,134 +309,6 @@ function MethodPart({
           ✕
         </button>
       </span>
-    </span>
-  );
-}
-
-/**
- * Returns a condition to start an expression from in place of `source`: it
- * returns the column the expression started from when the condition is true.
- */
-function conditionOn(source: Source, frame: Frame, dtype: Dtype | null): Source {
-  const column = columnBehind(source, frame);
-  // A number falls back to 0 and anything else to None, so both sides agree in dtype.
-  const fallback = dtype !== null && isNumeric(dtype) ? 0 : null;
-  return {
-    kind: 'when',
-    arms: [defaultArm(frame, { kind: 'column', column })],
-    otherwise: { kind: 'literal', value: fallback },
-  };
-}
-
-/** Returns the column `source` is most about: its own, or the first one a condition returns. */
-function columnBehind(source: Source, frame: Frame): string {
-  if (source.kind === 'column') return source.column;
-  const returned = source.arms.map((arm) => arm.returns).find((value) => value.kind === 'column');
-  return returned?.kind === 'column' ? returned.column : (frame[0]?.name ?? '');
-}
-
-/** Where a method is about to be added: its position in the chain and the seam it opens from. */
-interface Insertion {
-  readonly at: number;
-  readonly anchor: HTMLElement;
-}
-
-/** What an expression chain shows and reports. */
-export interface ExprChainProps {
-  /** The step the expression belongs to; its parts can only be dragged within it. */
-  readonly stepId: string;
-  readonly expr: Expr;
-  /** The frame the expression is worked out on. */
-  readonly frame: Frame;
-  readonly onChange: (expr: Expr) => void;
-}
-
-/** Draws `expr` as a column followed by its method parts. */
-export function ExprChain({ stepId, expr, frame, onChange }: ExprChainProps): React.JSX.Element {
-  const check = checkExpr(expr, frame);
-  const [insertion, setInsertion] = useState<Insertion | null>(null);
-  const withSource = (source: Source): void => {
-    onChange({ source, methods: expr.methods, alias: expr.alias });
-  };
-  const closeMenu = useCallback(() => {
-    setInsertion(null);
-  }, []);
-  const seam = (at: number): React.JSX.Element => (
-    <Seam
-      dtype={check.dtypes[at] ?? null}
-      last={at === expr.methods.length}
-      label={at === expr.methods.length ? 'Add a method' : 'Insert a method here'}
-      onOpen={(anchor) => {
-        setInsertion({ at, anchor });
-      }}
-    />
-  );
-
-  return (
-    // The chain's pieces sit directly in the step's row, so a long chain wraps
-    // piece by piece instead of dropping to a new line as a whole.
-    <span className="contents">
-      <span
-        className={cx(
-          'inline-flex flex-wrap items-center gap-y-1 rounded-md',
-          check.problem?.index === -1 && 'bg-invalid outline-1 outline-danger',
-        )}
-      >
-        {expr.source.kind === 'column' ? (
-          <Picker
-            label={expr.source.column}
-            tone="column"
-            choices={[
-              ...columnChoices(frame, expr.source.column, (column) => {
-                withSource({ kind: 'column', column });
-              }),
-              {
-                label: 'when … then … otherwise',
-                current: false,
-                reason: null,
-                onPick: () => {
-                  withSource(conditionOn(expr.source, frame, check.dtypes[0] ?? null));
-                },
-              },
-            ]}
-          />
-        ) : (
-          <WhenChain
-            source={expr.source}
-            frame={frame}
-            onChange={withSource}
-            onUseColumn={() => {
-              withSource({ kind: 'column', column: columnBehind(expr.source, frame) });
-            }}
-          />
-        )}
-      </span>
-      {expr.methods.map((method, index) => (
-        <MethodPart
-          key={method.id}
-          seam={seam(index)}
-          stepId={stepId}
-          index={index}
-          method={method}
-          expr={expr}
-          check={check}
-          frame={frame}
-          onChange={onChange}
-        />
-      ))}
-      {seam(expr.methods.length)}
-      {insertion !== null && (
-        <Popover anchor={insertion.anchor} onDismiss={closeMenu}>
-          <MethodMenu
-            input={check.dtypes[insertion.at] ?? null}
-            frame={frame}
-            onPick={(method) => {
-              onChange(withMethodInserted(expr, insertion.at, method));
-              setInsertion(null);
-            }}
-          />
-        </Popover>
-      )}
     </span>
   );
 }

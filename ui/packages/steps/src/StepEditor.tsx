@@ -14,7 +14,8 @@ import { useMemo, useState } from 'react';
 
 import { Panel, Picker, cx } from '@dageist/design';
 
-import { withMethodMoved } from './ExprChain';
+import type { DragSettings } from './ChainEditor';
+import { DragSettingsContext } from './ChainEditor';
 import { Pipeline } from './Pipeline';
 import { RowsPreview } from './RowsPreview';
 import { STEP_GROUP, StepCard, verbChoices } from './StepCard';
@@ -74,8 +75,8 @@ export function StepEditor({ styleNonce }: StepEditorProps): React.JSX.Element {
 
   // Dragging injects a few style rules; under a content security policy they
   // need the page's nonce. Without a policy dnd kit's defaults are right.
-  const dragOptions = useMemo(
-    () =>
+  const dragSettings = useMemo(
+    (): DragSettings =>
       styleNonce === null
         ? {}
         : {
@@ -97,115 +98,105 @@ export function StepEditor({ styleNonce }: StepEditorProps): React.JSX.Element {
     setSteps(steps.map((step) => (step.id === next.id ? next : step)));
   };
 
-  /** Applies a finished drag: a step moved in the list, or a part moved in its chain. */
-  const applyDrop = (group: string | number | undefined, from: number, to: number): void => {
-    if (group === STEP_GROUP) {
-      setSteps(moved(steps, from, to));
-      return;
-    }
-    const owner = steps.find((step) => step.id === group);
-    if (owner?.verb === 'with_columns') {
-      replaceStep({ ...owner, expr: withMethodMoved(owner.expr, from, to) });
-    }
-  };
-
   return (
-    <Panel
-      mark="ƒx"
-      title="Transform · Claim timing"
-      details={[
-        'Point at a step or a part for its tools and what it returns. A › between parts becomes a + to insert a method.',
-      ]}
-    >
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-          <DragDropProvider
-            {...dragOptions}
-            onDragEnd={(event) => {
-              const { source } = event.operation;
-              if (event.canceled || !isSortable(source)) return;
-              if (source.index !== source.initialIndex) {
-                applyDrop(source.group, source.initialIndex, source.index);
-              }
-            }}
-          >
-            <div className="rounded-lg border border-line">
-              {steps.map((step, index) => {
-                const result = results[index];
-                if (result === undefined) return null;
-                return (
-                  <StepCard
-                    key={step.id}
-                    step={step}
-                    index={index}
-                    frame={frameBefore(index)}
-                    result={result}
-                    selected={step.id === selectedId}
-                    onSelect={() => {
-                      setSelectedId(step.id);
-                    }}
-                    onChange={replaceStep}
-                    onRemove={() => {
-                      setSteps(steps.filter((existing) => existing.id !== step.id));
-                    }}
-                    onInsertAfter={(verb) => {
-                      const added = defaultStep(verb, result.frame);
-                      setSteps([...steps.slice(0, index + 1), added, ...steps.slice(index + 1)]);
-                      setSelectedId(added.id);
-                    }}
-                  />
-                );
-              })}
-            </div>
-          </DragDropProvider>
-          <div className="mt-1.5 pl-8">
-            <Picker
-              label="+ Add step"
-              tone="plain"
-              className="text-muted hover:text-ink"
-              choices={verbChoices(null, (verb) => {
-                const added = defaultStep(verb, last);
-                setSteps([...steps, added]);
-                setSelectedId(added.id);
-              })}
-            />
-          </div>
-        </div>
-        <div className="flex max-h-[48%] min-h-0 shrink-0 flex-col border-t border-line bg-raised">
-          <div className="flex gap-4 border-b border-line px-4">
-            <DockTab
-              active={dock === 'rows'}
-              onChoose={() => {
-                setDock('rows');
+    <DragSettingsContext.Provider value={dragSettings}>
+      <Panel
+        mark="ƒx"
+        title="Transform · Claim timing"
+        details={[
+          'Point at a step or a part for its tools and what it returns. A › between parts becomes a + to insert a method.',
+        ]}
+      >
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+            <DragDropProvider
+              {...dragSettings}
+              onDragEnd={(event) => {
+                const { source } = event.operation;
+                if (event.canceled || !isSortable(source)) return;
+                if (source.group === STEP_GROUP && source.index !== source.initialIndex) {
+                  setSteps(moved(steps, source.initialIndex, source.index));
+                }
               }}
             >
-              {shown === undefined
-                ? 'Rows as they arrive'
-                : `Rows after step ${String(selectedIndex + 1)}`}
-            </DockTab>
-            <DockTab
-              active={dock === 'polars'}
-              onChoose={() => {
-                setDock('polars');
-              }}
-            >
-              Polars
-            </DockTab>
-          </div>
-          <div className="min-h-0 overflow-auto px-4 py-2">
-            {dock === 'rows' ? (
-              <RowsPreview frame={shown?.frame ?? SOURCE_FRAME} added={shown?.added ?? []} />
-            ) : (
-              <Pipeline
-                source="claims"
-                steps={steps}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
+              <div className="rounded-lg border border-line">
+                {steps.map((step, index) => {
+                  const result = results[index];
+                  if (result === undefined) return null;
+                  return (
+                    <StepCard
+                      key={step.id}
+                      step={step}
+                      index={index}
+                      frame={frameBefore(index)}
+                      result={result}
+                      selected={step.id === selectedId}
+                      onSelect={() => {
+                        setSelectedId(step.id);
+                      }}
+                      onChange={replaceStep}
+                      onRemove={() => {
+                        setSteps(steps.filter((existing) => existing.id !== step.id));
+                      }}
+                      onInsertAfter={(verb) => {
+                        const added = defaultStep(verb, result.frame);
+                        setSteps([...steps.slice(0, index + 1), added, ...steps.slice(index + 1)]);
+                        setSelectedId(added.id);
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </DragDropProvider>
+            <div className="mt-1.5 pl-8">
+              <Picker
+                label="+ Add step"
+                tone="plain"
+                className="text-muted hover:text-ink"
+                choices={verbChoices(null, (verb) => {
+                  const added = defaultStep(verb, last);
+                  setSteps([...steps, added]);
+                  setSelectedId(added.id);
+                })}
               />
-            )}
+            </div>
+          </div>
+          <div className="flex max-h-[48%] min-h-0 shrink-0 flex-col border-t border-line bg-raised">
+            <div className="flex gap-4 border-b border-line px-4">
+              <DockTab
+                active={dock === 'rows'}
+                onChoose={() => {
+                  setDock('rows');
+                }}
+              >
+                {shown === undefined
+                  ? 'Rows as they arrive'
+                  : `Rows after step ${String(selectedIndex + 1)}`}
+              </DockTab>
+              <DockTab
+                active={dock === 'polars'}
+                onChoose={() => {
+                  setDock('polars');
+                }}
+              >
+                Polars
+              </DockTab>
+            </div>
+            <div className="min-h-0 overflow-auto px-4 py-2">
+              {dock === 'rows' ? (
+                <RowsPreview frame={shown?.frame ?? SOURCE_FRAME} added={shown?.added ?? []} />
+              ) : (
+                <Pipeline
+                  source="claims"
+                  steps={steps}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                />
+              )}
+            </div>
           </div>
         </div>
-      </div>
-    </Panel>
+      </Panel>
+    </DragSettingsContext.Provider>
   );
 }

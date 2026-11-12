@@ -13,6 +13,8 @@ export interface CommitFieldProps {
   readonly numeric: boolean;
   /** Draws the value in the code font, for names and literals that are code. */
   readonly code: boolean;
+  /** Reports whether typed text may be kept. Text that may not is put back as it was. */
+  readonly accepts?: (typed: string) => boolean;
   readonly onCommit: (value: string) => void;
 }
 
@@ -22,6 +24,7 @@ export function CommitField({
   label,
   numeric,
   code,
+  accepts,
   onCommit,
 }: CommitFieldProps): React.JSX.Element {
   return (
@@ -46,7 +49,14 @@ export function CommitField({
         field.style.width = `calc(${String(Math.max(field.value.length, 1))}ch + 0.75rem)`;
       }}
       onBlur={(event) => {
-        if (event.currentTarget.value !== value) onCommit(event.currentTarget.value);
+        const field = event.currentTarget;
+        if (field.value === value) return;
+        if (accepts !== undefined && !accepts(field.value)) {
+          field.value = value;
+          field.style.width = `calc(${String(Math.max(value.length, 1))}ch + 0.75rem)`;
+          return;
+        }
+        onCommit(field.value);
       }}
       onKeyDown={(event) => {
         if (event.key === 'Enter') event.currentTarget.blur();

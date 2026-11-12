@@ -6,8 +6,6 @@
  * validation and previews; nothing here is meant to survive.
  */
 
-import type { Expr } from './expr';
-import { checkExpr, evaluateExpr, exprText } from './expr';
 import type { Column, Frame } from './frame';
 import {
   SOURCE_FRAME,
@@ -15,11 +13,19 @@ import {
   compareCells,
   distinctValues,
   findColumn,
+  quoted,
   reordered,
 } from './frame';
 import { nextId } from './ids';
-import type { Condition } from './source';
-import { conditionHolds, conditionProblem, conditionText, quoted } from './source';
+import type { Condition, Expr } from './source';
+import {
+  checkChain,
+  conditionProblem,
+  conditionRows,
+  conditionText,
+  evaluateChain,
+  exprText,
+} from './source';
 import { TABLES, findTable } from './tables';
 
 /** The step verbs, by their Polars names. */
@@ -89,8 +95,8 @@ function failed(frame: Frame, problem: string): StepResult {
 function withColumns(frame: Frame, step: WithColumnsStep): StepResult {
   const { expr } = step;
   if (expr.alias.trim() === '') return failed(frame, 'alias needs a name.');
-  const check = checkExpr(expr, frame);
-  const cells = evaluateExpr(expr, frame);
+  const check = checkChain(expr, frame);
+  const cells = evaluateChain(expr, frame);
   const dtype = check.dtypes.at(-1);
   if (check.problem !== null || cells === null || dtype === undefined) {
     return failed(frame, check.problem?.message ?? 'This expression cannot be worked out.');
@@ -133,8 +139,7 @@ function sort(frame: Frame, step: SortStep): StepResult {
 function filter(frame: Frame, step: FilterStep): StepResult {
   const problem = conditionProblem(step.condition, frame);
   if (problem !== null) return failed(frame, problem);
-  const rows = Array.from({ length: frame[0]?.cells.length ?? 0 }, (_unused, row) => row);
-  const kept = rows.filter((row) => conditionHolds(step.condition, frame, row));
+  const kept = conditionRows(step.condition, frame).flatMap((holds, row) => (holds ? [row] : []));
   return { frame: reordered(frame, kept), problem: null, added: [] };
 }
 
