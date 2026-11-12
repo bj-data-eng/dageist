@@ -17,7 +17,8 @@ engineering methods. Apply `$pisct:invariants` to engineering and
 `$pisct:rust-modeling` to Rust models and APIs. Dageist-owned Rust prohibits
 executable `unsafe` without exception. TypeScript follows the Pragmatic
 TypeScript Guidelines (`pragmatic-typescript`); its type check, lint and
-format check are required gates for every change under `ui/`.
+format check are required gates for every change under `ui/`. The view is
+built with React, Tailwind CSS and Vite.
 
 The coordinator owns issue and label updates, staging, commits, integration and
 publication within the authorized scope. Use `$pisct:holistic-review` for final
@@ -26,7 +27,7 @@ independent integration review.
 ## Repository Identity And Ownership
 
 This repository owns the host-independent `dageist` core in `src/`, the
-dataframe engine and the host adapters under `crates/`, the TypeScript view in
+dataframe engine and the host adapters under `crates/`, the React view in
 `ui/`, their contracts, manifests, tests, documentation and shared tooling.
 Root owns workspace wiring and the core. The Tauri host owns its window,
 webview configuration, IPC commands and the view it serves.
@@ -45,7 +46,10 @@ and current source establishes behavior.
 | Webview permissions | [crates/dageist-tauri/capabilities/](crates/dageist-tauri/capabilities/) |
 | Engine identity, dependencies and Polars features | [crates/dageist-engine/Cargo.toml](crates/dageist-engine/Cargo.toml) |
 | IPC commands and their serialized views | [crates/dageist-tauri/src/](crates/dageist-tauri/src/main.rs) |
-| View toolchain, scripts and compiler settings | [ui/package.json](ui/package.json), [ui/package-lock.json](ui/package-lock.json), [ui/tsconfig.json](ui/tsconfig.json), [ui/scripts/tsconfig.json](ui/scripts/tsconfig.json) |
+| The view's IPC calls and their shapes | [ui/packages/host/src/](ui/packages/host/src/contract.ts) |
+| The view's packages and what each may depend on | each `package.json` under [ui/apps/](ui/apps/desktop/package.json) and [ui/packages/](ui/packages/) |
+| The view's bundler and design tokens | [ui/apps/desktop/vite.config.ts](ui/apps/desktop/vite.config.ts), [ui/apps/desktop/src/styles.css](ui/apps/desktop/src/styles.css) |
+| View toolchain, scripts and compiler settings | [ui/package.json](ui/package.json), [ui/package-lock.json](ui/package-lock.json), [ui/tsconfig.json](ui/tsconfig.json), [ui/tsconfig.node.json](ui/tsconfig.node.json) |
 | View lint rules and formatter settings | [ui/.oxlintrc.json](ui/.oxlintrc.json), [ui/.oxfmtrc.json](ui/.oxfmtrc.json) |
 | Architecture and integration boundaries | [docs/explanation.md](docs/explanation.md) |
 | Documentation navigation and source locations | [README.md](README.md), [docs/reference.md](docs/reference.md) |
@@ -64,10 +68,18 @@ file sinks as a directed acyclic graph on a canvas. Follow the
 Rust owns application behavior: the graph model, validation, execution, state
 and every value the view displays. Put that behavior in the core or in crates the
 core depends on. The core never depends on a host. The Tauri host translates
-core contracts into IPC commands and serializable views. The TypeScript view
-owns presentation and input only: it renders what the host reports, forwards
-user intent through IPC commands, holds no authoritative application state and
-performs no data processing.
+core contracts into IPC commands and serializable views. The view owns
+presentation and input only: it renders what the host reports, forwards user
+intent through IPC commands, holds no authoritative application state and
+performs no data processing. The step editor's model under
+`ui/packages/steps/src/model/` is a storyboard exception that works on fixed
+sample rows until the core provides that behavior.
+
+The view is an npm workspace. The shell in `ui/apps/desktop` is the only place
+features are composed. `ui/packages/host` is the only package that knows Tauri.
+`ui/packages/design` holds primitive components and knows no domain. Each
+feature has its own package, exports one entry file and never imports another
+feature. Follow the [view structure](docs/explanation.md#how-the-view-is-divided).
 
 Tauri is the interim host. [Surgeist](https://github.com/bj-data-eng/surgeist)
 is the intended eventual host, so keep host-specific code inside the host

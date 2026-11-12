@@ -19,7 +19,7 @@ The repository has three layers, each depending only on the one below it.
 | --- | --- | --- |
 | Core | `dageist` | Application behavior, independent of any window system. |
 | Host | `dageist-tauri` | The native window, webview configuration, permissions and IPC commands. |
-| View | `ui/` | Rendering and input inside the host's webview. |
+| View | `ui/` | Rendering and input inside the host's webview; see [How The View Is Divided](#how-the-view-is-divided). |
 
 The core never depends on Tauri. The host depends on the core and translates its
 values into serializable views, such as `IdentityView` for the `core_identity`
@@ -38,8 +38,9 @@ Table data takes a shorter path than other values. The engine crate,
   reads each requested block from disk, so memory use depends on the block and
   not on the table.
 
-Either way a caller asks for a block of rows and columns, and the host passes
-it through as the raw bytes of an Arrow IPC stream instead of JSON.
+Either way the view asks for only the rows and columns near what is on screen,
+and the host passes them through as the raw bytes of an Arrow IPC stream. The
+view decodes those bytes and draws them; it never holds the table.
 
 As the product grows, new behavior lands in the core or in crates under
 `crates/` that the core depends on. The host gains a command only when the view
@@ -58,19 +59,40 @@ Building the view on web standards first also shows which capabilities a real
 application needs from Surgeist. Those findings belong to Surgeist's own
 repository.
 
-## Why The View Has No Bundler
+## How The View Is Divided
 
-The view compiles with `tsc` alone and reaches Tauri through the
-`window.__TAURI__` global that `app.withGlobalTauri` injects, instead of
-importing `@tauri-apps/api` through a bundler. This keeps the view's development
-dependencies to checking tools (the compiler, the linter, the formatter and
-Node's type declarations for the build scripts) and its runtime dependencies
-at none. The cost is that `ui/src/tauri.d.ts` declares the global's types by
-hand, covering only the members the view uses. A bundler becomes worthwhile
-when the view needs runtime npm packages.
+The view is built with React, styled with Tailwind CSS and bundled by Vite. It
+is an npm workspace of small packages, and what each part may depend on is
+written down in its `package.json`. Nothing checks those boundaries
+automatically yet, so they are also a review criterion.
+
+| Part | Package | Responsibility |
+| --- | --- | --- |
+| Shell | `@dageist/desktop` | The composition root. It decides which host the view talks to and which feature is on screen, and owns the page, the bundler configuration and the design tokens. |
+| Host bridge | `@dageist/host` | The contract of every IPC command and its implementation over Tauri. No other package knows Tauri exists. |
+| Design system | `@dageist/design` | Primitive components. It knows nothing about dataframes, steps or tables. |
+| Features | `@dageist/steps`, `@dageist/table` | One package per feature, each exporting one entry component. |
+
+Three rules keep this workable as the application grows:
+
+- **Features never import each other.** They meet only in the shell, which
+  passes each one what it needs, such as the host.
+- **Features depend on the host contract, not on Tauri.** That is why the view
+  can run in a plain browser against a stand-in host while it is being worked
+  on.
+- **Rust stays the authority.** A feature holds interface state, such as what
+  is selected or which menu is open. Values and validation come from the host.
+  The step editor's model is a storyboard that works on fixed sample rows until
+  the core provides that behavior.
+
+The view reaches Tauri through the `window.__TAURI__` global that
+`app.withGlobalTauri` injects. The host bridge declares the global's types by
+hand, covering only the members it uses.
 
 ## Current Limitations
 
-The application opens its window and shows the core's identity. The graph model,
-node types, pipeline execution, previews and canvas interactions are not
-implemented yet.
+The application opens its window on two features. The step editor is a
+storyboard that works on fixed sample rows in the view. The table viewer shows a
+generated sample through the engine. The graph model, node types, pipeline
+execution, previews from the core and canvas interactions are not implemented
+yet.

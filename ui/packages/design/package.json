@@ -1,0 +1,14 @@
+{
+  "name": "@dageist/design",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Design tokens and primitive components shared by every dageist feature.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "react": "19.3.1"
+  }
+}

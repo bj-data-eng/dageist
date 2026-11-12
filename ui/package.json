@@ -2,22 +2,33 @@
   "name": "dageist-ui",
   "version": "0.1.0",
   "private": true,
-  "description": "TypeScript view for the dageist Tauri host.",
+  "description": "React view for the dageist Tauri host.",
   "license": "MIT",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "type": "module",
   "scripts": {
-    "check": "tsc -p . --noEmit && tsc -p scripts",
+    "dev": "npm run dev --workspace @dageist/desktop",
+    "check": "tsc -p . && tsc -p tsconfig.node.json",
     "lint": "oxlint --deny-warnings --report-unused-disable-directives",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "build": "tsc -p . && node scripts/copy-public.mjs"
+    "build": "npm run build --workspace @dageist/desktop"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "4.3.4",
     "@types/node": "20.19.43",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.2.1",
     "oxfmt": "0.78.0",
     "oxlint": "1.93.0",
     "oxlint-tsgolint": "7.0.2006",
-    "typescript": "7.0.2"
+    "tailwindcss": "4.3.4",
+    "typescript": "7.0.2",
+    "vite": "8.3.6"
   },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"

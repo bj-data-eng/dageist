@@ -1,0 +1,12 @@
+{
+  "name": "@dageist/host",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The view's only door to the dageist host: IPC calls and the shapes they answer in.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {}
+}

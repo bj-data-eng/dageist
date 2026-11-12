@@ -1,0 +1,51 @@
+@import 'tailwindcss';
+
+/* The feature packages hold most of the markup, so scan them for class names. */
+@source '../../../packages';
+
+@theme {
+  --color-canvas: #1b1d22;
+  --color-dot: #2c2f36;
+  --color-panel: #23262c;
+  --color-raised: #272a31;
+  --color-row: #2a2e36;
+  --color-line: #353941;
+  --color-line-strong: #4a4f5a;
+  --color-ink: #d7dbe2;
+  --color-muted: #8b919c;
+  --color-ready: #3fbf7f;
+  --color-danger: #e5566e;
+  --color-accent: #f08a3c;
+  --color-hover: #343945;
+  --color-column: #1e3a5c;
+  --color-column-ink: #9cc8ff;
+  --color-operator: #f3b27a;
+  --color-chain: #252931;
+  --color-invalid: #43262c;
+  --color-fresh: #2f2a22;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+/* The dotted canvas the application's panels sit on. */
+@utility bg-dots {
+  background-image: radial-gradient(var(--color-dot) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
