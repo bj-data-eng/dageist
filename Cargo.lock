@@ -833,6 +833,7 @@ name = "dageist-tauri"
 version = "0.1.0"
 dependencies = [
  "dageist",
+ "dageist-engine",
  "serde",
  "serde_json",
  "tauri",
