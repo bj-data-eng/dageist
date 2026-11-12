@@ -121,6 +121,38 @@ export const START: readonly Step[] = [
   },
   {
     id: nextId('step'),
+    verb: 'with_columns',
+    expr: {
+      source: {
+        kind: 'when',
+        arms: [
+          {
+            id: nextId('arm'),
+            condition: {
+              column: 'resolved_day',
+              comparison: 'is_in',
+              value: { kind: 'input', name: 'holidays' },
+            },
+            returns: { kind: 'literal', value: 'holiday' },
+          },
+          {
+            id: nextId('arm'),
+            condition: {
+              column: 'row_days',
+              comparison: '>',
+              value: { kind: 'input', name: 'sla_cutoff' },
+            },
+            returns: { kind: 'literal', value: 'over' },
+          },
+        ],
+        otherwise: { kind: 'literal', value: 'ok' },
+      },
+      methods: [],
+      alias: 'flag',
+    },
+  },
+  {
+    id: nextId('step'),
     verb: 'pivot',
     on: 'step_to',
     index: 'dcn',

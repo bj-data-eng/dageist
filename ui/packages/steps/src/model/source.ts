@@ -19,6 +19,7 @@ import {
 } from './expr';
 import type { Cell, Dtype, Frame } from './frame';
 import { compareCells, findColumn, isNumeric, quoted } from './frame';
+import { findInput } from './inputs';
 
 /** Returns `value` as Python would write it. */
 export function literalText(value: Cell): string {
@@ -46,14 +47,20 @@ export interface ChainValue {
   readonly chain: Chain;
 }
 
-/** A value a condition compares with or returns. */
-export type Value = ColumnValue | LiteralValue | ChainValue;
+/** A value that comes from one of the node's connections, by its name. */
+export interface InputValue {
+  readonly kind: 'input';
+  readonly name: string;
+}
 
-/** The comparison operators, as Polars and Python spell them. */
-export type Comparison = '==' | '!=' | '>' | '>=' | '<' | '<=';
+/** A value a condition compares with or returns. */
+export type Value = ColumnValue | LiteralValue | ChainValue | InputValue;
+
+/** The comparisons, as Polars and Python spell them. `is_in` tests membership in a list. */
+export type Comparison = '==' | '!=' | '>' | '>=' | '<' | '<=' | 'is_in';
 
 /** Every comparison, in the order it is offered. */
-export const COMPARISONS: readonly Comparison[] = ['==', '!=', '>', '>=', '<', '<='];
+export const COMPARISONS: readonly Comparison[] = ['==', '!=', '>', '>=', '<', '<=', 'is_in'];
 
 /** `pl.col(column) <comparison> value`. */
 export interface Condition {
@@ -121,6 +128,17 @@ function rowsOf(frame: Frame): number[] {
 }
 
 function checkValue(value: Value, frame: Frame): SourceCheck {
+  if (value.kind === 'input') {
+    const input = findInput(value.name);
+    if (input === null) return { dtype: null, problem: `There is no input "${value.name}".` };
+    if (input.kind !== 'value') {
+      return {
+        dtype: null,
+        problem: `"${input.name}" is a ${input.kind}; a single value is needed here.`,
+      };
+    }
+    return { dtype: input.dtype, problem: null };
+  }
   if (value.kind === 'chain') {
     const check = checkChain(value.chain, frame);
     return check.problem === null
@@ -140,6 +158,8 @@ function checkValue(value: Value, frame: Frame): SourceCheck {
 /** Returns the Polars text of `value` where a column or expression is expected. */
 export function valueText(value: Value): string {
   if (value.kind === 'chain') return chainText(value.chain);
+  // An input is named in the code as it is in the editor.
+  if (value.kind === 'input') return value.name;
   return value.kind === 'column' ? `pl.col(${quoted(value.column)})` : literalText(value.value);
 }
 
@@ -147,6 +167,10 @@ export function valueText(value: Value): string {
 function cellsOf(value: Value, frame: Frame): readonly Cell[] {
   if (value.kind === 'chain') return evaluateChain(value.chain, frame) ?? [];
   if (value.kind === 'column') return findColumn(frame, value.column)?.cells ?? [];
+  if (value.kind === 'input') {
+    const input = findInput(value.name);
+    return rowsOf(frame).map(() => (input?.kind === 'value' ? input.value : null));
+  }
   return rowsOf(frame).map(() => value.value);
 }
 
@@ -159,6 +183,13 @@ function agree(left: Dtype, right: Dtype): boolean {
 export function conditionProblem(condition: Condition, frame: Frame): string | null {
   const column = findColumn(frame, condition.column);
   if (column === null) return `There is no column "${condition.column}".`;
+  if (condition.comparison === 'is_in') {
+    const list = condition.value.kind === 'input' ? findInput(condition.value.name) : null;
+    if (list?.kind !== 'list') return 'is_in needs a list to look in.';
+    return agree(column.dtype, list.dtype)
+      ? null
+      : `"${column.name}" is ${column.dtype}, but "${list.name}" holds ${list.dtype}.`;
+  }
   const value = checkValue(condition.value, frame);
   if (value.problem !== null) return value.problem;
   if (value.dtype !== null && !agree(column.dtype, value.dtype)) {
@@ -192,6 +223,11 @@ function holds(comparison: Comparison, left: Cell, right: Cell): boolean {
 /** Reports, for every row of `frame`, whether `condition` is true on it. */
 export function conditionRows(condition: Condition, frame: Frame): boolean[] {
   const left = findColumn(frame, condition.column)?.cells ?? [];
+  if (condition.comparison === 'is_in') {
+    const list = condition.value.kind === 'input' ? findInput(condition.value.name) : null;
+    const members = list?.kind === 'list' ? list.values : [];
+    return rowsOf(frame).map((row) => left[row] !== null && members.includes(left[row] ?? null));
+  }
   const right = cellsOf(condition.value, frame);
   return rowsOf(frame).map((row) =>
     holds(condition.comparison, left[row] ?? null, right[row] ?? null),
@@ -200,6 +236,9 @@ export function conditionRows(condition: Condition, frame: Frame): boolean[] {
 
 /** Returns the Polars text of `condition`. */
 export function conditionText(condition: Condition): string {
+  if (condition.comparison === 'is_in') {
+    return `pl.col(${quoted(condition.column)}).is_in(${valueText(condition.value)})`;
+  }
   return `pl.col(${quoted(condition.column)}) ${condition.comparison} ${valueText(condition.value)}`;
 }
 

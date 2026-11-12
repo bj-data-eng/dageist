@@ -12,8 +12,9 @@ import { isSortable } from '@dnd-kit/react/sortable';
 import { createContext, useCallback, useContext, useState } from 'react';
 
 import type { Choice } from '@dageist/design';
-import { CommitField, Picker, Popover, cx } from '@dageist/design';
+import { CommitField, Hint, Picker, Popover, cx } from '@dageist/design';
 
+import { inputLines } from './InputsStrip';
 import { MethodMenu } from './MethodMenu';
 import { MethodPart, Seam, withMethodInserted, withMethodMoved } from './Parts';
 import { Expandable, SubRow } from './SubList';
@@ -21,6 +22,7 @@ import { columnChoices } from './choices';
 import type { Cell, Dtype, Frame } from './model/frame';
 import { distinctValues, isNumeric } from './model/frame';
 import { nextId } from './model/ids';
+import { INPUTS, findInput } from './model/inputs';
 import type { Arm, Chain, Condition, Source, Value, WhenSource } from './model/source';
 import { COMPARISONS, checkChain, literalText } from './model/source';
 
@@ -107,6 +109,8 @@ interface ValueSlotProps {
   readonly suggestions: readonly Cell[];
   /** What the value is for, for assistive technology. */
   readonly label: string;
+  /** Whether the slot takes a connected list, as `is_in` does, instead of a single value. */
+  readonly lists: boolean;
   readonly onChange: (value: Value) => void;
 }
 
@@ -120,9 +124,21 @@ function ValueSlot({
   frame,
   suggestions,
   label,
+  lists,
   onChange,
 }: ValueSlotProps): React.JSX.Element {
   const kinds = kindChoices(value, frame, onChange);
+  // The node's connections of the kind this slot takes: single values, or lists.
+  const connected: Choice[] = INPUTS.filter(
+    (input) => input.kind === (lists ? 'list' : 'value'),
+  ).map((input) => ({
+    label: `${input.name} · ${lists ? 'list of ' : ''}${'dtype' in input ? input.dtype : ''} · input`,
+    current: value.kind === 'input' && value.name === input.name,
+    reason: null,
+    onPick: () => {
+      onChange({ kind: 'input', name: input.name });
+    },
+  }));
   const literals: Choice[] = suggestions.map((suggestion) => ({
     label: literalText(suggestion),
     current: value.kind === 'literal' && value.value === suggestion,
@@ -136,10 +152,22 @@ function ValueSlot({
       label={text}
       tone="plain"
       className="px-1 text-[10px] tracking-wide text-muted"
-      choices={[...literals, ...kinds]}
+      choices={[...literals, ...connected, ...kinds]}
     />
   );
 
+  if (lists || value.kind === 'input') {
+    const input = value.kind === 'input' ? findInput(value.name) : null;
+    return (
+      <Hint lines={input === null ? [] : inputLines(input)} code={false}>
+        <Picker
+          label={value.kind === 'input' ? value.name : 'choose a list'}
+          tone="input"
+          choices={lists ? connected : [...connected, ...literals, ...kinds]}
+        />
+      </Hint>
+    );
+  }
   if (value.kind === 'chain') {
     return (
       <Expandable label="subchain" className="text-ink">
@@ -166,6 +194,7 @@ function ValueSlot({
           ...columnChoices(frame, value.column, (column) => {
             onChange({ kind: 'column', column });
           }),
+          ...connected,
           ...literals,
           ...kinds,
         ]}
@@ -173,7 +202,7 @@ function ValueSlot({
     );
   }
   if (value.value === null) {
-    return <Picker label="None" tone="term" choices={[...literals, ...kinds]} />;
+    return <Picker label="None" tone="term" choices={[...literals, ...connected, ...kinds]} />;
   }
   if (typeof value.value === 'number') {
     return (
@@ -246,7 +275,21 @@ export function ConditionSlots({
           current: comparison === condition.comparison,
           reason: null,
           onPick: () => {
-            onChange({ ...condition, comparison });
+            const wasList = condition.comparison === 'is_in';
+            if (comparison === 'is_in' && !wasList) {
+              // Membership needs a list, so start from the first connected one.
+              const list = INPUTS.find((input) => input.kind === 'list');
+              onChange({
+                ...condition,
+                comparison,
+                value: { kind: 'input', name: list?.name ?? '' },
+              });
+            } else if (comparison !== 'is_in' && wasList) {
+              const first = distinctValues(frame, condition.column)[0] ?? null;
+              onChange({ ...condition, comparison, value: { kind: 'literal', value: first } });
+            } else {
+              onChange({ ...condition, comparison });
+            }
           },
         }))}
       />
@@ -255,6 +298,7 @@ export function ConditionSlots({
         frame={frame}
         suggestions={distinctValues(frame, condition.column)}
         label={`Value compared with ${condition.column}`}
+        lists={condition.comparison === 'is_in'}
         onChange={(value) => {
           onChange({ ...condition, value });
         }}
@@ -317,6 +361,7 @@ function WhenList({ source, frame, onChange, onUseColumn }: WhenListProps): Reac
             frame={frame}
             suggestions={[]}
             label={`Value returned by condition ${String(position + 1)}`}
+            lists={false}
             onChange={(returns) => {
               withArm({ ...arm, returns });
             }}
@@ -332,6 +377,7 @@ function WhenList({ source, frame, onChange, onUseColumn }: WhenListProps): Reac
           frame={frame}
           suggestions={[]}
           label="Value returned when no condition is true"
+          lists={false}
           onChange={(otherwise) => {
             onChange({ ...source, otherwise });
           }}

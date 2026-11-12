@@ -16,6 +16,7 @@ import { Panel, Picker, cx } from '@dageist/design';
 
 import type { DragSettings } from './ChainEditor';
 import { DragSettingsContext } from './ChainEditor';
+import { InputsStrip } from './InputsStrip';
 import { Pipeline } from './Pipeline';
 import { RowsPreview } from './RowsPreview';
 import { STEP_GROUP, StepCard, verbChoices } from './StepCard';
@@ -109,6 +110,7 @@ export function StepEditor({ styleNonce }: StepEditorProps): React.JSX.Element {
       >
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+            <InputsStrip />
             <DragDropProvider
               {...dragSettings}
               onDragEnd={(event) => {
