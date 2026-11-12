@@ -194,7 +194,7 @@ export function StepEditor({ styleNonce }: StepEditorProps): React.JSX.Element {
           </div>
           <div className="min-h-0 overflow-auto px-4 py-2">
             {dock === 'rows' ? (
-              <RowsPreview frame={shown?.frame ?? SOURCE_FRAME} added={shown?.added ?? null} />
+              <RowsPreview frame={shown?.frame ?? SOURCE_FRAME} added={shown?.added ?? []} />
             ) : (
               <Pipeline
                 source="claims"

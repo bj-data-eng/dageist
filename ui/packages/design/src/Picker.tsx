@@ -18,11 +18,12 @@ export interface Choice {
 }
 
 /** How a picker is coloured: by what kind of thing it holds. */
-export type PickerTone = 'verb' | 'column' | 'term' | 'operator' | 'plain';
+export type PickerTone = 'verb' | 'column' | 'table' | 'term' | 'operator' | 'plain';
 
 const TONES: Readonly<Record<PickerTone, string>> = {
   verb: 'font-semibold',
   column: 'bg-column text-column-ink',
+  table: 'bg-table text-table-ink',
   term: 'font-mono text-[12.5px]',
   operator: 'font-mono text-[12.5px] font-semibold text-operator',
   plain: '',

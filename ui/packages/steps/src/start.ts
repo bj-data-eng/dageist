@@ -88,4 +88,35 @@ export const START: readonly Step[] = [
       alias: 'a_days',
     },
   },
+  {
+    id: nextId('step'),
+    verb: 'join',
+    table: 'step_sla',
+    leftOn: 'step_to',
+    rightOn: 'step',
+    how: 'left',
+  },
+  {
+    id: nextId('step'),
+    verb: 'with_columns',
+    expr: {
+      source: {
+        kind: 'when',
+        arms: [
+          {
+            id: nextId('arm'),
+            condition: {
+              column: 'row_days',
+              comparison: '<=',
+              value: { kind: 'column', column: 'sla_days' },
+            },
+            returns: { kind: 'literal', value: 'within' },
+          },
+        ],
+        otherwise: { kind: 'literal', value: 'late' },
+      },
+      methods: [],
+      alias: 'sla_status',
+    },
+  },
 ];

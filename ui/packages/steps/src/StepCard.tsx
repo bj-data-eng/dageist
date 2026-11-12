@@ -15,8 +15,17 @@ import { columnChoices } from './choices';
 import { formatCell } from './format';
 import { checkExpr } from './model/expr';
 import type { Frame } from './model/frame';
-import type { FilterStep, SortStep, Step, StepResult, Verb, WithColumnsStep } from './model/steps';
-import { VERBS, defaultStep, stepText } from './model/steps';
+import type {
+  FilterStep,
+  JoinStep,
+  SortStep,
+  Step,
+  StepResult,
+  Verb,
+  WithColumnsStep,
+} from './model/steps';
+import { HOWS, VERBS, defaultStep, stepText } from './model/steps';
+import { TABLES, findTable } from './model/tables';
 
 /** The sortable group every step row belongs to. */
 export const STEP_GROUP = 'steps';
@@ -26,6 +35,7 @@ const VERB_LABELS: Readonly<Record<Verb, string>> = {
   with_columns: 'Add column',
   sort: 'Sort table',
   filter: 'Filter table',
+  join: 'Join table',
 };
 
 /** The colour each verb is written in, so the kind of a step shows at a glance. */
@@ -33,6 +43,7 @@ const VERB_COLOURS: Readonly<Record<Verb, string>> = {
   with_columns: 'text-accent',
   sort: 'text-ready',
   filter: 'text-column-ink',
+  join: 'text-table-ink',
 };
 
 /** Lists the verbs as menu choices. */
@@ -157,6 +168,69 @@ function FilterSlots({ step, frame, onChange }: SlotsProps<FilterStep>): React.J
   );
 }
 
+function JoinSlots({ step, frame, onChange }: SlotsProps<JoinStep>): React.JSX.Element {
+  const table = findTable(step.table);
+  const leftDtype = frame.find((column) => column.name === step.leftOn)?.dtype;
+  const described = (table?.frame ?? []).map((column) => `${column.name} · ${column.dtype}`);
+  return (
+    <>
+      <Hint
+        lines={[`${step.table}: ${String(table?.frame[0]?.cells.length ?? 0)} rows`, ...described]}
+        code
+      >
+        <Picker
+          label={step.table}
+          tone="table"
+          choices={TABLES.map((candidate) => ({
+            label: candidate.name,
+            current: candidate.name === step.table,
+            reason: null,
+            onPick: () => {
+              // The key belonged to the old table, so start from the new table's first column.
+              onChange({ ...step, table: candidate.name, rightOn: candidate.frame[0]?.name ?? '' });
+            },
+          }))}
+        />
+      </Hint>
+      <SlotLabel>on</SlotLabel>
+      <Picker
+        label={step.leftOn}
+        tone="column"
+        choices={columnChoices(frame, step.leftOn, (leftOn) => {
+          onChange({ ...step, leftOn });
+        })}
+      />
+      <span className="px-0.5 font-mono text-[12.5px] font-semibold text-operator">==</span>
+      <Picker
+        label={step.rightOn}
+        tone="table"
+        choices={(table?.frame ?? []).map((column) => ({
+          label: `${column.name} · ${column.dtype}`,
+          current: column.name === step.rightOn,
+          reason:
+            leftDtype === undefined || column.dtype === leftDtype ? null : 'a different dtype',
+          onPick: () => {
+            onChange({ ...step, rightOn: column.name });
+          },
+        }))}
+      />
+      <SlotLabel>how</SlotLabel>
+      <Picker
+        label={step.how}
+        tone="term"
+        choices={HOWS.map((how) => ({
+          label: how,
+          current: how === step.how,
+          reason: null,
+          onPick: () => {
+            onChange({ ...step, how });
+          },
+        }))}
+      />
+    </>
+  );
+}
+
 function Slots({ step, frame, onChange }: SlotsProps<Step>): React.JSX.Element {
   switch (step.verb) {
     case 'with_columns':
@@ -165,6 +239,8 @@ function Slots({ step, frame, onChange }: SlotsProps<Step>): React.JSX.Element {
       return <SortSlots step={step} frame={frame} onChange={onChange} />;
     case 'filter':
       return <FilterSlots step={step} frame={frame} onChange={onChange} />;
+    case 'join':
+      return <JoinSlots step={step} frame={frame} onChange={onChange} />;
     default:
       return <></>;
   }
@@ -173,9 +249,9 @@ function Slots({ step, frame, onChange }: SlotsProps<Step>): React.JSX.Element {
 /** How many values of a new column its hover note shows. */
 const PEEK = 4;
 
-/** Returns the first values of the column `result` added, as one line of text. */
-function peek(result: StepResult): string[] {
-  const column = result.frame.find((candidate) => candidate.name === result.added);
+/** Returns the first values of the column called `name` in `result`, as one line of text. */
+function peek(result: StepResult, name: string): string[] {
+  const column = result.frame.find((candidate) => candidate.name === name);
   if (column === undefined) return [];
   const values = column.cells.slice(0, PEEK).map((cell) => formatCell(cell, column.dtype));
   return [`${values.join(', ')}${column.cells.length > PEEK ? ', …' : ''}`];
@@ -265,9 +341,27 @@ export function StepCard({
           <Slots step={step} frame={frame} onChange={onChange} />
         </div>
         {dtype !== null && (
-          <Hint lines={peek(result)} code>
+          <Hint lines={peek(result, result.added[0] ?? '')} code>
             <span className="shrink-0 pl-2 text-xs text-muted">
               returns <span className="font-mono text-[12.5px] text-ready">{dtype}</span>
+            </span>
+          </Hint>
+        )}
+        {step.verb === 'join' && result.problem === null && (
+          <Hint
+            lines={result.added.flatMap((name) => [
+              `${name} · ${result.frame.find((column) => column.name === name)?.dtype ?? ''}`,
+              ...peek(result, name),
+            ])}
+            code
+          >
+            <span className="shrink-0 pl-2 text-xs text-muted">
+              adds{' '}
+              <span className="font-mono text-[12.5px] text-ready">
+                {result.added.length === 1
+                  ? result.added[0]
+                  : `${String(result.added.length)} columns`}
+              </span>
             </span>
           </Hint>
         )}
