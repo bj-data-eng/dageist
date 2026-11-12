@@ -89,6 +89,34 @@ The view reaches Tauri through the `window.__TAURI__` global that
 `app.withGlobalTauri` injects. The host bridge declares the global's types by
 hand, covering only the members it uses.
 
+## What The Step Editor Storyboard Has Settled
+
+The step editor is where the design of a transform node is being worked out.
+It runs on fixed sample rows inside the view, so none of it is application
+behavior yet. The decisions below are the ones the core is expected to carry.
+
+- **Words.** A step is named for what it does to the table: Add column, Sort
+  table, Filter table, Join table, Pivot table. Methods keep their Polars
+  names, such as `shift`, `cum_sum` and `over`, because a plainer word would
+  only rename them. A type is always shown by its exact dtype name, as in
+  `returns Int64`, because dtypes decide which tables and values can meet.
+- **Chains.** A step is one row. A column's expression is a chain: a source
+  followed by methods. A method is inserted at the seam between two parts and
+  moved by dragging it. Anything that takes an expression of its own, such as
+  the arms of `when`, `then` and `otherwise`, opens as a collapsible sub-list
+  labelled `subchain`.
+- **Literals.** A literal is typed without quotes. A marker beside the field
+  says whether it is text, a number or `None`.
+- **Inputs, not variables.** A node declares no variables. What its steps can
+  use arrives from the nodes connected to it: tables, single values and
+  lists, each with a name, its dtypes and the node it comes from. Logic is
+  reused by connecting several nodes to one node's output.
+- **Leaving the lazy query.** A step that cannot run lazily carries a marker,
+  and the choice is the user's: collect there, sink first in a node of its
+  own, or change the step so that it stays lazy. Pivot is the only step
+  marked so far, because its output columns depend on the data unless they
+  are pinned.
+
 ## Current Limitations
 
 The application opens its window on two features. The step editor is a
