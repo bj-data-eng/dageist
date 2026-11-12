@@ -10,7 +10,15 @@
 export type Cell = string | number | null;
 
 /** The Polars dtypes the sample uses. */
-export type Dtype = 'String' | 'Int64' | 'UInt32' | 'Datetime' | 'Date' | 'Time' | 'Duration';
+export type Dtype =
+  | 'String'
+  | 'Int32'
+  | 'Int64'
+  | 'UInt32'
+  | 'Datetime'
+  | 'Date'
+  | 'Time'
+  | 'Duration';
 
 /** One column of a frame. */
 export interface Column {
@@ -70,7 +78,16 @@ export function quoted(text: string): string {
 
 /** Reports whether `dtype` holds numbers. */
 export function isNumeric(dtype: Dtype): boolean {
-  return dtype === 'Int64' || dtype === 'UInt32';
+  return dtype === 'Int32' || dtype === 'Int64' || dtype === 'UInt32';
+}
+
+/**
+ * Returns the dtype Polars gives two numeric dtypes that meet, as in a
+ * subtraction or the values of one `when`: their own when they are the same,
+ * and otherwise `Int64`, the narrowest dtype that holds both.
+ */
+export function numericSupertype(left: Dtype, right: Dtype): Dtype {
+  return left === right ? left : 'Int64';
 }
 
 /** Fails on a value the caller's `switch` was supposed to have covered. */

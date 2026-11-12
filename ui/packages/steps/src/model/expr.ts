@@ -7,7 +7,14 @@
  */
 
 import type { Cell, Dtype, Frame } from './frame';
-import { assertNever, compareCells, findColumn, isNumeric, quoted } from './frame';
+import {
+  assertNever,
+  compareCells,
+  findColumn,
+  isNumeric,
+  numericSupertype,
+  quoted,
+} from './frame';
 
 /** Every expression method the prototype knows, by its Polars name. */
 export type MethodName =
@@ -132,8 +139,12 @@ function isTemporal(dtype: Dtype): boolean {
   return dtype === 'Datetime' || dtype === 'Date' || dtype === 'Time';
 }
 
-/** Returns the dtype `name` produces from `input`, or null when it does not accept it. */
-export function methodDtype(name: MethodName, input: Dtype): Dtype | null {
+/**
+ * Returns the dtype `name` produces from `input`, or null when it does not
+ * accept it. `operand` is the dtype of the column the method works with, for
+ * a method that takes one and when that column is known.
+ */
+export function methodDtype(name: MethodName, input: Dtype, operand: Dtype | null): Dtype | null {
   switch (name) {
     case 'shift':
     case 'first':
@@ -149,7 +160,8 @@ export function methodDtype(name: MethodName, input: Dtype): Dtype | null {
       return isNumeric(input) || isTemporal(input) ? input : null;
     case 'sub':
       if (input === 'Datetime' || input === 'Date') return 'Duration';
-      return isNumeric(input) ? 'Int64' : null;
+      if (!isNumeric(input)) return null;
+      return operand !== null && isNumeric(operand) ? numericSupertype(input, operand) : input;
     case 'dt.total_days':
       return input === 'Duration' ? 'Int64' : null;
     case 'dt.date':
@@ -232,7 +244,14 @@ function offsetBy(value: string, duration: string): string {
   const amount = Number(groups?.amount ?? 0);
   const moment = new Date(`${value.slice(0, 10)}T00:00:00Z`);
   if (groups?.unit === 'mo') {
+    // Polars keeps the day of the month, or the month's last day when it is shorter.
+    const day = moment.getUTCDate();
+    moment.setUTCDate(1);
     moment.setUTCMonth(moment.getUTCMonth() + amount);
+    const lastDay = new Date(
+      Date.UTC(moment.getUTCFullYear(), moment.getUTCMonth() + 1, 0),
+    ).getUTCDate();
+    moment.setUTCDate(Math.min(day, lastDay));
   } else {
     moment.setUTCDate(moment.getUTCDate() + amount * (groups?.unit === 'w' ? 7 : 1));
   }
@@ -255,10 +274,12 @@ function applyToEach(method: Method, value: Cell): Cell {
   }
 }
 
+/** Returns the highest value so far at each row. A null stays null and does not count. */
 function runningMaximum(values: readonly Cell[]): Cell[] {
   let highest: Cell = null;
   return values.map((value) => {
-    if (value !== null && (highest === null || compareCells(value, highest) > 0)) highest = value;
+    if (value === null) return null;
+    if (highest === null || compareCells(value, highest) > 0) highest = value;
     return highest;
   });
 }
@@ -302,9 +323,11 @@ function applyAcrossGroup(
       });
     }
     case 'cum_sum': {
+      // A null stays null and adds nothing to the total.
       let total = 0;
       return values.map((value) => {
-        if (typeof value === 'number') total += value;
+        if (typeof value !== 'number') return null;
+        total += value;
         return total;
       });
     }
@@ -375,7 +398,7 @@ export function defaultArgument(
     case 'duration':
       return '-1d';
     case 'column':
-      return 'dcn';
+      return frame[0]?.name ?? '';
     default:
       return null;
   }

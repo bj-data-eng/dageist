@@ -45,7 +45,8 @@ export function MethodMenu({ input, frame, onPick }: MethodMenuProps): React.JSX
 
   const query = typed.trim().toLowerCase();
   const shown = METHOD_NAMES.filter((name) => matches(name, query));
-  const fits = (name: MethodName): boolean => input !== null && methodDtype(name, input) !== null;
+  const fits = (name: MethodName): boolean =>
+    input !== null && methodDtype(name, input, null) !== null;
   const pick = (name: MethodName): void => {
     onPick({ id: nextId('method'), name, argument: defaultArgument(name, frame, input) });
   };

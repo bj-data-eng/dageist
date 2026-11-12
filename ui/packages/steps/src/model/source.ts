@@ -18,7 +18,7 @@ import {
   rowGroups,
 } from './expr';
 import type { Cell, Dtype, Frame } from './frame';
-import { compareCells, findColumn, isNumeric, quoted } from './frame';
+import { compareCells, findColumn, isNumeric, numericSupertype, quoted } from './frame';
 import { findInput } from './inputs';
 
 /** Returns `value` as Python would write it. */
@@ -152,7 +152,8 @@ function checkValue(value: Value, frame: Frame): SourceCheck {
       : { dtype: column.dtype, problem: null };
   }
   if (value.value === null) return { dtype: null, problem: null };
-  return { dtype: typeof value.value === 'number' ? 'Int64' : 'String', problem: null };
+  // A whole number written on its own is Int32 in Polars.
+  return { dtype: typeof value.value === 'number' ? 'Int32' : 'String', problem: null };
 }
 
 /** Returns the Polars text of `value` where a column or expression is expected. */
@@ -175,7 +176,7 @@ function cellsOf(value: Value, frame: Frame): readonly Cell[] {
 }
 
 /** Reports whether two dtypes can be compared or returned side by side. */
-function agree(left: Dtype, right: Dtype): boolean {
+export function dtypesAgree(left: Dtype, right: Dtype): boolean {
   return left === right || (isNumeric(left) && isNumeric(right));
 }
 
@@ -186,13 +187,13 @@ export function conditionProblem(condition: Condition, frame: Frame): string | n
   if (condition.comparison === 'is_in') {
     const list = condition.value.kind === 'input' ? findInput(condition.value.name) : null;
     if (list?.kind !== 'list') return 'is_in needs a list to look in.';
-    return agree(column.dtype, list.dtype)
+    return dtypesAgree(column.dtype, list.dtype)
       ? null
       : `"${column.name}" is ${column.dtype}, but "${list.name}" holds ${list.dtype}.`;
   }
   const value = checkValue(condition.value, frame);
   if (value.problem !== null) return value.problem;
-  if (value.dtype !== null && !agree(column.dtype, value.dtype)) {
+  if (value.dtype !== null && !dtypesAgree(column.dtype, value.dtype)) {
     return `"${column.name}" is ${column.dtype}, but ${valueText(condition.value)} is ${value.dtype}.`;
   }
   return null;
@@ -251,28 +252,40 @@ function returnedText(value: Value): string {
 }
 
 function checkWhen(source: WhenSource, frame: Frame): SourceCheck {
-  const dtypes: Dtype[] = [];
   for (const arm of source.arms) {
     const problem = conditionProblem(arm.condition, frame);
     if (problem !== null) return { dtype: null, problem };
   }
+  // A literal takes the dtype of the columns it is returned beside, so the
+  // dtypes of columns, subchains and inputs are kept apart from literals'.
+  const typed: Dtype[] = [];
+  const literal: Dtype[] = [];
+  let negative = false;
   for (const value of [...source.arms.map((arm) => arm.returns), source.otherwise]) {
     const checked = checkValue(value, frame);
     if (checked.problem !== null) return checked;
-    if (checked.dtype !== null) dtypes.push(checked.dtype);
+    if (checked.dtype !== null) (value.kind === 'literal' ? literal : typed).push(checked.dtype);
+    if (value.kind === 'literal' && typeof value.value === 'number' && value.value < 0) {
+      negative = true;
+    }
   }
-  const [first] = dtypes;
+  const all = [...typed, ...literal];
+  const [first] = all;
   if (first === undefined) {
     return { dtype: null, problem: 'when needs at least one value that is not None.' };
   }
-  const odd = dtypes.find((dtype) => !agree(first, dtype));
+  const odd = all.find((dtype) => !dtypesAgree(first, dtype));
   if (odd !== undefined) {
     return {
       dtype: null,
       problem: `then and otherwise return different dtypes: ${first} and ${odd}.`,
     };
   }
-  return { dtype: dtypes.every((dtype) => dtype === 'UInt32') ? 'UInt32' : first, problem: null };
+  const dtype = (typed.length > 0 ? typed : literal).reduce((left, right) =>
+    numericSupertype(left, right),
+  );
+  // An unsigned column cannot hold a negative literal, so the two meet in Int64.
+  return { dtype: dtype === 'UInt32' && negative ? 'Int64' : dtype, problem: null };
 }
 
 /** Returns the dtype `source` gives on `frame`, or why it gives none. */
@@ -317,14 +330,16 @@ export function checkChain(chain: Chain, frame: Frame): ChainCheck {
   const dtypes: Dtype[] = [start.dtype];
   let current = start.dtype;
   for (const [index, method] of chain.methods.entries()) {
-    const next = methodDtype(method.name, current);
+    const operand = findColumn(frame, method.argument ?? '')?.dtype ?? null;
+    const next = methodDtype(method.name, current, operand);
     if (next === null) {
       const message = `${method.name} needs ${methodRequirement(method.name)}, but it is given ${current}.`;
       return { dtypes, problem: { index, message } };
     }
     const wrongArgument = argumentProblem(method, frame, current);
-    if (wrongArgument !== null) return { dtypes, problem: { index, message: wrongArgument } };
+    // The dtype fits even when the argument is wrong, so it is still reported.
     dtypes.push(next);
+    if (wrongArgument !== null) return { dtypes, problem: { index, message: wrongArgument } };
     current = next;
   }
   return { dtypes, problem: null };

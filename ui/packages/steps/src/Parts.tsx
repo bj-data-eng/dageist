@@ -112,7 +112,7 @@ function methodChoices(
       label: name,
       current: name === method.name,
       reason:
-        input === undefined || methodDtype(name, input) !== null
+        input === undefined || methodDtype(name, input, null) !== null
           ? null
           : `needs ${methodRequirement(name)}`,
       onPick: () => {

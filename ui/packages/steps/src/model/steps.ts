@@ -26,6 +26,7 @@ import {
   conditionText,
   evaluateChain,
   exprText,
+  literalText,
 } from './source';
 import { TABLES, findTable } from './tables';
 
@@ -222,6 +223,14 @@ function join(frame: Frame, step: JoinStep): StepResult {
       dtype: column.dtype,
       cells: pairs.map(([, match]) => (match === null ? null : (column.cells[match] ?? null))),
     }));
+  // Polars refuses a join that would leave two columns with one name.
+  const taken = new Set(frame.map((column) => column.name));
+  for (const column of brought) {
+    if (taken.has(column.name)) {
+      return failed(frame, `The join would add a second column "${column.name}".`);
+    }
+    taken.add(column.name);
+  }
   return {
     frame: [...kept, ...brought],
     problem: null,
@@ -229,22 +238,31 @@ function join(frame: Frame, step: JoinStep): StepResult {
   };
 }
 
+/**
+ * Returns what `aggregate` gives the cells that land in one pivot cell. Polars
+ * works each cell out as that aggregate over the rows that match, so a cell
+ * no row lands in holds what the aggregate gives no rows: 0 for `len` and
+ * `sum`, and null for the others.
+ */
 function aggregated(aggregate: Aggregate, cells: readonly Cell[]): Cell {
   const present = cells.filter((cell) => cell !== null);
-  if (aggregate === 'len') return cells.length;
   const [first] = present;
-  if (first === undefined) return null;
   switch (aggregate) {
+    case 'len':
+      return cells.length;
     case 'first':
-      return first;
+      // The first row's value, null or not.
+      return cells[0] ?? null;
     case 'sum':
       return present.reduce<number>(
         (total, cell) => total + (typeof cell === 'number' ? cell : 0),
         0,
       );
     case 'max':
+      if (first === undefined) return null;
       return present.reduce((best, cell) => (compareCells(cell, best) > 0 ? cell : best), first);
     case 'min':
+      if (first === undefined) return null;
       return present.reduce((best, cell) => (compareCells(cell, best) < 0 ? cell : best), first);
     default:
       return assertNever(aggregate);
@@ -374,7 +392,7 @@ function pivotText(step: PivotStep): string {
   const settings = `index=${quoted(step.index)}, values=${quoted(step.values)}, aggregate_function=${quoted(step.aggregate)}`;
   switch (step.columnsFrom) {
     case 'pinned': {
-      const columns = step.pinned.map((value) => quoted(String(value))).join(', ');
+      const columns = step.pinned.map((value) => literalText(value)).join(', ');
       return `.pivot(${quoted(step.on)}, on_columns=[${columns}], ${settings})`;
     }
     case 'collect':
