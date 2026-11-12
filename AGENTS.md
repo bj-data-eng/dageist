@@ -25,9 +25,9 @@ independent integration review.
 
 ## Repository Identity And Ownership
 
-This repository owns the host-independent `dageist` core in `src/`, the host
-adapters under `crates/`, the TypeScript view in `ui/`, their contracts,
-manifests, tests, documentation and shared tooling. Root owns workspace wiring
+This repository owns the host-independent `dageist` core in `src/`, the
+dataframe engine and the host adapters under `crates/`, the TypeScript view in
+`ui/`, their contracts, manifests, tests, documentation and shared tooling. Root owns workspace wiring
 and the core. The Tauri host owns its window, webview configuration, IPC
 commands and the view it serves.
 
@@ -43,7 +43,8 @@ and current source establishes behavior.
 | Host identity and dependencies | [crates/dageist-tauri/Cargo.toml](crates/dageist-tauri/Cargo.toml) |
 | Window, bundle, view location and content security policy | [crates/dageist-tauri/tauri.conf.json](crates/dageist-tauri/tauri.conf.json) |
 | Webview permissions | [crates/dageist-tauri/capabilities/](crates/dageist-tauri/capabilities/) |
-| IPC commands and their serialized views | [crates/dageist-tauri/src/main.rs](crates/dageist-tauri/src/main.rs) |
+| Engine identity, dependencies and Polars features | [crates/dageist-engine/Cargo.toml](crates/dageist-engine/Cargo.toml) |
+| IPC commands and their serialized views | [crates/dageist-tauri/src/](crates/dageist-tauri/src/main.rs) |
 | View toolchain, scripts and compiler settings | [ui/package.json](ui/package.json), [ui/package-lock.json](ui/package-lock.json), [ui/tsconfig.json](ui/tsconfig.json), [ui/scripts/tsconfig.json](ui/scripts/tsconfig.json) |
 | View lint rules and formatter settings | [ui/.oxlintrc.json](ui/.oxlintrc.json), [ui/.oxfmtrc.json](ui/.oxfmtrc.json) |
 | Architecture and integration boundaries | [docs/explanation.md](docs/explanation.md) |
@@ -104,8 +105,9 @@ Source remains authoritative; never hand-edit generated artifacts.
 Product packages share the root lockfile.
 
 Select focused checks through `$pisct:testing`; execute through `$pisct:process`.
-No blanket workspace tests. Targeted Cargo commands may run in parallel, with
-one build job per command. Monitor `pisct host status` and follow coordination's
+No blanket workspace tests. A Cargo command run on its own uses Cargo's default
+parallelism. When several Cargo commands run at the same time, give each one
+build job with `-j 1`. Monitor `pisct host status` and follow coordination's
 pressure guidance. Use separate targets for concurrent worktrees changing the
 same packages; reuse an existing target when source/context permit. Keep default
 test parallelism unless host status recommends a limit.
@@ -113,10 +115,17 @@ test parallelism unless host status recommends a limit.
 Core checks from the repository root:
 
 ```sh
-cargo check --offline --locked -j 1 -p dageist
-cargo test --offline --locked -j 1 -p dageist --lib
-cargo clippy --offline --locked -j 1 -p dageist --all-targets --no-deps -- -F unsafe-code -D warnings
+cargo check --offline --locked -p dageist
+cargo test --offline --locked -p dageist --lib
+cargo clippy --offline --locked -p dageist --all-targets --no-deps -- -F unsafe-code -D warnings
 cargo fmt --all -- --check
+```
+
+Engine checks from the repository root:
+
+```sh
+cargo test --offline --locked -p dageist-engine
+cargo clippy --offline --locked -p dageist-engine --all-targets --no-deps -- -F unsafe-code -D warnings
 ```
 
 View checks from the repository root. `npm --prefix ui ci --offline` restores
@@ -136,8 +145,8 @@ The lint denies warnings and reports unused suppressions.
 Host checks embed `ui/dist/`, so build the view first:
 
 ```sh
-cargo test --offline --locked -j 1 -p dageist-tauri
-cargo clippy --offline --locked -j 1 -p dageist-tauri --all-targets --no-deps -- -F unsafe-code -D warnings
+cargo test --offline --locked -p dageist-tauri
+cargo clippy --offline --locked -p dageist-tauri --all-targets --no-deps -- -F unsafe-code -D warnings
 ```
 
 `cargo run --offline --locked -p dageist-tauri` opens the native application

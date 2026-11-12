@@ -27,6 +27,20 @@ command. The view calls those commands, renders their results and forwards user
 intent back through further commands. It holds no authoritative state: anything
 it shows can be rebuilt by asking the host again.
 
+Table data takes a shorter path than other values. The engine crate,
+`dageist-engine`, runs Polars and offers a table two ways:
+
+- A **working window** holds every row of a limited number of keys in memory.
+  It is small enough to recompute in milliseconds, and because its keys are
+  whole, grouped and windowed expressions give the same answer on it as on the
+  full data.
+- A **stored result** stays in its Parquet files, however large. The engine
+  reads each requested block from disk, so memory use depends on the block and
+  not on the table.
+
+Either way a caller asks for a block of rows and columns, and the host passes
+it through as the raw bytes of an Arrow IPC stream instead of JSON.
+
 As the product grows, new behavior lands in the core or in crates under
 `crates/` that the core depends on. The host gains a command only when the view
 needs to reach that behavior.

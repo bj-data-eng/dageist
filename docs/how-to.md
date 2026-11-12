@@ -9,8 +9,8 @@ owns command selection, concurrency and host-monitoring policy.
 The core has no host or view dependency, so it builds and tests quickly:
 
 ```sh
-cargo test --offline --locked -j 1 -p dageist --lib
-cargo clippy --offline --locked -j 1 -p dageist --all-targets --no-deps -- -F unsafe-code -D warnings
+cargo test --offline --locked -p dageist --lib
+cargo clippy --offline --locked -p dageist --all-targets --no-deps -- -F unsafe-code -D warnings
 ```
 
 The tests pass and Clippy reports no warnings. `-F unsafe-code` rejects any
@@ -69,12 +69,28 @@ The host embeds `ui/dist/` at compile time, so [check the view](#check-the-view)
 first:
 
 ```sh
-cargo test --offline --locked -j 1 -p dageist-tauri
-cargo clippy --offline --locked -j 1 -p dageist-tauri --all-targets --no-deps -- -F unsafe-code -D warnings
+cargo test --offline --locked -p dageist-tauri
+cargo clippy --offline --locked -p dageist-tauri --all-targets --no-deps -- -F unsafe-code -D warnings
 ```
 
 The tests prove the `core_identity` command returns the core's identity and
-serializes it in the shape the view expects. They do not open a window.
+serializes it in the shape the view expects. They also prove that opening the
+sample table generates it only when it is missing, and that `table_block`
+answers through Tauri's IPC layer with raw Arrow bytes, for a working window
+and for a stored result, or with a message. They do not open a window.
+
+## Time The Engine
+
+Generate a claims table of about one million rows and 300 columns, then time
+loading a working window, slicing it and reading blocks straight from Parquet:
+
+```sh
+cargo run --release --offline --locked -p dageist-engine --example measure
+```
+
+The program writes about 1 GB of Parquet under `tmp/sample-claims/`, which Git
+ignores, and prints one line per measurement. Run it optimised, because an
+unoptimised Polars is many times slower.
 
 ## Check Formatting
 
