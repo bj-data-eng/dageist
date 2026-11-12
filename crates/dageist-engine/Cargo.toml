@@ -1,0 +1,30 @@
+[package]
+name = "dageist-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Dataframe engine for dageist: Polars plans, working windows and Arrow output."
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+polars = { version = "=0.55.2", default-features = false, features = [
+    "concat_str",
+    "dtype-array",
+    "dtype-date",
+    "dtype-datetime",
+    "ipc_streaming",
+    "lazy",
+    "parquet",
+    "range",
+    "round_series",
+    "row_hash",
+    "semi_anti_join",
+    "strings",
+    "temporal",
+    "timezones",
+] }

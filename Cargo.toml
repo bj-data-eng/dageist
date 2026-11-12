@@ -27,6 +27,7 @@ rust-version = "1.99.1"
 resolver = "3"
 default-members = ["."]
 members = [
+    "crates/dageist-engine",
     "crates/dageist-tauri",
 ]
 

@@ -7,7 +7,11 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod sample_table;
+
 use serde::Serialize;
+
+use sample_table::{OpenTable, SampleGate};
 
 /// Identity of the running dageist core, as presented to the view.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -27,7 +31,14 @@ fn core_identity() -> IdentityView {
 
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![core_identity])
+        .manage(SampleGate::default())
+        .manage(OpenTable::default())
+        .invoke_handler(tauri::generate_handler![
+            core_identity,
+            sample_table::open_sample_window,
+            sample_table::open_sample_result,
+            sample_table::table_block,
+        ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|error| panic!("dageist failed to run: {error}"));
 }

@@ -55,7 +55,8 @@ packages.
    cargo run --offline --locked -p dageist-tauri
    ```
 
-The first build compiles Tauri and its dependencies and takes several minutes.
+The first build compiles Tauri, Polars and their dependencies and takes several
+minutes.
 A dark window titled `dageist` then opens on an empty dotted canvas. Its status
 badge changes from `Connecting to core…` to `dageist 0.1.0`, which the view
 received from the Rust core through the `core_identity` IPC command. If the

@@ -10,6 +10,7 @@ workspace member through `[workspace.lints.rust]`. The workspace uses
 | Package | Path | Role |
 | --- | --- | --- |
 | `dageist` | [src/](../src/lib.rs) | Host-independent core library. |
+| `dageist-engine` | [crates/dageist-engine/](../crates/dageist-engine/Cargo.toml) | Dataframe engine on Polars: sample data, working windows, stored results and Arrow output. Not published. |
 | `dageist-tauri` | [crates/dageist-tauri/](../crates/dageist-tauri/Cargo.toml) | Tauri 2 host; builds the `dageist` binary. Not published. |
 | `dageist-ui` | [ui/](../ui/package.json) | Private npm package for the TypeScript view. |
 
@@ -23,12 +24,28 @@ workspace member through `[workspace.lints.rust]`. The workspace uses
 ## IPC Commands
 
 The host registers these commands in
-[crates/dageist-tauri/src/main.rs](../crates/dageist-tauri/src/main.rs). The view
-calls them through `window.__TAURI__.core.invoke`.
+[crates/dageist-tauri/src/main.rs](../crates/dageist-tauri/src/main.rs) and
+defines the table commands in
+[sample_table.rs](../crates/dageist-tauri/src/sample_table.rs). They are called
+through `window.__TAURI__.core.invoke`. The view calls `core_identity`; it does
+not use the table commands yet.
 
 | Command | Arguments | Result |
 | --- | --- | --- |
 | `core_identity` | None | `{ "name": string, "version": string }` from the core. |
+| `open_sample_window` | `keys`: how many whole keys to hold in memory, at most 50,000 | `{ "rows": number, "columns": [{ "name": string, "dataType": string }] }` for the working window. |
+| `open_sample_result` | None | The same shape for the whole sample, opened where it is stored without loading it. |
+| `table_block` | `offset`, `length`: the rows, at most 10,000; `columns`: the column names, each once, or an empty list for all | That block of whichever table is open, as the raw bytes of an Arrow IPC stream, not JSON. Rows past the end are left out. |
+
+A table command that fails rejects with `{ "message": string }`; arguments of
+the wrong type are rejected by Tauri with its own text. The first call to
+either open command generates the sample table, about two million rows of 300
+columns and 2 GB of Parquet, into a `claims-…` folder in the application cache
+(`~/Library/Caches/io.github.bj-data-eng.dageist/` on macOS). Later calls reuse
+it; delete the folder to reclaim the space. The sample is written beside that
+folder and moved into place when it is complete, and within one running
+application only one command generates it at a time. Two copies of the
+application generating at once are not guarded against.
 
 ## Host Configuration
 
