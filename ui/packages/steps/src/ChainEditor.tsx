@@ -24,7 +24,7 @@ import { distinctValues, isNumeric } from './model/frame';
 import { nextId } from './model/ids';
 import { INPUTS, findInput } from './model/inputs';
 import type { Arm, Chain, Condition, Source, Value, WhenSource } from './model/source';
-import { COMPARISONS, checkChain, literalText } from './model/source';
+import { COMPARISONS, checkChain, dtypesAgree, literalText } from './model/source';
 
 /** How every drag-and-drop area in the editor is set up. */
 export interface DragSettings {
@@ -111,6 +111,8 @@ interface ValueSlotProps {
   readonly label: string;
   /** Whether the slot takes a connected list, as `is_in` does, instead of a single value. */
   readonly lists: boolean;
+  /** The dtype the value is compared with, when it is compared with one. */
+  readonly expected: Dtype | null;
   readonly onChange: (value: Value) => void;
 }
 
@@ -125,28 +127,32 @@ function ValueSlot({
   suggestions,
   label,
   lists,
+  expected,
   onChange,
 }: ValueSlotProps): React.JSX.Element {
   const kinds = kindChoices(value, frame, onChange);
   // The node's connections of the kind this slot takes: single values, or lists.
-  const connected: Choice[] = INPUTS.filter(
-    (input) => input.kind === (lists ? 'list' : 'value'),
+  const connected: Choice[] = INPUTS.flatMap((input) =>
+    input.kind === (lists ? 'list' : 'value') ? [input] : [],
   ).map((input) => ({
-    label: `${input.name} · ${lists ? 'list of ' : ''}${'dtype' in input ? input.dtype : ''} · input`,
+    label: `${input.name} · ${lists ? 'list of ' : ''}${input.dtype} · input`,
     current: value.kind === 'input' && value.name === input.name,
-    reason: null,
+    reason: expected === null || dtypesAgree(expected, input.dtype) ? null : 'a different dtype',
     onPick: () => {
       onChange({ kind: 'input', name: input.name });
     },
   }));
-  const literals: Choice[] = suggestions.map((suggestion) => ({
-    label: literalText(suggestion),
-    current: value.kind === 'literal' && value.value === suggestion,
-    reason: null,
-    onPick: () => {
-      onChange({ kind: 'literal', value: suggestion });
-    },
-  }));
+  // None is offered among the kinds, so it is not suggested a second time.
+  const literals: Choice[] = suggestions
+    .filter((suggestion) => suggestion !== null)
+    .map((suggestion) => ({
+      label: literalText(suggestion),
+      current: value.kind === 'literal' && value.value === suggestion,
+      reason: null,
+      onPick: () => {
+        onChange({ kind: 'literal', value: suggestion });
+      },
+    }));
   const marker = (text: string): React.JSX.Element => (
     <Picker
       label={text}
@@ -256,12 +262,18 @@ export function ConditionSlots({
   frame,
   onChange,
 }: ConditionSlotsProps): React.JSX.Element {
+  const expected = frame.find((column) => column.name === condition.column)?.dtype ?? null;
   return (
     <>
       <Picker
         label={condition.column}
         tone="column"
         choices={columnChoices(frame, condition.column, (column) => {
+          if (condition.comparison === 'is_in') {
+            // Membership keeps its list; the step says so if the list no longer fits.
+            onChange({ ...condition, column });
+            return;
+          }
           // The old value belonged to the old column, so start from one of the new column's.
           const first = distinctValues(frame, column)[0] ?? null;
           onChange({ ...condition, column, value: { kind: 'literal', value: first } });
@@ -277,8 +289,11 @@ export function ConditionSlots({
           onPick: () => {
             const wasList = condition.comparison === 'is_in';
             if (comparison === 'is_in' && !wasList) {
-              // Membership needs a list, so start from the first connected one.
-              const list = INPUTS.find((input) => input.kind === 'list');
+              // Membership needs a list, so start from a connected one of the column's dtype.
+              const lists = INPUTS.flatMap((input) => (input.kind === 'list' ? [input] : []));
+              const list =
+                lists.find((input) => expected !== null && dtypesAgree(expected, input.dtype)) ??
+                lists[0];
               onChange({
                 ...condition,
                 comparison,
@@ -299,6 +314,7 @@ export function ConditionSlots({
         suggestions={distinctValues(frame, condition.column)}
         label={`Value compared with ${condition.column}`}
         lists={condition.comparison === 'is_in'}
+        expected={expected}
         onChange={(value) => {
           onChange({ ...condition, value });
         }}
@@ -362,6 +378,7 @@ function WhenList({ source, frame, onChange, onUseColumn }: WhenListProps): Reac
             suggestions={[]}
             label={`Value returned by condition ${String(position + 1)}`}
             lists={false}
+            expected={null}
             onChange={(returns) => {
               withArm({ ...arm, returns });
             }}
@@ -378,6 +395,7 @@ function WhenList({ source, frame, onChange, onUseColumn }: WhenListProps): Reac
           suggestions={[]}
           label="Value returned when no condition is true"
           lists={false}
+          expected={null}
           onChange={(otherwise) => {
             onChange({ ...source, otherwise });
           }}

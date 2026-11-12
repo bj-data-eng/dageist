@@ -101,7 +101,7 @@ export function Hint({ lines, code, children }: HintProps): React.JSX.Element {
             }}
           >
             {lines.map((line, at) => (
-              <div key={line} className={cx(at > 0 && 'text-muted')}>
+              <div key={at} className={cx(at > 0 && 'text-muted')}>
                 {line}
               </div>
             ))}

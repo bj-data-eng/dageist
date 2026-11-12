@@ -88,9 +88,10 @@ export function Picker({
       {open && button !== null && (
         <Popover anchor={button} onDismiss={close}>
           <div role="menu" className="min-w-40">
-            {choices.map((choice) => (
+            {choices.map((choice, at) => (
               <button
-                key={choice.label}
+                // A menu is rebuilt whole, so an entry's place identifies it.
+                key={at}
                 type="button"
                 role="menuitem"
                 disabled={choice.reason !== null}

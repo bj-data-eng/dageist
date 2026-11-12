@@ -139,6 +139,10 @@ export function StepEditor({ styleNonce }: StepEditorProps): React.JSX.Element {
                       onChange={replaceStep}
                       onRemove={() => {
                         setSteps(steps.filter((existing) => existing.id !== step.id));
+                        if (step.id === selectedId) {
+                          // The rows shown move to the step before, or the one after the first.
+                          setSelectedId((steps[index - 1] ?? steps[index + 1])?.id ?? null);
+                        }
                       }}
                       onInsertAfter={(verb) => {
                         const added = defaultStep(verb, result.frame);
