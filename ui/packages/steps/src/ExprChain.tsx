@@ -15,6 +15,7 @@ import type { Choice } from '@dageist/design';
 import { CommitField, Hint, Picker, Popover, cx } from '@dageist/design';
 
 import { MethodMenu } from './MethodMenu';
+import { WhenChain, defaultArm } from './WhenChain';
 import { columnChoices } from './choices';
 import type { Expr, ExprCheck, Method, MethodName } from './model/expr';
 import {
@@ -29,6 +30,8 @@ import {
   operandFits,
 } from './model/expr';
 import type { Dtype, Frame } from './model/frame';
+import { isNumeric } from './model/frame';
+import type { Source } from './model/source';
 
 /**
  * A part is dragged by its name, which is also the button that opens its
@@ -43,7 +46,7 @@ const PART_SENSORS = [
 ];
 
 function withMethods(expr: Expr, methods: readonly Method[]): Expr {
-  return { column: expr.column, methods, alias: expr.alias };
+  return { source: expr.source, methods, alias: expr.alias };
 }
 
 /** Returns `expr` with the method at `from` moved to position `to`. */
@@ -310,6 +313,28 @@ function MethodPart({
   );
 }
 
+/**
+ * Returns a condition to start an expression from in place of `source`: it
+ * returns the column the expression started from when the condition is true.
+ */
+function conditionOn(source: Source, frame: Frame, dtype: Dtype | null): Source {
+  const column = columnBehind(source, frame);
+  // A number falls back to 0 and anything else to None, so both sides agree in dtype.
+  const fallback = dtype !== null && isNumeric(dtype) ? 0 : null;
+  return {
+    kind: 'when',
+    arms: [defaultArm(frame, { kind: 'column', column })],
+    otherwise: { kind: 'literal', value: fallback },
+  };
+}
+
+/** Returns the column `source` is most about: its own, or the first one a condition returns. */
+function columnBehind(source: Source, frame: Frame): string {
+  if (source.kind === 'column') return source.column;
+  const returned = source.arms.map((arm) => arm.returns).find((value) => value.kind === 'column');
+  return returned?.kind === 'column' ? returned.column : (frame[0]?.name ?? '');
+}
+
 /** Where a method is about to be added: its position in the chain and the seam it opens from. */
 interface Insertion {
   readonly at: number;
@@ -330,6 +355,9 @@ export interface ExprChainProps {
 export function ExprChain({ stepId, expr, frame, onChange }: ExprChainProps): React.JSX.Element {
   const check = checkExpr(expr, frame);
   const [insertion, setInsertion] = useState<Insertion | null>(null);
+  const withSource = (source: Source): void => {
+    onChange({ source, methods: expr.methods, alias: expr.alias });
+  };
   const closeMenu = useCallback(() => {
     setInsertion(null);
   }, []);
@@ -345,20 +373,43 @@ export function ExprChain({ stepId, expr, frame, onChange }: ExprChainProps): Re
   );
 
   return (
-    <span className="inline-flex flex-wrap items-center gap-y-1">
+    // The chain's pieces sit directly in the step's row, so a long chain wraps
+    // piece by piece instead of dropping to a new line as a whole.
+    <span className="contents">
       <span
         className={cx(
-          'inline-flex rounded-md',
+          'inline-flex flex-wrap items-center gap-y-1 rounded-md',
           check.problem?.index === -1 && 'bg-invalid outline-1 outline-danger',
         )}
       >
-        <Picker
-          label={expr.column}
-          tone="column"
-          choices={columnChoices(frame, expr.column, (column) => {
-            onChange({ column, methods: expr.methods, alias: expr.alias });
-          })}
-        />
+        {expr.source.kind === 'column' ? (
+          <Picker
+            label={expr.source.column}
+            tone="column"
+            choices={[
+              ...columnChoices(frame, expr.source.column, (column) => {
+                withSource({ kind: 'column', column });
+              }),
+              {
+                label: 'when … then … otherwise',
+                current: false,
+                reason: null,
+                onPick: () => {
+                  withSource(conditionOn(expr.source, frame, check.dtypes[0] ?? null));
+                },
+              },
+            ]}
+          />
+        ) : (
+          <WhenChain
+            source={expr.source}
+            frame={frame}
+            onChange={withSource}
+            onUseColumn={() => {
+              withSource({ kind: 'column', column: columnBehind(expr.source, frame) });
+            }}
+          />
+        )}
       </span>
       {expr.methods.map((method, index) => (
         <MethodPart

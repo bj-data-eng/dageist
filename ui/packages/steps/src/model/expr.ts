@@ -8,7 +8,9 @@
  */
 
 import type { Cell, Dtype, Frame } from './frame';
-import { assertNever, compareCells, findColumn } from './frame';
+import { assertNever, compareCells, findColumn, isNumeric } from './frame';
+import type { Source } from './source';
+import { checkSource, evaluateSource, quoted, sourceText } from './source';
 
 /** Every expression method the prototype knows, by its Polars name. */
 export type MethodName =
@@ -126,20 +128,20 @@ export interface Method {
   readonly argument: string | null;
 }
 
-/** `pl.col(column)` followed by method calls and a final `.alias(alias)`. */
+/** A source followed by method calls and a final `.alias(alias)`. */
 export interface Expr {
-  readonly column: string;
+  readonly source: Source;
   readonly methods: readonly Method[];
   readonly alias: string;
 }
 
-/** Why an expression cannot be worked out, and at which method. Index -1 is `pl.col`. */
+/** Why an expression cannot be worked out, and at which method. Index -1 is the source. */
 export interface ExprProblem {
   readonly index: number;
   readonly message: string;
 }
 
-/** The dtype after `pl.col` and after each method, plus the first problem. */
+/** The dtype after the source and after each method, plus the first problem. */
 export interface ExprCheck {
   readonly dtypes: readonly Dtype[];
   readonly problem: ExprProblem | null;
@@ -147,10 +149,6 @@ export interface ExprCheck {
 
 const DURATION = /^(?<amount>-?\d+)(?<unit>d|w|mo)$/;
 const INTEGER = /^-?\d+$/;
-
-function isNumeric(dtype: Dtype): boolean {
-  return dtype === 'Int64' || dtype === 'UInt32';
-}
 
 function isTemporal(dtype: Dtype): boolean {
   return dtype === 'Datetime' || dtype === 'Date' || dtype === 'Time';
@@ -252,13 +250,13 @@ function argumentProblem(method: Method, frame: Frame, input: Dtype): string | n
 
 /** Checks that every method of `expr` accepts the dtype handed to it. */
 export function checkExpr(expr: Expr, frame: Frame): ExprCheck {
-  const column = findColumn(frame, expr.column);
-  if (column === null) {
-    const message = `There is no column "${expr.column}".`;
+  const start = checkSource(expr.source, frame);
+  if (start.problem !== null || start.dtype === null) {
+    const message = start.problem ?? 'This expression has no dtype.';
     return { dtypes: [], problem: { index: -1, message } };
   }
-  const dtypes: Dtype[] = [column.dtype];
-  let current = column.dtype;
+  const dtypes: Dtype[] = [start.dtype];
+  let current = start.dtype;
   for (const [index, method] of expr.methods.entries()) {
     const next = methodDtype(method.name, current);
     if (next === null) {
@@ -404,11 +402,10 @@ function applyWithin(
 
 /** Works `expr` out on the rows of `frame`, or returns null when it has a problem. */
 export function evaluateExpr(expr: Expr, frame: Frame): readonly Cell[] | null {
-  const column = findColumn(frame, expr.column);
-  if (column === null || checkExpr(expr, frame).problem !== null) return null;
-  let values: readonly Cell[] = column.cells;
+  if (checkExpr(expr, frame).problem !== null) return null;
+  let values = evaluateSource(expr.source, frame);
   let waiting: Method[] = [];
-  const rowCount = column.cells.length;
+  const rowCount = frame[0]?.cells.length ?? 0;
   for (const method of expr.methods) {
     if (method.name === 'over') {
       const keys = findColumn(frame, method.argument ?? '')?.cells ?? null;
@@ -451,11 +448,6 @@ export function defaultArgument(
   }
 }
 
-/** Returns `text` as a Python string literal. */
-export function quoted(text: string): string {
-  return JSON.stringify(text);
-}
-
 function methodText(method: Method): string {
   switch (ARGUMENT_KINDS[method.name]) {
     case 'integer':
@@ -473,5 +465,5 @@ function methodText(method: Method): string {
 /** Returns the Polars text of `expr`. */
 export function exprText(expr: Expr): string {
   const calls = expr.methods.map((method) => methodText(method)).join('');
-  return `pl.col(${quoted(expr.column)})${calls}.alias(${quoted(expr.alias)})`;
+  return `${sourceText(expr.source)}${calls}.alias(${quoted(expr.alias)})`;
 }

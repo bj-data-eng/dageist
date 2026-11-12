@@ -9,14 +9,14 @@ import { useSortable } from '@dnd-kit/react/sortable';
 import type { Choice } from '@dageist/design';
 import { CommitField, Hint, Picker, cx } from '@dageist/design';
 
+import { ConditionSlots } from './ConditionSlots';
 import { ExprChain } from './ExprChain';
 import { columnChoices } from './choices';
 import { formatCell } from './format';
 import { checkExpr } from './model/expr';
 import type { Frame } from './model/frame';
-import { distinctValues } from './model/frame';
 import type { FilterStep, SortStep, Step, StepResult, Verb, WithColumnsStep } from './model/steps';
-import { COMPARISONS, VERBS, defaultStep, literalText, stepText } from './model/steps';
+import { VERBS, defaultStep, stepText } from './model/steps';
 
 /** The sortable group every step row belongs to. */
 export const STEP_GROUP = 'steps';
@@ -67,7 +67,7 @@ function AddColumnSlots({ step, frame, onChange }: SlotsProps<WithColumnsStep>):
         numeric={false}
         code
         onCommit={(alias) => {
-          onChange({ ...step, expr: { column: expr.column, methods: expr.methods, alias } });
+          onChange({ ...step, expr: { source: expr.source, methods: expr.methods, alias } });
         }}
       />
       <SlotLabel>=</SlotLabel>
@@ -146,36 +146,12 @@ function FilterSlots({ step, frame, onChange }: SlotsProps<FilterStep>): React.J
   return (
     <>
       <SlotLabel>where</SlotLabel>
-      <Picker
-        label={step.column}
-        tone="column"
-        choices={columnChoices(frame, step.column, (column) => {
-          onChange({ ...step, column, value: distinctValues(frame, column)[0] ?? null });
-        })}
-      />
-      <Picker
-        label={step.comparison}
-        tone="operator"
-        choices={COMPARISONS.map((comparison) => ({
-          label: comparison,
-          current: comparison === step.comparison,
-          reason: null,
-          onPick: () => {
-            onChange({ ...step, comparison });
-          },
-        }))}
-      />
-      <Picker
-        label={literalText(step.value)}
-        tone="term"
-        choices={distinctValues(frame, step.column).map((value) => ({
-          label: literalText(value),
-          current: value === step.value,
-          reason: null,
-          onPick: () => {
-            onChange({ ...step, value });
-          },
-        }))}
+      <ConditionSlots
+        condition={step.condition}
+        frame={frame}
+        onChange={(condition) => {
+          onChange({ ...step, condition });
+        }}
       />
     </>
   );

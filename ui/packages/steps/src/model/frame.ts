@@ -63,6 +63,11 @@ export const SOURCE_FRAME: Frame = [
   { name: 'row_days', dtype: 'Int64', cells: [0, 2, 2, 0, 2, 2, 1] },
 ];
 
+/** Reports whether `dtype` holds numbers. */
+export function isNumeric(dtype: Dtype): boolean {
+  return dtype === 'Int64' || dtype === 'UInt32';
+}
+
 /** Fails on a value the caller's `switch` was supposed to have covered. */
 export function assertNever(unexpected: never): never {
   throw new Error(`Unexpected value: ${String(unexpected)}`);

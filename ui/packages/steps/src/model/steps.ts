@@ -7,8 +7,8 @@
  */
 
 import type { Expr } from './expr';
-import { checkExpr, evaluateExpr, exprText, quoted } from './expr';
-import type { Cell, Column, Frame } from './frame';
+import { checkExpr, evaluateExpr, exprText } from './expr';
+import type { Column, Frame } from './frame';
 import {
   SOURCE_FRAME,
   assertNever,
@@ -18,18 +18,14 @@ import {
   reordered,
 } from './frame';
 import { nextId } from './ids';
+import type { Condition } from './source';
+import { conditionHolds, conditionProblem, conditionText, quoted } from './source';
 
 /** The step verbs, by their Polars names. */
 export type Verb = 'with_columns' | 'sort' | 'filter';
 
 /** Every verb, in the order it is offered. */
 export const VERBS: readonly Verb[] = ['with_columns', 'sort', 'filter'];
-
-/** The comparison operators a filter can use. */
-export type Comparison = '==' | '!=';
-
-/** Every comparison, in the order it is offered. */
-export const COMPARISONS: readonly Comparison[] = ['==', '!='];
 
 /** `.with_columns(expr)`: adds a column, or replaces one of the same name. */
 export interface WithColumnsStep {
@@ -48,14 +44,12 @@ export interface SortStep {
   readonly descending: boolean;
 }
 
-/** `.filter(pl.col(column) <comparison> value)`. */
+/** `.filter(condition)`: keeps the rows where the condition is true. */
 export interface FilterStep {
   /** Stays with the step while it is moved or edited. */
   readonly id: string;
   readonly verb: 'filter';
-  readonly column: string;
-  readonly comparison: Comparison;
-  readonly value: Cell;
+  readonly condition: Condition;
 }
 
 /** One step of the list. */
@@ -118,14 +112,10 @@ function sort(frame: Frame, step: SortStep): StepResult {
 }
 
 function filter(frame: Frame, step: FilterStep): StepResult {
-  const column = findColumn(frame, step.column);
-  if (column === null) return failed(frame, `There is no column "${step.column}".`);
-  const kept: number[] = [];
-  for (const [row, cell] of column.cells.entries()) {
-    // A comparison with a null is null in Polars, and a filter drops it.
-    if (cell === null || step.value === null) continue;
-    if ((cell === step.value) === (step.comparison === '==')) kept.push(row);
-  }
+  const problem = conditionProblem(step.condition, frame);
+  if (problem !== null) return failed(frame, problem);
+  const rows = Array.from({ length: frame[0]?.cells.length ?? 0 }, (_unused, row) => row);
+  const kept = rows.filter((row) => conditionHolds(step.condition, frame, row));
   return { frame: reordered(frame, kept), problem: null, added: null };
 }
 
@@ -163,26 +153,26 @@ export function defaultStep(verb: Verb, frame: Frame): Step {
   const id = nextId('step');
   switch (verb) {
     case 'with_columns':
-      return { id, verb, expr: { column: first, methods: [], alias: 'new_column' } };
+      return {
+        id,
+        verb,
+        expr: { source: { kind: 'column', column: first }, methods: [], alias: 'new_column' },
+      };
     case 'sort':
       return { id, verb, by: [first], descending: false };
     case 'filter':
       return {
         id,
         verb,
-        column: first,
-        comparison: '==',
-        value: distinctValues(frame, first)[0] ?? null,
+        condition: {
+          column: first,
+          comparison: '==',
+          value: { kind: 'literal', value: distinctValues(frame, first)[0] ?? null },
+        },
       };
     default:
       return assertNever(verb);
   }
-}
-
-/** Returns `value` as Python would write it. */
-export function literalText(value: Cell): string {
-  if (value === null) return 'None';
-  return typeof value === 'number' ? String(value) : quoted(value);
 }
 
 /** Returns the Polars method call `step` stands for. */
@@ -195,7 +185,7 @@ export function stepText(step: Step): string {
       return step.descending ? `.sort(${columns}, descending=True)` : `.sort(${columns})`;
     }
     case 'filter':
-      return `.filter(pl.col(${quoted(step.column)}) ${step.comparison} ${literalText(step.value)})`;
+      return `.filter(${conditionText(step.condition)})`;
     default:
       return assertNever(step);
   }
