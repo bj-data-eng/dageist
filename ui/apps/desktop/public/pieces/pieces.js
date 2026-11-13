@@ -18,7 +18,7 @@ const VERSIONS = [
   {
     id: 'cmp-plain',
     name: 'Plain',
-    note: 'A value, a comparison and a value as three blocks a hair apart. Click the comparison: its list changes it, adds another with and or or, or removes it. Click and to make it or.',
+    note: 'A value, a comparison and a value as three blocks a hair apart. Click the comparison in the middle, such as > or ==. The top of its list adds another comparison after it, with and or or, or removes this one. Below that it changes the comparison. Click and to make it or.',
     kind: 'cond',
   },
   {
@@ -761,6 +761,22 @@ function offerRow(kind, value, word, isTicked, given = null) {
 }
 
 /**
+ * Returns a row of the offer that does something, where the others are
+ * something to take: its block says what it does in `label`.
+ * @param {string} kind
+ * @param {string} value
+ * @param {string} label
+ * @param {string} word
+ */
+function actRow(kind, value, label, word) {
+  const row = offerRow(kind, value, word, false);
+  row.classList.add('offer-act');
+  const block = row.querySelector('.shown');
+  if (block !== null) block.textContent = label;
+  return row;
+}
+
+/**
  * Returns one group of the offer: its heading, how many rows it has when
  * that is worth saying, and the rows.
  * @param {string} title
@@ -802,21 +818,23 @@ function listOffers(slot, typed, chosen) {
   /** @type {(row: [string, string]) => boolean} */
   const isSought = ([name, word]) => name.includes(sought) || word.includes(sought);
   if (takes(slot, 'op')) {
-    const rows = COMPARISONS_ON_OFFER.filter(isSought).map(([name, word]) =>
-      offerRow('op', name, word, false),
-    );
-    if (rows.length > 0) groups.push(offerGroup('Comparison', null, rows));
-    // Below them, what can be done with the whole comparison. Where a word waits to add the
-    // next one, adding is left to the word.
+    // First, what can be done with the whole comparison, as the shortest group: add another
+    // after it, or take it away. Where a word waits to add the next one, adding is left to it.
     const others = slot.closest('.body')?.querySelectorAll(':scope > .cmp').length ?? 0;
     const acts = [];
     if (slot.closest('.v-cmp-wait') === null) {
       acts.push(
-        ...JOINS_ON_OFFER.map(([name]) => offerRow('add', name, 'add a comparison', false)),
+        ...JOINS_ON_OFFER.map(([name]) =>
+          actRow('add', name, `+ ${name}`, 'add another comparison'),
+        ),
       );
     }
-    if (others > 1) acts.push(offerRow('remove', 'remove', 'this comparison', false));
-    if (sought === '' && acts.length > 0) groups.push(offerGroup('Condition', null, acts));
+    if (others > 1) acts.push(actRow('remove', 'remove', '× remove', 'this comparison'));
+    if (sought === '' && acts.length > 0) groups.push(offerGroup('This condition', null, acts));
+    const rows = COMPARISONS_ON_OFFER.filter(isSought).map(([name, word]) =>
+      offerRow('op', name, word, false),
+    );
+    if (rows.length > 0) groups.push(offerGroup('Comparison', null, rows));
   }
   if (takes(slot, 'join')) {
     const rows = JOINS_ON_OFFER.filter(isSought).map(([name, word]) =>
@@ -868,7 +886,10 @@ function listOffers(slot, typed, chosen) {
   }
   list.replaceChildren(...groups);
   const rows = [...list.querySelectorAll('.offer')];
-  const first = rows.findIndex((row) => !row.classList.contains('offer-chain'));
+  // Enter is not meant for a chain, nor for a row that adds or removes.
+  const first = rows.findIndex(
+    (row) => !row.classList.contains('offer-chain') && !row.classList.contains('offer-act'),
+  );
   const marked = Math.max(0, Math.min(chosen ?? first, rows.length - 1));
   rows[marked]?.classList.add('is-chosen');
   slot.dataset.chosen = String(marked);

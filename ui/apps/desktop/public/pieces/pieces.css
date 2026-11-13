@@ -1124,7 +1124,12 @@ body {
 
 /* In a list, the rows that add a comparison or take it away. */
 .offer .shown.is-add {
-  --tone: var(--function);
+  --tone: var(--add);
+}
+
+/* A comparison's list is short, so all of it is in view without scrolling. */
+.slot.op .offer-list {
+  max-height: none;
 }
 
 .offer .shown.is-remove {
