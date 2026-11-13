@@ -15,7 +15,9 @@
   --ink: #d7dbe2;
   --muted: #8b919c;
   --accent: #f08a3c;
-  --verb: #f08a3c;
+  /* The colour of each verb. */
+  --verb-add: #f08a3c;
+  --verb-sort: #3fbf7f;
   --dtype: #7fd6a4;
   /* The grey of the panels that slide out of the button's sides, and what they turn to. */
   --side-fill: #3a3f49;
@@ -164,7 +166,7 @@ body {
 
 .row .verb {
   margin-right: 4px;
-  color: var(--verb);
+  color: var(--verb-add);
   font: 600 13px/20px var(--sans);
 }
 
@@ -319,15 +321,23 @@ body {
 /*
  * Brackets: a square bracket outside each end of the button, whose arms reach
  * back over its corners. Pointing at the button moves each bracket outward by
- * the width of a side panel, which is what uncovers the panel. A version sets
- * these lengths:
+ * the width of a side panel, which is what uncovers the panel. The bracket is
+ * heavy, round and hugging. Its radius is measured at the line's outer edge,
+ * so the inner curve is the button's radius plus the gap, which keeps the two
+ * curves parallel.
  *   --gap     the space between the button's end and the bracket's upright
  *   --wrap    how far the arms reach over the button
  *   --rise    how far the bracket stands above and below the button
  *   --weight  how thick its line is
- *   --round   how round its two outer corners are, when they are round
+ *   --round   how round its two outer corners are
  */
 .piece.is-bracketed {
+  --gap: 1px;
+  --wrap: 4px;
+  --weight: 2px;
+  --rise: calc(var(--gap) + var(--weight));
+  --round: calc(var(--radius) + var(--gap) + var(--weight));
+
   margin: 0 calc(var(--gap) + var(--weight) + 1px);
 }
 
@@ -377,53 +387,6 @@ body {
   transform: translateX(var(--side));
 }
 
-/* B · Bracket: a fine line, standing a little clear of the button. */
-.v-bracket {
-  --gap: 3px;
-  --wrap: 4px;
-  --rise: 3px;
-  --weight: 1px;
-}
-
-/* C · Bracket, close: the same line, hugging the button. */
-.v-bracket-close {
-  --gap: 1px;
-  --wrap: 3px;
-  --rise: 2px;
-  --weight: 1px;
-}
-
-/* D · Bracket, heavy: a line twice as thick, standing clear. */
-.v-bracket-heavy {
-  --gap: 3px;
-  --wrap: 4px;
-  --rise: 4px;
-  --weight: 2px;
-}
-
-/*
- * E · Bracket, heavy and round: heavy and hugging, with round corners. A
- * corner's radius is measured at the line's outer edge, so the inner curve is
- * that less the line's weight. Here the inner curve is the button's radius
- * plus the gap, which keeps the two curves parallel.
- */
-.v-bracket-round {
-  --gap: 1px;
-  --wrap: 4px;
-  --weight: 2px;
-  --rise: calc(var(--gap) + var(--weight));
-  --round: calc(var(--radius) + var(--gap) + var(--weight));
-}
-
-/* F · Bracket, flush: the same with no gap, so the inner curve is the button's own corner. */
-.v-bracket-flush {
-  --gap: 0px;
-  --wrap: 4px;
-  --weight: 2px;
-  --rise: calc(var(--gap) + var(--weight));
-  --round: calc(var(--radius) + var(--gap) + var(--weight));
-}
-
 /*
  * The function: a bracketed piece whose body is in segments, the function
  * first and then the field it works on. The function is in the colour of
@@ -442,12 +405,12 @@ body {
 }
 
 /* Segments that touch are square where they meet. */
-.body .btn:not(:first-child) {
+:is(.body, .head) .btn:not(:first-child) {
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
 }
 
-.body .btn:not(:last-child) {
+:is(.body, .head) .btn:not(:last-child) {
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
 }
@@ -506,16 +469,6 @@ body {
   );
 }
 
-/* I · Chevron, a shade lighter. */
-.v-seam-lighter {
-  --seam-ink: color-mix(in srgb, var(--function) 44%, transparent);
-}
-
-/* J · Chevron, a shade darker. */
-.v-seam-darker {
-  --seam-ink: color-mix(in srgb, var(--function) 22%, transparent);
-}
-
 /* A seam card is two steps and nothing else, so it needs no rule above the first. */
 .card .note + .row {
   margin-top: 12px;
@@ -523,6 +476,161 @@ body {
 
 .row + .row {
   margin-top: 10px;
+}
+
+/* A step is read along one line, so the cards that show steps are wide. */
+#versions-head {
+  grid-template-columns: repeat(auto-fill, minmax(660px, 1fr));
+}
+
+/*
+ * The step head: the verb, and the name the step makes when it makes one.
+ * It is what marks where a step starts. Each verb has a colour, and the
+ * head's parts are buttons like any other.
+ */
+.step {
+  --verb: var(--verb-add);
+}
+
+.step[data-verb='sort'] {
+  --verb: var(--verb-sort);
+}
+
+.num {
+  flex: none;
+  width: 12px;
+  color: var(--muted);
+  font: 11px/24px var(--mono);
+  text-align: right;
+}
+
+.head {
+  display: inline-flex;
+  flex: none;
+  gap: 1px;
+}
+
+.btn.verb {
+  --tone: var(--verb);
+
+  font-weight: 600;
+  font-family: var(--sans);
+}
+
+.btn.alias {
+  --tone: var(--ink);
+}
+
+/* The equals sign is two bars in the weight and colour of the seam. */
+.equals {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 13px;
+}
+
+.equals::before {
+  content: '';
+  border-top: 2px solid var(--seam-ink);
+  border-bottom: 2px solid var(--seam-ink);
+  width: 7px;
+  height: 7px;
+}
+
+/* A · Words: today's head. Coloured text, an underlined name and a typed equals sign. */
+.v-head-words .head {
+  gap: 8px;
+}
+
+.v-head-words .btn:is(.verb, .alias) {
+  border-radius: 0;
+  background: none;
+  padding: 2px 0;
+  font-size: 13px;
+}
+
+.v-head-words .btn.alias {
+  border-bottom: 1px dashed var(--line-strong);
+  line-height: 19px;
+}
+
+.v-head-words .btn:is(.verb, .alias):hover {
+  color: #fff;
+}
+
+.v-head-words .equals::before {
+  content: '=';
+  border: 0;
+  width: auto;
+  height: auto;
+  color: var(--muted);
+}
+
+/* B · Block: needs nothing more. The verb and the name are two blocks a hair apart. */
+
+/*
+ * C · Flag: the verb is a solid flag with a point, and the name is notched
+ * to take it, so the two lock together the way the chevron points.
+ */
+.v-head-flag .head {
+  gap: 0;
+}
+
+.v-head-flag .btn.verb {
+  border-radius: 0;
+  background-color: color-mix(in srgb, var(--verb) 86%, transparent);
+  padding-right: 14px;
+  color: #14161a;
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 50%, calc(100% - 7px) 100%, 0 100%);
+}
+
+.v-head-flag .btn.verb:is(:hover, :active):enabled {
+  background-color: var(--verb);
+}
+
+.v-head-flag .btn.alias {
+  margin-left: -5px;
+  border-radius: 0;
+  padding-left: 14px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 7px 50%);
+}
+
+/* D · Rail: each step is a strip of its own, with the verb's colour down its edge. */
+.v-head-rail .step {
+  border-top: 0;
+  border-radius: var(--radius);
+  background-color: var(--panel);
+  box-shadow: inset 3px 0 0 var(--verb);
+  padding: 6px 8px 6px 11px;
+}
+
+.v-head-rail .row + .row {
+  margin-top: 4px;
+}
+
+.v-head-rail .btn.verb {
+  background: none;
+  padding-right: 3px;
+  padding-left: 0;
+}
+
+.v-head-rail .btn.verb:hover {
+  color: #fff;
+}
+
+/* E · Numbered: the step's number is a block of its own, joined to the verb. */
+.v-head-numbered .num {
+  margin-right: -5px;
+  border-radius: var(--radius) 0 0 var(--radius);
+  background-color: var(--raised);
+  width: 22px;
+  color: var(--ink);
+  text-align: center;
+}
+
+.v-head-numbered .head .btn:first-child {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

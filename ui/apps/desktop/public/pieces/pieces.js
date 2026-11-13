@@ -9,69 +9,57 @@
  * @property {string} id What its block in pieces.css is called.
  * @property {string} name What its card is headed.
  * @property {string} note One line on what sets it apart.
- * @property {'button' | 'function' | 'seam'} kind The piece it is a version of.
+ * @property {'head' | 'button' | 'function' | 'seam'} kind The piece it is a version of.
  */
 
 /** @type {Version[]} */
 const VERSIONS = [
   {
+    id: 'head-words',
+    name: 'Words',
+    note: 'Today’s head: the verb as coloured text, the name underlined, a typed equals sign.',
+    kind: 'head',
+  },
+  {
+    id: 'head-block',
+    name: 'Block',
+    note: 'The verb and the name as two blocks a hair apart, as a function and its field are.',
+    kind: 'head',
+  },
+  {
+    id: 'head-flag',
+    name: 'Flag',
+    note: 'The verb as a solid flag whose point locks into the name, echoing the chevron.',
+    kind: 'head',
+  },
+  {
+    id: 'head-rail',
+    name: 'Rail',
+    note: 'Each step is a strip of its own, with a rail in the verb’s colour down its edge.',
+    kind: 'head',
+  },
+  {
+    id: 'head-numbered',
+    name: 'Numbered',
+    note: 'The step’s number is a block of its own, joined to the verb.',
+    kind: 'head',
+  },
+  {
     id: 'tint',
-    name: 'Tint',
-    note: 'The version chosen. A flat fill in the colour of what it names.',
-    kind: 'button',
-  },
-  {
-    id: 'bracket',
-    name: 'Bracket',
-    note: 'A fine square bracket outside each end, standing a little clear.',
-    kind: 'button',
-  },
-  {
-    id: 'bracket-close',
-    name: 'Bracket, close',
-    note: 'The same bracket, hugging the button.',
-    kind: 'button',
-  },
-  {
-    id: 'bracket-heavy',
-    name: 'Bracket, heavy',
-    note: 'A line twice as thick, standing clear.',
-    kind: 'button',
-  },
-  {
-    id: 'bracket-round',
-    name: 'Bracket, heavy and round',
-    note: 'Heavy and hugging. Its inner curve runs parallel to the button’s corner.',
-    kind: 'button',
-  },
-  {
-    id: 'bracket-flush',
-    name: 'Bracket, flush',
-    note: 'The same, touching the button. Its inner curve is the button’s own corner.',
+    name: 'Button',
+    note: 'A column. A flat fill in the colour of what it names.',
     kind: 'button',
   },
   {
     id: 'fn',
-    name: 'Segments',
-    note: 'The version preferred. Two blocks a hair apart: the function, then its field.',
+    name: 'Function',
+    note: 'Bracketed, in two blocks a hair apart: the function, then its field.',
     kind: 'function',
   },
   {
     id: 'seam',
-    name: 'Chevron',
-    note: 'The version chosen: the weight of the brackets, in a darker shade so it sits back.',
-    kind: 'seam',
-  },
-  {
-    id: 'seam-lighter',
-    name: 'Chevron, a shade lighter',
-    note: 'Halfway back to the brackets’ own colour.',
-    kind: 'seam',
-  },
-  {
-    id: 'seam-darker',
-    name: 'Chevron, a shade darker',
-    note: 'Close to the lines of the card. It is there when looked for.',
+    name: 'Seam',
+    note: 'A heavy chevron in a darker shade of the brackets’ colour.',
     kind: 'seam',
   },
 ];
@@ -144,10 +132,8 @@ function pieceFor(source, slot, version) {
   const name = slot.getAttribute('data-name');
   if (name !== null) button.textContent = name;
   if (fn !== null) makeFunction(piece, button, fn);
-  // A function always has brackets. A column has them only in the versions that try them on it.
-  if (fn !== null || (version.kind === 'button' && version.id !== 'tint')) {
-    piece.classList.add('is-bracketed');
-  }
+  // A function has brackets. A column has none.
+  if (fn !== null) piece.classList.add('is-bracketed');
 
   const state = slot.getAttribute('data-piece');
   if (state === 'live') {
@@ -171,13 +157,12 @@ function pieceFor(source, slot, version) {
 
 if (pieceTemplate instanceof HTMLTemplateElement) {
   for (const [index, version] of VERSIONS.entries()) {
-    const template = document.querySelector(version.kind === 'seam' ? '#card-seam' : '#card');
+    const own = version.kind === 'seam' || version.kind === 'head';
+    const template = document.querySelector(own ? `#card-${version.kind}` : '#card');
     if (!(template instanceof HTMLTemplateElement)) continue;
     const card = template.content.firstElementChild?.cloneNode(true);
     if (!(card instanceof HTMLElement)) continue;
     card.classList.add(`v-${version.id}`);
-    // A function is drawn with the heavy round bracket.
-    if (version.kind !== 'button') card.classList.add('v-bracket-round');
     fill(card, '.letter', String.fromCodePoint(65 + index));
     fill(card, '.name', version.name);
     fill(card, '.note', version.note);
@@ -186,7 +171,8 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
       const piece = pieceFor(pieceTemplate, slot, version);
       if (piece !== null) slot.replaceWith(piece);
     }
-    document.querySelector(`#versions-${version.kind}`)?.append(card);
+    const section = version.kind === 'head' ? '#versions-head' : '#versions-settled';
+    document.querySelector(section)?.append(card);
   }
 }
 

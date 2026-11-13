@@ -16,18 +16,15 @@
     </header>
 
     <main>
-      <h2 class="section">Button <span>a column</span></h2>
-      <div id="versions-button" class="versions"></div>
+      <h2 class="section">
+        Step head <span>the verb and the name it makes, which mark where a step starts</span>
+      </h2>
+      <div id="versions-head" class="versions"></div>
 
       <h2 class="section">
-        Function <span>bracketed, in segments: the function, then its field</span>
+        Settled <span>the button, the function and the seam chosen so far</span>
       </h2>
-      <div id="versions-function" class="versions"></div>
-
-      <h2 class="section">
-        Seam <span>a caret between blocks, pointing the way the value flows</span>
-      </h2>
-      <div id="versions-seam" class="versions"></div>
+      <div id="versions-settled" class="versions"></div>
     </main>
 
     <!-- A card for a version of a piece: the piece enlarged, in its states, and inside a step. -->
@@ -97,7 +94,7 @@
       </section>
     </template>
 
-    <!-- A card for a version of the seam: two steps, so it is seen between every kind of block. -->
+    <!-- A card for one settled seam: two steps, so it is seen between every kind of block. -->
     <template id="card-seam">
       <section class="card">
         <h3><span class="letter"></span><span class="name"></span></h3>
@@ -129,6 +126,59 @@
             <span data-piece="live" data-fn="dt.total_days"></span>
           </span>
           <span class="returns">returns <b>Int64</b></span>
+        </div>
+      </section>
+    </template>
+
+    <!--
+      A card for a version of the step head: three steps one under another, so
+      it is seen marking where each step starts. The first step makes no name.
+    -->
+    <template id="card-head">
+      <section class="card">
+        <h3><span class="letter"></span><span class="name"></span></h3>
+        <p class="note"></p>
+
+        <div class="row step" data-verb="sort">
+          <span class="num">1</span>
+          <span class="head"><button type="button" class="btn verb">Sort table</button></span>
+          <span class="quiet">by</span>
+          <span data-piece="live"></span>
+          <span data-piece="live" data-name="timestamp"></span>
+        </div>
+
+        <div class="row step" data-verb="add">
+          <span class="num">2</span>
+          <span class="head">
+            <button type="button" class="btn verb">Add column</button>
+            <button type="button" class="btn alias">step_index</button>
+          </span>
+          <span class="equals"></span>
+          <span class="chain">
+            <span data-piece="live"></span>
+            <span class="seam"></span>
+            <span data-piece="live" data-fn="cum_count"></span>
+            <span class="seam"></span>
+            <span data-piece="live" data-fn="over"></span>
+          </span>
+          <span class="returns">returns <b>UInt32</b></span>
+        </div>
+
+        <div class="row step" data-verb="add">
+          <span class="num">3</span>
+          <span class="head">
+            <button type="button" class="btn verb">Add column</button>
+            <button type="button" class="btn alias">resolved_at</button>
+          </span>
+          <span class="equals"></span>
+          <span class="chain">
+            <span data-piece="live" data-name="timestamp"></span>
+            <span class="seam"></span>
+            <span data-piece="live" data-fn="shift"></span>
+            <span class="seam"></span>
+            <span data-piece="live" data-fn="over"></span>
+          </span>
+          <span class="returns">returns <b>Datetime</b></span>
         </div>
       </section>
     </template>
