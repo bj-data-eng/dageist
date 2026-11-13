@@ -1145,38 +1145,7 @@ body {
 }
 
 /*
- * B · Round brackets: the three blocks stand inside round brackets in the
- * comparison's colour, as a function stands inside square ones.
- */
-.v-cmp-round .cmp {
-  margin: 0 7px;
-}
-
-.v-cmp-round .cmp::before,
-.v-cmp-round .cmp::after {
-  content: '';
-  position: absolute;
-  top: -3px;
-  bottom: -3px;
-  border: 2px solid color-mix(in srgb, var(--operator) 70%, var(--ground));
-  width: 6px;
-  pointer-events: none;
-}
-
-.v-cmp-round .cmp::before {
-  left: -7px;
-  border-right: 0;
-  border-radius: 10px 0 0 10px / 15px 0 0 15px;
-}
-
-.v-cmp-round .cmp::after {
-  right: -7px;
-  border-left: 0;
-  border-radius: 0 10px 10px 0 / 0 15px 15px 0;
-}
-
-/*
- * C · Recess: the three blocks lie in a recess in whatever takes them, a
+ * B · Recess: the three blocks lie in a recess in whatever takes them, a
  * little smaller than it.
  */
 .v-cmp-recess .cmp {

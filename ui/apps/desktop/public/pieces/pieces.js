@@ -34,12 +34,6 @@ const VERSIONS = [
     kind: 'cond',
   },
   {
-    id: 'cmp-round',
-    name: 'Round brackets',
-    note: 'The same three blocks inside round brackets, as a function has square ones.',
-    kind: 'cond',
-  },
-  {
     id: 'cmp-recess',
     name: 'Recess',
     note: 'The three blocks lie in a recess in whatever takes them, a little smaller than it.',
