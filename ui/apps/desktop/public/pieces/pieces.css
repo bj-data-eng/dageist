@@ -1088,9 +1088,9 @@ body {
  * be, a chain among them, which then has its dots and its list as anywhere.
  * Comparisons are joined by a word, and or or.
  *
- * A · Plain, which is also how a comparison is drawn anywhere else: three
- * blocks a hair apart, the comparison in a colour of its own and a little
- * heavier than a name, so that it is not lost between the two values.
+ * It is drawn plain, the look chosen: three blocks a hair apart, the
+ * comparison in a colour of its own and a little heavier than a name, so
+ * that it is not lost between the two values.
  */
 .cmp {
   display: inline-flex;
@@ -1142,25 +1142,6 @@ body {
 
 .body > .cmp:last-child > :last-child :is(.shown, .nest-token) {
   border-radius: 0 var(--radius) var(--radius) 0;
-}
-
-/*
- * B · Recess: the three blocks lie in a recess in whatever takes them, a
- * little smaller than it.
- */
-.v-cmp-recess .cmp {
-  align-self: stretch;
-  background-color: color-mix(in srgb, #000 40%, var(--ground));
-  box-shadow:
-    inset 0 1px 2px rgb(0 0 0 / 55%),
-    inset 0 0 0 1px rgb(255 255 255 / 5%);
-  padding: 0 3px;
-}
-
-.v-cmp-recess .cmp .btn {
-  padding-top: 0;
-  padding-bottom: 0;
-  line-height: 18px;
 }
 
 /* ------------------------------------------------------------------ */

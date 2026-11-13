@@ -34,12 +34,6 @@ const VERSIONS = [
     kind: 'cond',
   },
   {
-    id: 'cmp-recess',
-    name: 'Recess',
-    note: 'The three blocks lie in a recess in whatever takes them, a little smaller than it.',
-    kind: 'cond',
-  },
-  {
     id: 'chain-only',
     name: 'Methods',
     note: 'Kept beside the comparison: the same steps with each comparison written as a method in a chain, as gt is. A condition that a function takes is a chain behind three dots. A test with one side, such as is_null, can only be written this way.',
