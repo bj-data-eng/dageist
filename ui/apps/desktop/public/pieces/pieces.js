@@ -5,20 +5,18 @@
  */
 
 const VERSIONS = [
-  { id: 'tint', name: 'Tint', note: 'A flat fill in the colour of what it names. Today’s look.' },
   {
-    id: 'hairline',
-    name: 'Hairline',
-    note: 'An outline at rest. The fill arrives with the pointer.',
+    id: 'tint',
+    name: 'Tint',
+    note: 'The version chosen. A flat fill in the colour of what it names.',
   },
   {
-    id: 'underline',
-    name: 'Underline',
-    note: 'Reads as code. A dashed rule says it can be changed.',
+    id: 'bracket',
+    name: 'Bracket',
+    note: 'A fine square bracket outside each end, standing a little clear.',
   },
-  { id: 'keycap', name: 'Keycap', note: 'Lit from above, and it sinks when pressed.' },
-  { id: 'rail', name: 'Rail', note: 'Neutral body. A rail at the edge carries the colour.' },
-  { id: 'corner', name: 'Corner', note: 'Tint, with a corner mark that says a menu is behind it.' },
+  { id: 'bracket-close', name: 'Bracket, close', note: 'The same bracket, hugging the button.' },
+  { id: 'bracket-heavy', name: 'Bracket, heavy', note: 'A line twice as thick, standing clear.' },
 ];
 
 const template = document.querySelector('#card');

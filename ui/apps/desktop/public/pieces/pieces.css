@@ -88,7 +88,7 @@ body {
 .stage {
   display: grid;
   place-items: center;
-  height: 38px;
+  height: 42px;
   zoom: 3;
 }
 
@@ -148,7 +148,11 @@ body {
 /* The button                                                          */
 /* ------------------------------------------------------------------ */
 
-/* What every version shares: its size, its type and how it answers the keyboard. */
+/*
+ * The button is Tint, the version chosen: a flat fill in the colour of what
+ * it names, which deepens as the button is used. Every version below starts
+ * from it.
+ */
 .btn {
   appearance: none;
   position: relative;
@@ -156,7 +160,7 @@ body {
   margin: 0;
   border: 0;
   border-radius: 2px;
-  background: none;
+  background-color: color-mix(in srgb, var(--tone) 18%, transparent);
   padding: 2px 7px;
   color: var(--tone);
   font: 12.5px/20px var(--mono);
@@ -164,10 +168,20 @@ body {
   cursor: pointer;
   transition:
     background-color 90ms ease-out,
-    box-shadow 90ms ease-out,
-    border-color 90ms ease-out,
-    color 90ms ease-out,
-    transform 60ms ease-out;
+    box-shadow 90ms ease-out;
+}
+
+.btn:is(:hover, .is-hover):enabled {
+  background-color: color-mix(in srgb, var(--tone) 28%, transparent);
+}
+
+.btn:is(:active, .is-active):enabled {
+  background-color: color-mix(in srgb, var(--tone) 38%, transparent);
+}
+
+.btn[aria-expanded='true'] {
+  background-color: color-mix(in srgb, var(--tone) 30%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 65%, transparent);
 }
 
 .btn:is(:focus-visible, .is-focus) {
@@ -184,163 +198,89 @@ body {
   pointer-events: none;
 }
 
+/*
+ * Brackets: a square bracket outside each end of the button, whose arms reach
+ * back over its corners. A version sets four lengths:
+ *   --gap     the space between the button's end and the bracket's upright
+ *   --wrap    how far the arms reach over the button
+ *   --rise    how far the bracket stands above and below the button
+ *   --weight  how thick its line is
+ */
+[class*='v-bracket'] .btn {
+  margin: 0 calc(var(--gap) + var(--weight) + 1px);
+}
+
+[class*='v-bracket'] .btn::before,
+[class*='v-bracket'] .btn::after {
+  content: '';
+  position: absolute;
+  top: calc(-1 * var(--rise));
+  bottom: calc(-1 * var(--rise));
+  border: var(--weight) solid color-mix(in srgb, var(--tone) 60%, transparent);
+  width: calc(var(--gap) + var(--weight) + var(--wrap));
+  pointer-events: none;
+  transition:
+    border-color 90ms ease-out,
+    transform 60ms ease-out;
+}
+
+[class*='v-bracket'] .btn::before {
+  left: calc(-1 * (var(--gap) + var(--weight)));
+  border-right: 0;
+}
+
+[class*='v-bracket'] .btn::after {
+  right: calc(-1 * (var(--gap) + var(--weight)));
+  border-left: 0;
+}
+
+[class*='v-bracket'] .btn:is(:hover, .is-hover, [aria-expanded='true']):enabled::before,
+[class*='v-bracket'] .btn:is(:hover, .is-hover, [aria-expanded='true']):enabled::after {
+  border-color: var(--tone);
+}
+
+/* Pressing the button draws the brackets in against it. */
+[class*='v-bracket'] .btn:is(:active, .is-active):enabled::before {
+  transform: translateX(1px);
+}
+
+[class*='v-bracket'] .btn:is(:active, .is-active):enabled::after {
+  transform: translateX(-1px);
+}
+
+/* The focus ring goes round the brackets as well. */
+[class*='v-bracket'] .btn:is(:focus-visible, .is-focus) {
+  outline-offset: calc(var(--gap) + var(--weight) + 2px);
+}
+
+/* B · Bracket: a fine line, standing a little clear of the button. */
+.v-bracket {
+  --gap: 3px;
+  --wrap: 4px;
+  --rise: 3px;
+  --weight: 1px;
+}
+
+/* C · Bracket, close: the same line, hugging the button. */
+.v-bracket-close {
+  --gap: 1px;
+  --wrap: 3px;
+  --rise: 2px;
+  --weight: 1px;
+}
+
+/* D · Bracket, heavy: a line twice as thick, standing clear. */
+.v-bracket-heavy {
+  --gap: 3px;
+  --wrap: 4px;
+  --rise: 4px;
+  --weight: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .btn {
+  .btn,
+  .btn::before,
+  .btn::after {
     transition: none;
   }
-}
-
-/* A · Tint: a flat fill that deepens as the button is used. */
-.v-tint .btn {
-  background-color: color-mix(in srgb, var(--tone) 18%, transparent);
-}
-.v-tint .btn:is(:hover, .is-hover):enabled {
-  background-color: color-mix(in srgb, var(--tone) 28%, transparent);
-}
-.v-tint .btn:is(:active, .is-active):enabled {
-  background-color: color-mix(in srgb, var(--tone) 38%, transparent);
-}
-.v-tint .btn[aria-expanded='true'] {
-  background-color: color-mix(in srgb, var(--tone) 30%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 65%, transparent);
-}
-
-/* B · Hairline: an outline at rest, filled only while the pointer is on it. */
-.v-hairline .btn {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 34%, transparent);
-}
-.v-hairline .btn:is(:hover, .is-hover):enabled {
-  background-color: color-mix(in srgb, var(--tone) 12%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 62%, transparent);
-}
-.v-hairline .btn:is(:active, .is-active):enabled {
-  background-color: color-mix(in srgb, var(--tone) 24%, transparent);
-}
-.v-hairline .btn[aria-expanded='true'] {
-  background-color: color-mix(in srgb, var(--tone) 18%, transparent);
-  box-shadow: inset 0 0 0 1px var(--tone);
-}
-
-/* C · Underline: text with a dashed rule. The least ink, the closest to code. */
-.v-underline .btn {
-  border-bottom: 1px dashed color-mix(in srgb, var(--tone) 55%, transparent);
-  border-radius: 2px 2px 0 0;
-  padding: 2px 3px;
-  line-height: 19px;
-}
-.v-underline .btn:is(:hover, .is-hover):enabled {
-  border-bottom-style: solid;
-  background-color: color-mix(in srgb, var(--tone) 14%, transparent);
-}
-.v-underline .btn:is(:active, .is-active):enabled {
-  background-color: color-mix(in srgb, var(--tone) 26%, transparent);
-}
-.v-underline .btn[aria-expanded='true'] {
-  border-bottom: 1px solid var(--tone);
-  background-color: color-mix(in srgb, var(--tone) 20%, transparent);
-}
-
-/* D · Keycap: lit from above with an edge beneath, and it sinks when pressed. */
-.v-keycap .btn {
-  background-image: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--tone) 26%, transparent),
-    color-mix(in srgb, var(--tone) 15%, transparent)
-  );
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 12%),
-    inset 0 0 0 1px color-mix(in srgb, var(--tone) 20%, transparent),
-    0 1px 0 rgb(0 0 0 / 55%);
-}
-.v-keycap .btn:is(:hover, .is-hover):enabled {
-  background-image: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--tone) 34%, transparent),
-    color-mix(in srgb, var(--tone) 21%, transparent)
-  );
-}
-.v-keycap .btn:is(:active, .is-active):enabled,
-.v-keycap .btn[aria-expanded='true'] {
-  transform: translateY(1px);
-  background-image: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--tone) 18%, transparent),
-    color-mix(in srgb, var(--tone) 26%, transparent)
-  );
-  box-shadow:
-    inset 0 1px 2px rgb(0 0 0 / 55%),
-    inset 0 0 0 1px color-mix(in srgb, var(--tone) 30%, transparent);
-}
-.v-keycap .btn[aria-expanded='true'] {
-  box-shadow:
-    inset 0 1px 2px rgb(0 0 0 / 55%),
-    inset 0 0 0 1px color-mix(in srgb, var(--tone) 70%, transparent);
-}
-
-/* E · Rail: a neutral body. Only the rail at its edge carries the colour. */
-.v-rail .btn {
-  background-color: var(--raised);
-  padding: 2px 7px 2px 10px;
-  color: var(--ink);
-}
-.v-rail .btn::before {
-  content: '';
-  position: absolute;
-  top: 4px;
-  bottom: 4px;
-  left: 4px;
-  border-radius: 1px;
-  background-color: var(--tone);
-  width: 2px;
-  transition:
-    top 90ms ease-out,
-    bottom 90ms ease-out;
-}
-.v-rail .btn:is(:hover, .is-hover):enabled {
-  background-color: color-mix(in srgb, var(--tone) 16%, var(--raised));
-  color: var(--tone);
-}
-.v-rail .btn:is(:active, .is-active):enabled {
-  background-color: color-mix(in srgb, var(--tone) 28%, var(--raised));
-  color: var(--tone);
-}
-.v-rail .btn[aria-expanded='true'] {
-  background-color: color-mix(in srgb, var(--tone) 22%, var(--raised));
-  color: var(--tone);
-}
-.v-rail .btn:is(:hover, .is-hover, [aria-expanded='true']):enabled::before {
-  top: 2px;
-  bottom: 2px;
-}
-
-/* F · Corner: tint, with a corner mark that shows there is a menu behind it. */
-.v-corner .btn {
-  background-color: color-mix(in srgb, var(--tone) 18%, transparent);
-  overflow: hidden;
-}
-.v-corner .btn::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  border: 3px solid transparent;
-  border-right-color: var(--tone);
-  border-bottom-color: var(--tone);
-  opacity: 0;
-  transition: opacity 90ms ease-out;
-}
-.v-corner .btn:is(:hover, .is-hover):enabled {
-  background-color: color-mix(in srgb, var(--tone) 26%, transparent);
-}
-.v-corner .btn:is(:hover, .is-hover):enabled::after {
-  opacity: 0.6;
-}
-.v-corner .btn:is(:active, .is-active):enabled {
-  background-color: color-mix(in srgb, var(--tone) 36%, transparent);
-}
-.v-corner .btn[aria-expanded='true'] {
-  background-color: color-mix(in srgb, var(--tone) 30%, transparent);
-}
-.v-corner .btn[aria-expanded='true']::after {
-  opacity: 1;
 }
