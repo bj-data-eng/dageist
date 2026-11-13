@@ -16,9 +16,6 @@
     </header>
 
     <main>
-      <h2 class="section">Nested chains <span>a value that is a chain of its own</span></h2>
-      <div id="versions-nest" class="versions"></div>
-
       <h2 class="section">Settled <span>the pieces chosen so far</span></h2>
       <div id="versions-settled" class="versions"></div>
     </main>
@@ -520,9 +517,10 @@
     </template>
 
     <!--
-      A card for a place to put a chain that is the value of a function: a
-      step that fills empty cells with a chain, followed by another function,
-      and a step that subtracts a chain that itself holds a list.
+      A card for a chain that is the value of a function: a step that fills
+      empty cells with a chain, followed by another function, and a step that
+      subtracts a chain that itself holds a list. pieces.js moves each nested
+      chain onto a line of its own under its step.
     -->
     <template id="card-nest">
       <section class="card">

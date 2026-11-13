@@ -16,21 +16,9 @@
 /** @type {Version[]} */
 const VERSIONS = [
   {
-    id: 'nest-inline',
-    name: 'Inline',
-    note: 'The chain sits inside the function, in a recess, a little smaller than the chain around it.',
-    kind: 'nest',
-  },
-  {
-    id: 'nest-below',
-    name: 'Line below',
-    note: 'The function holds a mark, and the chain is a line of its own under the step. Click the mark to fold it away.',
-    kind: 'nest',
-  },
-  {
-    id: 'nest-popup',
-    name: 'Pop-up',
-    note: 'The function holds a mark, and the chain opens in a panel beneath it. Click the mark.',
+    id: 'nest',
+    name: 'Nested chain',
+    note: 'A chain that is a value is a line of its own under the step. The function holds three dots. Click them to fold the line away.',
     kind: 'nest',
   },
   {
@@ -239,27 +227,36 @@ function pieceFor(source, spec) {
   return piece;
 }
 
+/** How many nested chains have been given a line, so that each line knows its mark. */
+let nestsLowered = 0;
+
 /**
  * Moves every nested chain in `card` out of its function and onto a line of
- * its own under the step it belongs to. The mark left in the function and
- * the mark that starts the line carry the same number.
+ * its own under the step it belongs to. Three dots stay in the function and
+ * three dots start the line. The lines of one step follow the order of their
+ * marks in it.
  * @param {HTMLElement} card
  */
 function lowerNests(card) {
-  for (const [index, nest] of [...card.querySelectorAll('.nest')].entries()) {
+  for (const nest of card.querySelectorAll('.nest')) {
     const chain = nest.querySelector('.nest-chain');
-    const token = nest.querySelector('.nest-token');
     const row = nest.closest('.row');
-    if (chain === null || token === null || row === null) continue;
-    const number = String(index + 1);
-    token.textContent = `↳ ${number}`;
+    if (!(nest instanceof HTMLElement) || chain === null || row === null) continue;
+    nestsLowered += 1;
+    nest.dataset.nest = String(nestsLowered);
     const line = document.createElement('div');
     line.className = 'subrow';
+    line.dataset.nest = nest.dataset.nest;
     const mark = document.createElement('span');
     mark.className = 'mark';
-    mark.textContent = `↳ ${number}`;
+    mark.textContent = '…';
     line.append(mark, chain);
-    row.after(line);
+    // A second nested chain of the same step goes under the first.
+    let last = row;
+    while (last.nextElementSibling?.classList.contains('subrow') === true) {
+      last = last.nextElementSibling;
+    }
+    last.after(line);
   }
 }
 
@@ -280,28 +277,19 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
       const piece = pieceFor(pieceTemplate, specOf(slot, version));
       if (piece !== null) slot.replaceWith(piece);
     }
-    if (version.id === 'nest-below') lowerNests(card);
-    const section = version.kind === 'nest' ? '#versions-nest' : '#versions-settled';
-    document.querySelector(section)?.append(card);
+    lowerNests(card);
+    document.querySelector('#versions-settled')?.append(card);
   }
 }
 
-// A click on the mark of a nested chain folds its line away or opens its panel. A click anywhere
-// else closes an open panel.
+// A click on the three dots of a nested chain folds its line away, or brings it back.
 document.addEventListener('click', (event) => {
   if (!(event.target instanceof Element)) return;
-  const token = event.target.closest('.nest-token');
-  const nest = token?.closest('.nest') ?? null;
-  for (const open of document.querySelectorAll('.nest.is-open')) {
-    if (open !== nest && !open.contains(event.target)) open.classList.remove('is-open');
-  }
-  if (token === null || nest === null) return;
-  nest.classList.toggle('is-open');
-  const card = nest.closest('.card');
-  const mark = token.textContent;
-  for (const line of card?.querySelectorAll('.subrow') ?? []) {
-    if (line.querySelector('.mark')?.textContent === mark) line.classList.toggle('is-shut');
-  }
+  const nest = event.target.closest('.nest-token')?.closest('.nest');
+  if (!(nest instanceof HTMLElement)) return;
+  const line = document.querySelector(`.subrow[data-nest="${nest.dataset.nest ?? ''}"]`);
+  line?.classList.toggle('is-shut');
+  nest.classList.toggle('is-shut', line?.classList.contains('is-shut') === true);
 });
 
 /**
