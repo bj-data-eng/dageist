@@ -28,6 +28,11 @@
   --column: #9cc8ff;
   --function: #d7dbe2;
   --value: #f3c98b;
+  /*
+   * The surface the pieces lie on. A piece's fill is its colour mixed into
+   * this, not into nothing, so a piece that slides over something hides it.
+   */
+  --ground: var(--canvas);
   /* The colour of the button being drawn. Everything a version draws is mixed from it. */
   --tone: var(--column);
   /* How round the button's corners are. */
@@ -202,7 +207,7 @@ body {
   margin: 0;
   border: 0;
   border-radius: var(--radius);
-  background-color: color-mix(in srgb, var(--tone) 18%, transparent);
+  background-color: color-mix(in srgb, var(--tone) 18%, var(--ground));
   padding: 2px 7px;
   color: var(--tone);
   font: 12.5px/20px var(--mono);
@@ -214,15 +219,15 @@ body {
 }
 
 .btn:is(:hover, .is-hover):enabled {
-  background-color: color-mix(in srgb, var(--tone) 28%, transparent);
+  background-color: color-mix(in srgb, var(--tone) 28%, var(--ground));
 }
 
 .btn:is(:active, .is-active):enabled {
-  background-color: color-mix(in srgb, var(--tone) 38%, transparent);
+  background-color: color-mix(in srgb, var(--tone) 38%, var(--ground));
 }
 
 .btn[aria-expanded='true'] {
-  background-color: color-mix(in srgb, var(--tone) 30%, transparent);
+  background-color: color-mix(in srgb, var(--tone) 30%, var(--ground));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 65%, transparent);
 }
 
@@ -258,7 +263,7 @@ body {
   --open: 0;
   /* 1 while the piece is parted around one of the pieces inside it. */
   --parted: 0;
-  --bracket-ink: color-mix(in srgb, var(--tone) 60%, transparent);
+  --bracket-ink: color-mix(in srgb, var(--tone) 60%, var(--ground));
 
   display: inline-flex;
   position: relative;
@@ -489,7 +494,7 @@ body {
 .word {
   flex: none;
   margin-left: -1px;
-  background-color: color-mix(in srgb, var(--tone) 18%, transparent);
+  background-color: color-mix(in srgb, var(--tone) 18%, var(--ground));
   padding: 2px 7px 2px 0;
   color: color-mix(in srgb, var(--tone) 62%, transparent);
   font: 12.5px/20px var(--mono);
@@ -566,39 +571,16 @@ body {
 
 /*
  * The function's own tools. Its name is at its left end, so pointing there
- * opens it. Its right end is its last value, which has tools of its own, so
- * the function's add cannot be reached there. Three ways round that follow.
- * The cap and the grips are in the page for every function and stay out of
- * the way unless a version uses them.
+ * opens it. Its right end is its last value, which has tools of its own. So
+ * the bracket is the handle: a strip over each bracket, reaching a little way
+ * outside it, opens the function. The strip lies under the panels, so once
+ * the function is open the panel takes the pointer.
  */
-.cap,
 .grip {
   display: none;
 }
 
-/*
- * A · End cap: a slim block in the function's colour closes the run, as the
- * name opens it. Pointing at it opens the function.
- */
-.v-end-cap .cap {
-  display: block;
-  flex: none;
-  align-self: stretch;
-  border-radius: 0 var(--radius) var(--radius) 0;
-  background-color: color-mix(in srgb, var(--tone) 18%, transparent);
-  width: 9px;
-}
-
-.v-end-cap .cap:hover {
-  background-color: color-mix(in srgb, var(--tone) 34%, transparent);
-}
-
-/*
- * B · Bracket handle: a strip over each bracket, reaching a little way
- * outside it, opens the function. It lies under the panels, so once the
- * function is open the panel takes the pointer.
- */
-.v-end-handle .is-bracketed > .grip {
+.is-bracketed > .grip {
   display: block;
   position: absolute;
   top: calc(-1 * var(--rise));
@@ -606,47 +588,12 @@ body {
   width: 9px;
 }
 
-.v-end-handle .is-bracketed > .grip-start {
+.is-bracketed > .grip-start {
   right: 100%;
 }
 
-.v-end-handle .is-bracketed > .grip-end {
+.is-bracketed > .grip-end {
   left: 100%;
-}
-
-/*
- * C · Two steps out: pointing at a value opens the function as well. The
- * function's panels stand one step beyond the value's, in the function's
- * colour, and its brackets move two steps.
- */
-.v-end-both .piece:has(.piece:hover) {
-  --open: 1;
-  --bracket-ink: var(--tone);
-}
-
-.v-end-both .is-bracketed > .side-remove {
-  transform: translateX(calc(var(--parted) * -1 * var(--side)));
-}
-
-.v-end-both .is-bracketed > .side-add {
-  transform: translateX(calc(var(--parted) * var(--side)));
-}
-
-.v-end-both .is-bracketed > .side {
-  background-color: color-mix(in srgb, var(--tone) 32%, var(--side-fill));
-  transition:
-    clip-path 140ms ease-out,
-    transform 140ms ease-out,
-    background-color 90ms ease-out,
-    color 90ms ease-out;
-}
-
-.v-end-both .is-bracketed > .side-remove:hover {
-  background-color: var(--remove);
-}
-
-.v-end-both .is-bracketed > .side-add:hover {
-  background-color: var(--add);
 }
 
 /*

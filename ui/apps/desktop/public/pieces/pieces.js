@@ -9,30 +9,11 @@
  * @property {string} id What its block in pieces.css is called.
  * @property {string} name What its card is headed.
  * @property {string} note One line on what sets it apart.
- * @property {'list' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind What its
- *   card shows.
+ * @property {'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind What its card shows.
  */
 
 /** @type {Version[]} */
 const VERSIONS = [
-  {
-    id: 'end-cap',
-    name: 'End cap',
-    note: 'A slim block in the function’s colour closes the run. Point at it, or at the name, to open the function.',
-    kind: 'list',
-  },
-  {
-    id: 'end-handle',
-    name: 'Bracket handle',
-    note: 'The bracket is the handle. Point at either bracket from outside to open the function.',
-    kind: 'list',
-  },
-  {
-    id: 'end-both',
-    name: 'Two steps out',
-    note: 'Pointing at a value opens the function as well: the function’s tools stand one step beyond the value’s.',
-    kind: 'list',
-  },
   {
     id: 'head',
     name: 'Step head',
@@ -42,7 +23,7 @@ const VERSIONS = [
   {
     id: 'list',
     name: 'Values',
-    note: 'Each value is one more block a hair apart. Point at one and the run parts around it.',
+    note: 'Each value is one more block a hair apart. Point at one and the run parts around it. Point at a bracket and the function opens.',
     kind: 'list-settled',
   },
   {
@@ -78,7 +59,6 @@ const FIELDS = new Map([
 
 /** The template each kind of card is stamped from. */
 const CARDS = {
-  list: '#card-list',
   'list-settled': '#card-list',
   head: '#card-head',
   seam: '#card-seam',
@@ -212,8 +192,7 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
       const piece = pieceFor(pieceTemplate, specOf(slot, version));
       if (piece !== null) slot.replaceWith(piece);
     }
-    const section = version.kind === 'list' ? '#versions-list' : '#versions-settled';
-    document.querySelector(section)?.append(card);
+    document.querySelector('#versions-settled')?.append(card);
   }
 }
 

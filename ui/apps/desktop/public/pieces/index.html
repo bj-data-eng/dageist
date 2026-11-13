@@ -16,12 +16,6 @@
     </header>
 
     <main>
-      <h2 class="section">
-        The function's own tools
-        <span>reaching them at the end where its last value has tools of its own</span>
-      </h2>
-      <div id="versions-list" class="versions"></div>
-
       <h2 class="section">Settled <span>the pieces chosen so far</span></h2>
       <div id="versions-settled" class="versions"></div>
     </main>
@@ -152,7 +146,6 @@
                 <span data-piece="live"></span>
                 <span data-piece="live" data-name="timestamp"></span>
               </span>
-              <span class="cap"></span>
             </span>
             <button type="button" class="side side-add" aria-label="Add a step after">+</button>
           </span>
@@ -211,8 +204,7 @@
       that sorts by a list of columns, the same step with a direction given
       to each column, and a function in a chain that takes a list and then a
       second, named parameter. A word inside the brackets names the parameter
-      that follows. A function that holds values ends in a cap, which only one
-      version shows.
+      that follows.
     -->
     <template id="card-list">
       <section class="card">
@@ -233,7 +225,6 @@
                 <span data-piece="live" data-name="timestamp"></span>
                 <span data-piece="live" data-name="step_to"></span>
               </span>
-              <span class="cap"></span>
             </span>
             <button type="button" class="side side-add" aria-label="Add a step after">+</button>
           </span>
@@ -258,7 +249,6 @@
                   <button type="button" class="btn value">descending</button>
                 </span>
               </span>
-              <span class="cap"></span>
             </span>
             <button type="button" class="side side-add" aria-label="Add a step after">+</button>
           </span>
@@ -296,7 +286,6 @@
                 <span class="list">
                   <span data-piece="live" data-name="timestamp"></span>
                 </span>
-                <span class="cap"></span>
               </span>
               <button type="button" class="side side-add" aria-label="Add">+</button>
             </span>
@@ -310,7 +299,7 @@
       The piece: the button's body between its two side panels. Pointing at it
       slides the panels out. pieces.js puts a copy wherever a card has a
       data-piece slot, and gives a function its second segment. The two grips
-      are strips over a function's brackets, which only one version uses.
+      are strips over a function's brackets: pointing at one opens the function.
     -->
     <template id="piece">
       <span class="piece">
