@@ -71,7 +71,7 @@ const VERSIONS = [
   {
     id: 'seam-line',
     name: 'Line',
-    note: 'A short rule from one block to the next, like a wire.',
+    note: 'A rule from one block to the next, like a wire.',
     kind: 'seam',
   },
   {
@@ -83,7 +83,7 @@ const VERSIONS = [
   {
     id: 'seam-joined',
     name: 'Joined',
-    note: 'No space either. The blocks stand shoulder to shoulder.',
+    note: 'No space at all. An opened block always lies over the one beside it.',
     kind: 'seam',
   },
 ];
