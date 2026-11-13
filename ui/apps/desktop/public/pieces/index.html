@@ -16,6 +16,9 @@
     </header>
 
     <main>
+      <h2 class="section">Nested chains <span>a value that is a chain of its own</span></h2>
+      <div id="versions-nest" class="versions"></div>
+
       <h2 class="section">Settled <span>the pieces chosen so far</span></h2>
       <div id="versions-settled" class="versions"></div>
     </main>
@@ -512,6 +515,110 @@
             </span>
             <button type="button" class="side side-add" aria-label="Add a step after">+</button>
           </span>
+        </div>
+      </section>
+    </template>
+
+    <!--
+      A card for a place to put a chain that is the value of a function: a
+      step that fills empty cells with a chain, followed by another function,
+      and a step that subtracts a chain that itself holds a list.
+    -->
+    <template id="card-nest">
+      <section class="card">
+        <h3><span class="letter"></span><span class="name"></span></h3>
+        <p class="note"></p>
+
+        <div class="row step" data-verb="add">
+          <span class="num">1</span>
+          <span class="piece head is-bracketed">
+            <button type="button" class="side side-remove" aria-label="Remove step">×</button>
+            <span class="body">
+              <button type="button" class="btn verb">Add column</button>
+              <label class="type is-name">
+                <input
+                  value="owner_filled"
+                  aria-label="Name of the new column"
+                  spellcheck="false"
+                />
+              </label>
+            </span>
+            <button type="button" class="side side-add" aria-label="Add a step after">+</button>
+          </span>
+          <span class="equals"></span>
+          <span class="chain">
+            <span data-piece="live" data-name="owner"></span>
+            <span class="seam"></span>
+            <span class="piece fn is-bracketed">
+              <button type="button" class="side side-remove" aria-label="Remove">×</button>
+              <span class="body">
+                <button type="button" class="btn">fill_null</button>
+                <span class="nest">
+                  <button
+                    type="button"
+                    class="btn shown is-chain nest-token"
+                    aria-label="A chain"
+                  ></button>
+                  <span class="nest-chain chain">
+                    <span data-piece="live" data-name="owner"></span>
+                    <span class="seam"></span>
+                    <span data-piece="live" data-fn="first"></span>
+                    <span class="seam"></span>
+                    <span data-piece="live" data-fn="over"></span>
+                  </span>
+                </span>
+              </span>
+              <button type="button" class="side side-add" aria-label="Add">+</button>
+            </span>
+            <span class="seam"></span>
+            <span data-piece="live" data-fn="shift" data-type="number:1"></span>
+          </span>
+          <span class="returns"><b>String</b></span>
+        </div>
+
+        <div class="row step" data-verb="add">
+          <span class="num">2</span>
+          <span class="piece head is-bracketed">
+            <button type="button" class="side side-remove" aria-label="Remove step">×</button>
+            <span class="body">
+              <button type="button" class="btn verb">Add column</button>
+              <label class="type is-name">
+                <input
+                  value="days_vs_mean"
+                  aria-label="Name of the new column"
+                  spellcheck="false"
+                />
+              </label>
+            </span>
+            <button type="button" class="side side-add" aria-label="Add a step after">+</button>
+          </span>
+          <span class="equals"></span>
+          <span class="chain">
+            <span data-piece="live" data-name="row_days"></span>
+            <span class="seam"></span>
+            <span class="piece fn is-bracketed">
+              <button type="button" class="side side-remove" aria-label="Remove">×</button>
+              <span class="body">
+                <button type="button" class="btn">sub</button>
+                <span class="nest">
+                  <button
+                    type="button"
+                    class="btn shown is-chain nest-token"
+                    aria-label="A chain"
+                  ></button>
+                  <span class="nest-chain chain">
+                    <span data-piece="live" data-name="row_days"></span>
+                    <span class="seam"></span>
+                    <span data-piece="live" data-fn="mean"></span>
+                    <span class="seam"></span>
+                    <span data-piece="live" data-fn="over" data-many="dcn,owner"></span>
+                  </span>
+                </span>
+              </span>
+              <button type="button" class="side side-add" aria-label="Add">+</button>
+            </span>
+          </span>
+          <span class="returns"><b>Float64</b></span>
         </div>
       </section>
     </template>

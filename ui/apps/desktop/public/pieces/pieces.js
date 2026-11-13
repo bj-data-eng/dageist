@@ -9,12 +9,30 @@
  * @property {string} id What its block in pieces.css is called.
  * @property {string} name What its card is headed.
  * @property {string} note One line on what sets it apart.
- * @property {'fold' | 'pick' | 'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind
+ * @property {'nest' | 'fold' | 'pick' | 'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind
  *   What its card shows.
  */
 
 /** @type {Version[]} */
 const VERSIONS = [
+  {
+    id: 'nest-inline',
+    name: 'Inline',
+    note: 'The chain sits inside the function, in a recess, a little smaller than the chain around it.',
+    kind: 'nest',
+  },
+  {
+    id: 'nest-below',
+    name: 'Line below',
+    note: 'The function holds a mark, and the chain is a line of its own under the step. Click the mark to fold it away.',
+    kind: 'nest',
+  },
+  {
+    id: 'nest-popup',
+    name: 'Pop-up',
+    note: 'The function holds a mark, and the chain opens in a panel beneath it. Click the mark.',
+    kind: 'nest',
+  },
   {
     id: 'fold',
     name: 'Fold',
@@ -78,6 +96,7 @@ const FIELDS = new Map([
 
 /** The template each kind of card is stamped from. */
 const CARDS = {
+  nest: '#card-nest',
   fold: '#card-fold',
   pick: '#card-pick',
   type: '#card-type',
@@ -220,6 +239,30 @@ function pieceFor(source, spec) {
   return piece;
 }
 
+/**
+ * Moves every nested chain in `card` out of its function and onto a line of
+ * its own under the step it belongs to. The mark left in the function and
+ * the mark that starts the line carry the same number.
+ * @param {HTMLElement} card
+ */
+function lowerNests(card) {
+  for (const [index, nest] of [...card.querySelectorAll('.nest')].entries()) {
+    const chain = nest.querySelector('.nest-chain');
+    const token = nest.querySelector('.nest-token');
+    const row = nest.closest('.row');
+    if (chain === null || token === null || row === null) continue;
+    const number = String(index + 1);
+    token.textContent = `↳ ${number}`;
+    const line = document.createElement('div');
+    line.className = 'subrow';
+    const mark = document.createElement('span');
+    mark.className = 'mark';
+    mark.textContent = `↳ ${number}`;
+    line.append(mark, chain);
+    row.after(line);
+  }
+}
+
 if (pieceTemplate instanceof HTMLTemplateElement) {
   for (const [index, version] of VERSIONS.entries()) {
     const template = document.querySelector(CARDS[version.kind]);
@@ -237,9 +280,29 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
       const piece = pieceFor(pieceTemplate, specOf(slot, version));
       if (piece !== null) slot.replaceWith(piece);
     }
-    document.querySelector('#versions-settled')?.append(card);
+    if (version.id === 'nest-below') lowerNests(card);
+    const section = version.kind === 'nest' ? '#versions-nest' : '#versions-settled';
+    document.querySelector(section)?.append(card);
   }
 }
+
+// A click on the mark of a nested chain folds its line away or opens its panel. A click anywhere
+// else closes an open panel.
+document.addEventListener('click', (event) => {
+  if (!(event.target instanceof Element)) return;
+  const token = event.target.closest('.nest-token');
+  const nest = token?.closest('.nest') ?? null;
+  for (const open of document.querySelectorAll('.nest.is-open')) {
+    if (open !== nest && !open.contains(event.target)) open.classList.remove('is-open');
+  }
+  if (token === null || nest === null) return;
+  nest.classList.toggle('is-open');
+  const card = nest.closest('.card');
+  const mark = token.textContent;
+  for (const line of card?.querySelectorAll('.subrow') ?? []) {
+    if (line.querySelector('.mark')?.textContent === mark) line.classList.toggle('is-shut');
+  }
+});
 
 /**
  * Closes every open button except `keep`.

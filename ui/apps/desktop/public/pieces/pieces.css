@@ -259,7 +259,8 @@ body {
  *
  * `--open` is 0 or 1 and everything that moves is worked out from it. A piece
  * is open when it is pointed at or reached by the keyboard, though not while
- * something in it is being typed.
+ * something in it is being typed. A piece that holds a chain stays shut
+ * while a piece of that chain is pointed at, so only the innermost opens.
  */
 .piece {
   /* A piece is a column unless it says otherwise, whatever piece it sits inside. */
@@ -272,7 +273,11 @@ body {
   flex: none;
 }
 
-.piece:is(:hover, .is-hover, :has(:focus-visible:not(input))):not(.is-off, :has(input:focus)) {
+.piece:is(:hover, .is-hover, :has(:focus-visible:not(input))):not(
+    .is-off,
+    :has(.piece:hover),
+    :has(input:focus)
+  ) {
   --open: 1;
   --bracket-ink: var(--tone);
 }
@@ -977,6 +982,122 @@ body {
 .given:focus {
   background-color: var(--ground);
   box-shadow: inset 0 0 0 1px var(--ink);
+}
+
+/*
+ * A nested chain: a value that is a chain of its own, such as what empty
+ * cells are filled with. In the page it sits inside its function with a mark
+ * before it. Where it is drawn is what the versions differ in.
+ */
+.nest {
+  display: inline-flex;
+  position: relative;
+  flex: none;
+  align-items: center;
+}
+
+.nest-token {
+  letter-spacing: 0;
+}
+
+.body > .nest:last-child > .nest-token {
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.nest-token:empty::before {
+  content: '…';
+}
+
+/*
+ * A · Inline: the chain sits inside the function, in a recess, a little
+ * smaller than the chain around it. There is no mark.
+ */
+.v-nest-inline .nest-token {
+  display: none;
+}
+
+.v-nest-inline .nest {
+  align-self: stretch;
+}
+
+.v-nest-inline .nest-chain {
+  flex-wrap: nowrap;
+  align-self: stretch;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background-color: color-mix(in srgb, #000 38%, var(--ground));
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 55%);
+  padding: 0 7px;
+  zoom: 0.86;
+}
+
+/*
+ * B · Line below: the function holds a numbered mark, and the chain is a
+ * line of its own under the step, behind the same mark. A click on the mark
+ * in the function folds the line away.
+ */
+.v-nest-below .nest-token,
+.subrow .mark {
+  --tone: var(--function);
+}
+
+.subrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 0 30px;
+  border-left: 2px solid color-mix(in srgb, var(--function) 30%, var(--ground));
+  padding: 4px 0 4px 10px;
+  font: 12.5px/20px var(--mono);
+  white-space: nowrap;
+}
+
+.subrow.is-shut {
+  display: none;
+}
+
+.subrow .mark {
+  flex: none;
+  color: color-mix(in srgb, var(--function) 62%, var(--ground));
+}
+
+/* A step that follows a line below keeps its rule above it. */
+.subrow + .row {
+  margin-top: 10px;
+}
+
+/*
+ * C · Pop-up: the function holds a mark, and the chain opens in a panel
+ * beneath it. In the step editor the panel is to be placed with the
+ * Floating UI library, as the lists are.
+ */
+.v-nest-popup .nest-chain {
+  display: none;
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 0;
+  flex-wrap: nowrap;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background-color: var(--panel);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 55%);
+  padding: 9px 12px;
+}
+
+.v-nest-popup .nest-chain .piece,
+.v-nest-popup .nest-chain .btn {
+  --ground: var(--panel);
+}
+
+.v-nest-popup .nest.is-open .nest-chain {
+  display: inline-flex;
+}
+
+.v-nest-popup .nest.is-open .nest-token {
+  box-shadow: inset 0 0 0 1px var(--tone);
+}
+
+.v-nest-popup .piece:has(.nest.is-open) {
+  z-index: 5;
 }
 
 @media (prefers-reduced-motion: reduce) {
