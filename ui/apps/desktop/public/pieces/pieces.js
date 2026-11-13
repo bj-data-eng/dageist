@@ -9,12 +9,30 @@
  * @property {string} id What its block in pieces.css is called.
  * @property {string} name What its card is headed.
  * @property {string} note One line on what sets it apart.
- * @property {'cond' | 'cond-chain' | 'nest' | 'fold' | 'pick' | 'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind
+ * @property {'fmt-lines' | 'fmt-lists' | 'fmt-row' | 'cond' | 'cond-chain' | 'nest' | 'fold' | 'pick' | 'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind
  *   What its card shows.
  */
 
 /** @type {Version[]} */
 const VERSIONS = [
+  {
+    id: 'fmt-lines',
+    name: 'Lines',
+    note: 'The blocks keep their shapes and the step is laid out by rule. A condition is one comparison to a line, led by its and or or. A group that is worked out first is set in, behind a rail. Every when starts a line, and the thens line up.',
+    kind: 'fmt-lines',
+  },
+  {
+    id: 'fmt-lists',
+    name: 'Lists under the step',
+    note: "The step editor's way. A condition is a list where all of the lines must hold, or any of them, and a group is a list inside a list, so nothing is left to precedence. when owns a list of cases: a condition, then a value, and otherwise last.",
+    kind: 'fmt-lists',
+  },
+  {
+    id: 'fmt-row',
+    name: 'On the row',
+    note: "Everything stays on the step's row and breaks before a caret. A group that is worked out first stands inside round brackets. The closest of the three to written code.",
+    kind: 'fmt-row',
+  },
   {
     id: 'cmp-plain',
     name: 'Plain',
@@ -114,6 +132,9 @@ const FIELDS = new Map([
 
 /** The template each kind of card is stamped from. */
 const CARDS = {
+  'fmt-lines': '#card-fmt-lines',
+  'fmt-lists': '#card-fmt-lists',
+  'fmt-row': '#card-fmt-row',
   cond: '#card-cond',
   'cond-chain': '#card-chain-only',
   nest: '#card-nest',
@@ -161,7 +182,7 @@ function fill(card, selector, text) {
  */
 function specOf(slot, version) {
   // A slot in a row says what it is. The others are the piece the version is about.
-  const inRow = slot.closest('.row') !== null;
+  const inRow = slot.closest('.row, .lines') !== null;
   const shown = version.kind === 'function' ? SHOWN_FUNCTION : null;
   return {
     state: slot.getAttribute('data-piece'),
@@ -321,7 +342,9 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
     fill(card, '.note', version.note);
     card.querySelector(version.kind === 'button' ? '.row-function' : '.row-button')?.remove();
     // The buttons written out in a row answer a click as the stamped pieces do.
-    for (const part of card.querySelectorAll('.row .body > .btn')) part.classList.add('live');
+    for (const part of card.querySelectorAll(':is(.row, .lines) .body > .btn')) {
+      part.classList.add('live');
+    }
     for (const slot of card.querySelectorAll('[data-piece]')) {
       const piece = pieceFor(pieceTemplate, specOf(slot, version));
       if (piece !== null) slot.replaceWith(piece);
@@ -336,7 +359,11 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
     }
     linkChains(card);
     lowerNests(card);
-    const section = version.kind.startsWith('cond') ? '#versions-cond' : '#versions-settled';
+    const section = version.kind.startsWith('fmt')
+      ? '#versions-format'
+      : version.kind.startsWith('cond')
+        ? '#versions-cond'
+        : '#versions-settled';
     document.querySelector(section)?.append(card);
   }
 }
@@ -349,7 +376,9 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
 function showList(nest, open) {
   if (!(nest instanceof HTMLElement)) return;
   nest.classList.toggle('is-open', open);
-  const list = document.querySelector(`.subrow[data-nest="${nest.dataset.nest ?? ''}"]`);
+  const list = document.querySelector(
+    `:is(.subrow, .lines)[data-nest="${nest.dataset.nest ?? ''}"]`,
+  );
   list?.classList.toggle('is-shut', !open);
 }
 
@@ -561,6 +590,13 @@ function removeComparison(comparison) {
   else if (isJoin(after)) after?.remove();
   comparison.remove();
 }
+
+/** The words for a list of comparisons taken as a group, and a word on each. */
+/** @type {[string, string][]} */
+const GROUPS_ON_OFFER = [
+  ['all of', 'every line must hold'],
+  ['any of', 'one line is enough'],
+];
 
 /** The room a count takes at the end of a folded slot, and the room a bracket takes after it. */
 const COUNT_ROOM = 44;
@@ -820,16 +856,18 @@ function listOffers(slot, typed, chosen) {
   if (takes(slot, 'op')) {
     // First, what can be done with the whole comparison, as the shortest group: add another
     // after it, or take it away. Where a word waits to add the next one, adding is left to it.
-    const others = slot.closest('.body')?.querySelectorAll(':scope > .cmp').length ?? 0;
+    const taker = slot.closest('.cmp')?.parentElement ?? null;
+    const inBody = taker?.classList.contains('body') ?? false;
+    const others = taker?.querySelectorAll(':scope > .cmp').length ?? 0;
     const acts = [];
-    if (slot.closest('.v-cmp-wait') === null) {
+    if (inBody && slot.closest('.v-cmp-wait') === null) {
       acts.push(
         ...JOINS_ON_OFFER.map(([name]) =>
           actRow('add', name, `+ ${name}`, 'add another comparison'),
         ),
       );
     }
-    if (others > 1) acts.push(actRow('remove', 'remove', '× remove', 'this comparison'));
+    if (inBody && others > 1) acts.push(actRow('remove', 'remove', '× remove', 'this comparison'));
     if (sought === '' && acts.length > 0) groups.push(offerGroup('This condition', null, acts));
     const rows = COMPARISONS_ON_OFFER.filter(isSought).map(([name, word]) =>
       offerRow('op', name, word, false),
@@ -842,6 +880,12 @@ function listOffers(slot, typed, chosen) {
     );
     const title = slot.classList.contains('waits') ? 'Add a comparison' : 'Joined by';
     if (rows.length > 0) groups.push(offerGroup(title, null, rows));
+  }
+  if (takes(slot, 'group')) {
+    const rows = GROUPS_ON_OFFER.filter(isSought).map(([name, word]) =>
+      offerRow('join', name, word, false),
+    );
+    if (rows.length > 0) groups.push(offerGroup('The lines below', null, rows));
   }
   if (takes(slot, 'chain')) {
     const chain = offerRow('chain', 'chain', 'a chain of its own', false);
@@ -914,7 +958,11 @@ function openSlot(slot) {
   input.spellcheck = false;
   input.className = 'sought';
   const isValue = !takes(slot, 'op') && !takes(slot, 'join');
-  input.placeholder = many ? 'Search fields' : isValue ? 'Type a value, or search' : 'Search';
+  input.placeholder = many
+    ? 'Search fields'
+    : isValue && !takes(slot, 'group')
+      ? 'Type a value, or search'
+      : 'Search';
   input.setAttribute('aria-label', input.placeholder);
   // A value that was typed can be changed where it is typed.
   const kind = slot.dataset.kind;

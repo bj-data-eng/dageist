@@ -1148,12 +1148,15 @@ body {
  * B · Round brackets: the three blocks stand inside round brackets in the
  * comparison's colour, as a function stands inside square ones.
  */
-.v-cmp-round .cmp {
+.v-cmp-round .cmp,
+.grp {
   margin: 0 7px;
 }
 
 .v-cmp-round .cmp::before,
-.v-cmp-round .cmp::after {
+.v-cmp-round .cmp::after,
+.grp::before,
+.grp::after {
   content: '';
   position: absolute;
   top: -3px;
@@ -1163,13 +1166,15 @@ body {
   pointer-events: none;
 }
 
-.v-cmp-round .cmp::before {
+.v-cmp-round .cmp::before,
+.grp::before {
   left: -7px;
   border-right: 0;
   border-radius: 10px 0 0 10px / 15px 0 0 15px;
 }
 
-.v-cmp-round .cmp::after {
+.v-cmp-round .cmp::after,
+.grp::after {
   right: -7px;
   border-left: 0;
   border-radius: 0 10px 10px 0 / 0 15px 15px 0;
@@ -1192,6 +1197,131 @@ body {
   padding-top: 0;
   padding-bottom: 0;
   line-height: 18px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Formatting                                                          */
+/* ------------------------------------------------------------------ */
+
+/*
+ * A group on the row: comparisons that are worked out first stand inside
+ * round brackets, a hair apart like the blocks of a function.
+ */
+.grp {
+  display: inline-flex;
+  position: relative;
+  flex: none;
+  align-items: center;
+  gap: 1px;
+}
+
+.body > .grp:last-child > .cmp:last-child > :last-child .shown {
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+/*
+ * Lines under a step. A step that is laid out on lines keeps its head on the
+ * row and puts what it takes beneath it, one thing to a line.
+ */
+.lines {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 6px 0 0 18px;
+  font: 12.5px/20px var(--mono);
+  white-space: nowrap;
+}
+
+.lines.is-shut {
+  display: none;
+}
+
+.lines + .row {
+  margin-top: 10px;
+}
+
+.line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.line:has(> .lines) {
+  align-items: flex-start;
+}
+
+/* The word that leads a line stands in a column of its own, so the comparisons line up. */
+.lead {
+  display: inline-flex;
+  flex: none;
+  justify-content: flex-end;
+  width: 32px;
+}
+
+/* A group is set in behind a rail: what is behind one rail is worked out together. */
+.lines .lines {
+  margin: 0;
+}
+
+.lines.is-group {
+  border-left: 2px solid color-mix(in srgb, var(--function) 30%, var(--ground));
+  padding-left: 2px;
+}
+
+/* A comparison that stands on a line of its own is round at both ends. */
+.line > .cmp > :first-child .shown {
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+
+.line > .cmp > :last-child .shown {
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.lines .line > .slot.join .shown,
+.lines .lead .shown {
+  --tone: var(--function);
+}
+
+/* Cases: every when starts a line, each line starts with its caret, and the thens line up. */
+.lines.is-cases {
+  display: grid;
+  grid-template-columns: var(--seam-space) max-content max-content;
+  justify-content: start;
+  justify-items: start;
+  align-items: center;
+}
+
+.lines.is-cases > .line {
+  display: contents;
+}
+
+/* A list under the step: numbered lines behind a rail, as a nested chain's are. */
+.lines.is-list {
+  margin-left: 30px;
+  border-left: 2px solid color-mix(in srgb, var(--function) 30%, var(--ground));
+  padding: 4px 0 4px 10px;
+}
+
+.lines.is-list .lines.is-list {
+  margin-left: 30px;
+}
+
+.lines.is-list.is-cases {
+  grid-template-columns: repeat(4, max-content);
+  column-gap: 8px;
+}
+
+.line .mark {
+  flex: none;
+  color: var(--muted);
+  font: 11px/24px var(--mono);
+}
+
+/* A word in a list of cases that is not a block: then, otherwise. */
+.label {
+  color: var(--muted);
+  font: 12.5px/24px var(--mono);
 }
 
 @media (prefers-reduced-motion: reduce) {
