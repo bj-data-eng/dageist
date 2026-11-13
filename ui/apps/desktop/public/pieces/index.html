@@ -1059,8 +1059,23 @@
             ><span class="cmp"
               ><span class="slot" data-kind="column" data-value="row_days"></span
               ><span class="slot op" data-takes="op" data-kind="op" data-value="&gt;"></span
-              ><span class="slot" data-kind="input" data-value="sla_cutoff"></span
+              ><span class="nest is-open" data-nest="mean"
+                ><button
+                  type="button"
+                  class="btn shown is-chain nest-token"
+                  aria-label="A chain"
+                ></button></span
             ></span>
+          </div>
+          <div class="lines is-list" data-nest="mean">
+            <div class="line">
+              <span class="mark">1.1.1</span
+              ><span class="chain"
+                ><span data-piece="live" data-name="row_days"></span><span class="seam"></span
+                ><span data-piece="live" data-fn="mean"></span><span class="seam"></span
+                ><span data-piece="live" data-fn="over"></span
+              ></span>
+            </div>
           </div>
           <div class="line">
             <span class="mark">1.2</span
@@ -1132,7 +1147,22 @@
               ><span class="slot op" data-takes="op" data-kind="op" data-value="&gt;"></span
               ><span class="slot" data-kind="input" data-value="sla_cutoff"></span></span
             ><span class="label">then</span
-            ><span class="slot" data-kind="text" data-value="over"></span>
+            ><span class="nest is-open" data-nest="upper"
+              ><button
+                type="button"
+                class="btn shown is-chain nest-token"
+                aria-label="A chain"
+              ></button
+            ></span>
+          </div>
+          <div class="lines is-list" data-nest="upper">
+            <div class="line">
+              <span class="mark">2.2.1</span
+              ><span class="chain"
+                ><span data-piece="live" data-name="owner"></span><span class="seam"></span
+                ><span data-piece="live" data-fn="str.to_uppercase"></span
+              ></span>
+            </div>
           </div>
           <div class="line">
             <span class="mark">2.3</span><span class="label">otherwise</span><span></span

@@ -1233,10 +1233,6 @@ body {
   white-space: nowrap;
 }
 
-.lines.is-shut {
-  display: none;
-}
-
 .lines + .row {
   margin-top: 10px;
 }
@@ -1307,6 +1303,11 @@ body {
   margin-left: 30px;
 }
 
+/* A list under a line of cases runs the full width, clear of the columns. */
+.lines.is-cases > .lines {
+  grid-column: 1 / -1;
+}
+
 .lines.is-list.is-cases {
   grid-template-columns: repeat(4, max-content);
   column-gap: 8px;
@@ -1316,6 +1317,11 @@ body {
   flex: none;
   color: var(--muted);
   font: 11px/24px var(--mono);
+}
+
+/* A list that is shut is not there, whatever kind of list it is. */
+.lines.is-shut {
+  display: none;
 }
 
 /* A word in a list of cases that is not a block: then, otherwise. */

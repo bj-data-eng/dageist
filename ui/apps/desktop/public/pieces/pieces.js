@@ -24,7 +24,7 @@ const VERSIONS = [
   {
     id: 'fmt-lists',
     name: 'Lists under the step',
-    note: "The step editor's way. A condition is a list where all of the lines must hold, or any of them, and a group is a list inside a list, so nothing is left to precedence. when owns a list of cases: a condition, then a value, and otherwise last.",
+    note: "The step editor's way. A condition is a list where all of the lines must hold, or any of them, and a group is a list inside a list, so nothing is left to precedence. when owns a list of cases: a condition, then a value, and otherwise last. A chain in a value is three dots, and its list sits under its own line, numbered from it.",
     kind: 'fmt-lists',
   },
   {
@@ -383,14 +383,15 @@ function showList(nest, open) {
 }
 
 // A click on three dots opens the list they own, or shuts it if it is open. It also shuts any
-// other list under the same step, so that a step never shows two functions' lists at once.
+// other list of the same step or line, so that neither shows two functions' lists at once.
 document.addEventListener('click', (event) => {
   if (!(event.target instanceof Element)) return;
   const nest = event.target.closest('.nest-token')?.closest('.nest');
-  const row = nest?.closest('.row');
-  if (nest === null || nest === undefined || row === null || row === undefined) return;
+  // Dots on a line of a list own a list under that line, so the line is what they share.
+  const owner = nest?.closest('.line, .row');
+  if (nest === null || nest === undefined || owner === null || owner === undefined) return;
   const open = !nest.classList.contains('is-open');
-  for (const other of row.querySelectorAll('.nest')) showList(other, false);
+  for (const other of owner.querySelectorAll('.nest')) showList(other, false);
   showList(nest, open);
 });
 
