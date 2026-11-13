@@ -9,70 +9,41 @@
  * @property {string} id What its block in pieces.css is called.
  * @property {string} name What its card is headed.
  * @property {string} note One line on what sets it apart.
- * @property {'list' | 'head' | 'button' | 'function' | 'seam'} kind The piece it is a version of.
+ * @property {'list' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind What its
+ *   card shows.
  */
 
 /** @type {Version[]} */
 const VERSIONS = [
   {
-    id: 'list-segments',
-    name: 'Segments',
-    note: 'Each value is one more block a hair apart. A pair is two blocks that touch.',
+    id: 'item-spread',
+    name: 'Spread',
+    note: 'The run parts around the value pointed at, as the brackets do, and its panels fill the room.',
     kind: 'list',
   },
   {
-    id: 'list-brackets',
-    name: 'Inner brackets',
-    note: 'The values stand in fine marks of their own: square for a list, curly for a dictionary.',
+    id: 'item-tab',
+    name: 'Tab above',
+    note: 'The value’s two tools rise above it, so nothing beside it is covered.',
     kind: 'list',
   },
   {
-    id: 'list-tray',
-    name: 'Tray',
-    note: 'The values lie in a recess in the function’s body, a little smaller than it.',
+    id: 'item-chip',
+    name: 'In the block',
+    note: 'Remove appears at the value’s own end. One cell at the end of the list adds a value.',
     kind: 'list',
   },
   {
-    id: 'list-run',
-    name: 'Run',
-    note: 'The values are written in one block as they are in code, with commas and colons.',
-    kind: 'list',
-  },
-  {
-    id: 'head-call',
-    name: 'Bracketed',
-    note: 'The format of a function: bracketed, the verb then the name. Its side panels remove the step or add one after it.',
+    id: 'head',
+    name: 'Step head',
+    note: 'Bracketed like a function, in the verb’s colour: the verb, then the name it makes.',
     kind: 'head',
   },
   {
-    id: 'head-words',
-    name: 'Words',
-    note: 'Today’s head: the verb as coloured text, the name underlined, a typed equals sign.',
-    kind: 'head',
-  },
-  {
-    id: 'head-block',
-    name: 'Block',
-    note: 'The verb and the name as two blocks a hair apart, as a function and its field are.',
-    kind: 'head',
-  },
-  {
-    id: 'head-flag',
-    name: 'Flag',
-    note: 'The verb as a solid flag whose point locks into the name, echoing the chevron.',
-    kind: 'head',
-  },
-  {
-    id: 'head-rail',
-    name: 'Rail',
-    note: 'Each step is a strip of its own, with a rail in the verb’s colour down its edge.',
-    kind: 'head',
-  },
-  {
-    id: 'head-numbered',
-    name: 'Numbered',
-    note: 'The step’s number is a block of its own, joined to the verb.',
-    kind: 'head',
+    id: 'list',
+    name: 'Values',
+    note: 'Each value in a bracket is one more block a hair apart. A word names a parameter.',
+    kind: 'list-settled',
   },
   {
     id: 'tint',
@@ -105,7 +76,17 @@ const FIELDS = new Map([
   ['sub', { text: 'resolved_at', kind: 'column' }],
 ]);
 
-/** The function the Function section shows. */
+/** The template each kind of card is stamped from. */
+const CARDS = {
+  list: '#card-list',
+  'list-settled': '#card-list',
+  head: '#card-head',
+  seam: '#card-seam',
+  button: '#card',
+  function: '#card',
+};
+
+/** The function the Function card shows. */
 const SHOWN_FUNCTION = 'over';
 
 const pieceTemplate = document.querySelector('#piece');
@@ -216,8 +197,7 @@ function pieceFor(source, spec) {
 
 if (pieceTemplate instanceof HTMLTemplateElement) {
   for (const [index, version] of VERSIONS.entries()) {
-    const own = version.kind === 'seam' || version.kind === 'head' || version.kind === 'list';
-    const template = document.querySelector(own ? `#card-${version.kind}` : '#card');
+    const template = document.querySelector(CARDS[version.kind]);
     if (!(template instanceof HTMLTemplateElement)) continue;
     const card = template.content.firstElementChild?.cloneNode(true);
     if (!(card instanceof HTMLElement)) continue;
@@ -226,17 +206,13 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
     fill(card, '.name', version.name);
     fill(card, '.note', version.note);
     card.querySelector(version.kind === 'button' ? '.row-function' : '.row-button')?.remove();
-    if (version.id === 'head-call' || version.kind === 'list') {
-      for (const head of card.querySelectorAll('.piece.head')) head.classList.add('is-bracketed');
-    }
     // The buttons written out in a row answer a click as the stamped pieces do.
     for (const part of card.querySelectorAll('.row .body > .btn')) part.classList.add('live');
     for (const slot of card.querySelectorAll('[data-piece]')) {
       const piece = pieceFor(pieceTemplate, specOf(slot, version));
       if (piece !== null) slot.replaceWith(piece);
     }
-    const sectioned = version.kind === 'head' || version.kind === 'list';
-    const section = sectioned ? `#versions-${version.kind}` : '#versions-settled';
+    const section = version.kind === 'list' ? '#versions-list' : '#versions-settled';
     document.querySelector(section)?.append(card);
   }
 }
