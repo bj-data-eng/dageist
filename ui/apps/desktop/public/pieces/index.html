@@ -20,7 +20,7 @@
       <div id="versions-button" class="versions"></div>
 
       <h2 class="section">
-        Function <span>the bracketed button, with its parameters in a panel</span>
+        Function <span>the bracketed button in segments: the function, then its field</span>
       </h2>
       <div id="versions-function" class="versions"></div>
     </main>
@@ -89,21 +89,14 @@
     </template>
 
     <!--
-      The button with its tools. Pointing at it slides a panel out of each of
-      its four sides. pieces.js puts a copy wherever a card has a data-piece slot.
+      The piece: the button's body between its two side panels. Pointing at it
+      slides the panels out. pieces.js puts a copy wherever a card has a
+      data-piece slot, and gives a function its second segment.
     -->
     <template id="piece">
       <span class="piece">
         <button type="button" class="side side-remove" aria-label="Remove">×</button>
-        <span class="flap flap-up">
-          <button type="button" aria-label="Option one">○</button>
-          <button type="button" aria-label="Option two">○</button>
-        </span>
-        <button type="button" class="btn">dcn</button>
-        <span class="flap flap-down">
-          <button type="button" aria-label="Option three">○</button>
-          <button type="button" aria-label="Option four">○</button>
-        </span>
+        <span class="body"><button type="button" class="btn">dcn</button></span>
         <button type="button" class="side side-add" aria-label="Add">+</button>
       </span>
     </template>

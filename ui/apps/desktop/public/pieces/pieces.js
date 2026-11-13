@@ -11,7 +11,6 @@
  * @property {string} note One line on what sets it apart.
  * @property {boolean} brackets Whether the piece is drawn with brackets.
  * @property {string | null} fn The function the piece is, or null for a column.
- * @property {'up' | 'down' | null} params The panel a function's parameters go in.
  */
 
 /** @type {Version[]} */
@@ -22,7 +21,6 @@ const VERSIONS = [
     note: 'The version chosen. A flat fill in the colour of what it names.',
     brackets: false,
     fn: null,
-    params: null,
   },
   {
     id: 'bracket',
@@ -30,7 +28,6 @@ const VERSIONS = [
     note: 'A fine square bracket outside each end, standing a little clear.',
     brackets: true,
     fn: null,
-    params: null,
   },
   {
     id: 'bracket-close',
@@ -38,7 +35,6 @@ const VERSIONS = [
     note: 'The same bracket, hugging the button.',
     brackets: true,
     fn: null,
-    params: null,
   },
   {
     id: 'bracket-heavy',
@@ -46,7 +42,6 @@ const VERSIONS = [
     note: 'A line twice as thick, standing clear.',
     brackets: true,
     fn: null,
-    params: null,
   },
   {
     id: 'bracket-round',
@@ -54,7 +49,6 @@ const VERSIONS = [
     note: 'Heavy and hugging. Its inner curve runs parallel to the button’s corner.',
     brackets: true,
     fn: null,
-    params: null,
   },
   {
     id: 'bracket-flush',
@@ -62,47 +56,37 @@ const VERSIONS = [
     note: 'The same, touching the button. Its inner curve is the button’s own corner.',
     brackets: true,
     fn: null,
-    params: null,
   },
   {
-    id: 'fn-below',
-    name: 'Parameters below',
-    note: 'The brackets say it is a call. Its parameters slide down on mouseover.',
+    id: 'fn-split',
+    name: 'Segments',
+    note: 'Two blocks a hair apart: the function, then its field in its own colour.',
     brackets: true,
-    fn: 'shift',
-    params: 'down',
+    fn: 'over',
   },
   {
-    id: 'fn-above',
-    name: 'Parameters above',
-    note: 'The same, with the parameters sliding up.',
+    id: 'fn-divided',
+    name: 'Segments, one body',
+    note: 'One fill throughout. A hairline parts the function from its field.',
     brackets: true,
-    fn: 'shift',
-    params: 'up',
+    fn: 'over',
   },
   {
-    id: 'fn-pinned',
-    name: 'Parameters below, kept in view',
-    note: 'A parameter that is set stays under the name. The rest arrive on mouseover.',
+    id: 'fn-inset',
+    name: 'Segments, field inset',
+    note: 'The field is a smaller button inside the function, as an argument sits in a call.',
     brackets: true,
-    fn: 'shift',
-    params: 'down',
+    fn: 'over',
   },
 ];
 
 /**
- * The parameters of each function shown, with the value each has here.
- * @type {Map<string, { name: string, value: string, set: boolean }[]>}
+ * The field each function shown works on, and whether it is a column or a plain value.
+ * @type {Map<string, { text: string, kind: 'column' | 'value' }>}
  */
-const PARAMETERS = new Map([
-  [
-    'shift',
-    [
-      { name: 'n', value: '1', set: true },
-      { name: 'fill_value', value: 'None', set: false },
-    ],
-  ],
-  ['over', [{ name: 'partition_by', value: 'dcn', set: true }]],
+const FIELDS = new Map([
+  ['over', { text: 'dcn', kind: 'column' }],
+  ['shift', { text: '1', kind: 'value' }],
 ]);
 
 const cardTemplate = document.querySelector('#card');
@@ -120,30 +104,22 @@ function fill(card, selector, text) {
 }
 
 /**
- * Makes `piece` the function `fn`: its name, and its parameters in the panel
- * `version` puts them in.
+ * Makes `piece` the function `fn`: its name in the first segment and the
+ * field it works on in a second.
  * @param {HTMLElement} piece
  * @param {HTMLButtonElement} button
  * @param {string} fn
- * @param {Version} version
  */
-function makeFunction(piece, button, fn, version) {
+function makeFunction(piece, button, fn) {
   piece.classList.add('fn');
   button.textContent = fn;
-  const panel = piece.querySelector(version.params === 'up' ? '.flap-up' : '.flap-down');
-  if (panel === null) return;
-  panel.classList.add('params');
-  panel.replaceChildren(
-    ...(PARAMETERS.get(fn) ?? []).map((parameter) => {
-      const cell = document.createElement('button');
-      cell.type = 'button';
-      cell.className = parameter.set ? 'param is-set' : 'param';
-      const name = document.createElement('i');
-      name.textContent = parameter.name;
-      cell.append(name, parameter.value);
-      return cell;
-    }),
-  );
+  const field = FIELDS.get(fn);
+  if (field === undefined) return;
+  const segment = document.createElement('button');
+  segment.type = 'button';
+  segment.className = field.kind === 'value' ? 'btn field is-value' : 'btn field';
+  segment.textContent = field.text;
+  button.after(segment);
 }
 
 /**
@@ -166,14 +142,14 @@ function pieceFor(source, slot, version) {
   const fn = inRow ? slot.getAttribute('data-fn') : version.fn;
   const name = slot.getAttribute('data-name');
   if (name !== null) button.textContent = name;
-  if (fn !== null) makeFunction(piece, button, fn, version);
+  if (fn !== null) makeFunction(piece, button, fn);
   if (version.brackets && (version.fn === null || fn !== null)) {
     piece.classList.add('is-bracketed');
   }
 
   const state = slot.getAttribute('data-piece');
   if (state === 'live') {
-    button.classList.add('live');
+    for (const segment of piece.querySelectorAll('.btn')) segment.classList.add('live');
     return piece;
   }
   for (const control of piece.querySelectorAll('button')) control.tabIndex = -1;
@@ -186,7 +162,7 @@ function pieceFor(source, slot, version) {
   if (state === 'focus') button.classList.add('is-focus');
   if (state === 'off') {
     piece.classList.add('is-off');
-    button.disabled = true;
+    for (const control of piece.querySelectorAll('button')) control.disabled = true;
   }
   return piece;
 }

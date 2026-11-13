@@ -1,7 +1,8 @@
 /*
  * The Pieces page: the parts the step editor is drawn with, tried out one at
  * a time in plain HTML and CSS. The first part of this file is the page. The
- * second is the button: a shared base, then one block per version.
+ * second is the piece: the button, its side panels and its brackets, then
+ * one block per version.
  */
 
 :root {
@@ -16,19 +17,21 @@
   --accent: #f08a3c;
   --verb: #f08a3c;
   --dtype: #7fd6a4;
-  --danger: #e5566e;
-  --ready: #3fbf7f;
-  /* The darker grey of the panels that slide out of the button. */
-  --well: #111216;
-  /* The colour of what the button names. Everything a version draws is mixed from it. */
-  --tone: #9cc8ff;
-  /* The colour of a function: the plain ink of the words around it. */
+  /* The grey of the panels that slide out of the button's sides, and what they turn to. */
+  --side-fill: #3a3f49;
+  --side-ink: #c3c8d1;
+  --remove: #f0203c;
+  --add: #0cae4f;
+  /* The colours of what a button names: a column, a function and a plain value. */
+  --column: #9cc8ff;
   --function: #d7dbe2;
+  --value: #f3c98b;
+  /* The colour of the button being drawn. Everything a version draws is mixed from it. */
+  --tone: var(--column);
   /* How round the button's corners are. */
   --radius: 2px;
-  /* How wide a side panel is, and how tall a flap above or below the button is. */
+  /* How wide a side panel is. */
   --side: 18px;
-  --flap: 16px;
   --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
@@ -115,7 +118,7 @@ body {
 .stage {
   display: grid;
   place-items: center;
-  height: 68px;
+  height: 44px;
   zoom: 3;
 }
 
@@ -123,15 +126,15 @@ body {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 30px 46px;
+  gap: 14px 46px;
   border-top: 1px solid var(--line);
-  padding: 26px 26px 10px;
+  padding: 14px 26px 10px;
 }
 
 .states figure {
   display: grid;
   justify-items: center;
-  gap: 22px;
+  gap: 7px;
   margin: 0;
 }
 
@@ -174,13 +177,13 @@ body {
 }
 
 /* ------------------------------------------------------------------ */
-/* The button                                                          */
+/* The piece                                                           */
 /* ------------------------------------------------------------------ */
 
 /*
  * The button is Tint, the version chosen: a flat fill in the colour of what
- * it names, which deepens as the button is used. Every version below starts
- * from it.
+ * it names, which deepens as the button is used. `--fill` lets a version fill
+ * a button in another colour than its text.
  */
 .btn {
   appearance: none;
@@ -189,7 +192,7 @@ body {
   margin: 0;
   border: 0;
   border-radius: var(--radius);
-  background-color: color-mix(in srgb, var(--tone) 18%, transparent);
+  background-color: color-mix(in srgb, var(--fill, var(--tone)) 18%, transparent);
   padding: 2px 7px;
   color: var(--tone);
   font: 12.5px/20px var(--mono);
@@ -201,19 +204,20 @@ body {
 }
 
 .btn:is(:hover, .is-hover):enabled {
-  background-color: color-mix(in srgb, var(--tone) 28%, transparent);
+  background-color: color-mix(in srgb, var(--fill, var(--tone)) 28%, transparent);
 }
 
 .btn:is(:active, .is-active):enabled {
-  background-color: color-mix(in srgb, var(--tone) 38%, transparent);
+  background-color: color-mix(in srgb, var(--fill, var(--tone)) 38%, transparent);
 }
 
 .btn[aria-expanded='true'] {
-  background-color: color-mix(in srgb, var(--tone) 30%, transparent);
+  background-color: color-mix(in srgb, var(--fill, var(--tone)) 30%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 65%, transparent);
 }
 
 .btn:is(:focus-visible, .is-focus) {
+  z-index: 1;
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -228,10 +232,10 @@ body {
 }
 
 /*
- * The piece: the button and the four panels that slide out of its sides when
- * it is pointed at. They lie over what is beside the button, so nothing in
- * the row moves. A panel that is tucked away is clipped to nothing, which
- * also keeps the pointer from finding it.
+ * The piece: the button's body and the panel that slides out of each side
+ * when it is pointed at. The panels lie over what is beside the button, so
+ * nothing in the row moves. A panel that is tucked away is clipped to
+ * nothing, which also keeps the pointer from finding it.
  */
 .piece {
   display: inline-flex;
@@ -243,36 +247,41 @@ body {
   z-index: 1;
 }
 
-.side,
-.flap {
-  position: absolute;
-  background-color: var(--well);
-  transition: clip-path 140ms ease-out;
+/* The body holds the button, or its segments. Pointing at the piece lifts it off the panels. */
+.body {
+  display: inline-flex;
+  position: relative;
+  z-index: 1;
+  border-radius: var(--radius);
+  transition: box-shadow 140ms ease-out;
 }
 
-.side,
-.flap button {
+.piece:is(:hover, .is-hover, :has(:focus-visible)):not(.is-off) .body {
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 28%),
+    0 1px 2px rgb(0 0 0 / 45%),
+    0 3px 7px rgb(0 0 0 / 35%);
+}
+
+/* The side panels: remove on the left, add on the right. */
+.side {
   appearance: none;
+  position: absolute;
+  top: 0;
+  bottom: 0;
   margin: 0;
   border: 0;
+  background-color: var(--side-fill);
   padding: 0;
-  color: var(--muted);
-  font-family: var(--mono);
+  width: var(--side);
+  color: var(--side-ink);
+  font: 13px/1 var(--mono);
   text-align: center;
   cursor: pointer;
   transition:
     clip-path 140ms ease-out,
     background-color 90ms ease-out,
     color 90ms ease-out;
-}
-
-/* The side panels: remove on the left, add on the right. */
-.side {
-  top: 0;
-  bottom: 0;
-  width: var(--side);
-  font-size: 13px;
-  line-height: 1;
 }
 
 .side-remove {
@@ -288,48 +297,16 @@ body {
 }
 
 .side-remove:hover {
-  background-color: color-mix(in srgb, var(--danger) 22%, var(--well));
-  color: var(--danger);
+  background-color: var(--remove);
+  color: #fff;
 }
 
 .side-add:hover {
-  background-color: color-mix(in srgb, var(--ready) 20%, var(--well));
-  color: var(--ready);
+  background-color: var(--add);
+  color: #fff;
 }
 
-/* The flaps: one above and one below, each a row of options. */
-.flap {
-  display: flex;
-  right: 0;
-  left: 0;
-  height: var(--flap);
-}
-
-.flap-up {
-  bottom: 100%;
-  border-radius: var(--radius) var(--radius) 0 0;
-  clip-path: inset(100% 0 0 0);
-}
-
-.flap-down {
-  top: 100%;
-  border-radius: 0 0 var(--radius) var(--radius);
-  clip-path: inset(0 0 100% 0);
-}
-
-.flap button {
-  flex: 1;
-  background: none;
-  font-size: 8px;
-  line-height: var(--flap);
-}
-
-.flap button:hover {
-  background-color: rgb(255 255 255 / 8%);
-  color: var(--ink);
-}
-
-.piece:is(:hover, .is-hover, :has(:focus-visible)):not(.is-off) :is(.side, .flap) {
+.piece:is(:hover, .is-hover, :has(:focus-visible)):not(.is-off) .side {
   clip-path: inset(0);
 }
 
@@ -394,67 +371,6 @@ body {
   transform: translateX(var(--side));
 }
 
-/* The focus ring goes round the brackets as well. */
-.is-bracketed .btn:is(:focus-visible, .is-focus) {
-  outline-offset: calc(var(--gap) + var(--weight) + 2px);
-}
-
-/*
- * The function: the bracketed button in the colour of plain words, with its
- * parameters in one of the flaps. That flap is as wide as its parameters
- * need, and at least as wide as the opened piece.
- */
-.piece.fn {
-  --tone: var(--function);
-}
-
-.flap.params {
-  right: auto;
-  left: 50%;
-  justify-content: center;
-  translate: -50% 0;
-  width: max-content;
-  min-width: calc(100% + 2 * var(--side));
-}
-
-.flap .param {
-  flex: none;
-  padding: 0 6px;
-  color: var(--ink);
-  font-size: 9.5px;
-  white-space: nowrap;
-}
-
-.param i {
-  margin-right: 4px;
-  color: var(--muted);
-  font-style: normal;
-}
-
-/*
- * I · Parameters below, kept in view: a parameter that is set stays under the
- * name as plain text. Pointing at the function gives it the panel and the
- * parameters that are not set.
- */
-.v-fn-pinned .flap.params {
-  background-color: transparent;
-  clip-path: inset(0);
-  transition: background-color 140ms ease-out;
-}
-
-.v-fn-pinned .piece:is(:hover, .is-hover, :has(:focus-visible)):not(.is-off) .flap.params {
-  background-color: var(--well);
-}
-
-.v-fn-pinned .piece:not(:hover, .is-hover, :has(:focus-visible)) .param:not(.is-set) {
-  display: none;
-}
-
-.v-fn-pinned .row {
-  row-gap: 22px;
-  padding-bottom: 18px;
-}
-
 /* B · Bracket: a fine line, standing a little clear of the button. */
 .v-bracket {
   --gap: 3px;
@@ -502,11 +418,84 @@ body {
   --round: calc(var(--radius) + var(--gap) + var(--weight));
 }
 
+/*
+ * The function: a bracketed piece whose body is in segments, the function
+ * first and then the field it works on. The function is in the colour of
+ * plain words. The field is in the colour of what it is.
+ */
+.piece.fn {
+  --tone: var(--function);
+}
+
+.field {
+  --tone: var(--column);
+}
+
+.field.is-value {
+  --tone: var(--value);
+}
+
+/* Segments that touch are square where they meet. */
+.body .btn:not(:first-child) {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.body .btn:not(:last-child) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* G · Segments: two blocks a hair apart, each filled in its own colour. */
+.v-fn-split .body {
+  gap: 1px;
+}
+
+/* H · Segments, one body: one fill throughout. A hairline parts the function from its field. */
+.v-fn-divided .field {
+  --fill: var(--function);
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--function) 30%, transparent);
+}
+
+.v-fn-divided .field[aria-expanded='true'] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 65%, transparent);
+}
+
+/*
+ * I · Segments, field inset: the field is a smaller button set inside the
+ * function's body, as an argument sits inside a call.
+ */
+.v-fn-inset .fn .body {
+  background-color: color-mix(in srgb, var(--function) 18%, transparent);
+}
+
+.v-fn-inset .fn .btn:not(.field) {
+  --fill: transparent;
+}
+
+.v-fn-inset .fn .btn:not(.field):is(:hover, .is-hover):enabled {
+  background-color: color-mix(in srgb, var(--function) 10%, transparent);
+}
+
+.v-fn-inset .fn .btn:not(.field):is(:active, .is-active):enabled {
+  background-color: color-mix(in srgb, var(--function) 20%, transparent);
+}
+
+.v-fn-inset .fn .btn:not(.field)[aria-expanded='true'] {
+  background-color: color-mix(in srgb, var(--function) 12%, transparent);
+}
+
+.v-fn-inset .field {
+  margin: 3px 3px 3px 0;
+  border-radius: var(--radius);
+  padding: 0 5px;
+  line-height: 18px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .btn,
+  .body,
   .side,
-  .flap,
-  .flap button,
   .piece::before,
   .piece::after {
     transition: none;
