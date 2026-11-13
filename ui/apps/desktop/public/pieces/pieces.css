@@ -164,7 +164,8 @@ body {
   white-space: nowrap;
 }
 
-.row .verb {
+/* The verb as plain words, where a row is not about the step head. */
+.row > .verb {
   margin-right: 4px;
   color: var(--verb-add);
   font: 600 13px/20px var(--sans);
@@ -244,31 +245,43 @@ body {
  * when it is pointed at. The panels lie over what is beside the button, so
  * nothing in the row moves. A panel that is tucked away is clipped to
  * nothing, which also keeps the pointer from finding it.
+ *
+ * `--open` is 0 or 1 and everything that moves is worked out from it. A piece
+ * is open when it is pointed at or reached by the keyboard. A piece that
+ * holds other pieces stays shut while one of those is pointed at, so only
+ * the innermost one opens.
  */
 .piece {
+  /* A piece is a column unless it says otherwise, whatever piece it sits inside. */
+  --tone: var(--column);
+  --open: 0;
+  --bracket-ink: color-mix(in srgb, var(--tone) 60%, transparent);
+
   display: inline-flex;
   position: relative;
   flex: none;
 }
 
-.piece:is(:hover, .is-hover, :has(:focus-visible)):not(.is-off) {
+.piece:is(:hover, .is-hover, :has(:focus-visible)):not(.is-off, :has(.piece:hover)) {
+  --open: 1;
+  --bracket-ink: var(--tone);
+}
+
+.piece:is(:hover, .is-hover, :has(:focus-visible)) {
   z-index: 1;
 }
 
-/* The body holds the button, or its segments. Pointing at the piece lifts it off the panels. */
+/* The body holds the button, or its segments. An open piece lifts it off the panels. */
 .body {
   display: inline-flex;
   position: relative;
   z-index: 1;
   border-radius: var(--radius);
-  transition: box-shadow 140ms ease-out;
-}
-
-.piece:is(:hover, .is-hover, :has(:focus-visible)):not(.is-off) .body {
   box-shadow:
-    0 0 0 1px rgb(0 0 0 / 28%),
-    0 1px 2px rgb(0 0 0 / 45%),
-    0 3px 7px rgb(0 0 0 / 35%);
+    0 0 0 1px rgb(0 0 0 / calc(var(--open) * 28%)),
+    0 1px 2px rgb(0 0 0 / calc(var(--open) * 45%)),
+    0 3px 7px rgb(0 0 0 / calc(var(--open) * 35%));
+  transition: box-shadow 140ms ease-out;
 }
 
 /* The side panels: remove on the left, add on the right. */
@@ -295,13 +308,13 @@ body {
 .side-remove {
   right: 100%;
   border-radius: var(--radius) 0 0 var(--radius);
-  clip-path: inset(0 0 0 100%);
+  clip-path: inset(0 0 0 calc((1 - var(--open)) * 100%));
 }
 
 .side-add {
   left: 100%;
   border-radius: 0 var(--radius) var(--radius) 0;
-  clip-path: inset(0 100% 0 0);
+  clip-path: inset(0 calc((1 - var(--open)) * 100%) 0 0);
 }
 
 .side-remove:hover {
@@ -314,14 +327,10 @@ body {
   color: #fff;
 }
 
-.piece:is(:hover, .is-hover, :has(:focus-visible)):not(.is-off) .side {
-  clip-path: inset(0);
-}
-
 /*
  * Brackets: a square bracket outside each end of the button, whose arms reach
- * back over its corners. Pointing at the button moves each bracket outward by
- * the width of a side panel, which is what uncovers the panel. The bracket is
+ * back over its corners. An open piece moves each bracket outward by the
+ * width of a side panel, which is what uncovers the panel. The bracket is
  * heavy, round and hugging. Its radius is measured at the line's outer edge,
  * so the inner curve is the button's radius plus the gap, which keeps the two
  * curves parallel.
@@ -341,13 +350,17 @@ body {
   margin: 0 calc(var(--gap) + var(--weight) + 1px);
 }
 
+.piece.is-bracketed:has(.btn[aria-expanded='true']) {
+  --bracket-ink: var(--tone);
+}
+
 .piece.is-bracketed::before,
 .piece.is-bracketed::after {
   content: '';
   position: absolute;
   top: calc(-1 * var(--rise));
   bottom: calc(-1 * var(--rise));
-  border: var(--weight) solid color-mix(in srgb, var(--tone) 60%, transparent);
+  border: var(--weight) solid var(--bracket-ink);
   width: calc(var(--gap) + var(--weight) + var(--wrap));
   pointer-events: none;
   transition:
@@ -357,34 +370,21 @@ body {
 
 .piece.is-bracketed::before {
   left: calc(-1 * (var(--gap) + var(--weight)));
+  transform: translateX(calc(var(--open) * -1 * var(--side)));
   border-right: 0;
-  border-radius: var(--round, 0) 0 0 var(--round, 0);
+  border-radius: var(--round) 0 0 var(--round);
 }
 
 .piece.is-bracketed::after {
   right: calc(-1 * (var(--gap) + var(--weight)));
+  transform: translateX(calc(var(--open) * var(--side)));
   border-left: 0;
-  border-radius: 0 var(--round, 0) var(--round, 0) 0;
+  border-radius: 0 var(--round) var(--round) 0;
 }
 
 .piece.is-bracketed.is-off::before,
 .piece.is-bracketed.is-off::after {
   opacity: 0.4;
-}
-
-.piece.is-bracketed:has(.btn[aria-expanded='true'])::before,
-.piece.is-bracketed:has(.btn[aria-expanded='true'])::after,
-.piece.is-bracketed:is(:hover, .is-hover, :has(:focus-visible)):not(.is-off)::before,
-.piece.is-bracketed:is(:hover, .is-hover, :has(:focus-visible)):not(.is-off)::after {
-  border-color: var(--tone);
-}
-
-.piece.is-bracketed:is(:hover, .is-hover, :has(:focus-visible)):not(.is-off)::before {
-  transform: translateX(calc(-1 * var(--side)));
-}
-
-.piece.is-bracketed:is(:hover, .is-hover, :has(:focus-visible)):not(.is-off)::after {
-  transform: translateX(var(--side));
 }
 
 /*
@@ -478,8 +478,159 @@ body {
   margin-top: 10px;
 }
 
+/*
+ * Lists and dictionaries: several values inside one function's brackets. A
+ * list is a run of pieces. A dictionary is a run of pairs, a piece and what
+ * it is given. Every item is a piece of its own, so its side panels remove it
+ * or add another after it, and the function's own panels stay shut meanwhile.
+ *
+ * A · Segments, which is also how a list is drawn anywhere else: each item is
+ * one more block a hair apart, and a pair is two blocks that touch.
+ */
+.list,
+.dict {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.pair {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* A colon is two dots in the colour of the seam. Only some versions draw it. */
+.colon {
+  display: none;
+  flex: none;
+  place-items: center;
+  width: 8px;
+}
+
+.colon::before {
+  content: '';
+  transform: translateY(-2.5px);
+  background-color: var(--seam-ink);
+  box-shadow: 0 5px 0 var(--seam-ink);
+  width: 2px;
+  height: 2px;
+}
+
+/*
+ * B · Inner brackets: the values stand in a pair of fine marks of their own,
+ * square for a list and curly for a dictionary, as they are written in code.
+ */
+.v-list-brackets :is(.list, .dict) {
+  position: relative;
+  gap: 2px;
+  margin-left: 2px;
+  padding: 0 6px;
+}
+
+.v-list-brackets .colon {
+  display: grid;
+}
+
+.v-list-brackets :is(.list, .dict)::before,
+.v-list-brackets :is(.list, .dict)::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 4px;
+  pointer-events: none;
+}
+
+.v-list-brackets :is(.list, .dict)::before {
+  left: 0;
+}
+
+.v-list-brackets :is(.list, .dict)::after {
+  right: 0;
+}
+
+.v-list-brackets .list::before,
+.v-list-brackets .list::after {
+  border: 1px solid var(--muted);
+}
+
+.v-list-brackets .list::before {
+  border-right: 0;
+}
+
+.v-list-brackets .list::after {
+  border-left: 0;
+}
+
+/* A curly brace is a drawn outline used as a stencil, so that it takes the colour given here. */
+.v-list-brackets .dict::before,
+.v-list-brackets .dict::after {
+  background-color: var(--muted);
+  width: 6px;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 20' preserveAspectRatio='none'%3E%3Cpath d='M5.5 .5C3.5 .5 3.5 2 3.5 4v3.5C3.5 9 2.5 10 .5 10c2 0 3 1 3 2.5V16c0 2 0 3.5 2 3.5' fill='none' stroke='%23000' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E")
+    center / 100% 100% no-repeat;
+}
+
+.v-list-brackets .dict::after {
+  transform: scaleX(-1);
+}
+
+/* C · Tray: the values lie in a recess in the function's body, a little smaller than it. */
+.v-list-tray :is(.list, .dict) {
+  gap: 3px;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background-color: rgb(0 0 0 / 38%);
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 55%),
+    inset 0 0 0 1px rgb(255 255 255 / 5%);
+  padding: 3px;
+}
+
+.v-list-tray :is(.list, .dict) .btn {
+  padding: 0 5px;
+  line-height: 18px;
+}
+
+/*
+ * D · Run: the values are written in one block the way they are in code,
+ * parted by commas, with a colon inside each pair.
+ */
+.v-list-run :is(.list, .dict) {
+  gap: 0;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  background-color: color-mix(in srgb, var(--function) 14%, transparent);
+  padding: 0 7px;
+}
+
+.v-list-run :is(.list, .dict) .btn {
+  background-color: transparent;
+  padding: 2px 0;
+}
+
+.v-list-run :is(.list, .dict) .btn:is(:hover, :active):enabled {
+  background-color: color-mix(in srgb, var(--tone) 22%, transparent);
+}
+
+.v-list-run .colon {
+  display: grid;
+}
+
+/* A comma is a short slanted stroke at the foot of the line. */
+.v-list-run .list > .piece + .piece::before,
+.v-list-run .pair + .pair::before {
+  content: '';
+  flex: none;
+  align-self: flex-end;
+  transform: translateY(-3px) skewX(-18deg);
+  margin: 0 7px 0 2px;
+  background-color: var(--seam-ink);
+  width: 2px;
+  height: 5px;
+}
+
 /* A step is read along one line, so the cards that show steps are wide. */
-#versions-head {
+#versions-head,
+#versions-list {
   grid-template-columns: repeat(auto-fill, minmax(660px, 1fr));
 }
 
@@ -521,6 +672,11 @@ body {
   box-shadow: none;
 }
 
+/* A step that sorts lists the columns it sorts by inside its head. */
+.btn.value {
+  --tone: var(--value);
+}
+
 .btn.verb {
   --tone: var(--verb);
 
@@ -546,7 +702,7 @@ body {
   border-bottom: 2px solid var(--seam-ink);
   /* The height takes in both bars, so 5px leaves 1px between them. */
   box-sizing: border-box;
-  width: 7px;
+  width: 8px;
   height: 5px;
 }
 

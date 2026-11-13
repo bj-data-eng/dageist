@@ -9,11 +9,35 @@
  * @property {string} id What its block in pieces.css is called.
  * @property {string} name What its card is headed.
  * @property {string} note One line on what sets it apart.
- * @property {'head' | 'button' | 'function' | 'seam'} kind The piece it is a version of.
+ * @property {'list' | 'head' | 'button' | 'function' | 'seam'} kind The piece it is a version of.
  */
 
 /** @type {Version[]} */
 const VERSIONS = [
+  {
+    id: 'list-segments',
+    name: 'Segments',
+    note: 'Each value is one more block a hair apart. A pair is two blocks that touch.',
+    kind: 'list',
+  },
+  {
+    id: 'list-brackets',
+    name: 'Inner brackets',
+    note: 'The values stand in fine marks of their own: square for a list, curly for a dictionary.',
+    kind: 'list',
+  },
+  {
+    id: 'list-tray',
+    name: 'Tray',
+    note: 'The values lie in a recess in the function’s body, a little smaller than it.',
+    kind: 'list',
+  },
+  {
+    id: 'list-run',
+    name: 'Run',
+    note: 'The values are written in one block as they are in code, with commas and colons.',
+    kind: 'list',
+  },
   {
     id: 'head-call',
     name: 'Bracketed',
@@ -98,15 +122,54 @@ function fill(card, selector, text) {
 }
 
 /**
- * Makes `piece` the function `fn`: its name in the first segment and the
- * field it works on in a second.
+ * @typedef {object} Spec What a piece is to be.
+ * @property {string | null} state `live`, or the one state it is a picture of.
+ * @property {string | null} name What a column is called, where it is not `dcn`.
+ * @property {string | null} fn The function it is, or null for a column.
+ * @property {string[]} list The columns a function takes as a list, if it takes one.
+ */
+
+/**
+ * Reads what the piece for `slot` is to be.
+ * @param {Element} slot
+ * @param {Version} version
+ * @returns {Spec}
+ */
+function specOf(slot, version) {
+  // A slot in a row says what it is. The others are the piece the version is about.
+  const inRow = slot.closest('.row') !== null;
+  const shown = version.kind === 'function' ? SHOWN_FUNCTION : null;
+  const list = slot.getAttribute('data-list');
+  return {
+    state: slot.getAttribute('data-piece'),
+    name: slot.getAttribute('data-name'),
+    fn: inRow ? slot.getAttribute('data-fn') : shown,
+    list: list === null ? [] : list.split(','),
+  };
+}
+
+/**
+ * Makes `piece` a function: bracketed, its name in the first segment, and
+ * after it either the list it takes or the one field it works on.
+ * @param {HTMLTemplateElement} source
  * @param {HTMLElement} piece
  * @param {HTMLButtonElement} button
+ * @param {Spec} spec
  * @param {string} fn
  */
-function makeFunction(piece, button, fn) {
-  piece.classList.add('fn');
+function makeFunction(source, piece, button, spec, fn) {
+  piece.classList.add('fn', 'is-bracketed');
   button.textContent = fn;
+  if (spec.list.length > 0) {
+    const list = document.createElement('span');
+    list.className = 'list';
+    for (const name of spec.list) {
+      const item = pieceFor(source, { state: spec.state, name, fn: null, list: [] });
+      if (item !== null) list.append(item);
+    }
+    button.after(list);
+    return;
+  }
   const field = FIELDS.get(fn);
   if (field === undefined) return;
   const segment = document.createElement('button');
@@ -117,44 +180,34 @@ function makeFunction(piece, button, fn) {
 }
 
 /**
- * Returns a copy of the piece for `slot`, as `version` draws it. A live one
- * answers the pointer and the keyboard. Any other is a picture of one state,
- * and answers neither.
+ * Returns a copy of the piece that `spec` describes. A live one answers the
+ * pointer and the keyboard. Any other is a picture of one state, and answers
+ * neither.
  * @param {HTMLTemplateElement} source
- * @param {Element} slot
- * @param {Version} version
+ * @param {Spec} spec
  * @returns {HTMLElement | null}
  */
-function pieceFor(source, slot, version) {
+function pieceFor(source, spec) {
   const piece = source.content.firstElementChild?.cloneNode(true);
   if (!(piece instanceof HTMLElement)) return null;
   const button = piece.querySelector('.btn');
   if (!(button instanceof HTMLButtonElement)) return null;
+  if (spec.name !== null) button.textContent = spec.name;
+  if (spec.fn !== null) makeFunction(source, piece, button, spec, spec.fn);
 
-  // A slot in a row says what it is. The others are the piece the version is about.
-  const inRow = slot.closest('.row') !== null;
-  const shown = version.kind === 'function' ? SHOWN_FUNCTION : null;
-  const fn = inRow ? slot.getAttribute('data-fn') : shown;
-  const name = slot.getAttribute('data-name');
-  if (name !== null) button.textContent = name;
-  if (fn !== null) makeFunction(piece, button, fn);
-  // A function has brackets. A column has none.
-  if (fn !== null) piece.classList.add('is-bracketed');
-
-  const state = slot.getAttribute('data-piece');
-  if (state === 'live') {
+  if (spec.state === 'live') {
     for (const segment of piece.querySelectorAll('.btn')) segment.classList.add('live');
     return piece;
   }
   for (const control of piece.querySelectorAll('button')) control.tabIndex = -1;
-  if (state === 'hover') {
+  if (spec.state === 'hover') {
     piece.classList.add('is-hover');
     button.classList.add('is-hover');
   }
-  if (state === 'pressed') button.classList.add('is-active');
-  if (state === 'open') button.setAttribute('aria-expanded', 'true');
-  if (state === 'focus') button.classList.add('is-focus');
-  if (state === 'off') {
+  if (spec.state === 'pressed') button.classList.add('is-active');
+  if (spec.state === 'open') button.setAttribute('aria-expanded', 'true');
+  if (spec.state === 'focus') button.classList.add('is-focus');
+  if (spec.state === 'off') {
     piece.classList.add('is-off');
     for (const control of piece.querySelectorAll('button')) control.disabled = true;
   }
@@ -163,7 +216,7 @@ function pieceFor(source, slot, version) {
 
 if (pieceTemplate instanceof HTMLTemplateElement) {
   for (const [index, version] of VERSIONS.entries()) {
-    const own = version.kind === 'seam' || version.kind === 'head';
+    const own = version.kind === 'seam' || version.kind === 'head' || version.kind === 'list';
     const template = document.querySelector(own ? `#card-${version.kind}` : '#card');
     if (!(template instanceof HTMLTemplateElement)) continue;
     const card = template.content.firstElementChild?.cloneNode(true);
@@ -173,14 +226,17 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
     fill(card, '.name', version.name);
     fill(card, '.note', version.note);
     card.querySelector(version.kind === 'button' ? '.row-function' : '.row-button')?.remove();
-    if (version.id === 'head-call') {
+    if (version.id === 'head-call' || version.kind === 'list') {
       for (const head of card.querySelectorAll('.piece.head')) head.classList.add('is-bracketed');
     }
+    // The head's own buttons answer a click as the pieces do.
+    for (const part of card.querySelectorAll('.head .btn')) part.classList.add('live');
     for (const slot of card.querySelectorAll('[data-piece]')) {
-      const piece = pieceFor(pieceTemplate, slot, version);
+      const piece = pieceFor(pieceTemplate, specOf(slot, version));
       if (piece !== null) slot.replaceWith(piece);
     }
-    const section = version.kind === 'head' ? '#versions-head' : '#versions-settled';
+    const sectioned = version.kind === 'head' || version.kind === 'list';
+    const section = sectioned ? `#versions-${version.kind}` : '#versions-settled';
     document.querySelector(section)?.append(card);
   }
 }
