@@ -17,6 +17,11 @@
 
     <main>
       <h2 class="section">
+        Wrapping <span>a function that holds more values than fit on a line</span>
+      </h2>
+      <div id="versions-wrap" class="versions"></div>
+
+      <h2 class="section">
         What a slot offers
         <span>the list a value is picked from, for one value and for several</span>
       </h2>
@@ -475,6 +480,61 @@
             <span data-piece="live" data-fn="cum_max"></span>
             <span class="seam"></span>
             <span data-piece="live" data-fn="over" data-many="dcn,owner"></span>
+          </span>
+          <span class="returns">returns <b>Int64</b></span>
+        </div>
+      </section>
+    </template>
+
+    <!--
+      A card for a way of wrapping: a step that selects sixty fields, and a
+      function in a chain that takes fourteen. Narrow the window to see them
+      wrap further.
+    -->
+    <template id="card-wrap">
+      <section class="card">
+        <h3><span class="letter"></span><span class="name"></span></h3>
+        <p class="note"></p>
+
+        <div class="row step" data-verb="select">
+          <span class="num">1</span>
+          <span class="piece head is-bracketed">
+            <span class="grip grip-start"></span>
+            <span class="grip grip-end"></span>
+            <button type="button" class="side side-remove" aria-label="Remove step">×</button>
+            <span class="body">
+              <button type="button" class="btn verb">Select</button>
+              <span class="slot is-many" data-many="first:60" data-takes="field"></span>
+            </span>
+            <button type="button" class="side side-add" aria-label="Add a step after">+</button>
+          </span>
+        </div>
+
+        <div class="row step" data-verb="add">
+          <span class="num">2</span>
+          <span class="piece head is-bracketed">
+            <span class="grip grip-start"></span>
+            <span class="grip grip-end"></span>
+            <button type="button" class="side side-remove" aria-label="Remove step">×</button>
+            <span class="body">
+              <button type="button" class="btn verb">Add column</button>
+              <label class="type is-name">
+                <input
+                  value="longest_wait"
+                  aria-label="Name of the new column"
+                  spellcheck="false"
+                />
+              </label>
+            </span>
+            <button type="button" class="side side-add" aria-label="Add a step after">+</button>
+          </span>
+          <span class="equals"></span>
+          <span class="chain">
+            <span data-piece="live" data-name="row_days"></span>
+            <span class="seam"></span>
+            <span data-piece="live" data-fn="cum_max"></span>
+            <span class="seam"></span>
+            <span data-piece="live" data-fn="over" data-many="first:14"></span>
           </span>
           <span class="returns">returns <b>Int64</b></span>
         </div>

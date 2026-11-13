@@ -9,12 +9,30 @@
  * @property {string} id What its block in pieces.css is called.
  * @property {string} name What its card is headed.
  * @property {string} note One line on what sets it apart.
- * @property {'pick' | 'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind
+ * @property {'wrap' | 'pick' | 'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind
  *   What its card shows.
  */
 
 /** @type {Version[]} */
 const VERSIONS = [
+  {
+    id: 'wrap-block',
+    name: 'Block',
+    note: 'The name becomes a spine down the left, the values wrap beside it, and the brackets grow to hold them all.',
+    kind: 'wrap',
+  },
+  {
+    id: 'wrap-flow',
+    name: 'Flow',
+    note: 'The values run on like a line of code: later lines are indented, and the bracket closes after the last value.',
+    kind: 'wrap',
+  },
+  {
+    id: 'wrap-fold',
+    name: 'Fold',
+    note: 'It never wraps. The first few values are shown and the rest are a count, which opens the list.',
+    kind: 'wrap',
+  },
   {
     id: 'pick',
     name: 'Grouped list',
@@ -84,6 +102,7 @@ const FIELDS = new Map([
 
 /** The template each kind of card is stamped from. */
 const CARDS = {
+  wrap: '#card-wrap',
   pick: '#card-pick',
   type: '#card-type',
   'list-settled': '#card-list',
@@ -263,8 +282,10 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
       const piece = pieceFor(pieceTemplate, specOf(slot, version));
       if (piece !== null) slot.replaceWith(piece);
     }
-    const sectioned = version.kind === 'type' || version.kind === 'pick';
+    const sectioned = version.kind === 'type' || version.kind === 'pick' || version.kind === 'wrap';
     const section = sectioned ? `#versions-${version.kind}` : '#versions-settled';
+    // What the ways of wrapping share is written once, for every card that wraps.
+    if (version.kind === 'wrap') card.classList.add('wraps');
     document.querySelector(section)?.append(card);
   }
 }
@@ -375,13 +396,24 @@ function takes(slot, what) {
   return (slot.dataset.takes ?? 'chain value input field').split(' ').includes(what);
 }
 
+/** How many fields a slot shows before it folds the rest into a count. */
+const SHOWN_BEFORE_FOLD = 4;
+
 /**
- * Returns the fields ticked in a slot that takes several.
+ * Returns the fields ticked in a slot that takes several. A page that wants
+ * many of them writes `first:60` for the first sixty fields of the table.
  * @param {HTMLElement} slot
  * @returns {string[]}
  */
 function ticked(slot) {
   const many = slot.dataset.many ?? '';
+  if (many.startsWith('first:')) {
+    const count = Number(many.slice('first:'.length));
+    slot.dataset.many = FIELDS_ON_OFFER.slice(0, count)
+      .map((field) => field.name)
+      .join(',');
+    return ticked(slot);
+  }
   return many === '' ? [] : many.split(',');
 }
 
@@ -412,11 +444,19 @@ function drawHeld(slot) {
     held.replaceChildren(blockOf(slot.dataset.kind ?? 'text', slot.dataset.value ?? ''));
   } else {
     const fields = ticked(slot);
-    held.replaceChildren(
-      ...(fields.length > 0
+    const blocks =
+      fields.length > 0
         ? fields.map((name) => blockOf('column', name))
-        : [blockOf('none', 'no fields')]),
-    );
+        : [blockOf('none', 'no fields')];
+    // The fields past the first few, and a count of them, for the version that folds them away.
+    for (const block of blocks.slice(SHOWN_BEFORE_FOLD)) block.classList.add('is-extra');
+    if (blocks.length > SHOWN_BEFORE_FOLD) {
+      const count = blockOf('chain', '');
+      count.classList.add('fold-count');
+      count.textContent = `+${String(blocks.length - SHOWN_BEFORE_FOLD)}`;
+      blocks.push(count);
+    }
+    held.replaceChildren(...blocks);
   }
   if (!held.isConnected) slot.prepend(held);
 }
