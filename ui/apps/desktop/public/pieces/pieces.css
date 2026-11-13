@@ -155,9 +155,9 @@ body {
   flex: none;
   margin: 0;
   border: 0;
-  border-radius: 5px;
+  border-radius: 2px;
   background: none;
-  padding: 0 7px;
+  padding: 2px 7px;
   color: var(--tone);
   font: 12.5px/20px var(--mono);
   white-space: nowrap;
@@ -224,8 +224,8 @@ body {
 /* C · Underline: text with a dashed rule. The least ink, the closest to code. */
 .v-underline .btn {
   border-bottom: 1px dashed color-mix(in srgb, var(--tone) 55%, transparent);
-  border-radius: 3px 3px 0 0;
-  padding: 0 3px;
+  border-radius: 2px 2px 0 0;
+  padding: 2px 3px;
   line-height: 19px;
 }
 .v-underline .btn:is(:hover, .is-hover):enabled {
@@ -279,9 +279,8 @@ body {
 
 /* E · Rail: a neutral body. Only the rail at its edge carries the colour. */
 .v-rail .btn {
-  border-radius: 4px;
   background-color: var(--raised);
-  padding: 0 7px 0 10px;
+  padding: 2px 7px 2px 10px;
   color: var(--ink);
 }
 .v-rail .btn::before {
