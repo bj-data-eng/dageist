@@ -18,7 +18,7 @@ const VERSIONS = [
   {
     id: 'nest',
     name: 'Nested chain',
-    note: 'A chain that is a value is a line of its own under the step. The function holds three dots. Click them to fold the line away.',
+    note: 'A chain that is a value is a numbered line of its own under the step. The function holds three dots. Click them to fold the line away.',
     kind: 'nest',
   },
   {
@@ -232,9 +232,9 @@ let nestsLowered = 0;
 
 /**
  * Moves every nested chain in `card` out of its function and onto a line of
- * its own under the step it belongs to. Three dots stay in the function and
- * three dots start the line. The lines of one step follow the order of their
- * marks in it.
+ * its own under the step it belongs to. Three dots stay in the function. The
+ * line is numbered after its step, as 1.1 and 1.2 are the lines of step 1,
+ * in the order of their dots in it.
  * @param {HTMLElement} card
  */
 function lowerNests(card) {
@@ -247,15 +247,17 @@ function lowerNests(card) {
     const line = document.createElement('div');
     line.className = 'subrow';
     line.dataset.nest = nest.dataset.nest;
-    const mark = document.createElement('span');
-    mark.className = 'mark';
-    mark.textContent = '…';
-    line.append(mark, chain);
     // A second nested chain of the same step goes under the first.
     let last = row;
+    let lines = 0;
     while (last.nextElementSibling?.classList.contains('subrow') === true) {
       last = last.nextElementSibling;
+      lines += 1;
     }
+    const mark = document.createElement('span');
+    mark.className = 'mark';
+    mark.textContent = `${row.querySelector('.num')?.textContent ?? ''}.${String(lines + 1)}`;
+    line.append(mark, chain);
     last.after(line);
   }
 }

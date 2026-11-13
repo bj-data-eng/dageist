@@ -982,9 +982,9 @@ body {
 /*
  * A nested chain: a value that is a chain of its own, such as what empty
  * cells are filled with. The function holds three dots in its place, and
- * the chain is a line of its own under the step, behind a rail and three
- * dots. A click on the dots in the function folds the line away, and they
- * dim while it is folded.
+ * the chain is a line of its own under the step, behind a rail and a number
+ * that follows the step's own. A click on the dots in the function folds the
+ * line away, and they dim while it is folded.
  */
 .nest {
   display: inline-flex;
@@ -1026,10 +1026,11 @@ body {
   display: none;
 }
 
+/* The line's number is written as a step's is. */
 .subrow .mark {
   flex: none;
-  color: color-mix(in srgb, var(--function) 62%, var(--ground));
-  letter-spacing: 1px;
+  color: var(--muted);
+  font: 11px/24px var(--mono);
 }
 
 /* A step that follows a line below keeps its rule above it. */
