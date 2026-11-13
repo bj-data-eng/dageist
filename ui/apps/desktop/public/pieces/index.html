@@ -646,13 +646,13 @@
               <button type="button" class="btn verb">Filter table</button>
               <span class="cmp">
                 <span class="slot" data-kind="column" data-value="row_days"></span>
-                <button type="button" class="btn op">&gt;</button>
+                <span class="slot op" data-takes="op" data-kind="op" data-value="&gt;"></span>
                 <span class="slot" data-kind="input" data-value="sla_cutoff"></span>
               </span>
-              <span class="word">and</span>
+              <span class="slot join" data-takes="join" data-kind="join" data-value="and"></span>
               <span class="cmp">
                 <span class="slot" data-kind="column" data-value="owner"></span>
-                <button type="button" class="btn op">==</button>
+                <span class="slot op" data-takes="op" data-kind="op" data-value="=="></span>
                 <span class="slot" data-kind="text" data-value="Company A"></span>
               </span>
             </span>
@@ -680,7 +680,7 @@
                 <button type="button" class="btn">when</button>
                 <span class="cmp">
                   <span class="slot" data-kind="column" data-value="resolved_day"></span>
-                  <button type="button" class="btn op">is_in</button>
+                  <span class="slot op" data-takes="op" data-kind="op" data-value="is_in"></span>
                   <span class="slot" data-kind="input" data-value="holidays"></span>
                 </span>
               </span>
@@ -695,7 +695,7 @@
                 <button type="button" class="btn">when</button>
                 <span class="cmp">
                   <span class="slot" data-kind="column" data-value="row_days"></span>
-                  <button type="button" class="btn op">&gt;</button>
+                  <span class="slot op" data-takes="op" data-kind="op" data-value="&gt;"></span>
                   <span class="slot" data-kind="input" data-value="sla_cutoff"></span>
                 </span>
               </span>
@@ -717,7 +717,7 @@
               <button type="button" class="btn verb">Filter table</button>
               <span class="cmp">
                 <span class="slot" data-kind="column" data-value="row_days"></span>
-                <button type="button" class="btn op">&gt;</button>
+                <span class="slot op" data-takes="op" data-kind="op" data-value="&gt;"></span>
                 <span class="nest">
                   <button
                     type="button"

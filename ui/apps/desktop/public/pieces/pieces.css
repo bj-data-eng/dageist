@@ -1065,12 +1065,35 @@ body {
   gap: 1px;
 }
 
-.btn.op {
+.shown.is-op {
   --tone: var(--operator);
 
   padding-right: 6px;
   padding-left: 6px;
   font-weight: 700;
+}
+
+/*
+ * The word that joins two comparisons is a block in the fill of whatever
+ * takes them, in a lighter voice. A click turns `and` into `or`. Where a
+ * word waits after the last comparison it has no fill until it is pointed at.
+ */
+.shown.is-join {
+  color: color-mix(in srgb, var(--tone) 62%, transparent);
+}
+
+.slot.waits:not(.is-open) .shown:not(:hover) {
+  background-color: transparent;
+  color: color-mix(in srgb, var(--tone) 34%, transparent);
+}
+
+/* In a list, the rows that add a comparison or take it away. */
+.offer .shown.is-add {
+  --tone: var(--function);
+}
+
+.offer .shown.is-remove {
+  --tone: var(--remove);
 }
 
 .cmp .btn {
@@ -1079,11 +1102,6 @@ body {
 
 .body > .cmp:last-child > :last-child :is(.shown, .nest-token) {
   border-radius: 0 var(--radius) var(--radius) 0;
-}
-
-.cmp + .word {
-  margin-left: 0;
-  padding-left: 7px;
 }
 
 /*

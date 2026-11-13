@@ -18,7 +18,13 @@ const VERSIONS = [
   {
     id: 'cmp-plain',
     name: 'Plain',
-    note: 'A value, a comparison and a value as three blocks a hair apart, the comparison in a colour of its own.',
+    note: 'A value, a comparison and a value as three blocks a hair apart. Click the comparison: its list changes it, adds another with and or or, or removes it. Click and to make it or.',
+    kind: 'cond',
+  },
+  {
+    id: 'cmp-wait',
+    name: 'Plain, with a waiting word',
+    note: "The same, with a faint and waiting after the last comparison. Click it, pick and or or, and the next comparison is there to fill in. The comparison's list only changes or removes it.",
     kind: 'cond',
   },
   {
@@ -296,6 +302,14 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
       const piece = pieceFor(pieceTemplate, specOf(slot, version));
       if (piece !== null) slot.replaceWith(piece);
     }
+    if (version.id === 'cmp-wait') {
+      // A word waits after the last comparison of every function that has one.
+      for (const body of card.querySelectorAll('.body:has(> .cmp)')) {
+        [...body.querySelectorAll(':scope > .cmp')]
+          .at(-1)
+          ?.after(slotOf('join', 'and', 'join waits'));
+      }
+    }
     lowerNests(card);
     const section = version.kind === 'cond' ? '#versions-cond' : '#versions-settled';
     document.querySelector(section)?.append(card);
@@ -430,6 +444,97 @@ const INPUTS_ON_OFFER = [
  */
 function takes(slot, what) {
   return (slot.dataset.takes ?? 'chain value input field').split(' ').includes(what);
+}
+
+/** The comparisons on offer, and a word on each. */
+/** @type {[string, string][]} */
+const COMPARISONS_ON_OFFER = [
+  ['==', 'equal to'],
+  ['!=', 'not equal to'],
+  ['>', 'greater than'],
+  ['>=', 'at least'],
+  ['<', 'less than'],
+  ['<=', 'at most'],
+  ['is_in', 'one of'],
+];
+
+/** The words that join two comparisons, and a word on each. */
+/** @type {[string, string][]} */
+const JOINS_ON_OFFER = [
+  ['and', 'both must hold'],
+  ['or', 'either may hold'],
+];
+
+/**
+ * Returns a slot that holds `value` as a value of `kind`. A comparison and a
+ * joining word are slots too: `role` names which, and whether the word waits.
+ * @param {string} kind
+ * @param {string} value
+ * @param {string} role
+ */
+function slotOf(kind, value, role = '') {
+  const slot = document.createElement('span');
+  slot.className = `slot ${role}`.trim();
+  if (role !== '') slot.dataset.takes = kind;
+  slot.dataset.kind = kind;
+  slot.dataset.value = value;
+  return slot;
+}
+
+/** Returns a comparison with nothing in it yet: a field, equal to, a value. */
+function emptyComparison() {
+  const comparison = document.createElement('span');
+  comparison.className = 'cmp';
+  comparison.append(slotOf('none', 'field'), slotOf('op', '==', 'op'), slotOf('none', 'value'));
+  return comparison;
+}
+
+/**
+ * Draws the slots just put on the page, and opens the first of them so that
+ * the new comparison's field is picked straight away.
+ * @param {HTMLElement[]} parts
+ */
+function drawNew(parts) {
+  const slots = parts.flatMap((part) =>
+    part.classList.contains('slot') ? [part] : [...part.querySelectorAll('.slot')],
+  );
+  for (const slot of slots) {
+    if (slot instanceof HTMLElement) showSlot(slot);
+  }
+  const first = parts.find((part) => part.classList.contains('cmp'))?.querySelector('.slot');
+  if (first instanceof HTMLElement) openSlot(first);
+}
+
+/**
+ * Puts an empty comparison after `comparison`, joined to it by `join`.
+ * @param {HTMLElement} comparison
+ * @param {string} join
+ */
+function addComparison(comparison, join) {
+  const parts = [slotOf('join', join, 'join'), emptyComparison()];
+  comparison.after(...parts);
+  drawNew(parts);
+}
+
+/**
+ * Reports whether `part` is a word that joins two comparisons, not one that waits.
+ * @param {Element | null} part
+ */
+function isJoin(part) {
+  return part !== null && part.classList.contains('join') && !part.classList.contains('waits');
+}
+
+/**
+ * Takes `comparison` away, with the word that joined it to the one before,
+ * or to the one after when it was the first.
+ * @param {HTMLElement} comparison
+ */
+function removeComparison(comparison) {
+  const before = comparison.previousElementSibling;
+  const after = comparison.nextElementSibling;
+  if (isJoin(before)) before?.remove();
+  else if (isJoin(after)) after?.remove();
+  comparison.remove();
 }
 
 /** The room a count takes at the end of a folded slot, and the room a bracket takes after it. */
@@ -669,6 +774,32 @@ function listOffers(slot, typed, chosen) {
   const isTicked = new Set(ticked(slot));
   /** @type {HTMLElement[]} */
   const groups = [];
+  /** @type {(row: [string, string]) => boolean} */
+  const isSought = ([name, word]) => name.includes(sought) || word.includes(sought);
+  if (takes(slot, 'op')) {
+    const rows = COMPARISONS_ON_OFFER.filter(isSought).map(([name, word]) =>
+      offerRow('op', name, word, false),
+    );
+    if (rows.length > 0) groups.push(offerGroup('Comparison', null, rows));
+    // Below them, what can be done with the whole comparison. Where a word waits to add the
+    // next one, adding is left to the word.
+    const others = slot.closest('.body')?.querySelectorAll(':scope > .cmp').length ?? 0;
+    const acts = [];
+    if (slot.closest('.v-cmp-wait') === null) {
+      acts.push(
+        ...JOINS_ON_OFFER.map(([name]) => offerRow('add', name, 'add a comparison', false)),
+      );
+    }
+    if (others > 1) acts.push(offerRow('remove', 'remove', 'this comparison', false));
+    if (sought === '' && acts.length > 0) groups.push(offerGroup('Condition', null, acts));
+  }
+  if (takes(slot, 'join')) {
+    const rows = JOINS_ON_OFFER.filter(isSought).map(([name, word]) =>
+      offerRow('join', name, word, false),
+    );
+    const title = slot.classList.contains('waits') ? 'Add a comparison' : 'Joined by';
+    if (rows.length > 0) groups.push(offerGroup(title, null, rows));
+  }
   if (takes(slot, 'chain')) {
     const chain = offerRow('chain', 'chain', 'a chain of its own', false);
     chain.classList.add('offer-chain');
@@ -723,6 +854,10 @@ function listOffers(slot, typed, chosen) {
  * @param {HTMLElement} slot
  */
 function openSlot(slot) {
+  // One list at a time: whatever else was open is closed first.
+  for (const other of document.querySelectorAll('.slot.is-open')) {
+    if (other instanceof HTMLElement && other !== slot) showSlot(other);
+  }
   slot.classList.add('is-open');
   const many = slot.classList.contains('is-many');
   const offers = document.createElement('span');
@@ -732,7 +867,8 @@ function openSlot(slot) {
   const input = document.createElement('input');
   input.spellcheck = false;
   input.className = 'sought';
-  input.placeholder = many ? 'Search fields' : 'Type a value, or search';
+  const isValue = !takes(slot, 'op') && !takes(slot, 'join');
+  input.placeholder = many ? 'Search fields' : isValue ? 'Type a value, or search' : 'Search';
   input.setAttribute('aria-label', input.placeholder);
   // A value that was typed can be changed where it is typed.
   const kind = slot.dataset.kind;
@@ -757,6 +893,25 @@ function openSlot(slot) {
 function takeOffer(slot, row) {
   if (!(row instanceof HTMLElement)) return;
   const value = row.dataset.value ?? '';
+  const comparison = slot.closest('.cmp');
+  if (row.dataset.kind === 'add' || row.dataset.kind === 'remove') {
+    // The row acts on the whole comparison, and leaves what it compares by as it was.
+    showSlot(slot);
+    if (!(comparison instanceof HTMLElement)) return;
+    if (row.dataset.kind === 'add') addComparison(comparison, value);
+    else removeComparison(comparison);
+    return;
+  }
+  if (slot.classList.contains('waits')) {
+    // The word that waited now joins a new comparison, and another word waits after it.
+    slot.classList.remove('waits');
+    slot.dataset.value = value;
+    showSlot(slot);
+    const parts = [emptyComparison(), slotOf('join', 'and', 'join waits')];
+    slot.after(...parts);
+    drawNew(parts);
+    return;
+  }
   if (!slot.classList.contains('is-many')) {
     slot.dataset.kind = row.dataset.kind;
     slot.dataset.value = value;
