@@ -528,133 +528,125 @@ body {
   align-items: center;
 }
 
-/* The cell that ends a list and adds a value to it. Only one version shows it. */
-.more {
-  display: none;
-}
-
 /*
  * Removing a value and adding another. Values in a bracket stand a hair
  * apart, so a panel at each side of one would lie over the next. A piece
- * that sits inside another piece is such a value.
- *
- * A · Spread: the run parts around the value pointed at, the way the brackets
- * part around the whole function, and the value's own panels fill the room.
- * Everything before the value moves left and everything after it moves right,
- * so the value itself stays under the pointer.
+ * that sits inside another piece is such a value, and the run parts around
+ * the one pointed at, the way the brackets part around the whole function.
+ * Everything before the value moves left and everything after it moves
+ * right, so the value itself stays under the pointer, and its own panels
+ * fill the room.
  */
-.v-item-spread .piece:has(.piece:hover) {
+.piece:has(.piece:hover) {
   --parted: 1;
 }
 
-.v-item-spread .body > *,
-.v-item-spread .list > *,
-.v-item-spread .dict > *,
-.v-item-spread .pair > * {
+.body > *,
+.list > *,
+.dict > *,
+.pair > * {
   transition:
     transform 140ms ease-out,
     background-color 90ms ease-out,
     box-shadow 90ms ease-out;
 }
 
-.v-item-spread .body > :has(~ :is(.list, .dict) .piece:hover),
-.v-item-spread .list > :has(~ .piece:hover),
-.v-item-spread .dict > :has(~ .pair .piece:hover) {
+.body > :has(~ :is(.list, .dict) .piece:hover),
+.list > :has(~ .piece:hover),
+.dict > :has(~ .pair .piece:hover) {
   transform: translateX(calc(-1 * var(--side)));
 }
 
-.v-item-spread .body > :is(.list, .dict):has(.piece:hover) ~ *,
-.v-item-spread .list > .piece:hover ~ *,
-.v-item-spread .dict > .pair:has(.piece:hover) ~ *,
-.v-item-spread .pair > .piece:hover ~ * {
+.body > :is(.list, .dict):has(.piece:hover) ~ *,
+.list > .piece:hover ~ *,
+.dict > .pair:has(.piece:hover) ~ *,
+.pair > .piece:hover ~ * {
   transform: translateX(var(--side));
 }
 
 /*
- * B · Tab above: the value's two tools rise above it as one tab, each half
- * its width, so nothing beside the value is covered.
+ * The function's own tools. Its name is at its left end, so pointing there
+ * opens it. Its right end is its last value, which has tools of its own, so
+ * the function's add cannot be reached there. Three ways round that follow.
+ * The cap and the grips are in the page for every function and stay out of
+ * the way unless a version uses them.
  */
-.v-item-tab .piece .piece .side {
-  top: auto;
-  bottom: 100%;
-  width: 50%;
-  height: 16px;
-  clip-path: inset(calc((1 - var(--open)) * 100%) 0 0 0);
-}
-
-.v-item-tab .piece .piece .side-remove {
-  right: auto;
-  left: 0;
-  border-radius: var(--radius) 0 0 0;
-}
-
-.v-item-tab .piece .piece .side-add {
-  left: 50%;
-  border-radius: 0 var(--radius) 0 0;
-}
-
-/*
- * C · In the block: remove appears at the value's own right end, over the
- * end of its name. Adding is one cell at the end of the list.
- */
-.v-item-chip .piece .piece .side-add {
+.cap,
+.grip {
   display: none;
 }
 
-.v-item-chip .piece .piece .side-remove {
-  right: 0;
-  z-index: 2;
-  opacity: var(--open);
-  border-radius: 0 var(--radius) var(--radius) 0;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--tone) 28%, var(--canvas)) 45%
-  );
-  padding-right: 4px;
-  width: 20px;
-  color: var(--ink);
-  text-align: right;
-  clip-path: none;
-  pointer-events: none;
-  transition: opacity 140ms ease-out;
-}
-
-.v-item-chip .piece .piece:is(:hover, :has(:focus-visible)) .side-remove {
-  pointer-events: auto;
-}
-
-.v-item-chip .piece .piece .side-remove:hover {
-  background: var(--remove);
-  color: #fff;
-}
-
-.v-item-chip .piece .piece .body {
-  box-shadow: none;
-}
-
-.v-item-chip .more {
-  appearance: none;
+/*
+ * A · End cap: a slim block in the function's colour closes the run, as the
+ * name opens it. Pointing at it opens the function.
+ */
+.v-end-cap .cap {
   display: block;
   flex: none;
   align-self: stretch;
-  margin: 0;
-  border: 0;
   border-radius: 0 var(--radius) var(--radius) 0;
-  background-color: color-mix(in srgb, var(--function) 10%, transparent);
-  padding: 0;
-  width: 15px;
-  color: var(--muted);
-  font: 12px/1 var(--mono);
-  cursor: pointer;
+  background-color: color-mix(in srgb, var(--tone) 18%, transparent);
+  width: 9px;
+}
+
+.v-end-cap .cap:hover {
+  background-color: color-mix(in srgb, var(--tone) 34%, transparent);
+}
+
+/*
+ * B · Bracket handle: a strip over each bracket, reaching a little way
+ * outside it, opens the function. It lies under the panels, so once the
+ * function is open the panel takes the pointer.
+ */
+.v-end-handle .is-bracketed > .grip {
+  display: block;
+  position: absolute;
+  top: calc(-1 * var(--rise));
+  bottom: calc(-1 * var(--rise));
+  width: 9px;
+}
+
+.v-end-handle .is-bracketed > .grip-start {
+  right: 100%;
+}
+
+.v-end-handle .is-bracketed > .grip-end {
+  left: 100%;
+}
+
+/*
+ * C · Two steps out: pointing at a value opens the function as well. The
+ * function's panels stand one step beyond the value's, in the function's
+ * colour, and its brackets move two steps.
+ */
+.v-end-both .piece:has(.piece:hover) {
+  --open: 1;
+  --bracket-ink: var(--tone);
+}
+
+.v-end-both .is-bracketed > .side-remove {
+  transform: translateX(calc(var(--parted) * -1 * var(--side)));
+}
+
+.v-end-both .is-bracketed > .side-add {
+  transform: translateX(calc(var(--parted) * var(--side)));
+}
+
+.v-end-both .is-bracketed > .side {
+  background-color: color-mix(in srgb, var(--tone) 32%, var(--side-fill));
   transition:
+    clip-path 140ms ease-out,
+    transform 140ms ease-out,
     background-color 90ms ease-out,
     color 90ms ease-out;
 }
 
-.v-item-chip .more:hover {
+.v-end-both .is-bracketed > .side-remove:hover {
+  background-color: var(--remove);
+}
+
+.v-end-both .is-bracketed > .side-add:hover {
   background-color: var(--add);
-  color: #fff;
 }
 
 /*

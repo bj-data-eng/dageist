@@ -17,8 +17,8 @@
 
     <main>
       <h2 class="section">
-        Values in a bracket
-        <span>removing one and adding another, where they stand too close for side panels</span>
+        The function's own tools
+        <span>reaching them at the end where its last value has tools of its own</span>
       </h2>
       <div id="versions-list" class="versions"></div>
 
@@ -142,6 +142,8 @@
         <div class="row step" data-verb="sort">
           <span class="num">1</span>
           <span class="piece head is-bracketed">
+            <span class="grip grip-start"></span>
+            <span class="grip grip-end"></span>
             <button type="button" class="side side-remove" aria-label="Remove step">×</button>
             <span class="body">
               <button type="button" class="btn verb">Sort table</button>
@@ -149,8 +151,8 @@
               <span class="list">
                 <span data-piece="live"></span>
                 <span data-piece="live" data-name="timestamp"></span>
-                <button type="button" class="more" aria-label="Add a value">+</button>
               </span>
+              <span class="cap"></span>
             </span>
             <button type="button" class="side side-add" aria-label="Add a step after">+</button>
           </span>
@@ -159,6 +161,8 @@
         <div class="row step" data-verb="add">
           <span class="num">2</span>
           <span class="piece head is-bracketed">
+            <span class="grip grip-start"></span>
+            <span class="grip grip-end"></span>
             <button type="button" class="side side-remove" aria-label="Remove step">×</button>
             <span class="body">
               <button type="button" class="btn verb">Add column</button>
@@ -180,6 +184,8 @@
         <div class="row step" data-verb="add">
           <span class="num">3</span>
           <span class="piece head is-bracketed">
+            <span class="grip grip-start"></span>
+            <span class="grip grip-end"></span>
             <button type="button" class="side side-remove" aria-label="Remove step">×</button>
             <span class="body">
               <button type="button" class="btn verb">Add column</button>
@@ -205,8 +211,8 @@
       that sorts by a list of columns, the same step with a direction given
       to each column, and a function in a chain that takes a list and then a
       second, named parameter. A word inside the brackets names the parameter
-      that follows. Every list ends in a cell that adds a value, which only
-      one version shows.
+      that follows. A function that holds values ends in a cap, which only one
+      version shows.
     -->
     <template id="card-list">
       <section class="card">
@@ -216,6 +222,8 @@
         <div class="row step" data-verb="sort">
           <span class="num">1</span>
           <span class="piece head is-bracketed">
+            <span class="grip grip-start"></span>
+            <span class="grip grip-end"></span>
             <button type="button" class="side side-remove" aria-label="Remove step">×</button>
             <span class="body">
               <button type="button" class="btn verb">Sort table</button>
@@ -224,8 +232,8 @@
                 <span data-piece="live"></span>
                 <span data-piece="live" data-name="timestamp"></span>
                 <span data-piece="live" data-name="step_to"></span>
-                <button type="button" class="more" aria-label="Add a value">+</button>
               </span>
+              <span class="cap"></span>
             </span>
             <button type="button" class="side side-add" aria-label="Add a step after">+</button>
           </span>
@@ -234,6 +242,8 @@
         <div class="row step" data-verb="sort">
           <span class="num">2</span>
           <span class="piece head is-bracketed">
+            <span class="grip grip-start"></span>
+            <span class="grip grip-end"></span>
             <button type="button" class="side side-remove" aria-label="Remove step">×</button>
             <span class="body">
               <button type="button" class="btn verb">Sort table</button>
@@ -247,8 +257,8 @@
                   <span data-piece="live" data-name="timestamp"></span>
                   <button type="button" class="btn value">descending</button>
                 </span>
-                <button type="button" class="more" aria-label="Add a value">+</button>
               </span>
+              <span class="cap"></span>
             </span>
             <button type="button" class="side side-add" aria-label="Add a step after">+</button>
           </span>
@@ -257,6 +267,8 @@
         <div class="row step" data-verb="add">
           <span class="num">3</span>
           <span class="piece head is-bracketed">
+            <span class="grip grip-start"></span>
+            <span class="grip grip-end"></span>
             <button type="button" class="side side-remove" aria-label="Remove step">×</button>
             <span class="body">
               <button type="button" class="btn verb">Add column</button>
@@ -271,19 +283,20 @@
             <span data-piece="live" data-fn="cum_max"></span>
             <span class="seam"></span>
             <span class="piece fn is-bracketed">
+              <span class="grip grip-start"></span>
+              <span class="grip grip-end"></span>
               <button type="button" class="side side-remove" aria-label="Remove">×</button>
               <span class="body">
                 <button type="button" class="btn">over</button>
                 <span class="list">
                   <span data-piece="live"></span>
                   <span data-piece="live" data-name="owner"></span>
-                  <button type="button" class="more" aria-label="Add a value">+</button>
                 </span>
                 <span class="word">order_by</span>
                 <span class="list">
                   <span data-piece="live" data-name="timestamp"></span>
-                  <button type="button" class="more" aria-label="Add a value">+</button>
                 </span>
+                <span class="cap"></span>
               </span>
               <button type="button" class="side side-add" aria-label="Add">+</button>
             </span>
@@ -296,10 +309,13 @@
     <!--
       The piece: the button's body between its two side panels. Pointing at it
       slides the panels out. pieces.js puts a copy wherever a card has a
-      data-piece slot, and gives a function its second segment.
+      data-piece slot, and gives a function its second segment. The two grips
+      are strips over a function's brackets, which only one version uses.
     -->
     <template id="piece">
       <span class="piece">
+        <span class="grip grip-start"></span>
+        <span class="grip grip-end"></span>
         <button type="button" class="side side-remove" aria-label="Remove">×</button>
         <span class="body"><button type="button" class="btn">dcn</button></span>
         <button type="button" class="side side-add" aria-label="Add">+</button>

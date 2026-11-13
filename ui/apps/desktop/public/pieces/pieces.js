@@ -16,21 +16,21 @@
 /** @type {Version[]} */
 const VERSIONS = [
   {
-    id: 'item-spread',
-    name: 'Spread',
-    note: 'The run parts around the value pointed at, as the brackets do, and its panels fill the room.',
+    id: 'end-cap',
+    name: 'End cap',
+    note: 'A slim block in the function’s colour closes the run. Point at it, or at the name, to open the function.',
     kind: 'list',
   },
   {
-    id: 'item-tab',
-    name: 'Tab above',
-    note: 'The value’s two tools rise above it, so nothing beside it is covered.',
+    id: 'end-handle',
+    name: 'Bracket handle',
+    note: 'The bracket is the handle. Point at either bracket from outside to open the function.',
     kind: 'list',
   },
   {
-    id: 'item-chip',
-    name: 'In the block',
-    note: 'Remove appears at the value’s own end. One cell at the end of the list adds a value.',
+    id: 'end-both',
+    name: 'Two steps out',
+    note: 'Pointing at a value opens the function as well: the function’s tools stand one step beyond the value’s.',
     kind: 'list',
   },
   {
@@ -42,7 +42,7 @@ const VERSIONS = [
   {
     id: 'list',
     name: 'Values',
-    note: 'Each value in a bracket is one more block a hair apart. A word names a parameter.',
+    note: 'Each value is one more block a hair apart. Point at one and the run parts around it.',
     kind: 'list-settled',
   },
   {
