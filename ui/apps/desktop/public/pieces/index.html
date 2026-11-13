@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pieces</title>
+    <link rel="stylesheet" href="pieces.css" />
+  </head>
+  <body>
+    <header class="page-head">
+      <h1>Pieces <span>Button</span></h1>
+      <p>One button, several versions. Hover it, press it, tab to it, click to hold it open.</p>
+    </header>
+
+    <main id="versions" class="versions"></main>
+
+    <!-- One card per version. pieces.js stamps it once for every entry in its list. -->
+    <template id="card">
+      <section class="card">
+        <h2><span class="letter"></span><span class="name"></span></h2>
+        <p class="note"></p>
+
+        <div class="stage"><button type="button" class="btn live">dcn</button></div>
+
+        <div class="states">
+          <figure>
+            <button type="button" class="btn" tabindex="-1">dcn</button>
+            <figcaption>rest</figcaption>
+          </figure>
+          <figure>
+            <button type="button" class="btn is-hover" tabindex="-1">dcn</button>
+            <figcaption>hover</figcaption>
+          </figure>
+          <figure>
+            <button type="button" class="btn is-active" tabindex="-1">dcn</button>
+            <figcaption>pressed</figcaption>
+          </figure>
+          <figure>
+            <button type="button" class="btn" aria-expanded="true" tabindex="-1">dcn</button>
+            <figcaption>open</figcaption>
+          </figure>
+          <figure>
+            <button type="button" class="btn is-focus" tabindex="-1">dcn</button>
+            <figcaption>focus</figcaption>
+          </figure>
+          <figure>
+            <button type="button" class="btn" disabled>dcn</button>
+            <figcaption>off</figcaption>
+          </figure>
+        </div>
+
+        <div class="row">
+          <span class="verb">Add column</span>
+          <span class="alias">step_index</span>
+          <span class="quiet">=</span>
+          <button type="button" class="btn live">dcn</button>
+          <span class="quiet">›</span>
+          <span class="method">cum_count</span>
+          <span class="quiet">›</span>
+          <span class="method">over</span>
+          <button type="button" class="btn live">dcn</button>
+          <span class="returns">returns <b>UInt32</b></span>
+        </div>
+      </section>
+    </template>
+
+    <script type="module" src="pieces.js"></script>
+  </body>
+</html>
