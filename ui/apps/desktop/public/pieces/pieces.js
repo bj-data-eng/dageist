@@ -41,8 +41,8 @@ const VERSIONS = [
   },
   {
     id: 'chain-only',
-    name: 'Chain only',
-    note: 'No comparison piece. A comparison is a function in a chain, as gt is: a value, a caret, then gt and what it is compared with. A condition that a function takes is a chain behind three dots, with a list of its own under the step.',
+    name: 'Methods',
+    note: 'Kept beside the comparison: the same steps with each comparison written as a method in a chain, as gt is. A condition that a function takes is a chain behind three dots. A test with one side, such as is_null, can only be written this way.',
     kind: 'cond-chain',
   },
   {

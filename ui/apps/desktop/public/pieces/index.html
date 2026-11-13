@@ -17,7 +17,8 @@
 
     <main>
       <h2 class="section">
-        Comparisons <span>a piece of their own, or one more function in a chain</span>
+        Comparisons
+        <span>a piece of their own for two values, and methods in a chain for the rest</span>
       </h2>
       <div id="versions-cond" class="versions"></div>
 
@@ -744,7 +745,8 @@
       A card for a condition with no comparison piece at all. A comparison is
       a function in a chain, as gt is, and a condition that a function takes
       is a chain behind three dots, with a list of its own under the step.
-      The steps are the same three as in the comparison cards.
+      The steps are the same three as in the comparison cards, and a
+      fourth that only a method can say: a test with one side.
     -->
     <template id="card-chain-only">
       <section class="card">
@@ -883,6 +885,22 @@
               </span>
               <button type="button" class="side side-add" aria-label="Add">+</button>
             </span>
+          </span>
+        </div>
+
+        <div class="row step" data-verb="filter">
+          <span class="num">4</span>
+          <span class="piece head is-bracketed">
+            <button type="button" class="side side-remove" aria-label="Remove step">×</button>
+            <span class="body">
+              <button type="button" class="btn verb">Filter table</button>
+            </span>
+            <button type="button" class="side side-add" aria-label="Add a step after">+</button>
+          </span>
+          <span class="chain">
+            <span data-piece="live" data-name="resolved_at"></span>
+            <span class="seam"></span>
+            <span data-piece="live" data-fn="is_null"></span>
           </span>
         </div>
       </section>
