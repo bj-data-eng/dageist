@@ -18,7 +18,7 @@ const VERSIONS = [
   {
     id: 'cond-methods',
     name: 'Methods',
-    note: 'A comparison is one more function of the chain, under its own name. What when and and_ take is a line below.',
+    note: 'A comparison is one more function of the chain, under its own name. What when and and_ take is a list below, opened by its dots.',
     kind: 'cond',
   },
   {
@@ -36,7 +36,7 @@ const VERSIONS = [
   {
     id: 'nest',
     name: 'Nested chain',
-    note: 'A chain that is a value is a numbered line of its own under the step. The function holds three dots. Click them to fold the step’s lines away.',
+    note: 'A chain that is a value is a list of its own under the step. The three dots in the function own it: click them to open it, which shuts any other list of that step.',
     kind: 'nest',
   },
   {
@@ -249,38 +249,36 @@ function pieceFor(source, spec) {
   return piece;
 }
 
-/** How many nested chains have been given a line, so that each line knows its mark. */
+/** How many nested chains have been given a list, so that each list knows its dots. */
 let nestsLowered = 0;
 
 /**
- * Moves every nested chain in `card` out of its function and onto a line of
- * its own under the step it belongs to. Three dots stay in the function. The
- * line is numbered after its step, as 1.1 and 1.2 are the lines of step 1,
- * in the order of their dots in it.
+ * Moves every nested chain in `card` out of its function and into a list of
+ * its own under the step it belongs to. Three dots stay in the function and
+ * own that list: it holds nothing of any other function, and its lines are
+ * numbered from one after the step, as 2.1 is the first line of a list under
+ * step 2. One list of a step is open at a time, the first to begin with.
  * @param {HTMLElement} card
  */
 function lowerNests(card) {
-  for (const nest of card.querySelectorAll('.nest')) {
-    const chain = nest.querySelector('.nest-chain');
-    const row = nest.closest('.row');
-    if (!(nest instanceof HTMLElement) || chain === null || row === null) continue;
-    nestsLowered += 1;
-    nest.dataset.nest = String(nestsLowered);
-    const line = document.createElement('div');
-    line.className = 'subrow';
-    line.dataset.nest = nest.dataset.nest;
-    // A second nested chain of the same step goes under the first.
+  for (const row of card.querySelectorAll('.row')) {
     let last = row;
-    let lines = 0;
-    while (last.nextElementSibling?.classList.contains('subrow') === true) {
-      last = last.nextElementSibling;
-      lines += 1;
+    for (const [index, nest] of [...row.querySelectorAll('.nest')].entries()) {
+      const chain = nest.querySelector('.nest-chain');
+      if (!(nest instanceof HTMLElement) || chain === null) continue;
+      nestsLowered += 1;
+      nest.dataset.nest = String(nestsLowered);
+      nest.classList.toggle('is-open', index === 0);
+      const list = document.createElement('div');
+      list.className = index === 0 ? 'subrow' : 'subrow is-shut';
+      list.dataset.nest = nest.dataset.nest;
+      const mark = document.createElement('span');
+      mark.className = 'mark';
+      mark.textContent = `${row.querySelector('.num')?.textContent ?? ''}.1`;
+      list.append(mark, chain);
+      last.after(list);
+      last = list;
     }
-    const mark = document.createElement('span');
-    mark.className = 'mark';
-    mark.textContent = `${row.querySelector('.num')?.textContent ?? ''}.${String(lines + 1)}`;
-    line.append(mark, chain);
-    last.after(line);
   }
 }
 
@@ -316,38 +314,28 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
 }
 
 /**
- * Returns the line under a step that holds the nested chain of `nest`.
- * @param {HTMLElement} nest
+ * Opens or shuts the list that the dots of `nest` own.
+ * @param {Element} nest
+ * @param {boolean} open
  */
-function lineOf(nest) {
-  return document.querySelector(`.subrow[data-nest="${nest.dataset.nest ?? ''}"]`);
+function showList(nest, open) {
+  if (!(nest instanceof HTMLElement)) return;
+  nest.classList.toggle('is-open', open);
+  const list = document.querySelector(`.subrow[data-nest="${nest.dataset.nest ?? ''}"]`);
+  list?.classList.toggle('is-shut', !open);
 }
 
-// A click on the three dots of a nested chain folds away every line under its step, or brings
-// them all back. The lines of a step belong together, so they are not folded one by one.
+// A click on three dots opens the list they own, or shuts it if it is open. It also shuts any
+// other list under the same step, so that a step never shows two functions' lists at once.
 document.addEventListener('click', (event) => {
   if (!(event.target instanceof Element)) return;
-  const row = event.target.closest('.nest-token')?.closest('.row');
-  if (row === null || row === undefined) return;
-  const nests = [...row.querySelectorAll('.nest')].filter((nest) => nest instanceof HTMLElement);
-  const shut = nests.some((nest) => lineOf(nest)?.classList.contains('is-shut') === false);
-  for (const nest of nests) {
-    nest.classList.toggle('is-shut', shut);
-    lineOf(nest)?.classList.toggle('is-shut', shut);
-  }
+  const nest = event.target.closest('.nest-token')?.closest('.nest');
+  const row = nest?.closest('.row');
+  if (nest === null || nest === undefined || row === null || row === undefined) return;
+  const open = !nest.classList.contains('is-open');
+  for (const other of row.querySelectorAll('.nest')) showList(other, false);
+  showList(nest, open);
 });
-
-// Pointing at the three dots lights the number of the line they stand for.
-for (const [type, lit] of /** @type {const} */ ([
-  ['pointerover', true],
-  ['pointerout', false],
-])) {
-  document.addEventListener(type, (event) => {
-    if (!(event.target instanceof Element)) return;
-    const nest = event.target.closest('.nest-token')?.closest('.nest');
-    if (nest instanceof HTMLElement) lineOf(nest)?.classList.toggle('is-pointed', lit);
-  });
-}
 
 /**
  * Closes every open button except `keep`.
