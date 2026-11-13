@@ -1165,7 +1165,7 @@ body {
   font-style: normal;
 }
 
-.offer .shown.is-method {
+.offer .shown:is(.is-method, .is-function, .is-wrap) {
   --tone: var(--function);
 }
 

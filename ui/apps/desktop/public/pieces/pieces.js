@@ -18,7 +18,7 @@ const VERSIONS = [
   {
     id: 'add-wait',
     name: 'Always waiting',
-    note: "A faint method waits at the end of every chain, and a faint step after the last step. Click one for its list, which is searched like any other. Point at a block in a chain: its + puts a method after it and its × takes it away. On a step's head, + adds a step after it and × removes the step.",
+    note: "A faint method waits at the end of every chain, and a faint step after the last step. Click one for its list. Point at a block in a chain: its + puts a method after it and its × takes it away. On a step's head, + adds a step after it and × removes the step. A function such as when or coalesce can only start a chain: pick it where a new chain starts, or under Wrap in a function in the method list, which puts the chain so far inside it. What a function takes is a list under the step.",
     kind: 'add',
   },
   {
@@ -584,6 +584,21 @@ const STEPS_ON_OFFER = [
   ['Rename', 'columns under new names', 'rename'],
 ];
 
+/**
+ * The functions on offer. A function is not called on a value, so it can
+ * only stand where a chain starts. Each has a word on what it gives, and
+ * what its list under the step holds: `cases`, or `values`, one to a line.
+ */
+/** @type {[string, string, string][]} */
+const FUNCTIONS_ON_OFFER = [
+  ['when', 'one value or another, by cases', 'cases'],
+  ['coalesce', 'the first value there is', 'values'],
+  ['concat_str', 'texts joined into one', 'values'],
+  ['sum_horizontal', 'the values added up', 'values'],
+  ['max_horizontal', 'the largest of the values', 'values'],
+  ['min_horizontal', 'the smallest of the values', 'values'],
+];
+
 /** The comparisons on offer, and a word on each. */
 /** @type {[string, string][]} */
 const COMPARISONS_ON_OFFER = [
@@ -700,10 +715,8 @@ function numberLines(list, prefix, start = 0) {
  * @param {Element} part
  */
 function renumber(part) {
-  let list = part.closest('.lines');
-  while (list?.parentElement?.classList.contains('lines') === true) list = list.parentElement;
-  const step = list?.previousElementSibling?.querySelector('.num')?.textContent ?? '';
-  if (list !== null && list !== undefined) numberLines(list, step);
+  const card = part.closest('.card');
+  if (card !== null) numberSteps(card);
 }
 
 /**
@@ -756,6 +769,166 @@ function addLine(slot, kind) {
 }
 
 /**
+ * Returns a word in a list that is not a block, such as then.
+ * @param {string} text
+ */
+function labelOf(text) {
+  const label = document.createElement('span');
+  label.className = 'label';
+  label.textContent = text;
+  return label;
+}
+
+/** Returns a case with nothing in it yet: a comparison, then a value. */
+function caseLine() {
+  return lineOf([conditionOf(emptyComparison()), labelOf('then'), slotOf('none', 'value')]);
+}
+
+/**
+ * Returns the faint line that waits at the end of a list to add the next
+ * one, with `word` in it.
+ * @param {string} word
+ * @param {string} adds What a click on it adds.
+ * @param {number} cells How many empty cells follow, in a list laid out in columns.
+ */
+function waitingLine(word, adds, cells = 0) {
+  const slot = slotOf('join', word, 'join waits');
+  slot.dataset.takes = adds;
+  const parts = [slot];
+  for (let cell = 0; cell < cells; cell += 1) parts.push(document.createElement('span'));
+  return lineOf(parts, true);
+}
+
+/** Returns the slot a chain starts from, with nothing picked: a value, an input, a field or a function. */
+function sourceSlot() {
+  const slot = slotOf('none', 'field');
+  slot.dataset.takes = 'function value input field';
+  return slot;
+}
+
+/** Returns a chain with nothing in it yet: where it starts, and the method that waits. */
+function freshChain() {
+  const chain = document.createElement('span');
+  chain.className = 'chain';
+  chain.append(sourceSlot(), waitingMethod());
+  return chain;
+}
+
+/**
+ * Returns the function called `name` as a block with three dots, and the
+ * list those dots own, still empty.
+ * @param {string} name
+ */
+function functionOf(name) {
+  if (!(pieceTemplate instanceof HTMLTemplateElement)) return null;
+  const piece = pieceFor(pieceTemplate, {
+    state: 'live',
+    name: null,
+    fn: name,
+    typed: null,
+    slot: null,
+    many: null,
+  });
+  const body = piece?.querySelector('.body') ?? null;
+  if (piece === null || body === null) return null;
+  nestsLowered += 1;
+  const nest = document.createElement('span');
+  nest.className = 'nest is-open';
+  nest.dataset.nest = String(nestsLowered);
+  const token = document.createElement('button');
+  token.type = 'button';
+  token.className = 'btn shown is-chain nest-token';
+  token.setAttribute('aria-label', `What ${name} takes`);
+  nest.append(token);
+  body.append(nest);
+  const list = document.createElement('div');
+  list.className = 'lines';
+  list.dataset.nest = nest.dataset.nest;
+  return { piece, list };
+}
+
+/**
+ * Starts a chain from the function called `name`, in place of `slot`. What
+ * the function takes is a list under the step or line the chain is on:
+ * cases for when, and for the others values, one to a line.
+ * @param {HTMLElement} slot Where the chain starts.
+ * @param {string} name
+ */
+function startWith(slot, name) {
+  const made = functionOf(name);
+  const owner = slot.closest('.line, .row, .subrow');
+  if (made === null || owner === null) return;
+  if (FUNCTIONS_ON_OFFER.find(([known]) => known === name)?.[2] === 'cases') {
+    made.list.classList.add('is-cases');
+    const last = lineOf([
+      labelOf('otherwise'),
+      document.createElement('span'),
+      slotOf('none', 'value'),
+    ]);
+    made.list.append(caseLine(), waitingLine('when', 'case', 2), last);
+  } else {
+    made.list.append(
+      lineOf([freshChain()]),
+      lineOf([freshChain()]),
+      waitingLine('value', 'value-line'),
+    );
+  }
+  slot.replaceWith(made.piece);
+  owner.after(made.list);
+  renumber(made.list);
+  settle(made.list);
+}
+
+/**
+ * Wraps the chain so far in the function called `name`. What stands before
+ * the method's place in `slot` goes inside the function as its first value,
+ * and whatever follows carries on after the function.
+ * @param {HTMLElement} slot The method that waits, or the one that is pending.
+ * @param {string} name
+ */
+function wrapIn(slot, name) {
+  const chain = slot.closest('.chain');
+  const here = slot.closest('.link');
+  const owner = slot.closest('.line, .row, .subrow');
+  const made = functionOf(name);
+  if (chain === null || here === null || owner === null || made === null) return;
+  const inner = document.createElement('span');
+  inner.className = 'chain';
+  while (chain.firstElementChild !== null && chain.firstElementChild !== here) {
+    inner.append(chain.firstElementChild);
+  }
+  inner.append(waitingMethod());
+  const next = lineOf([freshChain()]);
+  made.list.append(lineOf([inner]), next, waitingLine('value', 'value-line'));
+  if (slot.classList.contains('waits')) {
+    showSlot(slot);
+    chain.prepend(made.piece);
+  } else {
+    slot.classList.remove('is-pending');
+    here.replaceWith(made.piece);
+  }
+  owner.after(made.list);
+  renumber(made.list);
+  draw(made.list);
+  const first = next.querySelector('.slot');
+  if (first instanceof HTMLElement) openSlot(first);
+}
+
+/**
+ * Puts a new value before the word that waits in `slot`, in the list of a
+ * function that takes several: a chain to start and carry on.
+ * @param {HTMLElement} slot The word that waits.
+ */
+function addValueLine(slot) {
+  const waiting = slot.closest('.line');
+  if (waiting === null) return;
+  const line = lineOf([freshChain()]);
+  waiting.before(line);
+  renumber(waiting);
+  settle(line);
+}
+
+/**
  * Puts a new case before the `when` that waits in `slot`: a comparison, then
  * a value, both to fill in.
  * @param {HTMLElement} slot The word that waits.
@@ -763,10 +936,7 @@ function addLine(slot, kind) {
 function addCase(slot) {
   const waiting = slot.closest('.line');
   if (waiting === null) return;
-  const then = document.createElement('span');
-  then.className = 'label';
-  then.textContent = 'then';
-  const line = lineOf([conditionOf(emptyComparison()), then, slotOf('none', 'value')]);
+  const line = caseLine();
   waiting.before(line);
   renumber(waiting);
   drawNew([line]);
@@ -882,11 +1052,10 @@ function waitingStep() {
 }
 
 /**
- * Draws what was just put on the page, and goes to the first thing in it
- * that is to be filled in: a name or value to type, or a slot to pick for.
+ * Draws what was just put on the page: its slots, and its typed blocks.
  * @param {HTMLElement} part
  */
-function settle(part) {
+function draw(part) {
   for (const slot of part.querySelectorAll('.slot')) {
     if (slot instanceof HTMLElement) showSlot(slot);
   }
@@ -894,6 +1063,15 @@ function settle(part) {
     if (input instanceof HTMLInputElement) tend(input);
   }
   foldAll();
+}
+
+/**
+ * Draws what was just put on the page, and goes to the first thing in it
+ * that is to be filled in: a name or value to type, or a slot to pick for.
+ * @param {HTMLElement} part
+ */
+function settle(part) {
+  draw(part);
   const first = part.querySelector('.type input, .slot:not(.waits)');
   if (first instanceof HTMLInputElement) {
     first.focus();
@@ -955,12 +1133,21 @@ function pendMethod(piece) {
  */
 function removeMethod(piece) {
   const link = piece.parentElement;
-  if (link === null || !link.classList.contains('link')) return;
+  const starts = link !== null && !link.classList.contains('link');
+  // The block a chain starts from stays, unless it is a function, which leaves an empty start.
+  if (link === null || (starts && piece.querySelector('.nest') === null)) return;
   for (const nest of piece.querySelectorAll('.nest')) {
     const name = nest.getAttribute('data-nest') ?? '';
     document.querySelector(`:is(.subrow, .lines)[data-nest="${name}"]`)?.remove();
   }
-  link.remove();
+  if (starts) {
+    const slot = sourceSlot();
+    piece.replaceWith(slot);
+    showSlot(slot);
+  } else {
+    link.remove();
+  }
+  renumber(link);
   foldAll();
 }
 
@@ -970,17 +1157,20 @@ function removeMethod(piece) {
  */
 function numberSteps(card) {
   let count = 0;
+  let under = 0;
   for (const part of card.children) {
     if (part.classList.contains('step')) {
       if (part.classList.contains('waits') || part.classList.contains('is-pending')) continue;
       count += 1;
+      under = 0;
       const num = part.querySelector(':scope > .num');
       if (num !== null) num.textContent = String(count);
     } else if (part.classList.contains('subrow')) {
+      under += 1;
       const mark = part.querySelector(':scope > .mark');
-      if (mark !== null) mark.textContent = `${String(count)}.1`;
+      if (mark !== null) mark.textContent = `${String(count)}.${String(under)}`;
     } else if (part.classList.contains('lines')) {
-      numberLines(part, String(count));
+      under = numberLines(part, String(count), under);
     }
   }
 }
@@ -1022,7 +1212,7 @@ function stepOf(verb) {
     equals.className = 'equals';
     const chain = document.createElement('span');
     chain.className = 'chain';
-    chain.append(slotOf('none', 'field'), waitingMethod());
+    chain.append(sourceSlot(), waitingMethod());
     row.append(equals, chain);
   } else if (key === 'filter') {
     body.append(emptyComparison(), slotOf('join', 'and', 'join waits'));
@@ -1408,6 +1598,11 @@ function listOffers(slot, typed, chosen) {
     }
     found.sort((left, right) => left.childElementCount - right.childElementCount);
     groups.push(...found);
+    // Last, the functions that take several values: one of them wraps the chain so far.
+    const wraps = FUNCTIONS_ON_OFFER.filter(
+      ([name, word, holds]) => holds === 'values' && isSought([name, word]),
+    ).map(([name, word]) => offerRow('wrap', name, word, false));
+    if (wraps.length > 0) groups.push(offerGroup('Wrap in a function', null, wraps));
   }
   if (takes(slot, 'verb')) {
     const rows = STEPS_ON_OFFER.filter(([name, word]) => isSought([name, word])).map(
@@ -1445,6 +1640,12 @@ function listOffers(slot, typed, chosen) {
     const inputs = INPUTS_ON_OFFER.filter((input) => input.name.includes(sought));
     const rows = inputs.map((input) => offerRow('input', input.name, input.dtype, false));
     if (rows.length > 0) groups.push(offerGroup('Inputs', inputs.length, rows));
+  }
+  if (takes(slot, 'function')) {
+    const rows = FUNCTIONS_ON_OFFER.filter(([name, word]) => isSought([name, word])).map(
+      ([name, word]) => offerRow('function', name, word, false),
+    );
+    if (rows.length > 0) groups.push(offerGroup('Functions', rows.length, rows));
   }
   if (takes(slot, 'field')) {
     const fields = FIELDS_ON_OFFER.filter((field) => field.name.includes(sought));
@@ -1527,7 +1728,12 @@ function takeOffer(slot, row) {
   const value = row.dataset.value ?? '';
   const comparison = slot.closest('.cmp');
   if (takes(slot, 'method')) {
-    addMethod(slot, value);
+    if (row.dataset.kind === 'wrap') wrapIn(slot, value);
+    else addMethod(slot, value);
+    return;
+  }
+  if (row.dataset.kind === 'function') {
+    startWith(slot, value);
     return;
   }
   if (takes(slot, 'verb')) {
@@ -1602,6 +1808,8 @@ document.addEventListener('click', (event) => {
   } else if (takes(slot, 'case')) {
     // There is one thing a waiting when can add, so it adds it without a list.
     addCase(slot);
+  } else if (takes(slot, 'value-line')) {
+    addValueLine(slot);
   } else if (takes(slot, 'join')) {
     // Nor is there a choice after a lone comparison: the condition becomes a list.
     intoList(slot);
