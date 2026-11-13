@@ -259,16 +259,12 @@ body {
  *
  * `--open` is 0 or 1 and everything that moves is worked out from it. A piece
  * is open when it is pointed at or reached by the keyboard, though not while
- * something in it is being typed. A piece that
- * holds other pieces stays shut while one of those is pointed at, so only
- * the innermost one opens.
+ * something in it is being typed.
  */
 .piece {
   /* A piece is a column unless it says otherwise, whatever piece it sits inside. */
   --tone: var(--column);
   --open: 0;
-  /* 1 while the piece is parted around one of the pieces inside it. */
-  --parted: 0;
   --bracket-ink: color-mix(in srgb, var(--tone) 60%, var(--ground));
 
   display: inline-flex;
@@ -276,11 +272,7 @@ body {
   flex: none;
 }
 
-.piece:is(:hover, .is-hover, :has(:focus-visible:not(input))):not(
-    .is-off,
-    :has(.piece:hover),
-    :has(input:focus)
-  ) {
+.piece:is(:hover, .is-hover, :has(:focus-visible:not(input))):not(.is-off, :has(input:focus)) {
   --open: 1;
   --bracket-ink: var(--tone);
 }
@@ -388,14 +380,14 @@ body {
 
 .piece.is-bracketed::before {
   left: calc(-1 * (var(--gap) + var(--weight)));
-  transform: translateX(calc((var(--open) + var(--parted)) * -1 * var(--side)));
+  transform: translateX(calc(var(--open) * -1 * var(--side)));
   border-right: 0;
   border-radius: var(--round) 0 0 var(--round);
 }
 
 .piece.is-bracketed::after {
   right: calc(-1 * (var(--gap) + var(--weight)));
-  transform: translateX(calc((var(--open) + var(--parted)) * var(--side)));
+  transform: translateX(calc(var(--open) * var(--side)));
   border-left: 0;
   border-radius: 0 var(--round) var(--round) 0;
 }
@@ -517,93 +509,21 @@ body {
 }
 
 /* After a run of values the word starts a block of its own. */
-:is(.list, .dict) + .word {
+.slot + .word {
   margin-left: 0;
   padding-left: 7px;
 }
 
 /*
- * Lists and dictionaries: several values inside one function's brackets. A
- * list is a run of pieces. A dictionary is a run of pairs, a piece and what
- * it is given. Every item is a piece of its own, so its side panels remove it
- * or add another after it, and the function's own panels stay shut meanwhile.
- *
- * A · Segments, which is also how a list is drawn anywhere else: each item is
- * one more block a hair apart, and a pair is two blocks that touch.
+ * Several values inside one function's brackets are blocks a hair apart. A
+ * dictionary is pairs, a field and what it is given, as two blocks that
+ * touch. A click on any of them opens the list they are picked from, and
+ * pointing at the function opens the function itself, so a click is for what
+ * is inside and a hover is for the function.
  */
-.list,
-.dict {
-  display: inline-flex;
-  align-items: center;
-  gap: 1px;
-}
-
 .pair {
   display: inline-flex;
   align-items: center;
-}
-
-/*
- * Removing a value and adding another. Values in a bracket stand a hair
- * apart, so a panel at each side of one would lie over the next. A piece
- * that sits inside another piece is such a value, and the run parts around
- * the one pointed at, the way the brackets part around the whole function.
- * Everything before the value moves left and everything after it moves
- * right, so the value itself stays under the pointer, and its own panels
- * fill the room.
- */
-.piece:has(.piece:hover) {
-  --parted: 1;
-}
-
-.body > *,
-.list > *,
-.dict > *,
-.pair > * {
-  transition:
-    transform 140ms ease-out,
-    background-color 90ms ease-out,
-    box-shadow 90ms ease-out;
-}
-
-.body > :has(~ :is(.list, .dict) .piece:hover),
-.list > :has(~ .piece:hover),
-.dict > :has(~ .pair .piece:hover) {
-  transform: translateX(calc(-1 * var(--side)));
-}
-
-.body > :is(.list, .dict):has(.piece:hover) ~ *,
-.list > .piece:hover ~ *,
-.dict > .pair:has(.piece:hover) ~ *,
-.pair > .piece:hover ~ * {
-  transform: translateX(var(--side));
-}
-
-/*
- * The function's own tools. Its name is at its left end, so pointing there
- * opens it. Its right end is its last value, which has tools of its own. So
- * the bracket is the handle: a strip over each bracket, reaching a little way
- * outside it, opens the function. The strip lies under the panels, so once
- * the function is open the panel takes the pointer.
- */
-.grip {
-  display: none;
-}
-
-.is-bracketed > .grip {
-  display: block;
-  position: absolute;
-  top: calc(-1 * var(--rise));
-  bottom: calc(-1 * var(--rise));
-  width: 9px;
-}
-
-.is-bracketed > .grip-start {
-  right: 100%;
-}
-
-.is-bracketed > .grip-end {
-  left: 100%;
 }
 
 /*
@@ -836,8 +756,8 @@ body {
   border-radius: 0;
 }
 
-.body > .slot .held > .shown:last-child,
-.body > .slot .held > .pair:last-child > .shown:last-child {
+.body > .slot:last-child .held > .shown:last-child,
+.body > .slot:last-child .held > .pair:last-child > .shown:last-child {
   border-radius: 0 var(--radius) var(--radius) 0;
 }
 

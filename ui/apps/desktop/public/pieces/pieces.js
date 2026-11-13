@@ -54,7 +54,7 @@ const VERSIONS = [
   {
     id: 'list',
     name: 'Values',
-    note: 'Each value is one more block a hair apart. Point at one and the run parts around it. Point at a bracket and the function opens.',
+    note: 'Each value is one more block a hair apart, and a pair is two that touch. Click one to open its list. Point at the function for its own tools.',
     kind: 'list-settled',
   },
   {
@@ -121,7 +121,6 @@ function fill(card, selector, text) {
  * @property {string | null} state `live`, or the one state it is a picture of.
  * @property {string | null} name What a column is called, where it is not `dcn`.
  * @property {string | null} fn The function it is, or null for a column.
- * @property {string[]} list The columns a function takes as a list, if it takes one.
  * @property {string | null} typed A value the function takes that is typed, as `kind:text`.
  * @property {string | null} slot A value of any kind the function takes, as `kind:text`.
  * @property {string | null} many The fields a function takes several of, parted by commas.
@@ -137,12 +136,10 @@ function specOf(slot, version) {
   // A slot in a row says what it is. The others are the piece the version is about.
   const inRow = slot.closest('.row') !== null;
   const shown = version.kind === 'function' ? SHOWN_FUNCTION : null;
-  const list = slot.getAttribute('data-list');
   return {
     state: slot.getAttribute('data-piece'),
     name: slot.getAttribute('data-name'),
     fn: inRow ? slot.getAttribute('data-fn') : shown,
-    list: list === null ? [] : list.split(','),
     typed: slot.getAttribute('data-type'),
     slot: slot.getAttribute('data-slot'),
     many: slot.getAttribute('data-many'),
@@ -151,34 +148,16 @@ function specOf(slot, version) {
 
 /**
  * Makes `piece` a function: bracketed, its name in the first segment, and
- * after it either the list it takes or the one field it works on.
- * @param {HTMLTemplateElement} source
+ * after it whatever it takes: several fields, a value of any kind, a value
+ * that is typed, or the one field it works on.
  * @param {HTMLElement} piece
  * @param {HTMLButtonElement} button
  * @param {Spec} spec
  * @param {string} fn
  */
-function makeFunction(source, piece, button, spec, fn) {
+function makeFunction(piece, button, spec, fn) {
   piece.classList.add('fn', 'is-bracketed');
   button.textContent = fn;
-  if (spec.list.length > 0) {
-    const list = document.createElement('span');
-    list.className = 'list';
-    for (const name of spec.list) {
-      const item = pieceFor(source, {
-        state: spec.state,
-        name,
-        fn: null,
-        list: [],
-        typed: null,
-        slot: null,
-        many: null,
-      });
-      if (item !== null) list.append(item);
-    }
-    button.after(list);
-    return;
-  }
   if (spec.many !== null) {
     const slot = document.createElement('span');
     slot.className = 'slot is-many';
@@ -232,7 +211,7 @@ function pieceFor(source, spec) {
   const button = piece.querySelector('.btn');
   if (!(button instanceof HTMLButtonElement)) return null;
   if (spec.name !== null) button.textContent = spec.name;
-  if (spec.fn !== null) makeFunction(source, piece, button, spec, spec.fn);
+  if (spec.fn !== null) makeFunction(piece, button, spec, spec.fn);
 
   if (spec.state === 'live') {
     for (const segment of piece.querySelectorAll('.btn')) segment.classList.add('live');
@@ -459,7 +438,9 @@ function drawHeld(slot) {
       ? pairsOf(slot).map(([field, given]) => {
           const pair = document.createElement('span');
           pair.className = 'pair';
-          pair.append(blockOf('column', field), blockOf('name', given));
+          // What a field is given is a name, unless the page says it is a plain value.
+          const kind = slot.dataset.gives === 'value' ? 'number' : 'name';
+          pair.append(blockOf('column', field), blockOf(kind, given));
           return pair;
         })
       : ticked(slot).map((name) => blockOf('column', name));
