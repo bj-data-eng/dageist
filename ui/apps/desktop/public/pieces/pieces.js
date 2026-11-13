@@ -30,6 +30,7 @@ const VERSIONS = [
 ];
 
 const template = document.querySelector('#card');
+const pieceTemplate = document.querySelector('#piece');
 const versions = document.querySelector('#versions');
 
 /**
@@ -43,7 +44,42 @@ function fill(card, selector, text) {
   if (part !== null) part.textContent = text;
 }
 
-if (template instanceof HTMLTemplateElement && versions !== null) {
+/**
+ * Returns a copy of the piece in `state`. The live one answers the pointer
+ * and the keyboard. Any other is a picture of one state, and answers neither.
+ * @param {HTMLTemplateElement} source
+ * @param {string} state
+ * @returns {HTMLElement | null}
+ */
+function pieceIn(source, state) {
+  const piece = source.content.firstElementChild?.cloneNode(true);
+  if (!(piece instanceof HTMLElement)) return null;
+  const button = piece.querySelector('.btn');
+  if (!(button instanceof HTMLButtonElement)) return null;
+  if (state === 'live') {
+    button.classList.add('live');
+    return piece;
+  }
+  for (const control of piece.querySelectorAll('button')) control.tabIndex = -1;
+  if (state === 'hover') {
+    piece.classList.add('is-hover');
+    button.classList.add('is-hover');
+  }
+  if (state === 'pressed') button.classList.add('is-active');
+  if (state === 'open') button.setAttribute('aria-expanded', 'true');
+  if (state === 'focus') button.classList.add('is-focus');
+  if (state === 'off') {
+    piece.classList.add('is-off');
+    button.disabled = true;
+  }
+  return piece;
+}
+
+if (
+  template instanceof HTMLTemplateElement &&
+  pieceTemplate instanceof HTMLTemplateElement &&
+  versions !== null
+) {
   for (const [index, version] of VERSIONS.entries()) {
     const card = template.content.firstElementChild?.cloneNode(true);
     if (!(card instanceof HTMLElement)) continue;
@@ -51,6 +87,10 @@ if (template instanceof HTMLTemplateElement && versions !== null) {
     fill(card, '.letter', String.fromCodePoint(65 + index));
     fill(card, '.name', version.name);
     fill(card, '.note', version.note);
+    for (const slot of card.querySelectorAll('[data-piece]')) {
+      const piece = pieceIn(pieceTemplate, slot.getAttribute('data-piece') ?? 'rest');
+      if (piece !== null) slot.replaceWith(piece);
+    }
     versions.append(card);
   }
 }

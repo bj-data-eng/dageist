@@ -9,7 +9,10 @@
   <body>
     <header class="page-head">
       <h1>Pieces <span>Button</span></h1>
-      <p>One button, several versions. Hover it, press it, tab to it, click to hold it open.</p>
+      <p>
+        One button, several versions. Point at it for its tools, press it, tab to it, click to hold
+        it open.
+      </p>
     </header>
 
     <main id="versions" class="versions"></main>
@@ -20,31 +23,31 @@
         <h2><span class="letter"></span><span class="name"></span></h2>
         <p class="note"></p>
 
-        <div class="stage"><button type="button" class="btn live">dcn</button></div>
+        <div class="stage"><span data-piece="live"></span></div>
 
         <div class="states">
           <figure>
-            <button type="button" class="btn" tabindex="-1">dcn</button>
+            <span data-piece="rest"></span>
             <figcaption>rest</figcaption>
           </figure>
           <figure>
-            <button type="button" class="btn is-hover" tabindex="-1">dcn</button>
+            <span data-piece="hover"></span>
             <figcaption>hover</figcaption>
           </figure>
           <figure>
-            <button type="button" class="btn is-active" tabindex="-1">dcn</button>
+            <span data-piece="pressed"></span>
             <figcaption>pressed</figcaption>
           </figure>
           <figure>
-            <button type="button" class="btn" aria-expanded="true" tabindex="-1">dcn</button>
+            <span data-piece="open"></span>
             <figcaption>open</figcaption>
           </figure>
           <figure>
-            <button type="button" class="btn is-focus" tabindex="-1">dcn</button>
+            <span data-piece="focus"></span>
             <figcaption>focus</figcaption>
           </figure>
           <figure>
-            <button type="button" class="btn" disabled>dcn</button>
+            <span data-piece="off"></span>
             <figcaption>off</figcaption>
           </figure>
         </div>
@@ -53,15 +56,35 @@
           <span class="verb">Add column</span>
           <span class="alias">step_index</span>
           <span class="quiet">=</span>
-          <button type="button" class="btn live">dcn</button>
+          <span data-piece="live"></span>
           <span class="quiet">›</span>
           <span class="method">cum_count</span>
           <span class="quiet">›</span>
           <span class="method">over</span>
-          <button type="button" class="btn live">dcn</button>
+          <span data-piece="live"></span>
           <span class="returns">returns <b>UInt32</b></span>
         </div>
       </section>
+    </template>
+
+    <!--
+      The button with its tools. Pointing at it slides a panel out of each of
+      its four sides. pieces.js puts a copy wherever a card has a data-piece slot.
+    -->
+    <template id="piece">
+      <span class="piece">
+        <button type="button" class="side side-remove" aria-label="Remove">×</button>
+        <span class="flap flap-up">
+          <button type="button" aria-label="Option one">○</button>
+          <button type="button" aria-label="Option two">○</button>
+        </span>
+        <button type="button" class="btn">dcn</button>
+        <span class="flap flap-down">
+          <button type="button" aria-label="Option three">○</button>
+          <button type="button" aria-label="Option four">○</button>
+        </span>
+        <button type="button" class="side side-add" aria-label="Add">+</button>
+      </span>
     </template>
 
     <script type="module" src="pieces.js"></script>

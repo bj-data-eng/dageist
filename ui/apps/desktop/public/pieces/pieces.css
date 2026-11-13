@@ -16,10 +16,17 @@
   --accent: #f08a3c;
   --verb: #f08a3c;
   --dtype: #7fd6a4;
+  --danger: #e5566e;
+  --ready: #3fbf7f;
+  /* The darker grey of the panels that slide out of the button. */
+  --well: #111216;
   /* The colour of what the button names. Everything a version draws is mixed from it. */
   --tone: #9cc8ff;
   /* How round the button's corners are. */
   --radius: 2px;
+  /* How wide a side panel is, and how tall a flap above or below the button is. */
+  --side: 18px;
+  --flap: 16px;
   --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
@@ -90,7 +97,7 @@ body {
 .stage {
   display: grid;
   place-items: center;
-  height: 42px;
+  height: 68px;
   zoom: 3;
 }
 
@@ -98,13 +105,13 @@ body {
   display: flex;
   justify-content: space-between;
   border-top: 1px solid var(--line);
-  padding: 12px 6px 10px;
+  padding: 26px 26px 10px;
 }
 
 .states figure {
   display: grid;
   justify-items: center;
-  gap: 5px;
+  gap: 22px;
   margin: 0;
 }
 
@@ -196,25 +203,133 @@ body {
   cursor: not-allowed;
 }
 
-.states .btn {
+.states .piece {
   pointer-events: none;
 }
 
 /*
+ * The piece: the button and the four panels that slide out of its sides when
+ * it is pointed at. They lie over what is beside the button, so nothing in
+ * the row moves. A panel that is tucked away is clipped to nothing, which
+ * also keeps the pointer from finding it.
+ */
+.piece {
+  display: inline-flex;
+  position: relative;
+  flex: none;
+}
+
+.piece:is(:hover, .is-hover, :has(:focus-visible)):not(.is-off) {
+  z-index: 1;
+}
+
+.side,
+.flap {
+  position: absolute;
+  background-color: var(--well);
+  transition: clip-path 140ms ease-out;
+}
+
+.side,
+.flap button {
+  appearance: none;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    clip-path 140ms ease-out,
+    background-color 90ms ease-out,
+    color 90ms ease-out;
+}
+
+/* The side panels: remove on the left, add on the right. */
+.side {
+  top: 0;
+  bottom: 0;
+  width: var(--side);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.side-remove {
+  right: 100%;
+  border-radius: var(--radius) 0 0 var(--radius);
+  clip-path: inset(0 0 0 100%);
+}
+
+.side-add {
+  left: 100%;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  clip-path: inset(0 100% 0 0);
+}
+
+.side-remove:hover {
+  background-color: color-mix(in srgb, var(--danger) 22%, var(--well));
+  color: var(--danger);
+}
+
+.side-add:hover {
+  background-color: color-mix(in srgb, var(--ready) 20%, var(--well));
+  color: var(--ready);
+}
+
+/* The flaps: one above and one below, each a row of options. */
+.flap {
+  display: flex;
+  right: 0;
+  left: 0;
+  height: var(--flap);
+}
+
+.flap-up {
+  bottom: 100%;
+  border-radius: var(--radius) var(--radius) 0 0;
+  clip-path: inset(100% 0 0 0);
+}
+
+.flap-down {
+  top: 100%;
+  border-radius: 0 0 var(--radius) var(--radius);
+  clip-path: inset(0 0 100% 0);
+}
+
+.flap button {
+  flex: 1;
+  background: none;
+  font-size: 8px;
+  line-height: var(--flap);
+}
+
+.flap button:hover {
+  background-color: rgb(255 255 255 / 8%);
+  color: var(--ink);
+}
+
+.piece:is(:hover, .is-hover, :has(:focus-visible)):not(.is-off) :is(.side, .flap) {
+  clip-path: inset(0);
+}
+
+/*
  * Brackets: a square bracket outside each end of the button, whose arms reach
- * back over its corners. A version sets four lengths:
+ * back over its corners. Pointing at the button moves each bracket outward by
+ * the width of a side panel, which is what uncovers the panel. A version sets
+ * these lengths:
  *   --gap     the space between the button's end and the bracket's upright
  *   --wrap    how far the arms reach over the button
  *   --rise    how far the bracket stands above and below the button
  *   --weight  how thick its line is
  *   --round   how round its two outer corners are, when they are round
  */
-[class*='v-bracket'] .btn {
+[class*='v-bracket'] .piece {
   margin: 0 calc(var(--gap) + var(--weight) + 1px);
 }
 
-[class*='v-bracket'] .btn::before,
-[class*='v-bracket'] .btn::after {
+[class*='v-bracket'] .piece::before,
+[class*='v-bracket'] .piece::after {
   content: '';
   position: absolute;
   top: calc(-1 * var(--rise));
@@ -224,33 +339,39 @@ body {
   pointer-events: none;
   transition:
     border-color 90ms ease-out,
-    transform 60ms ease-out;
+    transform 140ms ease-out;
 }
 
-[class*='v-bracket'] .btn::before {
+[class*='v-bracket'] .piece::before {
   left: calc(-1 * (var(--gap) + var(--weight)));
   border-right: 0;
   border-radius: var(--round, 0) 0 0 var(--round, 0);
 }
 
-[class*='v-bracket'] .btn::after {
+[class*='v-bracket'] .piece::after {
   right: calc(-1 * (var(--gap) + var(--weight)));
   border-left: 0;
   border-radius: 0 var(--round, 0) var(--round, 0) 0;
 }
 
-[class*='v-bracket'] .btn:is(:hover, .is-hover, [aria-expanded='true']):enabled::before,
-[class*='v-bracket'] .btn:is(:hover, .is-hover, [aria-expanded='true']):enabled::after {
+[class*='v-bracket'] .piece.is-off::before,
+[class*='v-bracket'] .piece.is-off::after {
+  opacity: 0.4;
+}
+
+[class*='v-bracket'] .piece:has(.btn[aria-expanded='true'])::before,
+[class*='v-bracket'] .piece:has(.btn[aria-expanded='true'])::after,
+[class*='v-bracket'] .piece:is(:hover, .is-hover, :has(:focus-visible)):not(.is-off)::before,
+[class*='v-bracket'] .piece:is(:hover, .is-hover, :has(:focus-visible)):not(.is-off)::after {
   border-color: var(--tone);
 }
 
-/* Pressing the button draws the brackets in against it. */
-[class*='v-bracket'] .btn:is(:active, .is-active):enabled::before {
-  transform: translateX(1px);
+[class*='v-bracket'] .piece:is(:hover, .is-hover, :has(:focus-visible)):not(.is-off)::before {
+  transform: translateX(calc(-1 * var(--side)));
 }
 
-[class*='v-bracket'] .btn:is(:active, .is-active):enabled::after {
-  transform: translateX(-1px);
+[class*='v-bracket'] .piece:is(:hover, .is-hover, :has(:focus-visible)):not(.is-off)::after {
+  transform: translateX(var(--side));
 }
 
 /* The focus ring goes round the brackets as well. */
@@ -307,8 +428,11 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .btn,
-  .btn::before,
-  .btn::after {
+  .side,
+  .flap,
+  .flap button,
+  .piece::before,
+  .piece::after {
     transition: none;
   }
 }
