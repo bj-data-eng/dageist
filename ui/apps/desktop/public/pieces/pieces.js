@@ -17,6 +17,16 @@ const VERSIONS = [
   },
   { id: 'bracket-close', name: 'Bracket, close', note: 'The same bracket, hugging the button.' },
   { id: 'bracket-heavy', name: 'Bracket, heavy', note: 'A line twice as thick, standing clear.' },
+  {
+    id: 'bracket-round',
+    name: 'Bracket, heavy and round',
+    note: 'Heavy and hugging. Its inner curve runs parallel to the button’s corner.',
+  },
+  {
+    id: 'bracket-flush',
+    name: 'Bracket, flush',
+    note: 'The same, touching the button. Its inner curve is the button’s own corner.',
+  },
 ];
 
 const template = document.querySelector('#card');

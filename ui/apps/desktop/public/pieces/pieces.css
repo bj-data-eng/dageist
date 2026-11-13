@@ -18,6 +18,8 @@
   --dtype: #7fd6a4;
   /* The colour of what the button names. Everything a version draws is mixed from it. */
   --tone: #9cc8ff;
+  /* How round the button's corners are. */
+  --radius: 2px;
   --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
@@ -159,7 +161,7 @@ body {
   flex: none;
   margin: 0;
   border: 0;
-  border-radius: 2px;
+  border-radius: var(--radius);
   background-color: color-mix(in srgb, var(--tone) 18%, transparent);
   padding: 2px 7px;
   color: var(--tone);
@@ -205,6 +207,7 @@ body {
  *   --wrap    how far the arms reach over the button
  *   --rise    how far the bracket stands above and below the button
  *   --weight  how thick its line is
+ *   --round   how round its two outer corners are, when they are round
  */
 [class*='v-bracket'] .btn {
   margin: 0 calc(var(--gap) + var(--weight) + 1px);
@@ -227,11 +230,13 @@ body {
 [class*='v-bracket'] .btn::before {
   left: calc(-1 * (var(--gap) + var(--weight)));
   border-right: 0;
+  border-radius: var(--round, 0) 0 0 var(--round, 0);
 }
 
 [class*='v-bracket'] .btn::after {
   right: calc(-1 * (var(--gap) + var(--weight)));
   border-left: 0;
+  border-radius: 0 var(--round, 0) var(--round, 0) 0;
 }
 
 [class*='v-bracket'] .btn:is(:hover, .is-hover, [aria-expanded='true']):enabled::before,
@@ -275,6 +280,29 @@ body {
   --wrap: 4px;
   --rise: 4px;
   --weight: 2px;
+}
+
+/*
+ * E · Bracket, heavy and round: heavy and hugging, with round corners. A
+ * corner's radius is measured at the line's outer edge, so the inner curve is
+ * that less the line's weight. Here the inner curve is the button's radius
+ * plus the gap, which keeps the two curves parallel.
+ */
+.v-bracket-round {
+  --gap: 1px;
+  --wrap: 4px;
+  --weight: 2px;
+  --rise: calc(var(--gap) + var(--weight));
+  --round: calc(var(--radius) + var(--gap) + var(--weight));
+}
+
+/* F · Bracket, flush: the same with no gap, so the inner curve is the button's own corner. */
+.v-bracket-flush {
+  --gap: 0px;
+  --wrap: 4px;
+  --weight: 2px;
+  --rise: calc(var(--gap) + var(--weight));
+  --round: calc(var(--radius) + var(--gap) + var(--weight));
 }
 
 @media (prefers-reduced-motion: reduce) {
