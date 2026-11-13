@@ -9,12 +9,24 @@
  * @property {string} id What its block in pieces.css is called.
  * @property {string} name What its card is headed.
  * @property {string} note One line on what sets it apart.
- * @property {'fmt-lists' | 'cond' | 'cond-chain' | 'nest' | 'fold' | 'pick' | 'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind
+ * @property {'add' | 'fmt-lists' | 'cond' | 'cond-chain' | 'nest' | 'fold' | 'pick' | 'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind
  *   What its card shows.
  */
 
 /** @type {Version[]} */
 const VERSIONS = [
+  {
+    id: 'add-wait',
+    name: 'Always waiting',
+    note: "A faint method waits at the end of every chain, and a faint step after the last step. Click one for its list, which is searched like any other. Point at a block in a chain: its + puts a method after it and its × takes it away. On a step's head, + adds a step after it and × removes the step.",
+    kind: 'add',
+  },
+  {
+    id: 'add-point',
+    name: 'Waiting where you point',
+    note: 'The same, but a faint method shows only on the row or line the pointer is in, so the steps are quieter at rest. The faint step at the end always shows.',
+    kind: 'add',
+  },
   {
     id: 'fmt-lists',
     name: 'Lists under the step',
@@ -102,6 +114,7 @@ const FIELDS = new Map([
 
 /** The template each kind of card is stamped from. */
 const CARDS = {
+  add: '#card-add',
   'fmt-lists': '#card-fmt-lists',
   cond: '#card-cond',
   'cond-chain': '#card-chain-only',
@@ -325,12 +338,19 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
       if (comparison instanceof HTMLElement) conditionOf(comparison);
     }
     linkChains(card);
+    if (version.kind === 'add') {
+      // A method waits at the end of every chain, and a step after the last step.
+      for (const chain of card.querySelectorAll('.chain')) chain.append(waitingMethod());
+      card.append(waitingStep());
+    }
     lowerNests(card);
-    const section = version.kind.startsWith('fmt')
-      ? '#versions-format'
-      : version.kind.startsWith('cond')
-        ? '#versions-cond'
-        : '#versions-settled';
+    const section = version.kind.startsWith('add')
+      ? '#versions-add'
+      : version.kind.startsWith('fmt')
+        ? '#versions-format'
+        : version.kind.startsWith('cond')
+          ? '#versions-cond'
+          : '#versions-settled';
     document.querySelector(section)?.append(card);
   }
 }
@@ -467,6 +487,102 @@ const INPUTS_ON_OFFER = [
 function takes(slot, what) {
   return (slot.dataset.takes ?? 'chain value input field').split(' ').includes(what);
 }
+
+/**
+ * The methods on offer for a chain, in groups: each with a word on what it
+ * gives, and what it takes: nothing, a `slot` for any value, `many` fields,
+ * a `number` or a `text`. They stand for all the methods there are.
+ */
+/** @type {[string, [string, string, string][]][]} */
+const METHODS_ON_OFFER = [
+  [
+    'Null',
+    [
+      ['fill_null', 'a value where there is none', 'slot'],
+      ['is_null', 'whether there is no value', ''],
+      ['drop_nulls', 'without the missing values', ''],
+    ],
+  ],
+  [
+    'Text',
+    [
+      ['str.to_uppercase', 'in capitals', ''],
+      ['str.len_chars', 'how many characters', ''],
+      ['str.contains', 'whether it holds a text', 'text'],
+      ['str.strip_chars', 'without spaces at the ends', ''],
+    ],
+  ],
+  [
+    'Date',
+    [
+      ['dt.date', 'the date alone', ''],
+      ['dt.year', 'the year', ''],
+      ['dt.total_days', 'a duration in whole days', ''],
+      ['dt.truncate', 'to the start of a period', 'text'],
+    ],
+  ],
+  [
+    'Window',
+    [
+      ['over', 'within each group', 'many'],
+      ['shift', 'the value some rows away', 'number'],
+      ['cum_sum', 'a running total', ''],
+      ['cum_count', 'a running count', ''],
+      ['rank', 'its place in order', ''],
+    ],
+  ],
+  [
+    'Arithmetic',
+    [
+      ['add', 'plus', 'slot'],
+      ['sub', 'minus', 'slot'],
+      ['mul', 'times', 'slot'],
+      ['truediv', 'divided by', 'slot'],
+      ['abs', 'without its sign', ''],
+      ['round', 'to a number of decimals', 'number'],
+    ],
+  ],
+  [
+    'Compare',
+    [
+      ['gt', 'greater than', 'slot'],
+      ['ge', 'at least', 'slot'],
+      ['lt', 'less than', 'slot'],
+      ['le', 'at most', 'slot'],
+      ['eq', 'equal to', 'slot'],
+      ['is_in', 'one of', 'slot'],
+    ],
+  ],
+  [
+    'Aggregate',
+    [
+      ['sum', 'the total', ''],
+      ['mean', 'the average', ''],
+      ['min', 'the smallest', ''],
+      ['max', 'the largest', ''],
+      ['count', 'how many', ''],
+      ['first', 'the first', ''],
+      ['last', 'the last', ''],
+    ],
+  ],
+];
+
+/** What each method on offer takes, by its name. */
+/** @type {Map<string, string>} */
+const METHOD_TAKES = new Map();
+for (const [, methods] of METHODS_ON_OFFER) {
+  for (const [name, , what] of methods) METHOD_TAKES.set(name, what);
+}
+
+/** The steps on offer: the verb, a word on what it does, and the key its colour goes by. */
+/** @type {[string, string, string][]} */
+const STEPS_ON_OFFER = [
+  ['Add column', 'a new column from a chain', 'add'],
+  ['Filter table', 'the rows where a condition holds', 'filter'],
+  ['Sort table', 'the rows in the order of some fields', 'sort'],
+  ['Select', 'some of the columns', 'select'],
+  ['Rename', 'columns under new names', 'rename'],
+];
 
 /** The comparisons on offer, and a word on each. */
 /** @type {[string, string][]} */
@@ -722,6 +838,282 @@ function removeLine(line) {
   if (list !== null) renumber(list);
 }
 
+/**
+ * Returns a link of a chain: a caret, then `part`.
+ * @param {HTMLElement} part
+ */
+function linkOf(part) {
+  const link = document.createElement('span');
+  link.className = 'link';
+  const seam = document.createElement('span');
+  seam.className = 'seam';
+  link.append(seam, part);
+  return link;
+}
+
+/** Returns the faint method that waits at the end of a chain, behind its caret. */
+function waitingMethod() {
+  const slot = slotOf('none', 'method', 'method waits');
+  slot.dataset.takes = 'method';
+  const link = linkOf(slot);
+  link.classList.add('waits');
+  return link;
+}
+
+/**
+ * Returns a row that holds only a word for a step: the faint one that waits
+ * after the last step, or one that is there until a step is picked.
+ * @param {string} state `waits` or `is-pending`.
+ */
+function stepWord(state) {
+  const row = document.createElement('div');
+  row.className = `row step ${state}`;
+  const num = document.createElement('span');
+  num.className = 'num';
+  const slot = slotOf('none', 'step', `verb ${state}`);
+  slot.dataset.takes = 'verb';
+  row.append(num, slot);
+  return row;
+}
+
+/** Returns the faint step that waits after the last step. */
+function waitingStep() {
+  return stepWord('waits');
+}
+
+/**
+ * Draws what was just put on the page, and goes to the first thing in it
+ * that is to be filled in: a name or value to type, or a slot to pick for.
+ * @param {HTMLElement} part
+ */
+function settle(part) {
+  for (const slot of part.querySelectorAll('.slot')) {
+    if (slot instanceof HTMLElement) showSlot(slot);
+  }
+  for (const input of part.querySelectorAll('.type input')) {
+    if (input instanceof HTMLInputElement) tend(input);
+  }
+  foldAll();
+  const first = part.querySelector('.type input, .slot:not(.waits)');
+  if (first instanceof HTMLInputElement) {
+    first.focus();
+    first.select();
+  } else if (first instanceof HTMLElement) {
+    openSlot(first);
+  }
+}
+
+/**
+ * Puts the method called `name` into the chain of `slot`: before the method
+ * that waits, or in place of the one that was pending.
+ * @param {HTMLElement} slot
+ * @param {string} name
+ */
+function addMethod(slot, name) {
+  if (!(pieceTemplate instanceof HTMLTemplateElement)) return;
+  const what = METHOD_TAKES.get(name) ?? '';
+  const typed = new Map([
+    ['number', 'number:1'],
+    ['text', 'text:'],
+  ]);
+  const piece = pieceFor(pieceTemplate, {
+    state: 'live',
+    name: null,
+    fn: name,
+    typed: typed.get(what) ?? null,
+    slot: what === 'slot' ? 'none:value' : null,
+    many: what === 'many' ? '' : null,
+  });
+  if (piece === null) return;
+  if (slot.classList.contains('waits')) {
+    showSlot(slot);
+    slot.closest('.link')?.before(linkOf(piece));
+  } else {
+    slot.classList.remove('is-pending');
+    slot.replaceWith(piece);
+  }
+  settle(piece);
+}
+
+/**
+ * Opens a list of methods after `piece`, a block in a chain. The place is
+ * held by a pending method, which goes again if nothing is picked.
+ * @param {Element} piece
+ */
+function pendMethod(piece) {
+  const slot = slotOf('none', 'method', 'method is-pending');
+  slot.dataset.takes = 'method';
+  (piece.closest('.link') ?? piece).after(linkOf(slot));
+  showSlot(slot);
+  openSlot(slot);
+}
+
+/**
+ * Takes `piece` out of its chain, with its caret and any list its dots own.
+ * The block a chain starts from stays.
+ * @param {Element} piece
+ */
+function removeMethod(piece) {
+  const link = piece.parentElement;
+  if (link === null || !link.classList.contains('link')) return;
+  for (const nest of piece.querySelectorAll('.nest')) {
+    const name = nest.getAttribute('data-nest') ?? '';
+    document.querySelector(`:is(.subrow, .lines)[data-nest="${name}"]`)?.remove();
+  }
+  link.remove();
+  foldAll();
+}
+
+/**
+ * Numbers the steps of `card` in order, and the lists under each from it.
+ * @param {Element} card
+ */
+function numberSteps(card) {
+  let count = 0;
+  for (const part of card.children) {
+    if (part.classList.contains('step')) {
+      if (part.classList.contains('waits') || part.classList.contains('is-pending')) continue;
+      count += 1;
+      const num = part.querySelector(':scope > .num');
+      if (num !== null) num.textContent = String(count);
+    } else if (part.classList.contains('subrow')) {
+      const mark = part.querySelector(':scope > .mark');
+      if (mark !== null) mark.textContent = `${String(count)}.1`;
+    } else if (part.classList.contains('lines')) {
+      numberLines(part, String(count));
+    }
+  }
+}
+
+/**
+ * Returns a new step for `verb`, with what it takes still to be filled in.
+ * @param {string} verb
+ */
+function stepOf(verb) {
+  const source = document.querySelector('#step-head');
+  const head =
+    source instanceof HTMLTemplateElement
+      ? source.content.firstElementChild?.cloneNode(true)
+      : null;
+  if (!(head instanceof HTMLElement)) return null;
+  const body = head.querySelector('.body');
+  const button = head.querySelector('.btn.verb');
+  if (body === null || button === null) return null;
+  button.textContent = verb;
+  button.classList.add('live');
+  const key = STEPS_ON_OFFER.find(([name]) => name === verb)?.[2] ?? 'add';
+  const row = document.createElement('div');
+  row.className = 'row step';
+  row.dataset.verb = key;
+  const num = document.createElement('span');
+  num.className = 'num';
+  row.append(num, head);
+  if (key === 'add') {
+    // A column: a name to type, then a chain that starts from a field to pick.
+    const label = document.createElement('label');
+    label.className = 'type is-name';
+    const input = document.createElement('input');
+    input.value = 'new_column';
+    input.spellcheck = false;
+    input.setAttribute('aria-label', 'Name of the new column');
+    label.append(input);
+    body.append(label);
+    const equals = document.createElement('span');
+    equals.className = 'equals';
+    const chain = document.createElement('span');
+    chain.className = 'chain';
+    chain.append(slotOf('none', 'field'), waitingMethod());
+    row.append(equals, chain);
+  } else if (key === 'filter') {
+    body.append(emptyComparison(), slotOf('join', 'and', 'join waits'));
+  } else {
+    if (key === 'sort') {
+      const by = document.createElement('span');
+      by.className = 'word';
+      by.textContent = 'by';
+      body.append(by);
+    }
+    const slot = document.createElement('span');
+    slot.className = key === 'rename' ? 'slot is-many is-dict' : 'slot is-many';
+    slot.dataset.takes = 'field';
+    if (key === 'rename') slot.dataset.pairs = '';
+    else slot.dataset.many = '';
+    body.append(slot);
+  }
+  return row;
+}
+
+/**
+ * Puts a step for `verb` where the word in `slot` is: before the step that
+ * waits, or in place of the one that was pending.
+ * @param {HTMLElement} slot
+ * @param {string} verb
+ */
+function addStep(slot, verb) {
+  const word = slot.closest('.row');
+  const row = stepOf(verb);
+  if (word === null || row === null) return;
+  const card = word.closest('.card');
+  if (slot.classList.contains('waits')) {
+    showSlot(slot);
+    word.before(row);
+  } else {
+    slot.classList.remove('is-pending');
+    word.replaceWith(row);
+  }
+  if (card !== null) numberSteps(card);
+  settle(row);
+}
+
+/**
+ * Opens a list of steps after `row` and the lists under it. The place is
+ * held by a pending step, which goes again if nothing is picked.
+ * @param {Element} row
+ */
+function pendStep(row) {
+  let last = row;
+  while (last.nextElementSibling !== null && !last.nextElementSibling.classList.contains('row')) {
+    last = last.nextElementSibling;
+  }
+  const word = stepWord('is-pending');
+  last.after(word);
+  const slot = word.querySelector('.slot');
+  if (!(slot instanceof HTMLElement)) return;
+  showSlot(slot);
+  openSlot(slot);
+}
+
+/**
+ * Takes the step in `row` away, with the lists under it.
+ * @param {Element} row
+ */
+function removeStep(row) {
+  const card = row.closest('.card');
+  while (row.nextElementSibling !== null && !row.nextElementSibling.classList.contains('row')) {
+    row.nextElementSibling.remove();
+  }
+  row.remove();
+  if (card !== null) numberSteps(card);
+}
+
+// The panels at the sides of a block. On a block in a chain, + puts a method after it and × takes
+// it away. On a step's head they add a step after it and take the step away.
+document.addEventListener('click', (event) => {
+  const side = event.target instanceof Element ? event.target.closest('.side') : null;
+  const piece = side?.closest('.piece');
+  if (side === null || side === undefined || piece === null || piece === undefined) return;
+  const adds = side.classList.contains('side-add');
+  if (piece.classList.contains('head')) {
+    const row = piece.closest('.row.step');
+    if (row === null) return;
+    if (adds) pendStep(row);
+    else removeStep(row);
+  } else if (piece.closest('.chain') !== null) {
+    if (adds) pendMethod(piece);
+    else removeMethod(piece);
+  }
+});
+
 /** The words for a list of comparisons taken as a group, and a word on each. */
 /** @type {[string, string][]} */
 const GROUPS_ON_OFFER = [
@@ -889,8 +1281,14 @@ function fold(slot) {
  * @param {HTMLElement} slot
  */
 function showSlot(slot) {
+  const wasOpen = slot.classList.contains('is-open');
   slot.classList.remove('is-open');
   slot.querySelector('.offers')?.remove();
+  if (wasOpen && slot.classList.contains('is-pending')) {
+    // A place that was held for something to be added goes when nothing was picked for it.
+    (slot.closest('.link, .row') ?? slot).remove();
+    return;
+  }
   drawHeld(slot);
 }
 
@@ -998,6 +1396,24 @@ function listOffers(slot, typed, chosen) {
       offerRow('op', name, word, false),
     );
     if (rows.length > 0) groups.push(offerGroup('Comparison', null, rows));
+  }
+  if (takes(slot, 'method')) {
+    // The groups go from the shortest to the longest, as they do for a value.
+    const found = [];
+    for (const [title, methods] of METHODS_ON_OFFER) {
+      const rows = methods
+        .filter(([name, word]) => isSought([name, word]))
+        .map(([name, word]) => offerRow('method', name, word, false));
+      if (rows.length > 0) found.push(offerGroup(title, rows.length, rows));
+    }
+    found.sort((left, right) => left.childElementCount - right.childElementCount);
+    groups.push(...found);
+  }
+  if (takes(slot, 'verb')) {
+    const rows = STEPS_ON_OFFER.filter(([name, word]) => isSought([name, word])).map(
+      ([name, word]) => offerRow('verb', name, word, false),
+    );
+    if (rows.length > 0) groups.push(offerGroup('Step', null, rows));
   }
   if (takes(slot, 'line')) {
     const group = slot.dataset.value === 'and' ? 'any of' : 'all of';
@@ -1110,6 +1526,14 @@ function takeOffer(slot, row) {
   if (!(row instanceof HTMLElement)) return;
   const value = row.dataset.value ?? '';
   const comparison = slot.closest('.cmp');
+  if (takes(slot, 'method')) {
+    addMethod(slot, value);
+    return;
+  }
+  if (takes(slot, 'verb')) {
+    addStep(slot, value);
+    return;
+  }
   if (row.dataset.kind === 'remove') {
     // The row acts on the line the comparison stands on.
     showSlot(slot);

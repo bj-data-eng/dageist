@@ -1145,6 +1145,52 @@ body {
 }
 
 /* ------------------------------------------------------------------ */
+/* Adding                                                              */
+/* ------------------------------------------------------------------ */
+
+/*
+ * A method that waits at the end of a chain, or holds a place in one until
+ * a method is picked: a block that says method, behind a caret that is as
+ * faint as it is. A step that waits after the last step is the same, with
+ * no number.
+ */
+.link.waits > .seam,
+.link:has(> .is-pending) > .seam {
+  opacity: 0.45;
+}
+
+.slot:is(.method, .verb) .held .shown {
+  --tone: var(--function);
+
+  font-style: normal;
+}
+
+.offer .shown.is-method {
+  --tone: var(--function);
+}
+
+.offer .shown.is-verb {
+  --tone: var(--verb-add);
+
+  font-weight: 600;
+  font-family: var(--sans);
+}
+
+.row:is(.waits, .is-pending) > .num {
+  visibility: hidden;
+}
+
+/* B · Waiting where you point: a method that waits shows on the row or line the pointer is in. */
+.v-add-point .link.waits {
+  visibility: hidden;
+}
+
+.v-add-point :is(.row, .subrow, .line):hover .link.waits,
+.v-add-point .link.waits:has(.is-open) {
+  visibility: visible;
+}
+
+/* ------------------------------------------------------------------ */
 /* Lists under a step                                                  */
 /* ------------------------------------------------------------------ */
 

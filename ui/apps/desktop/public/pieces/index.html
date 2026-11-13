@@ -16,6 +16,9 @@
     </header>
 
     <main>
+      <h2 class="section">Adding <span>a method to a chain, and a step to the steps</span></h2>
+      <div id="versions-add" class="versions"></div>
+
       <h2 class="section">
         Lists under a step
         <span>what a step takes that is more than one thing is a list beneath it</span>
@@ -1023,6 +1026,95 @@
           </div>
         </div>
       </section>
+    </template>
+
+    <!--
+      A card for adding. A faint method waits at the end of every chain, and
+      a faint step after the last step. The + of a block in a chain puts a
+      method after it, and its × takes the block away. The + and × of a
+      step's head do the same for the step.
+    -->
+    <template id="card-add">
+      <section class="card">
+        <h3><span class="letter"></span><span class="name"></span></h3>
+        <p class="note"></p>
+        <div class="row step" data-verb="add">
+          <span class="num">1</span
+          ><span class="piece head is-bracketed"
+            ><button type="button" class="side side-remove" aria-label="Remove step">×</button
+            ><span class="body"
+              ><button type="button" class="btn verb">Add column</button
+              ><label class="type is-name"
+                ><input
+                  value="owner_filled"
+                  aria-label="Name of the new column"
+                  spellcheck="false" /></label></span
+            ><button type="button" class="side side-add" aria-label="Add a step after">
+              +
+            </button></span
+          ><span class="equals"></span
+          ><span class="chain"
+            ><span data-piece="live" data-name="owner"></span><span class="seam"></span
+            ><span data-piece="live" data-fn="fill_null" data-slot="text:unknown"></span></span
+          ><span class="returns"><b>String</b></span>
+        </div>
+        <div class="row step" data-verb="add">
+          <span class="num">2</span
+          ><span class="piece head is-bracketed"
+            ><button type="button" class="side side-remove" aria-label="Remove step">×</button
+            ><span class="body"
+              ><button type="button" class="btn verb">Add column</button
+              ><label class="type is-name"
+                ><input
+                  value="days_vs_mean"
+                  aria-label="Name of the new column"
+                  spellcheck="false" /></label></span
+            ><button type="button" class="side side-add" aria-label="Add a step after">
+              +
+            </button></span
+          ><span class="equals"></span
+          ><span class="chain"
+            ><span data-piece="live" data-name="row_days"></span><span class="seam"></span
+            ><span class="piece fn is-bracketed"
+              ><button type="button" class="side side-remove" aria-label="Remove">×</button
+              ><span class="body"
+                ><button type="button" class="btn">sub</button
+                ><span class="nest"
+                  ><button
+                    type="button"
+                    class="btn shown is-chain nest-token"
+                    aria-label="A chain"
+                  ></button
+                  ><span class="nest-chain chain"
+                    ><span data-piece="live" data-name="row_days"></span><span class="seam"></span
+                    ><span data-piece="live" data-fn="mean"></span><span class="seam"></span
+                    ><span data-piece="live" data-fn="over"></span></span></span></span
+              ><button type="button" class="side side-add" aria-label="Add">+</button></span
+            ></span
+          ><span class="returns"><b>Float64</b></span>
+        </div>
+        <div class="row step" data-verb="sort">
+          <span class="num">3</span
+          ><span class="piece head is-bracketed"
+            ><button type="button" class="side side-remove" aria-label="Remove step">×</button
+            ><span class="body"
+              ><button type="button" class="btn verb">Sort table</button><span class="word">by</span
+              ><span class="slot is-many" data-many="dcn,timestamp" data-takes="field"></span></span
+            ><button type="button" class="side side-add" aria-label="Add a step after">
+              +
+            </button></span
+          >
+        </div>
+      </section>
+    </template>
+
+    <!-- The head of a step, for a step that is added. pieces.js writes its verb and what it takes. -->
+    <template id="step-head">
+      <span class="piece head is-bracketed"
+        ><button type="button" class="side side-remove" aria-label="Remove step">×</button
+        ><span class="body"><button type="button" class="btn verb"></button></span
+        ><button type="button" class="side side-add" aria-label="Add a step after">+</button></span
+      >
     </template>
 
     <!--
