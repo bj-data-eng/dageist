@@ -37,6 +37,8 @@
    * more, so that a block which opens does not reach the one beside it.
    */
   --seam-space: calc(var(--side) + 2px);
+  /* The colour a seam is drawn in: the colour of a function's brackets. */
+  --seam-ink: color-mix(in srgb, var(--function) 60%, transparent);
   --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
@@ -456,10 +458,10 @@ body {
 }
 
 /*
- * The seam: what joins one block of a chain to the next. It no longer has to
- * be where a block is added, since each block's own panel does that, so it
- * only has to say that the blocks belong together. Every seam is the same
- * width, whatever is drawn in it.
+ * The seam: a caret between one block of a chain and the next, pointing the
+ * way the value flows. It no longer has to be where a block is added, since
+ * each block's own panel does that. Every seam is the same width, whatever is
+ * drawn in it.
  */
 .chain {
   display: inline-flex;
@@ -480,36 +482,96 @@ body {
   color: var(--muted);
 }
 
-/* H · Caret: today's seam. */
+/* The two things a seam can draw sit on top of each other, centred. */
+.seam::before,
+.seam::after {
+  grid-area: 1 / 1;
+}
+
+/* H · Glyph: the caret typed as text. Its weight and curve are the font's. */
 .seam::before {
   content: '›';
 }
 
-/* I · Dot: the dot that joins a chain in the code itself. */
-.v-seam-dot .seam::before {
+/*
+ * A drawn chevron is a box cut to shape. A version sets its width, its
+ * height and `--cut`, how thick its line is measured across the page.
+ */
+[class*='v-seam-chevron'] .seam::before,
+.v-seam-arrow .seam::after {
   content: '';
-  border-radius: 50%;
-  background-color: var(--muted);
-  width: 3px;
-  height: 3px;
+  background-color: var(--seam-ink);
+  width: var(--wide);
+  height: var(--tall);
+  clip-path: polygon(
+    0 0,
+    var(--cut) 0,
+    100% 50%,
+    var(--cut) 100%,
+    0 100%,
+    calc(100% - var(--cut)) 50%
+  );
 }
 
-/* J · Line: a rule from one block to the next. */
-.v-seam-line .seam::before {
+/* I · Chevron, fine: a hairline with square ends. */
+.v-seam-chevron-fine {
+  --wide: 5px;
+  --tall: 8px;
+  --cut: 1.6px;
+}
+
+/* J · Chevron, heavy: the weight of the brackets. */
+.v-seam-chevron-heavy {
+  --wide: 7px;
+  --tall: 10px;
+  --cut: 3.1px;
+}
+
+/* K · Chevron, tall: as tall as the button, so it reads as a third bracket that points. */
+.v-seam-chevron-tall {
+  --wide: 7px;
+  --tall: 24px;
+  --cut: 2.2px;
+}
+
+/* L · Chevron, round: heavy, with its point rounded like the brackets' corners. */
+.v-seam-round .seam::before {
   content: '';
-  background-color: var(--line-strong);
-  width: 100%;
+  transform: translateX(-2px) rotate(45deg);
+  border-top: 2px solid var(--seam-ink);
+  border-right: 2px solid var(--seam-ink);
+  border-top-right-radius: 2.5px;
+  width: 7px;
+  height: 7px;
+}
+
+/* M · Triangle: a small solid arrowhead. */
+.v-seam-triangle .seam::before {
+  content: '';
+  background-color: var(--seam-ink);
+  width: 5px;
+  height: 8px;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+/* N · Arrow: a rule from block to block that ends in a fine head. */
+.v-seam-arrow {
+  --wide: 4px;
+  --tall: 7px;
+  --cut: 1.5px;
+}
+
+.v-seam-arrow .seam::before {
+  content: '';
+  justify-self: start;
+  background-color: var(--seam-ink);
+  width: calc(100% - 3px);
   height: 1px;
 }
 
-/* K · Gap: nothing drawn. */
-.v-seam-gap .seam::before {
-  content: none;
-}
-
-/* L · Joined: no space at all, so an opened block always lies over the next. */
-.v-seam-joined .seam {
-  display: none;
+.v-seam-arrow .seam::after {
+  justify-self: end;
+  margin-right: 2px;
 }
 
 /* A seam card is two steps and nothing else, so it needs no rule above the first. */
