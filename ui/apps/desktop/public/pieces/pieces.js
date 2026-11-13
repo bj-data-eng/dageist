@@ -18,13 +18,13 @@ const VERSIONS = [
   {
     id: 'fmt-lists',
     name: 'Lists under the step',
-    note: 'A condition is a list where all of the lines must hold, or any of them, and a group is a list inside a list. when owns a list of cases. A chain in a value is three dots, with its list under its own line. A faint word waits at the end of a list: and or or adds a comparison or a group, when adds a case. Click a comparison such as > to remove its line.',
+    note: "A condition is a list where all of the lines must hold, or any of them, and a group is a list inside a list. when owns a list of cases. A chain in a value is three dots, with its list under its own line. A faint word waits where the next thing goes: and or or at the end of a list adds a comparison or a group, when adds a case, and the and after a case's one comparison turns that condition into a list. Click a comparison such as > to remove its line.",
     kind: 'fmt-lists',
   },
   {
     id: 'cmp',
     name: 'Comparison',
-    note: 'A value, a comparison and a value as three blocks a hair apart, with a faint and waiting after the last one. Click the word, pick and or or, and the next comparison is there to fill in. Click a comparison such as > to change it or remove it. Click and to make it or.',
+    note: 'A value, a comparison and a value as three blocks a hair apart. A row holds one comparison, with a faint and waiting after it. Click the word and the condition moves into a list under the step, headed all of, with the next comparison there to fill in. A chain the comparison holds goes with it, under its line.',
     kind: 'cond',
   },
   {
@@ -317,11 +317,12 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
       const piece = pieceFor(pieceTemplate, specOf(slot, version));
       if (piece !== null) slot.replaceWith(piece);
     }
-    // A word waits after the last comparison of every function that has one.
-    for (const body of card.querySelectorAll('.body:has(> .cmp)')) {
-      [...body.querySelectorAll(':scope > .cmp')]
-        .at(-1)
-        ?.after(slotOf('join', 'and', 'join waits'));
+    // A word waits after a comparison that is a whole condition: in a step's head, and in a case.
+    for (const comparison of card.querySelectorAll('.body > .cmp')) {
+      comparison.after(slotOf('join', 'and', 'join waits'));
+    }
+    for (const comparison of card.querySelectorAll('.lines.is-cases > .line > .cmp')) {
+      if (comparison instanceof HTMLElement) conditionOf(comparison);
     }
     linkChains(card);
     lowerNests(card);
@@ -479,13 +480,6 @@ const COMPARISONS_ON_OFFER = [
   ['is_in', 'one of'],
 ];
 
-/** The words that join two comparisons, and a word on each. */
-/** @type {[string, string][]} */
-const JOINS_ON_OFFER = [
-  ['and', 'both must hold'],
-  ['or', 'either may hold'],
-];
-
 /**
  * Returns a slot that holds `value` as a value of `kind`. A comparison and a
  * joining word are slots too: `role` names which, and whether the word waits.
@@ -530,24 +524,17 @@ function drawNew(parts) {
 }
 
 /**
- * Reports whether `part` is a word that joins two comparisons, not one that waits.
- * @param {Element | null} part
- */
-function isJoin(part) {
-  return part !== null && part.classList.contains('join') && !part.classList.contains('waits');
-}
-
-/**
- * Takes `comparison` away, with the word that joined it to the one before,
- * or to the one after when it was the first.
+ * Returns `comparison` as the whole condition of a case: the comparison, and
+ * the word that waits to turn the condition into a list.
  * @param {HTMLElement} comparison
  */
-function removeComparison(comparison) {
-  const before = comparison.previousElementSibling;
-  const after = comparison.nextElementSibling;
-  if (isJoin(before)) before?.remove();
-  else if (isJoin(after)) after?.remove();
-  comparison.remove();
+function conditionOf(comparison) {
+  const condition = document.createElement('span');
+  condition.className = 'cond';
+  // Where the comparison is on the page already, the condition takes its place.
+  comparison.replaceWith(condition);
+  condition.append(comparison, slotOf('join', 'and', 'join waits'));
+  return condition;
 }
 
 /**
@@ -565,24 +552,31 @@ function lineOf(parts, waits = false) {
 }
 
 /**
- * Numbers the lines of `list` from `prefix`, and the lists under each line
- * from that line's number. A line that waits has no number.
+ * Numbers the lines of `list` from `prefix`, starting after `start`, and
+ * the lists under each line from that line's number. Two lists under one
+ * line are numbered as one, so no two lines share a number. A line that
+ * waits has no number.
  * @param {Element} list
  * @param {string} prefix
+ * @param {number} start How many lines under `prefix` are numbered already.
+ * @returns {number} How many are numbered now.
  */
-function numberLines(list, prefix) {
-  let count = 0;
+function numberLines(list, prefix, start = 0) {
+  let count = start;
   let last = prefix;
+  let under = 0;
   for (const part of list.children) {
     if (part.classList.contains('lines')) {
-      numberLines(part, last);
+      under = numberLines(part, last, under);
     } else if (part.classList.contains('line') && !part.classList.contains('waits')) {
       count += 1;
+      under = 0;
       last = `${prefix}.${String(count)}`;
       const mark = part.querySelector(':scope > .mark');
       if (mark !== null) mark.textContent = last;
     }
   }
+  return count;
 }
 
 /**
@@ -656,10 +650,63 @@ function addCase(slot) {
   const then = document.createElement('span');
   then.className = 'label';
   then.textContent = 'then';
-  const line = lineOf([emptyComparison(), then, slotOf('none', 'value')]);
+  const line = lineOf([conditionOf(emptyComparison()), then, slotOf('none', 'value')]);
   waiting.before(line);
   renumber(waiting);
   drawNew([line]);
+}
+
+/**
+ * Returns the lists that the dots in `comparison` own, as lists of lines. A
+ * list that was a single line under a step is made into one.
+ * @param {HTMLElement} comparison
+ */
+function listsOwnedBy(comparison) {
+  /** @type {HTMLElement[]} */
+  const lists = [];
+  for (const nest of comparison.querySelectorAll('.nest')) {
+    const name = nest.getAttribute('data-nest') ?? '';
+    const owned = document.querySelector(`:is(.subrow, .lines)[data-nest="${name}"]`);
+    if (!(owned instanceof HTMLElement)) continue;
+    if (owned.classList.contains('lines')) {
+      lists.push(owned);
+      continue;
+    }
+    const chain = owned.querySelector('.chain');
+    const list = document.createElement('div');
+    list.className = owned.classList.contains('is-shut') ? 'lines is-shut' : 'lines';
+    list.dataset.nest = name;
+    if (chain instanceof HTMLElement) list.append(lineOf([chain]));
+    owned.remove();
+    lists.push(list);
+  }
+  return lists;
+}
+
+/**
+ * Moves the one comparison before the waiting word in `slot` into a list of
+ * its own: the word becomes all of, and under the step, or under the case,
+ * are the comparison, a new one to fill in, and a word that waits.
+ * @param {HTMLElement} slot The word that waits after the comparison.
+ */
+function intoList(slot) {
+  const comparison = slot.previousElementSibling;
+  const owner = slot.closest('.line') ?? slot.closest('.row');
+  if (!(comparison instanceof HTMLElement) || owner === null) return;
+  const group = slotOf('join', 'all of', 'join');
+  group.dataset.takes = 'group';
+  const word = slotOf('join', 'and', 'join waits');
+  word.dataset.takes = 'line';
+  const owned = listsOwnedBy(comparison);
+  const added = lineOf([emptyComparison()]);
+  const list = document.createElement('div');
+  list.className = 'lines';
+  list.append(lineOf([comparison]), ...owned, added, lineOf([word], true));
+  slot.replaceWith(group);
+  owner.after(list);
+  renumber(list);
+  for (const part of [group, word]) showSlot(part);
+  drawNew([added]);
 }
 
 /**
@@ -938,31 +985,19 @@ function listOffers(slot, typed, chosen) {
   /** @type {(row: [string, string]) => boolean} */
   const isSought = ([name, word]) => name.includes(sought) || word.includes(sought);
   if (takes(slot, 'op')) {
-    // First, what can be done with the whole comparison: take it away, where it is not the only
-    // one. Adding is left to the word that waits.
-    const taker = slot.closest('.cmp')?.parentElement ?? null;
-    const isLine = taker?.classList.contains('line') ?? false;
-    const others = isLine
-      ? (taker?.parentElement?.querySelectorAll(':scope > .line:not(.waits)').length ?? 0)
-      : (taker?.querySelectorAll(':scope > .cmp').length ?? 0);
-    const isCase = taker?.parentElement?.classList.contains('is-cases') ?? false;
-    if (sought === '' && others > 1 && !isCase) {
-      const what = isLine ? 'this line' : 'this comparison';
-      groups.push(
-        offerGroup('This condition', null, [actRow('remove', 'remove', '× remove', what)]),
-      );
+    // First, what can be done with the comparison's line in a list: take it away, where it is
+    // not the only one. Adding is left to the word that waits.
+    const line = slot.closest('.cmp')?.parentElement ?? null;
+    const isLine = line?.classList.contains('line') ?? false;
+    const lines = line?.parentElement?.querySelectorAll(':scope > .line:not(.waits)').length ?? 0;
+    if (sought === '' && isLine && lines > 1) {
+      const acts = [actRow('remove', 'remove', '× remove', 'this line')];
+      groups.push(offerGroup('This condition', null, acts));
     }
     const rows = COMPARISONS_ON_OFFER.filter(isSought).map(([name, word]) =>
       offerRow('op', name, word, false),
     );
     if (rows.length > 0) groups.push(offerGroup('Comparison', null, rows));
-  }
-  if (takes(slot, 'join')) {
-    const rows = JOINS_ON_OFFER.filter(isSought).map(([name, word]) =>
-      offerRow('join', name, word, false),
-    );
-    const title = slot.classList.contains('waits') ? 'Add a comparison' : 'Joined by';
-    if (rows.length > 0) groups.push(offerGroup(title, null, rows));
   }
   if (takes(slot, 'line')) {
     const group = slot.dataset.value === 'and' ? 'any of' : 'all of';
@@ -1076,26 +1111,15 @@ function takeOffer(slot, row) {
   const value = row.dataset.value ?? '';
   const comparison = slot.closest('.cmp');
   if (row.dataset.kind === 'remove') {
-    // The row acts on the whole comparison: on its line in a list, or on it alone in a row.
+    // The row acts on the line the comparison stands on.
     showSlot(slot);
     const line = comparison?.parentElement ?? null;
     if (line instanceof HTMLElement && line.classList.contains('line')) removeLine(line);
-    else if (comparison instanceof HTMLElement) removeComparison(comparison);
     return;
   }
   if (takes(slot, 'line')) {
     showSlot(slot);
     addLine(slot, row.dataset.kind);
-    return;
-  }
-  if (slot.classList.contains('waits')) {
-    // The word that waited now joins a new comparison, and another word waits after it.
-    slot.classList.remove('waits');
-    slot.dataset.value = value;
-    showSlot(slot);
-    const parts = [emptyComparison(), slotOf('join', 'and', 'join waits')];
-    slot.after(...parts);
-    drawNew(parts);
     return;
   }
   if (!slot.classList.contains('is-many')) {
@@ -1154,6 +1178,9 @@ document.addEventListener('click', (event) => {
   } else if (takes(slot, 'case')) {
     // There is one thing a waiting when can add, so it adds it without a list.
     addCase(slot);
+  } else if (takes(slot, 'join')) {
+    // Nor is there a choice after a lone comparison: the condition becomes a list.
+    intoList(slot);
   } else if (!slot.classList.contains('is-open')) {
     openSlot(slot);
   } else if (event.target.closest('.offers') === null) {

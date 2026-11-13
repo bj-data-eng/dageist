@@ -1189,17 +1189,27 @@ body {
 }
 
 /* A comparison that stands on a line of its own is round at both ends. */
-.line > .cmp > :first-child .shown {
+.line > .cmp > :first-child .shown,
+.cond > .cmp > :first-child .shown {
   border-radius: var(--radius) 0 0 var(--radius);
 }
 
-.line > .cmp > :last-child .shown {
+.line > .cmp > :last-child .shown,
+.cond > .cmp > :last-child .shown {
   border-radius: 0 var(--radius) var(--radius) 0;
 }
 
 /* The word for a group on a line of its own: all of, any of. */
-.line > .slot.join .shown {
+.line > .slot.join .shown,
+.cond > .slot.join .shown {
   --tone: var(--function);
+}
+
+/* The condition of a case: one comparison and the word that waits after it, or a group word. */
+.cond {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /*
