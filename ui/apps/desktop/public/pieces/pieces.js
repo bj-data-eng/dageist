@@ -9,29 +9,17 @@
  * @property {string} id What its block in pieces.css is called.
  * @property {string} name What its card is headed.
  * @property {string} note One line on what sets it apart.
- * @property {'fmt-lines' | 'fmt-lists' | 'fmt-row' | 'cond' | 'cond-chain' | 'nest' | 'fold' | 'pick' | 'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind
+ * @property {'fmt-lists' | 'cond' | 'cond-chain' | 'nest' | 'fold' | 'pick' | 'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind
  *   What its card shows.
  */
 
 /** @type {Version[]} */
 const VERSIONS = [
   {
-    id: 'fmt-lines',
-    name: 'Lines',
-    note: 'The blocks keep their shapes and the step is laid out by rule. A condition is one comparison to a line, led by its and or or. A group that is worked out first is set in, behind a rail. Every when starts a line, and the thens line up.',
-    kind: 'fmt-lines',
-  },
-  {
     id: 'fmt-lists',
     name: 'Lists under the step',
-    note: "The step editor's way. A condition is a list where all of the lines must hold, or any of them, and a group is a list inside a list, so nothing is left to precedence. when owns a list of cases: a condition, then a value, and otherwise last. A chain in a value is three dots, and its list sits under its own line, numbered from it.",
+    note: 'A condition is a list where all of the lines must hold, or any of them, and a group is a list inside a list, so nothing is left to precedence. when owns a list of cases: a condition, then a value, and otherwise last. A chain in a value is three dots, and its list sits under its own line, numbered from it. What a line holds depends on what owns the list.',
     kind: 'fmt-lists',
-  },
-  {
-    id: 'fmt-row',
-    name: 'On the row',
-    note: "Everything stays on the step's row and breaks before a caret. A group that is worked out first stands inside round brackets. The closest of the three to written code.",
-    kind: 'fmt-row',
   },
   {
     id: 'cmp-plain',
@@ -132,9 +120,7 @@ const FIELDS = new Map([
 
 /** The template each kind of card is stamped from. */
 const CARDS = {
-  'fmt-lines': '#card-fmt-lines',
   'fmt-lists': '#card-fmt-lists',
-  'fmt-row': '#card-fmt-row',
   cond: '#card-cond',
   'cond-chain': '#card-chain-only',
   nest: '#card-nest',

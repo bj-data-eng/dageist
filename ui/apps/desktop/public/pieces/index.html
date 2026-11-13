@@ -17,8 +17,8 @@
 
     <main>
       <h2 class="section">
-        Formatting
-        <span>how a step with cases and a grouped condition is laid out</span>
+        Lists under a step
+        <span>what a step takes that is more than one thing is a list beneath it</span>
       </h2>
       <div id="versions-format" class="versions"></div>
 
@@ -913,121 +913,6 @@
     </template>
 
     <!--
-      Formatting by rule: the blocks keep their shapes and the step is laid
-      out on lines. A condition is one comparison to a line. Every when
-      starts a line.
-    -->
-    <template id="card-fmt-lines">
-      <section class="card">
-        <h3><span class="letter"></span><span class="name"></span></h3>
-        <p class="note"></p>
-        <div class="row step" data-verb="filter">
-          <span class="num">1</span
-          ><span class="piece head is-bracketed"
-            ><button type="button" class="side side-remove" aria-label="Remove step">×</button
-            ><span class="body"><button type="button" class="btn verb">Filter table</button></span
-            ><button type="button" class="side side-add" aria-label="Add a step after">
-              +
-            </button></span
-          >
-        </div>
-        <div class="lines is-cond">
-          <div class="line">
-            <span class="lead"></span
-            ><span class="cmp"
-              ><span class="slot" data-kind="column" data-value="row_days"></span
-              ><span class="slot op" data-takes="op" data-kind="op" data-value="&gt;"></span
-              ><span class="slot" data-kind="input" data-value="sla_cutoff"></span
-            ></span>
-          </div>
-          <div class="line">
-            <span class="lead"
-              ><span class="slot join" data-takes="join" data-kind="join" data-value="and"></span
-            ></span>
-            <div class="lines is-group">
-              <div class="line">
-                <span class="lead"></span
-                ><span class="cmp"
-                  ><span class="slot" data-kind="column" data-value="owner"></span
-                  ><span class="slot op" data-takes="op" data-kind="op" data-value="=="></span
-                  ><span class="slot" data-kind="text" data-value="Company A"></span
-                ></span>
-              </div>
-              <div class="line">
-                <span class="lead"
-                  ><span
-                    class="slot join"
-                    data-takes="join"
-                    data-kind="join"
-                    data-value="or"
-                  ></span></span
-                ><span class="cmp"
-                  ><span class="slot" data-kind="column" data-value="owner"></span
-                  ><span class="slot op" data-takes="op" data-kind="op" data-value="=="></span
-                  ><span class="slot" data-kind="text" data-value="Company B"></span
-                ></span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="row step" data-verb="add">
-          <span class="num">2</span
-          ><span class="piece head is-bracketed"
-            ><button type="button" class="side side-remove" aria-label="Remove step">×</button
-            ><span class="body"
-              ><button type="button" class="btn verb">Add column</button
-              ><label class="type is-name"
-                ><input
-                  value="flag"
-                  aria-label="Name of the new column"
-                  spellcheck="false" /></label></span
-            ><button type="button" class="side side-add" aria-label="Add a step after">
-              +
-            </button></span
-          ><span class="equals"></span><span class="returns"><b>String</b></span>
-        </div>
-        <div class="lines is-cases">
-          <div class="line">
-            <span></span
-            ><span class="piece fn is-bracketed"
-              ><button type="button" class="side side-remove" aria-label="Remove">×</button
-              ><span class="body"
-                ><button type="button" class="btn">when</button
-                ><span class="cmp"
-                  ><span class="slot" data-kind="column" data-value="resolved_day"></span
-                  ><span class="slot op" data-takes="op" data-kind="op" data-value="is_in"></span
-                  ><span class="slot" data-kind="input" data-value="holidays"></span></span></span
-              ><button type="button" class="side side-add" aria-label="Add">+</button></span
-            ><span class="link"
-              ><span class="seam"></span
-              ><span data-piece="live" data-fn="then" data-slot="text:holiday"></span
-            ></span>
-          </div>
-          <div class="line">
-            <span class="seam"></span
-            ><span class="piece fn is-bracketed"
-              ><button type="button" class="side side-remove" aria-label="Remove">×</button
-              ><span class="body"
-                ><button type="button" class="btn">when</button
-                ><span class="cmp"
-                  ><span class="slot" data-kind="column" data-value="row_days"></span
-                  ><span class="slot op" data-takes="op" data-kind="op" data-value="&gt;"></span
-                  ><span class="slot" data-kind="input" data-value="sla_cutoff"></span></span></span
-              ><button type="button" class="side side-add" aria-label="Add">+</button></span
-            ><span class="link"
-              ><span class="seam"></span
-              ><span data-piece="live" data-fn="then" data-slot="text:over"></span
-            ></span>
-          </div>
-          <div class="line">
-            <span class="seam"></span
-            ><span data-piece="live" data-fn="otherwise" data-slot="text:ok"></span><span></span>
-          </div>
-        </div>
-      </section>
-    </template>
-
-    <!--
       Formatting as lists under the step, the way the step editor did it:
       when owns a list of cases, and a condition is a list whose lines must
       all hold, or any of them. A group is a list inside a list.
@@ -1053,7 +938,7 @@
             </button></span
           >
         </div>
-        <div class="lines is-list">
+        <div class="lines">
           <div class="line">
             <span class="mark">1.1</span
             ><span class="cmp"
@@ -1067,7 +952,7 @@
                 ></button></span
             ></span>
           </div>
-          <div class="lines is-list" data-nest="mean">
+          <div class="lines" data-nest="mean">
             <div class="line">
               <span class="mark">1.1.1</span
               ><span class="chain"
@@ -1081,7 +966,7 @@
             <span class="mark">1.2</span
             ><span class="slot join" data-takes="group" data-kind="join" data-value="any of"></span>
           </div>
-          <div class="lines is-list">
+          <div class="lines">
             <div class="line">
               <span class="mark">1.2.1</span
               ><span class="cmp"
@@ -1130,7 +1015,7 @@
             ></span
           ><span class="returns"><b>String</b></span>
         </div>
-        <div class="lines is-list is-cases" data-nest="cases">
+        <div class="lines is-cases" data-nest="cases">
           <div class="line">
             <span class="mark">2.1</span
             ><span class="cmp"
@@ -1155,7 +1040,7 @@
               ></button
             ></span>
           </div>
-          <div class="lines is-list" data-nest="upper">
+          <div class="lines" data-nest="upper">
             <div class="line">
               <span class="mark">2.2.1</span
               ><span class="chain"
@@ -1168,90 +1053,6 @@
             <span class="mark">2.3</span><span class="label">otherwise</span><span></span
             ><span class="slot" data-kind="text" data-value="ok"></span>
           </div>
-        </div>
-      </section>
-    </template>
-
-    <!--
-      Formatting on the row: everything stays in the step and breaks before
-      a caret. A group that is worked out first stands in round brackets.
-    -->
-    <template id="card-fmt-row">
-      <section class="card">
-        <h3><span class="letter"></span><span class="name"></span></h3>
-        <p class="note"></p>
-        <div class="row step" data-verb="filter">
-          <span class="num">1</span
-          ><span class="piece head is-bracketed"
-            ><button type="button" class="side side-remove" aria-label="Remove step">×</button
-            ><span class="body"
-              ><button type="button" class="btn verb">Filter table</button
-              ><span class="cmp"
-                ><span class="slot" data-kind="column" data-value="row_days"></span
-                ><span class="slot op" data-takes="op" data-kind="op" data-value="&gt;"></span
-                ><span class="slot" data-kind="input" data-value="sla_cutoff"></span></span
-              ><span class="slot join" data-takes="join" data-kind="join" data-value="and"></span
-              ><span class="grp"
-                ><span class="cmp"
-                  ><span class="slot" data-kind="column" data-value="owner"></span
-                  ><span class="slot op" data-takes="op" data-kind="op" data-value="=="></span
-                  ><span class="slot" data-kind="text" data-value="Company A"></span></span
-                ><span class="slot join" data-takes="join" data-kind="join" data-value="or"></span
-                ><span class="cmp"
-                  ><span class="slot" data-kind="column" data-value="owner"></span
-                  ><span class="slot op" data-takes="op" data-kind="op" data-value="=="></span
-                  ><span
-                    class="slot"
-                    data-kind="text"
-                    data-value="Company B"
-                  ></span></span></span></span
-            ><button type="button" class="side side-add" aria-label="Add a step after">
-              +
-            </button></span
-          >
-        </div>
-        <div class="row step" data-verb="add">
-          <span class="num">2</span
-          ><span class="piece head is-bracketed"
-            ><button type="button" class="side side-remove" aria-label="Remove step">×</button
-            ><span class="body"
-              ><button type="button" class="btn verb">Add column</button
-              ><label class="type is-name"
-                ><input
-                  value="flag"
-                  aria-label="Name of the new column"
-                  spellcheck="false" /></label></span
-            ><button type="button" class="side side-add" aria-label="Add a step after">
-              +
-            </button></span
-          ><span class="equals"></span
-          ><span class="chain"
-            ><span class="piece fn is-bracketed"
-              ><button type="button" class="side side-remove" aria-label="Remove">×</button
-              ><span class="body"
-                ><button type="button" class="btn">when</button
-                ><span class="cmp"
-                  ><span class="slot" data-kind="column" data-value="resolved_day"></span
-                  ><span class="slot op" data-takes="op" data-kind="op" data-value="is_in"></span
-                  ><span class="slot" data-kind="input" data-value="holidays"></span></span></span
-              ><button type="button" class="side side-add" aria-label="Add">+</button></span
-            ><span class="seam"></span
-            ><span data-piece="live" data-fn="then" data-slot="text:holiday"></span
-            ><span class="seam"></span
-            ><span class="piece fn is-bracketed"
-              ><button type="button" class="side side-remove" aria-label="Remove">×</button
-              ><span class="body"
-                ><button type="button" class="btn">when</button
-                ><span class="cmp"
-                  ><span class="slot" data-kind="column" data-value="row_days"></span
-                  ><span class="slot op" data-takes="op" data-kind="op" data-value="&gt;"></span
-                  ><span class="slot" data-kind="input" data-value="sla_cutoff"></span></span></span
-              ><button type="button" class="side side-add" aria-label="Add">+</button></span
-            ><span class="seam"></span
-            ><span data-piece="live" data-fn="then" data-slot="text:over"></span
-            ><span class="seam"></span
-            ><span data-piece="live" data-fn="otherwise" data-slot="text:ok"></span></span
-          ><span class="returns"><b>String</b></span>
         </div>
       </section>
     </template>
