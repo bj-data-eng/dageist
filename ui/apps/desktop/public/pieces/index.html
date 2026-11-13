@@ -451,10 +451,10 @@
     </template>
 
     <!--
-      A card for folding: a step that selects sixty fields, a step that
-      renames twelve, which is a dictionary of old names and new, and a
-      function in a chain that takes fourteen fields. Each shows its first
-      four entries and a count of the rest. Click any of them to open the list.
+      A card for a way of folding: a step that selects sixty fields, a step
+      that renames twelve, which is a dictionary of old names and new, a
+      function in a chain that takes fourteen fields, and a step that sorts by
+      two, which fit. Click any entry or count to open the list.
     -->
     <template id="card-fold">
       <section class="card">
@@ -514,6 +514,18 @@
             <span data-piece="live" data-fn="over" data-many="first:14"></span>
           </span>
           <span class="returns">returns <b>Int64</b></span>
+        </div>
+        <div class="row step" data-verb="sort">
+          <span class="num">4</span>
+          <span class="piece head is-bracketed">
+            <button type="button" class="side side-remove" aria-label="Remove step">×</button>
+            <span class="body">
+              <button type="button" class="btn verb">Sort table</button>
+              <span class="word">by</span>
+              <span class="slot is-many" data-many="dcn,timestamp" data-takes="field"></span>
+            </span>
+            <button type="button" class="side side-add" aria-label="Add a step after">+</button>
+          </span>
         </div>
       </section>
     </template>

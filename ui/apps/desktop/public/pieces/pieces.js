@@ -16,9 +16,21 @@
 /** @type {Version[]} */
 const VERSIONS = [
   {
-    id: 'fold',
-    name: 'Fold',
-    note: 'A long list or dictionary shows its first four entries and a count of the rest. Any of them opens the list.',
+    id: 'fold-fit',
+    name: 'Fit',
+    note: 'As many entries as the line has room for, then a count of the rest. Narrow the window and it shows fewer.',
+    kind: 'fold',
+  },
+  {
+    id: 'fold-fade',
+    name: 'Fade',
+    note: 'The entries run to the end of the room and fade out, and the count is how many there are in all.',
+    kind: 'fold',
+  },
+  {
+    id: 'fold-count',
+    name: 'Count only',
+    note: 'No entry is listed, however few. The function shows only how many it holds.',
     kind: 'fold',
   },
   {
@@ -361,8 +373,9 @@ function takes(slot, what) {
   return (slot.dataset.takes ?? 'chain value input field').split(' ').includes(what);
 }
 
-/** How many entries a slot shows before it folds the rest into a count. */
-const SHOWN_BEFORE_FOLD = 4;
+/** The room a count takes at the end of a folded slot, and the room a bracket takes after it. */
+const COUNT_ROOM = 44;
+const BRACKET_ROOM = 8;
 
 /**
  * Returns the pairs a dictionary slot holds: a field, and what it is given.
@@ -445,17 +458,92 @@ function drawHeld(slot) {
         })
       : ticked(slot).map((name) => blockOf('column', name));
     if (entries.length === 0) entries.push(blockOf('none', 'no fields'));
-    // The entries past the first few are folded away into a count of them.
-    for (const entry of entries.slice(SHOWN_BEFORE_FOLD)) entry.classList.add('is-extra');
-    if (entries.length > SHOWN_BEFORE_FOLD) {
-      const count = blockOf('chain', '');
-      count.classList.add('fold-count');
-      count.textContent = `+${String(entries.length - SHOWN_BEFORE_FOLD)}`;
-      entries.push(count);
-    }
     held.replaceChildren(...entries);
   }
   if (!held.isConnected) slot.prepend(held);
+  fold(slot);
+}
+
+/**
+ * Returns how a slot folds what it has no room for, which the card it is in
+ * decides: `fit` shows what fits and counts the rest, `fade` lets the entries
+ * run out and fade, `count` lists none of them.
+ * @param {HTMLElement} slot
+ */
+function foldMode(slot) {
+  const card = slot.closest('.card');
+  if (card?.classList.contains('v-fold-fade') === true) return 'fade';
+  if (card?.classList.contains('v-fold-count') === true) return 'count';
+  return 'fit';
+}
+
+/**
+ * Returns the room a slot's entries have: from where the slot starts to the
+ * end of its step, less what the step says it returns and the bracket that
+ * closes the function.
+ * @param {HTMLElement} slot
+ */
+function roomFor(slot) {
+  const row = slot.closest('.row');
+  if (row === null) return Number.POSITIVE_INFINITY;
+  const returns = row.querySelector('.returns');
+  const kept = returns === null ? 0 : returns.getBoundingClientRect().width + 14;
+  const end = row.getBoundingClientRect().right - kept - BRACKET_ROOM;
+  return end - slot.getBoundingClientRect().left;
+}
+
+/**
+ * Folds a slot that holds several entries to the room it has. The entries
+ * are measured, not counted, so a dictionary of long names folds sooner than
+ * a list of short ones.
+ * @param {HTMLElement} slot
+ */
+function fold(slot) {
+  if (!slot.classList.contains('is-many')) return;
+  const held = slot.querySelector('.held');
+  if (!(held instanceof HTMLElement)) return;
+  let count = slot.querySelector(':scope > .fold-count');
+  if (count === null) {
+    count = blockOf('chain', '');
+    count.classList.add('fold-count');
+    held.after(count);
+  }
+  const entries = [...held.children];
+  for (const entry of entries) entry.classList.remove('is-extra');
+  slot.classList.remove('is-folded');
+  held.style.maxWidth = '';
+  // A hair stands between two entries.
+  const widths = entries.map((entry) => entry.getBoundingClientRect().width + 1);
+  const needed = widths.reduce((sum, width) => sum + width, 0);
+  // With every entry out of the way the function sits where it will once it is folded, which is
+  // where its room has to be measured from.
+  for (const entry of entries) entry.classList.add('is-extra');
+  slot.classList.add('is-folded');
+  count.textContent = `+${String(entries.length)}`;
+  const mode = foldMode(slot);
+  if (mode === 'count') return;
+  const room = roomFor(slot);
+  if (needed <= room || mode === 'fade') {
+    for (const entry of entries) entry.classList.remove('is-extra');
+  }
+  if (needed <= room) {
+    slot.classList.remove('is-folded');
+    return;
+  }
+  if (mode === 'fade') {
+    held.style.maxWidth = `${String(Math.max(room - COUNT_ROOM, 0))}px`;
+    count.textContent = String(entries.length);
+    return;
+  }
+  let used = 0;
+  let shown = 0;
+  for (const width of widths) {
+    if (used + width > room - COUNT_ROOM) break;
+    used += width;
+    shown += 1;
+  }
+  for (const entry of entries.slice(0, shown)) entry.classList.remove('is-extra');
+  count.textContent = `+${String(entries.length - shown)}`;
 }
 
 /**
@@ -661,6 +749,16 @@ for (const slot of document.querySelectorAll('.slot')) {
   if (slot instanceof HTMLElement) showSlot(slot);
 }
 
+/** Works out again what every slot folds away. */
+function foldAll() {
+  for (const slot of document.querySelectorAll('.slot.is-many')) {
+    if (slot instanceof HTMLElement) fold(slot);
+  }
+}
+
+// The room changes with the window, so what is folded is worked out again.
+window.addEventListener('resize', foldAll);
+
 document.addEventListener('click', (event) => {
   if (!(event.target instanceof Element)) return;
   const slot = event.target.closest('.slot');
@@ -743,6 +841,9 @@ function tend(input) {
 for (const input of document.querySelectorAll('.type input')) {
   if (input instanceof HTMLInputElement) tend(input);
 }
+
+// The typed blocks have only now taken their widths, which moves what follows them.
+foldAll();
 
 document.addEventListener('input', (event) => {
   if (!(event.target instanceof HTMLInputElement)) return;
