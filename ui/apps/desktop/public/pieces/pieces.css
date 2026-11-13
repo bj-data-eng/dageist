@@ -544,6 +544,8 @@ body {
   content: '';
   border-top: 2px solid var(--seam-ink);
   border-bottom: 2px solid var(--seam-ink);
+  /* The height takes in both bars, so 5px leaves 1px between them. */
+  box-sizing: border-box;
   width: 7px;
   height: 5px;
 }
