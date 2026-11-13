@@ -9,17 +9,23 @@
  * @property {string} id What its block in pieces.css is called.
  * @property {string} name What its card is headed.
  * @property {string} note One line on what sets it apart.
- * @property {'slot' | 'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind
+ * @property {'pick' | 'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind
  *   What its card shows.
  */
 
 /** @type {Version[]} */
 const VERSIONS = [
   {
-    id: 'slot',
-    name: 'Type to pick',
-    note: 'Click a value and type. What is typed can stay as text or a number, or pick a field, an input, nothing or a chain.',
-    kind: 'slot',
+    id: 'pick-list',
+    name: 'Grouped list',
+    note: 'One list in groups, the shortest first: what was typed as a value, then inputs, then fields.',
+    kind: 'pick',
+  },
+  {
+    id: 'pick-panel',
+    name: 'Panel',
+    note: 'The groups stand side by side under the step, and fields can be cut down by dtype.',
+    kind: 'pick',
   },
   {
     id: 'type-block',
@@ -84,7 +90,7 @@ const FIELDS = new Map([
 
 /** The template each kind of card is stamped from. */
 const CARDS = {
-  slot: '#card-slot',
+  pick: '#card-pick',
   type: '#card-type',
   'list-settled': '#card-list',
   head: '#card-head',
@@ -117,6 +123,7 @@ function fill(card, selector, text) {
  * @property {string[]} list The columns a function takes as a list, if it takes one.
  * @property {string | null} typed A value the function takes that is typed, as `kind:text`.
  * @property {string | null} slot A value of any kind the function takes, as `kind:text`.
+ * @property {string | null} many The fields a function takes several of, parted by commas.
  */
 
 /**
@@ -137,6 +144,7 @@ function specOf(slot, version) {
     list: list === null ? [] : list.split(','),
     typed: slot.getAttribute('data-type'),
     slot: slot.getAttribute('data-slot'),
+    many: slot.getAttribute('data-many'),
   };
 }
 
@@ -163,10 +171,20 @@ function makeFunction(source, piece, button, spec, fn) {
         list: [],
         typed: null,
         slot: null,
+        many: null,
       });
       if (item !== null) list.append(item);
     }
     button.after(list);
+    return;
+  }
+  if (spec.many !== null) {
+    const slot = document.createElement('span');
+    slot.className = 'slot is-many';
+    slot.dataset.many = spec.many;
+    // Several fields are picked from the fields alone.
+    slot.dataset.takes = 'field';
+    button.after(slot);
     return;
   }
   if (spec.slot !== null) {
@@ -251,7 +269,7 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
       const piece = pieceFor(pieceTemplate, specOf(slot, version));
       if (piece !== null) slot.replaceWith(piece);
     }
-    const sectioned = version.kind === 'type' || version.kind === 'slot';
+    const sectioned = version.kind === 'type' || version.kind === 'pick';
     const section = sectioned ? `#versions-${version.kind}` : '#versions-settled';
     document.querySelector(section)?.append(card);
   }
@@ -276,53 +294,104 @@ document.addEventListener('click', (event) => {
 });
 
 /*
- * The slot that takes a value of any kind. It shows its value as a block of
- * the value's kind. A click turns it into a field with a list beneath: what
- * is typed narrows the list, and whatever is picked becomes the value.
- */
-
-/** The fields of the table and the inputs connected to the step, to pick from. */
-const FIELDS_ON_OFFER = ['dcn', 'timestamp', 'step_to', 'owner', 'row_days', 'resolved_at'];
-const INPUTS_ON_OFFER = ['sla_cutoff', 'as_of'];
-
-/** What the list says a kind is. */
-const KIND_WORDS = {
-  text: 'text',
-  number: 'number',
-  none: 'no value',
-  column: 'column',
-  input: 'input',
-  chain: 'a chain of its own',
-};
-
-/**
- * @typedef {object} Offer One thing a slot can become.
- * @property {keyof typeof KIND_WORDS} kind The kind of value it is.
- * @property {string} value What the value reads as.
+ * The slot that takes a value. It shows its value as a block of the value's
+ * kind, or several fields as several blocks. A click turns it into a field
+ * with what it can take offered beneath: what is typed narrows the offer, and
+ * whatever is picked becomes the value. A slot that takes several fields
+ * stays open while they are ticked.
  */
 
 /**
- * Lists what a slot can become for what has been typed: a number when it is
- * one, the fields and inputs it is part of, the text itself, nothing, and a
- * chain.
- * @param {string} typed
- * @returns {Offer[]}
+ * @typedef {object} Named Something on offer that has a name.
+ * @property {string} name What it is called.
+ * @property {string} dtype The dtype it holds.
  */
-function offersFor(typed) {
-  const sought = typed.trim().toLowerCase();
-  /** @type {Offer[]} */
-  const offers = [];
-  if (/^-?\d+$/.test(sought)) offers.push({ kind: 'number', value: sought });
-  for (const field of FIELDS_ON_OFFER) {
-    if (field.includes(sought)) offers.push({ kind: 'column', value: field });
-  }
-  for (const input of INPUTS_ON_OFFER) {
-    if (input.includes(sought)) offers.push({ kind: 'input', value: input });
-  }
-  if (typed !== '') offers.push({ kind: 'text', value: typed });
-  if (sought === '' || 'none'.startsWith(sought)) offers.push({ kind: 'none', value: 'None' });
-  offers.push({ kind: 'chain', value: 'chain' });
-  return offers;
+
+/** The dtypes the fields come in, for cutting a long offer down. */
+const DTYPES = ['String', 'Int64', 'Float64', 'Date', 'Datetime', 'Boolean'];
+
+/**
+ * Makes up the fields of a wide table: the six the steps use, then a few
+ * hundred more, so the offer can be judged at the size it has to work at.
+ * @returns {Named[]}
+ */
+function manyFields() {
+  const stems = [
+    'claim',
+    'member',
+    'provider',
+    'service',
+    'payment',
+    'adjustment',
+    'diagnosis',
+    'procedure',
+    'line',
+    'authorization',
+    'plan',
+    'group',
+    'facility',
+    'referral',
+    'appeal',
+  ];
+  /** @type {[string, string][]} */
+  const ends = [
+    ['id', 'String'],
+    ['code', 'String'],
+    ['status', 'String'],
+    ['type', 'String'],
+    ['name', 'String'],
+    ['date', 'Date'],
+    ['received_at', 'Datetime'],
+    ['amount', 'Float64'],
+    ['paid_amount', 'Float64'],
+    ['count', 'Int64'],
+    ['days', 'Int64'],
+    ['units', 'Int64'],
+    ['is_final', 'Boolean'],
+    ['is_void', 'Boolean'],
+    ['note', 'String'],
+    ['region', 'String'],
+    ['tier', 'Int64'],
+    ['closed_at', 'Datetime'],
+    ['due_date', 'Date'],
+    ['rate', 'Float64'],
+  ];
+  return [
+    { name: 'dcn', dtype: 'String' },
+    { name: 'timestamp', dtype: 'Datetime' },
+    { name: 'step_to', dtype: 'String' },
+    { name: 'owner', dtype: 'String' },
+    { name: 'row_days', dtype: 'Int64' },
+    { name: 'resolved_at', dtype: 'Datetime' },
+    ...stems.flatMap((stem) => ends.map(([end, dtype]) => ({ name: `${stem}_${end}`, dtype }))),
+  ];
+}
+
+const FIELDS_ON_OFFER = manyFields();
+
+/** @type {Named[]} */
+const INPUTS_ON_OFFER = [
+  { name: 'sla_cutoff', dtype: 'Int64' },
+  { name: 'as_of', dtype: 'Date' },
+];
+
+/**
+ * Reports whether `slot` takes `what`: a value, an input, a field or a chain.
+ * @param {HTMLElement} slot
+ * @param {string} what
+ */
+function takes(slot, what) {
+  return (slot.dataset.takes ?? 'value input field chain').split(' ').includes(what);
+}
+
+/**
+ * Returns the fields ticked in a slot that takes several.
+ * @param {HTMLElement} slot
+ * @returns {string[]}
+ */
+function ticked(slot) {
+  const many = slot.dataset.many ?? '';
+  return many === '' ? [] : many.split(',');
 }
 
 /**
@@ -340,19 +409,98 @@ function blockOf(kind, value) {
 }
 
 /**
- * Draws `slot` at rest: its value as a block.
+ * Draws `slot` at rest: its value as a block, or its fields as blocks.
  * @param {HTMLElement} slot
  */
 function showSlot(slot) {
   slot.classList.remove('is-open');
-  const block = blockOf(slot.dataset.kind ?? 'text', slot.dataset.value ?? '');
-  if (slot.classList.contains('is-picture')) block.tabIndex = -1;
-  slot.replaceChildren(block);
+  // A dtype the fields were cut down to lasts only while the slot is open.
+  delete slot.dataset.dtype;
+  if (!slot.classList.contains('is-many')) {
+    slot.replaceChildren(blockOf(slot.dataset.kind ?? 'text', slot.dataset.value ?? ''));
+    return;
+  }
+  const fields = ticked(slot);
+  slot.replaceChildren(
+    ...(fields.length > 0
+      ? fields.map((name) => blockOf('column', name))
+      : [blockOf('none', 'no fields')]),
+  );
 }
 
 /**
- * Draws the list under an open slot for what has been typed, with the offer
- * at `chosen` marked.
+ * Returns one row of the offer: a tick box, the value as a block, and a word
+ * on what it is.
+ * @param {string} kind
+ * @param {string} value
+ * @param {string} word
+ * @param {boolean} isTicked
+ */
+function offerRow(kind, value, word, isTicked) {
+  const row = document.createElement('button');
+  row.type = 'button';
+  row.tabIndex = -1;
+  row.className = isTicked ? 'offer is-ticked' : 'offer';
+  row.dataset.kind = kind;
+  row.dataset.value = value;
+  const box = document.createElement('span');
+  box.className = 'tick';
+  const what = document.createElement('i');
+  what.textContent = word;
+  row.append(box, blockOf(kind, value), what);
+  return row;
+}
+
+/**
+ * Returns one group of the offer: its heading, how many rows it has when
+ * that is worth saying, and the rows.
+ * @param {string} id
+ * @param {string} title
+ * @param {number | null} count
+ * @param {HTMLElement[]} rows
+ * @param {HTMLElement | null} above Something to stand between the heading and the rows.
+ */
+function offerGroup(id, title, count, rows, above) {
+  const group = document.createElement('span');
+  group.className = `group group-${id}`;
+  const heading = document.createElement('span');
+  heading.className = 'group-head';
+  heading.textContent = title;
+  if (count !== null) {
+    const number = document.createElement('i');
+    number.textContent = String(count);
+    heading.append(number);
+  }
+  const body = document.createElement('span');
+  body.className = 'group-body';
+  body.append(...rows);
+  group.append(heading, ...(above === null ? [] : [above]), body);
+  return group;
+}
+
+/**
+ * Returns the row of dtypes that cuts the fields down, with the one in force marked.
+ * @param {string} inForce
+ */
+function dtypeChips(inForce) {
+  const chips = document.createElement('span');
+  chips.className = 'dtypes';
+  for (const dtype of ['', ...DTYPES]) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.tabIndex = -1;
+    chip.className = dtype === inForce ? 'chip is-on' : 'chip';
+    chip.dataset.dtype = dtype;
+    chip.textContent = dtype === '' ? 'All' : dtype;
+    chips.append(chip);
+  }
+  return chips;
+}
+
+/**
+ * Draws what an open slot offers for what has been typed, with the row at
+ * `chosen` marked. The groups go from the shortest to the longest: what was
+ * typed as a value, then the inputs, then the fields.
  * @param {HTMLElement} slot
  * @param {string} typed
  * @param {number} chosen
@@ -360,45 +508,81 @@ function showSlot(slot) {
 function listOffers(slot, typed, chosen) {
   const list = slot.querySelector('.offers');
   if (list === null) return;
-  const offers = offersFor(typed);
-  list.replaceChildren(
-    ...offers.map((offer, index) => {
-      const row = document.createElement('button');
-      row.type = 'button';
-      row.tabIndex = -1;
-      row.className = index === chosen ? 'offer is-chosen' : 'offer';
-      row.dataset.kind = offer.kind;
-      row.dataset.value = offer.value;
-      const word = document.createElement('i');
-      word.textContent = KIND_WORDS[offer.kind];
-      row.append(blockOf(offer.kind, offer.value), word);
-      return row;
-    }),
-  );
-  slot.dataset.chosen = String(Math.min(chosen, offers.length - 1));
+  const sought = typed.trim().toLowerCase();
+  const isTicked = new Set(ticked(slot));
+  /** @type {HTMLElement[]} */
+  const groups = [];
+  if (takes(slot, 'value')) {
+    const rows = [];
+    if (/^-?\d+$/.test(sought)) rows.push(offerRow('number', sought, 'Int64', false));
+    if (typed !== '') rows.push(offerRow('text', typed, 'String', false));
+    rows.push(offerRow('none', 'None', 'no value', false));
+    groups.push(offerGroup('value', 'Value', null, rows, null));
+  }
+  if (takes(slot, 'input')) {
+    const inputs = INPUTS_ON_OFFER.filter((input) => input.name.includes(sought));
+    const rows = inputs.map((input) => offerRow('input', input.name, input.dtype, false));
+    // A group with nothing in it is left out.
+    if (rows.length > 0) groups.push(offerGroup('input', 'Inputs', inputs.length, rows, null));
+  }
+  if (takes(slot, 'field')) {
+    const dtype = slot.dataset.dtype ?? '';
+    const fields = FIELDS_ON_OFFER.filter(
+      (field) => field.name.includes(sought) && (dtype === '' || field.dtype === dtype),
+    );
+    // The fields already ticked come first, so they are in view however long the list is.
+    fields.sort(
+      (left, right) => Number(isTicked.has(right.name)) - Number(isTicked.has(left.name)),
+    );
+    const rows = fields.map((field) =>
+      offerRow('column', field.name, field.dtype, isTicked.has(field.name)),
+    );
+    // The fields stay even when none match while a dtype is in force, so the dtype can be undone.
+    if (rows.length > 0 || dtype !== '') {
+      groups.push(offerGroup('field', 'Fields', fields.length, rows, dtypeChips(dtype)));
+    }
+  }
+  if (takes(slot, 'chain')) {
+    const chain = offerRow('chain', 'chain', 'a chain of its own', false);
+    chain.classList.add('offer-chain');
+    groups.push(chain);
+  }
+  list.replaceChildren(...groups);
+  const rows = list.querySelectorAll('.offer');
+  const marked = Math.max(0, Math.min(chosen, rows.length - 1));
+  rows[marked]?.classList.add('is-chosen');
+  slot.dataset.chosen = String(marked);
 }
 
 /**
- * Opens `slot`: a field holding its value, selected, and the list beneath.
+ * Opens `slot`: a field to type in, and what it can take offered beneath. In
+ * the panel the offer is as wide as the step it belongs to.
  * @param {HTMLElement} slot
  */
 function openSlot(slot) {
-  // The field starts as wide as the block it takes the place of, so nothing beside it jumps.
-  const shown = slot.getBoundingClientRect().width;
+  // The field starts as wide as what it takes the place of, so nothing beside it jumps.
+  const shown = slot.getBoundingClientRect();
   slot.classList.add('is-open');
   const field = document.createElement('label');
   field.className = 'type';
   const input = document.createElement('input');
   input.spellcheck = false;
-  input.setAttribute('aria-label', 'A value: type it, or pick from the list');
+  const many = slot.classList.contains('is-many');
+  input.setAttribute('aria-label', many ? 'Find a field' : 'A value: type it, or pick one');
   const kind = slot.dataset.kind;
-  input.value = kind === 'none' || kind === 'chain' ? '' : (slot.dataset.value ?? '');
+  const typed = many || kind === 'none' || kind === 'chain' ? '' : (slot.dataset.value ?? '');
+  input.value = typed;
   field.append(input);
   const list = document.createElement('span');
   list.className = 'offers';
   slot.replaceChildren(field, list);
-  field.style.minWidth = `${shown}px`;
+  field.style.minWidth = `${shown.width}px`;
   input.style.width = `${Math.max(input.value.length, 1)}ch`;
+  const row = slot.closest('.row')?.getBoundingClientRect();
+  if (row !== undefined && slot.closest('.v-pick-panel') !== null) {
+    list.style.left = `${row.left - shown.left}px`;
+    list.style.width = `${row.width}px`;
+  }
   // What is there was the value before, so nothing is narrowed until something is typed.
   listOffers(slot, '', 0);
   input.focus();
@@ -406,17 +590,30 @@ function openSlot(slot) {
 }
 
 /**
- * Makes the offer at `index` the value of `slot` and closes it.
+ * Takes the offer in `row`. A slot that takes one value becomes it and
+ * closes. A slot that takes several fields ticks or unticks it and stays open.
  * @param {HTMLElement} slot
- * @param {number} index
+ * @param {Element | undefined} row
  */
-function takeOffer(slot, index) {
-  const row = slot.querySelectorAll('.offer')[index];
-  if (row instanceof HTMLElement) {
+function takeOffer(slot, row) {
+  if (!(row instanceof HTMLElement)) return;
+  const value = row.dataset.value ?? '';
+  if (!slot.classList.contains('is-many')) {
     slot.dataset.kind = row.dataset.kind;
-    slot.dataset.value = row.dataset.value;
+    slot.dataset.value = value;
+    showSlot(slot);
+    return;
   }
-  showSlot(slot);
+  const fields = ticked(slot);
+  const next = fields.includes(value)
+    ? fields.filter((name) => name !== value)
+    : [...fields, value];
+  slot.dataset.many = next.join(',');
+  const typed = slot.querySelector('input')?.value ?? '';
+  const scrolled = slot.querySelector('.group-field .group-body')?.scrollTop ?? 0;
+  listOffers(slot, typed, Number(slot.dataset.chosen ?? 0));
+  const body = slot.querySelector('.group-field .group-body');
+  if (body !== null) body.scrollTop = scrolled;
 }
 
 for (const slot of document.querySelectorAll('.slot')) {
@@ -425,17 +622,23 @@ for (const slot of document.querySelectorAll('.slot')) {
 
 document.addEventListener('click', (event) => {
   if (!(event.target instanceof Element)) return;
-  const slot = event.target.closest('.slot:not(.is-picture)');
+  const slot = event.target.closest('.slot');
   if (!(slot instanceof HTMLElement)) return;
+  const chip = event.target.closest('.chip');
+  if (chip instanceof HTMLElement) {
+    slot.dataset.dtype = chip.dataset.dtype ?? '';
+    listOffers(slot, slot.querySelector('input')?.value ?? '', 0);
+    return;
+  }
   const row = event.target.closest('.offer');
   if (row !== null) {
-    takeOffer(slot, [...slot.querySelectorAll('.offer')].indexOf(row));
+    takeOffer(slot, row);
   } else if (!slot.classList.contains('is-open')) {
     openSlot(slot);
   }
 });
 
-// A press on the list must not take the field's focus, or the slot would close before the click.
+// A press on the offer must not take the field's focus, or the slot would close before the click.
 document.addEventListener('pointerdown', (event) => {
   if (event.target instanceof Element && event.target.closest('.offers') !== null) {
     event.preventDefault();
@@ -454,15 +657,18 @@ document.addEventListener('keydown', (event) => {
   if (!(event.target instanceof HTMLInputElement)) return;
   const slot = event.target.closest('.slot.is-open');
   if (!(slot instanceof HTMLElement)) return;
+  const rows = slot.querySelectorAll('.offer');
   const chosen = Number(slot.dataset.chosen ?? 0);
   if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
     event.preventDefault();
-    const count = slot.querySelectorAll('.offer').length;
-    const next = (chosen + (event.key === 'ArrowDown' ? 1 : count - 1)) % count;
-    listOffers(slot, event.target.value, next);
+    const next = (chosen + (event.key === 'ArrowDown' ? 1 : rows.length - 1)) % rows.length;
+    rows[chosen]?.classList.remove('is-chosen');
+    rows[next]?.classList.add('is-chosen');
+    rows[next]?.scrollIntoView({ block: 'nearest' });
+    slot.dataset.chosen = String(next);
   } else if (event.key === 'Enter') {
     event.preventDefault();
-    takeOffer(slot, chosen);
+    takeOffer(slot, rows[chosen]);
   } else if (event.key === 'Escape') {
     showSlot(slot);
   }
