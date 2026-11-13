@@ -9,8 +9,7 @@
  * @property {string} id What its block in pieces.css is called.
  * @property {string} name What its card is headed.
  * @property {string} note One line on what sets it apart.
- * @property {boolean} brackets Whether the piece is drawn with brackets.
- * @property {string | null} fn The function the piece is, or null for a column.
+ * @property {'button' | 'function' | 'seam'} kind The piece it is a version of.
  */
 
 /** @type {Version[]} */
@@ -19,77 +18,90 @@ const VERSIONS = [
     id: 'tint',
     name: 'Tint',
     note: 'The version chosen. A flat fill in the colour of what it names.',
-    brackets: false,
-    fn: null,
+    kind: 'button',
   },
   {
     id: 'bracket',
     name: 'Bracket',
     note: 'A fine square bracket outside each end, standing a little clear.',
-    brackets: true,
-    fn: null,
+    kind: 'button',
   },
   {
     id: 'bracket-close',
     name: 'Bracket, close',
     note: 'The same bracket, hugging the button.',
-    brackets: true,
-    fn: null,
+    kind: 'button',
   },
   {
     id: 'bracket-heavy',
     name: 'Bracket, heavy',
     note: 'A line twice as thick, standing clear.',
-    brackets: true,
-    fn: null,
+    kind: 'button',
   },
   {
     id: 'bracket-round',
     name: 'Bracket, heavy and round',
     note: 'Heavy and hugging. Its inner curve runs parallel to the button’s corner.',
-    brackets: true,
-    fn: null,
+    kind: 'button',
   },
   {
     id: 'bracket-flush',
     name: 'Bracket, flush',
     note: 'The same, touching the button. Its inner curve is the button’s own corner.',
-    brackets: true,
-    fn: null,
+    kind: 'button',
   },
   {
-    id: 'fn-split',
+    id: 'fn',
     name: 'Segments',
-    note: 'Two blocks a hair apart: the function, then its field in its own colour.',
-    brackets: true,
-    fn: 'over',
+    note: 'The version preferred. Two blocks a hair apart: the function, then its field.',
+    kind: 'function',
   },
   {
-    id: 'fn-divided',
-    name: 'Segments, one body',
-    note: 'One fill throughout. A hairline parts the function from its field.',
-    brackets: true,
-    fn: 'over',
+    id: 'seam-caret',
+    name: 'Caret',
+    note: 'Today’s seam. It points the way the value flows.',
+    kind: 'seam',
   },
   {
-    id: 'fn-inset',
-    name: 'Segments, field inset',
-    note: 'The field is a smaller button inside the function, as an argument sits in a call.',
-    brackets: true,
-    fn: 'over',
+    id: 'seam-dot',
+    name: 'Dot',
+    note: 'The dot that joins a chain in the code itself.',
+    kind: 'seam',
+  },
+  {
+    id: 'seam-line',
+    name: 'Line',
+    note: 'A short rule from one block to the next, like a wire.',
+    kind: 'seam',
+  },
+  {
+    id: 'seam-gap',
+    name: 'Gap',
+    note: 'Nothing drawn. The space and the brackets do the parting.',
+    kind: 'seam',
+  },
+  {
+    id: 'seam-joined',
+    name: 'Joined',
+    note: 'No space either. The blocks stand shoulder to shoulder.',
+    kind: 'seam',
   },
 ];
 
 /**
- * The field each function shown works on, and whether it is a column or a plain value.
+ * The field each function shown works on, and whether it is a column or a
+ * plain value. A function that is not listed takes no field.
  * @type {Map<string, { text: string, kind: 'column' | 'value' }>}
  */
 const FIELDS = new Map([
   ['over', { text: 'dcn', kind: 'column' }],
   ['shift', { text: '1', kind: 'value' }],
+  ['sub', { text: 'resolved_at', kind: 'column' }],
 ]);
 
-const cardTemplate = document.querySelector('#card');
+/** The function the Function section shows. */
+const SHOWN_FUNCTION = 'over';
+
 const pieceTemplate = document.querySelector('#piece');
 
 /**
@@ -139,11 +151,13 @@ function pieceFor(source, slot, version) {
 
   // A slot in a row says what it is. The others are the piece the version is about.
   const inRow = slot.closest('.row') !== null;
-  const fn = inRow ? slot.getAttribute('data-fn') : version.fn;
+  const shown = version.kind === 'function' ? SHOWN_FUNCTION : null;
+  const fn = inRow ? slot.getAttribute('data-fn') : shown;
   const name = slot.getAttribute('data-name');
   if (name !== null) button.textContent = name;
   if (fn !== null) makeFunction(piece, button, fn);
-  if (version.brackets && (version.fn === null || fn !== null)) {
+  // A function always has brackets. A column has them only in the versions that try them on it.
+  if (fn !== null || (version.kind === 'button' && version.id !== 'tint')) {
     piece.classList.add('is-bracketed');
   }
 
@@ -167,23 +181,24 @@ function pieceFor(source, slot, version) {
   return piece;
 }
 
-if (cardTemplate instanceof HTMLTemplateElement && pieceTemplate instanceof HTMLTemplateElement) {
+if (pieceTemplate instanceof HTMLTemplateElement) {
   for (const [index, version] of VERSIONS.entries()) {
-    const card = cardTemplate.content.firstElementChild?.cloneNode(true);
+    const template = document.querySelector(version.kind === 'seam' ? '#card-seam' : '#card');
+    if (!(template instanceof HTMLTemplateElement)) continue;
+    const card = template.content.firstElementChild?.cloneNode(true);
     if (!(card instanceof HTMLElement)) continue;
     card.classList.add(`v-${version.id}`);
     // A function is drawn with the heavy round bracket.
-    if (version.fn !== null) card.classList.add('v-bracket-round');
+    if (version.kind !== 'button') card.classList.add('v-bracket-round');
     fill(card, '.letter', String.fromCodePoint(65 + index));
     fill(card, '.name', version.name);
     fill(card, '.note', version.note);
-    card.querySelector(version.fn === null ? '.row-function' : '.row-button')?.remove();
+    card.querySelector(version.kind === 'button' ? '.row-function' : '.row-button')?.remove();
     for (const slot of card.querySelectorAll('[data-piece]')) {
       const piece = pieceFor(pieceTemplate, slot, version);
       if (piece !== null) slot.replaceWith(piece);
     }
-    const section = version.fn === null ? '#versions-button' : '#versions-function';
-    document.querySelector(section)?.append(card);
+    document.querySelector(`#versions-${version.kind}`)?.append(card);
   }
 }
 

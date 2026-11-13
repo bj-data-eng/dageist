@@ -20,12 +20,15 @@
       <div id="versions-button" class="versions"></div>
 
       <h2 class="section">
-        Function <span>the bracketed button in segments: the function, then its field</span>
+        Function <span>bracketed, in segments: the function, then its field</span>
       </h2>
       <div id="versions-function" class="versions"></div>
+
+      <h2 class="section">Seam <span>what joins one block of a chain to the next</span></h2>
+      <div id="versions-seam" class="versions"></div>
     </main>
 
-    <!-- One card per version. pieces.js stamps it once for every entry in its list. -->
+    <!-- A card for a version of a piece: the piece enlarged, in its states, and inside a step. -->
     <template id="card">
       <section class="card">
         <h3><span class="letter"></span><span class="name"></span></h3>
@@ -65,11 +68,13 @@
           <span class="verb">Add column</span>
           <span class="alias">resolved_at</span>
           <span class="quiet">=</span>
-          <span data-piece="live" data-name="timestamp"></span>
-          <span class="quiet">›</span>
-          <span data-piece="live" data-fn="shift"></span>
-          <span class="quiet">›</span>
-          <span data-piece="live" data-fn="over"></span>
+          <span class="chain">
+            <span data-piece="live" data-name="timestamp"></span>
+            <span class="seam"></span>
+            <span data-piece="live" data-fn="shift"></span>
+            <span class="seam"></span>
+            <span data-piece="live" data-fn="over"></span>
+          </span>
           <span class="returns">returns <b>Datetime</b></span>
         </div>
 
@@ -77,13 +82,51 @@
           <span class="verb">Add column</span>
           <span class="alias">step_index</span>
           <span class="quiet">=</span>
-          <span data-piece="live"></span>
-          <span class="quiet">›</span>
-          <span class="method">cum_count</span>
-          <span class="quiet">›</span>
-          <span class="method">over</span>
-          <span data-piece="live"></span>
+          <span class="chain">
+            <span data-piece="live"></span>
+            <span class="seam"></span>
+            <span class="method">cum_count</span>
+            <span class="seam"></span>
+            <span class="method">over</span>
+            <span data-piece="live"></span>
+          </span>
           <span class="returns">returns <b>UInt32</b></span>
+        </div>
+      </section>
+    </template>
+
+    <!-- A card for a version of the seam: two steps, so it is seen between every kind of block. -->
+    <template id="card-seam">
+      <section class="card">
+        <h3><span class="letter"></span><span class="name"></span></h3>
+        <p class="note"></p>
+
+        <div class="row">
+          <span class="verb">Add column</span>
+          <span class="alias">resolved_at</span>
+          <span class="quiet">=</span>
+          <span class="chain">
+            <span data-piece="live" data-name="timestamp"></span>
+            <span class="seam"></span>
+            <span data-piece="live" data-fn="shift"></span>
+            <span class="seam"></span>
+            <span data-piece="live" data-fn="over"></span>
+          </span>
+          <span class="returns">returns <b>Datetime</b></span>
+        </div>
+
+        <div class="row">
+          <span class="verb">Add column</span>
+          <span class="alias">days_open</span>
+          <span class="quiet">=</span>
+          <span class="chain">
+            <span data-piece="live" data-name="received_at"></span>
+            <span class="seam"></span>
+            <span data-piece="live" data-fn="sub"></span>
+            <span class="seam"></span>
+            <span data-piece="live" data-fn="dt.total_days"></span>
+          </span>
+          <span class="returns">returns <b>Int64</b></span>
         </div>
       </section>
     </template>
