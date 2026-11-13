@@ -17,6 +17,12 @@
 
     <main>
       <h2 class="section">
+        A value of any kind
+        <span>typed, or picked from the fields and inputs, in one place</span>
+      </h2>
+      <div id="versions-slot" class="versions"></div>
+
+      <h2 class="section">
         Typing in a block <span>a name or a value that is typed, not picked</span>
       </h2>
       <div id="versions-type" class="versions"></div>
@@ -402,6 +408,129 @@
             <span data-piece="live" data-fn="shift" data-type="number:1"></span>
           </span>
           <span class="returns">returns <b>String</b></span>
+        </div>
+      </section>
+    </template>
+
+    <!--
+      A card for the slot that takes a value of any kind: the six kinds it can
+      hold, then three steps where fill_null is given a text, a column and a
+      connected input. Click a value to change it: type, and pick from what
+      is offered.
+    -->
+    <template id="card-slot">
+      <section class="card">
+        <h3><span class="letter"></span><span class="name"></span></h3>
+        <p class="note"></p>
+
+        <div class="states">
+          <figure>
+            <span class="slot is-picture" data-kind="text" data-value="unknown"></span>
+            <figcaption>text</figcaption>
+          </figure>
+          <figure>
+            <span class="slot is-picture" data-kind="number" data-value="0"></span>
+            <figcaption>number</figcaption>
+          </figure>
+          <figure>
+            <span class="slot is-picture" data-kind="none" data-value="None"></span>
+            <figcaption>nothing</figcaption>
+          </figure>
+          <figure>
+            <span class="slot is-picture" data-kind="column" data-value="owner"></span>
+            <figcaption>column</figcaption>
+          </figure>
+          <figure>
+            <span class="slot is-picture" data-kind="input" data-value="sla_cutoff"></span>
+            <figcaption>input</figcaption>
+          </figure>
+          <figure>
+            <span class="slot is-picture" data-kind="chain" data-value="chain"></span>
+            <figcaption>chain</figcaption>
+          </figure>
+        </div>
+
+        <div class="row step" data-verb="add">
+          <span class="num">1</span>
+          <span class="piece head is-bracketed">
+            <span class="grip grip-start"></span>
+            <span class="grip grip-end"></span>
+            <button type="button" class="side side-remove" aria-label="Remove step">×</button>
+            <span class="body">
+              <button type="button" class="btn verb">Add column</button>
+              <label class="type is-name">
+                <input
+                  value="owner_filled"
+                  aria-label="Name of the new column"
+                  spellcheck="false"
+                />
+              </label>
+            </span>
+            <button type="button" class="side side-add" aria-label="Add a step after">+</button>
+          </span>
+          <span class="equals"></span>
+          <span class="chain">
+            <span data-piece="live" data-name="owner"></span>
+            <span class="seam"></span>
+            <span data-piece="live" data-fn="fill_null" data-slot="text:unknown"></span>
+          </span>
+          <span class="returns">returns <b>String</b></span>
+        </div>
+
+        <div class="row step" data-verb="add">
+          <span class="num">2</span>
+          <span class="piece head is-bracketed">
+            <span class="grip grip-start"></span>
+            <span class="grip grip-end"></span>
+            <button type="button" class="side side-remove" aria-label="Remove step">×</button>
+            <span class="body">
+              <button type="button" class="btn verb">Add column</button>
+              <label class="type is-name">
+                <input
+                  value="resolved_or_seen"
+                  aria-label="Name of the new column"
+                  spellcheck="false"
+                />
+              </label>
+            </span>
+            <button type="button" class="side side-add" aria-label="Add a step after">+</button>
+          </span>
+          <span class="equals"></span>
+          <span class="chain">
+            <span data-piece="live" data-name="resolved_at"></span>
+            <span class="seam"></span>
+            <span data-piece="live" data-fn="fill_null" data-slot="column:timestamp"></span>
+          </span>
+          <span class="returns">returns <b>Datetime</b></span>
+        </div>
+
+        <div class="row step" data-verb="add">
+          <span class="num">3</span>
+          <span class="piece head is-bracketed">
+            <span class="grip grip-start"></span>
+            <span class="grip grip-end"></span>
+            <button type="button" class="side side-remove" aria-label="Remove step">×</button>
+            <span class="body">
+              <button type="button" class="btn verb">Add column</button>
+              <label class="type is-name">
+                <input
+                  value="days_or_cutoff"
+                  aria-label="Name of the new column"
+                  spellcheck="false"
+                />
+              </label>
+            </span>
+            <button type="button" class="side side-add" aria-label="Add a step after">+</button>
+          </span>
+          <span class="equals"></span>
+          <span class="chain">
+            <span data-piece="live" data-name="row_days"></span>
+            <span class="seam"></span>
+            <span data-piece="live" data-fn="fill_null" data-slot="input:sla_cutoff"></span>
+            <span class="seam"></span>
+            <span data-piece="live" data-fn="shift" data-type="number:1"></span>
+          </span>
+          <span class="returns">returns <b>Int64</b></span>
         </div>
       </section>
     </template>

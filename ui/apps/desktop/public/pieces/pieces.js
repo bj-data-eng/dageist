@@ -9,12 +9,18 @@
  * @property {string} id What its block in pieces.css is called.
  * @property {string} name What its card is headed.
  * @property {string} note One line on what sets it apart.
- * @property {'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind What its
- *   card shows.
+ * @property {'slot' | 'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind
+ *   What its card shows.
  */
 
 /** @type {Version[]} */
 const VERSIONS = [
+  {
+    id: 'slot',
+    name: 'Type to pick',
+    note: 'Click a value and type. What is typed can stay as text or a number, or pick a field, an input, nothing or a chain.',
+    kind: 'slot',
+  },
   {
     id: 'type-block',
     name: 'Block',
@@ -78,6 +84,7 @@ const FIELDS = new Map([
 
 /** The template each kind of card is stamped from. */
 const CARDS = {
+  slot: '#card-slot',
   type: '#card-type',
   'list-settled': '#card-list',
   head: '#card-head',
@@ -109,6 +116,7 @@ function fill(card, selector, text) {
  * @property {string | null} fn The function it is, or null for a column.
  * @property {string[]} list The columns a function takes as a list, if it takes one.
  * @property {string | null} typed A value the function takes that is typed, as `kind:text`.
+ * @property {string | null} slot A value of any kind the function takes, as `kind:text`.
  */
 
 /**
@@ -128,6 +136,7 @@ function specOf(slot, version) {
     fn: inRow ? slot.getAttribute('data-fn') : shown,
     list: list === null ? [] : list.split(','),
     typed: slot.getAttribute('data-type'),
+    slot: slot.getAttribute('data-slot'),
   };
 }
 
@@ -147,10 +156,26 @@ function makeFunction(source, piece, button, spec, fn) {
     const list = document.createElement('span');
     list.className = 'list';
     for (const name of spec.list) {
-      const item = pieceFor(source, { state: spec.state, name, fn: null, list: [], typed: null });
+      const item = pieceFor(source, {
+        state: spec.state,
+        name,
+        fn: null,
+        list: [],
+        typed: null,
+        slot: null,
+      });
       if (item !== null) list.append(item);
     }
     button.after(list);
+    return;
+  }
+  if (spec.slot !== null) {
+    const [kind = 'text', value = ''] = spec.slot.split(':');
+    const slot = document.createElement('span');
+    slot.className = 'slot';
+    slot.dataset.kind = kind;
+    slot.dataset.value = value;
+    button.after(slot);
     return;
   }
   if (spec.typed !== null) {
@@ -226,7 +251,8 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
       const piece = pieceFor(pieceTemplate, specOf(slot, version));
       if (piece !== null) slot.replaceWith(piece);
     }
-    const section = version.kind === 'type' ? '#versions-type' : '#versions-settled';
+    const sectioned = version.kind === 'type' || version.kind === 'slot';
+    const section = sectioned ? `#versions-${version.kind}` : '#versions-settled';
     document.querySelector(section)?.append(card);
   }
 }
@@ -247,6 +273,196 @@ document.addEventListener('click', (event) => {
   if (button === null) return;
   const open = button.getAttribute('aria-expanded') === 'true';
   button.setAttribute('aria-expanded', String(!open));
+});
+
+/*
+ * The slot that takes a value of any kind. It shows its value as a block of
+ * the value's kind. A click turns it into a field with a list beneath: what
+ * is typed narrows the list, and whatever is picked becomes the value.
+ */
+
+/** The fields of the table and the inputs connected to the step, to pick from. */
+const FIELDS_ON_OFFER = ['dcn', 'timestamp', 'step_to', 'owner', 'row_days', 'resolved_at'];
+const INPUTS_ON_OFFER = ['sla_cutoff', 'as_of'];
+
+/** What the list says a kind is. */
+const KIND_WORDS = {
+  text: 'text',
+  number: 'number',
+  none: 'no value',
+  column: 'column',
+  input: 'input',
+  chain: 'a chain of its own',
+};
+
+/**
+ * @typedef {object} Offer One thing a slot can become.
+ * @property {keyof typeof KIND_WORDS} kind The kind of value it is.
+ * @property {string} value What the value reads as.
+ */
+
+/**
+ * Lists what a slot can become for what has been typed: a number when it is
+ * one, the fields and inputs it is part of, the text itself, nothing, and a
+ * chain.
+ * @param {string} typed
+ * @returns {Offer[]}
+ */
+function offersFor(typed) {
+  const sought = typed.trim().toLowerCase();
+  /** @type {Offer[]} */
+  const offers = [];
+  if (/^-?\d+$/.test(sought)) offers.push({ kind: 'number', value: sought });
+  for (const field of FIELDS_ON_OFFER) {
+    if (field.includes(sought)) offers.push({ kind: 'column', value: field });
+  }
+  for (const input of INPUTS_ON_OFFER) {
+    if (input.includes(sought)) offers.push({ kind: 'input', value: input });
+  }
+  if (typed !== '') offers.push({ kind: 'text', value: typed });
+  if (sought === '' || 'none'.startsWith(sought)) offers.push({ kind: 'none', value: 'None' });
+  offers.push({ kind: 'chain', value: 'chain' });
+  return offers;
+}
+
+/**
+ * Returns the block that shows `value` as a value of `kind`.
+ * @param {string} kind
+ * @param {string} value
+ * @returns {HTMLButtonElement}
+ */
+function blockOf(kind, value) {
+  const block = document.createElement('button');
+  block.type = 'button';
+  block.className = `btn shown is-${kind}`;
+  block.textContent = kind === 'chain' ? '…' : value;
+  return block;
+}
+
+/**
+ * Draws `slot` at rest: its value as a block.
+ * @param {HTMLElement} slot
+ */
+function showSlot(slot) {
+  slot.classList.remove('is-open');
+  const block = blockOf(slot.dataset.kind ?? 'text', slot.dataset.value ?? '');
+  if (slot.classList.contains('is-picture')) block.tabIndex = -1;
+  slot.replaceChildren(block);
+}
+
+/**
+ * Draws the list under an open slot for what has been typed, with the offer
+ * at `chosen` marked.
+ * @param {HTMLElement} slot
+ * @param {string} typed
+ * @param {number} chosen
+ */
+function listOffers(slot, typed, chosen) {
+  const list = slot.querySelector('.offers');
+  if (list === null) return;
+  const offers = offersFor(typed);
+  list.replaceChildren(
+    ...offers.map((offer, index) => {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.tabIndex = -1;
+      row.className = index === chosen ? 'offer is-chosen' : 'offer';
+      row.dataset.kind = offer.kind;
+      row.dataset.value = offer.value;
+      const word = document.createElement('i');
+      word.textContent = KIND_WORDS[offer.kind];
+      row.append(blockOf(offer.kind, offer.value), word);
+      return row;
+    }),
+  );
+  slot.dataset.chosen = String(Math.min(chosen, offers.length - 1));
+}
+
+/**
+ * Opens `slot`: a field holding its value, selected, and the list beneath.
+ * @param {HTMLElement} slot
+ */
+function openSlot(slot) {
+  slot.classList.add('is-open');
+  const field = document.createElement('label');
+  field.className = 'type';
+  const input = document.createElement('input');
+  input.spellcheck = false;
+  input.setAttribute('aria-label', 'A value: type it, or pick from the list');
+  const kind = slot.dataset.kind;
+  input.value = kind === 'none' || kind === 'chain' ? '' : (slot.dataset.value ?? '');
+  field.append(input);
+  const list = document.createElement('span');
+  list.className = 'offers';
+  slot.replaceChildren(field, list);
+  input.style.width = `${Math.max(input.value.length, 6)}ch`;
+  // What is there was the value before, so nothing is narrowed until something is typed.
+  listOffers(slot, '', 0);
+  input.focus();
+  input.select();
+}
+
+/**
+ * Makes the offer at `index` the value of `slot` and closes it.
+ * @param {HTMLElement} slot
+ * @param {number} index
+ */
+function takeOffer(slot, index) {
+  const row = slot.querySelectorAll('.offer')[index];
+  if (row instanceof HTMLElement) {
+    slot.dataset.kind = row.dataset.kind;
+    slot.dataset.value = row.dataset.value;
+  }
+  showSlot(slot);
+}
+
+for (const slot of document.querySelectorAll('.slot')) {
+  if (slot instanceof HTMLElement) showSlot(slot);
+}
+
+document.addEventListener('click', (event) => {
+  if (!(event.target instanceof Element)) return;
+  const slot = event.target.closest('.slot:not(.is-picture)');
+  if (!(slot instanceof HTMLElement)) return;
+  const row = event.target.closest('.offer');
+  if (row !== null) {
+    takeOffer(slot, [...slot.querySelectorAll('.offer')].indexOf(row));
+  } else if (!slot.classList.contains('is-open')) {
+    openSlot(slot);
+  }
+});
+
+// A press on the list must not take the field's focus, or the slot would close before the click.
+document.addEventListener('pointerdown', (event) => {
+  if (event.target instanceof Element && event.target.closest('.offers') !== null) {
+    event.preventDefault();
+  }
+});
+
+// Leaving the field closes the slot. Only the field counts: the block a click replaces loses the
+// focus too, while the slot is opening.
+document.addEventListener('focusout', (event) => {
+  if (!(event.target instanceof HTMLInputElement)) return;
+  const slot = event.target.closest('.slot.is-open');
+  if (slot instanceof HTMLElement) showSlot(slot);
+});
+
+document.addEventListener('keydown', (event) => {
+  if (!(event.target instanceof HTMLInputElement)) return;
+  const slot = event.target.closest('.slot.is-open');
+  if (!(slot instanceof HTMLElement)) return;
+  const chosen = Number(slot.dataset.chosen ?? 0);
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    const count = slot.querySelectorAll('.offer').length;
+    const next = (chosen + (event.key === 'ArrowDown' ? 1 : count - 1)) % count;
+    listOffers(slot, event.target.value, next);
+  } else if (event.key === 'Enter') {
+    event.preventDefault();
+    takeOffer(slot, chosen);
+  } else if (event.key === 'Escape') {
+    showSlot(slot);
+  }
 });
 
 /**
@@ -270,11 +486,19 @@ for (const input of document.querySelectorAll('.type input')) {
 }
 
 document.addEventListener('input', (event) => {
-  if (event.target instanceof HTMLInputElement) tend(event.target);
+  if (!(event.target instanceof HTMLInputElement)) return;
+  const slot = event.target.closest('.slot.is-open');
+  if (slot instanceof HTMLElement) {
+    event.target.style.width = `${Math.max(event.target.value.length, 6)}ch`;
+    listOffers(slot, event.target.value, 0);
+  } else {
+    tend(event.target);
+  }
 });
 
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') closeOthers(null);
-  // Enter ends the typing, as leaving the block does.
-  if (event.key === 'Enter' && event.target instanceof HTMLInputElement) event.target.blur();
+  // Enter ends the typing, as leaving the block does. An open slot has its own answer to Enter.
+  const typing = event.target instanceof HTMLInputElement ? event.target : null;
+  if (event.key === 'Enter' && typing !== null && typing.closest('.slot') === null) typing.blur();
 });

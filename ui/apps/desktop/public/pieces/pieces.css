@@ -30,6 +30,7 @@
   --column: #9cc8ff;
   --function: #d7dbe2;
   --value: #f3c98b;
+  --input: #8fe3d0;
   /*
    * The surface the pieces lie on. A piece's fill is its colour mixed into
    * this, not into nothing, so a piece that slides over something hides it.
@@ -797,6 +798,108 @@ body {
   background-color: color-mix(in srgb, var(--tone) 10%, var(--ground));
   box-shadow: none;
   padding-bottom: 0;
+}
+
+/*
+ * The slot that takes a value of any kind. At rest it shows its value as a
+ * block in the colour of its kind: text between drawn quotation marks, a
+ * number or nothing as a plain value, a column, a connected input, or a
+ * chain of its own. A click opens a field with a list beneath it.
+ */
+.slot {
+  display: inline-flex;
+  position: relative;
+  flex: none;
+}
+
+.body > .slot > :is(.btn, .type) {
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.shown:is(.is-text, .is-number, .is-none) {
+  --tone: var(--value);
+}
+
+.shown.is-column {
+  --tone: var(--column);
+}
+
+.shown.is-input {
+  --tone: var(--input);
+}
+
+.shown.is-chain {
+  --tone: var(--function);
+
+  letter-spacing: 1px;
+}
+
+.shown.is-none {
+  font-style: italic;
+}
+
+.shown.is-text::before,
+.shown.is-text::after {
+  content: '"';
+  color: color-mix(in srgb, var(--tone) 50%, var(--ground));
+}
+
+.slot.is-picture {
+  pointer-events: none;
+}
+
+.slot.is-open {
+  z-index: 3;
+}
+
+/* The list of an open slot lies over the steps below it. */
+.piece:has(.slot.is-open) {
+  z-index: 5;
+}
+
+/* The list of what the slot can become, in the colour of each kind, with the kind named. */
+.offers {
+  display: grid;
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  gap: 1px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background-color: var(--panel);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 55%);
+  padding: 4px;
+  min-width: 210px;
+}
+
+.offer {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  padding: 2px 6px 2px 2px;
+  cursor: pointer;
+}
+
+.offer:is(:hover, .is-chosen) {
+  background-color: color-mix(in srgb, var(--ink) 12%, var(--panel));
+}
+
+.offer .shown {
+  --ground: var(--panel);
+
+  pointer-events: none;
+}
+
+.offer i {
+  color: var(--muted);
+  font: 11px/1 var(--sans);
+  white-space: nowrap;
 }
 
 @media (prefers-reduced-motion: reduce) {
