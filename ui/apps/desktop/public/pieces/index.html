@@ -16,15 +16,6 @@
     </header>
 
     <main>
-      <h2 class="section">Folding <span>a list or a dictionary too long for the line</span></h2>
-      <div id="versions-fold" class="versions"></div>
-
-      <h2 class="section">
-        What a slot offers
-        <span>the list a value is picked from, for one value and for several</span>
-      </h2>
-      <div id="versions-pick" class="versions"></div>
-
       <h2 class="section">
         Typing in a block <span>a name or a value that is typed, not picked</span>
       </h2>
@@ -81,7 +72,7 @@
             <span class="seam"></span>
             <span data-piece="live" data-fn="over"></span>
           </span>
-          <span class="returns">returns <b>Datetime</b></span>
+          <span class="returns"><b>Datetime</b></span>
         </div>
 
         <div class="row row-button">
@@ -96,7 +87,7 @@
             <span class="method">over</span>
             <span data-piece="live"></span>
           </span>
-          <span class="returns">returns <b>UInt32</b></span>
+          <span class="returns"><b>UInt32</b></span>
         </div>
       </section>
     </template>
@@ -118,7 +109,7 @@
             <span class="seam"></span>
             <span data-piece="live" data-fn="over"></span>
           </span>
-          <span class="returns">returns <b>Datetime</b></span>
+          <span class="returns"><b>Datetime</b></span>
         </div>
 
         <div class="row">
@@ -132,7 +123,7 @@
             <span class="seam"></span>
             <span data-piece="live" data-fn="dt.total_days"></span>
           </span>
-          <span class="returns">returns <b>Int64</b></span>
+          <span class="returns"><b>Int64</b></span>
         </div>
       </section>
     </template>
@@ -178,7 +169,7 @@
             <span class="seam"></span>
             <span data-piece="live" data-fn="over"></span>
           </span>
-          <span class="returns">returns <b>UInt32</b></span>
+          <span class="returns"><b>UInt32</b></span>
         </div>
 
         <div class="row step" data-verb="add">
@@ -199,7 +190,7 @@
             <span class="seam"></span>
             <span data-piece="live" data-fn="over"></span>
           </span>
-          <span class="returns">returns <b>Datetime</b></span>
+          <span class="returns"><b>Datetime</b></span>
         </div>
       </section>
     </template>
@@ -278,7 +269,7 @@
               <button type="button" class="side side-add" aria-label="Add">+</button>
             </span>
           </span>
-          <span class="returns">returns <b>Int64</b></span>
+          <span class="returns"><b>Int64</b></span>
         </div>
       </section>
     </template>
@@ -353,7 +344,7 @@
             <span class="seam"></span>
             <span data-piece="live" data-fn="over"></span>
           </span>
-          <span class="returns">returns <b>UInt32</b></span>
+          <span class="returns"><b>UInt32</b></span>
         </div>
 
         <div class="row step" data-verb="add">
@@ -380,7 +371,7 @@
             <span class="seam"></span>
             <span data-piece="live" data-fn="shift" data-type="number:1"></span>
           </span>
-          <span class="returns">returns <b>String</b></span>
+          <span class="returns"><b>String</b></span>
         </div>
       </section>
     </template>
@@ -418,7 +409,7 @@
             <span class="seam"></span>
             <span data-piece="live" data-fn="fill_null" data-slot="text:unknown"></span>
           </span>
-          <span class="returns">returns <b>String</b></span>
+          <span class="returns"><b>String</b></span>
         </div>
 
         <div class="row step" data-verb="add">
@@ -445,16 +436,16 @@
             <span class="seam"></span>
             <span data-piece="live" data-fn="over" data-many="dcn,owner"></span>
           </span>
-          <span class="returns">returns <b>Int64</b></span>
+          <span class="returns"><b>Int64</b></span>
         </div>
       </section>
     </template>
 
     <!--
-      A card for a way of folding: a step that selects sixty fields, a step
-      that renames twelve, which is a dictionary of old names and new, a
-      function in a chain that takes fourteen fields, and a step that sorts by
-      two, which fit. Click any entry or count to open the list.
+      A card for folding: a step that selects sixty fields, a step that
+      renames twelve, which is a dictionary of old names and new, a function
+      in a chain that takes fourteen fields, and a step that sorts by two,
+      which fit. Click any entry or count to open the list.
     -->
     <template id="card-fold">
       <section class="card">
@@ -513,7 +504,7 @@
             <span class="seam"></span>
             <span data-piece="live" data-fn="over" data-many="first:14"></span>
           </span>
-          <span class="returns">returns <b>Int64</b></span>
+          <span class="returns"><b>Int64</b></span>
         </div>
         <div class="row step" data-verb="sort">
           <span class="num">4</span>

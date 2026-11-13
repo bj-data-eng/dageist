@@ -973,9 +973,7 @@ body {
  * much of it shows is worked out from the room left on the line, not from a
  * set number, and a count in the function's colour stands for the rest. Any
  * entry, or the count, opens the list, where the ticked fields come first.
- *
- * A · Fit, which is also how a slot folds anywhere else: as many entries as
- * there is room for, then a count of the rest.
+ * As many entries show as there is room for, then a count of the rest.
  */
 .slot .is-extra {
   display: none;
@@ -997,19 +995,6 @@ body {
 .body > .slot:last-child > .fold-count {
   border-radius: 0 var(--radius) var(--radius) 0;
 }
-
-/*
- * B · Fade: the entries run to the end of the room and fade out there, so
- * the last one may be cut short. The count is how many there are in all.
- */
-.v-fold-fade .slot.is-folded .held {
-  display: flex;
-  gap: 1px;
-  overflow: hidden;
-  mask-image: linear-gradient(90deg, #000 calc(100% - 34px), transparent);
-}
-
-/* C · Count only: no entry is listed, however few. It needs nothing more than the count. */
 
 /* In a dictionary a field is given something, here a new name: a plain block beside it. */
 .shown.is-name {

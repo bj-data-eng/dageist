@@ -16,30 +16,6 @@
 /** @type {Version[]} */
 const VERSIONS = [
   {
-    id: 'fold-fit',
-    name: 'Fit',
-    note: 'As many entries as the line has room for, then a count of the rest. Narrow the window and it shows fewer.',
-    kind: 'fold',
-  },
-  {
-    id: 'fold-fade',
-    name: 'Fade',
-    note: 'The entries run to the end of the room and fade out, and the count is how many there are in all.',
-    kind: 'fold',
-  },
-  {
-    id: 'fold-count',
-    name: 'Count only',
-    note: 'No entry is listed, however few. The function shows only how many it holds.',
-    kind: 'fold',
-  },
-  {
-    id: 'pick',
-    name: 'Grouped list',
-    note: 'Click a value. Search at the top, then a chain, what was typed as a value, the inputs and the fields.',
-    kind: 'pick',
-  },
-  {
     id: 'type-block',
     name: 'Block',
     note: 'A block like any other at rest. Typing empties its fill and rings it in its own colour.',
@@ -56,6 +32,18 @@ const VERSIONS = [
     name: 'Line',
     note: 'No fill, a dashed line beneath, as a blank to be written on.',
     kind: 'type',
+  },
+  {
+    id: 'fold',
+    name: 'Fold',
+    note: 'A list or dictionary shows as many entries as its line has room for, then a count of the rest. Any of them opens the list.',
+    kind: 'fold',
+  },
+  {
+    id: 'pick',
+    name: 'Grouped list',
+    note: 'Click a value. Search at the top, then a chain, what was typed as a value, the inputs and the fields.',
+    kind: 'pick',
   },
   {
     id: 'head',
@@ -261,8 +249,7 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
       const piece = pieceFor(pieceTemplate, specOf(slot, version));
       if (piece !== null) slot.replaceWith(piece);
     }
-    const sectioned = version.kind === 'type' || version.kind === 'pick' || version.kind === 'fold';
-    const section = sectioned ? `#versions-${version.kind}` : '#versions-settled';
+    const section = version.kind === 'type' ? '#versions-type' : '#versions-settled';
     document.querySelector(section)?.append(card);
   }
 }
@@ -465,22 +452,10 @@ function drawHeld(slot) {
 }
 
 /**
- * Returns how a slot folds what it has no room for, which the card it is in
- * decides: `fit` shows what fits and counts the rest, `fade` lets the entries
- * run out and fade, `count` lists none of them.
- * @param {HTMLElement} slot
- */
-function foldMode(slot) {
-  const card = slot.closest('.card');
-  if (card?.classList.contains('v-fold-fade') === true) return 'fade';
-  if (card?.classList.contains('v-fold-count') === true) return 'count';
-  return 'fit';
-}
-
-/**
  * Returns the room a slot's entries have: from where the slot starts to the
- * end of its step, less what the step says it returns and the bracket that
- * closes the function.
+ * end of its step, less what the step returns, the bracket that closes the
+ * function, and whatever follows the slot inside the function. A word that
+ * follows keeps its width, and another slot is allowed the room of a count.
  * @param {HTMLElement} slot
  */
 function roomFor(slot) {
@@ -488,7 +463,11 @@ function roomFor(slot) {
   if (row === null) return Number.POSITIVE_INFINITY;
   const returns = row.querySelector('.returns');
   const kept = returns === null ? 0 : returns.getBoundingClientRect().width + 14;
-  const end = row.getBoundingClientRect().right - kept - BRACKET_ROOM;
+  let after = 0;
+  for (let next = slot.nextElementSibling; next !== null; next = next.nextElementSibling) {
+    after += next.classList.contains('slot') ? COUNT_ROOM : next.getBoundingClientRect().width;
+  }
+  const end = row.getBoundingClientRect().right - kept - BRACKET_ROOM - after;
   return end - slot.getBoundingClientRect().left;
 }
 
@@ -511,7 +490,6 @@ function fold(slot) {
   const entries = [...held.children];
   for (const entry of entries) entry.classList.remove('is-extra');
   slot.classList.remove('is-folded');
-  held.style.maxWidth = '';
   // A hair stands between two entries.
   const widths = entries.map((entry) => entry.getBoundingClientRect().width + 1);
   const needed = widths.reduce((sum, width) => sum + width, 0);
@@ -520,19 +498,10 @@ function fold(slot) {
   for (const entry of entries) entry.classList.add('is-extra');
   slot.classList.add('is-folded');
   count.textContent = `+${String(entries.length)}`;
-  const mode = foldMode(slot);
-  if (mode === 'count') return;
   const room = roomFor(slot);
-  if (needed <= room || mode === 'fade') {
-    for (const entry of entries) entry.classList.remove('is-extra');
-  }
   if (needed <= room) {
+    for (const entry of entries) entry.classList.remove('is-extra');
     slot.classList.remove('is-folded');
-    return;
-  }
-  if (mode === 'fade') {
-    held.style.maxWidth = `${String(Math.max(room - COUNT_ROOM, 0))}px`;
-    count.textContent = String(entries.length);
     return;
   }
   let used = 0;
