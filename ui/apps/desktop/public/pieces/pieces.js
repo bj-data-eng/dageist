@@ -229,8 +229,8 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
     if (version.id === 'head-call' || version.kind === 'list') {
       for (const head of card.querySelectorAll('.piece.head')) head.classList.add('is-bracketed');
     }
-    // The head's own buttons answer a click as the pieces do.
-    for (const part of card.querySelectorAll('.head .btn')) part.classList.add('live');
+    // The buttons written out in a row answer a click as the stamped pieces do.
+    for (const part of card.querySelectorAll('.row .body > .btn')) part.classList.add('live');
     for (const slot of card.querySelectorAll('[data-piece]')) {
       const piece = pieceFor(pieceTemplate, specOf(slot, version));
       if (piece !== null) slot.replaceWith(piece);

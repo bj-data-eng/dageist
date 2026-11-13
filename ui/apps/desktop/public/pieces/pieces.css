@@ -479,6 +479,32 @@ body {
 }
 
 /*
+ * A word inside the brackets names the parameter that follows it, as `by`
+ * does after Sort table. It is not a button. It carries on the block before
+ * it in the same fill, in a lighter voice.
+ */
+.word {
+  flex: none;
+  margin-left: -1px;
+  background-color: color-mix(in srgb, var(--tone) 18%, transparent);
+  padding: 2px 7px 2px 0;
+  color: color-mix(in srgb, var(--tone) 62%, transparent);
+  font: 12.5px/20px var(--mono);
+  white-space: nowrap;
+}
+
+/* The button before a word gives up some of its padding, so the two read as one phrase. */
+.btn:has(+ .word) {
+  padding-right: 6px;
+}
+
+/* After a run of values the word starts a block of its own. */
+:is(.list, .dict) + .word {
+  margin-left: 0;
+  padding-left: 7px;
+}
+
+/*
  * Lists and dictionaries: several values inside one function's brackets. A
  * list is a run of pieces. A dictionary is a run of pairs, a piece and what
  * it is given. Every item is a piece of its own, so its side panels remove it
