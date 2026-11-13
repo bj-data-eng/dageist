@@ -446,6 +446,41 @@ body {
   row-gap: 4px;
 }
 
+/*
+ * A caret and the block after it are one link, so a chain breaks only before
+ * a caret: a line that carries on a chain starts with the caret.
+ */
+.link {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+
+/*
+ * In a step the chain is not a box of its own: its links wrap as the row's
+ * own parts, straight after whatever comes before the chain. A line that
+ * carries on starts under the step's head, clear of the step's number. Each
+ * link gives back the row's gap, so a caret stays midway between two blocks.
+ */
+.row:has(> .chain) {
+  --hang: 24px;
+
+  padding-left: var(--hang);
+}
+
+.row:has(> .chain) > :first-child:not(.chain),
+.row > .chain:first-child > :first-child {
+  margin-left: calc(var(--hang) * -1);
+}
+
+.row > .chain {
+  display: contents;
+}
+
+.row > .chain > .link {
+  margin-left: -6px;
+}
+
 .chain > .method + .piece {
   margin-left: 6px;
 }

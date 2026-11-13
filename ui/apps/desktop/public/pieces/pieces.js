@@ -256,6 +256,23 @@ function pieceFor(source, spec) {
 let nestsLowered = 0;
 
 /**
+ * Joins each caret of a chain to the block after it, so that a chain too
+ * long for its line breaks before a caret and never between a caret and the
+ * block it points at.
+ * @param {HTMLElement} card
+ */
+function linkChains(card) {
+  for (const seam of card.querySelectorAll('.chain > .seam')) {
+    const next = seam.nextElementSibling;
+    const link = document.createElement('span');
+    link.className = 'link';
+    seam.before(link);
+    link.append(seam);
+    if (next !== null) link.append(next);
+  }
+}
+
+/**
  * Moves every nested chain in `card` out of its function and into a list of
  * its own under the step it belongs to. Three dots stay in the function and
  * own that list: it holds nothing of any other function, and its lines are
@@ -310,6 +327,7 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
           ?.after(slotOf('join', 'and', 'join waits'));
       }
     }
+    linkChains(card);
     lowerNests(card);
     const section = version.kind === 'cond' ? '#versions-cond' : '#versions-settled';
     document.querySelector(section)?.append(card);
