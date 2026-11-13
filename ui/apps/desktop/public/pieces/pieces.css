@@ -20,6 +20,7 @@
   --verb-sort: #3fbf7f;
   --verb-select: #c79bf2;
   --verb-rename: #f08fb0;
+  --verb-filter: #e3cf6b;
   --dtype: #7fd6a4;
   /* The grey of the panels that slide out of the button's sides, and what they turn to. */
   --side-fill: #3a3f49;
@@ -32,6 +33,8 @@
   --column: #9cc8ff;
   --function: #d7dbe2;
   --value: #f3c98b;
+  /* The colour of a comparison written as a symbol. */
+  --operator: #ff9d5c;
   --input: #8fe3d0;
   /*
    * The surface the pieces lie on. A piece's fill is its colour mixed into
@@ -547,6 +550,10 @@ body {
   --verb: var(--verb-rename);
 }
 
+.step[data-verb='filter'] {
+  --verb: var(--verb-filter);
+}
+
 .num {
   flex: none;
   width: 12px;
@@ -1036,6 +1043,20 @@ body {
 /* A step that follows a line below keeps its rule above it. */
 .subrow + .row {
   margin-top: 10px;
+}
+
+/*
+ * Comparisons and conditions. A comparison is a function of a chain like any
+ * other. Where it is written as a symbol, the symbol is a block in a colour
+ * of its own, a little heavier than a name, so that it is not lost between
+ * the two values it stands between.
+ */
+.btn.op {
+  --tone: var(--operator);
+
+  padding-right: 6px;
+  padding-left: 6px;
+  font-weight: 700;
 }
 
 @media (prefers-reduced-motion: reduce) {

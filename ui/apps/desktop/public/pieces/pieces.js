@@ -9,12 +9,30 @@
  * @property {string} id What its block in pieces.css is called.
  * @property {string} name What its card is headed.
  * @property {string} note One line on what sets it apart.
- * @property {'nest' | 'fold' | 'pick' | 'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind
+ * @property {'cond' | 'nest' | 'fold' | 'pick' | 'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind
  *   What its card shows.
  */
 
 /** @type {Version[]} */
 const VERSIONS = [
+  {
+    id: 'cond-methods',
+    name: 'Methods',
+    note: 'A comparison is one more function of the chain, under its own name. What when and and_ take is a line below.',
+    kind: 'cond',
+  },
+  {
+    id: 'cond-symbols',
+    name: 'Symbols',
+    note: 'The same, with the comparison written as its symbol where it has one.',
+    kind: 'cond',
+  },
+  {
+    id: 'cond-inline',
+    name: 'Inline',
+    note: 'A condition is one unit inside the bracket of what takes it: a value, a comparison, a value. No line below.',
+    kind: 'cond',
+  },
   {
     id: 'nest',
     name: 'Nested chain',
@@ -84,6 +102,7 @@ const FIELDS = new Map([
 
 /** The template each kind of card is stamped from. */
 const CARDS = {
+  cond: '#card-cond',
   nest: '#card-nest',
   fold: '#card-fold',
   pick: '#card-pick',
@@ -119,6 +138,7 @@ function fill(card, selector, text) {
  * @property {string | null} typed A value the function takes that is typed, as `kind:text`.
  * @property {string | null} slot A value of any kind the function takes, as `kind:text`.
  * @property {string | null} many The fields a function takes several of, parted by commas.
+ * @property {string | null} symbol The symbol a comparison is written as, where it has one.
  */
 
 /**
@@ -138,6 +158,7 @@ function specOf(slot, version) {
     typed: slot.getAttribute('data-type'),
     slot: slot.getAttribute('data-slot'),
     many: slot.getAttribute('data-many'),
+    symbol: slot.getAttribute('data-symbol'),
   };
 }
 
@@ -153,6 +174,7 @@ function specOf(slot, version) {
 function makeFunction(piece, button, spec, fn) {
   piece.classList.add('fn', 'is-bracketed');
   button.textContent = fn;
+  if (spec.symbol !== null) button.dataset.symbol = spec.symbol;
   if (spec.many !== null) {
     const slot = document.createElement('span');
     slot.className = 'slot is-many';
@@ -264,7 +286,8 @@ function lowerNests(card) {
 
 if (pieceTemplate instanceof HTMLTemplateElement) {
   for (const [index, version] of VERSIONS.entries()) {
-    const template = document.querySelector(CARDS[version.kind]);
+    const inline = version.id === 'cond-inline';
+    const template = document.querySelector(inline ? '#card-cond-inline' : CARDS[version.kind]);
     if (!(template instanceof HTMLTemplateElement)) continue;
     const card = template.content.firstElementChild?.cloneNode(true);
     if (!(card instanceof HTMLElement)) continue;
@@ -279,8 +302,16 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
       const piece = pieceFor(pieceTemplate, specOf(slot, version));
       if (piece !== null) slot.replaceWith(piece);
     }
+    // The version that shows symbols writes a comparison as its symbol, in the colour of one.
+    if (version.id === 'cond-symbols') {
+      for (const named of card.querySelectorAll('.btn[data-symbol]')) {
+        named.textContent = named.getAttribute('data-symbol');
+        named.classList.add('op');
+      }
+    }
     lowerNests(card);
-    document.querySelector('#versions-settled')?.append(card);
+    const section = version.kind === 'cond' ? '#versions-cond' : '#versions-settled';
+    document.querySelector(section)?.append(card);
   }
 }
 
