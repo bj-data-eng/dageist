@@ -1202,6 +1202,18 @@ body {
   --tone: var(--function);
 }
 
+/*
+ * A line that waits has no number. In a list of cases it keeps the number's
+ * column, so that its word stands under the conditions.
+ */
+.line.waits > .mark {
+  visibility: hidden;
+}
+
+.lines:not(.is-cases) > .line.waits > .mark {
+  display: none;
+}
+
 /* Cases: a condition, then a value, in columns, so the values line up. */
 .lines.is-cases {
   display: grid;
