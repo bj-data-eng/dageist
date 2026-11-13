@@ -36,7 +36,7 @@ const VERSIONS = [
   {
     id: 'nest',
     name: 'Nested chain',
-    note: 'A chain that is a value is a numbered line of its own under the step. The function holds three dots. Click them to fold the line away.',
+    note: 'A chain that is a value is a numbered line of its own under the step. The function holds three dots. Click them to fold the step’s lines away.',
     kind: 'nest',
   },
   {
@@ -315,15 +315,39 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
   }
 }
 
-// A click on the three dots of a nested chain folds its line away, or brings it back.
+/**
+ * Returns the line under a step that holds the nested chain of `nest`.
+ * @param {HTMLElement} nest
+ */
+function lineOf(nest) {
+  return document.querySelector(`.subrow[data-nest="${nest.dataset.nest ?? ''}"]`);
+}
+
+// A click on the three dots of a nested chain folds away every line under its step, or brings
+// them all back. The lines of a step belong together, so they are not folded one by one.
 document.addEventListener('click', (event) => {
   if (!(event.target instanceof Element)) return;
-  const nest = event.target.closest('.nest-token')?.closest('.nest');
-  if (!(nest instanceof HTMLElement)) return;
-  const line = document.querySelector(`.subrow[data-nest="${nest.dataset.nest ?? ''}"]`);
-  line?.classList.toggle('is-shut');
-  nest.classList.toggle('is-shut', line?.classList.contains('is-shut') === true);
+  const row = event.target.closest('.nest-token')?.closest('.row');
+  if (row === null || row === undefined) return;
+  const nests = [...row.querySelectorAll('.nest')].filter((nest) => nest instanceof HTMLElement);
+  const shut = nests.some((nest) => lineOf(nest)?.classList.contains('is-shut') === false);
+  for (const nest of nests) {
+    nest.classList.toggle('is-shut', shut);
+    lineOf(nest)?.classList.toggle('is-shut', shut);
+  }
 });
+
+// Pointing at the three dots lights the number of the line they stand for.
+for (const [type, lit] of /** @type {const} */ ([
+  ['pointerover', true],
+  ['pointerout', false],
+])) {
+  document.addEventListener(type, (event) => {
+    if (!(event.target instanceof Element)) return;
+    const nest = event.target.closest('.nest-token')?.closest('.nest');
+    if (nest instanceof HTMLElement) lineOf(nest)?.classList.toggle('is-pointed', lit);
+  });
+}
 
 /**
  * Closes every open button except `keep`.
