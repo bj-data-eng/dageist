@@ -16,24 +16,6 @@
 /** @type {Version[]} */
 const VERSIONS = [
   {
-    id: 'type-block',
-    name: 'Block',
-    note: 'A block like any other at rest. Typing empties its fill and rings it in its own colour.',
-    kind: 'type',
-  },
-  {
-    id: 'type-well',
-    name: 'Well',
-    note: 'A recess, always: what is typed sits in the surface, what is picked sits on it.',
-    kind: 'type',
-  },
-  {
-    id: 'type-line',
-    name: 'Line',
-    note: 'No fill, a dashed line beneath, as a blank to be written on.',
-    kind: 'type',
-  },
-  {
     id: 'fold',
     name: 'Fold',
     note: 'A list or dictionary shows as many entries as its line has room for, then a count of the rest. Any of them opens the list.',
@@ -44,6 +26,12 @@ const VERSIONS = [
     name: 'Grouped list',
     note: 'Click a value. Search at the top, then a chain, what was typed as a value, the inputs and the fields.',
     kind: 'pick',
+  },
+  {
+    id: 'type',
+    name: 'Typed block',
+    note: 'A name or a value that is typed. A block like any other at rest. Typing empties its fill and rings it.',
+    kind: 'type',
   },
   {
     id: 'head',
@@ -249,8 +237,7 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
       const piece = pieceFor(pieceTemplate, specOf(slot, version));
       if (piece !== null) slot.replaceWith(piece);
     }
-    const section = version.kind === 'type' ? '#versions-type' : '#versions-settled';
-    document.querySelector(section)?.append(card);
+    document.querySelector('#versions-settled')?.append(card);
   }
 }
 

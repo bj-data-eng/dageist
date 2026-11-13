@@ -602,9 +602,8 @@ body {
  * The block that is typed in: a name, a text value or a number. It holds a
  * real field, kept as wide as what is in it. Text is shown between quotation
  * marks that are drawn, not typed. What cannot be taken turns the block red.
- *
- * A · Block, which is also how it is drawn anywhere else: a block like any
- * other at rest. Typing empties its fill and rings it in its own colour.
+ * At rest it is a block like any other. Typing empties its fill and rings it
+ * in its own colour.
  */
 .type {
   --tone: var(--value);
@@ -682,52 +681,6 @@ body {
   to {
     opacity: 0;
   }
-}
-
-/*
- * B · Well: a recess, always. What is typed sits in the surface and what is
- * picked sits on it, so the two can be told apart before either is touched.
- */
-.v-type-well .type {
-  background-color: color-mix(in srgb, #000 40%, var(--ground));
-  box-shadow:
-    inset 0 1px 2px rgb(0 0 0 / 60%),
-    inset 0 0 0 1px rgb(255 255 255 / 5%);
-}
-
-.v-type-well .type:is(:hover, .is-hover) {
-  background-color: color-mix(in srgb, #000 40%, var(--ground));
-  box-shadow:
-    inset 0 1px 2px rgb(0 0 0 / 60%),
-    inset 0 0 0 1px color-mix(in srgb, var(--tone) 40%, transparent);
-}
-
-.v-type-well .type:is(:focus-within, .is-typing) {
-  background-color: color-mix(in srgb, #000 55%, var(--ground));
-  box-shadow:
-    inset 0 1px 2px rgb(0 0 0 / 60%),
-    inset 0 0 0 1px var(--tone);
-}
-
-/* C · Line: no fill, a dashed line beneath, as a blank to be written on. */
-.v-type-line .type {
-  border-bottom: 1px dashed color-mix(in srgb, var(--tone) 55%, var(--ground));
-  border-radius: 0;
-  background-color: var(--ground);
-  padding: 2px 4px 1px;
-}
-
-.v-type-line .type:is(:hover, .is-hover) {
-  border-bottom-style: solid;
-  border-bottom-color: var(--tone);
-  background-color: color-mix(in srgb, var(--tone) 12%, var(--ground));
-}
-
-.v-type-line .type:is(:focus-within, .is-typing) {
-  border-bottom: 2px solid var(--accent);
-  background-color: color-mix(in srgb, var(--tone) 10%, var(--ground));
-  box-shadow: none;
-  padding-bottom: 0;
 }
 
 /*
