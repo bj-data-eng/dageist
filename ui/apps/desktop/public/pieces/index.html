@@ -16,10 +16,8 @@
     </header>
 
     <main>
-      <h2 class="section">
-        Wrapping <span>a function that holds more values than fit on a line</span>
-      </h2>
-      <div id="versions-wrap" class="versions"></div>
+      <h2 class="section">Folding <span>a list or a dictionary too long for the line</span></h2>
+      <div id="versions-fold" class="versions"></div>
 
       <h2 class="section">
         What a slot offers
@@ -487,11 +485,12 @@
     </template>
 
     <!--
-      A card for a way of wrapping: a step that selects sixty fields, and a
-      function in a chain that takes fourteen. Narrow the window to see them
-      wrap further.
+      A card for folding: a step that selects sixty fields, a step that
+      renames twelve, which is a dictionary of old names and new, and a
+      function in a chain that takes fourteen fields. Each shows its first
+      four entries and a count of the rest. Click any of them to open the list.
     -->
-    <template id="card-wrap">
+    <template id="card-fold">
       <section class="card">
         <h3><span class="letter"></span><span class="name"></span></h3>
         <p class="note"></p>
@@ -510,8 +509,26 @@
           </span>
         </div>
 
-        <div class="row step" data-verb="add">
+        <div class="row step" data-verb="rename">
           <span class="num">2</span>
+          <span class="piece head is-bracketed">
+            <span class="grip grip-start"></span>
+            <span class="grip grip-end"></span>
+            <button type="button" class="side side-remove" aria-label="Remove step">×</button>
+            <span class="body">
+              <button type="button" class="btn verb">Rename</button>
+              <span
+                class="slot is-many is-dict"
+                data-pairs="dcn:claim_no,timestamp:moved_at,step_to:step,owner:team,row_days:days,resolved_at:resolved,claim_id:id,claim_code:code,claim_status:status,claim_type:kind,claim_name:label,claim_date:filed_on"
+                data-takes="field"
+              ></span>
+            </span>
+            <button type="button" class="side side-add" aria-label="Add a step after">+</button>
+          </span>
+        </div>
+
+        <div class="row step" data-verb="add">
+          <span class="num">3</span>
           <span class="piece head is-bracketed">
             <span class="grip grip-start"></span>
             <span class="grip grip-end"></span>

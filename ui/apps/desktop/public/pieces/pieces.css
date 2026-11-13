@@ -19,6 +19,7 @@
   --verb-add: #f08a3c;
   --verb-sort: #3fbf7f;
   --verb-select: #c79bf2;
+  --verb-rename: #f08fb0;
   --dtype: #7fd6a4;
   /* The grey of the panels that slide out of the button's sides, and what they turn to. */
   --side-fill: #3a3f49;
@@ -622,6 +623,10 @@ body {
   --verb: var(--verb-select);
 }
 
+.step[data-verb='rename'] {
+  --verb: var(--verb-rename);
+}
+
 .num {
   flex: none;
   width: 12px;
@@ -826,12 +831,14 @@ body {
   gap: 1px;
 }
 
-.body > .slot .held > .shown:last-child {
-  border-radius: 0 var(--radius) var(--radius) 0;
+/* The blocks a slot holds are square where they meet, and round only at the function's end. */
+.body > .slot .held .shown {
+  border-radius: 0;
 }
 
-.body > .slot .held > .shown:not(:last-child) {
-  border-radius: 0;
+.body > .slot .held > .shown:last-child,
+.body > .slot .held > .pair:last-child > .shown:last-child {
+  border-radius: 0 var(--radius) var(--radius) 0;
 }
 
 .shown:is(.is-text, .is-number, .is-none) {
@@ -1042,134 +1049,42 @@ body {
 }
 
 /*
- * Wrapping: what a function does when it holds more values than fit on a
- * line. Left alone it runs past the edge of what encloses it.
- *
- * What every way of wrapping shares: a step is laid out from its top, the
- * chain takes what is left of the line and may narrow, and a piece may narrow
- * too. A piece that does not fit beside what comes before it moves to a line
- * of its own first, and wraps only once it has the whole width.
+ * Folding: a list or a dictionary too long for the line never wraps. Its
+ * first few entries are shown and the rest are a count in the function's
+ * colour. Any of them opens the list, where the ticked fields come first.
  */
-.fold-count {
+.slot .is-extra {
   display: none;
 }
 
-.wraps .row {
-  align-items: flex-start;
+/* In a dictionary a field is given something, here a new name: a plain block beside it. */
+.shown.is-name {
+  --tone: var(--ink);
 }
 
-/* A step whose head holds the values keeps its number beside it. */
-.wraps .row:has(> .head .is-many) {
-  flex-wrap: nowrap;
+.slot.is-dict .offers {
+  width: 380px;
 }
 
-.wraps .row .returns {
-  line-height: 24px;
-}
-
-.wraps .equals {
-  height: 24px;
-}
-
-.wraps .chain {
-  flex: 1 1 280px;
-  min-width: 0;
-}
-
-.wraps .piece,
-.wraps .body {
-  flex: 0 1 auto;
-  min-width: 0;
-}
-
-/*
- * A · Block: the name becomes a spine down the left, the values wrap beside
- * it, and the brackets grow to hold them all.
- */
-.v-wrap-block .body {
-  align-items: stretch;
-}
-
-.v-wrap-block .body > .btn {
-  display: flex;
-  align-items: flex-start;
-}
-
-.v-wrap-block .slot.is-many {
-  flex: 0 1 auto;
-  flex-wrap: wrap;
-  row-gap: 1px;
-  min-width: 0;
-}
-
-.v-wrap-block .slot.is-many .held > .shown {
-  border-radius: 0;
-}
-
-/*
- * B · Flow: the values run on like a line of code. Later lines are indented
- * under the first, the opening bracket is one line tall, and the closing
- * bracket follows the last value wherever it lands.
- */
-.v-wrap-flow .body:has(> .slot.is-many) {
-  flex-wrap: wrap;
-  row-gap: 1px;
-  padding-left: 18px;
-}
-
-.v-wrap-flow .body:has(> .slot.is-many) > .btn:first-child {
-  margin-left: -18px;
-}
-
-.v-wrap-flow .slot.is-many {
-  display: contents;
-}
-
-.v-wrap-flow .slot.is-many .held > .shown {
-  border-radius: 0;
-}
-
-.v-wrap-flow .piece:has(> .body > .slot.is-many)::before {
-  bottom: auto;
-  height: calc(24px + 2 * var(--rise));
-}
-
-.v-wrap-flow .piece:has(> .body > .slot.is-many)::after {
-  display: none;
-}
-
-/* The last value is the last block, or the one before the count that only Fold shows. */
-.v-wrap-flow .slot.is-many .held > .shown:last-child:not(.fold-count)::after,
-.v-wrap-flow .slot.is-many .held > .shown:has(+ .fold-count)::after {
-  content: '';
-  position: absolute;
-  top: calc(-1 * var(--rise));
-  right: calc(-1 * (var(--gap) + var(--weight)));
-  bottom: calc(-1 * var(--rise));
-  border: var(--weight) solid var(--bracket-ink);
-  border-left: 0;
-  border-radius: 0 var(--round) var(--round) 0;
-  width: calc(var(--gap) + var(--weight) + var(--wrap));
-  pointer-events: none;
-}
-
-/*
- * C · Fold: it never wraps. The first few values are shown and the rest are
- * a count in the function's colour. Any of them opens the list, where the
- * ticked fields come first.
- */
-.v-wrap-fold .slot.is-many .is-extra {
-  display: none;
-}
-
-/* Nothing here wraps, so nothing narrows either. */
-.v-wrap-fold .piece,
-.v-wrap-fold .body {
+/* The field in a ticked row where what the field is given is typed. */
+.given {
+  appearance: none;
   flex: none;
+  margin: 0;
+  outline: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background-color: color-mix(in srgb, var(--ink) 14%, var(--panel));
+  padding: 0 6px;
+  width: 124px;
+  color: var(--ink);
+  font: 12.5px/20px var(--mono);
+  caret-color: var(--accent);
 }
 
-.v-wrap-fold .fold-count {
-  display: block;
+.given:focus {
+  background-color: var(--ground);
+  box-shadow: inset 0 0 0 1px var(--ink);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -9,29 +9,17 @@
  * @property {string} id What its block in pieces.css is called.
  * @property {string} name What its card is headed.
  * @property {string} note One line on what sets it apart.
- * @property {'wrap' | 'pick' | 'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind
+ * @property {'fold' | 'pick' | 'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind
  *   What its card shows.
  */
 
 /** @type {Version[]} */
 const VERSIONS = [
   {
-    id: 'wrap-block',
-    name: 'Block',
-    note: 'The name becomes a spine down the left, the values wrap beside it, and the brackets grow to hold them all.',
-    kind: 'wrap',
-  },
-  {
-    id: 'wrap-flow',
-    name: 'Flow',
-    note: 'The values run on like a line of code: later lines are indented, and the bracket closes after the last value.',
-    kind: 'wrap',
-  },
-  {
-    id: 'wrap-fold',
+    id: 'fold',
     name: 'Fold',
-    note: 'It never wraps. The first few values are shown and the rest are a count, which opens the list.',
-    kind: 'wrap',
+    note: 'A long list or dictionary shows its first four entries and a count of the rest. Any of them opens the list.',
+    kind: 'fold',
   },
   {
     id: 'pick',
@@ -102,7 +90,7 @@ const FIELDS = new Map([
 
 /** The template each kind of card is stamped from. */
 const CARDS = {
-  wrap: '#card-wrap',
+  fold: '#card-fold',
   pick: '#card-pick',
   type: '#card-type',
   'list-settled': '#card-list',
@@ -282,10 +270,8 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
       const piece = pieceFor(pieceTemplate, specOf(slot, version));
       if (piece !== null) slot.replaceWith(piece);
     }
-    const sectioned = version.kind === 'type' || version.kind === 'pick' || version.kind === 'wrap';
+    const sectioned = version.kind === 'type' || version.kind === 'pick' || version.kind === 'fold';
     const section = sectioned ? `#versions-${version.kind}` : '#versions-settled';
-    // What the ways of wrapping share is written once, for every card that wraps.
-    if (version.kind === 'wrap') card.classList.add('wraps');
     document.querySelector(section)?.append(card);
   }
 }
@@ -396,8 +382,31 @@ function takes(slot, what) {
   return (slot.dataset.takes ?? 'chain value input field').split(' ').includes(what);
 }
 
-/** How many fields a slot shows before it folds the rest into a count. */
+/** How many entries a slot shows before it folds the rest into a count. */
 const SHOWN_BEFORE_FOLD = 4;
+
+/**
+ * Returns the pairs a dictionary slot holds: a field, and what it is given.
+ * @param {HTMLElement} slot
+ * @returns {[string, string][]}
+ */
+function pairsOf(slot) {
+  const pairs = slot.dataset.pairs ?? '';
+  if (pairs === '') return [];
+  return pairs.split(',').map((pair) => {
+    const [field = '', given = ''] = pair.split(':');
+    return [field, given];
+  });
+}
+
+/**
+ * Writes the pairs a dictionary slot holds.
+ * @param {HTMLElement} slot
+ * @param {[string, string][]} pairs
+ */
+function setPairs(slot, pairs) {
+  slot.dataset.pairs = pairs.map(([field, given]) => `${field}:${given}`).join(',');
+}
 
 /**
  * Returns the fields ticked in a slot that takes several. A page that wants
@@ -406,6 +415,7 @@ const SHOWN_BEFORE_FOLD = 4;
  * @returns {string[]}
  */
 function ticked(slot) {
+  if (slot.classList.contains('is-dict')) return pairsOf(slot).map(([field]) => field);
   const many = slot.dataset.many ?? '';
   if (many.startsWith('first:')) {
     const count = Number(many.slice('first:'.length));
@@ -443,20 +453,26 @@ function drawHeld(slot) {
   if (!slot.classList.contains('is-many')) {
     held.replaceChildren(blockOf(slot.dataset.kind ?? 'text', slot.dataset.value ?? ''));
   } else {
-    const fields = ticked(slot);
-    const blocks =
-      fields.length > 0
-        ? fields.map((name) => blockOf('column', name))
-        : [blockOf('none', 'no fields')];
-    // The fields past the first few, and a count of them, for the version that folds them away.
-    for (const block of blocks.slice(SHOWN_BEFORE_FOLD)) block.classList.add('is-extra');
-    if (blocks.length > SHOWN_BEFORE_FOLD) {
+    // An entry is a field, or in a dictionary a field and what it is given, as two blocks that touch.
+    /** @type {HTMLElement[]} */
+    const entries = slot.classList.contains('is-dict')
+      ? pairsOf(slot).map(([field, given]) => {
+          const pair = document.createElement('span');
+          pair.className = 'pair';
+          pair.append(blockOf('column', field), blockOf('name', given));
+          return pair;
+        })
+      : ticked(slot).map((name) => blockOf('column', name));
+    if (entries.length === 0) entries.push(blockOf('none', 'no fields'));
+    // The entries past the first few are folded away into a count of them.
+    for (const entry of entries.slice(SHOWN_BEFORE_FOLD)) entry.classList.add('is-extra');
+    if (entries.length > SHOWN_BEFORE_FOLD) {
       const count = blockOf('chain', '');
       count.classList.add('fold-count');
-      count.textContent = `+${String(blocks.length - SHOWN_BEFORE_FOLD)}`;
-      blocks.push(count);
+      count.textContent = `+${String(entries.length - SHOWN_BEFORE_FOLD)}`;
+      entries.push(count);
     }
-    held.replaceChildren(...blocks);
+    held.replaceChildren(...entries);
   }
   if (!held.isConnected) slot.prepend(held);
 }
@@ -473,13 +489,15 @@ function showSlot(slot) {
 
 /**
  * Returns one row of the offer: a tick box, the value as a block, and a word
- * on what it is.
+ * on what it is. In a dictionary a ticked row has, in place of the word, a
+ * field for what the value is given.
  * @param {string} kind
  * @param {string} value
  * @param {string} word
  * @param {boolean} isTicked
+ * @param {string | null} given What a ticked field is given in a dictionary, or null elsewhere.
  */
-function offerRow(kind, value, word, isTicked) {
+function offerRow(kind, value, word, isTicked, given = null) {
   const row = document.createElement('button');
   row.type = 'button';
   row.tabIndex = -1;
@@ -489,8 +507,16 @@ function offerRow(kind, value, word, isTicked) {
   const box = document.createElement('span');
   box.className = 'tick';
   const what = document.createElement('i');
-  what.textContent = word;
+  what.textContent = given === null ? word : '→';
   row.append(box, blockOf(kind, value), what);
+  if (given !== null) {
+    const field = document.createElement('input');
+    field.className = 'given';
+    field.value = given;
+    field.spellcheck = false;
+    field.setAttribute('aria-label', `New name for ${value}`);
+    row.append(field);
+  }
   return row;
 }
 
@@ -556,8 +582,15 @@ function listOffers(slot, typed, chosen) {
     fields.sort(
       (left, right) => Number(isTicked.has(right.name)) - Number(isTicked.has(left.name)),
     );
+    const given = new Map(slot.classList.contains('is-dict') ? pairsOf(slot) : []);
     const rows = fields.map((field) =>
-      offerRow('column', field.name, field.dtype, isTicked.has(field.name)),
+      offerRow(
+        'column',
+        field.name,
+        field.dtype,
+        isTicked.has(field.name),
+        given.get(field.name) ?? null,
+      ),
     );
     if (rows.length > 0) groups.push(offerGroup('Fields', fields.length, rows));
   }
@@ -588,6 +621,7 @@ function openSlot(slot) {
   search.className = 'search';
   const input = document.createElement('input');
   input.spellcheck = false;
+  input.className = 'sought';
   input.placeholder = many ? 'Search fields' : 'Type a value, or search';
   input.setAttribute('aria-label', input.placeholder);
   // A value that was typed can be changed where it is typed.
@@ -620,10 +654,21 @@ function takeOffer(slot, row) {
     return;
   }
   const fields = ticked(slot);
-  const next = fields.includes(value)
-    ? fields.filter((name) => name !== value)
-    : [...fields, value];
-  slot.dataset.many = next.join(',');
+  if (slot.classList.contains('is-dict')) {
+    // A field newly ticked in a dictionary is given its own name until another is typed.
+    const pairs = pairsOf(slot);
+    setPairs(
+      slot,
+      fields.includes(value)
+        ? pairs.filter(([field]) => field !== value)
+        : [...pairs, [value, value]],
+    );
+  } else {
+    const next = fields.includes(value)
+      ? fields.filter((name) => name !== value)
+      : [...fields, value];
+    slot.dataset.many = next.join(',');
+  }
   drawHeld(slot);
   const list = slot.querySelector('.offer-list');
   const scrolled = list?.scrollTop ?? 0;
@@ -639,6 +684,8 @@ document.addEventListener('click', (event) => {
   if (!(event.target instanceof Element)) return;
   const slot = event.target.closest('.slot');
   if (!(slot instanceof HTMLElement)) return;
+  // A click in the field where a new name is typed is not a tick.
+  if (event.target instanceof HTMLInputElement) return;
   const row = event.target.closest('.offer');
   if (row !== null) {
     takeOffer(slot, row);
@@ -657,17 +704,28 @@ document.addEventListener('pointerdown', (event) => {
   if (event.target.closest('.slot.is-open') !== null) event.preventDefault();
 });
 
-// Leaving the search box closes the slot.
+// Leaving the slot closes it. Moving between its search box and its other fields does not.
 document.addEventListener('focusout', (event) => {
   if (!(event.target instanceof HTMLInputElement)) return;
   const slot = event.target.closest('.slot.is-open');
-  if (slot instanceof HTMLElement) showSlot(slot);
+  if (!(slot instanceof HTMLElement)) return;
+  if (event.relatedTarget instanceof Node && slot.contains(event.relatedTarget)) return;
+  showSlot(slot);
 });
 
 document.addEventListener('keydown', (event) => {
   if (!(event.target instanceof HTMLInputElement)) return;
   const slot = event.target.closest('.slot.is-open');
   if (!(slot instanceof HTMLElement)) return;
+  if (event.target.classList.contains('given')) {
+    // Enter or Escape in a new name goes back to the search box.
+    if (event.key === 'Enter' || event.key === 'Escape') {
+      event.preventDefault();
+      const sought = slot.querySelector('.sought');
+      if (sought instanceof HTMLElement) sought.focus();
+    }
+    return;
+  }
   const rows = slot.querySelectorAll('.offer');
   const chosen = Number(slot.dataset.chosen ?? 0);
   if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
@@ -708,10 +766,19 @@ for (const input of document.querySelectorAll('.type input')) {
 document.addEventListener('input', (event) => {
   if (!(event.target instanceof HTMLInputElement)) return;
   const slot = event.target.closest('.slot.is-open');
-  if (slot instanceof HTMLElement) {
-    listOffers(slot, event.target.value, null);
-  } else {
+  if (!(slot instanceof HTMLElement)) {
     tend(event.target);
+  } else if (event.target.classList.contains('given')) {
+    // A new name is written into its pair as it is typed. The offer is left as it is.
+    const field = event.target.closest('.offer')?.getAttribute('data-value');
+    const typed = event.target.value;
+    setPairs(
+      slot,
+      pairsOf(slot).map(([old, given]) => [old, old === field ? typed : given]),
+    );
+    drawHeld(slot);
+  } else {
+    listOffers(slot, event.target.value, null);
   }
 });
 
