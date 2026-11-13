@@ -801,10 +801,10 @@ body {
 }
 
 /*
- * The slot that takes a value of any kind. At rest it shows its value as a
- * block in the colour of its kind: text between drawn quotation marks, a
- * number or nothing as a plain value, a column, a connected input, or a
- * chain of its own. A click opens a field with a list beneath it.
+ * The slot that takes a value. At rest it shows its value as a block in the
+ * colour of its kind: text between drawn quotation marks, a number or
+ * nothing as a plain value, a column, a connected input, or a chain of its
+ * own. Several fields are several blocks a hair apart.
  */
 .slot {
   display: inline-flex;
@@ -812,8 +812,21 @@ body {
   flex: none;
 }
 
-.body > .slot > :is(.btn, .type) {
+/* What the slot holds is laid out as if its blocks were the slot's own. */
+.held {
+  display: contents;
+}
+
+.slot.is-many {
+  gap: 1px;
+}
+
+.body > .slot .held > .shown:last-child {
   border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.body > .slot .held > .shown:not(:last-child) {
+  border-radius: 0;
 }
 
 .shown:is(.is-text, .is-number, .is-none) {
@@ -844,27 +857,29 @@ body {
   color: color-mix(in srgb, var(--tone) 50%, var(--ground));
 }
 
-.slot.is-picture {
-  pointer-events: none;
-}
-
+/* An open slot is ringed, and its offer lies over the steps below it. */
 .slot.is-open {
   z-index: 3;
 }
 
-/* The list of an open slot lies over the steps below it. */
+.slot.is-open .held > .shown {
+  box-shadow: inset 0 0 0 1px var(--tone);
+}
+
 .piece:has(.slot.is-open) {
   z-index: 5;
 }
 
 /*
- * What an open slot offers, in groups: what was typed as a value, then the
- * inputs, then the fields. The shortest group comes first. Each row is the
- * value as a block and a word on what it is, a dtype where it has one. A
- * slot that takes several fields ticks them and keeps the offer open.
+ * What an open slot offers: a search box, then groups from the shortest to
+ * the longest. A chain comes first, then what was typed as a value, then the
+ * inputs, then the fields. Each row is the value as a block and a word on
+ * what it is, a dtype where it has one. A slot that takes several fields
+ * ticks them and keeps the offer open.
  *
- * A · Grouped list, which is also how the offer is drawn anywhere else: one
- * list, the groups one under another, scrolled when it is long.
+ * Here the offer always opens under its slot. In the step editor it is to be
+ * placed with the Floating UI library, so that it turns upward or shifts
+ * sideways when it would leave the window or cover something it should not.
  */
 .offers {
   display: flex;
@@ -872,20 +887,65 @@ body {
   top: calc(100% + 5px);
   left: 0;
   flex-direction: column;
-  gap: 4px;
   border: 1px solid var(--line-strong);
   border-radius: 4px;
   background-color: var(--panel);
   box-shadow: 0 8px 22px rgb(0 0 0 / 55%);
-  padding: 5px;
   width: 290px;
-  max-height: 340px;
-  overflow-y: auto;
+  overflow: hidden;
   font: 12.5px/20px var(--mono);
 }
 
-.group,
-.group-body {
+/* The search box: a drawn glass, and a field that takes what is typed. */
+.search {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding: 6px 9px;
+  cursor: text;
+}
+
+.search::before {
+  content: '';
+  flex: none;
+  border: 1.5px solid var(--muted);
+  border-radius: 50%;
+  box-shadow: 4px 4px 0 -3px var(--muted);
+  width: 8px;
+  height: 8px;
+}
+
+.search input {
+  appearance: none;
+  flex: 1;
+  margin: 0;
+  outline: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  min-width: 0;
+  color: var(--ink);
+  font: inherit;
+  caret-color: var(--accent);
+}
+
+.search input::placeholder {
+  color: var(--muted);
+  font-family: var(--sans);
+}
+
+.offer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 5px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.group {
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -904,6 +964,12 @@ body {
 .group-head i {
   font-style: normal;
   font-weight: 400;
+}
+
+.nothing {
+  padding: 6px;
+  color: var(--muted);
+  font: 12px/1.4 var(--sans);
 }
 
 .offer {
@@ -968,88 +1034,6 @@ body {
 
 .offer.is-ticked .tick::before {
   content: '✓';
-}
-
-/* The dtypes that cut the fields down. Only the panel shows them. */
-.dtypes {
-  display: none;
-}
-
-.chip {
-  appearance: none;
-  margin: 0;
-  border: 0;
-  border-radius: var(--radius);
-  background-color: var(--raised);
-  padding: 1px 6px;
-  color: var(--muted);
-  font: 10.5px/16px var(--mono);
-  cursor: pointer;
-}
-
-.chip:hover {
-  color: var(--ink);
-}
-
-.chip.is-on {
-  background-color: color-mix(in srgb, var(--accent) 30%, var(--panel));
-  color: var(--ink);
-}
-
-/* Several fields at rest are blocks a hair apart, as values in a bracket are. */
-.slot.is-many {
-  gap: 1px;
-}
-
-/*
- * B · Panel: the groups stand side by side under the step, as wide as it is.
- * The fields are in two columns and can be cut down by dtype, for a table
- * with hundreds of them.
- */
-.v-pick-panel .offers {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 6px 12px;
-  padding: 8px;
-  max-height: none;
-  overflow: visible;
-}
-
-.v-pick-panel .group-value {
-  flex: 0 0 150px;
-}
-
-.v-pick-panel .group-input {
-  flex: 0 0 170px;
-}
-
-.v-pick-panel .group-field {
-  flex: 1 1 300px;
-  min-width: 0;
-}
-
-.v-pick-panel .group-field .group-body {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-content: start;
-  gap: 1px 8px;
-  max-height: 232px;
-  overflow-y: auto;
-}
-
-.v-pick-panel .dtypes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-  padding: 0 4px 5px;
-}
-
-.v-pick-panel .offer-chain {
-  flex: 1 0 100%;
-  border-top: 1px solid var(--line);
-  border-radius: 0;
-  padding-top: 6px;
 }
 
 @media (prefers-reduced-motion: reduce) {
