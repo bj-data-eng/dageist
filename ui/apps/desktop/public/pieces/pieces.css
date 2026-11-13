@@ -1047,17 +1047,93 @@ body {
 }
 
 /*
- * Comparisons and conditions. A comparison is a function of a chain like any
- * other. Where it is written as a symbol, the symbol is a block in a colour
- * of its own, a little heavier than a name, so that it is not lost between
- * the two values it stands between.
+ * A comparison is a piece of its own: a value, a comparison and a value,
+ * held together. It is not a function and not a chain, so it has neither
+ * square brackets nor three dots. Either value can be anything a value can
+ * be, a chain among them, which then has its dots and its list as anywhere.
+ * Comparisons are joined by a word, and or or.
+ *
+ * A · Plain, which is also how a comparison is drawn anywhere else: three
+ * blocks a hair apart, the comparison in a colour of its own and a little
+ * heavier than a name, so that it is not lost between the two values.
  */
+.cmp {
+  display: inline-flex;
+  position: relative;
+  flex: none;
+  align-items: center;
+  gap: 1px;
+}
+
 .btn.op {
   --tone: var(--operator);
 
   padding-right: 6px;
   padding-left: 6px;
   font-weight: 700;
+}
+
+.cmp .btn {
+  border-radius: 0;
+}
+
+.body > .cmp:last-child > :last-child :is(.shown, .nest-token) {
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.cmp + .word {
+  margin-left: 0;
+  padding-left: 7px;
+}
+
+/*
+ * B · Round brackets: the three blocks stand inside round brackets in the
+ * comparison's colour, as a function stands inside square ones.
+ */
+.v-cmp-round .cmp {
+  margin: 0 7px;
+}
+
+.v-cmp-round .cmp::before,
+.v-cmp-round .cmp::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  border: 2px solid color-mix(in srgb, var(--operator) 70%, var(--ground));
+  width: 6px;
+  pointer-events: none;
+}
+
+.v-cmp-round .cmp::before {
+  left: -7px;
+  border-right: 0;
+  border-radius: 10px 0 0 10px / 15px 0 0 15px;
+}
+
+.v-cmp-round .cmp::after {
+  right: -7px;
+  border-left: 0;
+  border-radius: 0 10px 10px 0 / 0 15px 15px 0;
+}
+
+/*
+ * C · Recess: the three blocks lie in a recess in whatever takes them, a
+ * little smaller than it.
+ */
+.v-cmp-recess .cmp {
+  align-self: stretch;
+  background-color: color-mix(in srgb, #000 40%, var(--ground));
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 55%),
+    inset 0 0 0 1px rgb(255 255 255 / 5%);
+  padding: 0 3px;
+}
+
+.v-cmp-recess .cmp .btn {
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 18px;
 }
 
 @media (prefers-reduced-motion: reduce) {
