@@ -23,6 +23,8 @@
   --side-fill: #3a3f49;
   --side-ink: #c3c8d1;
   --remove: #f0203c;
+  /* The colour of something typed that cannot be taken. */
+  --wrong: #ff7385;
   --add: #0cae4f;
   /* The colours of what a button names: a column, a function and a plain value. */
   --column: #9cc8ff;
@@ -242,7 +244,7 @@ body {
   cursor: not-allowed;
 }
 
-.states .piece {
+.states :is(.piece, .type) {
   pointer-events: none;
 }
 
@@ -253,7 +255,8 @@ body {
  * nothing, which also keeps the pointer from finding it.
  *
  * `--open` is 0 or 1 and everything that moves is worked out from it. A piece
- * is open when it is pointed at or reached by the keyboard. A piece that
+ * is open when it is pointed at or reached by the keyboard, though not while
+ * something in it is being typed. A piece that
  * holds other pieces stays shut while one of those is pointed at, so only
  * the innermost one opens.
  */
@@ -270,12 +273,16 @@ body {
   flex: none;
 }
 
-.piece:is(:hover, .is-hover, :has(:focus-visible)):not(.is-off, :has(.piece:hover)) {
+.piece:is(:hover, .is-hover, :has(:focus-visible:not(input))):not(
+    .is-off,
+    :has(.piece:hover),
+    :has(input:focus)
+  ) {
   --open: 1;
   --bracket-ink: var(--tone);
 }
 
-.piece:is(:hover, .is-hover, :has(:focus-visible)) {
+.piece:is(:hover, .is-hover, :has(:focus-visible:not(input))) {
   z-index: 1;
 }
 
@@ -660,12 +667,149 @@ body {
   height: 5px;
 }
 
+/*
+ * The block that is typed in: a name, a text value or a number. It holds a
+ * real field, kept as wide as what is in it. Text is shown between quotation
+ * marks that are drawn, not typed. What cannot be taken turns the block red.
+ *
+ * A · Block, which is also how it is drawn anywhere else: a block like any
+ * other at rest. Typing empties its fill and rings it in its own colour.
+ */
+.type {
+  --tone: var(--value);
+
+  display: inline-flex;
+  position: relative;
+  flex: none;
+  align-items: center;
+  border-radius: var(--radius);
+  background-color: color-mix(in srgb, var(--tone) 18%, var(--ground));
+  padding: 2px 7px;
+  color: var(--tone);
+  font: 12.5px/20px var(--mono);
+  cursor: text;
+  transition:
+    background-color 90ms ease-out,
+    box-shadow 90ms ease-out,
+    border-color 90ms ease-out;
+}
+
+.type.is-name {
+  --tone: var(--ink);
+}
+
+.type:is(:has(input[aria-invalid='true']), .is-wrong) {
+  --tone: var(--wrong);
+}
+
+.body > .type {
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.type input {
+  appearance: none;
+  margin: 0;
+  outline: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  min-width: 1ch;
+  color: inherit;
+  font: inherit;
+  caret-color: var(--accent);
+}
+
+.type.is-text::before,
+.type.is-text::after {
+  content: '"';
+  color: color-mix(in srgb, var(--tone) 50%, var(--ground));
+}
+
+.type:is(:hover, .is-hover) {
+  background-color: color-mix(in srgb, var(--tone) 28%, var(--ground));
+}
+
+.type:is(:focus-within, .is-typing) {
+  background-color: var(--ground);
+  box-shadow: inset 0 0 0 1px var(--tone);
+}
+
+.type:has(input:disabled) {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* The caret in the picture of a block being typed in. A live block has the real one. */
+.caret {
+  background-color: var(--accent);
+  width: 1px;
+  height: 14px;
+  animation: blink 1.1s steps(2, jump-none) infinite;
+}
+
+@keyframes blink {
+  to {
+    opacity: 0;
+  }
+}
+
+/*
+ * B · Well: a recess, always. What is typed sits in the surface and what is
+ * picked sits on it, so the two can be told apart before either is touched.
+ */
+.v-type-well .type {
+  background-color: color-mix(in srgb, #000 40%, var(--ground));
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 60%),
+    inset 0 0 0 1px rgb(255 255 255 / 5%);
+}
+
+.v-type-well .type:is(:hover, .is-hover) {
+  background-color: color-mix(in srgb, #000 40%, var(--ground));
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 60%),
+    inset 0 0 0 1px color-mix(in srgb, var(--tone) 40%, transparent);
+}
+
+.v-type-well .type:is(:focus-within, .is-typing) {
+  background-color: color-mix(in srgb, #000 55%, var(--ground));
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 60%),
+    inset 0 0 0 1px var(--tone);
+}
+
+/* C · Line: no fill, a dashed line beneath, as a blank to be written on. */
+.v-type-line .type {
+  border-bottom: 1px dashed color-mix(in srgb, var(--tone) 55%, var(--ground));
+  border-radius: 0;
+  background-color: var(--ground);
+  padding: 2px 4px 1px;
+}
+
+.v-type-line .type:is(:hover, .is-hover) {
+  border-bottom-style: solid;
+  border-bottom-color: var(--tone);
+  background-color: color-mix(in srgb, var(--tone) 12%, var(--ground));
+}
+
+.v-type-line .type:is(:focus-within, .is-typing) {
+  border-bottom: 2px solid var(--accent);
+  background-color: color-mix(in srgb, var(--tone) 10%, var(--ground));
+  box-shadow: none;
+  padding-bottom: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .btn,
   .body,
   .side,
   .piece::before,
-  .piece::after {
+  .piece::after,
+  .type {
     transition: none;
+  }
+
+  .caret {
+    animation: none;
   }
 }

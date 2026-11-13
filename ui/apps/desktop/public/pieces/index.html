@@ -16,6 +16,11 @@
     </header>
 
     <main>
+      <h2 class="section">
+        Typing in a block <span>a name or a value that is typed, not picked</span>
+      </h2>
+      <div id="versions-type" class="versions"></div>
+
       <h2 class="section">Settled <span>the pieces chosen so far</span></h2>
       <div id="versions-settled" class="versions"></div>
     </main>
@@ -291,6 +296,112 @@
             </span>
           </span>
           <span class="returns">returns <b>Int64</b></span>
+        </div>
+      </section>
+    </template>
+
+    <!--
+      A card for a version of the block that is typed in: a text value
+      enlarged and live, its states, and two steps that hold a typed name, a
+      typed text value and a typed number.
+    -->
+    <template id="card-type">
+      <section class="card">
+        <h3><span class="letter"></span><span class="name"></span></h3>
+        <p class="note"></p>
+
+        <div class="stage">
+          <label class="type is-text">
+            <input value="unknown" aria-label="A text value" spellcheck="false" />
+          </label>
+        </div>
+
+        <div class="states">
+          <figure>
+            <label class="type is-text">
+              <input value="unknown" aria-label="rest" tabindex="-1" readonly />
+            </label>
+            <figcaption>rest</figcaption>
+          </figure>
+          <figure>
+            <label class="type is-text is-hover">
+              <input value="unknown" aria-label="hover" tabindex="-1" readonly />
+            </label>
+            <figcaption>hover</figcaption>
+          </figure>
+          <figure>
+            <label class="type is-text is-typing">
+              <input value="unkn" aria-label="typing" tabindex="-1" readonly />
+              <i class="caret"></i>
+            </label>
+            <figcaption>typing</figcaption>
+          </figure>
+          <figure>
+            <label class="type is-number is-wrong">
+              <input value="1.5" aria-label="rejected" tabindex="-1" readonly />
+            </label>
+            <figcaption>rejected</figcaption>
+          </figure>
+          <figure>
+            <label class="type is-text">
+              <input value="unknown" aria-label="off" tabindex="-1" readonly disabled />
+            </label>
+            <figcaption>off</figcaption>
+          </figure>
+        </div>
+
+        <div class="row step" data-verb="add">
+          <span class="num">1</span>
+          <span class="piece head is-bracketed">
+            <span class="grip grip-start"></span>
+            <span class="grip grip-end"></span>
+            <button type="button" class="side side-remove" aria-label="Remove step">×</button>
+            <span class="body">
+              <button type="button" class="btn verb">Add column</button>
+              <label class="type is-name">
+                <input value="step_index" aria-label="Name of the new column" spellcheck="false" />
+              </label>
+            </span>
+            <button type="button" class="side side-add" aria-label="Add a step after">+</button>
+          </span>
+          <span class="equals"></span>
+          <span class="chain">
+            <span data-piece="live"></span>
+            <span class="seam"></span>
+            <span data-piece="live" data-fn="cum_count"></span>
+            <span class="seam"></span>
+            <span data-piece="live" data-fn="over"></span>
+          </span>
+          <span class="returns">returns <b>UInt32</b></span>
+        </div>
+
+        <div class="row step" data-verb="add">
+          <span class="num">2</span>
+          <span class="piece head is-bracketed">
+            <span class="grip grip-start"></span>
+            <span class="grip grip-end"></span>
+            <button type="button" class="side side-remove" aria-label="Remove step">×</button>
+            <span class="body">
+              <button type="button" class="btn verb">Add column</button>
+              <label class="type is-name">
+                <input
+                  value="owner_before"
+                  aria-label="Name of the new column"
+                  spellcheck="false"
+                />
+              </label>
+            </span>
+            <button type="button" class="side side-add" aria-label="Add a step after">+</button>
+          </span>
+          <span class="equals"></span>
+          <span class="chain">
+            <span data-piece="live" data-name="owner"></span>
+            <span class="seam"></span>
+            <span data-piece="live" data-fn="fill_null" data-type="text:unknown"></span>
+            <span class="seam"></span>
+            <span data-piece="live" data-fn="shift" data-type="number:1"></span>
+          </span>
+          <span class="returns">returns <b>String</b></span>
         </div>
       </section>
     </template>

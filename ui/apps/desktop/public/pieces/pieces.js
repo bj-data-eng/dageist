@@ -9,11 +9,30 @@
  * @property {string} id What its block in pieces.css is called.
  * @property {string} name What its card is headed.
  * @property {string} note One line on what sets it apart.
- * @property {'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind What its card shows.
+ * @property {'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind What its
+ *   card shows.
  */
 
 /** @type {Version[]} */
 const VERSIONS = [
+  {
+    id: 'type-block',
+    name: 'Block',
+    note: 'A block like any other at rest. Typing empties its fill and rings it in its own colour.',
+    kind: 'type',
+  },
+  {
+    id: 'type-well',
+    name: 'Well',
+    note: 'A recess, always: what is typed sits in the surface, what is picked sits on it.',
+    kind: 'type',
+  },
+  {
+    id: 'type-line',
+    name: 'Line',
+    note: 'No fill, a dashed line beneath, as a blank to be written on.',
+    kind: 'type',
+  },
   {
     id: 'head',
     name: 'Step head',
@@ -59,6 +78,7 @@ const FIELDS = new Map([
 
 /** The template each kind of card is stamped from. */
 const CARDS = {
+  type: '#card-type',
   'list-settled': '#card-list',
   head: '#card-head',
   seam: '#card-seam',
@@ -88,6 +108,7 @@ function fill(card, selector, text) {
  * @property {string | null} name What a column is called, where it is not `dcn`.
  * @property {string | null} fn The function it is, or null for a column.
  * @property {string[]} list The columns a function takes as a list, if it takes one.
+ * @property {string | null} typed A value the function takes that is typed, as `kind:text`.
  */
 
 /**
@@ -106,6 +127,7 @@ function specOf(slot, version) {
     name: slot.getAttribute('data-name'),
     fn: inRow ? slot.getAttribute('data-fn') : shown,
     list: list === null ? [] : list.split(','),
+    typed: slot.getAttribute('data-type'),
   };
 }
 
@@ -125,10 +147,22 @@ function makeFunction(source, piece, button, spec, fn) {
     const list = document.createElement('span');
     list.className = 'list';
     for (const name of spec.list) {
-      const item = pieceFor(source, { state: spec.state, name, fn: null, list: [] });
+      const item = pieceFor(source, { state: spec.state, name, fn: null, list: [], typed: null });
       if (item !== null) list.append(item);
     }
     button.after(list);
+    return;
+  }
+  if (spec.typed !== null) {
+    const [kind = 'text', text = ''] = spec.typed.split(':');
+    const block = document.createElement('label');
+    block.className = `type is-${kind}`;
+    const input = document.createElement('input');
+    input.value = text;
+    input.spellcheck = false;
+    input.setAttribute('aria-label', kind === 'number' ? 'A whole number' : 'A text value');
+    block.append(input);
+    button.after(block);
     return;
   }
   const field = FIELDS.get(fn);
@@ -192,7 +226,8 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
       const piece = pieceFor(pieceTemplate, specOf(slot, version));
       if (piece !== null) slot.replaceWith(piece);
     }
-    document.querySelector('#versions-settled')?.append(card);
+    const section = version.kind === 'type' ? '#versions-type' : '#versions-settled';
+    document.querySelector(section)?.append(card);
   }
 }
 
@@ -214,6 +249,32 @@ document.addEventListener('click', (event) => {
   button.setAttribute('aria-expanded', String(!open));
 });
 
+/**
+ * Keeps a typed block as wide as what is in it, and marks it when what is
+ * typed cannot be taken: a number that is not whole, or a name left empty.
+ * @param {HTMLInputElement} input
+ */
+function tend(input) {
+  input.style.width = `${Math.max(input.value.length, 1)}ch`;
+  const block = input.closest('.type');
+  if (block === null || block.classList.contains('is-wrong')) return;
+  const wholeNumber = /^-?\d+$/.test(input.value);
+  const wrong =
+    (block.classList.contains('is-number') && !wholeNumber) ||
+    (block.classList.contains('is-name') && input.value.trim() === '');
+  input.setAttribute('aria-invalid', String(wrong));
+}
+
+for (const input of document.querySelectorAll('.type input')) {
+  if (input instanceof HTMLInputElement) tend(input);
+}
+
+document.addEventListener('input', (event) => {
+  if (event.target instanceof HTMLInputElement) tend(event.target);
+});
+
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') closeOthers(null);
+  // Enter ends the typing, as leaving the block does.
+  if (event.key === 'Enter' && event.target instanceof HTMLInputElement) event.target.blur();
 });
