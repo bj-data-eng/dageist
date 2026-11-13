@@ -383,6 +383,8 @@ function listOffers(slot, typed, chosen) {
  * @param {HTMLElement} slot
  */
 function openSlot(slot) {
+  // The field starts as wide as the block it takes the place of, so nothing beside it jumps.
+  const shown = slot.getBoundingClientRect().width;
   slot.classList.add('is-open');
   const field = document.createElement('label');
   field.className = 'type';
@@ -395,7 +397,8 @@ function openSlot(slot) {
   const list = document.createElement('span');
   list.className = 'offers';
   slot.replaceChildren(field, list);
-  input.style.width = `${Math.max(input.value.length, 6)}ch`;
+  field.style.minWidth = `${shown}px`;
+  input.style.width = `${Math.max(input.value.length, 1)}ch`;
   // What is there was the value before, so nothing is narrowed until something is typed.
   listOffers(slot, '', 0);
   input.focus();
@@ -489,7 +492,7 @@ document.addEventListener('input', (event) => {
   if (!(event.target instanceof HTMLInputElement)) return;
   const slot = event.target.closest('.slot.is-open');
   if (slot instanceof HTMLElement) {
-    event.target.style.width = `${Math.max(event.target.value.length, 6)}ch`;
+    event.target.style.width = `${Math.max(event.target.value.length, 1)}ch`;
     listOffers(slot, event.target.value, 0);
   } else {
     tend(event.target);
