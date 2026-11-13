@@ -133,6 +133,8 @@
     <!--
       A card for a version of the step head: three steps one under another, so
       it is seen marking where each step starts. The first step makes no name.
+      The head is a piece like any other, with a panel at each side. Only the
+      bracketed version opens them.
     -->
     <template id="card-head">
       <section class="card">
@@ -141,7 +143,13 @@
 
         <div class="row step" data-verb="sort">
           <span class="num">1</span>
-          <span class="head"><button type="button" class="btn verb">Sort table</button></span>
+          <span class="piece head">
+            <button type="button" class="side side-remove" aria-label="Remove step">×</button>
+            <span class="body">
+              <button type="button" class="btn verb">Sort table</button>
+            </span>
+            <button type="button" class="side side-add" aria-label="Add a step after">+</button>
+          </span>
           <span class="quiet">by</span>
           <span data-piece="live"></span>
           <span data-piece="live" data-name="timestamp"></span>
@@ -149,9 +157,13 @@
 
         <div class="row step" data-verb="add">
           <span class="num">2</span>
-          <span class="head">
-            <button type="button" class="btn verb">Add column</button>
-            <button type="button" class="btn alias">step_index</button>
+          <span class="piece head">
+            <button type="button" class="side side-remove" aria-label="Remove step">×</button>
+            <span class="body">
+              <button type="button" class="btn verb">Add column</button>
+              <button type="button" class="btn alias">step_index</button>
+            </span>
+            <button type="button" class="side side-add" aria-label="Add a step after">+</button>
           </span>
           <span class="equals"></span>
           <span class="chain">
@@ -166,9 +178,13 @@
 
         <div class="row step" data-verb="add">
           <span class="num">3</span>
-          <span class="head">
-            <button type="button" class="btn verb">Add column</button>
-            <button type="button" class="btn alias">resolved_at</button>
+          <span class="piece head">
+            <button type="button" class="side side-remove" aria-label="Remove step">×</button>
+            <span class="body">
+              <button type="button" class="btn verb">Add column</button>
+              <button type="button" class="btn alias">resolved_at</button>
+            </span>
+            <button type="button" class="side side-add" aria-label="Add a step after">+</button>
           </span>
           <span class="equals"></span>
           <span class="chain">

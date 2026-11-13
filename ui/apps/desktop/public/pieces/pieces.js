@@ -15,6 +15,12 @@
 /** @type {Version[]} */
 const VERSIONS = [
   {
+    id: 'head-call',
+    name: 'Bracketed',
+    note: 'The format of a function: bracketed, the verb then the name. Its side panels remove the step or add one after it.',
+    kind: 'head',
+  },
+  {
     id: 'head-words',
     name: 'Words',
     note: 'Today’s head: the verb as coloured text, the name underlined, a typed equals sign.',
@@ -167,6 +173,9 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
     fill(card, '.name', version.name);
     fill(card, '.note', version.note);
     card.querySelector(version.kind === 'button' ? '.row-function' : '.row-button')?.remove();
+    if (version.id === 'head-call') {
+      for (const head of card.querySelectorAll('.piece.head')) head.classList.add('is-bracketed');
+    }
     for (const slot of card.querySelectorAll('[data-piece]')) {
       const piece = pieceFor(pieceTemplate, slot, version);
       if (piece !== null) slot.replaceWith(piece);

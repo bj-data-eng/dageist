@@ -405,12 +405,12 @@ body {
 }
 
 /* Segments that touch are square where they meet. */
-:is(.body, .head) .btn:not(:first-child) {
+.body .btn:not(:first-child) {
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
 }
 
-:is(.body, .head) .btn:not(:last-child) {
+.body .btn:not(:last-child) {
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
 }
@@ -504,10 +504,21 @@ body {
   text-align: right;
 }
 
-.head {
-  display: inline-flex;
-  flex: none;
+/* The head is a piece in the verb's colour. Its panels open only where it is bracketed. */
+.piece.head {
+  --tone: var(--verb);
+}
+
+.head .body {
   gap: 1px;
+}
+
+.piece.head:not(.is-bracketed) .side {
+  display: none;
+}
+
+.piece.head:not(.is-bracketed) .body {
+  box-shadow: none;
 }
 
 .btn.verb {
@@ -534,11 +545,17 @@ body {
   border-top: 2px solid var(--seam-ink);
   border-bottom: 2px solid var(--seam-ink);
   width: 7px;
-  height: 7px;
+  height: 6px;
 }
 
-/* A · Words: today's head. Coloured text, an underlined name and a typed equals sign. */
-.v-head-words .head {
+/*
+ * A · Bracketed: the format of a function. It needs nothing more than the
+ * brackets, which pieces.js gives it: the verb and the name are two blocks a
+ * hair apart, and the side panels remove the step or add one after it.
+ */
+
+/* B · Words: today's head. Coloured text, an underlined name and a typed equals sign. */
+.v-head-words .head .body {
   gap: 8px;
 }
 
@@ -566,13 +583,13 @@ body {
   color: var(--muted);
 }
 
-/* B · Block: needs nothing more. The verb and the name are two blocks a hair apart. */
+/* C · Block: needs nothing more. The verb and the name are two blocks a hair apart. */
 
 /*
- * C · Flag: the verb is a solid flag with a point, and the name is notched
+ * D · Flag: the verb is a solid flag with a point, and the name is notched
  * to take it, so the two lock together the way the chevron points.
  */
-.v-head-flag .head {
+.v-head-flag .head .body {
   gap: 0;
 }
 
@@ -595,7 +612,7 @@ body {
   clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 7px 50%);
 }
 
-/* D · Rail: each step is a strip of its own, with the verb's colour down its edge. */
+/* E · Rail: each step is a strip of its own, with the verb's colour down its edge. */
 .v-head-rail .step {
   border-top: 0;
   border-radius: var(--radius);
@@ -618,7 +635,7 @@ body {
   color: #fff;
 }
 
-/* E · Numbered: the step's number is a block of its own, joined to the verb. */
+/* F · Numbered: the step's number is a block of its own, joined to the verb. */
 .v-head-numbered .num {
   margin-right: -5px;
   border-radius: var(--radius) 0 0 var(--radius);
