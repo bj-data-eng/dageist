@@ -9,7 +9,7 @@
  * @property {string} id What its block in pieces.css is called.
  * @property {string} name What its card is headed.
  * @property {string} note One line on what sets it apart.
- * @property {'cond' | 'nest' | 'fold' | 'pick' | 'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind
+ * @property {'cond' | 'cond-chain' | 'nest' | 'fold' | 'pick' | 'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind
  *   What its card shows.
  */
 
@@ -38,6 +38,12 @@ const VERSIONS = [
     name: 'Recess',
     note: 'The three blocks lie in a recess in whatever takes them, a little smaller than it.',
     kind: 'cond',
+  },
+  {
+    id: 'chain-only',
+    name: 'Chain only',
+    note: 'No comparison piece. A comparison is a function in a chain, as gt is: a value, a caret, then gt and what it is compared with. A condition that a function takes is a chain behind three dots, with a list of its own under the step.',
+    kind: 'cond-chain',
   },
   {
     id: 'nest',
@@ -109,6 +115,7 @@ const FIELDS = new Map([
 /** The template each kind of card is stamped from. */
 const CARDS = {
   cond: '#card-cond',
+  'cond-chain': '#card-chain-only',
   nest: '#card-nest',
   fold: '#card-fold',
   pick: '#card-pick',
@@ -329,7 +336,7 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
     }
     linkChains(card);
     lowerNests(card);
-    const section = version.kind === 'cond' ? '#versions-cond' : '#versions-settled';
+    const section = version.kind.startsWith('cond') ? '#versions-cond' : '#versions-settled';
     document.querySelector(section)?.append(card);
   }
 }
