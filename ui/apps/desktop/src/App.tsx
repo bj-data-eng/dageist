@@ -177,7 +177,7 @@ export function App(): React.JSX.Element {
         )}
         {visited.includes('table') && (
           <div className={frame('table')} inert={workspace !== 'table'}>
-            {host === null ? (
+            {host === null || status.tone !== 'ready' ? (
               <Panel mark="▦" title="The table needs the core" details={[status.text]}>
                 {null}
               </Panel>

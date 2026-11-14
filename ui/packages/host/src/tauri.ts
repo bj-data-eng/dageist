@@ -4,19 +4,7 @@
  */
 
 import type { BlockRequest, Host, IdentityView, TableView } from './contract';
-
-/** Tells this window's messages from those of the other windows. */
-const WINDOW_ID = Math.random().toString(36).slice(2);
-
-/** A message as it travels between windows: who sent it, and what it says. */
-interface Envelope {
-  readonly from: string;
-  readonly body: unknown;
-}
-
-function isEnvelope(value: unknown): value is Envelope {
-  return typeof value === 'object' && value !== null && 'from' in value && 'body' in value;
-}
+import { deliverMessage, sealMessage } from './envelope';
 
 /** Turns what a failed command rejected with into an `Error`. */
 function commandError(command: string, reason: unknown): Error {
@@ -55,14 +43,13 @@ export function tauriHost(): Host | null {
       }),
     openWindow: async (name) => invoke<undefined>('open_view_window', { name }),
     broadcast: (topic, message) => {
-      const envelope: Envelope = { from: WINDOW_ID, body: message };
       // A message that cannot be sent is one the other window never sees; it asks again.
-      void events.emit(`dageist:${topic}`, envelope).catch(() => undefined);
+      void events.emit(`dageist:${topic}`, sealMessage(message)).catch(() => undefined);
     },
     listen: (topic, listener) => {
-      // Tauri delivers an event to the window that sent it too, so its own are left out.
+      // Tauri delivers an event to the window that sent it too; the envelope leaves those out.
       const stop = events.listen<unknown>(`dageist:${topic}`, ({ payload }) => {
-        if (isEnvelope(payload) && payload.from !== WINDOW_ID) listener(payload.body);
+        deliverMessage(payload, listener);
       });
       return () => {
         void stop.then((unlisten) => {

@@ -47,8 +47,10 @@ npm --prefix ui run dev
 ```
 
 The page updates as files under `ui/` change, with no build of the application.
-Outside Tauri there is no engine, so the shell loads a stand-in host: the step
-editor works as usual, and the table shows made-up rows. The status badge reads
+Outside Tauri there is no engine, so the shell loads a stand-in host: the steps
+work as usual, and the table shows made-up rows. The stand-in opens the editor
+as a second browser tab where the application opens a window, and carries the
+messages between the two over a broadcast channel. The status badge reads
 `Browser preview made-up data`. Stop the server with Ctrl+C.
 
 ## Format The View

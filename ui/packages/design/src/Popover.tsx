@@ -89,6 +89,8 @@ export function Popover({ anchor, onDismiss, children }: PopoverProps): React.JS
     // A wheel turned over the panel scrolls the panel's list and nothing else: at the end of
     // the list, or over a list too short to scroll, the page behind stays where it is.
     const onWheel = (event: WheelEvent): void => {
+      // A pinch to zoom, or a turn sideways, is not a scroll of the list and is left alone.
+      if (event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
       if (panel !== null && !scrollsWithin(panel, event.target, event.deltaY)) {
         event.preventDefault();
       }

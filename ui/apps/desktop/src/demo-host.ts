@@ -7,6 +7,7 @@
 import { tableFromArrays, tableToIPC } from '@uwdata/flechette';
 
 import type { BlockRequest, ColumnView, Host, TableView } from '@dageist/host';
+import { deliverMessage, sealMessage } from '@dageist/host';
 
 const COLUMNS: readonly ColumnView[] = [
   { name: 'dcn', dataType: 'str' },
@@ -57,14 +58,15 @@ export function demoHost(): Host {
     broadcast: (topic, message) => {
       const channel = new BroadcastChannel(`dageist:${topic}`);
       // oxlint-disable-next-line unicorn/require-post-message-target-origin -- a broadcast channel takes no target; it reaches this origin only
-      channel.postMessage(message);
+      channel.postMessage(sealMessage(message));
       channel.close();
     },
     listen: (topic, listener) => {
-      // A channel does not hear what its own window says on it.
+      // Another channel of the same name in this window hears what is sent here too; the
+      // envelope leaves this window's own messages out, as it does for the Tauri host.
       const channel = new BroadcastChannel(`dageist:${topic}`);
       channel.addEventListener('message', (event: MessageEvent<unknown>) => {
-        listener(event.data);
+        deliverMessage(event.data, listener);
       });
       return () => {
         channel.close();

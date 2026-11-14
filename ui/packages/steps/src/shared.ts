@@ -4,6 +4,12 @@
  * tell each other of every change, so that what is done in one shows in the
  * other at once. A window that opens asks the others what they hold.
  *
+ * The whole list is sent on every change, and the last change wins. A message
+ * is trusted to come from this application's own windows: it is checked for
+ * its shape, not step by step. The main window tells whether the steps window
+ * is open by its regular word, which a browser may slow down for a window in
+ * the background, so that sign can lag behind.
+ *
  * This is storyboard code. In the real application the Rust core owns the
  * steps and tells every window of a change; nothing here is meant to survive.
  */
@@ -36,6 +42,7 @@ type Message =
   | { readonly kind: 'gone' }
   | ({ readonly kind: 'state' } & Held);
 
+/** Reports whether `value` has the marks of a step: an id and a known verb. It looks no deeper. */
 function isStep(value: unknown): value is Step {
   return (
     typeof value === 'object' &&
