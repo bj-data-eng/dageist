@@ -537,8 +537,13 @@ export function ConditionBlocks({
           group={condition}
           frame={frame}
           onChange={(next) => {
-            // The condition of a step or a case always has something in it.
-            if (next !== null) onChange(next);
+            // The condition of a step or a case always has something in it. A list that has
+            // come down to one line is that line, back on its row.
+            let settled = next;
+            while (settled?.kind === 'group' && settled.items.length === 1) {
+              settled = settled.items[0] ?? null;
+            }
+            if (settled !== null) onChange(settled);
           }}
         />
       </OwnedLines>

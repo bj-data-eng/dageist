@@ -218,7 +218,7 @@ function checkValue(value: Value, frame: Frame): SourceCheck {
 /** Returns the Polars text of `value` where a column or expression is expected. */
 export function valueText(value: Value): string {
   if (value.kind === 'chain') return chainText(value.chain);
-  // What is still to be picked is written as nothing.
+  // What is still to be picked is written as `None`, which is what Polars would be given.
   if (value.kind === 'unset') return 'None';
   // An input is named in the code as it is in the editor.
   if (value.kind === 'input') return value.name;

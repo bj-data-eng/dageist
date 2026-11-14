@@ -179,9 +179,8 @@ export function OfferList({
                   <span data-tone={offer.tone} data-look={offer.look} className="dg-block">
                     {offer.label}
                   </span>
-                  {offer.extra === null && (
-                    <span className="dg-offer-note">{offer.reason ?? offer.note}</span>
-                  )}
+                  {/* The note stays beside a control at the end of the row, so a row always says what it is. */}
+                  <span className="dg-offer-note">{offer.reason ?? offer.note}</span>
                 </button>
                 {offer.extra}
               </div>

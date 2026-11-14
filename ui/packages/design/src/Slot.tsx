@@ -168,6 +168,12 @@ function fold(slot: HTMLElement): void {
   }
   for (const entry of entries.slice(0, shown)) entry.classList.remove('dg-extra');
   count.classList.toggle('dg-extra', shown === entries.length);
+  // A mistake that is folded away shows on the count that stands for it.
+  const hidden = entries.slice(shown);
+  count.classList.toggle(
+    'dg-wrong',
+    hidden.some((entry) => entry.querySelector('.dg-wrong') !== null),
+  );
   count.textContent = `+${String(entries.length - shown)}`;
 }
 
