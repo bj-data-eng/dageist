@@ -1,9 +1,10 @@
 /**
  * @file A floating panel placed against another element. It is drawn at the
  * top of the page, outside whatever scrolls or clips its anchor, and stays
- * against its anchor while the page scrolls or changes size. A wheel turned
- * over it scrolls only what is in it. It goes away when the pointer is
- * pressed elsewhere or Escape is pressed.
+ * against its anchor while the page scrolls or changes size. While the
+ * anchor is scrolled out of view the panel is not drawn, and it is back when
+ * the anchor is. A wheel turned over it scrolls only what is in it. It goes
+ * away when the pointer is pressed elsewhere or Escape is pressed.
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -14,10 +15,34 @@ const GAP = 4;
 /** The space kept between the panel and the window's edge, in pixels. */
 const EDGE = 8;
 
-/** Where the panel's top-left corner goes, in window coordinates. */
+/** Where the panel's top-left corner goes, in window coordinates, and whether it is drawn. */
 interface Place {
   readonly left: number;
   readonly top: number;
+  /** Whether any of the anchor shows. A panel whose anchor is scrolled away is not drawn. */
+  readonly shown: boolean;
+}
+
+/**
+ * Reports whether any of `anchor` shows: inside the window and inside
+ * everything that scrolls or clips it.
+ */
+function shows(anchor: HTMLElement): boolean {
+  const box = anchor.getBoundingClientRect();
+  let top = Math.max(box.top, 0);
+  let bottom = Math.min(box.bottom, window.innerHeight);
+  let left = Math.max(box.left, 0);
+  let right = Math.min(box.right, window.innerWidth);
+  for (let around = anchor.parentElement; around !== null; around = around.parentElement) {
+    const style = window.getComputedStyle(around);
+    if (style.overflowX === 'visible' && style.overflowY === 'visible') continue;
+    const clip = around.getBoundingClientRect();
+    top = Math.max(top, clip.top);
+    bottom = Math.min(bottom, clip.bottom);
+    left = Math.max(left, clip.left);
+    right = Math.min(right, clip.right);
+  }
+  return bottom > top && right > left;
 }
 
 /** Returns where `panel` goes against `anchor`: beneath it, or above when there is no room. */
@@ -29,6 +54,7 @@ function placeAgainst(anchor: HTMLElement, panel: HTMLElement): Place {
   return {
     left: Math.max(EDGE, Math.min(against.left, window.innerWidth - size.width - EDGE)),
     top: fitsBelow ? below : Math.max(EDGE, against.top - GAP - size.height),
+    shown: shows(anchor),
   };
 }
 
@@ -121,9 +147,11 @@ export function Popover({ anchor, onDismiss, children }: PopoverProps): React.JS
       style={{
         left: place?.left ?? 0,
         top: place?.top ?? 0,
-        // Until it is placed the panel is transparent, not hidden, so that
-        // something inside it can take focus as soon as it opens.
-        opacity: place === null ? 0 : 1,
+        // Until it is placed, and while its anchor is scrolled out of view, the panel is
+        // transparent and out of the pointer's way. It is not hidden, so that what is typed in
+        // it keeps the focus and is there again when the anchor comes back.
+        opacity: place?.shown === true ? 1 : 0,
+        pointerEvents: place?.shown === true ? 'auto' : 'none',
       }}
     >
       {children}
