@@ -13,7 +13,7 @@ import { StepEditor } from '@dageist/steps';
 import { TableViewer } from '@dageist/table';
 
 /** A feature the shell can put on screen. */
-type Workspace = 'steps' | 'table';
+type Workspace = 'steps' | 'table' | 'pieces';
 
 /** A workspace and what its tab says. */
 interface WorkspaceTab {
@@ -24,7 +24,17 @@ interface WorkspaceTab {
 const WORKSPACES: readonly WorkspaceTab[] = [
   { id: 'steps', label: 'Step editor' },
   { id: 'table', label: 'Table' },
+  { id: 'pieces', label: 'Pieces' },
 ];
+
+/**
+ * Returns the workspace the address names after its `#`, or the step editor.
+ * The address keeps the workspace, so reloading the page stays on it.
+ */
+function startingWorkspace(): Workspace {
+  const named = window.location.hash.slice(1);
+  return WORKSPACES.find((entry) => entry.id === named)?.id ?? 'steps';
+}
 
 /** What the status badge says about the host. */
 interface HostStatus {
@@ -63,10 +73,10 @@ export function App(): React.JSX.Element {
     text: 'Connecting to core…',
     tone: 'pending',
   });
-  const [workspace, setWorkspace] = useState<Workspace>('steps');
+  const [workspace, setWorkspace] = useState<Workspace>(startingWorkspace);
   // A workspace is mounted when it is first shown and then stays mounted, so
   // switching away and back keeps what was being done in it.
-  const [visited, setVisited] = useState<readonly Workspace[]>(['steps']);
+  const [visited, setVisited] = useState<readonly Workspace[]>(() => [startingWorkspace()]);
 
   useEffect(() => {
     let live = true;
@@ -89,6 +99,7 @@ export function App(): React.JSX.Element {
 
   const show = (next: Workspace): void => {
     setWorkspace(next);
+    window.history.replaceState(null, '', `#${next}`);
     if (!visited.includes(next)) setVisited([...visited, next]);
   };
   // A workspace that is not on screen keeps its box, collapsed to no height,
@@ -142,6 +153,17 @@ export function App(): React.JSX.Element {
             ) : (
               <TableViewer host={host} />
             )}
+          </div>
+        )}
+        {visited.includes('pieces') && (
+          <div className={frame('pieces')} inert={workspace !== 'pieces'}>
+            {/* The pieces are plain HTML and CSS, tried out apart from the features. */}
+            {/* oxlint-disable-next-line react/iframe-missing-sandbox -- the frame shows a page of this application, from its own origin */}
+            <iframe
+              title="Pieces"
+              src="pieces/index.html"
+              className="h-full flex-1 rounded-xl border border-line bg-panel"
+            />
           </div>
         )}
       </main>

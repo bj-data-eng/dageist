@@ -124,3 +124,10 @@ storyboard that works on fixed sample rows in the view. The table viewer shows a
 generated sample through the engine. The graph model, node types, pipeline
 execution, previews from the core and canvas interactions are not implemented
 yet.
+
+A third tab shows the Pieces page. It is a design prototype, not a feature:
+a static page in plain HTML, CSS and JavaScript where the blocks the step
+editor is written with are tried out in several versions before one is
+built. It works on made-up samples of its own, shares no code with the view's
+packages and calls no host command. The tab that is open is kept in the
+page's address, so reloading the page returns to it.

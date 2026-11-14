@@ -1,0 +1,1306 @@
+/*
+ * The Pieces page: the parts the step editor is drawn with, tried out one at
+ * a time in plain HTML and CSS. The first part of this file is the page. The
+ * second is the pieces themselves: the button, its side panels and its
+ * brackets, then each piece that was settled after them.
+ */
+
+:root {
+  color-scheme: dark;
+  --canvas: #1b1d22;
+  --panel: #23262c;
+  --raised: #272a31;
+  --line: #353941;
+  --line-strong: #4a4f5a;
+  --ink: #d7dbe2;
+  --muted: #8b919c;
+  --accent: #f08a3c;
+  /* The colour of each verb. */
+  --verb-add: #f08a3c;
+  --verb-sort: #3fbf7f;
+  --verb-select: #c79bf2;
+  --verb-rename: #f08fb0;
+  --verb-filter: #e3cf6b;
+  --dtype: #7fd6a4;
+  /* The grey of the panels that slide out of the button's sides, and what they turn to. */
+  --side-fill: #3a3f49;
+  --side-ink: #c3c8d1;
+  --remove: #f0203c;
+  /* The colour of something typed that cannot be taken. */
+  --wrong: #ff7385;
+  --add: #0cae4f;
+  /* The colours of what a button names: a column, a function and a plain value. */
+  --column: #9cc8ff;
+  --function: #d7dbe2;
+  --value: #f3c98b;
+  /* The colour of a comparison written as a symbol. */
+  --operator: #ff9d5c;
+  --input: #8fe3d0;
+  /*
+   * The surface the pieces lie on. A piece's fill is its colour mixed into
+   * this, not into nothing, so a piece that slides over something hides it.
+   */
+  --ground: var(--canvas);
+  /* The colour of the button being drawn. Everything a version draws is mixed from it. */
+  --tone: var(--column);
+  /* How round the button's corners are. */
+  --radius: 2px;
+  /* How wide a side panel is. */
+  --side: 18px;
+  /*
+   * How far apart two blocks of a chain stand: a side panel and a little
+   * more, so that a block which opens does not reach the one beside it.
+   */
+  --seam-space: calc(var(--side) + 2px);
+  /* The colour a seam is drawn in: the brackets' colour, darker, so that it sits back. */
+  --seam-ink: color-mix(in srgb, var(--function) 32%, transparent);
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 20px 24px 40px;
+  background: var(--panel);
+  color: var(--ink);
+  font: 13px/1.5 var(--sans);
+}
+
+.page-head h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.page-head h1 span {
+  margin-left: 6px;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.page-head p {
+  margin: 2px 0 18px;
+  color: var(--muted);
+}
+
+.section {
+  margin: 22px 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.section:first-child {
+  margin-top: 0;
+}
+
+.section span {
+  margin-left: 6px;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.versions {
+  display: grid;
+  /* A step is read along one line, so the cards are wide. */
+  grid-template-columns: repeat(auto-fill, minmax(660px, 1fr));
+  gap: 14px;
+}
+
+.card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--canvas);
+  padding: 14px 16px 12px;
+}
+
+.card h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.letter {
+  color: var(--accent);
+  font-family: var(--mono);
+}
+
+.note {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* The button at three times its size, to see the detail and feel the press. */
+.stage {
+  display: grid;
+  place-items: center;
+  height: 44px;
+  zoom: 3;
+}
+
+.states {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px 46px;
+  border-top: 1px solid var(--line);
+  padding: 14px 26px 10px;
+}
+
+.states figure {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  margin: 0;
+}
+
+.states figcaption {
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+/* The button where it lives: one step of the editor. */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  font: 12.5px/20px var(--mono);
+  white-space: nowrap;
+}
+
+/* The verb as plain words, where a row is not about the step head. */
+.row > .verb {
+  margin-right: 4px;
+  color: var(--verb-add);
+  font: 600 13px/20px var(--sans);
+}
+
+.row .quiet {
+  color: var(--muted);
+}
+
+.row .returns {
+  margin-left: auto;
+  color: var(--muted);
+  font: 12px/20px var(--sans);
+}
+
+.row .returns b {
+  color: var(--dtype);
+  font: 400 12.5px/20px var(--mono);
+}
+
+/* ------------------------------------------------------------------ */
+/* The piece                                                           */
+/* ------------------------------------------------------------------ */
+
+/*
+ * The button is Tint, the version chosen: a flat fill in the colour of what
+ * it names, which deepens as the button is used.
+ */
+.btn {
+  appearance: none;
+  position: relative;
+  flex: none;
+  margin: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background-color: color-mix(in srgb, var(--tone) 18%, var(--ground));
+  padding: 2px 7px;
+  color: var(--tone);
+  font: 12.5px/20px var(--mono);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 90ms ease-out,
+    box-shadow 90ms ease-out;
+}
+
+.btn:is(:hover, .is-hover):enabled {
+  background-color: color-mix(in srgb, var(--tone) 28%, var(--ground));
+}
+
+.btn:is(:active, .is-active):enabled {
+  background-color: color-mix(in srgb, var(--tone) 38%, var(--ground));
+}
+
+.btn[aria-expanded='true'] {
+  background-color: color-mix(in srgb, var(--tone) 30%, var(--ground));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 65%, transparent);
+}
+
+.btn:is(:focus-visible, .is-focus) {
+  z-index: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.states :is(.piece, .type) {
+  pointer-events: none;
+}
+
+/*
+ * The piece: the button's body and the panel that slides out of each side
+ * when it is pointed at. The panels lie over what is beside the button, so
+ * nothing in the row moves. A panel that is tucked away is clipped to
+ * nothing, which also keeps the pointer from finding it.
+ *
+ * `--open` is 0 or 1 and everything that moves is worked out from it. A piece
+ * is open when it is pointed at or reached by the keyboard, though not while
+ * something in it is being typed.
+ */
+.piece {
+  /* A piece is a column unless it says otherwise, whatever piece it sits inside. */
+  --tone: var(--column);
+  --open: 0;
+  --bracket-ink: color-mix(in srgb, var(--tone) 60%, var(--ground));
+
+  display: inline-flex;
+  position: relative;
+  flex: none;
+}
+
+.piece:is(:hover, .is-hover, :has(:focus-visible:not(input))):not(.is-off, :has(input:focus)) {
+  --open: 1;
+  --bracket-ink: var(--tone);
+}
+
+.piece:is(:hover, .is-hover, :has(:focus-visible:not(input))) {
+  z-index: 1;
+}
+
+/* The body holds the button, or its segments. An open piece lifts it off the panels. */
+.body {
+  display: inline-flex;
+  position: relative;
+  z-index: 1;
+  border-radius: var(--radius);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / calc(var(--open) * 28%)),
+    0 1px 2px rgb(0 0 0 / calc(var(--open) * 45%)),
+    0 3px 7px rgb(0 0 0 / calc(var(--open) * 35%));
+  transition: box-shadow 140ms ease-out;
+}
+
+/* The side panels: remove on the left, add on the right. */
+.side {
+  appearance: none;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  margin: 0;
+  border: 0;
+  background-color: var(--side-fill);
+  padding: 0;
+  width: var(--side);
+  color: var(--side-ink);
+  font: 13px/1 var(--mono);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    clip-path 140ms ease-out,
+    background-color 90ms ease-out,
+    color 90ms ease-out;
+}
+
+.side-remove {
+  right: 100%;
+  border-radius: var(--radius) 0 0 var(--radius);
+  clip-path: inset(0 0 0 calc((1 - var(--open)) * 100%));
+}
+
+.side-add {
+  left: 100%;
+  border-radius: 0 var(--radius) var(--radius) 0;
+  clip-path: inset(0 calc((1 - var(--open)) * 100%) 0 0);
+}
+
+.side-remove:hover {
+  background-color: var(--remove);
+  color: #fff;
+}
+
+.side-add:hover {
+  background-color: var(--add);
+  color: #fff;
+}
+
+/*
+ * Brackets: a square bracket outside each end of the button, whose arms reach
+ * back over its corners. An open piece moves each bracket outward by the
+ * width of a side panel, which is what uncovers the panel. The bracket is
+ * heavy, round and hugging. Its radius is measured at the line's outer edge,
+ * so the inner curve is the button's radius plus the gap, which keeps the two
+ * curves parallel.
+ *   --gap     the space between the button's end and the bracket's upright
+ *   --wrap    how far the arms reach over the button
+ *   --rise    how far the bracket stands above and below the button
+ *   --weight  how thick its line is
+ *   --round   how round its two outer corners are
+ */
+.piece.is-bracketed {
+  --gap: 1px;
+  --wrap: 4px;
+  --weight: 2px;
+  --rise: calc(var(--gap) + var(--weight));
+  --round: calc(var(--radius) + var(--gap) + var(--weight));
+
+  margin: 0 calc(var(--gap) + var(--weight) + 1px);
+}
+
+.piece.is-bracketed:has(.btn[aria-expanded='true']) {
+  --bracket-ink: var(--tone);
+}
+
+.piece.is-bracketed::before,
+.piece.is-bracketed::after {
+  content: '';
+  position: absolute;
+  top: calc(-1 * var(--rise));
+  bottom: calc(-1 * var(--rise));
+  border: var(--weight) solid var(--bracket-ink);
+  width: calc(var(--gap) + var(--weight) + var(--wrap));
+  pointer-events: none;
+  transition:
+    border-color 90ms ease-out,
+    transform 140ms ease-out;
+}
+
+.piece.is-bracketed::before {
+  left: calc(-1 * (var(--gap) + var(--weight)));
+  transform: translateX(calc(var(--open) * -1 * var(--side)));
+  border-right: 0;
+  border-radius: var(--round) 0 0 var(--round);
+}
+
+.piece.is-bracketed::after {
+  right: calc(-1 * (var(--gap) + var(--weight)));
+  transform: translateX(calc(var(--open) * var(--side)));
+  border-left: 0;
+  border-radius: 0 var(--round) var(--round) 0;
+}
+
+.piece.is-bracketed.is-off::before,
+.piece.is-bracketed.is-off::after {
+  opacity: 0.4;
+}
+
+/*
+ * The function: a bracketed piece whose body is in segments, the function
+ * first and then the field it works on. The function is in the colour of
+ * plain words. The field is in the colour of what it is.
+ */
+.piece.fn {
+  --tone: var(--function);
+}
+
+.field {
+  --tone: var(--column);
+}
+
+.field.is-value {
+  --tone: var(--value);
+}
+
+/* Segments that touch are square where they meet. */
+.body .btn:not(:first-child) {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.body .btn:not(:last-child) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* The segments are two blocks a hair apart, each filled in its own colour. */
+.fn .body {
+  gap: 1px;
+}
+
+/*
+ * The seam: a caret between one block of a chain and the next, pointing the
+ * way the value flows. It no longer has to be where a block is added, since
+ * each block's own panel does that. Every seam is the same width, whatever is
+ * drawn in it.
+ */
+.chain {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 4px;
+}
+
+/*
+ * A caret and the block after it are one link, so a chain breaks only before
+ * a caret: a line that carries on a chain starts with the caret.
+ */
+.link {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+
+/*
+ * In a step the chain is not a box of its own: its links wrap as the row's
+ * own parts, straight after whatever comes before the chain. A line that
+ * carries on starts under the step's head, clear of the step's number. Each
+ * link gives back the row's gap, so a caret stays midway between two blocks.
+ */
+.row:has(> .chain) {
+  --hang: 24px;
+
+  padding-left: var(--hang);
+}
+
+.row:has(> .chain) > :first-child:not(.chain),
+.row > .chain:first-child > :first-child {
+  margin-left: calc(var(--hang) * -1);
+}
+
+.row > .chain {
+  display: contents;
+}
+
+.row > .chain > .link {
+  margin-left: -6px;
+}
+
+.chain > .method + .piece {
+  margin-left: 6px;
+}
+
+.seam {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--seam-space);
+  color: var(--muted);
+}
+
+/*
+ * The caret is a heavy chevron, the version chosen: a box cut to shape, in
+ * the weight of the brackets. `--cut` is how thick its line is, measured
+ * across the page.
+ */
+.seam::before {
+  --wide: 7px;
+  --tall: 10px;
+  --cut: 3.1px;
+
+  content: '';
+  background-color: var(--seam-ink);
+  width: var(--wide);
+  height: var(--tall);
+  clip-path: polygon(
+    0 0,
+    var(--cut) 0,
+    100% 50%,
+    var(--cut) 100%,
+    0 100%,
+    calc(100% - var(--cut)) 50%
+  );
+}
+
+/* A seam card is two steps and nothing else, so it needs no rule above the first. */
+.card .note + .row {
+  margin-top: 12px;
+}
+
+.row + .row {
+  margin-top: 10px;
+}
+
+/*
+ * A word inside the brackets names the parameter that follows it, as `by`
+ * does after Sort table. It is not a button. It carries on the block before
+ * it in the same fill, in a lighter voice.
+ */
+.word {
+  flex: none;
+  margin-left: -1px;
+  background-color: color-mix(in srgb, var(--tone) 18%, var(--ground));
+  padding: 2px 7px 2px 0;
+  color: color-mix(in srgb, var(--tone) 62%, transparent);
+  font: 12.5px/20px var(--mono);
+  white-space: nowrap;
+}
+
+/* The button before a word gives up some of its padding, so the two read as one phrase. */
+.btn:has(+ .word) {
+  padding-right: 6px;
+}
+
+/* After a run of values the word starts a block of its own. */
+.slot + .word {
+  margin-left: 0;
+  padding-left: 7px;
+}
+
+/*
+ * Several values inside one function's brackets are blocks a hair apart. A
+ * dictionary is pairs, a field and what it is given, as two blocks that
+ * touch. A click on any of them opens the list they are picked from, and
+ * pointing at the function opens the function itself, so a click is for what
+ * is inside and a hover is for the function.
+ */
+.pair {
+  display: inline-flex;
+  align-items: center;
+}
+
+/*
+ * The step head: the verb, and the name the step makes when it makes one.
+ * It is what marks where a step starts. Each verb has a colour, and the
+ * head's parts are buttons like any other.
+ */
+.step {
+  --verb: var(--verb-add);
+}
+
+.step[data-verb='sort'] {
+  --verb: var(--verb-sort);
+}
+
+.step[data-verb='select'] {
+  --verb: var(--verb-select);
+}
+
+.step[data-verb='rename'] {
+  --verb: var(--verb-rename);
+}
+
+.step[data-verb='filter'] {
+  --verb: var(--verb-filter);
+}
+
+.num {
+  flex: none;
+  width: 12px;
+  color: var(--muted);
+  font: 11px/24px var(--mono);
+  text-align: right;
+}
+
+/* The head is a bracketed piece in the verb's colour. */
+.piece.head {
+  --tone: var(--verb);
+}
+
+.head .body {
+  gap: 1px;
+}
+
+/* A plain value, such as a direction. */
+.btn.value {
+  --tone: var(--value);
+}
+
+.btn.verb {
+  --tone: var(--verb);
+
+  font-weight: 600;
+  font-family: var(--sans);
+}
+
+.btn.alias {
+  --tone: var(--ink);
+}
+
+/* The equals sign is two bars in the weight and colour of the seam. */
+.equals {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 13px;
+}
+
+.equals::before {
+  content: '';
+  border-top: 2px solid var(--seam-ink);
+  border-bottom: 2px solid var(--seam-ink);
+  /* The height takes in both bars, so 5px leaves 1px between them. */
+  box-sizing: border-box;
+  width: 8px;
+  height: 5px;
+}
+
+/*
+ * The block that is typed in: a name, a text value or a number. It holds a
+ * real field, kept as wide as what is in it. Text is shown between quotation
+ * marks that are drawn, not typed. What cannot be taken turns the block red.
+ * At rest it is a block like any other. Typing empties its fill and rings it
+ * in its own colour.
+ */
+.type {
+  --tone: var(--value);
+
+  display: inline-flex;
+  position: relative;
+  flex: none;
+  align-items: center;
+  border-radius: var(--radius);
+  background-color: color-mix(in srgb, var(--tone) 18%, var(--ground));
+  padding: 2px 7px;
+  color: var(--tone);
+  font: 12.5px/20px var(--mono);
+  cursor: text;
+  transition:
+    background-color 90ms ease-out,
+    box-shadow 90ms ease-out,
+    border-color 90ms ease-out;
+}
+
+.type.is-name {
+  --tone: var(--ink);
+}
+
+.type:is(:has(input[aria-invalid='true']), .is-wrong) {
+  --tone: var(--wrong);
+}
+
+.body > .type {
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.type input {
+  appearance: none;
+  margin: 0;
+  outline: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  min-width: 1ch;
+  color: inherit;
+  font: inherit;
+  caret-color: var(--accent);
+}
+
+.type.is-text::before,
+.type.is-text::after {
+  content: '"';
+  color: color-mix(in srgb, var(--tone) 50%, var(--ground));
+}
+
+.type:is(:hover, .is-hover) {
+  background-color: color-mix(in srgb, var(--tone) 28%, var(--ground));
+}
+
+.type:is(:focus-within, .is-typing) {
+  background-color: var(--ground);
+  box-shadow: inset 0 0 0 1px var(--tone);
+}
+
+.type:has(input:disabled) {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* The caret in the picture of a block being typed in. A live block has the real one. */
+.caret {
+  background-color: var(--accent);
+  width: 1px;
+  height: 14px;
+  animation: blink 1.1s steps(2, jump-none) infinite;
+}
+
+@keyframes blink {
+  to {
+    opacity: 0;
+  }
+}
+
+/*
+ * The slot that takes a value. At rest it shows its value as a block in the
+ * colour of its kind: text between drawn quotation marks, a number or
+ * nothing as a plain value, a column, a connected input, or a chain of its
+ * own. Several fields are several blocks a hair apart.
+ */
+.slot {
+  display: inline-flex;
+  position: relative;
+  flex: none;
+}
+
+/* What the slot holds is laid out as if its blocks were the slot's own. */
+.held {
+  display: contents;
+}
+
+.slot.is-many {
+  gap: 1px;
+}
+
+/* The blocks a slot holds are square where they meet, and round only at the function's end. */
+.body > .slot .held .shown {
+  border-radius: 0;
+}
+
+.body > .slot:last-child .held > .shown:last-child,
+.body > .slot:last-child .held > .pair:last-child > .shown:last-child {
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.shown:is(.is-text, .is-number, .is-none) {
+  --tone: var(--value);
+}
+
+.shown.is-column {
+  --tone: var(--column);
+}
+
+.shown.is-input {
+  --tone: var(--input);
+}
+
+.shown.is-chain {
+  --tone: var(--function);
+
+  letter-spacing: 1px;
+}
+
+.shown.is-none {
+  font-style: italic;
+}
+
+.shown.is-text::before,
+.shown.is-text::after {
+  content: '"';
+  color: color-mix(in srgb, var(--tone) 50%, var(--ground));
+}
+
+/* An open slot is ringed, and its offer lies over the steps below it. */
+.slot.is-open {
+  z-index: 3;
+}
+
+.slot.is-open .held > .shown {
+  box-shadow: inset 0 0 0 1px var(--tone);
+}
+
+.piece:has(.slot.is-open) {
+  z-index: 5;
+}
+
+/*
+ * What an open slot offers: a search box, then groups from the shortest to
+ * the longest. A chain comes first, then what was typed as a value, then the
+ * inputs, then the fields. Each row is the value as a block and a word on
+ * what it is, a dtype where it has one. A slot that takes several fields
+ * ticks them and keeps the offer open.
+ *
+ * Here the offer always opens under its slot. In the step editor it is to be
+ * placed with the Floating UI library, so that it turns upward or shifts
+ * sideways when it would leave the window or cover something it should not.
+ */
+.offers {
+  display: flex;
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  flex-direction: column;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background-color: var(--panel);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 55%);
+  width: 290px;
+  overflow: hidden;
+  font: 12.5px/20px var(--mono);
+}
+
+/* The search box: a drawn glass, and a field that takes what is typed. */
+.search {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding: 6px 9px;
+  cursor: text;
+}
+
+.search::before {
+  content: '';
+  flex: none;
+  border: 1.5px solid var(--muted);
+  border-radius: 50%;
+  box-shadow: 4px 4px 0 -3px var(--muted);
+  width: 8px;
+  height: 8px;
+}
+
+.search input {
+  appearance: none;
+  flex: 1;
+  margin: 0;
+  outline: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  min-width: 0;
+  color: var(--ink);
+  font: inherit;
+  caret-color: var(--accent);
+}
+
+.search input::placeholder {
+  color: var(--muted);
+  font-family: var(--sans);
+}
+
+.offer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 5px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.group-head {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 6px 3px;
+  color: var(--muted);
+  font: 600 10px/1 var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.group-head i {
+  font-style: normal;
+  font-weight: 400;
+}
+
+.nothing {
+  padding: 6px;
+  color: var(--muted);
+  font: 12px/1.4 var(--sans);
+}
+
+.offer {
+  appearance: none;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  padding: 2px 6px 2px 2px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.offer:is(:hover, .is-chosen) {
+  background-color: color-mix(in srgb, var(--ink) 12%, var(--panel));
+}
+
+.offer .shown {
+  --ground: var(--panel);
+
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.offer i {
+  margin-left: auto;
+  color: var(--muted);
+  font: 11px/1 var(--sans);
+  font-style: normal;
+  white-space: nowrap;
+}
+
+/* The box a field is ticked in, where several can be taken. */
+.tick {
+  display: none;
+  flex: none;
+  place-items: center;
+  margin-left: 3px;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  width: 12px;
+  height: 12px;
+  color: var(--canvas);
+  font: 700 9px/1 var(--sans);
+}
+
+.slot.is-many .tick {
+  display: grid;
+}
+
+.offer.is-ticked .tick {
+  border-color: var(--accent);
+  background-color: var(--accent);
+}
+
+.offer.is-ticked .tick::before {
+  content: '✓';
+}
+
+/*
+ * Folding: a list or a dictionary too long for the line never wraps. How
+ * much of it shows is worked out from the room left on the line, not from a
+ * set number, and a count in the function's colour stands for the rest. Any
+ * entry, or the count, opens the list, where the ticked fields come first.
+ * As many entries show as there is room for, then a count of the rest.
+ */
+.slot .is-extra {
+  display: none;
+}
+
+.fold-count {
+  display: none;
+  letter-spacing: 0;
+}
+
+.slot.is-folded > .fold-count {
+  display: block;
+}
+
+.body > .slot.is-folded .held .shown {
+  border-radius: 0;
+}
+
+.body > .slot:last-child > .fold-count {
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+/* In a dictionary a field is given something, here a new name: a plain block beside it. */
+.shown.is-name {
+  --tone: var(--ink);
+}
+
+.slot.is-dict .offers {
+  width: 380px;
+}
+
+/* The field in a ticked row where what the field is given is typed. */
+.given {
+  appearance: none;
+  flex: none;
+  margin: 0;
+  outline: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background-color: color-mix(in srgb, var(--ink) 14%, var(--panel));
+  padding: 0 6px;
+  width: 124px;
+  color: var(--ink);
+  font: 12.5px/20px var(--mono);
+  caret-color: var(--accent);
+}
+
+.given:focus {
+  background-color: var(--ground);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+
+/*
+ * A nested chain: a value that is a chain of its own, such as what empty
+ * cells are filled with. The function holds three dots in its place. The
+ * dots own a list under the step, behind a rail, whose lines are numbered
+ * from one after the step's own number. The list holds nothing of any other
+ * function. A click on the dots opens their list and shuts any other list
+ * under the same step, and the dots of an open list are ringed.
+ */
+.nest {
+  display: inline-flex;
+  position: relative;
+  flex: none;
+  align-items: center;
+}
+
+.nest-token {
+  --tone: var(--function);
+
+  letter-spacing: 1px;
+}
+
+.body > .nest:last-child > .nest-token {
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.nest-token::before {
+  content: '…';
+}
+
+.nest.is-open .nest-token {
+  box-shadow: inset 0 0 0 1px var(--tone);
+}
+
+.subrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 0 30px;
+  border-left: 2px solid color-mix(in srgb, var(--function) 30%, var(--ground));
+  padding: 4px 0 4px 10px;
+  font: 12.5px/20px var(--mono);
+  white-space: nowrap;
+}
+
+.subrow.is-shut {
+  display: none;
+}
+
+/* The line's number is written as a step's is. */
+.subrow .mark {
+  flex: none;
+  color: var(--muted);
+  font: 11px/24px var(--mono);
+}
+
+/* A step that follows a line below keeps its rule above it. */
+.subrow + .row {
+  margin-top: 10px;
+}
+
+/*
+ * A comparison is a piece of its own: a value, a comparison and a value,
+ * held together. It is not a function and not a chain, so it has neither
+ * square brackets nor three dots. Either value can be anything a value can
+ * be, a chain among them, which then has its dots and its list as anywhere.
+ * Comparisons are joined by a word, and or or.
+ *
+ * It is drawn plain, the look chosen: three blocks a hair apart, the
+ * comparison in a colour of its own and a little heavier than a name, so
+ * that it is not lost between the two values.
+ */
+.cmp {
+  display: inline-flex;
+  position: relative;
+  flex: none;
+  align-items: center;
+  gap: 1px;
+}
+
+.shown.is-op {
+  --tone: var(--operator);
+
+  padding-right: 6px;
+  padding-left: 6px;
+  font-weight: 700;
+}
+
+/*
+ * The word that joins two comparisons is a block in the fill of whatever
+ * takes them, in a lighter voice. A click turns `and` into `or`. Where a
+ * word waits after the last comparison it has no fill until it is pointed at.
+ */
+.shown.is-join {
+  color: color-mix(in srgb, var(--tone) 62%, transparent);
+}
+
+.slot.waits:not(.is-open) .shown:not(:hover) {
+  background-color: transparent;
+  color: color-mix(in srgb, var(--tone) 34%, transparent);
+}
+
+/* In a list, the rows that add a comparison or take it away. */
+.offer .shown.is-add {
+  --tone: var(--add);
+}
+
+/* A comparison's list is short, so all of it is in view without scrolling. */
+.slot.op .offer-list {
+  max-height: none;
+}
+
+.offer .shown.is-remove {
+  --tone: var(--remove);
+}
+
+.cmp .btn {
+  border-radius: 0;
+}
+
+.body > .cmp:last-child > :last-child :is(.shown, .nest-token) {
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Adding                                                              */
+/* ------------------------------------------------------------------ */
+
+/*
+ * A method that waits at the end of a chain, or holds a place in one until
+ * a method is picked: a block that says method, behind a caret that is as
+ * faint as it is. A step that waits after the last step is the same, with
+ * no number.
+ */
+.link.waits > .seam,
+.link:has(> .is-pending) > .seam {
+  opacity: 0.45;
+}
+
+.slot:is(.method, .verb) .held .shown {
+  --tone: var(--function);
+
+  font-style: normal;
+}
+
+.offer .shown:is(.is-method, .is-function, .is-wrap) {
+  --tone: var(--function);
+}
+
+.offer .shown.is-verb {
+  --tone: var(--verb-add);
+
+  font-weight: 600;
+  font-family: var(--sans);
+}
+
+.row:is(.waits, .is-pending) > .num {
+  visibility: hidden;
+}
+
+/* ------------------------------------------------------------------ */
+/* Lists under a step                                                  */
+/* ------------------------------------------------------------------ */
+
+/*
+ * The layout chosen. A step keeps its head on the row. Whatever it takes
+ * that is more than one thing is a list beneath it: numbered lines behind a
+ * rail, as a nested chain's are. A list inside a list is set in again.
+ * What a line holds depends on what owns the list: a condition's list holds
+ * comparisons and groups, the list of a when holds cases, and the list of a
+ * value holds a chain.
+ */
+.lines {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 6px 0 0 30px;
+  border-left: 2px solid color-mix(in srgb, var(--function) 30%, var(--ground));
+  padding: 4px 0 4px 10px;
+  font: 12.5px/20px var(--mono);
+  white-space: nowrap;
+}
+
+.lines .lines {
+  margin-top: 0;
+}
+
+.lines + .row {
+  margin-top: 10px;
+}
+
+.line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.line .mark {
+  flex: none;
+  color: var(--muted);
+  font: 11px/24px var(--mono);
+}
+
+/* A comparison that stands on a line of its own is round at both ends. */
+.line > .cmp > :first-child .shown,
+.cond > .cmp > :first-child .shown {
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+
+.line > .cmp > :last-child .shown,
+.cond > .cmp > :last-child .shown {
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+/* The word for a group on a line of its own: all of, any of. */
+.line > .slot.join .shown,
+.cond > .slot.join .shown {
+  --tone: var(--function);
+}
+
+/* The condition of a case: one comparison and the word that waits after it, or a group word. */
+.cond {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/*
+ * A line that waits has no number. In a list of cases it keeps the number's
+ * column, so that its word stands under the conditions.
+ */
+.line.waits > .mark {
+  visibility: hidden;
+}
+
+.lines:not(.is-cases) > .line.waits > .mark {
+  display: none;
+}
+
+/* Cases: a condition, then a value, in columns, so the values line up. */
+.lines.is-cases {
+  display: grid;
+  grid-template-columns: repeat(4, max-content);
+  justify-content: start;
+  justify-items: start;
+  align-items: center;
+  column-gap: 8px;
+}
+
+.lines.is-cases > .line {
+  display: contents;
+}
+
+/* A list under a line of cases runs the full width, clear of the columns. */
+.lines.is-cases > .lines {
+  grid-column: 1 / -1;
+}
+
+/* A list that is shut is not there, whatever kind of list it is. */
+.lines.is-shut {
+  display: none;
+}
+
+/* A word in a list of cases that is not a block: then, otherwise. */
+.label {
+  color: var(--muted);
+  font: 12.5px/24px var(--mono);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .body,
+  .side,
+  .piece::before,
+  .piece::after,
+  .type {
+    transition: none;
+  }
+
+  .caret {
+    animation: none;
+  }
+}

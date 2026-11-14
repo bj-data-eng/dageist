@@ -58,7 +58,8 @@ packages.
 The first build compiles Tauri, Polars and their dependencies and takes several
 minutes. A dark window titled `dageist` then opens on the step editor, with a
 `Table` workspace beside it that
-[generates its sample](how-to.md#open-the-sample-table) when first opened. The
+[generates its sample](how-to.md#open-the-sample-table) when first opened, and a
+`Pieces` tab that shows a design prototype of the editor's blocks. The
 status badge changes from `Connecting to core…` to `dageist 0.1.0`, which the view
 received from the Rust core through the `core_identity` IPC command. If the
 badge reads `Core unavailable: …`, the view loaded but the IPC call failed.
