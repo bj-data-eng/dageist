@@ -59,16 +59,27 @@ fn bring_forward<R: Runtime>(window: &WebviewWindow<R>) -> Result<(), ErrorView>
 /// Opens the window called `name`, or brings it forward when it is open.
 #[tauri::command(async)]
 pub fn open_view_window<R: Runtime>(app: AppHandle<R>, name: ViewWindow) -> Result<(), ErrorView> {
+    open_once(&app, name, || {
+        WebviewWindowBuilder::new(&app, name.label(), WebviewUrl::App(name.page().into()))
+            .title(name.title())
+            .inner_size(1180.0, 820.0)
+            .min_inner_size(820.0, 520.0)
+            .theme(Some(Theme::Dark))
+            .build()
+    })
+}
+
+/// Brings the window called `name` forward when it is open, and otherwise
+/// opens it with `build`.
+fn open_once<R: Runtime>(
+    app: &AppHandle<R>,
+    name: ViewWindow,
+    build: impl FnOnce() -> tauri::Result<WebviewWindow<R>>,
+) -> Result<(), ErrorView> {
     if let Some(open) = app.get_webview_window(name.label()) {
         return bring_forward(&open);
     }
-    let built = WebviewWindowBuilder::new(&app, name.label(), WebviewUrl::App(name.page().into()))
-        .title(name.title())
-        .inner_size(1180.0, 820.0)
-        .min_inner_size(820.0, 520.0)
-        .theme(Some(Theme::Dark))
-        .build();
-    match built {
+    match build() {
         Ok(_window) => Ok(()),
         // Two requests that arrive together both find no window, and the second cannot build
         // one under a label that is now taken. The window it wanted is there all the same.
