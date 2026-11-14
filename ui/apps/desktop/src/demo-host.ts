@@ -48,11 +48,18 @@ export function demoHost(): Host {
     openSampleResult: async () => Promise.resolve(open(RESULT_ROWS)),
     fetchTableBlock: async (request) => Promise.resolve(makeBlock(request, rows)),
     openWindow: async (name) => {
-      // A browser tab stands in for the host's window. Opening it by name again goes back to it.
-      const address = new URL(window.location.href);
-      address.search = `?window=${name}`;
-      address.hash = '';
-      window.open(address, `dageist-${name}`)?.focus();
+      // A browser tab stands in for the host's window. Asking for the tab by name with no
+      // address returns the open one as it is, or a new blank one, which is then sent to the
+      // view. Giving the address every time would load the open tab again.
+      const tab = window.open('', `dageist-${name}`);
+      if (tab === null) return Promise.resolve();
+      if (tab.location.href === 'about:blank') {
+        const address = new URL(window.location.href);
+        address.search = `?window=${name}`;
+        address.hash = '';
+        tab.location.replace(address);
+      }
+      tab.focus();
       return Promise.resolve();
     },
     broadcast: (topic, message) => {
