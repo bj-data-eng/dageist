@@ -3,6 +3,8 @@
 //! The view asks for a window by name. Each name is one window: asking for it
 //! again brings the open one forward instead of opening a second.
 
+use std::sync::{Mutex, PoisonError};
+
 use serde::Deserialize;
 use tauri::{
     AppHandle, Manager, Runtime, Theme, WebviewUrl, WebviewWindow, WebviewWindowBuilder, Window,
@@ -13,6 +15,11 @@ use crate::sample_table::ErrorView;
 
 /// The label of the window the application opens on, as `tauri.conf.json` names it.
 const MAIN_WINDOW: &str = "main";
+
+/// Held from looking for a window until it is built. A window cannot be
+/// found before it is built, so without this two requests that arrive
+/// together would both find none and build two under one label.
+static OPENING: Mutex<()> = Mutex::new(());
 
 /// A window of the application besides the main one, by what it shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -70,24 +77,21 @@ pub fn open_view_window<R: Runtime>(app: AppHandle<R>, name: ViewWindow) -> Resu
 }
 
 /// Brings the window called `name` forward when it is open, and otherwise
-/// opens it with `build`.
+/// opens it with `build`. One request at a time gets this far, so the second
+/// of two finds the window the first built.
 fn open_once<R: Runtime>(
     app: &AppHandle<R>,
     name: ViewWindow,
     build: impl FnOnce() -> tauri::Result<WebviewWindow<R>>,
 ) -> Result<(), ErrorView> {
+    // The lock guards no value, so one a panic left poisoned is as good as any.
+    let _opening = OPENING.lock().unwrap_or_else(PoisonError::into_inner);
     if let Some(open) = app.get_webview_window(name.label()) {
         return bring_forward(&open);
     }
-    match build() {
-        Ok(_window) => Ok(()),
-        // Two requests that arrive together both find no window, and the second cannot build
-        // one under a label that is now taken. The window it wanted is there all the same.
-        Err(error) => match app.get_webview_window(name.label()) {
-            Some(open) => bring_forward(&open),
-            None => Err(ErrorView::new(error.to_string())),
-        },
-    }
+    build()
+        .map(|_window| ())
+        .map_err(|error| ErrorView::new(error.to_string()))
 }
 
 /// Closes every other window when the main one is closed, so that no window
