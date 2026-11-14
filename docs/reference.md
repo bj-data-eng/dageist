@@ -83,6 +83,7 @@ Every package is private and is consumed as TypeScript source.
 | [ui/apps/desktop/vite.config.ts](../ui/apps/desktop/vite.config.ts) | Bundler settings; the bundle is written to `ui/dist/`. |
 | [ui/apps/desktop/src/styles.css](../ui/apps/desktop/src/styles.css) | Tailwind entry and the colour and font tokens. |
 | [ui/apps/desktop/src/demo-host.ts](../ui/apps/desktop/src/demo-host.ts) | A stand-in host with made-up rows, loaded only when the page is open outside Tauri. |
+| [ui/apps/desktop/public/pieces/](../ui/apps/desktop/public/pieces/index.html) | The Pieces page: a prototype of the step editor's blocks in plain HTML, CSS and JavaScript, copied into the bundle as it is and shown in the Pieces tab. |
 | [ui/tsconfig.json](../ui/tsconfig.json) | Strict compiler settings for every package's `src/`; emits nothing. |
 | [ui/tsconfig.node.json](../ui/tsconfig.node.json) | Strict type checking of the Vite configuration; emits nothing. |
 | [ui/.oxlintrc.json](../ui/.oxlintrc.json) | Lint rules: the `correctness` and `suspicious` categories plus the listed rules, all as errors, with type-aware, React and accessibility rules enabled. |
