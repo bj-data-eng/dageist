@@ -12,17 +12,19 @@ import { DragDropProvider } from '@dnd-kit/react';
 import { isSortable } from '@dnd-kit/react/sortable';
 import { useMemo, useState } from 'react';
 
-import { Panel, Picker, cx } from '@dageist/design';
+import { Panel, Slot, cx } from '@dageist/design';
 
-import type { DragSettings } from './ChainEditor';
-import { DragSettingsContext } from './ChainEditor';
+import type { DragSettings } from './Chain';
+import { DragSettingsContext } from './Chain';
 import { InputsStrip } from './InputsStrip';
+import type { Fresh } from './Lists';
+import { FreshContext } from './Lists';
 import { Pipeline } from './Pipeline';
 import { RowsPreview } from './RowsPreview';
-import { STEP_GROUP, StepCard, verbChoices } from './StepCard';
+import { STEP_GROUP, StepRow, verbOffers } from './StepRow';
 import type { Frame } from './model/frame';
 import { SOURCE_FRAME } from './model/frame';
-import type { Step } from './model/steps';
+import type { Step, Verb } from './model/steps';
 import { defaultStep, runSteps } from './model/steps';
 import { START } from './start';
 
@@ -73,6 +75,9 @@ export function StepEditor({ styleNonce }: StepEditorProps): React.JSX.Element {
   const [steps, setSteps] = useState<readonly Step[]>(START);
   const [selectedId, setSelectedId] = useState<string | null>(START[2]?.id ?? null);
   const [dock, setDock] = useState<Dock>('rows');
+  // What was just added, so that its first slot opens or its name is typed straight away.
+  const [freshId, setFreshId] = useState<string | null>(null);
+  const fresh = useMemo((): Fresh => ({ id: freshId, mark: setFreshId }), [freshId]);
 
   // Dragging injects a few style rules; under a content security policy they
   // need the page's nonce. Without a policy dnd kit's defaults are right.
@@ -93,116 +98,134 @@ export function StepEditor({ styleNonce }: StepEditorProps): React.JSX.Element {
   const frameBefore = (index: number): Frame => results[index - 1]?.frame ?? SOURCE_FRAME;
   const selectedIndex = steps.findIndex((step) => step.id === selectedId);
   const shown = results[selectedIndex];
-  const last = results.at(-1)?.frame ?? SOURCE_FRAME;
 
   const replaceStep = (next: Step): void => {
     setSteps(steps.map((step) => (step.id === next.id ? next : step)));
   };
+  const addStep = (verb: Verb, after: number): void => {
+    const added = defaultStep(verb, results[after]?.frame ?? SOURCE_FRAME);
+    setSteps([...steps.slice(0, after + 1), added, ...steps.slice(after + 1)]);
+    setSelectedId(added.id);
+    // What is gone to first: the field of a new filter's comparison, or the step itself.
+    setFreshId(added.verb === 'filter' ? added.condition.id : added.id);
+  };
+  // Whatever is done next, nothing is new any more.
+  const settle = (): void => {
+    if (freshId !== null) setFreshId(null);
+  };
 
   return (
     <DragSettingsContext.Provider value={dragSettings}>
-      <Panel
-        mark="ƒx"
-        title="Transform · Claim timing"
-        details={[
-          'Point at a step or a part for its tools and what it returns. A › between parts becomes a + to insert a method.',
-        ]}
-      >
-        <div className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-            <InputsStrip />
-            <DragDropProvider
-              {...dragSettings}
-              onDragEnd={(event) => {
-                const { source } = event.operation;
-                if (event.canceled || !isSortable(source)) return;
-                if (source.group === STEP_GROUP && source.index !== source.initialIndex) {
-                  setSteps(moved(steps, source.initialIndex, source.index));
-                }
-              }}
-            >
-              <div className="rounded-lg border border-line">
-                {steps.map((step, index) => {
-                  const result = results[index];
-                  if (result === undefined) return null;
-                  return (
-                    <StepCard
-                      key={step.id}
-                      step={step}
-                      index={index}
-                      frame={frameBefore(index)}
-                      result={result}
-                      selected={step.id === selectedId}
-                      onSelect={() => {
-                        setSelectedId(step.id);
-                      }}
-                      onChange={replaceStep}
-                      onRemove={() => {
-                        setSteps(steps.filter((existing) => existing.id !== step.id));
-                        if (step.id === selectedId) {
-                          // The rows shown move to the step before, or the one after the first.
-                          setSelectedId((steps[index - 1] ?? steps[index + 1])?.id ?? null);
-                        }
-                      }}
-                      onInsertAfter={(verb) => {
-                        const added = defaultStep(verb, result.frame);
-                        setSteps([...steps.slice(0, index + 1), added, ...steps.slice(index + 1)]);
-                        setSelectedId(added.id);
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            </DragDropProvider>
-            <div className="mt-1.5 pl-8">
-              <Picker
-                label="+ Add step"
-                tone="plain"
-                className="text-muted hover:text-ink"
-                choices={verbChoices(null, (verb) => {
-                  const added = defaultStep(verb, last);
-                  setSteps([...steps, added]);
-                  setSelectedId(added.id);
-                })}
-              />
-            </div>
-          </div>
-          <div className="flex max-h-[48%] min-h-0 shrink-0 flex-col border-t border-line bg-raised">
-            <div className="flex gap-4 border-b border-line px-4">
-              <DockTab
-                active={dock === 'rows'}
-                onChoose={() => {
-                  setDock('rows');
+      <FreshContext.Provider value={fresh}>
+        <Panel
+          mark="ƒx"
+          title="Transform · Claim timing"
+          details={[
+            'Click a block to change what is in it. Point at a step or a method to part its brackets: × removes it, + adds one after it. A faint word waits where the next thing goes.',
+          ]}
+        >
+          <div
+            className="flex min-h-0 flex-1 flex-col"
+            onPointerDownCapture={settle}
+            onKeyDownCapture={settle}
+          >
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+              <InputsStrip />
+              <DragDropProvider
+                {...dragSettings}
+                onDragEnd={(event) => {
+                  const { source } = event.operation;
+                  if (event.canceled || !isSortable(source)) return;
+                  if (source.group === STEP_GROUP && source.index !== source.initialIndex) {
+                    setSteps(moved(steps, source.initialIndex, source.index));
+                  }
                 }}
               >
-                {shown === undefined
-                  ? 'Rows as they arrive'
-                  : `Rows after step ${String(selectedIndex + 1)}`}
-              </DockTab>
-              <DockTab
-                active={dock === 'polars'}
-                onChoose={() => {
-                  setDock('polars');
-                }}
-              >
-                Polars
-              </DockTab>
-            </div>
-            <div className="min-h-0 overflow-auto px-4 py-2">
-              {dock === 'rows' ? (
-                <RowsPreview frame={shown?.frame ?? SOURCE_FRAME} added={shown?.added ?? []} />
-              ) : (
-                <Pipeline
-                  source="claims"
-                  steps={steps}
-                  selectedId={selectedId}
-                  onSelect={setSelectedId}
+                <div className="rounded-lg border border-line">
+                  {steps.map((step, index) => {
+                    const result = results[index];
+                    if (result === undefined) return null;
+                    return (
+                      <StepRow
+                        key={step.id}
+                        step={step}
+                        index={index}
+                        frame={frameBefore(index)}
+                        result={result}
+                        selected={step.id === selectedId}
+                        onSelect={() => {
+                          setSelectedId(step.id);
+                        }}
+                        onChange={replaceStep}
+                        onRemove={() => {
+                          setSteps(steps.filter((existing) => existing.id !== step.id));
+                          if (step.id === selectedId) {
+                            // The rows shown move to the step before, or the one after the first.
+                            setSelectedId((steps[index - 1] ?? steps[index + 1])?.id ?? null);
+                          }
+                        }}
+                        onInsertAfter={(verb) => {
+                          addStep(verb, index);
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </DragDropProvider>
+              {/* A faint step waits after the last one. */}
+              <div className="dg-ground mt-2 pl-[42px]">
+                <Slot
+                  label="step"
+                  tone="ink"
+                  look="plain"
+                  waits
+                  describedAs="Add a step at the end"
+                  placeholder="Search the steps"
+                  offers={(typed) =>
+                    verbOffers(typed, (verb) => {
+                      addStep(verb, steps.length - 1);
+                    })
+                  }
                 />
-              )}
+              </div>
+            </div>
+            <div className="flex max-h-[48%] min-h-0 shrink-0 flex-col border-t border-line bg-raised">
+              <div className="flex gap-4 border-b border-line px-4">
+                <DockTab
+                  active={dock === 'rows'}
+                  onChoose={() => {
+                    setDock('rows');
+                  }}
+                >
+                  {shown === undefined
+                    ? 'Rows as they arrive'
+                    : `Rows after step ${String(selectedIndex + 1)}`}
+                </DockTab>
+                <DockTab
+                  active={dock === 'polars'}
+                  onChoose={() => {
+                    setDock('polars');
+                  }}
+                >
+                  Polars
+                </DockTab>
+              </div>
+              <div className="min-h-0 overflow-auto px-4 py-2">
+                {dock === 'rows' ? (
+                  <RowsPreview frame={shown?.frame ?? SOURCE_FRAME} added={shown?.added ?? []} />
+                ) : (
+                  <Pipeline
+                    source="claims"
+                    steps={steps}
+                    selectedId={selectedId}
+                    onSelect={setSelectedId}
+                  />
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      </Panel>
+        </Panel>
+      </FreshContext.Provider>
     </DragSettingsContext.Provider>
   );
 }

@@ -7,7 +7,14 @@ import type { Step } from './model/steps';
 
 /** Sort, then added columns; later ones build on columns earlier steps add. */
 export const START: readonly Step[] = [
-  { id: nextId('step'), verb: 'sort', by: ['dcn', 'timestamp'], descending: false },
+  {
+    id: nextId('step'),
+    verb: 'sort',
+    by: [
+      { column: 'dcn', descending: false },
+      { column: 'timestamp', descending: false },
+    ],
+  },
   {
     id: nextId('step'),
     verb: 'with_columns',
@@ -72,6 +79,8 @@ export const START: readonly Step[] = [
           {
             id: nextId('arm'),
             condition: {
+              kind: 'test',
+              id: nextId('test'),
               column: 'owner',
               comparison: '==',
               value: { kind: 'literal', value: 'Company A' },
@@ -106,6 +115,8 @@ export const START: readonly Step[] = [
           {
             id: nextId('arm'),
             condition: {
+              kind: 'test',
+              id: nextId('test'),
               column: 'row_days',
               comparison: '<=',
               value: { kind: 'column', column: 'sla_days' },
@@ -129,6 +140,8 @@ export const START: readonly Step[] = [
           {
             id: nextId('arm'),
             condition: {
+              kind: 'test',
+              id: nextId('test'),
               column: 'resolved_day',
               comparison: 'is_in',
               value: { kind: 'input', name: 'holidays' },
@@ -138,6 +151,8 @@ export const START: readonly Step[] = [
           {
             id: nextId('arm'),
             condition: {
+              kind: 'test',
+              id: nextId('test'),
               column: 'row_days',
               comparison: '>',
               value: { kind: 'input', name: 'sla_cutoff' },

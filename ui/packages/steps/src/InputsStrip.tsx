@@ -4,7 +4,7 @@
  * no variables.
  */
 
-import { Hint, cx } from '@dageist/design';
+import { Hint } from '@dageist/design';
 
 import { formatCell } from './format';
 import type { Input } from './model/inputs';
@@ -50,18 +50,20 @@ export function inputLines(input: Input): string[] {
 /** Lists the node's inputs, each with its kind and dtype. */
 export function InputsStrip(): React.JSX.Element {
   return (
-    <div className="mb-2 flex flex-wrap items-center gap-1.5 text-xs">
+    <div className="dg-ground mb-3 flex flex-wrap items-center gap-1.5 text-xs">
       <span className="pr-1 font-semibold tracking-wide text-muted">Inputs</span>
       {INPUTS.map((input) => (
         <Hint key={input.name} lines={inputLines(input)} code={false}>
-          <span
-            className={cx(
-              'inline-flex items-center gap-1.5 rounded-md px-1.5 leading-[22px]',
-              input.kind === 'table' ? 'bg-table text-table-ink' : 'bg-input text-input-ink',
-            )}
-          >
-            <span className="text-[13px]">{input.name}</span>
-            <span className="font-mono text-[11px] opacity-70">{detail(input)}</span>
+          <span className="inline-flex items-center gap-px">
+            <span
+              data-tone={input.kind === 'table' ? 'table' : 'input'}
+              className="dg-block dg-fixed"
+            >
+              {input.name}
+            </span>
+            <span data-tone="ink" className="dg-block dg-fixed text-[11px] opacity-70">
+              {detail(input)}
+            </span>
           </span>
         </Hint>
       ))}

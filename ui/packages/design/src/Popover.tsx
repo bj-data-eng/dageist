@@ -75,7 +75,7 @@ export function Popover({ anchor, onDismiss, children }: PopoverProps): React.JS
   return createPortal(
     <div
       ref={panel}
-      className="fixed z-50 rounded-lg border border-line-strong bg-panel p-1 text-ink shadow-lg"
+      className="dg-ground fixed z-50 overflow-hidden rounded border border-line-strong bg-panel text-ink shadow-[0_8px_22px_rgb(0_0_0/55%)]"
       style={{
         left: place?.left ?? 0,
         top: place?.top ?? 0,

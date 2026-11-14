@@ -95,18 +95,41 @@ The step editor is where the design of a transform node is being worked out.
 It runs on fixed sample rows inside the view, so none of it is application
 behavior yet. The decisions below are the ones the core is expected to carry.
 
-- **Words.** A step is named for what it does to the table: Add column, Sort
-  table, Filter table, Join table, Pivot table. Methods keep their Polars
-  names, such as `shift`, `cum_sum` and `over`, because a plainer word would
-  only rename them. A type is always shown by its exact dtype name, as in
-  `returns Int64`, because dtypes decide which tables and values can meet.
-- **Chains.** A step is one row. A column's expression is a chain: a source
-  followed by methods. A method is inserted at the seam between two parts and
-  moved by dragging it. Anything that takes an expression of its own, such as
-  the arms of `when`, `then` and `otherwise`, opens as a collapsible sub-list
-  labelled `subchain`.
-- **Literals.** A literal is typed without quotes. A marker beside the field
-  says whether it is text, a number or `None`.
+- **Words.** A step is named for what it does to the table: Add column,
+  Filter table, Sort table, Select, Rename, Join table, Pivot table. Methods
+  keep their Polars names, such as `shift`, `cum_sum` and `over`, because a
+  plainer word would only rename them. A type is always shown by its exact
+  dtype name, such as `Int64`, because dtypes decide which tables and values
+  can meet.
+- **Blocks.** Everything that can be pressed is a block in the colour of what
+  it names: a field, a method, a value, a comparison, a connected input. A
+  click on a block opens a searched list of what it can hold, in groups from
+  the shortest to the longest, and a choice that does not fit says why. A
+  step's head and a method stand in square brackets. Pointing at one parts
+  its brackets: a cross removes it and a plus adds one after it. A click is
+  for what is inside; pointing is for the step or method itself.
+- **Chains.** A column's expression is a chain: what it starts from, then
+  methods, each behind a caret. A chain too long for its row breaks before a
+  caret. A method is moved by dragging its name. A function such as `when`
+  is not called on a value, so it can only stand where a chain starts.
+- **Lists under a step.** A step's head is one row. Whatever it takes that is
+  more than one thing is a numbered list beneath it, and a list inside a
+  list is numbered from its line, as 9.1.2 is under 9.1. The cases of a
+  `when` are lines of a condition, then a value, with `otherwise` last. A
+  chain used as a value is three dots where it stands, with its own line in
+  the list. Several fields in one step, as in Sort table or Select, stay on
+  the row and fold to the room there is, with a count of the rest.
+- **Conditions.** A comparison is a field, a comparison and a value. A row
+  holds one comparison. More than one is a list headed `all of` or `any of`,
+  and a group is a list inside the list. Nothing depends on whether `and` or
+  `or` binds tighter, because the two are never mixed in one list.
+- **Adding.** A faint word waits where the next thing goes: `step` after the
+  last step, `method` at the end of a chain, `when` after the last case, and
+  `and` or `or` at the end of a condition's list. What is added starts from
+  stand-ins that say what is still to be picked.
+- **Values.** A value is typed into the search box of its list, where it is
+  offered as a number or as text. Text is shown between quotation marks that
+  are drawn, not typed.
 - **Inputs, not variables.** A node declares no variables. What its steps can
   use arrives from the nodes connected to it: tables, single values and
   lists, each with a name, its dtypes and the node it comes from. Logic is
