@@ -56,7 +56,9 @@ packages.
    ```
 
 The first build compiles Tauri, Polars and their dependencies and takes several
-minutes. A dark window titled `dageist` then opens on the step editor, with a
+minutes. A dark window titled `dageist` then opens on a transform: the rows
+after the chosen step in the centre and the steps listed on the right. Choosing
+a step opens the steps in a second window, where they are edited. There is a
 `Table` workspace beside it that
 [generates its sample](how-to.md#open-the-sample-table) when first opened, and a
 `Pieces` tab that shows a design prototype of the editor's blocks. The

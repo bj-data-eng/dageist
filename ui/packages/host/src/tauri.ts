@@ -53,7 +53,7 @@ export function tauriHost(): Host | null {
         length: request.length,
         columns: request.columns,
       }),
-    openWindow: async (name) => invoke<undefined>('open_window', { name }),
+    openWindow: async (name) => invoke<undefined>('open_view_window', { name }),
     broadcast: (topic, message) => {
       const envelope: Envelope = { from: WINDOW_ID, body: message };
       // A message that cannot be sent is one the other window never sees; it asks again.

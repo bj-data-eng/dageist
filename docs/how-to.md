@@ -91,7 +91,9 @@ The tests prove the `core_identity` command returns the core's identity and
 serializes it in the shape the view expects. They also prove that opening the
 sample table generates it only when it is missing, and that `table_block`
 answers through Tauri's IPC layer with raw Arrow bytes, for a working window
-and for a stored result, or with a message. They do not open a window.
+and for a stored result, or with a message. They prove that asking twice for
+the steps window opens it once, and that the capability names its label. They
+run against Tauri's mock runtime and do not open a real window.
 
 ## Open The Sample Table
 

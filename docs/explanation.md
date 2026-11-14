@@ -95,6 +95,12 @@ The step editor is where the design of a transform node is being worked out.
 It runs on fixed sample rows inside the view, so none of it is application
 behavior yet. The decisions below are the ones the core is expected to carry.
 
+- **Two windows.** The table is the centre of the main window, and the steps
+  are listed down its right side, each said by its head, such as "Sort table
+  by dcn" or "Add column step_index". The steps themselves are edited in a
+  window of their own, which shows every step as its blocks beside the same
+  list. The step chosen in either window is the one whose rows the table
+  shows, and a change in the steps window shows in the main window at once.
 - **Words.** A step is named for what it does to the table: Add column,
   Filter table, Sort table, Select, Rename, Join table, Pivot table. Methods
   keep their Polars names, such as `shift`, `cum_sum` and `over`, because a
@@ -142,8 +148,10 @@ behavior yet. The decisions below are the ones the core is expected to carry.
 
 ## Current Limitations
 
-The application opens its window on two features. The step editor is a
-storyboard that works on fixed sample rows in the view. The table viewer shows a
+The application opens its window on two features. The steps of a transform
+are a storyboard that works on fixed sample rows in the view; its two windows
+keep the steps the same by telling each other of every change, where the core
+will later own them. The table viewer shows a
 generated sample through the engine. The graph model, node types, pipeline
 execution, previews from the core and canvas interactions are not implemented
 yet.

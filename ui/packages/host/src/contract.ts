@@ -28,7 +28,7 @@ export interface BlockRequest {
   readonly columns: readonly string[];
 }
 
-/** A window of the application besides the main one, by what it shows. */
+/** Mirrors `ViewWindow` in crates/dageist-tauri/src/windows.rs. */
 export type WindowName = 'steps';
 
 /** Every command the view can send to the host. */

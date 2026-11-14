@@ -8,6 +8,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod sample_table;
+mod windows;
 
 use serde::Serialize;
 
@@ -38,6 +39,7 @@ fn main() {
             sample_table::open_sample_window,
             sample_table::open_sample_result,
             sample_table::table_block,
+            windows::open_view_window,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|error| panic!("dageist failed to run: {error}"));

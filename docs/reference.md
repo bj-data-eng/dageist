@@ -36,6 +36,12 @@ them through the host bridge in
 | `open_sample_window` | `keys`: how many whole keys to hold in memory, at most 50,000 | `{ "rows": number, "columns": [{ "name": string, "dataType": string }] }` for the working window. |
 | `open_sample_result` | None | The same shape for the whole sample, opened where it is stored without loading it. |
 | `table_block` | `offset`, `length`: the rows, at most 10,000; `columns`: the column names, each once, or an empty list for all | That block of whichever table is open, as the raw bytes of an Arrow IPC stream, not JSON. Rows past the end are left out. |
+| `open_view_window` | `name`: which window, `"steps"` | Nothing. Opens that window, or brings it forward when it is already open. Defined in [windows.rs](../crates/dageist-tauri/src/windows.rs). |
+
+The windows also talk to each other without the core. The host bridge sends a
+message as a Tauri event named `dageist:<topic>`, and every other window that
+listens to the topic receives it. The steps window and the main window keep
+the steps the same this way while the steps are a storyboard in the view.
 
 A table command that fails rejects with `{ "message": string }`; arguments of
 the wrong type are rejected by Tauri with its own text. The first call to
@@ -58,11 +64,13 @@ sets the following:
 | View | `../../ui/dist`, embedded at compile time; build it with `npm --prefix ui run build` first |
 | Global API | `app.withGlobalTauri` is `true`, which injects `window.__TAURI__` |
 | Main window | Label `main`, title `dageist`, 1440×900, minimum 960×600, dark theme |
+| Steps window | Label `steps`, title `dageist · steps`, 1180×820, minimum 820×520, dark theme. It loads the view's page as `index.html?window=steps` and is opened by `open_view_window`, not at start. |
 | Minimum macOS | 13.3, the first version whose system WebKit supports the CSS that Tailwind CSS 4 emits |
 | Content security policy | Same-origin scripts, styles and images, plus `data:` images and the IPC channel |
 
 [crates/dageist-tauri/capabilities/default.json](../crates/dageist-tauri/capabilities/default.json)
-grants the `main` window the `core:default` permission set.
+grants the `main` and `steps` windows the `core:default` permission set, which
+includes sending and listening to events.
 
 ## View Packages
 
@@ -74,7 +82,7 @@ Every package is private and is consumed as TypeScript source.
 | `@dageist/desktop` | [ui/apps/desktop/](../ui/apps/desktop/src/App.tsx) | The shell: picks the host, composes the features, owns the page, the bundler configuration and the design tokens. | Every package below, React, and flechette for the stand-in host |
 | `@dageist/host` | [ui/packages/host/](../ui/packages/host/src/contract.ts) | The contract of every IPC command and its implementation over Tauri. | Nothing |
 | `@dageist/design` | [ui/packages/design/](../ui/packages/design/src/index.ts) | Primitive components: `Block`, `Piece`, `Slot`, `ManySlot`, `OfferList`, `TypedBlock`, `Popover`, `Hint`, `ToggleButton`, `Panel`, and the blocks' stylesheet `blocks.css`. | React, React DOM |
-| `@dageist/steps` | [ui/packages/steps/](../ui/packages/steps/src/StepEditor.tsx) | The step editor and its storyboard model. | `@dageist/design`, dnd kit, React, React DOM |
+| `@dageist/steps` | [ui/packages/steps/](../ui/packages/steps/src/StepsWorkspace.tsx) | The steps of a transform and their storyboard model: the main window's table with its list of steps, and the window the steps are edited in. | `@dageist/design`, `@dageist/host`, dnd kit, React, React DOM |
 | `@dageist/table` | [ui/packages/table/](../ui/packages/table/src/TableViewer.tsx) | The table viewer: fetches blocks as Arrow bytes and draws only those. | `@dageist/design`, `@dageist/host`, flechette, React |
 
 | File | Contents |
