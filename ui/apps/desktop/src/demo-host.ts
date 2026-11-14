@@ -46,5 +46,29 @@ export function demoHost(): Host {
     openSampleWindow: async () => Promise.resolve(open(WINDOW_ROWS)),
     openSampleResult: async () => Promise.resolve(open(RESULT_ROWS)),
     fetchTableBlock: async (request) => Promise.resolve(makeBlock(request, rows)),
+    openWindow: async (name) => {
+      // A browser tab stands in for the host's window. Opening it by name again goes back to it.
+      const address = new URL(window.location.href);
+      address.search = `?window=${name}`;
+      address.hash = '';
+      window.open(address, `dageist-${name}`)?.focus();
+      return Promise.resolve();
+    },
+    broadcast: (topic, message) => {
+      const channel = new BroadcastChannel(`dageist:${topic}`);
+      // oxlint-disable-next-line unicorn/require-post-message-target-origin -- a broadcast channel takes no target; it reaches this origin only
+      channel.postMessage(message);
+      channel.close();
+    },
+    listen: (topic, listener) => {
+      // A channel does not hear what its own window says on it.
+      const channel = new BroadcastChannel(`dageist:${topic}`);
+      channel.addEventListener('message', (event: MessageEvent<unknown>) => {
+        listener(event.data);
+      });
+      return () => {
+        channel.close();
+      };
+    },
   };
 }

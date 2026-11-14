@@ -3,5 +3,12 @@
  * obtain a host with `tauriHost`.
  */
 
-export type { BlockRequest, ColumnView, Host, IdentityView, TableView } from './contract';
+export type {
+  BlockRequest,
+  ColumnView,
+  Host,
+  IdentityView,
+  TableView,
+  WindowName,
+} from './contract';
 export { tauriHost } from './tauri';
