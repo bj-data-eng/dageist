@@ -56,6 +56,14 @@ depends on, distributed by the Preact Team:
 * License: [MIT License](licenses/preact-signals/LICENSE)
 * Homepage: [Preact Signals](https://github.com/preactjs/signals)
 
+This product's view includes Floating UI's React DOM package 2.1.9
+(`@floating-ui/react-dom`, with the packages `@floating-ui/dom` 1.8.0,
+`@floating-ui/core` 1.8.0 and `@floating-ui/utils` 0.2.12 that it depends on),
+distributed by the Floating UI contributors:
+
+* License: [MIT License](licenses/floating-ui/LICENSE)
+* Homepage: [Floating UI](https://floating-ui.com)
+
 This product depends on polars 0.55.2, distributed by Ritchie Vink, with some
 portions by NVIDIA Corporation and affiliates:
 

@@ -55,42 +55,10 @@ import {
 } from './model/steps';
 import { checkChain } from './model/source';
 import { TABLES, findTable } from './model/tables';
+import { VERB_COLOURS, VERB_LABELS, VERB_NOTES } from './verbs';
 
 /** The sortable group every step row belongs to. */
 export const STEP_GROUP = 'steps';
-
-/** What each step is called: Polars' own word where it has one, in a plain phrase. */
-const VERB_LABELS: Readonly<Record<Verb, string>> = {
-  with_columns: 'Add column',
-  filter: 'Filter table',
-  sort: 'Sort table',
-  select: 'Select',
-  rename: 'Rename',
-  join: 'Join table',
-  pivot: 'Pivot table',
-};
-
-/** What each step does, for someone choosing one. */
-const VERB_NOTES: Readonly<Record<Verb, string>> = {
-  with_columns: 'a new column from a chain',
-  filter: 'the rows where a condition holds',
-  sort: 'the rows in the order of some fields',
-  select: 'some of the columns',
-  rename: 'columns under new names',
-  join: 'columns from another table, by a key',
-  pivot: 'the values of a field as columns',
-};
-
-/** The colour each step is written in, so the kind of a step shows at a glance. */
-const VERB_COLOURS: Readonly<Record<Verb, string>> = {
-  with_columns: '[--verb:var(--color-verb-add)]',
-  filter: '[--verb:var(--color-verb-filter)]',
-  sort: '[--verb:var(--color-verb-sort)]',
-  select: '[--verb:var(--color-verb-select)]',
-  rename: '[--verb:var(--color-verb-rename)]',
-  join: '[--verb:var(--color-verb-join)]',
-  pivot: '[--verb:var(--color-verb-pivot)]',
-};
 
 /** Lists the steps that can be added or changed to. */
 export function verbOffers(typed: string, onPick: (verb: Verb) => void): OfferGroup[] {
@@ -269,7 +237,7 @@ function RenameHead({ step, frame, onChange }: HeadProps<RenameStep>): React.JSX
               // A setting that can be anything is typed in a field inside the list.
               return (
                 <>
-                  <span className="dg-offer-note">→</span>
+                  <span className="dg-arrow">→</span>
                   <input
                     type="text"
                     aria-label={`New name for ${name}`}
@@ -765,6 +733,7 @@ export function StepRow({
         setRoot(element);
         ref(element);
       }}
+      data-step-id={step.id}
       className={cx(
         'dg-ground group/step relative border-b border-line bg-panel first:rounded-t-lg last:rounded-b-lg last:border-b-0',
         VERB_COLOURS[step.verb],

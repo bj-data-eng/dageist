@@ -28,6 +28,9 @@ export interface BlockRequest {
   readonly columns: readonly string[];
 }
 
+/** Mirrors `ViewWindow` in crates/dageist-tauri/src/windows.rs. */
+export type WindowName = 'steps';
+
 /** Every command the view can send to the host. */
 export interface Host {
   /** Asks the core who it is. */
@@ -38,4 +41,16 @@ export interface Host {
   readonly openSampleResult: () => Promise<TableView>;
   /** Fetches a block of the open table as the bytes of an Arrow IPC stream. */
   readonly fetchTableBlock: (request: BlockRequest) => Promise<ArrayBuffer>;
+  /** Opens the window called `name`, or brings it forward when it is already open. */
+  readonly openWindow: (name: WindowName) => Promise<void>;
+  /**
+   * Sends `message` to every other window of the application that listens to
+   * `topic`. The window that sends it does not receive it.
+   */
+  readonly broadcast: (topic: string, message: unknown) => void;
+  /**
+   * Calls `listener` with every message another window sends on `topic`.
+   * Returns a function that stops listening.
+   */
+  readonly listen: (topic: string, listener: (message: unknown) => void) => () => void;
 }

@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import { Panel, ToggleButton, cx } from '@dageist/design';
 import type { Host } from '@dageist/host';
 import { tauriHost } from '@dageist/host';
-import { StepEditor } from '@dageist/steps';
+import { StepsWindow, StepsWorkspace } from '@dageist/steps';
 import { TableViewer } from '@dageist/table';
 
 /** A feature the shell can put on screen. */
@@ -22,13 +22,13 @@ interface WorkspaceTab {
 }
 
 const WORKSPACES: readonly WorkspaceTab[] = [
-  { id: 'steps', label: 'Step editor' },
+  { id: 'steps', label: 'Transform' },
   { id: 'table', label: 'Table' },
   { id: 'pieces', label: 'Pieces' },
 ];
 
 /**
- * Returns the workspace the address names after its `#`, or the step editor.
+ * Returns the workspace the address names after its `#`, or the transform.
  * The address keeps the workspace, so reloading the page stays on it.
  */
 function startingWorkspace(): Workspace {
@@ -66,6 +66,12 @@ async function findHost(): Promise<Host> {
 
 const STYLE_NONCE = readStyleNonce();
 
+/**
+ * Whether this page is the steps window and not the main one. The address
+ * says so after its `?`, which is how the host opens that window.
+ */
+const IS_STEPS_WINDOW = new URLSearchParams(window.location.search).get('window') === 'steps';
+
 /** Draws the application window. */
 export function App(): React.JSX.Element {
   const [host, setHost] = useState<Host | null>(null);
@@ -79,13 +85,18 @@ export function App(): React.JSX.Element {
   const [visited, setVisited] = useState<readonly Workspace[]>(() => [startingWorkspace()]);
 
   useEffect(() => {
+    if (IS_STEPS_WINDOW) document.title = 'dageist · steps';
+  }, []);
+
+  useEffect(() => {
     let live = true;
     const connect = async (): Promise<void> => {
       try {
         const found = await findHost();
+        // The host opens windows and carries messages whether or not the core answers.
+        if (live) setHost(found);
         const identity = await found.coreIdentity();
         if (!live) return;
-        setHost(found);
         setStatus({ text: `${identity.name} ${identity.version}`, tone: 'ready' });
       } catch (error) {
         if (live) setStatus({ text: `Core unavailable: ${String(error)}`, tone: 'failed' });
@@ -109,6 +120,20 @@ export function App(): React.JSX.Element {
       'flex min-h-0 justify-center',
       id === workspace ? 'flex-1' : 'invisible h-0 overflow-hidden',
     );
+
+  if (IS_STEPS_WINDOW) {
+    return (
+      <main className="flex h-full flex-col bg-canvas bg-dots p-4">
+        {host === null ? (
+          <Panel mark="ƒx" title="Steps" details={[status.text]}>
+            {null}
+          </Panel>
+        ) : (
+          <StepsWindow host={host} styleNonce={STYLE_NONCE} />
+        )}
+      </main>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col bg-canvas bg-dots">
@@ -141,12 +166,18 @@ export function App(): React.JSX.Element {
       <main className="flex min-h-0 flex-1 flex-col px-7 pt-3 pb-6">
         {visited.includes('steps') && (
           <div className={frame('steps')} inert={workspace !== 'steps'}>
-            <StepEditor styleNonce={STYLE_NONCE} />
+            {host === null ? (
+              <Panel mark="ƒx" title="Transform · Claim timing" details={[status.text]}>
+                {null}
+              </Panel>
+            ) : (
+              <StepsWorkspace host={host} styleNonce={STYLE_NONCE} />
+            )}
           </div>
         )}
         {visited.includes('table') && (
           <div className={frame('table')} inert={workspace !== 'table'}>
-            {host === null ? (
+            {host === null || status.tone !== 'ready' ? (
               <Panel mark="▦" title="The table needs the core" details={[status.text]}>
                 {null}
               </Panel>

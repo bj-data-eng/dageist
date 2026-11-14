@@ -7,6 +7,7 @@
 import { tableFromArrays, tableToIPC } from '@uwdata/flechette';
 
 import type { BlockRequest, ColumnView, Host, TableView } from '@dageist/host';
+import { deliverMessage, sealMessage } from '@dageist/host';
 
 const COLUMNS: readonly ColumnView[] = [
   { name: 'dcn', dataType: 'str' },
@@ -46,5 +47,37 @@ export function demoHost(): Host {
     openSampleWindow: async () => Promise.resolve(open(WINDOW_ROWS)),
     openSampleResult: async () => Promise.resolve(open(RESULT_ROWS)),
     fetchTableBlock: async (request) => Promise.resolve(makeBlock(request, rows)),
+    openWindow: async (name) => {
+      // A browser tab stands in for the host's window. Asking for the tab by name with no
+      // address returns the open one as it is, or a new blank one, which is then sent to the
+      // view. Giving the address every time would load the open tab again.
+      const tab = window.open('', `dageist-${name}`);
+      if (tab === null) return Promise.resolve();
+      if (tab.location.href === 'about:blank') {
+        const address = new URL(window.location.href);
+        address.search = `?window=${name}`;
+        address.hash = '';
+        tab.location.replace(address);
+      }
+      tab.focus();
+      return Promise.resolve();
+    },
+    broadcast: (topic, message) => {
+      const channel = new BroadcastChannel(`dageist:${topic}`);
+      // oxlint-disable-next-line unicorn/require-post-message-target-origin -- a broadcast channel takes no target; it reaches this origin only
+      channel.postMessage(sealMessage(message));
+      channel.close();
+    },
+    listen: (topic, listener) => {
+      // Another channel of the same name in this window hears what is sent here too; the
+      // envelope leaves this window's own messages out, as it does for the Tauri host.
+      const channel = new BroadcastChannel(`dageist:${topic}`);
+      channel.addEventListener('message', (event: MessageEvent<unknown>) => {
+        deliverMessage(event.data, listener);
+      });
+      return () => {
+        channel.close();
+      };
+    },
   };
 }

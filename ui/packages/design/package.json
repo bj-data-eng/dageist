@@ -9,6 +9,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@floating-ui/react-dom": "2.1.9",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   }

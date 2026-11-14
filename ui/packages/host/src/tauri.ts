@@ -4,6 +4,7 @@
  */
 
 import type { BlockRequest, Host, IdentityView, TableView } from './contract';
+import { deliverMessage, sealMessage } from './envelope';
 
 /** Turns what a failed command rejected with into an `Error`. */
 function commandError(command: string, reason: unknown): Error {
@@ -18,9 +19,9 @@ function commandError(command: string, reason: unknown): Error {
 
 /** Returns the Tauri host, or `null` when the page is open in a plain browser. */
 export function tauriHost(): Host | null {
-  const found = window.__TAURI__?.core;
+  const found = window.__TAURI__;
   if (found === undefined) return null;
-  const core: TauriCore = found;
+  const { core, event: events } = found;
 
   async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
     try {
@@ -40,5 +41,21 @@ export function tauriHost(): Host | null {
         length: request.length,
         columns: request.columns,
       }),
+    openWindow: async (name) => invoke<undefined>('open_view_window', { name }),
+    broadcast: (topic, message) => {
+      // A message that cannot be sent is one the other window never sees; it asks again.
+      void events.emit(`dageist:${topic}`, sealMessage(message)).catch(() => undefined);
+    },
+    listen: (topic, listener) => {
+      // Tauri delivers an event to the window that sent it too; the envelope leaves those out.
+      const stop = events.listen<unknown>(`dageist:${topic}`, ({ payload }) => {
+        deliverMessage(payload, listener);
+      });
+      return () => {
+        void stop.then((unlisten) => {
+          unlisten();
+        });
+      };
+    },
   };
 }
