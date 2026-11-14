@@ -1,12 +1,12 @@
 /**
  * @file Stamps one card for every version of a piece and lets a click hold a
- * button open. A version is one entry in the list here and one block in
- * pieces.css under `.v-<id>`.
+ * button open. A version is one entry in the list here, drawn from the
+ * template its kind names.
  */
 
 /**
  * @typedef {object} Version
- * @property {string} id What its block in pieces.css is called.
+ * @property {string} id A short name that tells it from the other versions.
  * @property {string} name What its card is headed.
  * @property {string} note One line on what sets it apart.
  * @property {'add' | 'fmt-lists' | 'cond' | 'cond-chain' | 'nest' | 'fold' | 'pick' | 'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind
@@ -311,7 +311,6 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
     if (!(template instanceof HTMLTemplateElement)) continue;
     const card = template.content.firstElementChild?.cloneNode(true);
     if (!(card instanceof HTMLElement)) continue;
-    card.classList.add(`v-${version.id}`);
     fill(card, '.letter', String.fromCodePoint(65 + index));
     fill(card, '.name', version.name);
     fill(card, '.note', version.note);
@@ -1848,6 +1847,8 @@ document.addEventListener('keydown', (event) => {
   const chosen = Number(slot.dataset.chosen ?? 0);
   if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
     event.preventDefault();
+    // With nothing on offer there is no row to go to.
+    if (rows.length === 0) return;
     const next = (chosen + (event.key === 'ArrowDown' ? 1 : rows.length - 1)) % rows.length;
     rows[chosen]?.classList.remove('is-chosen');
     rows[next]?.classList.add('is-chosen');

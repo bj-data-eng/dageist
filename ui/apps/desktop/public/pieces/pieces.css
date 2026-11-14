@@ -1,8 +1,8 @@
 /*
  * The Pieces page: the parts the step editor is drawn with, tried out one at
  * a time in plain HTML and CSS. The first part of this file is the page. The
- * second is the piece: the button, its side panels and its brackets, then
- * one block per version.
+ * second is the pieces themselves: the button, its side panels and its
+ * brackets, then each piece that was settled after them.
  */
 
 :root {
