@@ -17,14 +17,8 @@
 const VERSIONS = [
   {
     id: 'add-wait',
-    name: 'Always waiting',
+    name: 'Adding',
     note: "A faint method waits at the end of every chain, and a faint step after the last step. Click one for its list. Point at a block in a chain: its + puts a method after it and its × takes it away. On a step's head, + adds a step after it and × removes the step. A function such as when or coalesce can only start a chain: pick it where a new chain starts, or under Wrap in a function in the method list, which puts the chain so far inside it. What a function takes is a list under the step.",
-    kind: 'add',
-  },
-  {
-    id: 'add-point',
-    name: 'Waiting where you point',
-    note: 'The same, but a faint method shows only on the row or line the pointer is in, so the steps are quieter at rest. The faint step at the end always shows.',
     kind: 'add',
   },
   {

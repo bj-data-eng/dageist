@@ -1180,16 +1180,6 @@ body {
   visibility: hidden;
 }
 
-/* B · Waiting where you point: a method that waits shows on the row or line the pointer is in. */
-.v-add-point .link.waits {
-  visibility: hidden;
-}
-
-.v-add-point :is(.row, .subrow, .line):hover .link.waits,
-.v-add-point .link.waits:has(.is-open) {
-  visibility: visible;
-}
-
 /* ------------------------------------------------------------------ */
 /* Lists under a step                                                  */
 /* ------------------------------------------------------------------ */
