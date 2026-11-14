@@ -28,7 +28,7 @@ const WORKSPACES: readonly WorkspaceTab[] = [
 ];
 
 /**
- * Returns the workspace the address names after its `#`, or the step editor.
+ * Returns the workspace the address names after its `#`, or the transform.
  * The address keeps the workspace, so reloading the page stays on it.
  */
 function startingWorkspace(): Workspace {

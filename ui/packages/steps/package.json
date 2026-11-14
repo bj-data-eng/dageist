@@ -2,7 +2,7 @@
   "name": "@dageist/steps",
   "version": "0.1.0",
   "private": true,
-  "description": "The step editor: a transformation built as a list of steps made of swappable parts.",
+  "description": "A transformation built as a list of steps made of swappable parts: the table with the steps beside it, and the window that edits them.",
   "license": "MIT",
   "type": "module",
   "exports": {
