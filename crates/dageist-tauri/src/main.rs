@@ -34,6 +34,7 @@ fn main() {
     tauri::Builder::default()
         .manage(SampleGate::default())
         .manage(OpenTable::default())
+        .on_window_event(windows::close_with_main)
         .invoke_handler(tauri::generate_handler![
             core_identity,
             sample_table::open_sample_window,

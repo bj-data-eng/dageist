@@ -64,7 +64,7 @@ sets the following:
 | View | `../../ui/dist`, embedded at compile time; build it with `npm --prefix ui run build` first |
 | Global API | `app.withGlobalTauri` is `true`, which injects `window.__TAURI__` |
 | Main window | Label `main`, title `dageist`, 1440×900, minimum 960×600, dark theme |
-| Steps window | Label `steps`, title `dageist · steps`, 1180×820, minimum 820×520, dark theme. It loads the view's page as `index.html?window=steps` and is opened by `open_view_window`, not at start. |
+| Steps window | Label `steps`, title `dageist · steps`, 1180×820, minimum 820×520, dark theme. It loads the view's page as `index.html?window=steps` and is opened by `open_view_window`, not at start. It closes when the main window does. |
 | Minimum macOS | 13.3, the first version whose system WebKit supports the CSS that Tailwind CSS 4 emits |
 | Content security policy | Same-origin scripts, styles and images, plus `data:` images and the IPC channel |
 
