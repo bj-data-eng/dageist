@@ -237,7 +237,7 @@ function RenameHead({ step, frame, onChange }: HeadProps<RenameStep>): React.JSX
               // A setting that can be anything is typed in a field inside the list.
               return (
                 <>
-                  <span className="dg-offer-note">→</span>
+                  <span className="dg-arrow">→</span>
                   <input
                     type="text"
                     aria-label={`New name for ${name}`}

@@ -81,7 +81,7 @@ Every package is private and is consumed as TypeScript source.
 | --- | --- | --- | --- |
 | `@dageist/desktop` | [ui/apps/desktop/](../ui/apps/desktop/src/App.tsx) | The shell: picks the host, composes the features, owns the page, the bundler configuration and the design tokens. | Every package below, React, and flechette for the stand-in host |
 | `@dageist/host` | [ui/packages/host/](../ui/packages/host/src/contract.ts) | The contract of every IPC command and its implementation over Tauri. | Nothing |
-| `@dageist/design` | [ui/packages/design/](../ui/packages/design/src/index.ts) | Primitive components: `Block`, `Piece`, `Slot`, `ManySlot`, `OfferList`, `TypedBlock`, `Popover`, `Hint`, `ToggleButton`, `Panel`, and the blocks' stylesheet `blocks.css`. | React, React DOM |
+| `@dageist/design` | [ui/packages/design/](../ui/packages/design/src/index.ts) | Primitive components: `Block`, `Piece`, `Slot`, `ManySlot`, `OfferList`, `TypedBlock`, `Popover`, `Hint`, `ToggleButton`, `Panel`, and the blocks' stylesheet `blocks.css`. `Popover` is placed by Floating UI. | Floating UI, React, React DOM |
 | `@dageist/steps` | [ui/packages/steps/](../ui/packages/steps/src/StepsWorkspace.tsx) | The steps of a transform and their storyboard model: the main window's table with its list of steps, and the window the steps are edited in. | `@dageist/design`, `@dageist/host`, dnd kit, React, React DOM |
 | `@dageist/table` | [ui/packages/table/](../ui/packages/table/src/TableViewer.tsx) | The table viewer: fetches blocks as Arrow bytes and draws only those. | `@dageist/design`, `@dageist/host`, flechette, React |
 
