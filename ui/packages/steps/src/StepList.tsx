@@ -4,16 +4,13 @@
  * to another place, and a faint step waits after the last one.
  */
 
-import type { Plugins } from '@dnd-kit/abstract';
-import { StyleInjector } from '@dnd-kit/dom';
 import { DragDropProvider } from '@dnd-kit/react';
 import { isSortable } from '@dnd-kit/react/sortable';
 import { useMemo, useState } from 'react';
 
 import { Slot } from '@dageist/design';
 
-import type { DragSettings } from './Chain';
-import { DragSettingsContext } from './Chain';
+import { DragSettingsContext, dragSettingsFor, moved } from './Chain';
 import type { Fresh } from './Lists';
 import { FreshContext } from './Lists';
 import { STEP_GROUP, StepRow, verbOffers } from './StepRow';
@@ -21,14 +18,6 @@ import type { Frame } from './model/frame';
 import { SOURCE_FRAME } from './model/frame';
 import type { Step, StepResult, Verb } from './model/steps';
 import { defaultStep } from './model/steps';
-
-function moved<T>(items: readonly T[], from: number, to: number): readonly T[] {
-  const next = [...items];
-  const [item] = next.splice(from, 1);
-  if (item === undefined) return items;
-  next.splice(to, 0, item);
-  return next;
-}
 
 /** What a step list shows and reports. */
 export interface StepListProps {
@@ -57,20 +46,7 @@ export function StepList({
   const [freshId, setFreshId] = useState<string | null>(null);
   const fresh = useMemo((): Fresh => ({ id: freshId, mark: setFreshId }), [freshId]);
 
-  // Dragging injects a few style rules; under a content security policy they
-  // need the page's nonce. Without a policy dnd kit's defaults are right.
-  const dragSettings = useMemo(
-    (): DragSettings =>
-      styleNonce === null
-        ? {}
-        : {
-            plugins: (defaults: Plugins): Plugins => [
-              ...defaults,
-              StyleInjector.configure({ nonce: styleNonce }),
-            ],
-          },
-    [styleNonce],
-  );
+  const dragSettings = useMemo(() => dragSettingsFor(styleNonce), [styleNonce]);
 
   const frameBefore = (index: number): Frame => results[index - 1]?.frame ?? SOURCE_FRAME;
   const addStep = (verb: Verb, after: number): void => {

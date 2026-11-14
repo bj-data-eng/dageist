@@ -8,7 +8,7 @@
  */
 
 import type { Plugins } from '@dnd-kit/abstract';
-import { PointerActivationConstraints, PointerSensor } from '@dnd-kit/dom';
+import { PointerActivationConstraints, PointerSensor, StyleInjector } from '@dnd-kit/dom';
 import { DragDropProvider } from '@dnd-kit/react';
 import { isSortable, useSortable } from '@dnd-kit/react/sortable';
 import { createContext, useCallback, useContext, useState } from 'react';
@@ -41,6 +41,31 @@ import { checkChain } from './model/source';
 /** How every drag-and-drop area in the editor is set up. */
 export interface DragSettings {
   readonly plugins?: (defaults: Plugins) => Plugins;
+}
+
+/**
+ * Returns how dragging is set up for a page whose content security policy
+ * accepts `styleNonce` for injected styles, or has no policy when it is
+ * `null`. Dragging injects a few style rules; without a policy dnd kit's
+ * defaults are right.
+ */
+export function dragSettingsFor(styleNonce: string | null): DragSettings {
+  if (styleNonce === null) return {};
+  return {
+    plugins: (defaults: Plugins): Plugins => [
+      ...defaults,
+      StyleInjector.configure({ nonce: styleNonce }),
+    ],
+  };
+}
+
+/** Returns `items` with the one at `from` moved to the place `to`. */
+export function moved<T>(items: readonly T[], from: number, to: number): readonly T[] {
+  const next = [...items];
+  const [item] = next.splice(from, 1);
+  if (item === undefined) return items;
+  next.splice(to, 0, item);
+  return next;
 }
 
 /** The drag-and-drop settings the editor's chains share. */

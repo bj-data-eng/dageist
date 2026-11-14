@@ -171,7 +171,7 @@ export function App(): React.JSX.Element {
                 {null}
               </Panel>
             ) : (
-              <StepsWorkspace host={host} />
+              <StepsWorkspace host={host} styleNonce={STYLE_NONCE} />
             )}
           </div>
         )}

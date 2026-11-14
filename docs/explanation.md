@@ -97,10 +97,13 @@ behavior yet. The decisions below are the ones the core is expected to carry.
 
 - **Two windows.** The table is the centre of the main window, and the steps
   are listed down its right side, each said by its head, such as "Sort table
-  by dcn" or "Add column step_index". The steps themselves are edited in a
-  window of their own, which shows every step as its blocks beside the same
-  list. The step chosen in either window is the one whose rows the table
-  shows, and a change in the steps window shows in the main window at once.
+  by dcn" or "Add column step_index". Choosing a step there shows the rows
+  after it, so the table can be followed step by step, and a step is dragged
+  to another place in the list. The steps themselves are edited in a window
+  of their own, opened by a button or a double click on a step, which shows
+  every step as its blocks beside the same list. The step chosen in either
+  window is the one whose rows the table shows, and a change in one window
+  shows in the other at once.
 - **Words.** A step is named for what it does to the table: Add column,
   Filter table, Sort table, Select, Rename, Join table, Pivot table. Methods
   keep their Polars names, such as `shift`, `cum_sum` and `over`, because a

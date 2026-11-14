@@ -1,8 +1,9 @@
 /**
  * @file The main window's view of a transform: the table in the centre and
  * the steps down the right, each said by its head. Choosing a step shows the
- * rows after it and opens the steps in a window of their own, where they are
- * edited. What is changed there shows here at once.
+ * rows after it, and a step is dragged to another place in the list. The
+ * steps are edited in a window of their own, which a button opens. What is
+ * changed there shows here at once.
  */
 
 import { useState } from 'react';
@@ -10,6 +11,7 @@ import { useState } from 'react';
 import { Panel, cx } from '@dageist/design';
 import type { Host } from '@dageist/host';
 
+import { moved } from './Chain';
 import { Pipeline } from './Pipeline';
 import { RowsPreview } from './RowsPreview';
 import { StepNavigator } from './StepNavigator';
@@ -46,10 +48,15 @@ function CentreTab({ active, onChoose, children }: CentreTabProps): React.JSX.El
 export interface StepsWorkspaceProps {
   /** Opens the steps window and carries the steps between the windows. */
   readonly host: Host;
+  /**
+   * The nonce the page's content security policy accepts for injected styles,
+   * or `null` when there is no policy. Dragging injects a few style rules.
+   */
+  readonly styleNonce: string | null;
 }
 
 /** Draws the table of the sample claims with its steps listed beside it. */
-export function StepsWorkspace({ host }: StepsWorkspaceProps): React.JSX.Element {
+export function StepsWorkspace({ host, styleNonce }: StepsWorkspaceProps): React.JSX.Element {
   const { steps, selectedId, stepsOpen, change } = useSharedSteps(host, 'main');
   const [centre, setCentre] = useState<Centre>('rows');
   const results = runSteps(steps);
@@ -65,7 +72,7 @@ export function StepsWorkspace({ host }: StepsWorkspaceProps): React.JSX.Element
       mark="ƒx"
       title="Transform · Claim timing"
       details={[
-        'The rows after the chosen step. Choose a step on the right to see its rows and to open the steps in their own window.',
+        'The rows after the chosen step. Choose a step on the right to see how the table changes, and drag a step to another place. Open the editor to change the steps.',
       ]}
     >
       <div className="flex min-h-0 flex-1">
@@ -111,10 +118,11 @@ export function StepsWorkspace({ host }: StepsWorkspaceProps): React.JSX.Element
             <span className="font-mono text-[11px] text-muted">{steps.length}</span>
             <button
               type="button"
-              className="ml-auto cursor-pointer rounded-sm px-1.5 text-xs text-muted hover:bg-hover hover:text-ink"
+              title="Opens every step as its blocks, in a window of its own. A double click on a step does the same."
+              className="ml-auto cursor-pointer rounded-md border border-line-strong px-2 py-0.5 text-xs font-semibold text-ink hover:border-accent hover:bg-hover"
               onClick={openSteps}
             >
-              {stepsOpen ? 'Go to the steps window' : 'Open the steps'}
+              {stepsOpen ? 'Go to the editor' : 'Open the editor'}
             </button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
@@ -122,7 +130,15 @@ export function StepsWorkspace({ host }: StepsWorkspaceProps): React.JSX.Element
               steps={steps}
               results={results}
               selectedId={selectedId}
+              styleNonce={styleNonce}
               onSelect={(id) => {
+                // Choosing a step only shows its rows. The editor is asked for on its own.
+                change(steps, id);
+              }}
+              onMove={(from, to) => {
+                change(moved(steps, from, to), selectedId);
+              }}
+              onOpen={(id) => {
                 change(steps, id);
                 openSteps();
               }}
@@ -130,7 +146,7 @@ export function StepsWorkspace({ host }: StepsWorkspaceProps): React.JSX.Element
           </div>
           {stepsOpen && (
             <p className="m-0 border-t border-line px-3 py-2 text-xs text-muted">
-              The steps are open in their own window. What is changed there shows here.
+              The editor is open in its own window. What is changed there shows here.
             </p>
           )}
         </aside>

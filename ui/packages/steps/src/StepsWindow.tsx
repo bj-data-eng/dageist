@@ -10,6 +10,7 @@ import { useEffect } from 'react';
 import { Panel } from '@dageist/design';
 import type { Host } from '@dageist/host';
 
+import { moved } from './Chain';
 import { InputsStrip } from './InputsStrip';
 import { StepList } from './StepList';
 import { StepNavigator } from './StepNavigator';
@@ -57,9 +58,14 @@ export function StepsWindow({ host, styleNonce }: StepsWindowProps): React.JSX.E
             steps={steps}
             results={results}
             selectedId={selectedId}
+            styleNonce={styleNonce}
             onSelect={(id) => {
               change(steps, id);
             }}
+            onMove={(from, to) => {
+              change(moved(steps, from, to), selectedId);
+            }}
+            onOpen={null}
           />
         </nav>
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-3">
