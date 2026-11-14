@@ -107,10 +107,19 @@ pub fn close_with_main<R: Runtime>(window: &Window<R>, event: &WindowEvent) {
 
 #[cfg(test)]
 mod tests {
-    use tauri::test::{mock_builder, mock_context, noop_assets};
-    use tauri::{Manager, WindowEvent};
+    use std::sync::Barrier;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::thread;
+    use std::time::Duration;
 
-    use super::{ViewWindow, close_with_main, open_view_window};
+    use tauri::test::{mock_builder, mock_context, noop_assets};
+    use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+
+    use super::{ViewWindow, close_with_main, open_once, open_view_window};
+
+    /// How long the stand-in for a native window takes to build. A real one
+    /// takes longer; this is long enough for a second request to arrive.
+    const BUILD_TIME: Duration = Duration::from_millis(50);
 
     #[test]
     fn asking_twice_for_the_steps_window_opens_it_once() {
@@ -124,6 +133,34 @@ mod tests {
 
         assert_eq!(app.webview_windows().len(), 1);
         assert!(app.get_webview_window("steps").is_some());
+    }
+
+    #[test]
+    fn requests_that_arrive_together_build_one_steps_window() {
+        let app = mock_builder()
+            .build(mock_context(noop_assets()))
+            .expect("the mock application builds");
+        let handle = app.handle().clone();
+        let built = AtomicUsize::new(0);
+        let together = Barrier::new(2);
+
+        thread::scope(|scope| {
+            for _ in 0..2 {
+                scope.spawn(|| {
+                    together.wait();
+                    open_once(&handle, ViewWindow::Steps, || {
+                        built.fetch_add(1, Ordering::SeqCst);
+                        // The time under test: the window is not there to be found until
+                        // it is built, and the other request arrives in the meantime.
+                        thread::sleep(BUILD_TIME);
+                        WebviewWindowBuilder::new(&handle, "steps", WebviewUrl::default()).build()
+                    })
+                    .expect("the window opens or comes forward");
+                });
+            }
+        });
+
+        assert_eq!(built.load(Ordering::SeqCst), 1);
     }
 
     #[test]
