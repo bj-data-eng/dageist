@@ -5,6 +5,7 @@
 import type { Offer, OfferGroup, Tone } from '@dageist/design';
 
 import type { Dtype, Frame } from './model/frame';
+import { findColumn } from './model/frame';
 
 /** Reports whether what was typed is found in any of `texts`. Nothing typed finds everything. */
 export function matches(typed: string, ...texts: readonly string[]): boolean {
@@ -49,8 +50,8 @@ export function titled(title: string | null, offers: readonly Offer[]): OfferGro
 export interface FieldOffering {
   /** Returns why a field of `dtype` cannot be picked, or `null` when it can. */
   readonly reasonFor: (dtype: Dtype) => string | null;
-  /** Reports whether a field is ticked, in a list that takes several. `null` in one that takes one. */
-  readonly ticked: ((name: string) => boolean) | null;
+  /** The fields that are ticked, in a list that takes several. `null` in one that takes one. */
+  readonly chosen: readonly string[] | null;
   /** Returns the control a ticked field has at the end of its row, or `null`. */
   readonly renderExtra: (name: string) => React.ReactNode;
   readonly onPick: (name: string) => void;
@@ -58,32 +59,38 @@ export interface FieldOffering {
 
 /** Lists the fields of `frame` that match what was typed, each with its exact dtype. */
 export function fieldOffers(frame: Frame, typed: string, offering: FieldOffering): Offer[] {
-  const { reasonFor, ticked, renderExtra, onPick } = offering;
+  const { reasonFor, chosen, renderExtra, onPick } = offering;
+  const pick = (name: string): (() => void) => {
+    return () => {
+      onPick(name);
+    };
+  };
   const found = frame
     .filter((column) => matches(typed, column.name))
     .map((column) =>
-      offer(
-        column.name,
-        'column',
-        column.dtype,
-        () => {
-          onPick(column.name);
-        },
-        {
-          reason: reasonFor(column.dtype),
-          ticked: ticked === null ? null : ticked(column.name),
-          extra: renderExtra(column.name),
-        },
-      ),
+      offer(column.name, 'column', column.dtype, pick(column.name), {
+        reason: reasonFor(column.dtype),
+        ticked: chosen === null ? null : chosen.includes(column.name),
+        extra: renderExtra(column.name),
+      }),
+    );
+  if (chosen === null) return found;
+  // A ticked field that is no longer in the rows is still listed, so that it can be unticked.
+  const missing = chosen
+    .filter((name) => findColumn(frame, name) === null && matches(typed, name))
+    .map((name) =>
+      offer(name, 'column', 'not in the rows', pick(name), {
+        id: `missing:${name}`,
+        ticked: true,
+        extra: renderExtra(name),
+      }),
     );
   // The fields already ticked come first, so they are in view however long the list is.
-  if (ticked === null) return found;
-  const ordered = [...found];
-  ordered.sort((left, right) => Number(right.ticked) - Number(left.ticked));
-  return ordered;
+  found.sort((left, right) => Number(right.ticked) - Number(left.ticked));
+  return [...missing, ...found];
 }
 
 /** Offers every field, one to pick, with nothing ruled out. */
 export function anyField(onPick: (name: string) => void): FieldOffering {
-  return { reasonFor: () => null, ticked: null, renderExtra: () => null, onPick };
+  return { reasonFor: () => null, chosen: null, renderExtra: () => null, onPick };
 }

@@ -100,6 +100,8 @@ export function Slot({
 export interface Entry {
   /** Tells the entry from the others in its slot. */
   readonly id: string;
+  /** Whether the entry cannot be worked out, such as a field that is no longer there. */
+  readonly wrong: boolean;
   readonly blocks: ReadonlyArray<{
     readonly label: string;
     readonly tone: Tone;
@@ -218,7 +220,7 @@ export function ManySlot({
                 tone={block.tone}
                 look={block.look}
                 describedAs={`${describedAs}: ${block.label}`}
-                wrong={wrong}
+                wrong={wrong || entry.wrong}
                 expanded={open}
                 onPress={toggle}
               />

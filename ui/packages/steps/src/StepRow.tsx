@@ -140,6 +140,7 @@ function SortHead({ step, frame, onChange }: HeadProps<SortStep>): React.JSX.Ele
   const fresh = useContext(FreshContext);
   const entries: Entry[] = step.by.map((key) => ({
     id: key.column,
+    wrong: findColumn(frame, key.column) === null,
     blocks: [
       { label: key.column, tone: 'column', look: 'plain' },
       { label: key.descending ? 'descending' : 'ascending', tone: 'value', look: 'plain' },
@@ -160,7 +161,7 @@ function SortHead({ step, frame, onChange }: HeadProps<SortStep>): React.JSX.Ele
             'Fields',
             fieldOffers(frame, typed, {
               reasonFor: () => null,
-              ticked: (name) => step.by.some((key) => key.column === name),
+              chosen: step.by.map((key) => key.column),
               renderExtra: (name) => {
                 const key = step.by.find((candidate) => candidate.column === name);
                 if (key === undefined) return null;
@@ -206,6 +207,7 @@ function SelectHead({ step, frame, onChange }: HeadProps<SelectStep>): React.JSX
   const fresh = useContext(FreshContext);
   const entries: Entry[] = step.columns.map((name) => ({
     id: name,
+    wrong: findColumn(frame, name) === null,
     blocks: [{ label: name, tone: 'column', look: 'plain' }],
   }));
   return (
@@ -220,7 +222,7 @@ function SelectHead({ step, frame, onChange }: HeadProps<SelectStep>): React.JSX
           'Fields',
           fieldOffers(frame, typed, {
             reasonFor: () => null,
-            ticked: (name) => step.columns.includes(name),
+            chosen: step.columns,
             renderExtra: () => null,
             onPick: (name) => {
               onChange({
@@ -241,6 +243,7 @@ function RenameHead({ step, frame, onChange }: HeadProps<RenameStep>): React.JSX
   const fresh = useContext(FreshContext);
   const entries: Entry[] = step.names.map(({ from, to }) => ({
     id: from,
+    wrong: findColumn(frame, from) === null || to === '',
     blocks: [
       { label: from, tone: 'column', look: 'plain' },
       { label: to === '' ? 'name' : to, tone: 'ink', look: to === '' ? 'none' : 'plain' },
@@ -259,7 +262,7 @@ function RenameHead({ step, frame, onChange }: HeadProps<RenameStep>): React.JSX
           'Fields',
           fieldOffers(frame, typed, {
             reasonFor: () => null,
-            ticked: (name) => step.names.some((naming) => naming.from === name),
+            chosen: step.names.map((naming) => naming.from),
             renderExtra: (name) => {
               const naming = step.names.find((candidate) => candidate.from === name);
               if (naming === undefined) return null;
@@ -514,6 +517,7 @@ function PivotHead({ step, frame, onChange }: HeadProps<PivotStep>): React.JSX.E
           <ManySlot
             entries={step.pinned.map((value) => ({
               id: cellLabel(value),
+              wrong: false,
               blocks: [{ label: cellLabel(value), tone: 'value', look: 'plain' }],
             }))}
             empty="no values"
@@ -522,7 +526,7 @@ function PivotHead({ step, frame, onChange }: HeadProps<PivotStep>): React.JSX.E
             offers={(typed) => [
               counted(
                 `Values of ${step.on}`,
-                values
+                [...step.pinned.filter((value) => !values.includes(value)), ...values]
                   .filter((value) => matches(typed, cellLabel(value)))
                   .map((value) =>
                     offer(

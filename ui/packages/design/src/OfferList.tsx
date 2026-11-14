@@ -54,6 +54,20 @@ export interface OfferListProps {
   readonly onDone: () => void;
 }
 
+/** Returns what tells a row from every other row of a list: its group and its id. */
+function keyOf(group: OfferGroup, offer: Offer): string {
+  return `${group.title ?? ''}\u0000${offer.id}`;
+}
+
+/** Returns the place of every row within its group. */
+function placesOf(groups: readonly OfferGroup[]): ReadonlyMap<string, number> {
+  const places = new Map<string, number>();
+  for (const group of groups) {
+    for (const [at, offer] of group.offers.entries()) places.set(keyOf(group, offer), at);
+  }
+  return places;
+}
+
 /** Shows what is on offer and picks from it by pointer or keyboard. */
 export function OfferList({
   placeholder,
@@ -65,13 +79,24 @@ export function OfferList({
   const [typed, setTyped] = useState('');
   /** The row the keyboard is on, or `null` for the first one Enter is meant for. */
   const [marked, setMarked] = useState<string | null>(null);
+  // Where each row stood when the list opened or was last searched. The rows keep those places
+  // while rows are ticked, so the row under the pointer does not move away from it.
+  const [places, setPlaces] = useState(() => placesOf(groups('')));
   const search = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
   useEffect(() => {
     search.current?.focus();
   }, []);
 
-  const shown = groups(typed).filter((group) => group.offers.length > 0);
+  const shown = groups(typed)
+    .filter((group) => group.offers.length > 0)
+    .map((group) => {
+      const offers = [...group.offers];
+      const placeOf = (offer: Offer): number =>
+        places.get(keyOf(group, offer)) ?? Number.MAX_SAFE_INTEGER;
+      offers.sort((left, right) => placeOf(left) - placeOf(right));
+      return { ...group, offers };
+    });
   const pickable = shown.flatMap((group) => group.offers).filter((offer) => offer.reason === null);
   const first = pickable.find((offer) => !offer.act) ?? pickable[0];
   const chosen = pickable.find((offer) => offer.id === marked) ?? first;
@@ -107,6 +132,7 @@ export function OfferList({
           onChange={(event) => {
             setTyped(event.currentTarget.value);
             setMarked(null);
+            setPlaces(placesOf(groups(event.currentTarget.value)));
           }}
           onKeyDown={(event) => {
             if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
