@@ -70,12 +70,32 @@ export type Comparison = '==' | '!=' | '>' | '>=' | '<' | '<=' | 'is_in';
 /** Every comparison, in the order it is offered. */
 export const COMPARISONS: readonly Comparison[] = ['==', '!=', '>', '>=', '<', '<=', 'is_in'];
 
-/** `pl.col(column) <comparison> value`. */
-export interface Condition {
+/** One test: `pl.col(column) <comparison> value`. */
+export interface Test {
+  readonly kind: 'test';
+  /** Stays with the test while it is edited or moved into a group. */
+  readonly id: string;
   readonly column: string;
   readonly comparison: Comparison;
   readonly value: Value;
 }
+
+/**
+ * Several conditions taken together. Every one of them must hold, or any one
+ * of them is enough. A group inside a group is worked out first, so nothing
+ * depends on which of `&` and `|` binds tighter.
+ */
+export interface Group {
+  readonly kind: 'group';
+  /** Stays with the group while it is edited. */
+  readonly id: string;
+  /** Whether every item must hold. Otherwise any one of them is enough. */
+  readonly every: boolean;
+  readonly items: readonly Condition[];
+}
+
+/** What a filter keeps rows by, and what a `when` decides by. */
+export type Condition = Test | Group;
 
 /** One `.when(condition).then(value)` pair. */
 export interface Arm {
@@ -215,6 +235,15 @@ export function dtypesAgree(left: Dtype, right: Dtype): boolean {
 
 /** Returns why `condition` cannot be worked out on `frame`, or `null` when it can. */
 export function conditionProblem(condition: Condition, frame: Frame): string | null {
+  if (condition.kind === 'group') {
+    if (condition.items.length === 0) return 'A group needs at least one condition.';
+    for (const item of condition.items) {
+      const problem = conditionProblem(item, frame);
+      if (problem !== null) return problem;
+    }
+    return null;
+  }
+  if (condition.column === '') return 'Pick the field to compare.';
   const column = findColumn(frame, condition.column);
   if (column === null) return `There is no column "${condition.column}".`;
   if (condition.comparison === 'is_in') {
@@ -256,6 +285,14 @@ function holds(comparison: Comparison, left: Cell, right: Cell): boolean {
 
 /** Reports, for every row of `frame`, whether `condition` is true on it. */
 export function conditionRows(condition: Condition, frame: Frame): boolean[] {
+  if (condition.kind === 'group') {
+    const items = condition.items.map((item) => conditionRows(item, frame));
+    return rowsOf(frame).map((row) =>
+      condition.every
+        ? items.every((item) => item[row] === true)
+        : items.some((item) => item[row] === true),
+    );
+  }
   const left = findColumn(frame, condition.column)?.cells ?? [];
   if (condition.comparison === 'is_in') {
     const list = condition.value.kind === 'input' ? findInput(condition.value.name) : null;
@@ -275,6 +312,11 @@ export function conditionRows(condition: Condition, frame: Frame): boolean[] {
 
 /** Returns the Polars text of `condition`. */
 export function conditionText(condition: Condition): string {
+  if (condition.kind === 'group') {
+    // Every item stands in brackets, so the text says what the lists say.
+    const joined = condition.items.map((item) => `(${conditionText(item)})`);
+    return joined.join(condition.every ? ' & ' : ' | ');
+  }
   if (condition.comparison === 'is_in') {
     return `pl.col(${quoted(condition.column)}).is_in(${valueText(condition.value)})`;
   }
@@ -354,6 +396,9 @@ function checkWhen(source: WhenSource, frame: Frame): SourceCheck {
 /** Returns the dtype `source` gives on `frame`, or why it gives none. */
 export function checkSource(source: Source, frame: Frame): SourceCheck {
   if (source.kind === 'when') return checkWhen(source, frame);
+  if (source.column === '') {
+    return { dtype: null, problem: 'Pick the field the chain starts from.' };
+  }
   const column = findColumn(frame, source.column);
   return column === null
     ? { dtype: null, problem: `There is no column "${source.column}".` }

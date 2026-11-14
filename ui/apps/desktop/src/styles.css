@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* The blocks the design system draws with. Their colours are the tokens below. */
+@import '../../../packages/design/src/blocks.css';
 
 /* The feature packages hold most of the markup, so scan them for class names. */
 @source '../../../packages';
@@ -27,6 +29,26 @@
   --color-chain: #252931;
   --color-invalid: #43262c;
   --color-fresh: #2f2a22;
+  /* What a block names: a function or method, a plain value, a comparison, a dtype. */
+  --color-function: #d7dbe2;
+  --color-value: #f3c98b;
+  --color-compare: #ff9d5c;
+  --color-dtype: #7fd6a4;
+  /* Something that cannot be worked out. */
+  --color-wrong: #ff7385;
+  /* The panels at the sides of a block, and what they turn to: take away, and add. */
+  --color-side: #3a3f49;
+  --color-side-ink: #c3c8d1;
+  --color-remove: #f0203c;
+  --color-add: #0cae4f;
+  /* The colour each kind of step is written in. */
+  --color-verb-add: #f08a3c;
+  --color-verb-filter: #e3cf6b;
+  --color-verb-sort: #3fbf7f;
+  --color-verb-select: #c79bf2;
+  --color-verb-rename: #f08fb0;
+  --color-verb-join: #cbbcff;
+  --color-verb-pivot: #7fc4e8;
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }

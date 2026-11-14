@@ -1,6 +1,7 @@
 /**
- * @file The step list in Polars' own vocabulary: `with_columns`, `sort` and
- * `filter`, each working on the frame the step before it produced.
+ * @file The step list in Polars' own vocabulary: `with_columns`, `filter`,
+ * `sort`, `select`, `rename`, `join` and `pivot`, each working on the frame
+ * the step before it produced.
  *
  * This is storyboard code. In the real application the Rust core owns types,
  * validation and previews; nothing here is meant to survive.
@@ -32,10 +33,18 @@ import {
 import { TABLES, findTable } from './tables';
 
 /** The step verbs, by their Polars names. */
-export type Verb = 'with_columns' | 'sort' | 'filter' | 'join' | 'pivot';
+export type Verb = 'with_columns' | 'filter' | 'sort' | 'select' | 'rename' | 'join' | 'pivot';
 
 /** Every verb, in the order it is offered. */
-export const VERBS: readonly Verb[] = ['with_columns', 'sort', 'filter', 'join', 'pivot'];
+export const VERBS: readonly Verb[] = [
+  'with_columns',
+  'filter',
+  'sort',
+  'select',
+  'rename',
+  'join',
+  'pivot',
+];
 
 /** `.with_columns(expr)`: adds a column, or replaces one of the same name. */
 export interface WithColumnsStep {
@@ -45,13 +54,40 @@ export interface WithColumnsStep {
   readonly expr: Expr;
 }
 
-/** `.sort(by…, descending=…)`. */
+/** One column a sort orders by, and which way. */
+export interface SortKey {
+  readonly column: string;
+  readonly descending: boolean;
+}
+
+/** `.sort(by…, descending=[…])`: orders the rows by one column after another. */
 export interface SortStep {
   /** Stays with the step while it is moved or edited. */
   readonly id: string;
   readonly verb: 'sort';
-  readonly by: readonly string[];
-  readonly descending: boolean;
+  readonly by: readonly SortKey[];
+}
+
+/** `.select(columns…)`: keeps some of the columns, in the order given. */
+export interface SelectStep {
+  /** Stays with the step while it is moved or edited. */
+  readonly id: string;
+  readonly verb: 'select';
+  readonly columns: readonly string[];
+}
+
+/** One column a rename gives a new name. */
+export interface Renaming {
+  readonly from: string;
+  readonly to: string;
+}
+
+/** `.rename({from: to, …})`: gives columns new names. */
+export interface RenameStep {
+  /** Stays with the step while it is moved or edited. */
+  readonly id: string;
+  readonly verb: 'rename';
+  readonly names: readonly Renaming[];
 }
 
 /** `.filter(condition)`: keeps the rows where the condition is true. */
@@ -112,7 +148,14 @@ export interface PivotStep {
 }
 
 /** One step of the list. */
-export type Step = WithColumnsStep | SortStep | FilterStep | JoinStep | PivotStep;
+export type Step =
+  | WithColumnsStep
+  | FilterStep
+  | SortStep
+  | SelectStep
+  | RenameStep
+  | JoinStep
+  | PivotStep;
 
 /** Where the lazy query has to stop before `step` can run, if it has to. */
 export function stepBreak(step: Step): 'collect' | 'sink' | null {
@@ -152,13 +195,13 @@ function withColumns(frame: Frame, step: WithColumnsStep): StepResult {
 }
 
 function sort(frame: Frame, step: SortStep): StepResult {
-  const keys: Column[] = [];
-  for (const name of step.by) {
-    const column = findColumn(frame, name);
-    if (column === null) return failed(frame, `There is no column "${name}".`);
-    keys.push(column);
+  const keys: Array<{ readonly cells: readonly Cell[]; readonly descending: boolean }> = [];
+  for (const key of step.by) {
+    const column = findColumn(frame, key.column);
+    if (column === null) return failed(frame, `There is no column "${key.column}".`);
+    keys.push({ cells: column.cells, descending: key.descending });
   }
-  if (keys.length === 0) return failed(frame, 'sort needs a column.');
+  if (keys.length === 0) return failed(frame, 'Pick the fields to sort by.');
   const order = Array.from({ length: frame[0]?.cells.length ?? 0 }, (_unused, row) => row);
   order.sort((left, right) => {
     for (const key of keys) {
@@ -167,12 +210,45 @@ function sort(frame: Frame, step: SortStep): StepResult {
       const compared = compareCells(first, second);
       if (compared === 0) continue;
       // Polars keeps nulls first whichever way the values are ordered.
-      const reverses = step.descending && first !== null && second !== null;
+      const reverses = key.descending && first !== null && second !== null;
       return reverses ? -compared : compared;
     }
     return left - right;
   });
   return { frame: reordered(frame, order), problem: null, added: [] };
+}
+
+function select(frame: Frame, step: SelectStep): StepResult {
+  if (step.columns.length === 0) return failed(frame, 'Pick the fields to keep.');
+  const kept: Column[] = [];
+  for (const name of step.columns) {
+    const column = findColumn(frame, name);
+    if (column === null) return failed(frame, `There is no column "${name}".`);
+    kept.push(column);
+  }
+  return { frame: kept, problem: null, added: [] };
+}
+
+function rename(frame: Frame, step: RenameStep): StepResult {
+  const renamed = new Map<string, string>();
+  for (const { from, to } of step.names) {
+    if (findColumn(frame, from) === null) return failed(frame, `There is no column "${from}".`);
+    if (to.trim() === '') return failed(frame, `"${from}" needs a new name.`);
+    renamed.set(from, to);
+  }
+  const next = frame.map((column) => ({
+    ...column,
+    name: renamed.get(column.name) ?? column.name,
+  }));
+  // Polars refuses a rename that would leave two columns with one name.
+  const taken = new Set<string>();
+  for (const column of next) {
+    if (taken.has(column.name)) {
+      return failed(frame, `The rename would leave two columns called "${column.name}".`);
+    }
+    taken.add(column.name);
+  }
+  return { frame: next, problem: null, added: [...renamed.values()] };
 }
 
 function filter(frame: Frame, step: FilterStep): StepResult {
@@ -311,6 +387,10 @@ function runStep(frame: Frame, step: Step): StepResult {
       return sort(frame, step);
     case 'filter':
       return filter(frame, step);
+    case 'select':
+      return select(frame, step);
+    case 'rename':
+      return rename(frame, step);
     case 'join':
       return join(frame, step);
     case 'pivot':
@@ -344,18 +424,26 @@ export function defaultStep(verb: Verb, frame: Frame): Step {
       return {
         id,
         verb,
-        expr: { source: { kind: 'column', column: first }, methods: [], alias: 'new_column' },
+        // The chain starts from a field that is still to be picked.
+        expr: { source: { kind: 'column', column: '' }, methods: [], alias: 'new_column' },
       };
     case 'sort':
-      return { id, verb, by: [first], descending: false };
+      return { id, verb, by: [] };
+    case 'select':
+      return { id, verb, columns: frame.map((column) => column.name) };
+    case 'rename':
+      return { id, verb, names: [] };
     case 'filter':
       return {
         id,
         verb,
         condition: {
-          column: first,
+          // A comparison whose field and value are still to be picked.
+          kind: 'test',
+          id: nextId('test'),
+          column: '',
           comparison: '==',
-          value: { kind: 'literal', value: distinctValues(frame, first)[0] ?? null },
+          value: { kind: 'literal', value: null },
         },
       };
     case 'join': {
@@ -414,8 +502,16 @@ export function stepText(step: Step): string {
     case 'with_columns':
       return `.with_columns(${exprText(step.expr)})`;
     case 'sort': {
-      const columns = step.by.map((name) => quoted(name)).join(', ');
-      return step.descending ? `.sort(${columns}, descending=True)` : `.sort(${columns})`;
+      const columns = step.by.map((key) => quoted(key.column)).join(', ');
+      if (!step.by.some((key) => key.descending)) return `.sort(${columns})`;
+      const ways = step.by.map((key) => (key.descending ? 'True' : 'False')).join(', ');
+      return `.sort(${columns}, descending=[${ways}])`;
+    }
+    case 'select':
+      return `.select(${step.columns.map((name) => quoted(name)).join(', ')})`;
+    case 'rename': {
+      const names = step.names.map(({ from, to }) => `${quoted(from)}: ${quoted(to)}`);
+      return `.rename({${names.join(', ')}})`;
     }
     case 'filter':
       return `.filter(${conditionText(step.condition)})`;
