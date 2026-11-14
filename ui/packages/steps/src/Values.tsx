@@ -50,7 +50,7 @@ export function emptyTest(): Test {
     id: nextId('test'),
     column: '',
     comparison: '==',
-    value: { kind: 'literal', value: null },
+    value: { kind: 'unset' },
   };
 }
 
@@ -66,8 +66,6 @@ export interface ValueSlotProps {
   readonly lists: boolean;
   /** The dtype the value is compared with, when it is compared with one. */
   readonly expected: Dtype | null;
-  /** Whether nothing is picked yet, so that the slot says what goes there. */
-  readonly unset: boolean;
   readonly onChange: (value: Value) => void;
 }
 
@@ -84,7 +82,6 @@ export function ValueSlot({
   label,
   lists,
   expected,
-  unset,
   onChange,
 }: ValueSlotProps): React.JSX.Element {
   const fresh = useContext(FreshContext);
@@ -173,7 +170,7 @@ export function ValueSlot({
         <Line
           waits={false}
           onRemove={() => {
-            onChange({ kind: 'literal', value: null });
+            onChange({ kind: 'unset' });
           }}
         >
           <span className="dg-flow">
@@ -211,7 +208,8 @@ export function ValueSlot({
       wrong: column === null,
       lines: column === null ? [] : [`${column.name} · ${column.dtype}`],
     };
-  } else if (unset) {
+  } else if (value.kind === 'unset') {
+    // Nothing is picked yet, so the slot says what goes there.
     shown = { label: 'value', tone: 'value', look: 'none', wrong: false, lines: [] };
   } else {
     shown = { ...literalBlock(value.value), tone: 'value', wrong: false, lines: [] };
@@ -254,7 +252,7 @@ export function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JS
         found.find((input) => expected !== null && keysFit(expected, input.dtype)) ?? found[0];
       onChange({ ...test, comparison, value: { kind: 'input', name: list?.name ?? '' } });
     } else if (comparison !== 'is_in' && wasList) {
-      onChange({ ...test, comparison, value: { kind: 'literal', value: null } });
+      onChange({ ...test, comparison, value: { kind: 'unset' } });
     } else {
       onChange({ ...test, comparison });
     }
@@ -317,7 +315,6 @@ export function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JS
         label={unset ? 'The value it is compared with' : `Value compared with ${test.column}`}
         lists={test.comparison === 'is_in'}
         expected={expected}
-        unset={unset}
         onChange={(value) => {
           onChange({ ...test, value });
         }}
@@ -326,9 +323,13 @@ export function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JS
   );
 }
 
-/** Returns `group` without the item called `id`. A group left with one item is that item. */
-function withoutItem(group: Group, id: string): Condition {
+/**
+ * Returns `group` without the item called `id`. A group left with one item
+ * is that item, and a group left with none is nothing, so it goes too.
+ */
+function withoutItem(group: Group, id: string): Condition | null {
   const items = group.items.filter((item) => item.id !== id);
+  if (items.length === 0) return null;
   const [only] = items;
   return items.length === 1 && only !== undefined ? only : { ...group, items };
 }
@@ -375,8 +376,8 @@ function GroupWord({ group, tone, onChange }: GroupWordProps): React.JSX.Element
 interface GroupLinesProps {
   readonly group: Group;
   readonly frame: Frame;
-  /** Reports the group as it is now, or the one item it has come down to. */
-  readonly onChange: (condition: Condition) => void;
+  /** Reports the group as it is now, the one item it has come down to, or `null` when none is left. */
+  readonly onChange: (condition: Condition | null) => void;
 }
 
 /**
@@ -426,7 +427,9 @@ function GroupLines({ group, frame, onChange }: GroupLinesProps): React.JSX.Elem
                   group={item}
                   frame={frame}
                   onChange={(inner) => {
-                    withItem(inner, item.id);
+                    // A group with no line left goes, as a line that is removed does.
+                    if (inner === null) onChange(withoutItem(group, item.id));
+                    else withItem(inner, item.id);
                   }}
                 />
               </OwnedLines>
@@ -530,7 +533,14 @@ export function ConditionBlocks({
     <>
       <GroupWord group={condition} tone={tone} onChange={onChange} />
       <OwnedLines>
-        <GroupLines group={condition} frame={frame} onChange={onChange} />
+        <GroupLines
+          group={condition}
+          frame={frame}
+          onChange={(next) => {
+            // The condition of a step or a case always has something in it.
+            if (next !== null) onChange(next);
+          }}
+        />
       </OwnedLines>
     </>
   );

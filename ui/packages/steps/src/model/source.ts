@@ -61,8 +61,13 @@ export interface InputValue {
   readonly name: string;
 }
 
+/** A value that is still to be picked. It stands for nothing until it is. */
+export interface UnsetValue {
+  readonly kind: 'unset';
+}
+
 /** A value a condition compares with or returns. */
-export type Value = ColumnValue | LiteralValue | ChainValue | InputValue;
+export type Value = ColumnValue | LiteralValue | ChainValue | InputValue | UnsetValue;
 
 /** The comparisons, as Polars and Python spell them. `is_in` tests membership in a list. */
 export type Comparison = '==' | '!=' | '>' | '>=' | '<' | '<=' | 'is_in';
@@ -179,6 +184,7 @@ function withLiteral(dtype: Dtype, value: number): Dtype | null {
 }
 
 function checkValue(value: Value, frame: Frame): SourceCheck {
+  if (value.kind === 'unset') return { dtype: null, problem: 'Pick a value.' };
   if (value.kind === 'input') {
     const input = findInput(value.name);
     if (input === null) return { dtype: null, problem: `There is no input "${value.name}".` };
@@ -212,6 +218,8 @@ function checkValue(value: Value, frame: Frame): SourceCheck {
 /** Returns the Polars text of `value` where a column or expression is expected. */
 export function valueText(value: Value): string {
   if (value.kind === 'chain') return chainText(value.chain);
+  // What is still to be picked is written as nothing.
+  if (value.kind === 'unset') return 'None';
   // An input is named in the code as it is in the editor.
   if (value.kind === 'input') return value.name;
   return value.kind === 'column' ? `pl.col(${quoted(value.column)})` : literalText(value.value);
@@ -225,7 +233,7 @@ function cellsOf(value: Value, frame: Frame): readonly Cell[] {
     const input = findInput(value.name);
     return rowsOf(frame).map(() => (input?.kind === 'value' ? input.value : null));
   }
-  return rowsOf(frame).map(() => value.value);
+  return rowsOf(frame).map(() => (value.kind === 'unset' ? null : value.value));
 }
 
 /** Reports whether two dtypes can be compared or returned side by side. */

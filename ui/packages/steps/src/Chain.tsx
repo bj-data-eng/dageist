@@ -117,7 +117,7 @@ function columnBehind(source: Source): string {
 
 /** Returns a case with nothing in it yet: a comparison, then a value. */
 function emptyArm(): Arm {
-  return { id: nextId('arm'), condition: emptyTest(), returns: { kind: 'literal', value: null } };
+  return { id: nextId('arm'), condition: emptyTest(), returns: { kind: 'unset' } };
 }
 
 interface CasesProps {
@@ -147,7 +147,6 @@ function Cases({ source, frame, onChange }: CasesProps): React.JSX.Element {
       label={label}
       lists={false}
       expected={null}
-      unset={false}
       onChange={onValue}
     />
   );
@@ -434,7 +433,7 @@ export function ChainBlocks({
                         withSource({
                           kind: 'when',
                           arms: [arm],
-                          otherwise: { kind: 'literal', value: null },
+                          otherwise: { kind: 'unset' },
                         });
                         fresh.mark(arm.condition.id);
                       }),

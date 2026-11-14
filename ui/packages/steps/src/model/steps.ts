@@ -220,6 +220,9 @@ function sort(frame: Frame, step: SortStep): StepResult {
 
 function select(frame: Frame, step: SelectStep): StepResult {
   if (step.columns.length === 0) return failed(frame, 'Pick the fields to keep.');
+  // Polars refuses to select one column twice.
+  const twice = step.columns.find((name, at) => step.columns.indexOf(name) !== at);
+  if (twice !== undefined) return failed(frame, `"${twice}" is selected twice.`);
   const kept: Column[] = [];
   for (const name of step.columns) {
     const column = findColumn(frame, name);
@@ -233,7 +236,7 @@ function rename(frame: Frame, step: RenameStep): StepResult {
   const renamed = new Map<string, string>();
   for (const { from, to } of step.names) {
     if (findColumn(frame, from) === null) return failed(frame, `There is no column "${from}".`);
-    if (to.trim() === '') return failed(frame, `"${from}" needs a new name.`);
+    if (to === '') return failed(frame, `"${from}" needs a new name.`);
     renamed.set(from, to);
   }
   const next = frame.map((column) => ({
@@ -443,7 +446,7 @@ export function defaultStep(verb: Verb, frame: Frame): Step {
           id: nextId('test'),
           column: '',
           comparison: '==',
-          value: { kind: 'literal', value: null },
+          value: { kind: 'unset' },
         },
       };
     case 'join': {
