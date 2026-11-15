@@ -5,16 +5,16 @@
 dependencies declared in
 [crates/dageist-tauri/Cargo.toml](crates/dageist-tauri/Cargo.toml) and
 [crates/dageist-engine/Cargo.toml](crates/dageist-engine/Cargo.toml) at the
-versions resolved by [Cargo.lock](Cargo.lock), and for the libraries copied
-into the view. It does not enumerate the Rust dependencies' transitive,
-optional, platform, or compiled dependencies, and it is not a complete
-inventory for a distributed application bundle.
+versions resolved by [Cargo.lock](Cargo.lock), and for the libraries and the
+typefaces copied into the view. It does not enumerate the Rust dependencies'
+transitive, optional, platform, or compiled dependencies, and it is not a
+complete inventory for a distributed application bundle.
 
 Vite and its React plugin, the Tailwind CSS Vite plugin, TypeScript, oxlint,
 oxlint-tsgolint, oxfmt and the React and Node type declarations, declared in
 [ui/package.json](ui/package.json), are development-only tools and are not
 redistributed. The view in `ui/dist/` contains this repository's compiled
-source bundled with the libraries listed below.
+source bundled with the libraries listed below, and the typefaces' files.
 
 ## Dependencies
 
@@ -63,6 +63,19 @@ distributed by the Floating UI contributors:
 
 * License: [MIT License](licenses/floating-ui/LICENSE)
 * Homepage: [Floating UI](https://floating-ui.com)
+
+This product's view includes the upright variable font of the Inter typeface
+4.1, unmodified, distributed by The Inter Project Authors:
+
+* License: [SIL Open Font License 1.1](licenses/inter/LICENSE.txt)
+* Homepage: [Inter](https://rsms.me/inter/)
+
+This product's view includes the regular and semi-bold weights of the
+JetBrains Mono typeface 2.304, unmodified, distributed by The JetBrains Mono
+Project Authors:
+
+* License: [SIL Open Font License 1.1](licenses/jetbrains-mono/OFL.txt)
+* Homepage: [JetBrains Mono](https://www.jetbrains.com/lp/mono/)
 
 This product depends on polars 0.55.2, distributed by Ritchie Vink, with some
 portions by NVIDIA Corporation and affiliates:
