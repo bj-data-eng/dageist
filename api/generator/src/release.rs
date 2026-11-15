@@ -26,6 +26,18 @@ pub struct Listed<'a> {
     pub reason: &'a str,
 }
 
+/// A package that upstream crates use, compiled with features that only one
+/// of the builds turns on, and why.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ExpectedFeatures<'a> {
+    pub package: &'a str,
+    /// Features only the workspace's build turns on.
+    pub only_here: &'a [&'a str],
+    /// Features only the release build turns on.
+    pub only_in_release: &'a [&'a str],
+    pub reason: &'a str,
+}
+
 /// The upstream project whose release build the workspace builds like.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Upstream<'a> {
@@ -39,6 +51,8 @@ pub struct Upstream<'a> {
     pub left_out_crates: &'a [Listed<'a>],
     /// Packages the workspace's upstream crates use that the release build does not.
     pub extra_packages: &'a [Listed<'a>],
+    /// Packages upstream crates use that one build compiles with features the other does not.
+    pub expected_features: &'a [ExpectedFeatures<'a>],
 }
 
 /// Where a package comes from, as `cargo tree` names it.
@@ -160,11 +174,25 @@ fn is_upstream(package: &Package, upstream_dir: &Path) -> bool {
 /// Returns every package that is not an upstream crate and that an upstream
 /// crate uses, directly or not.
 fn used_by_upstream(graph: &Graph, upstream_dir: &Path) -> BTreeSet<Package> {
+    reached_from_upstream(graph, upstream_dir, &|_| false)
+        .into_iter()
+        .map(|unit| unit.package.clone())
+        .collect()
+}
+
+/// Returns every unit that is not an upstream crate and that an upstream
+/// crate uses, directly or not, counting only the upstream crates that
+/// `skipped` does not name.
+fn reached_from_upstream<'g>(
+    graph: &'g Graph,
+    upstream_dir: &Path,
+    skipped: &dyn Fn(&str) -> bool,
+) -> BTreeSet<&'g Unit> {
     let mut seen: BTreeSet<&Unit> = BTreeSet::new();
     let mut waiting: Vec<&Unit> = graph
         .uses
         .keys()
-        .filter(|unit| is_upstream(&unit.package, upstream_dir))
+        .filter(|unit| is_upstream(&unit.package, upstream_dir) && !skipped(&unit.package.name))
         .collect();
     while let Some(unit) = waiting.pop() {
         for used in graph.uses.get(unit).into_iter().flatten() {
@@ -173,10 +201,105 @@ fn used_by_upstream(graph: &Graph, upstream_dir: &Path) -> BTreeSet<Package> {
             }
         }
     }
-    seen.into_iter()
-        .map(|unit| unit.package.clone())
-        .filter(|package| !is_upstream(package, upstream_dir))
+    seen.retain(|unit| !is_upstream(&unit.package, upstream_dir));
+    seen
+}
+
+/// Returns the features each package is compiled with in `units`, counting
+/// every copy of it together.
+fn features_by_package<'g>(
+    units: impl IntoIterator<Item = &'g Unit>,
+) -> BTreeMap<&'g Package, BTreeSet<&'g str>> {
+    let mut features: BTreeMap<&Package, BTreeSet<&str>> = BTreeMap::new();
+    for unit in units {
+        features
+            .entry(&unit.package)
+            .or_default()
+            .extend(unit.features.iter().map(String::as_str));
+    }
+    features
+}
+
+/// Returns the features in `found` that `listed` does not expect.
+fn unexpected<'f>(found: &BTreeSet<&'f str>, listed: Option<&[&str]>) -> Vec<&'f str> {
+    found
+        .iter()
+        .filter(|feature| !listed.is_some_and(|listed| listed.contains(feature)))
+        .copied()
         .collect()
+}
+
+/// Compares the features of the packages upstream crates use in both builds,
+/// adding a problem for each difference that `upstream` does not expect and
+/// for each expected one that no longer occurs. The release's own package
+/// and the crates the workspace leaves out are not counted as users.
+fn compare_shared_features(
+    ours: &Graph,
+    release: &Graph,
+    upstream: &Upstream<'_>,
+    upstream_dir: &Path,
+    problems: &mut Vec<String>,
+) {
+    let skipped = |name: &str| {
+        name == upstream.package
+            || upstream
+                .left_out_crates
+                .iter()
+                .any(|listed| listed.name == name)
+    };
+    let our_features = features_by_package(reached_from_upstream(ours, upstream_dir, &skipped));
+    let release_reached =
+        features_by_package(reached_from_upstream(release, upstream_dir, &skipped));
+    let mut differences: BTreeMap<&str, (BTreeSet<&str>, BTreeSet<&str>)> = BTreeMap::new();
+    for (package, ours) in &our_features {
+        // A package the release's shared crates do not use is reported with the versions.
+        let Some(theirs) = release_reached.get(package) else {
+            continue;
+        };
+        let only_here = ours.difference(theirs).copied().collect::<BTreeSet<_>>();
+        let only_in_release = theirs.difference(ours).copied().collect::<BTreeSet<_>>();
+        let expected = upstream
+            .expected_features
+            .iter()
+            .find(|expected| expected.package == package.name);
+        let here = unexpected(&only_here, expected.map(|expected| expected.only_here));
+        let there = unexpected(
+            &only_in_release,
+            expected.map(|expected| expected.only_in_release),
+        );
+        if !here.is_empty() {
+            problems.push(format!(
+                "{package} is compiled here with features the release does not turn on: {}",
+                here.join(", ")
+            ));
+        }
+        if !there.is_empty() {
+            problems.push(format!(
+                "{package} is compiled without features the release turns on: {}",
+                there.join(", ")
+            ));
+        }
+        differences.insert(package.name.as_str(), (only_here, only_in_release));
+    }
+    for expected in upstream.expected_features {
+        let (only_here, only_in_release) = differences
+            .get(expected.package)
+            .cloned()
+            .unwrap_or_default();
+        for (listed, found, side) in [
+            (expected.only_here, &only_here, "here"),
+            (expected.only_in_release, &only_in_release, "in the release"),
+        ] {
+            for feature in listed {
+                if !found.contains(feature) {
+                    problems.push(format!(
+                        "the expected feature {feature} of {} {side} no longer differs; remove it from the list",
+                        expected.package
+                    ));
+                }
+            }
+        }
+    }
 }
 
 /// The upstream crates of a build by name, with every set of features each
@@ -320,6 +443,8 @@ pub fn compare(
             )
         });
     }
+
+    compare_shared_features(ours, release, upstream, upstream_dir, &mut problems);
 
     for listed in upstream.left_out_features {
         if !has_feature(&release_crates, listed.krate, listed.feature)

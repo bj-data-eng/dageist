@@ -14,8 +14,8 @@ use std::process::Command;
 mod release;
 
 pub use release::{
-    Graph, LeftOutFeature, Listed, Origin, Package, Unit, Upstream, check_release, compare,
-    parse_graph, parse_tree_line, toolchain_channel, toolchain_problems,
+    ExpectedFeatures, Graph, LeftOutFeature, Listed, Origin, Package, Unit, Upstream,
+    check_release, compare, parse_graph, parse_tree_line, toolchain_channel, toolchain_problems,
 };
 
 /// The toolchain whose rustdoc writes the JSON, and whose Cargo reads the
@@ -128,8 +128,86 @@ pub const DAGEIST: Workspace<'static> = Workspace {
             name: "objc2-exception-helper",
             reason: "Tauri turns on objc2's exception feature, and Polars' sysinfo uses objc2",
         }],
+        expected_features: &[
+            ExpectedFeatures {
+                package: "base64",
+                only_here: &["default", "simd-unsafe"],
+                only_in_release: &[],
+                reason: "plist, which Tauri uses, takes base64's default features",
+            },
+            ExpectedFeatures {
+                package: "icu_properties",
+                only_here: &["default"],
+                only_in_release: &[],
+                reason: "urlpattern, which Tauri's tauri-utils uses, takes its default features",
+            },
+            ExpectedFeatures {
+                package: "matrixmultiply",
+                only_here: &[],
+                only_in_release: &["std"],
+                reason: NUMPY,
+            },
+            ExpectedFeatures {
+                package: "miniz_oxide",
+                only_here: &["default"],
+                only_in_release: &[],
+                reason: "png, which Tauri's icon handling uses, takes its default features",
+            },
+            ExpectedFeatures {
+                package: "ndarray",
+                only_here: &[],
+                only_in_release: &["default", "std"],
+                reason: NUMPY,
+            },
+            ExpectedFeatures {
+                package: "num-complex",
+                only_here: &[],
+                only_in_release: &["default", "std"],
+                reason: NUMPY,
+            },
+            ExpectedFeatures {
+                package: "num-integer",
+                only_here: &[],
+                only_in_release: &["default", "std"],
+                reason: NUMPY,
+            },
+            ExpectedFeatures {
+                package: "objc2",
+                only_here: &["disable-encoding-assertions", "exception"],
+                only_in_release: &[],
+                reason: "wry, Tauri's webview, turns them on",
+            },
+            ExpectedFeatures {
+                package: "proc-macro2",
+                only_here: &["span-locations"],
+                only_in_release: &[],
+                reason: "tauri-macros turns it on; proc-macro2 runs only while building",
+            },
+            ExpectedFeatures {
+                package: "serde_json",
+                only_here: &["alloc", "raw_value"],
+                only_in_release: &[],
+                reason: "Tauri's tauri and serialize-to-javascript turn on raw_value, and its jsonptr alloc",
+            },
+            ExpectedFeatures {
+                package: "simd-adler32",
+                only_here: &["const-generics", "default", "std"],
+                only_in_release: &[],
+                reason: "fdeflate, which Tauri's PNG handling uses, takes its default features",
+            },
+            ExpectedFeatures {
+                package: "url",
+                only_here: &["serde"],
+                only_in_release: &[],
+                reason: "Tauri's tauri-utils turns it on",
+            },
+        ],
     },
 };
+
+/// Why the release compiles some numeric crates with more features.
+const NUMPY: &str = "numpy, which Polars' Python glue uses, takes ndarray's default features, \
+     and with them std in ndarray and the crates it builds on";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ArtifactCheck {
@@ -764,6 +842,7 @@ mod tests {
         left_out_features: &[],
         left_out_crates: &[],
         extra_packages: &[],
+        expected_features: &[],
     };
 
     #[test]
@@ -1352,6 +1431,7 @@ mod tests {
             name: "host-only",
             reason: "test",
         }],
+        expected_features: &[],
     };
 
     /// The release build: its runtime uses `up-core` and `up-binding`, which use registry crates.
@@ -1542,6 +1622,69 @@ mod tests {
         assert!(problems.iter().all(|problem| !problem.contains("tauri")));
     }
 
+    /// Compares `ours` with the release under `upstream`.
+    fn compared_with(ours: &str, upstream: &Upstream<'_>) -> Vec<String> {
+        compare(
+            &parse_graph(ours).unwrap(),
+            &parse_graph(RELEASE_TREE).unwrap(),
+            upstream,
+            Path::new(UP),
+        )
+    }
+
+    #[test]
+    fn a_shared_package_compiled_with_other_features_is_named() {
+        let ours = our_tree("a", "").replacen("2libc v0.2.1|std\n", "2libc v0.2.1|std,extra\n", 1);
+        assert_eq!(
+            compared(&ours),
+            ["libc 0.2.1 is compiled here with features the release does not turn on: extra"],
+        );
+
+        let ours = our_tree("a", "").replacen("2libc v0.2.1|std\n", "2libc v0.2.1|\n", 1);
+        assert!(compared(&ours).contains(
+            &"libc 0.2.1 is compiled without features the release turns on: std".to_owned()
+        ),);
+    }
+
+    #[test]
+    fn an_expected_feature_difference_passes_and_a_stale_one_is_named() {
+        let ours = our_tree("a", "").replacen("2libc v0.2.1|std\n", "2libc v0.2.1|std,extra\n", 1);
+        let expected = Upstream {
+            expected_features: &[ExpectedFeatures {
+                package: "libc",
+                only_here: &["extra"],
+                only_in_release: &[],
+                reason: "test",
+            }],
+            ..UPSTREAM
+        };
+        assert_eq!(compared_with(&ours, &expected), Vec::<String>::new());
+
+        assert_eq!(
+            compared_with(&our_tree("a", ""), &expected),
+            ["the expected feature extra of libc here no longer differs; remove it from the list"],
+        );
+    }
+
+    #[test]
+    fn a_package_only_a_left_out_crate_uses_in_the_release_is_not_compared() {
+        // In the release only the binding uses zlib; here up-core uses it with other features.
+        let release = RELEASE_TREE.replace(
+            "1up-binding v1.0.0 (/work/vendor/up/binding)|\n",
+            "1up-binding v1.0.0 (/work/vendor/up/binding)|\n2zlib v1.0.0|python\n",
+        );
+        let ours = our_tree("a", "2zlib v1.0.0|\n");
+
+        let problems = compare(
+            &parse_graph(&ours).unwrap(),
+            &parse_graph(&release).unwrap(),
+            &UPSTREAM,
+            Path::new(UP),
+        );
+
+        assert_eq!(problems, Vec::<String>::new());
+    }
+
     #[test]
     fn listed_exceptions_that_no_longer_apply_are_named() {
         // The release no longer turns on glue, builds up-binding, or differs on host-only.
@@ -1644,6 +1787,7 @@ mod tests {
         }],
         left_out_crates: &[],
         extra_packages: &[],
+        expected_features: &[],
     };
 
     #[test]
