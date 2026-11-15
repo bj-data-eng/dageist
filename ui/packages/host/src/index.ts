@@ -6,11 +6,18 @@
 
 export type {
   BlockRequest,
+  CatalogueView,
+  ChoiceView,
   ColumnView,
+  EntryView,
   Host,
   IdentityView,
+  KindView,
+  ParameterView,
+  ShapeView,
   TableView,
   WindowName,
+  WordsView,
 } from './contract';
 export { deliverMessage, sealMessage } from './envelope';
 export { tauriHost } from './tauri';

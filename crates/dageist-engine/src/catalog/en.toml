@@ -1,0 +1,486 @@
+# English words for the catalogue. Every word the editor shows comes from a language
+# file like this one, Polars' own names included. In English the shown name of an
+# entry, a parameter and a choice word is exactly Polars' name; `changed` lists the
+# names that are deliberately not, written as `Entry.id`, `Entry.id#parameter` or
+# `Entry.id#parameter#word`.
+changed = []
+
+[families.steps]
+title = "Steps · change the table"
+
+[families.rows]
+title = "Rows"
+
+[families.cumulative]
+title = "Cumulative"
+
+[families.arithmetic]
+title = "Arithmetic"
+
+[families.temporal]
+title = "dt · dates and times"
+
+[families.window]
+title = "Window"
+
+[families.compare]
+title = "Comparison · true or false"
+
+[families.start]
+title = "Start · a column or a value"
+
+[families.condition]
+title = "Condition · when, then, otherwise"
+
+[dtypes.any]
+name = "any"
+hint = "every dtype"
+
+[dtypes.numeric]
+name = "numeric"
+hint = "integers and floats"
+
+[dtypes.integer]
+name = "integer"
+hint = "whole numbers"
+
+[dtypes.temporal]
+name = "temporal"
+hint = "dates, times and durations"
+
+[dtypes.Datetime]
+name = "Datetime"
+hint = "a date with a time of day"
+
+[dtypes.Date]
+name = "Date"
+hint = "a calendar date"
+
+[dtypes.Time]
+name = "Time"
+hint = "a time of day"
+
+[dtypes.Duration]
+name = "Duration"
+hint = "a length of time"
+
+[dtypes.String]
+name = "String"
+hint = "text"
+
+[dtypes.Boolean]
+name = "Boolean"
+hint = "true or false"
+
+[entries."Expr.cum_count"]
+name = "cum_count"
+hint = "running count"
+
+[entries."Expr.cum_count".parameters.reverse]
+name = "reverse"
+label = "from the end"
+
+[entries."Expr.cum_max"]
+name = "cum_max"
+hint = "running maximum"
+
+[entries."Expr.cum_max".parameters.reverse]
+name = "reverse"
+label = "from the end"
+
+[entries."Expr.cum_sum"]
+name = "cum_sum"
+hint = "running total"
+
+[entries."Expr.cum_sum".parameters.reverse]
+name = "reverse"
+label = "from the end"
+
+[entries."Expr.dt.date"]
+name = "dt.date"
+hint = "the date part"
+
+[entries."Expr.dt.month_start"]
+name = "dt.month_start"
+hint = "first of the month"
+
+[entries."Expr.dt.offset_by"]
+name = "dt.offset_by"
+hint = "move by a duration"
+
+[entries."Expr.dt.offset_by".parameters.by]
+name = "by"
+label = "by"
+
+[entries."Expr.dt.time"]
+name = "dt.time"
+hint = "the time part"
+
+[entries."Expr.dt.total_days"]
+name = "dt.total_days"
+hint = "whole days in a duration"
+
+[entries."Expr.dt.total_days".parameters.fractional]
+name = "fractional"
+label = "with fractions"
+
+[entries."Expr.eq"]
+name = "eq"
+hint = "equal to"
+
+[entries."Expr.eq".parameters.other]
+name = "other"
+label = "compared with"
+
+[entries."Expr.first"]
+name = "first"
+hint = "first value"
+
+[entries."Expr.first".parameters.ignore_nulls]
+name = "ignore_nulls"
+label = "skip empty values"
+
+[entries."Expr.ge"]
+name = "ge"
+hint = "at least"
+
+[entries."Expr.ge".parameters.other]
+name = "other"
+label = "compared with"
+
+[entries."Expr.gt"]
+name = "gt"
+hint = "greater than"
+
+[entries."Expr.gt".parameters.other]
+name = "other"
+label = "compared with"
+
+[entries."Expr.is_not_null"]
+name = "is_not_null"
+hint = "has a value"
+
+[entries."Expr.is_null"]
+name = "is_null"
+hint = "has no value"
+
+[entries."Expr.last"]
+name = "last"
+hint = "last value"
+
+[entries."Expr.last".parameters.ignore_nulls]
+name = "ignore_nulls"
+label = "skip empty values"
+
+[entries."Expr.le"]
+name = "le"
+hint = "at most"
+
+[entries."Expr.le".parameters.other]
+name = "other"
+label = "compared with"
+
+[entries."Expr.lt"]
+name = "lt"
+hint = "less than"
+
+[entries."Expr.lt".parameters.other]
+name = "other"
+label = "compared with"
+
+[entries."Expr.ne"]
+name = "ne"
+hint = "not equal to"
+
+[entries."Expr.ne".parameters.other]
+name = "other"
+label = "compared with"
+
+[entries."Expr.over"]
+name = "over"
+hint = "within each group"
+
+[entries."Expr.over".parameters.partition_by]
+name = "partition_by"
+label = "group by"
+
+[entries."Expr.over".parameters.more_exprs]
+name = "more_exprs"
+label = "and by"
+
+[entries."Expr.over".parameters.order_by]
+name = "order_by"
+label = "ordered by"
+
+[entries."Expr.over".parameters.descending]
+name = "descending"
+label = "descending"
+
+[entries."Expr.over".parameters.nulls_last]
+name = "nulls_last"
+label = "empty values last"
+
+[entries."Expr.over".parameters.mapping_strategy]
+name = "mapping_strategy"
+label = "result per"
+
+[entries."Expr.over".parameters.mapping_strategy.choices]
+group_to_rows = "group_to_rows"
+join = "join"
+explode = "explode"
+
+[entries."Expr.shift"]
+name = "shift"
+hint = "value n rows earlier"
+
+[entries."Expr.shift".parameters.n]
+name = "n"
+label = "rows"
+
+[entries."Expr.shift".parameters.fill_value]
+name = "fill_value"
+label = "fill with"
+
+[entries."Expr.sub"]
+name = "sub"
+hint = "minus another value"
+
+[entries."Expr.sub".parameters.other]
+name = "other"
+label = "minus"
+
+[entries."LazyFrame.filter"]
+name = "filter"
+hint = "the rows where a condition holds"
+head = "Filter table"
+
+[entries."LazyFrame.filter".parameters.predicates]
+name = "predicates"
+label = "conditions"
+
+[entries."LazyFrame.filter".parameters.constraints]
+name = "constraints"
+label = "columns equal to"
+
+[entries."LazyFrame.join"]
+name = "join"
+hint = "columns from another table, by a key"
+head = "Join table"
+
+[entries."LazyFrame.join".parameters.other]
+name = "other"
+label = "other table"
+
+[entries."LazyFrame.join".parameters.on]
+name = "on"
+label = "key"
+
+[entries."LazyFrame.join".parameters.how]
+name = "how"
+label = "kind of join"
+
+[entries."LazyFrame.join".parameters.how.choices]
+inner = "inner"
+left = "left"
+right = "right"
+full = "full"
+semi = "semi"
+anti = "anti"
+cross = "cross"
+
+[entries."LazyFrame.join".parameters.left_on]
+name = "left_on"
+label = "left key"
+
+[entries."LazyFrame.join".parameters.right_on]
+name = "right_on"
+label = "right key"
+
+[entries."LazyFrame.join".parameters.suffix]
+name = "suffix"
+label = "suffix for repeated names"
+
+[entries."LazyFrame.join".parameters.validate]
+name = "validate"
+label = "keys must be"
+
+[entries."LazyFrame.join".parameters.validate.choices]
+"m:m" = "m:m"
+"m:1" = "m:1"
+"1:m" = "1:m"
+"1:1" = "1:1"
+
+[entries."LazyFrame.join".parameters.nulls_equal]
+name = "nulls_equal"
+label = "empty keys match"
+
+[entries."LazyFrame.join".parameters.coalesce]
+name = "coalesce"
+label = "merge key columns"
+
+[entries."LazyFrame.join".parameters.maintain_order]
+name = "maintain_order"
+label = "keep the order of"
+
+[entries."LazyFrame.join".parameters.maintain_order.choices]
+none = "none"
+left = "left"
+right = "right"
+left_right = "left_right"
+right_left = "right_left"
+
+[entries."LazyFrame.join".parameters.build_side]
+name = "build_side"
+label = "lookup built from"
+
+[entries."LazyFrame.join".parameters.build_side.choices]
+auto = "auto"
+prefer_left = "prefer_left"
+prefer_right = "prefer_right"
+force_left = "force_left"
+force_right = "force_right"
+
+[entries."LazyFrame.join".parameters.allow_parallel]
+name = "allow_parallel"
+label = "allow parallel work"
+
+[entries."LazyFrame.join".parameters.force_parallel]
+name = "force_parallel"
+label = "force parallel work"
+
+[entries."LazyFrame.pivot"]
+name = "pivot"
+hint = "the values of a field as columns"
+head = "Pivot table"
+
+[entries."LazyFrame.pivot".parameters.on]
+name = "on"
+label = "columns to spread"
+
+[entries."LazyFrame.pivot".parameters.on_columns]
+name = "on_columns"
+label = "values to spread"
+
+[entries."LazyFrame.pivot".parameters.index]
+name = "index"
+label = "rows kept"
+
+[entries."LazyFrame.pivot".parameters.values]
+name = "values"
+label = "values filled in"
+
+[entries."LazyFrame.pivot".parameters.aggregate_function]
+name = "aggregate_function"
+label = "repeats combined by"
+
+[entries."LazyFrame.pivot".parameters.maintain_order]
+name = "maintain_order"
+label = "keep the order"
+
+[entries."LazyFrame.pivot".parameters.separator]
+name = "separator"
+label = "separator"
+
+[entries."LazyFrame.pivot".parameters.column_naming]
+name = "column_naming"
+label = "column names"
+
+[entries."LazyFrame.pivot".parameters.column_naming.choices]
+auto = "auto"
+combine = "combine"
+
+[entries."LazyFrame.rename"]
+name = "rename"
+hint = "columns under new names"
+head = "Rename"
+
+[entries."LazyFrame.rename".parameters.mapping]
+name = "mapping"
+label = "new names"
+
+[entries."LazyFrame.rename".parameters.strict]
+name = "strict"
+label = "fail on unknown column"
+
+[entries."LazyFrame.select"]
+name = "select"
+hint = "some of the columns"
+head = "Select"
+
+[entries."LazyFrame.select".parameters.exprs]
+name = "exprs"
+label = "columns"
+
+[entries."LazyFrame.select".parameters.named_exprs]
+name = "named_exprs"
+label = "new columns"
+
+[entries."LazyFrame.sort"]
+name = "sort"
+hint = "the rows in the order of some fields"
+head = "Sort table"
+
+[entries."LazyFrame.sort".parameters.by]
+name = "by"
+label = "sort by"
+
+[entries."LazyFrame.sort".parameters.more_by]
+name = "more_by"
+label = "then by"
+
+[entries."LazyFrame.sort".parameters.descending]
+name = "descending"
+label = "descending"
+
+[entries."LazyFrame.sort".parameters.nulls_last]
+name = "nulls_last"
+label = "empty values last"
+
+[entries."LazyFrame.sort".parameters.maintain_order]
+name = "maintain_order"
+label = "keep the order of ties"
+
+[entries."LazyFrame.sort".parameters.multithreaded]
+name = "multithreaded"
+label = "use many threads"
+
+[entries."LazyFrame.with_columns"]
+name = "with_columns"
+hint = "a new column from a chain"
+head = "Add column"
+
+[entries."LazyFrame.with_columns".parameters.exprs]
+name = "exprs"
+label = "columns"
+
+[entries."LazyFrame.with_columns".parameters.named_exprs]
+name = "named_exprs"
+label = "new columns"
+
+[entries."polars.col"]
+name = "col"
+hint = "a column of the table"
+
+[entries."polars.col".parameters.name]
+name = "name"
+label = "column"
+
+[entries."polars.col".parameters.more_names]
+name = "more_names"
+label = "more columns"
+
+[entries."polars.lit"]
+name = "lit"
+hint = "a value written out"
+
+[entries."polars.lit".parameters.value]
+name = "value"
+label = "value"
+
+[entries."polars.lit".parameters.dtype]
+name = "dtype"
+label = "as dtype"
+
+[entries."polars.lit".parameters.allow_object]
+name = "allow_object"
+label = "allow any object"

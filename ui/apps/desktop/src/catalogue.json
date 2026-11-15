@@ -1,0 +1,1353 @@
+{
+  "families": [
+    {
+      "key": "steps",
+      "title": "Steps · change the table"
+    },
+    {
+      "key": "rows",
+      "title": "Rows"
+    },
+    {
+      "key": "cumulative",
+      "title": "Cumulative"
+    },
+    {
+      "key": "arithmetic",
+      "title": "Arithmetic"
+    },
+    {
+      "key": "temporal",
+      "title": "dt · dates and times"
+    },
+    {
+      "key": "window",
+      "title": "Window"
+    },
+    {
+      "key": "compare",
+      "title": "Comparison · true or false"
+    },
+    {
+      "key": "start",
+      "title": "Start · a column or a value"
+    },
+    {
+      "key": "condition",
+      "title": "Condition · when, then, otherwise"
+    }
+  ],
+  "dtypes": [
+    {
+      "key": "any",
+      "title": "any"
+    },
+    {
+      "key": "numeric",
+      "title": "numeric"
+    },
+    {
+      "key": "integer",
+      "title": "integer"
+    },
+    {
+      "key": "temporal",
+      "title": "temporal"
+    },
+    {
+      "key": "Datetime",
+      "title": "Datetime"
+    },
+    {
+      "key": "Date",
+      "title": "Date"
+    },
+    {
+      "key": "Time",
+      "title": "Time"
+    },
+    {
+      "key": "Duration",
+      "title": "Duration"
+    },
+    {
+      "key": "String",
+      "title": "String"
+    },
+    {
+      "key": "Boolean",
+      "title": "Boolean"
+    }
+  ],
+  "entries": [
+    {
+      "id": "Expr.cum_count",
+      "applies": "expression",
+      "family": "cumulative",
+      "name": "cum_count",
+      "hint": "running count",
+      "head": null,
+      "accepts": ["any"],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "reverse",
+          "shown": "reverse",
+          "label": "from the end",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "False"
+        }
+      ]
+    },
+    {
+      "id": "Expr.cum_max",
+      "applies": "expression",
+      "family": "cumulative",
+      "name": "cum_max",
+      "hint": "running maximum",
+      "head": null,
+      "accepts": ["numeric", "temporal", "String", "Boolean"],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "reverse",
+          "shown": "reverse",
+          "label": "from the end",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "False"
+        }
+      ]
+    },
+    {
+      "id": "Expr.cum_sum",
+      "applies": "expression",
+      "family": "cumulative",
+      "name": "cum_sum",
+      "hint": "running total",
+      "head": null,
+      "accepts": ["numeric", "Boolean", "Duration"],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "reverse",
+          "shown": "reverse",
+          "label": "from the end",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "False"
+        }
+      ]
+    },
+    {
+      "id": "Expr.dt.date",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.date",
+      "hint": "the date part",
+      "head": null,
+      "accepts": ["Datetime", "Date"],
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.dt.month_start",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.month_start",
+      "hint": "first of the month",
+      "head": null,
+      "accepts": ["Datetime", "Date"],
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.dt.offset_by",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.offset_by",
+      "hint": "move by a duration",
+      "head": null,
+      "accepts": ["Datetime", "Date"],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "by",
+          "shown": "by",
+          "label": "by",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["String"]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.dt.time",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.time",
+      "hint": "the time part",
+      "head": null,
+      "accepts": ["Datetime", "Time"],
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.dt.total_days",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.total_days",
+      "hint": "whole days in a duration",
+      "head": null,
+      "accepts": ["Duration"],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "fractional",
+          "shown": "fractional",
+          "label": "with fractions",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "False"
+        }
+      ]
+    },
+    {
+      "id": "Expr.eq",
+      "applies": "expression",
+      "family": "compare",
+      "name": "eq",
+      "hint": "equal to",
+      "head": null,
+      "accepts": ["any"],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "other",
+          "shown": "other",
+          "label": "compared with",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.first",
+      "applies": "expression",
+      "family": "rows",
+      "name": "first",
+      "hint": "first value",
+      "head": null,
+      "accepts": ["any"],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "ignore_nulls",
+          "shown": "ignore_nulls",
+          "label": "skip empty values",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "False"
+        }
+      ]
+    },
+    {
+      "id": "Expr.ge",
+      "applies": "expression",
+      "family": "compare",
+      "name": "ge",
+      "hint": "at least",
+      "head": null,
+      "accepts": ["any"],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "other",
+          "shown": "other",
+          "label": "compared with",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.gt",
+      "applies": "expression",
+      "family": "compare",
+      "name": "gt",
+      "hint": "greater than",
+      "head": null,
+      "accepts": ["any"],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "other",
+          "shown": "other",
+          "label": "compared with",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.is_not_null",
+      "applies": "expression",
+      "family": "compare",
+      "name": "is_not_null",
+      "hint": "has a value",
+      "head": null,
+      "accepts": ["any"],
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.is_null",
+      "applies": "expression",
+      "family": "compare",
+      "name": "is_null",
+      "hint": "has no value",
+      "head": null,
+      "accepts": ["any"],
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.last",
+      "applies": "expression",
+      "family": "rows",
+      "name": "last",
+      "hint": "last value",
+      "head": null,
+      "accepts": ["any"],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "ignore_nulls",
+          "shown": "ignore_nulls",
+          "label": "skip empty values",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "False"
+        }
+      ]
+    },
+    {
+      "id": "Expr.le",
+      "applies": "expression",
+      "family": "compare",
+      "name": "le",
+      "hint": "at most",
+      "head": null,
+      "accepts": ["any"],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "other",
+          "shown": "other",
+          "label": "compared with",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.lt",
+      "applies": "expression",
+      "family": "compare",
+      "name": "lt",
+      "hint": "less than",
+      "head": null,
+      "accepts": ["any"],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "other",
+          "shown": "other",
+          "label": "compared with",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.ne",
+      "applies": "expression",
+      "family": "compare",
+      "name": "ne",
+      "hint": "not equal to",
+      "head": null,
+      "accepts": ["any"],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "other",
+          "shown": "other",
+          "label": "compared with",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.over",
+      "applies": "expression",
+      "family": "window",
+      "name": "over",
+      "hint": "within each group",
+      "head": null,
+      "accepts": ["any"],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "partition_by",
+          "shown": "partition_by",
+          "label": "group by",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": "None"
+        },
+        {
+          "name": "more_exprs",
+          "shown": "more_exprs",
+          "label": "and by",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": "()"
+        },
+        {
+          "name": "order_by",
+          "shown": "order_by",
+          "label": "ordered by",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": "None"
+        },
+        {
+          "name": "descending",
+          "shown": "descending",
+          "label": "descending",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "False"
+        },
+        {
+          "name": "nulls_last",
+          "shown": "nulls_last",
+          "label": "empty values last",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "False"
+        },
+        {
+          "name": "mapping_strategy",
+          "shown": "mapping_strategy",
+          "label": "result per",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "group_to_rows",
+                "shown": "group_to_rows"
+              },
+              {
+                "word": "join",
+                "shown": "join"
+              },
+              {
+                "word": "explode",
+                "shown": "explode"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "'group_to_rows'"
+        }
+      ]
+    },
+    {
+      "id": "Expr.shift",
+      "applies": "expression",
+      "family": "rows",
+      "name": "shift",
+      "hint": "value n rows earlier",
+      "head": null,
+      "accepts": ["any"],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "n",
+          "shown": "n",
+          "label": "rows",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["integer"]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "1"
+        },
+        {
+          "name": "fill_value",
+          "shown": "fill_value",
+          "label": "fill with",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "None"
+        }
+      ]
+    },
+    {
+      "id": "Expr.sub",
+      "applies": "expression",
+      "family": "arithmetic",
+      "name": "sub",
+      "hint": "minus another value",
+      "head": null,
+      "accepts": ["numeric", "temporal"],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "other",
+          "shown": "other",
+          "label": "minus",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": null
+        }
+      ]
+    },
+    {
+      "id": "LazyFrame.filter",
+      "applies": "frame",
+      "family": "steps",
+      "name": "filter",
+      "hint": "the rows where a condition holds",
+      "head": "Filter table",
+      "accepts": [],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "predicates",
+          "shown": "predicates",
+          "label": "conditions",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["Boolean"]
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": "()"
+        },
+        {
+          "name": "constraints",
+          "shown": "constraints",
+          "label": "columns equal to",
+          "kind": {
+            "kind": "pairs",
+            "key": {
+              "kind": "column"
+            },
+            "value": {
+              "kind": "expression",
+              "dtypes": ["any"]
+            }
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "{}"
+        }
+      ]
+    },
+    {
+      "id": "LazyFrame.join",
+      "applies": "frame",
+      "family": "steps",
+      "name": "join",
+      "hint": "columns from another table, by a key",
+      "head": "Join table",
+      "accepts": [],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "other",
+          "shown": "other",
+          "label": "other table",
+          "kind": {
+            "kind": "table"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": null
+        },
+        {
+          "name": "on",
+          "shown": "on",
+          "label": "key",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": "None"
+        },
+        {
+          "name": "how",
+          "shown": "how",
+          "label": "kind of join",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "inner",
+                "shown": "inner"
+              },
+              {
+                "word": "left",
+                "shown": "left"
+              },
+              {
+                "word": "right",
+                "shown": "right"
+              },
+              {
+                "word": "full",
+                "shown": "full"
+              },
+              {
+                "word": "semi",
+                "shown": "semi"
+              },
+              {
+                "word": "anti",
+                "shown": "anti"
+              },
+              {
+                "word": "cross",
+                "shown": "cross"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "'inner'"
+        },
+        {
+          "name": "left_on",
+          "shown": "left_on",
+          "label": "left key",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": "None"
+        },
+        {
+          "name": "right_on",
+          "shown": "right_on",
+          "label": "right key",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": "None"
+        },
+        {
+          "name": "suffix",
+          "shown": "suffix",
+          "label": "suffix for repeated names",
+          "kind": {
+            "kind": "value",
+            "type": "string"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "'_right'"
+        },
+        {
+          "name": "validate",
+          "shown": "validate",
+          "label": "keys must be",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "m:m",
+                "shown": "m:m"
+              },
+              {
+                "word": "m:1",
+                "shown": "m:1"
+              },
+              {
+                "word": "1:m",
+                "shown": "1:m"
+              },
+              {
+                "word": "1:1",
+                "shown": "1:1"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "'m:m'"
+        },
+        {
+          "name": "nulls_equal",
+          "shown": "nulls_equal",
+          "label": "empty keys match",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "False"
+        },
+        {
+          "name": "coalesce",
+          "shown": "coalesce",
+          "label": "merge key columns",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "None"
+        },
+        {
+          "name": "maintain_order",
+          "shown": "maintain_order",
+          "label": "keep the order of",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "none",
+                "shown": "none"
+              },
+              {
+                "word": "left",
+                "shown": "left"
+              },
+              {
+                "word": "right",
+                "shown": "right"
+              },
+              {
+                "word": "left_right",
+                "shown": "left_right"
+              },
+              {
+                "word": "right_left",
+                "shown": "right_left"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "None"
+        },
+        {
+          "name": "build_side",
+          "shown": "build_side",
+          "label": "lookup built from",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "auto",
+                "shown": "auto"
+              },
+              {
+                "word": "prefer_left",
+                "shown": "prefer_left"
+              },
+              {
+                "word": "prefer_right",
+                "shown": "prefer_right"
+              },
+              {
+                "word": "force_left",
+                "shown": "force_left"
+              },
+              {
+                "word": "force_right",
+                "shown": "force_right"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "'auto'"
+        },
+        {
+          "name": "allow_parallel",
+          "shown": "allow_parallel",
+          "label": "allow parallel work",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "True"
+        },
+        {
+          "name": "force_parallel",
+          "shown": "force_parallel",
+          "label": "force parallel work",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "False"
+        }
+      ]
+    },
+    {
+      "id": "LazyFrame.pivot",
+      "applies": "frame",
+      "family": "steps",
+      "name": "pivot",
+      "hint": "the values of a field as columns",
+      "head": "Pivot table",
+      "accepts": [],
+      "lazy": false,
+      "parameters": [
+        {
+          "name": "on",
+          "shown": "on",
+          "label": "columns to spread",
+          "kind": {
+            "kind": "column"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": null
+        },
+        {
+          "name": "on_columns",
+          "shown": "on_columns",
+          "label": "values to spread",
+          "kind": {
+            "kind": "table"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": null
+        },
+        {
+          "name": "index",
+          "shown": "index",
+          "label": "rows kept",
+          "kind": {
+            "kind": "column"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "None"
+        },
+        {
+          "name": "values",
+          "shown": "values",
+          "label": "values filled in",
+          "kind": {
+            "kind": "column"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "None"
+        },
+        {
+          "name": "aggregate_function",
+          "shown": "aggregate_function",
+          "label": "repeats combined by",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "None"
+        },
+        {
+          "name": "maintain_order",
+          "shown": "maintain_order",
+          "label": "keep the order",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "False"
+        },
+        {
+          "name": "separator",
+          "shown": "separator",
+          "label": "separator",
+          "kind": {
+            "kind": "value",
+            "type": "string"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "'_'"
+        },
+        {
+          "name": "column_naming",
+          "shown": "column_naming",
+          "label": "column names",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "auto",
+                "shown": "auto"
+              },
+              {
+                "word": "combine",
+                "shown": "combine"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "'auto'"
+        }
+      ]
+    },
+    {
+      "id": "LazyFrame.rename",
+      "applies": "frame",
+      "family": "steps",
+      "name": "rename",
+      "hint": "columns under new names",
+      "head": "Rename",
+      "accepts": [],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "mapping",
+          "shown": "mapping",
+          "label": "new names",
+          "kind": {
+            "kind": "pairs",
+            "key": {
+              "kind": "column"
+            },
+            "value": {
+              "kind": "column"
+            }
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": null
+        },
+        {
+          "name": "strict",
+          "shown": "strict",
+          "label": "fail on unknown column",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "True"
+        }
+      ]
+    },
+    {
+      "id": "LazyFrame.select",
+      "applies": "frame",
+      "family": "steps",
+      "name": "select",
+      "hint": "some of the columns",
+      "head": "Select",
+      "accepts": [],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "exprs",
+          "shown": "exprs",
+          "label": "columns",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": "()"
+        },
+        {
+          "name": "named_exprs",
+          "shown": "named_exprs",
+          "label": "new columns",
+          "kind": {
+            "kind": "pairs",
+            "key": {
+              "kind": "column"
+            },
+            "value": {
+              "kind": "expression",
+              "dtypes": ["any"]
+            }
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "{}"
+        }
+      ]
+    },
+    {
+      "id": "LazyFrame.sort",
+      "applies": "frame",
+      "family": "steps",
+      "name": "sort",
+      "hint": "the rows in the order of some fields",
+      "head": "Sort table",
+      "accepts": [],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "by",
+          "shown": "by",
+          "label": "sort by",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": null
+        },
+        {
+          "name": "more_by",
+          "shown": "more_by",
+          "label": "then by",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": "()"
+        },
+        {
+          "name": "descending",
+          "shown": "descending",
+          "label": "descending",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "perItem",
+            "of": "by"
+          },
+          "default": "False"
+        },
+        {
+          "name": "nulls_last",
+          "shown": "nulls_last",
+          "label": "empty values last",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "perItem",
+            "of": "by"
+          },
+          "default": "False"
+        },
+        {
+          "name": "maintain_order",
+          "shown": "maintain_order",
+          "label": "keep the order of ties",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "False"
+        },
+        {
+          "name": "multithreaded",
+          "shown": "multithreaded",
+          "label": "use many threads",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "True"
+        }
+      ]
+    },
+    {
+      "id": "LazyFrame.with_columns",
+      "applies": "frame",
+      "family": "steps",
+      "name": "with_columns",
+      "hint": "a new column from a chain",
+      "head": "Add column",
+      "accepts": [],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "exprs",
+          "shown": "exprs",
+          "label": "columns",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": "()"
+        },
+        {
+          "name": "named_exprs",
+          "shown": "named_exprs",
+          "label": "new columns",
+          "kind": {
+            "kind": "pairs",
+            "key": {
+              "kind": "column"
+            },
+            "value": {
+              "kind": "expression",
+              "dtypes": ["any"]
+            }
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "{}"
+        }
+      ]
+    },
+    {
+      "id": "polars.col",
+      "applies": "function",
+      "family": "start",
+      "name": "col",
+      "hint": "a column of the table",
+      "head": null,
+      "accepts": [],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "name",
+          "shown": "name",
+          "label": "column",
+          "kind": {
+            "kind": "column"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": null
+        },
+        {
+          "name": "more_names",
+          "shown": "more_names",
+          "label": "more columns",
+          "kind": {
+            "kind": "column"
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": "()"
+        }
+      ]
+    },
+    {
+      "id": "polars.lit",
+      "applies": "function",
+      "family": "start",
+      "name": "lit",
+      "hint": "a value written out",
+      "head": null,
+      "accepts": [],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "value",
+          "shown": "value",
+          "label": "value",
+          "kind": {
+            "kind": "value",
+            "type": "any"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": null
+        },
+        {
+          "name": "dtype",
+          "shown": "dtype",
+          "label": "as dtype",
+          "kind": {
+            "kind": "dtype"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "None"
+        },
+        {
+          "name": "allow_object",
+          "shown": "allow_object",
+          "label": "allow any object",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": "False"
+        }
+      ]
+    }
+  ]
+}

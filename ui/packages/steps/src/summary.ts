@@ -5,10 +5,11 @@
  */
 
 import { COMPARISON_SIGNS } from './comparisons';
+import type { Catalogue } from './model/catalogue';
 import type { Condition, Value } from './model/source';
 import { literalText } from './model/source';
 import type { Step } from './model/steps';
-import { VERB_LABELS } from './verbs';
+import { verbHead } from './verbs';
 
 function valueSummary(value: Value): string {
   switch (value.kind) {
@@ -72,6 +73,6 @@ export function stepDetail(step: Step): string {
 }
 
 /** Returns `step` as one phrase, such as "Sort table by dcn, timestamp". */
-export function stepTitle(step: Step): string {
-  return `${VERB_LABELS[step.verb]} ${stepDetail(step)}`;
+export function stepTitle(catalogue: Catalogue, step: Step): string {
+  return `${verbHead(catalogue, step.verb)} ${stepDetail(step)}`;
 }

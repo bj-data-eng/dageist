@@ -96,6 +96,63 @@ The view reaches Tauri through the `window.__TAURI__` global that
 `app.withGlobalTauri` injects. The host bridge declares the global's types by
 hand, covering only the members it uses.
 
+## The Catalogue Of Operations
+
+The engine holds a catalogue of the Polars operations the step editor can
+offer, as data, in `dageist_engine::catalog`. Each entry is one item of the
+Python Polars API, such as `Expr.shift` or `LazyFrame.filter`, under an
+identifier that saved steps keep. An entry records:
+
+- what it applies to: an expression, a frame, or nothing, for a function such
+  as `col`;
+- the family it can be swapped within, such as the cumulative methods;
+- its parameters, with Python's names and defaults, each of one kind;
+- the dtypes it accepts on the value it follows;
+- whether it works on a lazy frame;
+- the function that builds it in Polars from filled-in arguments.
+
+Those build functions are the start of the path from a saved document of
+steps to a Polars plan. Result dtypes are not stored, because Polars works
+them out from a schema without reading data.
+
+Every parameter is one of ten kinds, and the view has one way of drawing
+each, so a new operation needs data rather than a new look:
+
+| Kind | Holds |
+| --- | --- |
+| expression | A chain: a field, a value or an input, then methods. A typed number or text is a chain of one value. |
+| column | Names of input columns. |
+| value | A literal of a stated type that cannot be an expression. |
+| flag | True or false, and unset where Polars decides by default. |
+| choice | One word of a closed set. |
+| dtype | A Polars dtype. |
+| duration | A Polars duration such as `1mo`. |
+| table | A frame from the graph. |
+| path | A file, folder or cloud location. |
+| pairs | Key and value entries, each side of its own kind. |
+
+A parameter holds one of its kind, an ordered list of them, or one for each
+item of another parameter, such as sort's `descending` for each key.
+
+Every word the editor shows comes from a language file beside the catalogue,
+including Polars' own names. In English the shown names equal Polars' names,
+and a test proves it unless a change is listed in the file. Renaming
+something for the editor, or translating it, therefore changes no entry and
+no saved step.
+
+The catalogue is checked against the [Python API audit](reference.md#public-api-audits).
+Every item there is either an entry or on a list of items left out, with the
+reason: deprecated, taking a Python function, meaningful only with a Python
+object, or not yet catalogued. When Polars moves, refreshing the audit makes
+that test name every item that changed. The first part catalogues the seven
+steps and the expression methods the storyboard uses, with `col` and `lit`.
+
+The host serves the catalogue with its English words to the view through the
+`operation_catalogue` command. The step editor takes its method lists,
+families, hints, step heads and argument editors from it, and draws a
+method's first parameter by its kind. Its previews still run on the
+storyboard's sample rows.
+
 ## What The Step Editor Storyboard Has Settled
 
 The step editor is where the design of a transform node is being worked out.
@@ -181,7 +238,8 @@ behavior yet. The decisions below are the ones the core is expected to carry.
 ## Current Limitations
 
 The application opens its window on two features. The steps of a transform
-are a storyboard that works on fixed sample rows in the view; its two windows
+are a storyboard that works on fixed sample rows in the view, offering the
+operations of the engine's catalogue; its two windows
 keep the steps the same by telling each other of every change, where the core
 will later own them. The table viewer shows a
 generated sample through the engine. The graph model, node types, pipeline

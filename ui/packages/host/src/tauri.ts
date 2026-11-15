@@ -3,7 +3,7 @@
  * view that knows Tauri exists.
  */
 
-import type { BlockRequest, Host, IdentityView, TableView } from './contract';
+import type { BlockRequest, CatalogueView, Host, IdentityView, TableView } from './contract';
 import { deliverMessage, sealMessage } from './envelope';
 
 /** Turns what a failed command rejected with into an `Error`. */
@@ -33,6 +33,7 @@ export function tauriHost(): Host | null {
 
   return {
     coreIdentity: async () => invoke<IdentityView>('core_identity'),
+    operationCatalogue: async () => invoke<CatalogueView>('operation_catalogue'),
     openSampleWindow: async (keys) => invoke<TableView>('open_sample_window', { keys }),
     openSampleResult: async () => invoke<TableView>('open_sample_result'),
     fetchTableBlock: async (request: BlockRequest) =>

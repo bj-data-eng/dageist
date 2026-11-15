@@ -11,6 +11,7 @@ import { useState } from 'react';
 import { Panel, cx } from '@dageist/design';
 import type { Host } from '@dageist/host';
 
+import { CatalogueProvider, useCatalogue } from './CatalogueProvider';
 import { moved } from './Chain';
 import { Pipeline } from './Pipeline';
 import { RowsPreview } from './RowsPreview';
@@ -55,11 +56,20 @@ export interface StepsWorkspaceProps {
   readonly styleNonce: string | null;
 }
 
-/** Draws the table of the sample claims with its steps listed beside it. */
+/** Draws the table of the sample claims with its steps listed beside it, once the catalogue is there. */
 export function StepsWorkspace({ host, styleNonce }: StepsWorkspaceProps): React.JSX.Element {
+  return (
+    <CatalogueProvider host={host} title="Transform · Claim timing">
+      <Transform host={host} styleNonce={styleNonce} />
+    </CatalogueProvider>
+  );
+}
+
+function Transform({ host, styleNonce }: StepsWorkspaceProps): React.JSX.Element {
+  const catalogue = useCatalogue();
   const { steps, selectedId, stepsOpen, change } = useSharedSteps(host, 'main');
   const [centre, setCentre] = useState<Centre>('rows');
-  const results = runSteps(steps);
+  const results = runSteps(catalogue, steps);
   const selectedIndex = steps.findIndex((step) => step.id === selectedId);
   const shown = results[selectedIndex];
   const openSteps = (): void => {

@@ -14,7 +14,7 @@ of the Polars release in `vendor/polars`: Polars' forks of `hashbrown` and
 | Package | Path | Role |
 | --- | --- | --- |
 | `dageist` | [src/](../src/lib.rs) | Host-independent core library. |
-| `dageist-engine` | [crates/dageist-engine/](../crates/dageist-engine/Cargo.toml) | Dataframe engine on Polars, built from `vendor/polars` as the release there is built, with Polars' allocator as the global allocator: sample data, working windows, stored results and Arrow output. Not published. |
+| `dageist-engine` | [crates/dageist-engine/](../crates/dageist-engine/Cargo.toml) | Dataframe engine on Polars, built from `vendor/polars` as the release there is built, with Polars' allocator as the global allocator: sample data, working windows, stored results, Arrow output, and the [catalogue of operations](explanation.md#the-catalogue-of-operations) with its English language file. Not published. |
 | `dageist-tauri` | [crates/dageist-tauri/](../crates/dageist-tauri/Cargo.toml) | Tauri 2 host; builds the `dageist` binary. Not published. |
 | `dageist-ui` | [ui/](../ui/package.json) | Private npm workspace for the React view; see [View Packages](#view-packages). |
 | `dageist-api-generator` | [api/generator/](../api/generator/Cargo.toml) | Writes and checks the [public API audits](#public-api-audits). A workspace of its own with its own lock file, outside the product workspace. Not published. |
@@ -63,6 +63,7 @@ them through the host bridge in
 | Command | Arguments | Result |
 | --- | --- | --- |
 | `core_identity` | None | `{ "name": string, "version": string }` from the core. |
+| `operation_catalogue` | None | The engine's catalogue of operations with its English words: `{ "families", "dtypes", "entries" }`, each entry with its identifier, family, shown name, hint, step head, accepted dtypes, laziness and parameters. The shapes are `CatalogueView` and the types beside it in [catalogue.rs](../crates/dageist-tauri/src/catalogue.rs) and [contract.ts](../ui/packages/host/src/contract.ts). |
 | `open_sample_window` | `keys`: how many whole keys to hold in memory, at most 50,000 | `{ "rows": number, "columns": [{ "name": string, "dataType": string }] }` for the working window. |
 | `open_sample_result` | None | The same shape for the whole sample, opened where it is stored without loading it. |
 | `table_block` | `offset`, `length`: the rows, at most 10,000; `columns`: the column names, each once, or an empty list for all | That block of whichever table is open, as the raw bytes of an Arrow IPC stream, not JSON. Rows past the end are left out. |
@@ -121,7 +122,8 @@ Every package is private and is consumed as TypeScript source.
 | [ui/apps/desktop/vite.config.ts](../ui/apps/desktop/vite.config.ts) | Bundler settings; the bundle is written to `ui/dist/`. |
 | [ui/apps/desktop/src/styles.css](../ui/apps/desktop/src/styles.css) | Tailwind entry, the colour and font tokens, and the declarations of the two typefaces. |
 | [ui/apps/desktop/public/fonts/](../ui/apps/desktop/public/fonts/) | The typefaces the view is set in, each with the licence it comes under, copied into the bundle as they are: Inter for everything that is not code or data, and JetBrains Mono for code and data. |
-| [ui/apps/desktop/src/demo-host.ts](../ui/apps/desktop/src/demo-host.ts) | A stand-in host with made-up rows, loaded only when the page is open outside Tauri. |
+| [ui/apps/desktop/src/demo-host.ts](../ui/apps/desktop/src/demo-host.ts) | A stand-in host with made-up rows and the catalogue snapshot, loaded only when the page is open outside Tauri. |
+| [ui/apps/desktop/src/catalogue.json](../ui/apps/desktop/src/catalogue.json) | The `operation_catalogue` command's view, written by the host's snapshot test for the stand-in host to serve. Generated; [refresh it](how-to.md#refresh-the-catalogue-snapshot), never edit it. |
 | [ui/apps/desktop/public/pieces/](../ui/apps/desktop/public/pieces/index.html) | The Pieces page: a prototype of how the step editor is drawn, in plain HTML, CSS and JavaScript, copied into the bundle as it is and shown in the Pieces tab. |
 | [ui/tsconfig.json](../ui/tsconfig.json) | Strict compiler settings for every package's `src/`; emits nothing. |
 | [ui/tsconfig.node.json](../ui/tsconfig.node.json) | Strict type checking of the Vite configuration; emits nothing. |

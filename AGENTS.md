@@ -53,6 +53,7 @@ and current source establishes behavior.
 | Window, bundle, view location and content security policy | [crates/dageist-tauri/tauri.conf.json](crates/dageist-tauri/tauri.conf.json) |
 | Webview permissions | [crates/dageist-tauri/capabilities/](crates/dageist-tauri/capabilities/) |
 | Engine identity, dependencies and Polars features | [crates/dageist-engine/Cargo.toml](crates/dageist-engine/Cargo.toml) |
+| The operations the step editor offers, their parameter kinds and shown words | [crates/dageist-engine/src/catalog/](crates/dageist-engine/src/catalog/mod.rs), its language file [en.toml](crates/dageist-engine/src/catalog/en.toml) |
 | IPC commands and their serialized views | [crates/dageist-tauri/src/](crates/dageist-tauri/src/main.rs) |
 | The view's IPC calls and their shapes | [ui/packages/host/src/](ui/packages/host/src/contract.ts) |
 | The view's packages and what each may depend on | each `package.json` under [ui/apps/](ui/apps/desktop/package.json) and [ui/packages/](ui/packages/) |
@@ -119,6 +120,7 @@ Source remains authoritative; never hand-edit generated artifacts.
 | Raster icons in `crates/dageist-tauri/icons/` | [icon procedure](docs/how-to.md#regenerate-the-application-icons) from `icon.svg` |
 | `ui/package-lock.json` | npm, from [ui/package.json](ui/package.json) |
 | `ui/dist/` (ignored) | `npm --prefix ui run build` |
+| `ui/apps/desktop/src/catalogue.json` | the host's catalogue view, written by its snapshot test; [refresh procedure](docs/how-to.md#refresh-the-catalogue-snapshot) |
 | `crates/dageist-tauri/gen/` (ignored) | `tauri-build`, during any build of `dageist-tauri` |
 | `api/public-api.txt`, `api/crates/*.txt`, `api/polars/*.txt` | [api/generator/](api/generator/src/lib.rs); [audit procedures](docs/how-to.md#check-the-public-api-audits) |
 | `api/generator/Cargo.lock` | Cargo, from [api/generator/Cargo.toml](api/generator/Cargo.toml) |

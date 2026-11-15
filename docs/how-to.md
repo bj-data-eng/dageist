@@ -97,6 +97,24 @@ and for a stored result, or with a message. They prove that asking twice for
 the steps window opens it once, and that the capability names its label. They
 run against Tauri's mock runtime and do not open a real window.
 
+They also prove the `operation_catalogue` command's view of the catalogue,
+and that `ui/apps/desktop/src/catalogue.json`, the copy of that view the
+browser stand-in serves, is current.
+
+### Refresh The Catalogue Snapshot
+
+After a change to the catalogue, its language file or the view of it, the
+snapshot test fails and says how to refresh the file. Write it from the
+host's own serializer, then format it as the view's formatter expects:
+
+```sh
+DAGEIST_REFRESH_CATALOGUE=1 cargo test --offline --locked -p dageist-tauri catalogue::tests::the_snapshot_is_what_the_command_returns
+npm --prefix ui run format
+```
+
+The test compares the file with the view by value, so the formatter's
+layout does not affect it. Never edit the file by hand.
+
 ## Open The Sample Table
 
 The `Table` workspace shows a generated claims table of about two million rows
