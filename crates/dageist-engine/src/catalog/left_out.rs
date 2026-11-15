@@ -14,6 +14,11 @@ pub enum Reason {
     /// It only makes sense with an object that exists in Python alone, such
     /// as a pyarrow dataset or a Delta table.
     PythonObject,
+    /// It is not an operation a step could use, and never will be: it only
+    /// raises, is Python's own syntax for an operation that has its own entry,
+    /// returns what it is given, or runs, reads or shows a query, which the
+    /// host does itself. Each such item is justified where `LEFT_OUT` lists it.
+    NeverOffered,
     /// It could be offered but is not yet. The list of these shrinks as the
     /// catalogue grows, so its length measures how far the catalogue is from
     /// complete.
@@ -51,10 +56,23 @@ pub fn left_out() -> &'static [LeftOut] {
     LEFT_OUT
 }
 
+// Items marked `NeverOffered`, and why each is not an operation a step could use:
+//
+// - `LazyFrame.__eq__`, `__ne__`, `__lt__`, `__le__`, `__gt__` and `__ge__` only raise
+//   a `TypeError`: a lazy frame has no value to compare until it is collected.
+// - `LazyFrame.__contains__` is Python's `in`: it asks whether a column name is in the
+//   schema and gives a bool, not a table or an expression.
+// - `LazyFrame.__getitem__` is Python's subscript syntax for `LazyFrame.slice`, which
+//   is the item to catalogue for that operation; it supports no other subscript.
+// - `LazyFrame.clone` and `LazyFrame.lazy` return the frame they are given, unchanged.
+// - `LazyFrame.collect`, `collect_async`, `collect_batches`, `execute`, and
+//   `polars.collect_all` and `collect_all_async` run a query and hand the rows to
+//   Python. The host runs queries and reads their rows itself.
+// - `LazyFrame.collect_schema`, `columns`, `dtypes`, `schema` and `width` read a
+//   schema, which the host reads itself to know what each step gives.
+// - `LazyFrame.explain`, `show`, `show_graph`, `inspect` and `polars.explain_all` print,
+//   draw or describe a plan or its rows and leave the table as it was.
 const LEFT_OUT: &[LeftOut] = &[
-    LeftOut::new("ChainedThen.otherwise", Reason::NotYetCatalogued),
-    LeftOut::new("ChainedThen.when", Reason::NotYetCatalogued),
-    LeftOut::new("ChainedWhen.then", Reason::NotYetCatalogued),
     LeftOut::new("Expr.__abs__", Reason::NotYetCatalogued),
     LeftOut::new("Expr.__add__", Reason::NotYetCatalogued),
     LeftOut::new("Expr.__and__", Reason::NotYetCatalogued),
@@ -277,7 +295,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.is_unique", Reason::NotYetCatalogued),
     LeftOut::new("Expr.item", Reason::NotYetCatalogued),
     LeftOut::new("Expr.kurtosis", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.len", Reason::NotYetCatalogued),
     LeftOut::new("Expr.limit", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.__getitem__", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.agg", Reason::NotYetCatalogued),
@@ -339,7 +356,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.map.values", Reason::NotYetCatalogued),
     LeftOut::new("Expr.map_batches", Reason::TakesPythonFunction),
     LeftOut::new("Expr.map_elements", Reason::TakesPythonFunction),
-    LeftOut::new("Expr.max", Reason::NotYetCatalogued),
     LeftOut::new("Expr.max_by", Reason::NotYetCatalogued),
     LeftOut::new("Expr.mean", Reason::NotYetCatalogued),
     LeftOut::new("Expr.median", Reason::NotYetCatalogued),
@@ -365,7 +381,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.meta.show_graph", Reason::NotYetCatalogued),
     LeftOut::new("Expr.meta.tree_format", Reason::NotYetCatalogued),
     LeftOut::new("Expr.meta.undo_aliases", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.min", Reason::NotYetCatalogued),
     LeftOut::new("Expr.min_by", Reason::NotYetCatalogued),
     LeftOut::new("Expr.mod", Reason::NotYetCatalogued),
     LeftOut::new("Expr.mode", Reason::NotYetCatalogued),
@@ -501,7 +516,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.struct.rename_fields", Reason::NotYetCatalogued),
     LeftOut::new("Expr.struct.unnest", Reason::NotYetCatalogued),
     LeftOut::new("Expr.struct.with_fields", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.sum", Reason::NotYetCatalogued),
     LeftOut::new("Expr.tail", Reason::NotYetCatalogued),
     LeftOut::new("Expr.tan", Reason::NotYetCatalogued),
     LeftOut::new("Expr.tanh", Reason::NotYetCatalogued),
@@ -517,33 +531,33 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.value_counts", Reason::NotYetCatalogued),
     LeftOut::new("Expr.var", Reason::NotYetCatalogued),
     LeftOut::new("Expr.xor", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.__contains__", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.__eq__", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.__ge__", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.__getitem__", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.__gt__", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.__le__", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.__lt__", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.__ne__", Reason::NotYetCatalogued),
+    LeftOut::new("LazyFrame.__contains__", Reason::NeverOffered),
+    LeftOut::new("LazyFrame.__eq__", Reason::NeverOffered),
+    LeftOut::new("LazyFrame.__ge__", Reason::NeverOffered),
+    LeftOut::new("LazyFrame.__getitem__", Reason::NeverOffered),
+    LeftOut::new("LazyFrame.__gt__", Reason::NeverOffered),
+    LeftOut::new("LazyFrame.__le__", Reason::NeverOffered),
+    LeftOut::new("LazyFrame.__lt__", Reason::NeverOffered),
+    LeftOut::new("LazyFrame.__ne__", Reason::NeverOffered),
     LeftOut::new("LazyFrame.bottom_k", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.cache", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.cast", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.clear", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.clone", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.collect", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.collect_async", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.collect_batches", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.collect_schema", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.columns", Reason::NotYetCatalogued),
+    LeftOut::new("LazyFrame.clone", Reason::NeverOffered),
+    LeftOut::new("LazyFrame.collect", Reason::NeverOffered),
+    LeftOut::new("LazyFrame.collect_async", Reason::NeverOffered),
+    LeftOut::new("LazyFrame.collect_batches", Reason::NeverOffered),
+    LeftOut::new("LazyFrame.collect_schema", Reason::NeverOffered),
+    LeftOut::new("LazyFrame.columns", Reason::NeverOffered),
     LeftOut::new("LazyFrame.count", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.describe", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.deserialize", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.drop", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.drop_nans", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.drop_nulls", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.dtypes", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.execute", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.explain", Reason::NotYetCatalogued),
+    LeftOut::new("LazyFrame.dtypes", Reason::NeverOffered),
+    LeftOut::new("LazyFrame.execute", Reason::NeverOffered),
+    LeftOut::new("LazyFrame.explain", Reason::NeverOffered),
     LeftOut::new("LazyFrame.explode", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.fill_nan", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.fill_null", Reason::NotYetCatalogued),
@@ -554,12 +568,12 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("LazyFrame.group_by", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.group_by_dynamic", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.head", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.inspect", Reason::NotYetCatalogued),
+    LeftOut::new("LazyFrame.inspect", Reason::NeverOffered),
     LeftOut::new("LazyFrame.interpolate", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.join_asof", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.join_where", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.last", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.lazy", Reason::NotYetCatalogued),
+    LeftOut::new("LazyFrame.lazy", Reason::NeverOffered),
     LeftOut::new("LazyFrame.limit", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.map_batches", Reason::TakesPythonFunction),
     LeftOut::new("LazyFrame.match_to_schema", Reason::NotYetCatalogued),
@@ -576,13 +590,13 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("LazyFrame.remove", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.reverse", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.rolling", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.schema", Reason::NotYetCatalogued),
+    LeftOut::new("LazyFrame.schema", Reason::NeverOffered),
     LeftOut::new("LazyFrame.select_seq", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.serialize", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.set_sorted", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.shift", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.show", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.show_graph", Reason::NotYetCatalogued),
+    LeftOut::new("LazyFrame.show", Reason::NeverOffered),
+    LeftOut::new("LazyFrame.show_graph", Reason::NeverOffered),
     LeftOut::new("LazyFrame.sink_batches", Reason::TakesPythonFunction),
     LeftOut::new("LazyFrame.sink_csv", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.sink_delta", Reason::PythonObject),
@@ -601,7 +615,7 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("LazyFrame.unpivot", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.update", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.var", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.width", Reason::NotYetCatalogued),
+    LeftOut::new("LazyFrame.width", Reason::NeverOffered),
     LeftOut::new("LazyFrame.with_columns_seq", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.with_row_index", Reason::NotYetCatalogued),
     LeftOut::new("LazyGroupBy.agg", Reason::NotYetCatalogued),
@@ -620,9 +634,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("LazyGroupBy.quantile", Reason::NotYetCatalogued),
     LeftOut::new("LazyGroupBy.sum", Reason::NotYetCatalogued),
     LeftOut::new("LazyGroupBy.tail", Reason::NotYetCatalogued),
-    LeftOut::new("Then.otherwise", Reason::NotYetCatalogued),
-    LeftOut::new("Then.when", Reason::NotYetCatalogued),
-    LeftOut::new("When.then", Reason::NotYetCatalogued),
     LeftOut::new("polars.align_frames", Reason::NotYetCatalogued),
     LeftOut::new("polars.all", Reason::NotYetCatalogued),
     LeftOut::new("polars.all_horizontal", Reason::NotYetCatalogued),
@@ -635,8 +646,8 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("polars.arg_where", Reason::NotYetCatalogued),
     LeftOut::new("polars.business_day_count", Reason::NotYetCatalogued),
     LeftOut::new("polars.coalesce", Reason::NotYetCatalogued),
-    LeftOut::new("polars.collect_all", Reason::NotYetCatalogued),
-    LeftOut::new("polars.collect_all_async", Reason::NotYetCatalogued),
+    LeftOut::new("polars.collect_all", Reason::NeverOffered),
+    LeftOut::new("polars.collect_all_async", Reason::NeverOffered),
     LeftOut::new("polars.concat", Reason::NotYetCatalogued),
     LeftOut::new("polars.concat_arr", Reason::NotYetCatalogued),
     LeftOut::new("polars.concat_list", Reason::NotYetCatalogued),
@@ -657,10 +668,9 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("polars.datetime_ranges", Reason::NotYetCatalogued),
     LeftOut::new("polars.dtype_of", Reason::NotYetCatalogued),
     LeftOut::new("polars.duration", Reason::NotYetCatalogued),
-    LeftOut::new("polars.element", Reason::NotYetCatalogued),
     LeftOut::new("polars.escape_regex", Reason::NotYetCatalogued),
     LeftOut::new("polars.exclude", Reason::NotYetCatalogued),
-    LeftOut::new("polars.explain_all", Reason::NotYetCatalogued),
+    LeftOut::new("polars.explain_all", Reason::NeverOffered),
     LeftOut::new("polars.field", Reason::NotYetCatalogued),
     LeftOut::new("polars.first", Reason::NotYetCatalogued),
     LeftOut::new("polars.fold", Reason::TakesPythonFunction),
@@ -721,6 +731,5 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("polars.time_ranges", Reason::NotYetCatalogued),
     LeftOut::new("polars.union", Reason::NotYetCatalogued),
     LeftOut::new("polars.var", Reason::NotYetCatalogued),
-    LeftOut::new("polars.when", Reason::NotYetCatalogued),
     LeftOut::new("polars.zeros", Reason::NotYetCatalogued),
 ];

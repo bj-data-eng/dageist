@@ -103,17 +103,21 @@ offer, as data, in `dageist_engine::catalog`. Each entry is one item of the
 Python Polars API, such as `Expr.shift` or `LazyFrame.filter`, under an
 identifier that saved steps keep. An entry records:
 
-- what it applies to: an expression, a frame, or nothing, for a function such
-  as `col`;
+- what it applies to: an expression, a frame, nothing for a function such as
+  `col`, or a chain of conditions for `when`, `then` and `otherwise`;
 - the family it can be swapped within, such as the cumulative methods;
-- its parameters, with Python's names and defaults, each of one kind;
+- its parameters, with Python's names and defaults, each of one kind. The
+  engine reads each default from Python's text into a value, such as a whole
+  number, a flag or unset, so nothing else parses Python;
 - the dtypes it accepts on the value it follows;
 - whether it works on a lazy frame;
 - the function that builds it in Polars from filled-in arguments.
 
-Those build functions are the start of the path from a saved document of
-steps to a Polars plan. Result dtypes are not stored, because Polars works
-them out from a schema without reading data.
+Those build functions are the start of the path from a saved document of steps
+to a Polars plan. The arguments for an entry are checked against its
+parameters, their kinds, shapes and choice words before it is built. Result
+dtypes are not stored, because Polars works them out from a schema without
+reading data.
 
 Every parameter is one of ten kinds, and the view has one way of drawing
 each, so a new operation needs data rather than a new look:
@@ -140,18 +144,32 @@ and a test proves it unless a change is listed in the file. Renaming
 something for the editor, or translating it, therefore changes no entry and
 no saved step.
 
-The catalogue is checked against the [Python API audit](reference.md#public-api-audits).
+The catalogue is checked against the
+[Python API audit](reference.md#public-api-audits).
 Every item there is either an entry or on a list of items left out, with the
 reason: deprecated, taking a Python function, meaningful only with a Python
-object, or not yet catalogued. When Polars moves, refreshing the audit makes
-that test name every item that changed. The first part catalogues the seven
-steps and the expression methods the storyboard uses, with `col` and `lit`.
+object, never offered because it is not an operation a step could use (such
+as running a query or printing a plan), or not yet catalogued. When Polars
+moves, refreshing the audit makes that test name every item that changed.
+The catalogue holds the seven steps, the expression methods the storyboard
+uses, the aggregates `sum`, `min`, `max` and `len`, `col`, `lit`, `element`,
+and the links of `when`, `then` and `otherwise`.
 
 The host serves the catalogue with its English words to the view through the
 `operation_catalogue` command. The step editor takes its method lists,
-families, hints, step heads and argument editors from it, and draws a
-method's first parameter by its kind. Its previews still run on the
-storyboard's sample rows.
+families, hints, step heads and the words `when`, `then` and `otherwise` from
+it, and draws every parameter by its kind. A method's first expression
+parameter is written inline. Any other parameter of a method or step is an
+option: the list its name opens offers the rest by name, and an option is
+written into the Polars text only when it differs from its default. A step's
+own parameters are drawn by kind too: sort's keys and their per-item
+`descending`, select's expressions, join's table, keys and `how`, a rename's
+pairs, and a pivot's aggregate, which is a chain from `pl.element()`. A new
+column's name and chain and a filter's conditions keep the lines the
+storyboard settled, which lay out an expression list one item to a line, and a
+pivot's output columns stay pinned values until the graph supplies tables.
+Previews still run on the storyboard's sample rows, and a set option a preview
+cannot apply is named under the step instead of being ignored.
 
 ## What The Step Editor Storyboard Has Settled
 

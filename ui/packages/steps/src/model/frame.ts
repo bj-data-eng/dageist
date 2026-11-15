@@ -24,6 +24,19 @@ export type Dtype =
   | 'Duration'
   | 'Boolean';
 
+/** Every dtype the sample uses, in the order they are offered. */
+export const DTYPES: readonly Dtype[] = [
+  'String',
+  'Int32',
+  'Int64',
+  'UInt32',
+  'Datetime',
+  'Date',
+  'Time',
+  'Duration',
+  'Boolean',
+];
+
 /** One column of a frame. */
 export interface Column {
   readonly name: string;

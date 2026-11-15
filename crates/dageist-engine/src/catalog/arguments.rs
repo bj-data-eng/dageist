@@ -4,6 +4,8 @@ use std::collections::BTreeMap;
 
 use polars::prelude::{DataType, Expr, LazyFrame, PolarsError};
 
+use super::{Entry, Kind, Parameter, Shape, ValueType};
+
 /// One filled-in argument, ready for Polars. Its variant follows the
 /// parameter's kind; a parameter of shape many or per item holds `Many`.
 #[derive(Clone)]
@@ -80,6 +82,24 @@ pub enum BuildError {
         /// The word given.
         word: String,
     },
+    /// An argument for a name the entry has no parameter of.
+    UnknownParameter {
+        /// The name given.
+        parameter: String,
+    },
+    /// Two arguments for the same parameter.
+    Repeated {
+        /// The parameter's name.
+        parameter: &'static str,
+    },
+    /// A link of a condition that cannot follow the state of the condition it
+    /// was given, such as a `then` after a `then`.
+    OutOfOrder {
+        /// The state the link needs, such as `then`.
+        expected: &'static str,
+        /// The state it was given.
+        found: &'static str,
+    },
     /// Polars refused the arguments.
     Polars(PolarsError),
 }
@@ -95,6 +115,18 @@ impl std::fmt::Display for BuildError {
             } => write!(formatter, "{parameter} takes {expected}, not {found}"),
             Self::UnknownChoice { parameter, word } => {
                 write!(formatter, "{parameter} has no choice {word:?}")
+            }
+            Self::UnknownParameter { parameter } => {
+                write!(formatter, "there is no parameter {parameter}")
+            }
+            Self::Repeated { parameter } => {
+                write!(formatter, "{parameter} was given more than once")
+            }
+            Self::OutOfOrder { expected, found } => {
+                write!(
+                    formatter,
+                    "this needs a {expected} before it, not a {found}"
+                )
             }
             Self::Polars(error) => write!(formatter, "{error}"),
         }
@@ -130,9 +162,12 @@ impl Arguments {
         Self::default()
     }
 
-    /// These arguments with `parameter` set to `argument`.
+    /// These arguments with `parameter` set to `argument`, unchecked. The
+    /// tests of the build functions use it to hand them what
+    /// [`Entry::arguments`] would refuse.
+    #[cfg(test)]
     #[must_use]
-    pub fn with(mut self, parameter: &'static str, argument: Argument) -> Self {
+    pub(super) fn with(mut self, parameter: &'static str, argument: Argument) -> Self {
         self.given.insert(parameter, argument);
         self
     }
@@ -311,5 +346,115 @@ impl Arguments {
             Some(Argument::Pairs(pairs)) => Ok(pairs.clone()),
             Some(other) => Err(Self::wrong(parameter, "pairs", other)),
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Checking arguments against an entry
+
+/// What an argument for a parameter of `kind` is, as the error names it.
+const fn expects(kind: Kind) -> &'static str {
+    match kind {
+        Kind::Expression(_) => "an expression",
+        Kind::Column => "column names",
+        Kind::Value(ValueType::Integer) => "a whole number",
+        Kind::Value(ValueType::Float) => "a number",
+        Kind::Value(ValueType::String) => "text",
+        // No argument holds a date yet, so no argument fits it.
+        Kind::Value(ValueType::Date) => "a date",
+        Kind::Value(ValueType::Any) => "a number, text or a flag",
+        Kind::Flag => "a flag",
+        Kind::Choice(_) => "a choice",
+        Kind::Dtype => "a dtype",
+        Kind::Duration => "a duration",
+        Kind::Table => "a table",
+        Kind::Path => "a path",
+        Kind::Pairs(..) => "pairs",
+    }
+}
+
+/// Whether `argument` is one value of `kind`.
+fn check_kind(parameter: &'static str, kind: Kind, argument: &Argument) -> Result<(), BuildError> {
+    match (kind, argument) {
+        (Kind::Expression(_), Argument::Expression(_))
+        | (Kind::Column, Argument::Columns(_))
+        | (Kind::Value(ValueType::Integer), Argument::Integer(_))
+        | (Kind::Value(ValueType::Float), Argument::Float(_))
+        | (Kind::Value(ValueType::String), Argument::String(_))
+        | (
+            Kind::Value(ValueType::Any),
+            Argument::Integer(_) | Argument::Float(_) | Argument::String(_) | Argument::Flag(_),
+        )
+        | (Kind::Flag, Argument::Flag(_))
+        | (Kind::Dtype, Argument::Dtype(_))
+        | (Kind::Duration, Argument::Duration(_))
+        | (Kind::Table, Argument::Table(_))
+        | (Kind::Path, Argument::Path(_)) => Ok(()),
+        (Kind::Choice(words), Argument::Choice(word)) => {
+            if words.contains(&word.as_str()) {
+                Ok(())
+            } else {
+                Err(BuildError::UnknownChoice {
+                    parameter,
+                    word: word.clone(),
+                })
+            }
+        }
+        (Kind::Pairs(key, value), Argument::Pairs(pairs)) => pairs.iter().try_for_each(|(k, v)| {
+            check_kind(parameter, *key, k)?;
+            check_kind(parameter, *value, v)
+        }),
+        (kind, other) => Err(Arguments::wrong(parameter, expects(kind), other)),
+    }
+}
+
+/// Whether `argument` is what `parameter` holds: its kind, in its shape.
+fn check(parameter: &Parameter, argument: &Argument) -> Result<(), BuildError> {
+    let (name, kind) = (parameter.name(), parameter.kind());
+    match (parameter.shape(), argument) {
+        (Shape::Many | Shape::PerItem(_), Argument::Many(items)) => items
+            .iter()
+            .try_for_each(|item| check_kind(name, kind, item)),
+        (Shape::Many, other) => Err(Arguments::wrong(name, "a list", other)),
+        (Shape::One | Shape::PerItem(_), one) => check_kind(name, kind, one),
+    }
+}
+
+impl Entry {
+    /// The arguments for one use of the entry, each given by the name of the
+    /// parameter it is for.
+    ///
+    /// Each argument must be of its parameter's kind, in its shape: a
+    /// parameter of shape many takes a list, and one of shape per item takes
+    /// one argument or a list. Where a kind holds words, the word must be one
+    /// of them. What cannot be known without a table is not checked: the
+    /// dtypes an expression may have, whether a column exists, and how many
+    /// items a per-item list has. Building the entry reports those.
+    ///
+    /// # Errors
+    ///
+    /// When a name is not a parameter of the entry, a parameter is given
+    /// twice, or an argument does not fit its parameter.
+    pub fn arguments<'a>(
+        &self,
+        given: impl IntoIterator<Item = (&'a str, Argument)>,
+    ) -> Result<Arguments, BuildError> {
+        let mut arguments = Arguments::new();
+        for (name, argument) in given {
+            let parameter = self
+                .parameters
+                .iter()
+                .find(|parameter| parameter.name() == name)
+                .ok_or_else(|| BuildError::UnknownParameter {
+                    parameter: name.to_owned(),
+                })?;
+            check(parameter, &argument)?;
+            if arguments.given.insert(parameter.name(), argument).is_some() {
+                return Err(BuildError::Repeated {
+                    parameter: parameter.name(),
+                });
+            }
+        }
+        Ok(arguments)
     }
 }

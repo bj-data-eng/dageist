@@ -13,6 +13,8 @@
 //! language files beside this module, keyed by the same identifiers.
 
 mod arguments;
+mod condition;
+mod defaults;
 mod entries;
 mod left_out;
 #[cfg(test)]
@@ -20,6 +22,8 @@ mod tests;
 mod words;
 
 pub use arguments::{Argument, Arguments, BuildError};
+pub use condition::Conditional;
+pub use defaults::{DefaultValue, ParameterDefault};
 pub use left_out::{LeftOut, Reason, left_out};
 pub use words::{Words, WordsError, english};
 
@@ -49,6 +53,10 @@ pub enum Applies {
     Frame,
     /// A function that makes an expression from its arguments, such as `col`.
     Function,
+    /// A link of a `when-then-otherwise` expression: `when`, `then` or
+    /// `otherwise`. It starts, continues or ends a [`Conditional`], and only
+    /// `otherwise` gives an expression.
+    Condition,
 }
 
 /// The families an entry is swapped within. An entry can be changed for
@@ -63,6 +71,8 @@ pub enum Family {
     Cumulative,
     /// Arithmetic between two values.
     Arithmetic,
+    /// One value for a whole group: `sum`, `min`, `max`, `len`.
+    Aggregate,
     /// Dates and times: the `dt` namespace.
     Temporal,
     /// Working within groups: `over`.
@@ -77,11 +87,12 @@ pub enum Family {
 
 impl Family {
     /// Every family, in the order they are offered.
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::Steps,
         Self::Rows,
         Self::Cumulative,
         Self::Arithmetic,
+        Self::Aggregate,
         Self::Temporal,
         Self::Window,
         Self::Compare,
@@ -97,6 +108,7 @@ impl Family {
             Self::Rows => "rows",
             Self::Cumulative => "cumulative",
             Self::Arithmetic => "arithmetic",
+            Self::Aggregate => "aggregate",
             Self::Temporal => "temporal",
             Self::Window => "window",
             Self::Compare => "compare",
@@ -221,27 +233,17 @@ pub enum Shape {
     PerItem(&'static str),
 }
 
-/// What a parameter holds when it is not given.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Default {
-    /// It must be given.
-    Required,
-    /// Polars' default, written as Python writes it, such as `1`, `None` or
-    /// `'group_to_rows'`.
-    Python(&'static str),
-}
-
 /// One parameter of an entry, named as Python names it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Parameter {
     name: &'static str,
     kind: Kind,
     shape: Shape,
-    default: Default,
+    default: ParameterDefault,
 }
 
 impl Parameter {
-    const fn new(name: &'static str, kind: Kind, shape: Shape, default: Default) -> Self {
+    const fn new(name: &'static str, kind: Kind, shape: Shape, default: ParameterDefault) -> Self {
         Self {
             name,
             kind,
@@ -268,9 +270,10 @@ impl Parameter {
         self.shape
     }
 
-    /// What the parameter holds when it is not given.
+    /// What the parameter holds when it is not given, as Python writes it.
+    /// [`ParameterDefault::value`] reads it as a value.
     #[must_use]
-    pub const fn default(&self) -> Default {
+    pub const fn default(&self) -> ParameterDefault {
         self.default
     }
 }
@@ -293,6 +296,14 @@ pub enum Build {
     Frame(fn(LazyFrame, &Arguments) -> Result<LazyFrame, BuildError>),
     /// Makes an expression from its arguments alone.
     Function(fn(&Arguments) -> Result<Expr, BuildError>),
+    /// Starts a condition from its arguments alone: `when`.
+    Condition(fn(&Arguments) -> Result<Conditional, BuildError>),
+    /// Continues the condition it follows: `then`, or a further `when`. The
+    /// link that cannot follow the condition's state is refused.
+    ConditionStep(fn(Conditional, &Arguments) -> Result<Conditional, BuildError>),
+    /// Ends the condition it follows in an expression: `otherwise`. The link
+    /// that cannot follow the condition's state is refused.
+    ConditionEnd(fn(Conditional, &Arguments) -> Result<Expr, BuildError>),
 }
 
 impl std::fmt::Debug for Build {
@@ -301,6 +312,9 @@ impl std::fmt::Debug for Build {
             Self::Expression(_) => "Build::Expression",
             Self::Frame(_) => "Build::Frame",
             Self::Function(_) => "Build::Function",
+            Self::Condition(_) => "Build::Condition",
+            Self::ConditionStep(_) => "Build::ConditionStep",
+            Self::ConditionEnd(_) => "Build::ConditionEnd",
         })
     }
 }
@@ -330,6 +344,9 @@ impl Entry {
             Build::Expression(_) => Applies::Expression,
             Build::Frame(_) => Applies::Frame,
             Build::Function(_) => Applies::Function,
+            Build::Condition(_) | Build::ConditionStep(_) | Build::ConditionEnd(_) => {
+                Applies::Condition
+            }
         }
     }
 

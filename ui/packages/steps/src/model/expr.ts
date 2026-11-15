@@ -31,6 +31,16 @@ import {
   supertype,
   withLiteral,
 } from './frame';
+import { findInput } from './inputs';
+import type { Options, Setting } from './settings';
+import {
+  atDefault,
+  flagIsSet,
+  isComplete,
+  optionOf,
+  optionParameters,
+  setParameters,
+} from './settings';
 
 /** The methods that compare a value with another and give a Boolean. */
 export type ComparisonMethod = 'eq' | 'ne' | 'gt' | 'ge' | 'lt' | 'le';
@@ -40,6 +50,10 @@ export type MethodName =
   | 'shift'
   | 'first'
   | 'last'
+  | 'sum'
+  | 'min'
+  | 'max'
+  | 'len'
   | 'cum_sum'
   | 'cum_count'
   | 'cum_max'
@@ -59,6 +73,10 @@ const PREVIEWED: Readonly<Record<MethodName, true>> = {
   shift: true,
   first: true,
   last: true,
+  sum: true,
+  min: true,
+  max: true,
+  len: true,
   cum_sum: true,
   cum_count: true,
   cum_max: true,
@@ -84,13 +102,50 @@ export function isMethodName(name: string): name is MethodName {
   return Object.hasOwn(PREVIEWED, name);
 }
 
-/** One method call. `argument` holds the argument as typed, or `null`. */
+/**
+ * One method call. `argument` holds the argument as typed, or `null`. Any
+ * other parameter the method takes is in `options` when it is set.
+ */
 export interface Method {
   /** Stays with the call while it is moved or edited. */
   readonly id: string;
   readonly name: MethodName;
   readonly argument: string | null;
+  readonly options: Options;
 }
+
+/**
+ * The parameters of each method the preview applies when they are set. A
+ * parameter that is set and not here is left out of the preview, and the
+ * method says so.
+ */
+const PREVIEWED_OPTIONS: Readonly<Record<MethodName, readonly string[]>> = {
+  shift: ['fill_value'],
+  first: ['ignore_nulls'],
+  last: ['ignore_nulls'],
+  sum: [],
+  min: [],
+  max: [],
+  len: [],
+  cum_sum: ['reverse'],
+  cum_count: ['reverse'],
+  cum_max: ['reverse'],
+  sub: [],
+  'dt.date': [],
+  'dt.time': [],
+  'dt.offset_by': [],
+  'dt.month_start': [],
+  'dt.total_days': [],
+  over: [],
+  eq: [],
+  ne: [],
+  gt: [],
+  ge: [],
+  lt: [],
+  le: [],
+  is_null: [],
+  is_not_null: [],
+};
 
 const DURATION = /^(?<amount>-?\d+)(?<unit>d|w|mo)$/;
 const INTEGER = /^-?\d+$/;
@@ -234,7 +289,16 @@ export function methodDtype(name: MethodName, input: Dtype, given: Given | null)
     case 'over':
       return input;
     case 'cum_count':
+    case 'len':
       return 'UInt32';
+    case 'sum':
+      // Polars widens only integers narrower than 32 bits before summing.
+      return isNumeric(input) || input === 'Duration' ? input : null;
+    case 'min':
+    case 'max':
+      return isNumeric(input) || isTemporal(input) || input === 'String' || input === 'Boolean'
+        ? input
+        : null;
     case 'cum_sum':
       // Polars widens only integers narrower than 32 bits before summing.
       return isNumeric(input) || input === 'Duration' ? input : null;
@@ -346,6 +410,94 @@ export function argumentRule(catalogue: Catalogue, name: MethodName): ArgumentRu
   const argument = entry === null ? null : argumentOf(entry);
   if (entry === null || argument === null) return null;
   return { name, shown: entry.name, ...argument };
+}
+
+/**
+ * Returns the parameters of the method `name` that can be added to it: all
+ * but the argument that is drawn where the method is.
+ */
+export function methodOptionParameters(
+  catalogue: Catalogue,
+  name: MethodName,
+): readonly ParameterView[] {
+  const entry = methodEntry(catalogue, name);
+  if (entry === null) return [];
+  const argument = argumentOf(entry);
+  return optionParameters(entry, argument === null ? [] : [argument.parameter.name]);
+}
+
+/**
+ * Returns the Polars names of the parameters `method` is set with that the
+ * preview does not apply, so that it can say so. A parameter that is at its
+ * default, or still to be given, is not written and so is not named.
+ */
+export function skippedOptions(catalogue: Catalogue, method: Method): string[] {
+  const entry = methodEntry(catalogue, method.name);
+  if (entry === null) return [];
+  const applied = PREVIEWED_OPTIONS[method.name];
+  return setParameters(entry, method.options)
+    .filter(
+      ({ parameter, setting }) =>
+        isComplete(setting) &&
+        !atDefault(parameter, setting) &&
+        !(
+          applied.includes(parameter.name) &&
+          (method.name !== 'shift' || fillOf(setting) !== undefined)
+        ),
+    )
+    .map(({ parameter }) => parameter.name);
+}
+
+/**
+ * Returns the cell a `shift` fills the rows it empties with: the one value
+ * it is given, or `undefined` when the preview cannot work it out, as for a
+ * field.
+ */
+function fillOf(setting: Setting | null): Cell | undefined {
+  if (setting === null) return null;
+  if (setting.kind !== 'expression') return undefined;
+  const { value } = setting;
+  if (value.kind === 'literal') return value.value;
+  if (value.kind === 'input') {
+    const input = findInput(value.name);
+    return input?.kind === 'value' ? input.value : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Returns what a `shift` fills with, as the words and dtype of the value it
+ * is given: `null` for None, which fits every dtype, or `undefined` when the
+ * preview cannot tell, as for a field.
+ */
+function fillValue(setting: Setting): { label: string; dtype: Dtype } | null | undefined {
+  if (setting.kind !== 'expression') return undefined;
+  const { value } = setting;
+  if (value.kind === 'literal') {
+    if (value.value === null) return null;
+    return typeof value.value === 'number'
+      ? { label: String(value.value), dtype: literalDtype(value.value) }
+      : { label: quoted(value.value), dtype: 'String' };
+  }
+  if (value.kind === 'input') {
+    const input = findInput(value.name);
+    return input?.kind === 'value' ? { label: value.name, dtype: input.dtype } : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Returns why the `fill_value` a `shift` is set with does not go with the
+ * `input` dtype it shifts, or `null` when it does, when it is not set, or when
+ * the preview cannot tell.
+ */
+export function fillProblem(method: Method, input: Dtype): string | null {
+  if (method.name !== 'shift') return null;
+  const setting = optionOf(method.options, 'fill_value');
+  if (setting === null || !isComplete(setting)) return null;
+  const fill = fillValue(setting);
+  if (fill === null || fill === undefined || supertype(input, fill.dtype) !== null) return null;
+  return `shift is given ${input}, but its fill_value ${fill.label} is ${fill.dtype}.`;
 }
 
 /** Reports whether a column of `operand` dtype can be taken from a value of `input` dtype. */
@@ -561,6 +713,54 @@ function compared(name: ComparisonMethod, left: Cell, right: Cell): Cell {
   }
 }
 
+/** Returns a copy of `values` in the opposite order. */
+function backwards(values: readonly Cell[]): Cell[] {
+  return Array.from(values, (_value, at) => values[values.length - 1 - at] ?? null);
+}
+
+/** Returns `work` done on `values` from the last to the first, in the order they came in. */
+function fromTheEnd(
+  reverse: boolean,
+  values: readonly Cell[],
+  work: (values: readonly Cell[]) => Cell[],
+): Cell[] {
+  return reverse ? backwards(work(backwards(values))) : work(values);
+}
+
+/** Returns `value` on every row, as an aggregate that gives one value is the same on each. */
+function broadcast(values: readonly Cell[], value: Cell): Cell[] {
+  return values.map(() => value);
+}
+
+/** Returns the total of the numbers in `cells`; a null adds nothing, and no cells total 0. */
+function summed(cells: readonly Cell[]): number {
+  return cells.reduce<number>((total, cell) => total + (typeof cell === 'number' ? cell : 0), 0);
+}
+
+/** Returns the highest cell of `cells` when `side` is 1, or the lowest when it is -1; a null is skipped. */
+function extreme(cells: readonly Cell[], side: 1 | -1): Cell {
+  const present = cells.filter((cell) => cell !== null);
+  const [first] = present;
+  if (first === undefined) return null;
+  return present.reduce((best, cell) => (compareCells(cell, best) * side > 0 ? cell : best), first);
+}
+
+/** The methods that give one value for all the values they are handed. */
+const AGGREGATING: readonly MethodName[] = ['first', 'last', 'sum', 'min', 'max', 'len'];
+
+/** Reports whether the method `name` gives one value for all the values it is handed. */
+export function isAggregating(name: MethodName): boolean {
+  return AGGREGATING.includes(name);
+}
+
+/**
+ * Returns what the aggregate `name` gives no values at all: 0 for a count or a
+ * total, and null for the others.
+ */
+export function emptyAggregate(name: MethodName): Cell {
+  return name === 'len' || name === 'sum' ? 0 : null;
+}
+
 function applyAcrossGroup(
   method: Method,
   values: readonly Cell[],
@@ -570,6 +770,8 @@ function applyAcrossGroup(
   if (isComparison(name)) {
     return values.map((value, position) => compared(name, value, operand[position] ?? null));
   }
+  const reverse = flagIsSet(method.options, 'reverse');
+  const ignoreNulls = flagIsSet(method.options, 'ignore_nulls');
   switch (method.name) {
     case 'is_null':
       return values.map((value) => booleanCell(value === null));
@@ -582,30 +784,49 @@ function applyAcrossGroup(
     case 'shift': {
       // Every row gives the same number: a shift takes one, not one for each row.
       const rows = typeof operand[0] === 'number' ? operand[0] : 0;
-      return values.map((_value, position) => values[position - rows] ?? null);
-    }
-    case 'first':
-      return values.map(() => values[0] ?? null);
-    case 'last':
-      return values.map(() => values.at(-1) ?? null);
-    case 'cum_count': {
-      let count = 0;
-      return values.map((value) => {
-        if (value !== null) count += 1;
-        return count;
+      const fill = fillOf(optionOf(method.options, 'fill_value')) ?? null;
+      return values.map((_value, position) => {
+        const from = position - rows;
+        return from < 0 || from >= values.length ? fill : (values[from] ?? null);
       });
     }
-    case 'cum_sum': {
-      // A null stays null and adds nothing to the total.
-      let total = 0;
-      return values.map((value) => {
-        if (typeof value !== 'number') return null;
-        total += value;
-        return total;
-      });
+    case 'first': {
+      const first = ignoreNulls ? (values.find((value) => value !== null) ?? null) : values[0];
+      return values.map(() => first ?? null);
     }
+    case 'last': {
+      const present = values.filter((value) => value !== null);
+      const last = ignoreNulls ? present.at(-1) : values.at(-1);
+      return values.map(() => last ?? null);
+    }
+    case 'sum':
+      return broadcast(values, summed(values));
+    case 'min':
+      return broadcast(values, extreme(values, -1));
+    case 'max':
+      return broadcast(values, extreme(values, 1));
+    case 'len':
+      return broadcast(values, values.length);
+    case 'cum_count':
+      return fromTheEnd(reverse, values, (ordered) => {
+        let count = 0;
+        return ordered.map((value) => {
+          if (value !== null) count += 1;
+          return count;
+        });
+      });
+    case 'cum_sum':
+      return fromTheEnd(reverse, values, (ordered) => {
+        // A null stays null and adds nothing to the total.
+        let total = 0;
+        return ordered.map((value) => {
+          if (typeof value !== 'number') return null;
+          total += value;
+          return total;
+        });
+      });
     case 'cum_max':
-      return runningMaximum(values);
+      return fromTheEnd(reverse, values, runningMaximum);
     default:
       return values.map((value, position) => applyToEach(method, value, operand[position] ?? null));
   }
@@ -669,9 +890,6 @@ export function applyWithin(
   return result;
 }
 
-const PYTHON_NUMBER = /^-?\d+$/;
-const PYTHON_TEXT = /^'(?<text>[^']*)'$/;
-
 /**
  * Returns the argument `name` starts with when it is added to a chain, or
  * `null` when it takes none. A default Polars gives as a whole number or as
@@ -681,14 +899,14 @@ const PYTHON_TEXT = /^'(?<text>[^']*)'$/;
 export function defaultArgument(catalogue: Catalogue, name: MethodName): string | null {
   const rule = argumentRule(catalogue, name);
   if (rule === null) return null;
-  const python = rule.parameter.default;
-  if (python === null) return '';
-  if (PYTHON_NUMBER.test(python)) {
-    const value = Number(python);
-    return groupsHold(rule.dtypes, literalDtype(value)) ? literalComparand(value) : '';
+  const given = rule.parameter.default;
+  if (given.kind === 'integer' && Number.isSafeInteger(given.value)) {
+    return groupsHold(rule.dtypes, literalDtype(given.value)) ? literalComparand(given.value) : '';
   }
-  const text = PYTHON_TEXT.exec(python)?.groups?.text;
-  return text !== undefined && groupsHold(rule.dtypes, 'String') ? literalComparand(text) : '';
+  if (given.kind === 'text') {
+    return groupsHold(rule.dtypes, 'String') ? literalComparand(given.value) : '';
+  }
+  return '';
 }
 
 /**
@@ -717,7 +935,12 @@ function argumentText(argument: string | null): string {
   return typeof read.value === 'number' ? String(read.value) : `pl.lit(${quoted(read.value)})`;
 }
 
-/** Returns the Polars text of one method call. A method with no argument is written with none. */
-export function methodText(method: Method): string {
-  return `.${method.name}(${method.argument === null ? '' : argumentText(method.argument)})`;
+/**
+ * Returns the Polars text of one method call: its argument, then `settings`,
+ * the text of each parameter that is set. A method with nothing is written
+ * with no arguments.
+ */
+export function methodText(method: Method, settings: readonly string[]): string {
+  const argument = method.argument === null ? [] : [argumentText(method.argument)];
+  return `.${method.name}(${[...argument, ...settings].join(', ')})`;
 }

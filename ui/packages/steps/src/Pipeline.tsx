@@ -4,6 +4,7 @@
 
 import { cx } from '@dageist/design';
 
+import { useCatalogue } from './CatalogueProvider';
 import type { Step } from './model/steps';
 import { stepText } from './model/steps';
 
@@ -23,6 +24,7 @@ export function Pipeline({
   selectedId,
   onSelect,
 }: PipelineProps): React.JSX.Element {
+  const catalogue = useCatalogue();
   return (
     <div className="flex flex-col overflow-x-auto rounded-[10px] border border-dashed border-line-strong py-2 font-mono text-[13px]">
       <div className="min-w-max px-3.5 leading-5">{source}</div>
@@ -38,7 +40,7 @@ export function Pipeline({
             onSelect(step.id);
           }}
         >
-          {`  ${stepText(step)}`}
+          {`  ${stepText(catalogue, step)}`}
         </button>
       ))}
     </div>

@@ -6,9 +6,10 @@
  *
  * The whole list is sent on every change, and the last change wins. A message
  * is trusted to come from this application's own windows: it is checked for
- * its shape, not step by step. The main window tells whether the steps window
- * is open by its regular word, which a browser may slow down for a window in
- * the background, so that sign can lag behind.
+ * its shape, and the settings, values and chains of each step in depth. The
+ * main window tells whether the steps window is open by its regular word,
+ * which a browser may slow down for a window in the background, so that sign
+ * can lag behind.
  *
  * This is storyboard code. In the real application the Rust core owns the
  * steps and tells every window of a change; nothing here is meant to survive.
@@ -18,6 +19,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { Host } from '@dageist/host';
 
+import { isCondition, isOptions, isRecord, isValue } from './model/shape';
 import type { Step } from './model/steps';
 import { VERBS } from './model/steps';
 import { START } from './start';
@@ -42,16 +44,18 @@ type Message =
   | { readonly kind: 'gone' }
   | ({ readonly kind: 'state' } & Held);
 
-/** Reports whether `value` has the marks of a step: an id and a known verb. It looks no deeper. */
+/**
+ * Reports whether `value` has the marks of a step: an id, a known verb and
+ * options that are all settings. What a step holds as an expression or a
+ * condition is checked all the way down, chains and the options of their
+ * methods included. It looks no deeper at the rest.
+ */
 function isStep(value: unknown): value is Step {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'id' in value &&
-    typeof value.id === 'string' &&
-    'verb' in value &&
-    VERBS.some((verb) => verb === value.verb)
-  );
+  if (!isRecord(value) || typeof value.id !== 'string') return false;
+  if (!VERBS.some((verb) => verb === value.verb) || !isOptions(value.options)) return false;
+  if (value.verb === 'with_columns') return isValue(value.value);
+  if (value.verb === 'filter') return isCondition(value.condition);
+  return true;
 }
 
 /** Returns `message` as something a window says about the steps, or `null` when it is not. */

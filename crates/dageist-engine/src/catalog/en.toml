@@ -8,6 +8,9 @@ changed = []
 [families.steps]
 title = "Steps · change the table"
 
+[families.aggregate]
+title = "Aggregate · one value"
+
 [families.rows]
 title = "Rows"
 
@@ -71,6 +74,34 @@ hint = "text"
 [dtypes.Boolean]
 name = "Boolean"
 hint = "true or false"
+
+[entries."ChainedThen.otherwise"]
+name = "otherwise"
+hint = "the value where no condition holds"
+
+[entries."ChainedThen.otherwise".parameters.statement]
+name = "statement"
+label = "value when none holds"
+
+[entries."ChainedThen.when"]
+name = "when"
+hint = "another condition"
+
+[entries."ChainedThen.when".parameters.predicates]
+name = "predicates"
+label = "conditions"
+
+[entries."ChainedThen.when".parameters.constraints]
+name = "constraints"
+label = "columns equal to"
+
+[entries."ChainedWhen.then"]
+name = "then"
+hint = "the value where that condition holds"
+
+[entries."ChainedWhen.then".parameters.statement]
+name = "statement"
+label = "value when it holds"
 
 [entries."Expr.cum_count"]
 name = "cum_count"
@@ -457,6 +488,34 @@ label = "columns"
 name = "named_exprs"
 label = "new columns"
 
+[entries."Then.otherwise"]
+name = "otherwise"
+hint = "the value where no condition holds"
+
+[entries."Then.otherwise".parameters.statement]
+name = "statement"
+label = "value when none holds"
+
+[entries."Then.when"]
+name = "when"
+hint = "another condition"
+
+[entries."Then.when".parameters.predicates]
+name = "predicates"
+label = "conditions"
+
+[entries."Then.when".parameters.constraints]
+name = "constraints"
+label = "columns equal to"
+
+[entries."When.then"]
+name = "then"
+hint = "the value where the condition holds"
+
+[entries."When.then".parameters.statement]
+name = "statement"
+label = "value when it holds"
+
 [entries."polars.col"]
 name = "col"
 hint = "a column of the table"
@@ -484,3 +543,35 @@ label = "as dtype"
 [entries."polars.lit".parameters.allow_object]
 name = "allow_object"
 label = "allow any object"
+
+[entries."polars.element"]
+name = "element"
+hint = "each value of the cell being combined"
+
+[entries."polars.when"]
+name = "when"
+hint = "choose a value by a condition"
+
+[entries."polars.when".parameters.predicates]
+name = "predicates"
+label = "conditions"
+
+[entries."polars.when".parameters.constraints]
+name = "constraints"
+label = "columns equal to"
+
+[entries."Expr.len"]
+name = "len"
+hint = "number of values"
+
+[entries."Expr.max"]
+name = "max"
+hint = "highest value"
+
+[entries."Expr.min"]
+name = "min"
+hint = "lowest value"
+
+[entries."Expr.sum"]
+name = "sum"
+hint = "total"

@@ -9,16 +9,16 @@ use polars::prelude::{
 
 use crate::catalog::{Argument, Arguments, Build, BuildError, entry};
 
-fn micros() -> TimeUnit {
+pub(super) fn micros() -> TimeUnit {
     TimeUnit::Microseconds
 }
 
-fn datetime() -> DataType {
+pub(super) fn datetime() -> DataType {
     DataType::Datetime(micros(), None)
 }
 
 /// Three rows, one column of each dtype the entries work on.
-fn sample() -> LazyFrame {
+pub(super) fn sample() -> LazyFrame {
     df!(
         "i" => [1_i64, 2, 3],
         "f" => [0.5_f64, 1.5, 2.5],
@@ -37,36 +37,36 @@ fn sample() -> LazyFrame {
     ])
 }
 
-fn expression_arg(expr: Expr) -> Argument {
+pub(super) fn expression_arg(expr: Expr) -> Argument {
     Argument::Expression(expr)
 }
 
-fn flag(value: bool) -> Argument {
+pub(super) fn flag(value: bool) -> Argument {
     Argument::Flag(Some(value))
 }
 
-fn columns(names: &[&str]) -> Argument {
+pub(super) fn columns(names: &[&str]) -> Argument {
     Argument::Columns(names.iter().map(|name| (*name).to_owned()).collect())
 }
 
-fn many(items: Vec<Argument>) -> Argument {
+pub(super) fn many(items: Vec<Argument>) -> Argument {
     Argument::Many(items)
 }
 
-fn choice(word: &str) -> Argument {
+pub(super) fn choice(word: &str) -> Argument {
     Argument::Choice(word.to_owned())
 }
 
-fn text(value: &str) -> Argument {
+pub(super) fn text(value: &str) -> Argument {
     Argument::String(value.to_owned())
 }
 
-fn pairs(entries: Vec<(Argument, Argument)>) -> Argument {
+pub(super) fn pairs(entries: Vec<(Argument, Argument)>) -> Argument {
     Argument::Pairs(entries)
 }
 
 /// The expression entry `id` makes of `receiver`.
-fn method(id: &str, receiver: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+pub(super) fn method(id: &str, receiver: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
     match entry(id).expect("an entry").build() {
         Build::Expression(build) => build(receiver, arguments),
         other => panic!("{id} is {other:?}, not an expression method"),
@@ -74,7 +74,7 @@ fn method(id: &str, receiver: Expr, arguments: &Arguments) -> Result<Expr, Build
 }
 
 /// The expression function entry `id` makes.
-fn function(id: &str, arguments: &Arguments) -> Result<Expr, BuildError> {
+pub(super) fn function(id: &str, arguments: &Arguments) -> Result<Expr, BuildError> {
     match entry(id).expect("an entry").build() {
         Build::Function(build) => build(arguments),
         other => panic!("{id} is {other:?}, not a function"),
@@ -82,35 +82,39 @@ fn function(id: &str, arguments: &Arguments) -> Result<Expr, BuildError> {
 }
 
 /// The frame step entry `id` makes of `frame`.
-fn step(id: &str, frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
+pub(super) fn step(
+    id: &str,
+    frame: LazyFrame,
+    arguments: &Arguments,
+) -> Result<LazyFrame, BuildError> {
     match entry(id).expect("an entry").build() {
         Build::Frame(build) => build(frame, arguments),
         other => panic!("{id} is {other:?}, not a step"),
     }
 }
 
-fn schema(mut frame: LazyFrame) -> Schema {
+pub(super) fn schema(mut frame: LazyFrame) -> Schema {
     (*frame.collect_schema().expect("a schema")).clone()
 }
 
 /// The dtype Polars gives `expr` selected from the sample table.
-fn dtype_of(expr: &Expr) -> DataType {
+pub(super) fn dtype_of(expr: &Expr) -> DataType {
     let schema = schema(sample().select([expr.clone().alias("out")]));
     schema.get("out").expect("one column, out").clone()
 }
 
-fn names(frame: LazyFrame) -> Vec<String> {
+pub(super) fn names(frame: LazyFrame) -> Vec<String> {
     schema(frame)
         .iter_names()
         .map(PlSmallStr::to_string)
         .collect()
 }
 
-fn run(frame: LazyFrame) -> DataFrame {
+pub(super) fn run(frame: LazyFrame) -> DataFrame {
     frame.collect().expect("rows")
 }
 
-fn integers(frame: &DataFrame, name: &str) -> Vec<Option<i64>> {
+pub(super) fn integers(frame: &DataFrame, name: &str) -> Vec<Option<i64>> {
     frame
         .column(name)
         .expect("a column")
@@ -120,7 +124,7 @@ fn integers(frame: &DataFrame, name: &str) -> Vec<Option<i64>> {
         .collect()
 }
 
-fn none() -> Arguments {
+pub(super) fn none() -> Arguments {
     Arguments::new()
 }
 
@@ -560,8 +564,8 @@ fn rename_gives_columns_their_new_names() {
     let given = Arguments::new().with(
         "mapping",
         pairs(vec![
-            (columns(&["i"]), columns(&["index"])),
-            (columns(&["s"]), columns(&["label"])),
+            (columns(&["i"]), text("index")),
+            (columns(&["s"]), text("label")),
         ]),
     );
     let renamed = step("LazyFrame.rename", sample(), &given).unwrap();
@@ -573,7 +577,7 @@ fn rename_gives_columns_their_new_names() {
 
 #[test]
 fn rename_of_a_column_the_table_lacks_fails_only_when_strict() {
-    let mapping = pairs(vec![(columns(&["nope"]), columns(&["other"]))]);
+    let mapping = pairs(vec![(columns(&["nope"]), text("other"))]);
     let strict = Arguments::new().with("mapping", mapping.clone());
     let renamed = step("LazyFrame.rename", sample(), &strict).unwrap();
     assert!(renamed.clone().collect_schema().is_err());
@@ -584,15 +588,15 @@ fn rename_of_a_column_the_table_lacks_fails_only_when_strict() {
     assert_eq!(names(renamed), names(sample()));
 }
 
-fn other_table() -> LazyFrame {
+pub(super) fn other_table() -> LazyFrame {
     sample().select([col("i"), col("f"), col("s").alias("t")])
 }
 
-fn table_arg() -> Argument {
+pub(super) fn table_arg() -> Argument {
     Argument::Table(other_table())
 }
 
-fn on_i() -> Argument {
+pub(super) fn on_i() -> Argument {
     many(vec![expression_arg(col("i"))])
 }
 
@@ -724,7 +728,7 @@ fn sorted(mut values: Vec<Option<i64>>) -> Vec<Option<i64>> {
     values
 }
 
-fn floats(frame: &DataFrame, name: &str) -> Vec<Option<f64>> {
+pub(super) fn floats(frame: &DataFrame, name: &str) -> Vec<Option<f64>> {
     frame
         .column(name)
         .expect("a column")
@@ -781,29 +785,45 @@ fn pivot_takes_the_other_columns_as_values_or_as_the_index() {
     }
 }
 
-#[test]
-fn pivot_combines_repeated_values_with_the_aggregate_given() {
-    let table = df!(
+/// Two `a` values and one `b` value for the same `i`, which a pivot must combine.
+fn repeated_values() -> LazyFrame {
+    df!(
         "i" => [1_i64, 1, 1],
         "s" => ["a", "a", "b"],
         "f" => [1.0_f64, 2.0, 5.0],
     )
     .unwrap()
-    .lazy();
-    let summed = Arguments::new()
-        .with("on", columns(&["s"]))
-        .with("on_columns", values_of_s())
-        .with("index", columns(&["i"]))
-        .with(
-            "aggregate_function",
-            expression_arg(polars::prelude::element().sum()),
-        )
-        .with("column_naming", choice("combine"))
-        .with("separator", text("."));
-    let pivoted = step("LazyFrame.pivot", table, &summed).unwrap();
+    .lazy()
+}
+
+/// A pivot of `repeated_values` that combines the values of a cell with the expression
+/// `combine` makes of `polars.element`, which stands for the values of the cell.
+fn pivot_combining(combine: fn(Expr) -> Expr) -> DataFrame {
+    let element = function("polars.element", &none()).unwrap();
+    let given = entry("LazyFrame.pivot")
+        .expect("an entry")
+        .arguments([
+            ("on", columns(&["s"])),
+            ("on_columns", values_of_s()),
+            ("index", columns(&["i"])),
+            ("aggregate_function", expression_arg(combine(element))),
+            ("column_naming", choice("combine")),
+            ("separator", text(".")),
+        ])
+        .expect("arguments that fit");
+    let pivoted = step("LazyFrame.pivot", repeated_values(), &given).unwrap();
     assert_eq!(names(pivoted.clone()), ["i", "f.a", "f.b"]);
-    let rows = run(pivoted);
+    run(pivoted)
+}
+
+#[test]
+fn pivot_combines_repeated_values_with_the_aggregate_given() {
+    // The `a` cell holds 1.0 and 2.0 and the `b` cell 5.0.
+    let rows = pivot_combining(Expr::sum);
     assert_eq!(floats(&rows, "f.a"), [Some(3.0)]);
+    assert_eq!(floats(&rows, "f.b"), [Some(5.0)]);
+    let rows = pivot_combining(Expr::max);
+    assert_eq!(floats(&rows, "f.a"), [Some(2.0)]);
     assert_eq!(floats(&rows, "f.b"), [Some(5.0)]);
 }
 
@@ -906,10 +926,8 @@ fn an_argument_of_the_wrong_kind_names_the_parameter_and_what_was_given() {
         ),
         ("other", "a table", "a whole number")
     );
-    let two_names = Arguments::new().with(
-        "mapping",
-        pairs(vec![(columns(&["a", "b"]), columns(&["c"]))]),
-    );
+    let two_names =
+        Arguments::new().with("mapping", pairs(vec![(columns(&["a", "b"]), text("c"))]));
     assert_eq!(
         wrong(
             step("LazyFrame.rename", sample(), &two_names)

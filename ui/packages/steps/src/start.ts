@@ -3,8 +3,10 @@
  */
 
 import { nextId } from './model/ids';
+import { NO_OPTIONS, expressionSetting } from './model/settings';
 import type { Chain, Value } from './model/source';
 import type { Step } from './model/steps';
+import { elementChain, fieldKeys } from './model/steps';
 
 /** Returns `chain` as what a column holds: a field alone is that field, anything more is a chain. */
 function chainValue(chain: Chain): Value {
@@ -18,10 +20,7 @@ export const START: readonly Step[] = [
   {
     id: nextId('step'),
     verb: 'sort',
-    by: [
-      { column: 'dcn', descending: false },
-      { column: 'timestamp', descending: false },
-    ],
+    options: { by: fieldKeys(['dcn', 'timestamp']) },
   },
   {
     id: nextId('step'),
@@ -30,10 +29,11 @@ export const START: readonly Step[] = [
     value: chainValue({
       source: { kind: 'column', column: 'dcn' },
       methods: [
-        { id: nextId('method'), name: 'cum_count', argument: null },
-        { id: nextId('method'), name: 'over', argument: 'dcn' },
+        { id: nextId('method'), name: 'cum_count', argument: null, options: NO_OPTIONS },
+        { id: nextId('method'), name: 'over', argument: 'dcn', options: NO_OPTIONS },
       ],
     }),
+    options: NO_OPTIONS,
   },
   {
     id: nextId('step'),
@@ -42,10 +42,11 @@ export const START: readonly Step[] = [
     value: chainValue({
       source: { kind: 'column', column: 'timestamp' },
       methods: [
-        { id: nextId('method'), name: 'shift', argument: '1' },
-        { id: nextId('method'), name: 'over', argument: 'dcn' },
+        { id: nextId('method'), name: 'shift', argument: '1', options: NO_OPTIONS },
+        { id: nextId('method'), name: 'over', argument: 'dcn', options: NO_OPTIONS },
       ],
     }),
+    options: NO_OPTIONS,
   },
   {
     id: nextId('step'),
@@ -55,6 +56,7 @@ export const START: readonly Step[] = [
       source: { kind: 'column', column: 'timestamp' },
       methods: [],
     }),
+    options: NO_OPTIONS,
   },
   {
     id: nextId('step'),
@@ -62,8 +64,9 @@ export const START: readonly Step[] = [
     alias: 'resolved_day',
     value: chainValue({
       source: { kind: 'column', column: 'resolved_at' },
-      methods: [{ id: nextId('method'), name: 'dt.date', argument: null }],
+      methods: [{ id: nextId('method'), name: 'dt.date', argument: null, options: NO_OPTIONS }],
     }),
+    options: NO_OPTIONS,
   },
   {
     id: nextId('step'),
@@ -72,10 +75,11 @@ export const START: readonly Step[] = [
     value: chainValue({
       source: { kind: 'column', column: 'received_at' },
       methods: [
-        { id: nextId('method'), name: 'sub', argument: 'resolved_at' },
-        { id: nextId('method'), name: 'dt.total_days', argument: null },
+        { id: nextId('method'), name: 'sub', argument: 'resolved_at', options: NO_OPTIONS },
+        { id: nextId('method'), name: 'dt.total_days', argument: null, options: NO_OPTIONS },
       ],
     }),
+    options: NO_OPTIONS,
   },
   {
     id: nextId('step'),
@@ -100,18 +104,21 @@ export const START: readonly Step[] = [
         otherwise: { kind: 'literal', value: 0 },
       },
       methods: [
-        { id: nextId('method'), name: 'cum_sum', argument: null },
-        { id: nextId('method'), name: 'over', argument: 'dcn' },
+        { id: nextId('method'), name: 'cum_sum', argument: null, options: NO_OPTIONS },
+        { id: nextId('method'), name: 'over', argument: 'dcn', options: NO_OPTIONS },
       ],
     }),
+    options: NO_OPTIONS,
   },
   {
     id: nextId('step'),
     verb: 'join',
     table: 'step_sla',
-    leftOn: 'step_to',
-    rightOn: 'step',
-    how: 'left',
+    options: {
+      left_on: fieldKeys(['step_to']),
+      right_on: fieldKeys(['step']),
+      how: { kind: 'word', value: 'left' },
+    },
   },
   {
     id: nextId('step'),
@@ -137,6 +144,7 @@ export const START: readonly Step[] = [
       },
       methods: [],
     }),
+    options: NO_OPTIONS,
   },
   {
     id: nextId('step'),
@@ -185,6 +193,7 @@ export const START: readonly Step[] = [
       },
       methods: [],
     }),
+    options: NO_OPTIONS,
   },
   {
     id: nextId('step'),
@@ -192,8 +201,15 @@ export const START: readonly Step[] = [
     on: 'step_to',
     index: 'dcn',
     values: 'row_days',
-    aggregate: 'sum',
     columnsFrom: 'collect',
     pinned: [],
+    options: {
+      aggregate_function: expressionSetting({
+        kind: 'chain',
+        id: nextId('chain'),
+        // Each cell holds one row, so the first value is the only one.
+        chain: elementChain('first'),
+      }),
+    },
   },
 ];

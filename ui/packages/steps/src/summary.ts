@@ -6,9 +6,11 @@
 
 import { COMPARISON_SIGNS } from './comparisons';
 import type { Catalogue } from './model/catalogue';
+import { pairsOf, textOf } from './model/settings';
 import type { Condition, Value } from './model/source';
 import { literalText } from './model/source';
 import type { Step } from './model/steps';
+import { keysOf } from './model/steps';
 import { verbHead } from './verbs';
 
 function valueSummary(value: Value): string {
@@ -56,15 +58,22 @@ export function stepDetail(step: Step): string {
     case 'filter':
       return conditionSummary(step.condition);
     case 'sort':
-      return `by ${fieldList(step.by.map((key) => key.column))}`;
+      return `by ${fieldList(keysOf(step.options, 'by').map((key) => valueSummary(key)))}`;
     case 'select':
-      return fieldList(step.columns);
-    case 'rename':
-      return step.names.length <= 2 && step.names.length > 0
-        ? step.names.map(({ from, to }) => `${from} → ${to}`).join(', ')
-        : fieldList(step.names.map((naming) => naming.from));
+      return fieldList(keysOf(step.options, 'exprs').map((key) => valueSummary(key)));
+    case 'rename': {
+      const names = pairsOf(step.options, 'mapping').map(({ key, value }) => ({
+        from: textOf(key) ?? 'field',
+        to: textOf(value) ?? 'name',
+      }));
+      return names.length <= 2 && names.length > 0
+        ? names.map(({ from, to }) => `${from} → ${to}`).join(', ')
+        : fieldList(names.map((naming) => naming.from));
+    }
     case 'join':
-      return `${step.table} on ${step.leftOn}`;
+      return `${step.table} on ${keysOf(step.options, 'left_on')
+        .map((key) => valueSummary(key))
+        .join(', ')}`;
     case 'pivot':
       return `on ${step.on}`;
     default:

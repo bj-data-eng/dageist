@@ -14,12 +14,12 @@ use polars::frame::PivotColumnNaming;
 use polars::prelude::{
     Expr, JoinBuildSide, JoinCoalesce, JoinType, JoinValidation, LazyFrame, MaintainOrderJoin,
     NULL, NamedFrom, Operator, PolarsError, Scalar, Series, SortMultipleOptions, SortOptions,
-    WindowMapping, all, all_horizontal, binary_expr, col, cols, element, lit,
+    WindowMapping, all, all_horizontal, binary_expr, col, cols, element, lit, when,
 };
 
 use super::{
-    Argument, Arguments, Build, BuildError, Default, Dtypes, Entry, EntryId, Family, Kind,
-    Laziness, Parameter, Shape, ValueType,
+    Argument, Arguments, Build, BuildError, Conditional, Dtypes, Entry, EntryId, Family, Kind,
+    Laziness, Parameter, ParameterDefault, Shape, ValueType,
 };
 
 const ANY: &[Dtypes] = &[Dtypes::Any];
@@ -61,11 +61,11 @@ const COLUMN_NAMING: &[&str] = &["auto", "combine"];
 const MAPPING_STRATEGY: &[&str] = &["group_to_rows", "join", "explode"];
 
 const fn required(name: &'static str, kind: Kind, shape: Shape) -> Parameter {
-    Parameter::new(name, kind, shape, Default::Required)
+    Parameter::new(name, kind, shape, ParameterDefault::Required)
 }
 
 const fn optional(name: &'static str, kind: Kind, shape: Shape, python: &'static str) -> Parameter {
-    Parameter::new(name, kind, shape, Default::Python(python))
+    Parameter::new(name, kind, shape, ParameterDefault::Python(python))
 }
 
 /// `*name`: any number of arguments of `kind`.
@@ -85,6 +85,13 @@ const fn flag(name: &'static str, default: &'static str) -> Parameter {
 
 /// The parameter every comparison, and `sub`, takes.
 const OTHER: Parameter = required("other", EXPRESSION, Shape::One);
+
+/// `*predicates`: conditions that must all hold, which `when` and `filter` take.
+const PREDICATES: Parameter = starred("predicates", Kind::Expression(BOOLEAN));
+/// `**constraints`: columns that must equal a value, which `when` and `filter` take.
+const CONSTRAINTS: Parameter = double_starred("constraints");
+/// The value a `then` or an `otherwise` gives.
+const STATEMENT: Parameter = required("statement", EXPRESSION, Shape::One);
 
 // ---------------------------------------------------------------------------
 // Reading arguments
@@ -169,6 +176,16 @@ fn positional_and_named(arguments: &Arguments) -> Result<Vec<Expr>, BuildError> 
     Ok(exprs)
 }
 
+/// The conditions of `*predicates` followed by the equalities of
+/// `**constraints`, each a column that must equal its value.
+fn predicates_and_constraints(arguments: &Arguments) -> Result<Vec<Expr>, BuildError> {
+    let mut predicates = arguments.expressions("predicates")?;
+    for (name, value) in named_expressions(arguments, "constraints")? {
+        predicates.push(col(name).eq(value));
+    }
+    Ok(predicates)
+}
+
 /// The column names given for a required parameter.
 fn required_columns(
     arguments: &Arguments,
@@ -200,6 +217,22 @@ fn shift(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
         Some(fill_value) => expr.shift_and_fill(n, fill_value),
         None => expr.shift(n),
     })
+}
+
+fn sum(expr: Expr, _arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.sum())
+}
+
+fn min(expr: Expr, _arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.min())
+}
+
+fn max(expr: Expr, _arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.max())
+}
+
+fn len(expr: Expr, _arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.len())
 }
 
 fn first(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
@@ -318,13 +351,80 @@ fn is_not_null(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
 }
 
 // ---------------------------------------------------------------------------
+// Conditions
+
+/// The one condition `*predicates` and `**constraints` make, which holds where
+/// every one of them does, as Python's `when` takes them.
+fn condition(arguments: &Arguments) -> Result<Expr, BuildError> {
+    let mut predicates = predicates_and_constraints(arguments)?;
+    match predicates.len() {
+        0 => Err(refused(
+            "at least one predicate or constraint must be provided",
+        )),
+        1 => Ok(predicates.remove(0)),
+        _ => Ok(all_horizontal(&predicates)?),
+    }
+}
+
+fn polars_when(arguments: &Arguments) -> Result<Conditional, BuildError> {
+    Ok(Conditional::When(when(condition(arguments)?)))
+}
+
+fn when_then(after: Conditional, arguments: &Arguments) -> Result<Conditional, BuildError> {
+    match after {
+        Conditional::When(when) => Ok(Conditional::Then(
+            when.then(arguments.required_expression("statement")?),
+        )),
+        other => Err(other.out_of_order("when")),
+    }
+}
+
+fn then_when(after: Conditional, arguments: &Arguments) -> Result<Conditional, BuildError> {
+    match after {
+        Conditional::Then(then) => Ok(Conditional::ChainedWhen(then.when(condition(arguments)?))),
+        other => Err(other.out_of_order("then")),
+    }
+}
+
+fn then_otherwise(after: Conditional, arguments: &Arguments) -> Result<Expr, BuildError> {
+    match after {
+        Conditional::Then(then) => Ok(then.otherwise(arguments.required_expression("statement")?)),
+        other => Err(other.out_of_order("then")),
+    }
+}
+
+fn chained_when_then(after: Conditional, arguments: &Arguments) -> Result<Conditional, BuildError> {
+    match after {
+        Conditional::ChainedWhen(when) => Ok(Conditional::ChainedThen(
+            when.then(arguments.required_expression("statement")?),
+        )),
+        other => Err(other.out_of_order("chained when")),
+    }
+}
+
+fn chained_then_when(after: Conditional, arguments: &Arguments) -> Result<Conditional, BuildError> {
+    match after {
+        Conditional::ChainedThen(then) => {
+            Ok(Conditional::ChainedWhen(then.when(condition(arguments)?)))
+        }
+        other => Err(other.out_of_order("chained then")),
+    }
+}
+
+fn chained_then_otherwise(after: Conditional, arguments: &Arguments) -> Result<Expr, BuildError> {
+    match after {
+        Conditional::ChainedThen(then) => {
+            Ok(then.otherwise(arguments.required_expression("statement")?))
+        }
+        other => Err(other.out_of_order("chained then")),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Frame steps
 
 fn filter(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
-    let mut predicates = arguments.expressions("predicates")?;
-    for (name, value) in named_expressions(arguments, "constraints")? {
-        predicates.push(col(name).eq(value));
-    }
+    let mut predicates = predicates_and_constraints(arguments)?;
     // Python keeps the table as it is when it is given nothing to filter by.
     Ok(match predicates.len() {
         0 => frame,
@@ -366,7 +466,10 @@ fn rename(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildErr
     let (mut existing, mut new) = (Vec::new(), Vec::new());
     for (from, to) in arguments.pairs("mapping")? {
         existing.push(name_of("mapping", &from)?);
-        new.push(name_of("mapping", &to)?);
+        new.push(match to {
+            Argument::String(name) => name,
+            other => return Err(Arguments::wrong("mapping", "a new name", &other)),
+        });
     }
     Ok(frame.rename(existing, new, arguments.flag("strict", true)?))
 }
@@ -506,6 +609,10 @@ fn polars_col(arguments: &Arguments) -> Result<Expr, BuildError> {
     Ok(cols(names).as_expr())
 }
 
+fn polars_element(_: &Arguments) -> Result<Expr, BuildError> {
+    Ok(element())
+}
+
 fn polars_lit(arguments: &Arguments) -> Result<Expr, BuildError> {
     if arguments.flag("allow_object", false)? {
         return Err(refused(
@@ -551,6 +658,30 @@ fn polars_lit(arguments: &Arguments) -> Result<Expr, BuildError> {
 
 /// Every entry, ordered by identifier.
 pub(super) const ENTRIES: &[Entry] = &[
+    Entry {
+        id: EntryId("ChainedThen.otherwise"),
+        family: Family::Condition,
+        accepts: &[],
+        parameters: &[STATEMENT],
+        laziness: Laziness::Lazy,
+        build: Build::ConditionEnd(chained_then_otherwise),
+    },
+    Entry {
+        id: EntryId("ChainedThen.when"),
+        family: Family::Condition,
+        accepts: &[],
+        parameters: &[PREDICATES, CONSTRAINTS],
+        laziness: Laziness::Lazy,
+        build: Build::ConditionStep(chained_then_when),
+    },
+    Entry {
+        id: EntryId("ChainedWhen.then"),
+        family: Family::Condition,
+        accepts: &[],
+        parameters: &[STATEMENT],
+        laziness: Laziness::Lazy,
+        build: Build::ConditionStep(chained_when_then),
+    },
     Entry {
         id: EntryId("Expr.cum_count"),
         family: Family::Cumulative,
@@ -681,12 +812,36 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(le),
     },
     Entry {
+        id: EntryId("Expr.len"),
+        family: Family::Aggregate,
+        accepts: ANY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(len),
+    },
+    Entry {
         id: EntryId("Expr.lt"),
         family: Family::Compare,
         accepts: ANY,
         parameters: &[OTHER],
         laziness: Laziness::Lazy,
         build: Build::Expression(lt),
+    },
+    Entry {
+        id: EntryId("Expr.max"),
+        family: Family::Aggregate,
+        accepts: CUM_MAX,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(max),
+    },
+    Entry {
+        id: EntryId("Expr.min"),
+        family: Family::Aggregate,
+        accepts: CUM_MAX,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(min),
     },
     Entry {
         id: EntryId("Expr.ne"),
@@ -736,13 +891,18 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(sub),
     },
     Entry {
+        id: EntryId("Expr.sum"),
+        family: Family::Aggregate,
+        accepts: CUM_SUM,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(sum),
+    },
+    Entry {
         id: EntryId("LazyFrame.filter"),
         family: Family::Steps,
         accepts: &[],
-        parameters: &[
-            starred("predicates", Kind::Expression(BOOLEAN)),
-            double_starred("constraints"),
-        ],
+        parameters: &[PREDICATES, CONSTRAINTS],
         laziness: Laziness::Lazy,
         build: Build::Frame(filter),
     },
@@ -815,7 +975,7 @@ pub(super) const ENTRIES: &[Entry] = &[
             // Python also takes a function from the old name to the new; a step holds none.
             required(
                 "mapping",
-                Kind::Pairs(&Kind::Column, &Kind::Column),
+                Kind::Pairs(&Kind::Column, &Kind::Value(ValueType::String)),
                 Shape::One,
             ),
             flag("strict", "True"),
@@ -855,6 +1015,30 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Frame(with_columns),
     },
     Entry {
+        id: EntryId("Then.otherwise"),
+        family: Family::Condition,
+        accepts: &[],
+        parameters: &[STATEMENT],
+        laziness: Laziness::Lazy,
+        build: Build::ConditionEnd(then_otherwise),
+    },
+    Entry {
+        id: EntryId("Then.when"),
+        family: Family::Condition,
+        accepts: &[],
+        parameters: &[PREDICATES, CONSTRAINTS],
+        laziness: Laziness::Lazy,
+        build: Build::ConditionStep(then_when),
+    },
+    Entry {
+        id: EntryId("When.then"),
+        family: Family::Condition,
+        accepts: &[],
+        parameters: &[STATEMENT],
+        laziness: Laziness::Lazy,
+        build: Build::ConditionStep(when_then),
+    },
+    Entry {
         id: EntryId("polars.col"),
         family: Family::Start,
         accepts: &[],
@@ -864,6 +1048,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         ],
         laziness: Laziness::Lazy,
         build: Build::Function(polars_col),
+    },
+    Entry {
+        id: EntryId("polars.element"),
+        family: Family::Start,
+        accepts: &[],
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Function(polars_element),
     },
     Entry {
         id: EntryId("polars.lit"),
@@ -876,5 +1068,13 @@ pub(super) const ENTRIES: &[Entry] = &[
         ],
         laziness: Laziness::Lazy,
         build: Build::Function(polars_lit),
+    },
+    Entry {
+        id: EntryId("polars.when"),
+        family: Family::Condition,
+        accepts: &[],
+        parameters: &[PREDICATES, CONSTRAINTS],
+        laziness: Laziness::Lazy,
+        build: Build::Condition(polars_when),
     },
 ];

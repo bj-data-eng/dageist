@@ -4,6 +4,7 @@
 pub mod dageist_engine
 pub mod dageist_engine::catalog
 pub enum dageist_engine::catalog::Applies
+pub dageist_engine::catalog::Applies::Condition
 pub dageist_engine::catalog::Applies::Expression
 pub dageist_engine::catalog::Applies::Frame
 pub dageist_engine::catalog::Applies::Function
@@ -22,6 +23,9 @@ pub dageist_engine::catalog::Argument::Path(alloc::string::String)
 pub dageist_engine::catalog::Argument::String(alloc::string::String)
 pub dageist_engine::catalog::Argument::Table(polars_lazy::frame::LazyFrame)
 pub enum dageist_engine::catalog::Build
+pub dageist_engine::catalog::Build::Condition(fn(&dageist_engine::catalog::Arguments) -> core::result::Result<dageist_engine::catalog::Conditional, dageist_engine::catalog::BuildError>)
+pub dageist_engine::catalog::Build::ConditionEnd(fn(dageist_engine::catalog::Conditional, &dageist_engine::catalog::Arguments) -> core::result::Result<polars_plan::dsl::expr::Expr, dageist_engine::catalog::BuildError>)
+pub dageist_engine::catalog::Build::ConditionStep(fn(dageist_engine::catalog::Conditional, &dageist_engine::catalog::Arguments) -> core::result::Result<dageist_engine::catalog::Conditional, dageist_engine::catalog::BuildError>)
 pub dageist_engine::catalog::Build::Expression(fn(polars_plan::dsl::expr::Expr, &dageist_engine::catalog::Arguments) -> core::result::Result<polars_plan::dsl::expr::Expr, dageist_engine::catalog::BuildError>)
 pub dageist_engine::catalog::Build::Frame(fn(polars_lazy::frame::LazyFrame, &dageist_engine::catalog::Arguments) -> core::result::Result<polars_lazy::frame::LazyFrame, dageist_engine::catalog::BuildError>)
 pub dageist_engine::catalog::Build::Function(fn(&dageist_engine::catalog::Arguments) -> core::result::Result<polars_plan::dsl::expr::Expr, dageist_engine::catalog::BuildError>)
@@ -30,10 +34,17 @@ pub fn dageist_engine::catalog::Build::fmt(&self, formatter: &mut core::fmt::For
 pub enum dageist_engine::catalog::BuildError
 pub dageist_engine::catalog::BuildError::Missing
 pub dageist_engine::catalog::BuildError::Missing::parameter: &'static str
+pub dageist_engine::catalog::BuildError::OutOfOrder
+pub dageist_engine::catalog::BuildError::OutOfOrder::expected: &'static str
+pub dageist_engine::catalog::BuildError::OutOfOrder::found: &'static str
 pub dageist_engine::catalog::BuildError::Polars(polars_error::PolarsError)
+pub dageist_engine::catalog::BuildError::Repeated
+pub dageist_engine::catalog::BuildError::Repeated::parameter: &'static str
 pub dageist_engine::catalog::BuildError::UnknownChoice
 pub dageist_engine::catalog::BuildError::UnknownChoice::parameter: &'static str
 pub dageist_engine::catalog::BuildError::UnknownChoice::word: alloc::string::String
+pub dageist_engine::catalog::BuildError::UnknownParameter
+pub dageist_engine::catalog::BuildError::UnknownParameter::parameter: alloc::string::String
 pub dageist_engine::catalog::BuildError::WrongKind
 pub dageist_engine::catalog::BuildError::WrongKind::expected: &'static str
 pub dageist_engine::catalog::BuildError::WrongKind::found: &'static str
@@ -44,9 +55,26 @@ impl core::error::Error for dageist_engine::catalog::BuildError
 pub fn dageist_engine::catalog::BuildError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
 impl core::fmt::Display for dageist_engine::catalog::BuildError
 pub fn dageist_engine::catalog::BuildError::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-pub enum dageist_engine::catalog::Default
-pub dageist_engine::catalog::Default::Python(&'static str)
-pub dageist_engine::catalog::Default::Required
+pub enum dageist_engine::catalog::Conditional
+pub dageist_engine::catalog::Conditional::ChainedThen(polars_plan::dsl::arity::ChainedThen)
+pub dageist_engine::catalog::Conditional::ChainedWhen(polars_plan::dsl::arity::ChainedWhen)
+pub dageist_engine::catalog::Conditional::Then(polars_plan::dsl::arity::Then)
+pub dageist_engine::catalog::Conditional::When(polars_plan::dsl::arity::When)
+impl dageist_engine::catalog::Conditional
+pub fn dageist_engine::catalog::Conditional::into_expr(self) -> core::result::Result<polars_plan::dsl::expr::Expr, dageist_engine::catalog::BuildError>
+impl core::fmt::Debug for dageist_engine::catalog::Conditional
+pub fn dageist_engine::catalog::Conditional::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum dageist_engine::catalog::DefaultValue
+pub dageist_engine::catalog::DefaultValue::Empty
+pub dageist_engine::catalog::DefaultValue::Flag(bool)
+pub dageist_engine::catalog::DefaultValue::Float(f64)
+pub dageist_engine::catalog::DefaultValue::Integer(i64)
+pub dageist_engine::catalog::DefaultValue::Other
+pub dageist_engine::catalog::DefaultValue::Required
+pub dageist_engine::catalog::DefaultValue::Text(alloc::string::String)
+pub dageist_engine::catalog::DefaultValue::Unset
+impl dageist_engine::catalog::DefaultValue
+pub fn dageist_engine::catalog::DefaultValue::from_python(text: &str) -> Self
 pub enum dageist_engine::catalog::Dtypes
 pub dageist_engine::catalog::Dtypes::Any
 pub dageist_engine::catalog::Dtypes::Boolean
@@ -62,6 +90,7 @@ impl dageist_engine::catalog::Dtypes
 pub const dageist_engine::catalog::Dtypes::ALL: [Self; 10]
 pub const fn dageist_engine::catalog::Dtypes::key(self) -> &'static str
 pub enum dageist_engine::catalog::Family
+pub dageist_engine::catalog::Family::Aggregate
 pub dageist_engine::catalog::Family::Arithmetic
 pub dageist_engine::catalog::Family::Compare
 pub dageist_engine::catalog::Family::Condition
@@ -72,7 +101,7 @@ pub dageist_engine::catalog::Family::Steps
 pub dageist_engine::catalog::Family::Temporal
 pub dageist_engine::catalog::Family::Window
 impl dageist_engine::catalog::Family
-pub const dageist_engine::catalog::Family::ALL: [Self; 9]
+pub const dageist_engine::catalog::Family::ALL: [Self; 10]
 pub const fn dageist_engine::catalog::Family::key(self) -> &'static str
 pub enum dageist_engine::catalog::Kind
 pub dageist_engine::catalog::Kind::Choice(&'static [&'static str])
@@ -88,8 +117,14 @@ pub dageist_engine::catalog::Kind::Value(dageist_engine::catalog::ValueType)
 pub enum dageist_engine::catalog::Laziness
 pub dageist_engine::catalog::Laziness::Lazy
 pub dageist_engine::catalog::Laziness::NeedsCollect
+pub enum dageist_engine::catalog::ParameterDefault
+pub dageist_engine::catalog::ParameterDefault::Python(&'static str)
+pub dageist_engine::catalog::ParameterDefault::Required
+impl dageist_engine::catalog::ParameterDefault
+pub fn dageist_engine::catalog::ParameterDefault::value(self) -> dageist_engine::catalog::DefaultValue
 pub enum dageist_engine::catalog::Reason
 pub dageist_engine::catalog::Reason::Deprecated
+pub dageist_engine::catalog::Reason::NeverOffered
 pub dageist_engine::catalog::Reason::NotYetCatalogued
 pub dageist_engine::catalog::Reason::PythonObject
 pub dageist_engine::catalog::Reason::TakesPythonFunction
@@ -129,7 +164,6 @@ pub fn dageist_engine::catalog::Arguments::pairs(&self, parameter: &'static str)
 pub fn dageist_engine::catalog::Arguments::required_expression(&self, parameter: &'static str) -> core::result::Result<polars_plan::dsl::expr::Expr, dageist_engine::catalog::BuildError>
 pub fn dageist_engine::catalog::Arguments::string(&self, parameter: &'static str) -> core::result::Result<core::option::Option<alloc::string::String>, dageist_engine::catalog::BuildError>
 pub fn dageist_engine::catalog::Arguments::table(&self, parameter: &'static str) -> core::result::Result<polars_lazy::frame::LazyFrame, dageist_engine::catalog::BuildError>
-pub fn dageist_engine::catalog::Arguments::with(self, parameter: &'static str, argument: dageist_engine::catalog::Argument) -> Self
 pub struct dageist_engine::catalog::Entry
 impl dageist_engine::catalog::Entry
 pub const fn dageist_engine::catalog::Entry::accepts(&self) -> &'static [dageist_engine::catalog::Dtypes]
@@ -139,6 +173,8 @@ pub const fn dageist_engine::catalog::Entry::family(&self) -> dageist_engine::ca
 pub const fn dageist_engine::catalog::Entry::id(&self) -> dageist_engine::catalog::EntryId
 pub const fn dageist_engine::catalog::Entry::laziness(&self) -> dageist_engine::catalog::Laziness
 pub const fn dageist_engine::catalog::Entry::parameters(&self) -> &'static [dageist_engine::catalog::Parameter]
+impl dageist_engine::catalog::Entry
+pub fn dageist_engine::catalog::Entry::arguments<'a>(&self, given: impl core::iter::traits::collect::IntoIterator<Item = (&'a str, dageist_engine::catalog::Argument)>) -> core::result::Result<dageist_engine::catalog::Arguments, dageist_engine::catalog::BuildError>
 pub struct dageist_engine::catalog::EntryId(_)
 impl dageist_engine::catalog::EntryId
 pub const fn dageist_engine::catalog::EntryId::as_str(self) -> &'static str
@@ -148,7 +184,7 @@ pub const fn dageist_engine::catalog::LeftOut::id(&self) -> &'static str
 pub const fn dageist_engine::catalog::LeftOut::reason(&self) -> dageist_engine::catalog::Reason
 pub struct dageist_engine::catalog::Parameter
 impl dageist_engine::catalog::Parameter
-pub const fn dageist_engine::catalog::Parameter::default(&self) -> dageist_engine::catalog::Default
+pub const fn dageist_engine::catalog::Parameter::default(&self) -> dageist_engine::catalog::ParameterDefault
 pub const fn dageist_engine::catalog::Parameter::kind(&self) -> dageist_engine::catalog::Kind
 pub const fn dageist_engine::catalog::Parameter::name(&self) -> &'static str
 pub const fn dageist_engine::catalog::Parameter::shape(&self) -> dageist_engine::catalog::Shape

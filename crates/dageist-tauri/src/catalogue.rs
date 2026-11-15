@@ -12,8 +12,8 @@
 use std::fmt;
 
 use dageist_engine::catalog::{
-    Applies, Default, Dtypes, Entry, Family, Kind, Laziness, Parameter, Shape, ValueType, Words,
-    english, entries,
+    Applies, DefaultValue, Dtypes, Entry, Family, Kind, Laziness, Parameter, ParameterDefault,
+    Shape, ValueType, Words, english, entries,
 };
 use serde::Serialize;
 
@@ -75,8 +75,36 @@ enum KindView {
     },
 }
 
+/// What a parameter holds when it is not given, as the engine reads Polars'
+/// default.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+enum DefaultView {
+    /// It must be given.
+    Required,
+    /// Python's `None`: unset, which leaves the choice to Polars.
+    #[serde(rename = "none")]
+    Unset,
+    Flag {
+        value: bool,
+    },
+    Integer {
+        value: i64,
+    },
+    Float {
+        value: f64,
+    },
+    Text {
+        value: String,
+    },
+    /// An empty `*` or `**` parameter.
+    Empty,
+    /// A default the engine does not read as a value.
+    Other,
+}
+
 /// One parameter of an entry.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 struct ParameterView {
     /// Python's name, which identifies the parameter.
     name: &'static str,
@@ -85,8 +113,10 @@ struct ParameterView {
     label: String,
     kind: KindView,
     shape: ShapeView,
+    /// Polars' default, read by the engine.
+    default: DefaultView,
     /// Polars' default as Python writes it; `None` when it must be given.
-    default: Option<&'static str>,
+    python: Option<&'static str>,
 }
 
 /// What an entry is applied to.
@@ -96,10 +126,12 @@ enum AppliesView {
     Expression,
     Frame,
     Function,
+    /// One link of `when`, `then` and `otherwise`.
+    Condition,
 }
 
 /// One operation of the catalogue.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 struct EntryView {
     id: &'static str,
     applies: AppliesView,
@@ -120,7 +152,7 @@ struct WordsView {
 }
 
 /// The whole catalogue with its words.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct CatalogueView {
     families: Vec<WordsView>,
     dtypes: Vec<WordsView>,
@@ -159,6 +191,20 @@ const fn applies_view(applies: Applies) -> AppliesView {
         Applies::Expression => AppliesView::Expression,
         Applies::Frame => AppliesView::Frame,
         Applies::Function => AppliesView::Function,
+        Applies::Condition => AppliesView::Condition,
+    }
+}
+
+fn default_view(default: ParameterDefault) -> DefaultView {
+    match default.value() {
+        DefaultValue::Required => DefaultView::Required,
+        DefaultValue::Unset => DefaultView::Unset,
+        DefaultValue::Flag(value) => DefaultView::Flag { value },
+        DefaultValue::Integer(value) => DefaultView::Integer { value },
+        DefaultValue::Float(value) => DefaultView::Float { value },
+        DefaultValue::Text(value) => DefaultView::Text { value },
+        DefaultValue::Empty => DefaultView::Empty,
+        DefaultValue::Other => DefaultView::Other,
     }
 }
 
@@ -251,9 +297,10 @@ fn parameter_view(
         })?,
         kind: kind_view(entry, parameter, words)?,
         shape: shape_view(parameter.shape()),
-        default: match parameter.default() {
-            Default::Required => None,
-            Default::Python(text) => Some(text),
+        default: default_view(parameter.default()),
+        python: match parameter.default() {
+            ParameterDefault::Required => None,
+            ParameterDefault::Python(text) => Some(text),
         },
     })
 }
@@ -381,7 +428,8 @@ mod tests {
                         "label": "rows",
                         "kind": { "kind": "expression", "dtypes": ["integer"] },
                         "shape": { "shape": "one" },
-                        "default": "1"
+                        "default": { "kind": "integer", "value": 1 },
+                        "python": "1"
                     },
                     {
                         "name": "fill_value",
@@ -389,7 +437,8 @@ mod tests {
                         "label": "fill with",
                         "kind": { "kind": "expression", "dtypes": ["any"] },
                         "shape": { "shape": "one" },
-                        "default": "None"
+                        "default": { "kind": "none" },
+                        "python": "None"
                     }
                 ]
             })
@@ -410,7 +459,8 @@ mod tests {
                 "label": "kind of join",
                 "kind": { "kind": "choice", "words": words },
                 "shape": { "shape": "one" },
-                "default": "'inner'"
+                "default": { "kind": "text", "value": "inner" },
+                "python": "'inner'"
             })
         );
     }
@@ -427,22 +477,116 @@ mod tests {
                 "label": "descending",
                 "kind": { "kind": "flag" },
                 "shape": { "shape": "perItem", "of": "by" },
-                "default": "False"
+                "default": { "kind": "flag", "value": false },
+                "python": "False"
             })
         );
     }
 
     #[test]
-    fn a_required_parameter_has_a_null_default_and_a_step_has_a_head() {
+    fn a_required_parameter_has_a_required_default_and_a_step_has_a_head() {
         let view = view();
         // `LazyFrame.join(other, ...)`: `other` has no default.
         let other = parameter(&view, "LazyFrame.join", "other");
-        assert_eq!(other["default"], Value::Null);
+        assert_eq!(other["default"], json!({ "kind": "required" }));
+        assert_eq!(other["python"], Value::Null);
         assert_eq!(other["kind"], json!({ "kind": "table" }));
         // A frame step is the only entry with a plain head.
         assert!(entry(&view, "LazyFrame.join")["head"].is_string());
         assert_eq!(entry(&view, "LazyFrame.join")["applies"], "frame");
         assert_eq!(entry(&view, "polars.col")["applies"], "function");
+    }
+
+    #[test]
+    fn defaults_serialize_as_the_value_the_engine_read_and_the_python_text() {
+        let view = view();
+        // Each case: entry, parameter, the default as Python writes it, and the value read.
+        // `LazyFrame.join(..., coalesce=None, allow_parallel=True)`, `filter(*predicates)`,
+        // `filter(**constraints)`, and `LazyFrame.pivot(separator='_')`.
+        let cases = [
+            (
+                "LazyFrame.join",
+                "coalesce",
+                "None",
+                json!({ "kind": "none" }),
+            ),
+            (
+                "LazyFrame.join",
+                "allow_parallel",
+                "True",
+                json!({ "kind": "flag", "value": true }),
+            ),
+            (
+                "LazyFrame.filter",
+                "predicates",
+                "()",
+                json!({ "kind": "empty" }),
+            ),
+            (
+                "LazyFrame.filter",
+                "constraints",
+                "{}",
+                json!({ "kind": "empty" }),
+            ),
+            (
+                "LazyFrame.pivot",
+                "separator",
+                "'_'",
+                json!({ "kind": "text", "value": "_" }),
+            ),
+        ];
+        for (id, name, python, read) in cases {
+            let found = parameter(&view, id, name);
+            assert_eq!(found["python"], python, "{id} {name}");
+            assert_eq!(found["default"], read, "{id} {name}");
+        }
+    }
+
+    #[test]
+    fn a_default_is_read_as_each_type_python_writes() {
+        // The kinds that no catalogued parameter has yet, from Python's own spellings.
+        let cases = [
+            ("7", json!({ "kind": "integer", "value": 7 })),
+            ("-2", json!({ "kind": "integer", "value": -2 })),
+            ("0.5", json!({ "kind": "float", "value": 0.5 })),
+            ("'x'", json!({ "kind": "text", "value": "x" })),
+            ("DEFAULT_QUERY_OPT_FLAGS", json!({ "kind": "other" })),
+        ];
+        for (python, read) in cases {
+            let python: &'static str = python;
+            let value = serde_json::to_value(default_view(ParameterDefault::Python(python)))
+                .expect("a default serializes");
+            assert_eq!(value, read, "{python}");
+        }
+        assert_eq!(
+            serde_json::to_value(default_view(ParameterDefault::Required))
+                .expect("a default serializes"),
+            json!({ "kind": "required" })
+        );
+    }
+
+    #[test]
+    fn the_links_of_a_condition_apply_to_a_condition() {
+        let view = view();
+        // `polars.when(*predicates, **constraints)` starts one, `Then.otherwise(statement)`
+        // ends it, and both are of the condition family.
+        let when = entry(&view, "polars.when");
+        assert_eq!(when["applies"], "condition");
+        assert_eq!(when["family"], "condition");
+        assert_eq!(when["accepts"], json!([]));
+        assert_eq!(when["head"], Value::Null);
+        let statement = parameter(&view, "Then.otherwise", "statement");
+        assert_eq!(statement["default"], json!({ "kind": "required" }));
+        assert_eq!(
+            statement["kind"],
+            json!({ "kind": "expression", "dtypes": ["any"] })
+        );
+        assert_eq!(entry(&view, "Then.otherwise")["applies"], "condition");
+        // `polars.element()` is a function of the start family, with no parameter.
+        let element = entry(&view, "polars.element");
+        assert_eq!(element["applies"], "function");
+        assert_eq!(element["family"], "start");
+        assert_eq!(element["parameters"], json!([]));
     }
 
     #[test]
@@ -475,6 +619,7 @@ mod tests {
                 "rows",
                 "cumulative",
                 "arithmetic",
+                "aggregate",
                 "temporal",
                 "window",
                 "compare",
