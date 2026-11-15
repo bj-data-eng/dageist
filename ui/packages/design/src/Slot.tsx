@@ -151,13 +151,15 @@ const COUNT_ROOM = 40;
 /**
  * Returns the room the entries of `slot` have on their line: from where the
  * slot starts to the end of the line of code it is in, less whatever follows
- * the slot on that line.
+ * the slot on that line. What follows on lines of its own, such as a step's
+ * problem, takes no room on this one.
  */
 function roomFor(slot: HTMLElement): number {
   const flow = slot.closest('[data-dg-flow]');
   if (flow === null) return Number.POSITIVE_INFINITY;
   let after = 0;
   for (let next = slot.nextElementSibling; next !== null; next = next.nextElementSibling) {
+    if (getComputedStyle(next).display === 'block') continue;
     after += next.getBoundingClientRect().width;
   }
   return flow.getBoundingClientRect().right - after - slot.getBoundingClientRect().left;
