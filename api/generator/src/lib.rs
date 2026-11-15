@@ -133,7 +133,7 @@ pub const DAGEIST: Workspace<'static> = Workspace {
                 package: "base64",
                 only_here: &["default", "simd-unsafe"],
                 only_in_release: &[],
-                reason: "plist, which Tauri uses, takes base64's default features",
+                reason: "plist and tauri-codegen, which Tauri uses, take base64's default features",
             },
             ExpectedFeatures {
                 package: "icu_properties",

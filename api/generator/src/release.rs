@@ -279,7 +279,10 @@ fn compare_shared_features(
                 there.join(", ")
             ));
         }
-        differences.insert(package.name.as_str(), (only_here, only_in_release));
+        // A package used at several versions is listed once; what differs in any version counts.
+        let (here_all, release_all) = differences.entry(package.name.as_str()).or_default();
+        here_all.extend(only_here);
+        release_all.extend(only_in_release);
     }
     for expected in upstream.expected_features {
         let (only_here, only_in_release) = differences
