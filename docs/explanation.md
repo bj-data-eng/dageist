@@ -126,12 +126,14 @@ behavior yet. The decisions below are the ones the core is expected to carry.
   foot of the list holds what can be done to the thing the word names: adding
   after it and taking it away. A step's name names the step, a method's name
   the method, a comparison's sign its line, and the word a chain starts from
-  the chain.
-- **Chains.** A column's expression is a chain: what it starts from, then
-  methods, each behind a caret. A chain too long for its row carries on set
-  in, breaking before a caret. A method is moved by dragging its name. A
-  function such as `when` is not called on a value, so it can only stand
-  where a chain starts.
+  the chain. A faint `step` waits after the last step and adds one there.
+- **Chains.** A chain is what it starts from, then methods, each behind a
+  caret. It can stand wherever a value can: as what a new column holds, after
+  `then` and `otherwise`, and as a line of a condition. A field becomes the
+  start of a chain when a method is added after it. A chain too long for its
+  row carries on set in, breaking before a caret. A method is moved by
+  dragging its name. A function such as `when` is not called on a value, so
+  it can only stand where a chain starts.
 - **Lines under a step.** Whatever a step takes that is more than one thing
   is set out on lines beneath it, each set in under what it belongs to, as
   code is. A `when` is its condition, then `then` and `otherwise` with the
@@ -176,6 +178,7 @@ yet.
 
 A third tab shows the Pieces page. It is a design prototype, not a feature:
 a static page in plain HTML, CSS and JavaScript where the way the step
-editor is drawn is tried out in several versions before one is built. It works on made-up samples of its own, shares no code with the view's
+editor is drawn is tried out in several versions before one is built. It
+works on made-up samples of its own, shares no code with the view's
 packages and calls no host command. The tab that is open is kept in the
 page's address, so reloading the page returns to it.
