@@ -30,8 +30,19 @@ members = [
     "crates/dageist-engine",
     "crates/dageist-tauri",
 ]
+# Vendored sources keep their own workspaces; Polars' crates inherit from Polars' root manifest.
+exclude = ["vendor"]
 
 [workspace.dependencies]
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
+
+# The crate patches the Polars release in vendor/polars applies to the crates dageist builds,
+# at the same revisions. Polars' `color-backtrace` patch serves only its Python binding.
+# The API generator's release check keeps these equal to vendor/polars/Cargo.toml.
+[patch.crates-io]
+# Polars calls the prefetch API this fork adds (https://github.com/rust-lang/hashbrown/pull/727).
+hashbrown = { git = "https://github.com/pola-rs/hashbrown", rev = "d76a6f81abd8f388676aff15068236a8d21c7e1a" }
+# The build script change in https://github.com/tikv/jemallocator/pull/168.
+tikv-jemalloc-sys = { git = "https://github.com/pola-rs/jemallocator", rev = "0d683dfb157097e2075d5e0eaf25f71f514a7552" }

@@ -1,0 +1,5 @@
+# The toolchain the Python Polars release in vendor/polars is built with. The release turns on
+# Polars' `nightly` feature, so dageist builds with the same nightly toolchain.
+[toolchain]
+channel = "nightly-2026-09-01"
+components = ["rustfmt", "clippy"]

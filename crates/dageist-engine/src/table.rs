@@ -47,6 +47,7 @@ impl Table {
                 [col(key_column)],
                 JoinArgs::new(JoinType::Semi),
             )
+            .map_err(|source| EngineError::polars("joining the working window's keys", source))?
             .collect()
             .map_err(|source| EngineError::polars("loading the working window", source))?;
         let columns = column_infos(frame.schema());
