@@ -203,10 +203,12 @@ def binding_class(name):
 
 
 def flag_test(test, dead):
-    """Returns which branch of an `if` on a flag that is off can run: "orelse" when the
-    test is `flag` or `flag is not None`, "body" when it is `not flag` or `flag is None`,
-    or None when the test is about something else."""
-    if isinstance(test, ast.Name) and test.id in dead:
+    """Returns which branch of an `if` on a flag that is off can run, "body" or "orelse",
+    or None when the test is about something else. `dead` holds each such flag with the
+    default it keeps, False or None: both fail `if flag`, and only None passes
+    `flag is None`."""
+    defaults = dict(dead)
+    if isinstance(test, ast.Name) and test.id in defaults:
         return "orelse"
     if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
         inner = flag_test(test.operand, dead)
@@ -214,15 +216,14 @@ def flag_test(test, dead):
     if (
         isinstance(test, ast.Compare)
         and isinstance(test.left, ast.Name)
-        and test.left.id in dead
+        and test.left.id in defaults
         and len(test.ops) == 1
+        and isinstance(test.ops[0], (ast.Is, ast.IsNot))
         and isinstance(test.comparators[0], ast.Constant)
         and test.comparators[0].value is None
     ):
-        if isinstance(test.ops[0], ast.IsNot):
-            return "orelse"
-        if isinstance(test.ops[0], ast.Is):
-            return "body"
+        holds = (defaults[test.left.id] is None) == isinstance(test.ops[0], ast.Is)
+        return "body" if holds else "orelse"
     return None
 
 
@@ -244,8 +245,9 @@ def walk(node, dead=frozenset()):
 
 
 def dead_flags(function, call):
-    """Returns the parameters of `function` that default to False or None and that `call`
-    does not pass, so they are off wherever the function runs from that call."""
+    """Returns the parameters of `function` that default to False or None, that `call`
+    does not pass and that the function never assigns, each with its default: they keep
+    it wherever the function runs from that call."""
     if any(keyword.arg is None for keyword in call.keywords) or any(
         isinstance(argument, ast.Starred) for argument in call.args
     ):
@@ -263,10 +265,16 @@ def dead_flags(function, call):
     )
     passed = {keyword.arg for keyword in call.keywords}
     passed |= {argument.arg for argument in positional[offset : offset + len(call.args)]}
+    assigned = {
+        node.id for node in ast.walk(function) if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)
+    }
     return frozenset(
-        name
+        (name, default.value)
         for name, default in defaults.items()
-        if name not in passed and isinstance(default, ast.Constant) and default.value in (False, None)
+        if name not in passed
+        and name not in assigned
+        and isinstance(default, ast.Constant)
+        and (default.value is False or default.value is None)
     )
 
 
@@ -485,22 +493,22 @@ def receiver_targets(package, module, receiver, method):
         name = receiver.func.id
         found = package.resolve(module, name)
         if found and isinstance(found[1], ast.FunctionDef) and name.startswith("_"):
-            targets.append((found[0], found[1], None))
+            targets.append((found[0], found[1], None, receiver))
             home, classes = returned_classes(package, found[0], found[1])
             for cls in classes:
                 located = method_of(package, home, cls, method)
                 if located:
-                    targets.append(located)
+                    targets.append((*located, None))
         elif found and isinstance(found[1], ast.ClassDef):
             located = method_of(package, found[0], found[1], method)
             if located:
-                targets.append(located)
+                targets.append((*located, None))
     else:
         found = known_class(package, module, receiver)
         if found:
             located = method_of(package, found[0], found[1], method)
             if located:
-                targets.append(located)
+                targets.append((*located, None))
     return targets
 
 
@@ -547,8 +555,9 @@ def follow(package, module, node, own_class=None):
                     continue
                 if isinstance(receiver, ast.Name) and receiver.id in receivers:
                     receiver = receivers[receiver.id]
-                for located in receiver_targets(package, current_module, receiver, func.attr):
-                    targets.append((*located, True, dead_flags(located[1], child)))
+                for *located, own_call in receiver_targets(package, current_module, receiver, func.attr):
+                    flags = dead_flags(located[1], own_call if own_call is not None else child)
+                    targets.append((*located, True, flags))
         for target in targets:
             key = (target[0].name, id(target[1]), target[4])
             if key not in seen:
