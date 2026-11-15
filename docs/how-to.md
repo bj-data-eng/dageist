@@ -171,9 +171,13 @@ public method, property and operator of `Expr` and its namespaces,
 A binding call made through code the item delegates to is counted as the
 item's own: private helpers in any module; the engine or resolver object a
 helper returns or that the item makes; and class methods such as
-`pl.LazyFrame.from_lazyframe_resolver`. A branch on a flag that defaults to
-off, such as `if background:`, is left out where the call does not pass that
-flag. The item's own public methods are not followed; they are listed as what
+`pl.LazyFrame.from_lazyframe_resolver`. Take a flag that defaults to `False`
+or `None` and that the function never assigns. Where the call does not pass it,
+an `if` that tests it as `flag`, `not flag`, `flag is None` or
+`flag is not None` keeps only the branch the default takes. For example,
+`if background:` drops its body. Tests that combine the flag with anything else
+keep both branches. A call that spreads `*args` or `**kwargs` keeps every
+branch. The item's own public methods are not followed; they are listed as what
 it is built from.
 
 The header counts each kind and says what is not covered, such as the eager
