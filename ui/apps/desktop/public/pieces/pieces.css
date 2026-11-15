@@ -5,6 +5,32 @@
  * brackets, then each piece that was settled after them.
  */
 
+/* Inter, the face the application sets everything but code and data in: one file for every weight. */
+@font-face {
+  font-style: normal;
+  font-weight: 100 900;
+  src: url('../fonts/inter/InterVariable.woff2') format('woff2');
+  font-family: 'Inter';
+  font-display: swap;
+}
+
+/* JetBrains Mono, the face the application sets code and data in. */
+@font-face {
+  font-style: normal;
+  font-weight: 400;
+  src: url('../fonts/jetbrains-mono/JetBrainsMono-Regular.woff2') format('woff2');
+  font-family: 'JetBrains Mono';
+  font-display: swap;
+}
+
+@font-face {
+  font-style: normal;
+  font-weight: 600;
+  src: url('../fonts/jetbrains-mono/JetBrainsMono-SemiBold.woff2') format('woff2');
+  font-family: 'JetBrains Mono';
+  font-display: swap;
+}
+
 :root {
   color-scheme: dark;
   --canvas: #1b1d22;
@@ -54,8 +80,8 @@
   --seam-space: calc(var(--side) + 2px);
   /* The colour a seam is drawn in: the brackets' colour, darker, so that it sits back. */
   --seam-ink: color-mix(in srgb, var(--function) 32%, transparent);
-  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
 
 * {
