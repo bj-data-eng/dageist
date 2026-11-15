@@ -7,8 +7,12 @@ shows the identity the Rust core reports.
 ## Prerequisites
 
 - Git.
-- Rust 1.99.1 or newer with Cargo, matching the compatibility floor in
-  [Cargo.toml](../Cargo.toml).
+- Rust installed through rustup. [rust-toolchain.toml](../rust-toolchain.toml)
+  selects the nightly toolchain the Polars release in `vendor/polars` is built
+  with, `nightly-2026-09-01`, with rustfmt and Clippy; rustup installs it the
+  first time a Cargo command runs in the checkout.
+- A C compiler and `make`, which build the jemalloc allocator Polars uses on
+  macOS and Linux.
 - Node.js 20.19 or newer on the 20 line, or 22.12 or newer, with npm. The
   linter and formatter in [ui/package.json](../ui/package.json) set this floor.
 - The platform's Tauri 2 system dependencies: on macOS, the Xcode Command Line
@@ -39,7 +43,9 @@ packages.
    `git clone --recurse-submodules` instead fetches the newest commit of
    every Polars branch and tag, about 150 MB, and grows as Polars adds tags.
 
-2. Retrieve the locked Rust dependencies into the local Cargo cache:
+2. Retrieve the locked Rust dependencies into the local Cargo cache. Besides
+   crates.io, this fetches the two crates Polars patches from their git
+   repositories:
 
    ```sh
    cargo fetch --locked

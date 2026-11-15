@@ -38,6 +38,11 @@ Table data takes a shorter path than other values. The engine crate,
   reads each requested block from disk, so memory use depends on the block and
   not on the table.
 
+The engine builds Polars from the source of a Python Polars release, kept in
+`vendor/polars`, exactly as that release is built. Polars' Rust crates are
+released less often than Python Polars and from other commits, so this is the
+only way for a step to behave in dageist as it does in Python Polars.
+
 Either way the view asks for only the rows and columns near what is on screen,
 and the host passes them through as the raw bytes of an Arrow IPC stream. The
 view decodes those bytes and draws them; it never holds the table.
