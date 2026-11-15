@@ -11,7 +11,13 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+mod python;
 mod release;
+
+pub use python::{
+    Binding, Kind, PythonAudit, PythonItem, Reached, RustApi, Traced, parse_inventory,
+    read_binding_sources, render_python_artifact, trace_body, trace_item,
+};
 
 pub use release::{
     ExpectedFeatures, Graph, LeftOutFeature, Listed, Origin, Package, Unit, Upstream,
@@ -37,6 +43,8 @@ pub struct Workspace<'a> {
     pub dependencies: &'a [&'a str],
     /// The upstream project whose release build the workspace builds its dependencies like.
     pub upstream: Upstream<'a>,
+    /// The audit of the upstream project's Python API, written beside the dependencies' audits.
+    pub python: Option<PythonAudit<'a>>,
 }
 
 /// Why the Python binding's own features are left out: they connect Polars to Python.
@@ -203,6 +211,15 @@ pub const DAGEIST: Workspace<'static> = Workspace {
             },
         ],
     },
+    python: Some(PythonAudit {
+        package: "vendor/polars/py-polars/src/polars",
+        binding: "vendor/polars/crates/polars-python/src",
+        rust_audits: &[
+            "api/polars/polars.txt",
+            "api/polars/polars-lazy.txt",
+            "api/polars/polars-plan.txt",
+        ],
+    }),
 };
 
 /// Why the release compiles some numeric crates with more features.
@@ -296,6 +313,8 @@ enum Source {
     Workspace,
     /// A dependency, documented with the features a build of the release package resolves for it.
     Dependency,
+    /// The upstream project's Python API, traced through its binding to the Rust API.
+    Python,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -351,8 +370,23 @@ impl ApiTarget {
         self.artifact.clone()
     }
 
+    /// An audit of the upstream project's Python API, written for the workspace at `root`.
+    pub fn python(root: impl Into<PathBuf>, artifact: impl Into<PathBuf>) -> Self {
+        Self {
+            name: "python".to_owned(),
+            root: root.into(),
+            artifact: artifact.into(),
+            source: Source::Python,
+        }
+    }
+
     pub fn is_dependency(&self) -> bool {
         self.source == Source::Dependency
+    }
+
+    /// Whether the audit is about the upstream project: a dependency or its Python API.
+    pub fn is_upstream(&self) -> bool {
+        self.source != Source::Workspace
     }
 }
 
@@ -408,14 +442,17 @@ pub fn discover_targets(root: &Path, workspace: &Workspace<'_>) -> Result<Vec<Ap
         targets.extend(crate_targets);
     }
 
+    let dependency_dir = root.join("api").join(workspace.dependency_directory);
     for name in workspace.dependencies {
         targets.push(ApiTarget::dependency(
             *name,
             root,
-            root.join("api")
-                .join(workspace.dependency_directory)
-                .join(format!("{name}.txt")),
+            dependency_dir.join(format!("{name}.txt")),
         ));
+    }
+    // The Python audit reads the dependencies' audits, so it comes after them.
+    if workspace.python.is_some() {
+        targets.push(ApiTarget::python(root, dependency_dir.join("python.txt")));
     }
 
     Ok(targets)
@@ -433,10 +470,9 @@ pub fn select_targets(
             .into_iter()
             .filter(|target| !target.is_dependency() && target.name() == workspace.root_package)
             .collect()),
-        TargetSelection::Dependencies => Ok(targets
-            .into_iter()
-            .filter(ApiTarget::is_dependency)
-            .collect()),
+        TargetSelection::Dependencies => {
+            Ok(targets.into_iter().filter(ApiTarget::is_upstream).collect())
+        }
         TargetSelection::Crate(name) => {
             let matches = targets
                 .iter()
@@ -505,6 +541,9 @@ where
 pub fn render_list_line(root: &Path, target: &ApiTarget) -> String {
     if target.is_dependency() {
         return format!("{} dependency", target.name());
+    }
+    if target.source == Source::Python {
+        return format!("{} upstream Python API", target.name());
     }
     let relative = target
         .root()
@@ -627,6 +666,14 @@ pub fn generate_target_artifact(
     target: &ApiTarget,
     workspace: &Workspace<'_>,
 ) -> Result<String, String> {
+    if target.source == Source::Python {
+        let audit = workspace
+            .python
+            .as_ref()
+            .ok_or("the workspace describes no Python audit")?;
+        let source = upstream_commit(target.root(), &workspace.upstream)?;
+        return python::generate(target.root(), audit, Some(&source));
+    }
     // A dependency is documented only when what rustdoc builds is what a release builds.
     let resolved = if target.is_dependency() {
         let manifest = target.manifest_path();
@@ -698,6 +745,12 @@ fn describe_source(
     if !inside {
         return Ok(None);
     }
+    upstream_commit(root, upstream).map(Some)
+}
+
+/// Names the upstream checkout and the commit it is at, as `vendor/polars at <commit>`.
+fn upstream_commit(root: &Path, upstream: &Upstream<'_>) -> Result<String, String> {
+    let checkout = root.join(upstream.root);
     let output = Command::new("git")
         .arg("-C")
         .arg(&checkout)
@@ -712,7 +765,7 @@ fn describe_source(
         ));
     }
     let commit = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-    Ok(Some(format!("{} at {commit}", upstream.root)))
+    Ok(format!("{} at {commit}", upstream.root))
 }
 
 pub fn render_api_artifact(name: &str, api: &str, missing_item_ids: &[String]) -> String {
@@ -833,6 +886,7 @@ mod tests {
         dependency_directory: "deps",
         dependencies: &["dep-facade", "dep"],
         upstream: NO_UPSTREAM,
+        python: None,
     };
 
     /// An upstream that a fixture does not check out.
@@ -1019,6 +1073,53 @@ mod tests {
             names(TargetSelection::All),
             ["app", "app-engine", "dep-facade", "dep"]
         );
+    }
+
+    #[test]
+    fn the_python_audit_follows_the_dependencies_and_is_selected_with_them() {
+        let fixture = TempFixture::new("dageist-api-python-target");
+        fixture.file("Cargo.toml", "[package]\nname = \"app\"\n");
+        let workspace = Workspace {
+            python: Some(PythonAudit {
+                package: "vendor/up/python",
+                binding: "vendor/up/binding",
+                rust_audits: &["api/deps/dep.txt"],
+            }),
+            ..FIXTURE
+        };
+
+        let all = select_targets(fixture.path(), &workspace, TargetSelection::All).unwrap();
+        let listed = all
+            .iter()
+            .map(|target| render_list_line(fixture.path(), target))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            listed,
+            [
+                "app .",
+                "dep-facade dependency",
+                "dep dependency",
+                "python upstream Python API"
+            ],
+        );
+        assert_eq!(
+            all.last().unwrap().artifact_path(),
+            fixture.path().join("api/deps/python.txt")
+        );
+
+        let upstream =
+            select_targets(fixture.path(), &workspace, TargetSelection::Dependencies).unwrap();
+        assert_eq!(
+            upstream.iter().map(ApiTarget::name).collect::<Vec<_>>(),
+            ["dep-facade", "dep", "python"]
+        );
+        let python = select_targets(
+            fixture.path(),
+            &workspace,
+            TargetSelection::Crate("python".to_owned()),
+        )
+        .unwrap();
+        assert_eq!(python.len(), 1);
     }
 
     #[test]
@@ -1348,6 +1449,7 @@ mod tests {
         dependency_directory: "deps",
         dependencies: &["dep"],
         upstream: NO_UPSTREAM,
+        python: None,
     };
 
     #[test]
@@ -1926,6 +2028,894 @@ mod tests {
         assert_eq!(
             error,
             "app-host does not build the crates of vendor/up as up-runtime does: 1 differences",
+        );
+    }
+
+    /// A Rust API with the few items the binding tests reach.
+    fn small_api() -> RustApi {
+        let mut api = RustApi::default();
+        api.read(concat!(
+            "pub fn polars_plan::dsl::Expr::cum_sum(self, reverse: bool) -> Self\n",
+            "pub fn polars_plan::dsl::Expr::shift(self, n: polars_plan::dsl::Expr) -> Self\n",
+            "pub fn polars_plan::dsl::Expr::shift_and_fill<E: core::convert::Into<polars_plan::dsl::Expr>>(self, n: E, fill: E) -> Self\n",
+            "pub fn polars_plan::dsl::Expr::over<E: core::convert::AsRef<[IE]>, IE: core::convert::Into<polars_plan::dsl::Expr> + core::clone::Clone>(self, partition_by: E) -> polars_error::PolarsResult<Self>\n",
+            "pub fn polars_plan::dsl::Expr::map<F>(self, function: F) -> Self where F: core::ops::function::Fn(i32) -> i32\n",
+            "pub fn polars_plan::dsl::Expr::str(self) -> polars_plan::dsl::string::StringNameSpace\n",
+            "pub fn polars_plan::dsl::string::StringNameSpace::to_uppercase(self) -> polars_plan::dsl::Expr\n",
+            "pub fn polars_plan::dsl::functions::as_list(s: polars_plan::dsl::Expr) -> polars_plan::dsl::Expr\n",
+            "pub const fn polars_plan::dsl::col(name: &str) -> polars_plan::dsl::Expr\n",
+            "pub fn polars_plan::dsl::when<E>(condition: E) -> polars_plan::dsl::When\n",
+            "pub fn polars_plan::dsl::When::then<E>(self, expr: E) -> polars_plan::dsl::Then\n",
+            "pub fn polars_plan::dsl::ChainedWhen::then<E>(self, expr: E) -> polars_plan::dsl::ChainedThen\n",
+            "pub fn polars_plan::dsl::Then::otherwise<E>(self, expr: E) -> polars_plan::dsl::Expr\n",
+            "pub fn polars_plan::dsl::ChainedThen::otherwise<E>(self, expr: E) -> polars_plan::dsl::Expr\n",
+            "pub fn polars_lazy::frame::LazyCsvReader::new_with_sources(sources: ScanSources) -> Self\n",
+            "pub fn polars_lazy::frame::LazyCsvReader::with_separator(self, separator: u8) -> Self\n",
+            "pub fn polars_lazy::frame::LazyCsvReader::with_n_rows(self, n: core::option::Option<usize>) -> Self\n",
+            "pub fn polars_lazy::frame::LazyCsvReader::finish(self) -> polars_error::PolarsResult<polars_lazy::frame::LazyFrame>\n",
+            "pub fn polars_lazy::frame::LazyJsonLineReader::new(source: ScanSources) -> Self\n",
+            "pub fn polars_lazy::frame::LazyJsonLineReader::with_n_rows(self, n: core::option::Option<usize>) -> Self\n",
+            "pub fn polars_lazy::frame::LazyJsonLineReader::finish(self) -> polars_error::PolarsResult<polars_lazy::frame::LazyFrame>\n",
+            "pub fn polars_lazy::frame::LazyFrame::with_row_index(self, name: &str) -> Self\n",
+            "pub fn polars_lazy::frame::LazyFrame::cache(self) -> Self\n",
+            "pub fn polars_plan::dsl::functions::empty() -> polars_plan::dsl::Selector\n",
+            "pub fn polars_plan::plans::DslPlan::serialize_versioned<W>(&self, writer: W) -> polars_error::PolarsResult<()>\n",
+            "pub struct polars_plan::dsl::Expr\n",
+        ));
+        api
+    }
+
+    fn binding_of(source: &str) -> Binding {
+        read_binding_sources(&[source.to_owned()], &small_api()).unwrap()
+    }
+
+    fn reached(binding: &Binding, owner: &str, name: &str) -> Vec<String> {
+        binding[&(owner.to_owned(), name.to_owned())]
+            .items
+            .iter()
+            .cloned()
+            .collect()
+    }
+
+    #[test]
+    fn reads_methods_by_type_and_free_functions_from_an_audit() {
+        let api = small_api();
+
+        assert_eq!(
+            api.methods["Expr"]["cum_sum"].as_deref(),
+            Some("Expr"),
+            "Self is the type itself"
+        );
+        assert_eq!(
+            api.methods["Expr"]["over"].as_deref(),
+            Some("Expr"),
+            "a result is looked through, and generics with Fn bounds are skipped"
+        );
+        assert_eq!(
+            api.methods["Expr"]["map"].as_deref(),
+            Some("Expr"),
+            "a where clause is not the return type"
+        );
+        assert_eq!(
+            api.methods["Expr"]["str"].as_deref(),
+            Some("StringNameSpace")
+        );
+        assert_eq!(
+            api.methods["LazyCsvReader"]["finish"].as_deref(),
+            Some("LazyFrame")
+        );
+        assert_eq!(api.functions["as_list"].as_deref(), Some("Expr"));
+        assert!(
+            api.functions.contains_key("col"),
+            "a const fn is a function too"
+        );
+        assert!(
+            !api.functions.contains_key("Expr"),
+            "a struct is not a function"
+        );
+    }
+
+    #[test]
+    fn a_binding_method_reaches_the_rust_methods_it_calls_on_the_wrapped_value() {
+        let binding = binding_of(
+            r#"
+            #[pymethods]
+            impl PyExpr {
+                fn cum_sum(&self, reverse: bool) -> Self {
+                    self.inner.clone().cum_sum(reverse).into()
+                }
+                fn str_to_uppercase(&self) -> Self {
+                    self.inner
+                        .clone()
+                        .str()
+                        .to_uppercase()
+                        .into()
+                }
+                fn shift(&self, n: Self, fill_value: Option<Self>) -> Self {
+                    let expr = self.inner.clone();
+                    let out = match fill_value {
+                        Some(v) => expr.shift_and_fill(n.inner, v.inner),
+                        None => expr.shift(n.inner),
+                    };
+                    out.into()
+                }
+            }
+            "#,
+        );
+
+        assert_eq!(reached(&binding, "PyExpr", "cum_sum"), ["Expr::cum_sum"]);
+        assert_eq!(
+            reached(&binding, "PyExpr", "str_to_uppercase"),
+            ["Expr::str", "StringNameSpace::to_uppercase"]
+        );
+        assert_eq!(
+            reached(&binding, "PyExpr", "shift"),
+            ["Expr::shift", "Expr::shift_and_fill"]
+        );
+    }
+
+    #[test]
+    fn a_call_on_anything_but_the_wrapped_value_is_not_a_polars_method() {
+        let binding = binding_of(
+            r#"
+            #[pymethods]
+            impl PyExpr {
+                fn over(&self, partition_by: Option<Vec<Self>>) -> Self {
+                    let partition_by = partition_by.map(|by| by);
+                    self.inner.clone().over(partition_by).into()
+                }
+            }
+            "#,
+        );
+
+        assert_eq!(reached(&binding, "PyExpr", "over"), ["Expr::over"]);
+    }
+
+    #[test]
+    fn a_method_counts_on_the_type_the_value_has_not_another_type_with_the_name() {
+        let binding = binding_of(
+            r#"
+            #[pymethods]
+            impl PyLazyFrame {
+                fn new_from_ndjson(source: Sources, n_rows: Option<usize>, row_index: Option<String>) -> Self {
+                    let mut lf = LazyJsonLineReader::new(source).with_n_rows(n_rows).finish()?;
+                    if let Some(name) = row_index {
+                        lf = lf.with_row_index(&name);
+                    }
+                    lf.into()
+                }
+            }
+            #[pymethods]
+            impl PyChainedWhen {
+                fn then(&self, statement: PyExpr) -> PyChainedThen {
+                    self.inner.clone().then(statement.inner).into()
+                }
+            }
+            "#,
+        );
+
+        assert_eq!(
+            reached(&binding, "PyLazyFrame", "new_from_ndjson"),
+            [
+                "LazyFrame::with_row_index",
+                "LazyJsonLineReader::finish",
+                "LazyJsonLineReader::new",
+                "LazyJsonLineReader::with_n_rows"
+            ],
+        );
+        assert_eq!(
+            reached(&binding, "PyChainedWhen", "then"),
+            ["ChainedWhen::then"]
+        );
+    }
+
+    #[test]
+    fn a_sibling_method_a_typed_field_and_a_qualified_path_are_read_as_they_are() {
+        let binding = binding_of(
+            r#"
+            #[pymethods]
+            impl PyExpr {
+                fn str_upper(&self) -> Self {
+                    self.uppercase()
+                }
+                fn uppercase(&self) -> Self {
+                    self.inner.clone().str().to_uppercase().into()
+                }
+            }
+            #[pymethods]
+            impl PyLazyFrame {
+                fn serialize(&self, writer: Writer) {
+                    self.ldf.read().logical_plan.serialize_versioned(writer);
+                }
+                fn collect(&self) -> PyDataFrame {
+                    let frame = DataFrame::empty();
+                    frame.into()
+                }
+            }
+            #[pyfunction]
+            fn dtype_of(e: PyExpr) -> PyDataTypeExpr {
+                DataTypeExpr::OfExpr(Box::new(e.inner)).into()
+            }
+            #[pyfunction]
+            fn plan_filter(input: Arc<DslPlan>) -> PyLazyFrame {
+                DslPlan::Filter { input, predicate: col("a") }.into()
+            }
+            #[pyfunction]
+            fn arena_node(arena: &mut Arena<AExpr>) {
+                arena.add(AExpr::Len);
+            }
+            #[pyfunction]
+            fn arena_only(node: Node) -> bool {
+                let arena: Arena<AExpr> = Arena::new();
+                arena.get(node).is_some()
+            }
+            #[pyfunction]
+            fn built(plan: DslPlan) -> PyLazyFrame {
+                DslBuilder::from(plan).build().into()
+            }
+            #[pyfunction]
+            fn plain_call(plan: DslPlan) -> PyLazyFrame {
+                plan.into()
+            }
+            "#,
+        );
+
+        assert_eq!(
+            reached(&binding, "PyExpr", "str_upper"),
+            ["Expr::str", "StringNameSpace::to_uppercase"],
+            "a helper method of the same binding type is followed"
+        );
+        assert_eq!(
+            reached(&binding, "PyLazyFrame", "serialize"),
+            ["DslPlan::serialize_versioned"],
+            "a lazy frame's logical plan is a DslPlan"
+        );
+        assert!(
+            reached(&binding, "PyLazyFrame", "collect").is_empty(),
+            "DataFrame::empty is not the free function empty"
+        );
+        for name in ["plan_filter", "arena_node", "arena_only", "built"] {
+            assert!(
+                binding[&("module".to_owned(), name.to_owned())].internals,
+                "{name} builds Polars' internals"
+            );
+        }
+        assert!(!binding[&("module".to_owned(), "plain_call".to_owned())].internals);
+        let dtype_of = &binding[&("module".to_owned(), "dtype_of".to_owned())];
+        assert!(
+            dtype_of.internals,
+            "naming a variant of a Polars expression enum builds internals"
+        );
+    }
+
+    #[test]
+    fn a_constructor_is_listed_under_its_own_name_and_as_new() {
+        let binding = binding_of(
+            r#"
+            #[pymethods]
+            impl PyReader {
+                #[new]
+                fn new(name: &str) -> Self { Self { expr: col(name) } }
+            }
+            "#,
+        );
+
+        assert_eq!(reached(&binding, "PyReader", "__new__"), ["col()"]);
+        assert_eq!(reached(&binding, "PyReader", "new"), ["col()"]);
+    }
+
+    #[test]
+    fn module_functions_associated_functions_and_renames_are_followed() {
+        let binding = binding_of(
+            r#"
+            #[pyfunction(name = "list")]
+            pub fn as_list_py(s: PyExpr) -> PyExpr {
+                as_list(s.inner).into()
+            }
+            #[pyfunction]
+            #[pyo3(name = "col")]
+            pub fn column(name: &str) -> PyExpr {
+                dsl::col(name).into()
+            }
+            #[pymethods]
+            impl PyLazyFrame {
+                fn new_from_csv(sources: Sources, separator: u8) -> Self {
+                    let mut r = LazyCsvReader::new_with_sources(sources);
+                    r = r.with_separator(separator);
+                    r.finish().into()
+                }
+            }
+            mod nested {
+                #[pyfunction]
+                fn building() -> PyExpr {
+                    Expr::Function { input: vec![], function: FunctionExpr::Abs }.into()
+                }
+            }
+            "#,
+        );
+
+        assert_eq!(reached(&binding, "module", "list"), ["as_list()"]);
+        assert_eq!(reached(&binding, "module", "col"), ["col()"]);
+        assert_eq!(
+            reached(&binding, "PyLazyFrame", "new_from_csv"),
+            [
+                "LazyCsvReader::finish",
+                "LazyCsvReader::new_with_sources",
+                "LazyCsvReader::with_separator"
+            ]
+        );
+        let building = &binding[&("module".to_owned(), "building".to_owned())];
+        assert!(building.items.is_empty());
+        assert!(
+            building.internals,
+            "building Polars' expression enum is reported"
+        );
+    }
+
+    fn item(owner: &str, name: &str, binding: &[(&str, &str)], uses: &[&str]) -> PythonItem {
+        PythonItem {
+            owner: owner.to_owned(),
+            name: name.to_owned(),
+            kind: "method".to_owned(),
+            parameters: vec!["n=10".to_owned()],
+            deprecated: false,
+            binding: binding
+                .iter()
+                .map(|(kind, name)| ((*kind).to_owned(), (*name).to_owned()))
+                .collect(),
+            uses: uses.iter().map(|used| (*used).to_owned()).collect(),
+        }
+    }
+
+    #[test]
+    fn a_python_item_is_traced_and_sorted_into_its_kind() {
+        let binding = binding_of(
+            r#"
+            #[pymethods]
+            impl PyExpr {
+                fn cum_sum(&self, reverse: bool) -> Self { self.inner.clone().cum_sum(reverse).into() }
+                fn str_upper(&self) -> Self { self.inner.clone().str().to_uppercase().into() }
+                fn meta_eq(&self, other: Self) -> bool { self.inner == other.inner }
+            }
+            "#,
+        );
+
+        let traced = trace_item(
+            &item("Expr", "cum_sum", &[("PyExpr", "cum_sum")], &[]),
+            &binding,
+        );
+        assert_eq!(traced.kind, Kind::SameName);
+        assert_eq!(
+            traced.line,
+            "Expr.cum_sum(n=10) | PyExpr.cum_sum | Expr::cum_sum | same name"
+        );
+
+        let traced = trace_item(
+            &item("Expr.str", "upper", &[("PyExpr", "str_upper")], &[]),
+            &binding,
+        );
+        assert_eq!(traced.kind, Kind::OtherName);
+
+        let traced = trace_item(&item("Expr", "head", &[], &["slice"]), &binding);
+        assert_eq!(traced.kind, Kind::InPython);
+        assert_eq!(traced.line, "Expr.head(n=10) | in Python from slice");
+
+        let traced = trace_item(
+            &item("Expr.meta", "eq", &[("PyExpr", "meta_eq")], &[]),
+            &binding,
+        );
+        assert_eq!(traced.kind, Kind::NotResolved);
+
+        let traced = trace_item(&item("Expr", "gone", &[("PyExpr", "gone")], &[]), &binding);
+        assert_eq!(traced.kind, Kind::NotResolved);
+        assert!(traced.line.contains("PyExpr.gone (not in the binding)"));
+    }
+
+    #[test]
+    fn the_python_audit_counts_each_kind_in_its_header() {
+        let traced = [
+            Traced {
+                kind: Kind::SameName,
+                line: "a".to_owned(),
+            },
+            Traced {
+                kind: Kind::InPython,
+                line: "b".to_owned(),
+            },
+            Traced {
+                kind: Kind::SameName,
+                line: "c".to_owned(),
+            },
+        ];
+
+        let artifact = render_python_artifact(Some("vendor/up at 1"), &traced);
+
+        assert!(artifact.starts_with(
+            "# Python Polars public API, traced through its binding to the Rust API\n"
+        ));
+        assert!(artifact.contains("# source: vendor/up at 1\n"));
+        assert!(
+            artifact
+                .contains("# same name: 2\n# other name: 0\n# in Python: 1\n# not resolved: 0\n")
+        );
+        assert!(artifact.ends_with("\na\nb\nc\n"));
+    }
+
+    #[test]
+    fn reads_the_inventory_the_python_reader_prints() {
+        let items = parse_inventory(
+            r#"[{"binding": [["PyExpr", "abs"]], "deprecated": false, "kind": "method",
+                 "name": "abs", "owner": "Expr", "parameters": [], "uses": []}]"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            items,
+            [item("Expr", "abs", &[("PyExpr", "abs")], &[])].map(|item| PythonItem {
+                parameters: Vec::new(),
+                ..item
+            })
+        );
+        assert!(parse_inventory(r#"[{"owner": "Expr"}]"#).is_err());
+    }
+
+    #[test]
+    fn the_python_audit_needs_the_dependency_audits_it_reads() {
+        let fixture = TempFixture::new("dageist-api-python-missing");
+        let audit = PythonAudit {
+            package: "vendor/up/python",
+            binding: "vendor/up/binding",
+            rust_audits: &["api/deps/dep.txt"],
+        };
+
+        let error = python::generate(fixture.path(), &audit, None).unwrap_err();
+
+        assert!(error.contains("api/deps/dep.txt"));
+        assert!(error.ends_with("generate the dependency audits before the Python audit"));
+    }
+
+    /// Lays out the few files of a Python package the reader needs, each holding a little.
+    fn python_fixture() -> TempFixture {
+        let fixture = TempFixture::new("dageist-api-python");
+        let empty = [
+            ("expr/string.py", "ExprStringNameSpace"),
+            ("expr/datetime.py", "ExprDateTimeNameSpace"),
+            ("expr/list.py", "ExprListNameSpace"),
+            ("expr/array.py", "ExprArrayNameSpace"),
+            ("expr/categorical.py", "ExprCatNameSpace"),
+            ("expr/name.py", "ExprNameNameSpace"),
+            ("expr/struct.py", "ExprStructNameSpace"),
+            ("expr/binary.py", "ExprBinaryNameSpace"),
+            ("expr/meta.py", "ExprMetaNameSpace"),
+            ("expr/map.py", "ExprMapNameSpace"),
+            ("expr/ext.py", "ExprExtensionNameSpace"),
+            ("lazyframe/group_by.py", "LazyGroupBy"),
+        ];
+        for (file, class) in empty {
+            fixture.file(file, &format!("class {class}:\n    pass\n"));
+        }
+        fixture.file(
+            "expr/whenthen.py",
+            "class When:\n    pass\nclass Then:\n    pass\nclass ChainedWhen:\n    pass\nclass ChainedThen:\n    pass\n",
+        );
+        fixture.file(
+            "expr/expr.py",
+            concat!(
+                "from polars._plr import arg_where as py_arg_where\n",
+                "from polars._utils.parse.expr import parse_into_expression\n",
+                "class Expr:\n",
+                "    def __rand__(self, other):\n        other_expr = parse_into_expression(other)\n        return wrap_expr(other_expr.and_(self._pyexpr))\n",
+                "    def map_batches(self, function):\n        return wrap_expr(self._pyexpr.map_batches(function))\n",
+                "    def map_elements(self, function, strategy='thread_local'):\n        if strategy == 'threading':\n            return wrap_expr(plr.collect_all(function))\n        return self.map_batches(function)\n",
+                "    def abs(self):\n        return wrap_expr(self._pyexpr.abs())\n",
+                "    def head(self, n=10):\n        return self.slice(0, n)\n",
+                "    def slice(self, offset, length=None, /):\n        return wrap_expr(self._pyexpr.slice(offset, length))\n",
+                "    def arg_true(self):\n        return wrap_expr(py_arg_where(self._pyexpr))\n",
+                "    def __add__(self, other):\n        return self._from_pyexpr(self._pyexpr + other)\n",
+                "    def __rsub__(self, other):\n        return self._from_pyexpr(other - self._pyexpr)\n",
+                "    def __neg__(self):\n        return wrap_expr(-self._pyexpr)\n",
+                "    def __repr__(self):\n        return ''\n",
+                "    def _hidden(self):\n        pass\n",
+                "    @property\n    def str(self):\n        pass\n",
+                "    @property\n    def width(self):\n        return self._pyexpr.width()\n",
+                "    @deprecated(\"use abs\")\n    def absolute(self, *, strict=True):\n        return self.abs()\n",
+                "    @deprecate_renamed_parameter(\"a\", \"b\")\n    def kept(self, b):\n        return wrap_expr(self._pyexpr.kept(b))\n",
+            ),
+        );
+        fixture.file(
+            "_utils/parse/expr.py",
+            "def parse_into_expression(value) -> PyExpr:\n    return value\n",
+        );
+        fixture.file(
+            "lazyframe/resolver.py",
+            "import polars._reexport as pl\nclass Resolver:\n    def lazy(self):\n        return pl.LazyFrame.from_resolver(self)\n",
+        );
+        fixture.file(
+            "lazyframe/frame.py",
+            concat!(
+                "from polars.lazyframe.engine_config import _select_engine\n",
+                "class LazyFrame:\n",
+                "    @classmethod\n    def from_resolver(cls, resolver):\n        return wrap_ldf(PyLazyFrame.from_lazyframe_resolver(resolver))\n",
+                "    def execute(self, *, engine='auto'):\n        return _select_engine(engine).execute(self)\n",
+                "    def filter(self, *predicates):\n        return self._filter(predicates)\n",
+                "    def _filter(self, predicates):\n        return self._from_pyldf(self._ldf.filter(predicates))\n",
+                "    def explain(self):\n        ldf = self._ldf.with_optimizations(1)\n        return ldf.describe_plan()\n",
+                "    def collect(self, *, engine='auto', background=False):\n        engine_ = _select_engine(engine)\n        return engine_.collect(self, background=background)\n",
+            ),
+        );
+        fixture.file(
+            "lazyframe/engine.py",
+            concat!(
+                "class Engine:\n    def collect(self, lf):\n        raise NotImplementedError\n",
+                "class _LocalEngine(Engine):\n",
+                "    @overload\n    def collect(self, lf): ...\n",
+                "    def collect(self, lf, background=False):\n        ldf = lf._ldf.with_optimizations(0)\n        if background:\n            return ldf.collect_concurrently()\n        return wrap_df(ldf.collect())\n",
+                "    def execute(self, lf):\n        return self.collect(lf)\n",
+                "class Unrelated:\n    def collect(self, lf):\n        return lf._ldf.unrelated()\n",
+            ),
+        );
+        fixture.file(
+            "lazyframe/engine_config.py",
+            concat!(
+                "from polars.lazyframe.engine import Engine, _LocalEngine\n",
+                "def _select_engine(engine) -> Engine:\n    return _engine_from_name(engine)\n",
+            ),
+        );
+        fixture.file(
+            "functions/__init__.py",
+            concat!(
+                "from polars.functions.col import col\n",
+                "from polars.functions.lazy import coalesce, count, dtype_of, arrow_reader, scan_thing\n",
+                "from polars.functions.lazy import _private\n",
+            ),
+        );
+        fixture.file(
+            "functions/col.py",
+            concat!(
+                "class Col:\n",
+                "    def __call__(self, name, *more_names):\n        return self._create(name)\n",
+                "    def _create(self, name):\n        return wrap_expr(plr.col(name))\n",
+                "col: Col = Col()\n",
+            ),
+        );
+        fixture.file(
+            "functions/lazy.py",
+            concat!(
+                "@overload\ndef coalesce(exprs): ...\n",
+                "def coalesce(exprs, *more_exprs, eager=False):\n    return wrap_expr(plr.coalesce(exprs))\n",
+                "def count(*columns):\n    return F.col(*columns).count()\n",
+                "def dtype_of(expr):\n    from polars._plr import PyDataTypeExpr\n    return PyDataTypeExpr.of_expr(expr._pyexpr)\n",
+                "def arrow_reader(source):\n    return wrap_ldf(plr.PyArrowCStreamReader(source).read())\n",
+                "def scan_thing():\n    from polars.lazyframe.resolver import Resolver\n    return Resolver().lazy()\n",
+                "def _private():\n    pass\n",
+            ),
+        );
+        fixture.file(
+            "io/__init__.py",
+            "from polars.io.csv import read_csv, scan_csv\n",
+        );
+        fixture.file(
+            "io/csv/__init__.py",
+            "from polars.io.csv.functions import read_csv, scan_csv\n",
+        );
+        fixture.file(
+            "io/csv/functions.py",
+            concat!(
+                "def read_csv(source):\n    pass\n",
+                "from polars._plr import PyLazyFrame\n",
+                "def scan_csv(source, *, has_header=True):\n    return wrap_ldf(PyLazyFrame.new_from_csv(source))\n",
+            ),
+        );
+        fixture
+    }
+
+    #[test]
+    fn the_python_reader_lists_methods_and_functions_with_their_binding_calls() {
+        let fixture = python_fixture();
+
+        let items = python::read_python(fixture.path()).unwrap();
+        let find = |owner: &str, name: &str| {
+            items
+                .iter()
+                .find(|item| item.owner == owner && item.name == name)
+                .unwrap_or_else(|| panic!("{owner}.{name} is listed"))
+        };
+        let calls = |pairs: &[(&str, &str)]| {
+            pairs
+                .iter()
+                .map(|(kind, name)| ((*kind).to_owned(), (*name).to_owned()))
+                .collect::<Vec<_>>()
+        };
+
+        assert_eq!(find("Expr", "abs").binding, calls(&[("PyExpr", "abs")]));
+        assert_eq!(find("Expr", "head").parameters, ["n=10"]);
+        assert!(find("Expr", "head").binding.is_empty());
+        assert_eq!(find("Expr", "head").uses, ["slice"]);
+        assert_eq!(
+            find("Expr", "slice").parameters,
+            ["offset", "length=None", "/"]
+        );
+        assert_eq!(
+            find("Expr", "arg_true").binding,
+            calls(&[("module", "arg_where")]),
+            "a binding function imported under another name is a binding call"
+        );
+        assert_eq!(
+            find("Expr", "__rand__").binding,
+            calls(&[("PyExpr", "and_")]),
+            "a local made by a function annotated to return a binding object holds one"
+        );
+        assert_eq!(
+            find("Expr", "map_elements").binding,
+            calls(&[("module", "collect_all")])
+        );
+        assert_eq!(
+            find("Expr", "map_elements").uses,
+            ["map_batches"],
+            "a public method of the item's own class is listed as used, not followed"
+        );
+        assert_eq!(
+            find("LazyFrame", "execute").binding,
+            calls(&[
+                ("PyLazyFrame", "collect"),
+                ("PyLazyFrame", "with_optimizations")
+            ]),
+            "in a class reached by delegation, its own public methods are followed, \
+             and a branch on a flag the call leaves off is not"
+        );
+        assert_eq!(
+            find("polars", "scan_thing").binding,
+            calls(&[("PyLazyFrame", "from_lazyframe_resolver")]),
+            "a method of a class made there, and a class method through pl, are followed"
+        );
+        assert_eq!(find("Expr", "__add__").kind, "operator");
+        assert_eq!(
+            find("Expr", "__add__").binding,
+            calls(&[("PyExpr", "__add__")])
+        );
+        assert_eq!(
+            find("Expr", "__rsub__").binding,
+            calls(&[("PyExpr", "__sub__")]),
+            "the binding's own operator is called whichever side the binding object is on"
+        );
+        assert_eq!(
+            find("Expr", "__neg__").binding,
+            calls(&[("PyExpr", "__neg__")])
+        );
+        assert_eq!(find("Expr", "width").kind, "property");
+        assert_eq!(find("Expr", "width").binding, calls(&[("PyExpr", "width")]));
+        assert!(find("Expr", "absolute").deprecated);
+        assert_eq!(find("Expr", "absolute").parameters, ["*", "strict=True"]);
+        assert!(
+            !find("Expr", "kept").deprecated,
+            "a renamed parameter does not deprecate the method"
+        );
+        assert!(
+            items
+                .iter()
+                .all(|item| !["_hidden", "str", "__repr__"].contains(&item.name.as_str())),
+            "private methods, namespace accessors and other dunders are not listed"
+        );
+        assert_eq!(
+            find("LazyFrame", "filter").binding,
+            calls(&[("PyLazyFrame", "filter")]),
+            "a private method of the class is followed"
+        );
+        assert_eq!(
+            find("LazyFrame", "explain").binding,
+            calls(&[
+                ("PyLazyFrame", "describe_plan"),
+                ("PyLazyFrame", "with_optimizations")
+            ]),
+            "a local holding the binding object is followed"
+        );
+        assert_eq!(
+            find("LazyFrame", "collect").binding,
+            calls(&[
+                ("PyLazyFrame", "collect"),
+                ("PyLazyFrame", "collect_concurrently"),
+                ("PyLazyFrame", "with_optimizations")
+            ]),
+            "the method of the class a private helper of another module is annotated to return, \
+             and of its subclasses, is followed, and not that of another class there"
+        );
+        assert_eq!(find("polars", "col").binding, calls(&[("module", "col")]));
+        assert_eq!(find("polars", "col").parameters, ["name", "*more_names"]);
+        assert_eq!(
+            find("polars", "coalesce").parameters,
+            ["exprs", "*more_exprs", "eager=False"],
+            "an overload stub is passed over"
+        );
+        assert_eq!(find("polars", "count").uses, ["col", "count"]);
+        assert_eq!(
+            find("polars", "dtype_of").binding,
+            calls(&[("PyDataTypeExpr", "of_expr")]),
+            "a binding class imported from the binding module is followed"
+        );
+        assert_eq!(
+            find("polars", "arrow_reader").binding,
+            calls(&[("PyArrowCStreamReader", "__new__")]),
+            "a binding class called through the module is its constructor"
+        );
+        assert_eq!(
+            find("polars", "scan_csv").binding,
+            calls(&[("PyLazyFrame", "new_from_csv")]),
+            "a re-exported function is found where it is defined"
+        );
+        assert!(
+            items
+                .iter()
+                .all(|item| item.name != "read_csv" && item.name != "_private")
+        );
+    }
+
+    #[test]
+    fn the_python_reader_leaves_out_only_branches_an_unset_flag_cannot_take() {
+        let fixture = python_fixture();
+        fixture.file(
+            "functions/__init__.py",
+            "from polars.functions.flags import (unset, positional, keyword, spread, starred, both, \
+             both_reversed, false_default, rebound, method_passed, receiver_helper, pruned_receiver, \
+             held, calls_public)\n",
+        );
+        fixture.file(
+            "lazyframe/group_by.py",
+            "class LazyGroupBy:\n    def agg(self, *aggs):\n        return F.agg(aggs)\n",
+        );
+        fixture.file(
+            "functions/flags.py",
+            concat!(
+                "def _helper(x, flag=False, other=None, *, kw=None):\n",
+                "    if flag:\n        plr.flag_on()\n",
+                "    if not flag:\n        plr.flag_off()\n",
+                "    if other is None:\n        plr.other_unset()\n",
+                "    if other is not None:\n        plr.other_set()\n",
+                "    if kw:\n        plr.kw_on()\n",
+                "    return plr.flag_on_expr() if flag else plr.flag_off_expr()\n",
+                "def _false_default(flag=False):\n",
+                "    if flag is not None:\n        plr.false_is_not_none()\n",
+                "    if flag is None:\n        plr.false_is_none()\n",
+                "def _rebound(flag=None):\n",
+                "    if flag is None:\n        flag = True\n",
+                "    if flag:\n        plr.rebound_on()\n",
+                "class _Runner:\n",
+                "    def run(self, flag=False):\n        if flag:\n            plr.run_flag_on()\n",
+                "def _make(flag=False) -> _Runner:\n",
+                "    if flag:\n        plr.make_flag_on()\n",
+                "    return _Runner()\n",
+                "def _held(x, flag=False):\n",
+                "    value = x\n",
+                "    if flag:\n        value = x._pyexpr\n",
+                "    return value.held_method()\n",
+                "def _pruned_receiver(flag=False):\n",
+                "    runner = None\n",
+                "    if flag:\n        runner = _Runner()\n",
+                "    return runner.run(True)\n",
+                "def unset(x):\n    return _helper(x)\n",
+                "def positional(x):\n    return _helper(x, True, 1)\n",
+                "def keyword(x):\n    return _helper(x, kw=True)\n",
+                "def spread(x, **options):\n    return _helper(x, **options)\n",
+                "def starred(x, *rest):\n    return _helper(x, *rest)\n",
+                "def both(x):\n    _helper(x)\n    return _helper(x, True)\n",
+                "def both_reversed(x):\n    _helper(x, True)\n    return _helper(x)\n",
+                "def false_default():\n    return _false_default()\n",
+                "def rebound():\n    return _rebound()\n",
+                "def method_passed():\n    return _Runner().run(True)\n",
+                "def receiver_helper():\n    return _make().run(True)\n",
+                "def pruned_receiver():\n    return _pruned_receiver()\n",
+                "def held(x):\n    return _held(x)\n",
+                "def calls_public(x):\n    return unset(x)\n",
+            ),
+        );
+
+        let items = python::read_python(fixture.path()).unwrap();
+        let calls = |name: &str| -> Vec<&str> {
+            let item = items
+                .iter()
+                .find(|item| item.owner == "polars" && item.name == name)
+                .unwrap_or_else(|| panic!("polars.{name} is listed"));
+            item.binding.iter().map(|(_, call)| call.as_str()).collect()
+        };
+        let uses = |owner: &str, name: &str| {
+            items
+                .iter()
+                .find(|item| item.owner == owner && item.name == name)
+                .unwrap_or_else(|| panic!("{owner}.{name} is listed"))
+                .uses
+                .clone()
+        };
+        let all = [
+            "flag_off",
+            "flag_off_expr",
+            "flag_on",
+            "flag_on_expr",
+            "kw_on",
+            "other_set",
+            "other_unset",
+        ];
+
+        assert_eq!(
+            calls("unset"),
+            ["flag_off", "flag_off_expr", "other_unset"],
+            "`if flag`, `not flag`, `is None`, `is not None` and a conditional expression \
+             each keep only the branch an unset flag takes, keyword-only flags included"
+        );
+        assert_eq!(
+            calls("positional"),
+            [
+                "flag_off",
+                "flag_off_expr",
+                "flag_on",
+                "flag_on_expr",
+                "other_set",
+                "other_unset"
+            ],
+            "a flag passed by position keeps both branches"
+        );
+        assert_eq!(
+            calls("keyword"),
+            ["flag_off", "flag_off_expr", "kw_on", "other_unset"]
+        );
+        assert_eq!(
+            calls("spread"),
+            all,
+            "a call spreading keywords may pass any flag"
+        );
+        assert_eq!(
+            calls("starred"),
+            all,
+            "a call spreading positions may pass any flag"
+        );
+        for name in ["both", "both_reversed"] {
+            assert_eq!(
+                calls(name),
+                [
+                    "flag_off",
+                    "flag_off_expr",
+                    "flag_on",
+                    "flag_on_expr",
+                    "other_unset"
+                ],
+                "a helper called with and without a flag keeps both branches"
+            );
+        }
+        assert_eq!(
+            calls("false_default"),
+            ["false_is_not_none"],
+            "a flag that defaults to False is not None"
+        );
+        assert_eq!(
+            calls("rebound"),
+            ["rebound_on"],
+            "a flag the function assigns is not known to stay off"
+        );
+        assert_eq!(
+            calls("method_passed"),
+            ["run_flag_on"],
+            "`self` takes no argument of the call"
+        );
+        assert_eq!(
+            calls("receiver_helper"),
+            ["run_flag_on"],
+            "a helper a method is called on keeps the flags of its own call"
+        );
+        assert!(
+            calls("pruned_receiver").is_empty(),
+            "an instance made only in a branch that cannot run is not followed"
+        );
+        assert!(
+            calls("held").is_empty(),
+            "a binding object held only in a branch that cannot run is not followed"
+        );
+        assert_eq!(
+            uses("polars", "calls_public"),
+            ["unset"],
+            "a public function of the same module is listed as used"
+        );
+        assert_eq!(
+            uses("LazyGroupBy", "agg"),
+            ["agg"],
+            "a method built from a function of the same name lists it"
         );
     }
 

@@ -74,6 +74,8 @@ version = "0.1.0"
 dependencies = [
  "public-api",
  "rustdoc-json",
+ "serde_json",
+ "syn",
 ]
 
 [[package]]

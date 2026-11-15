@@ -156,6 +156,41 @@ because Polars' own crates turn features on for each other. The generator
 refuses to write a Polars audit when documenting the crate on its own would
 resolve other features than that build.
 
+`api/polars/python.txt` traces the Python API of the same release. For each
+public method, property and operator of `Expr` and its namespaces,
+`when`/`then`, `LazyFrame` and `LazyGroupBy`, and each function of
+`polars.functions` and `scan_*` function, one line gives:
+
+- its parameters with their defaults;
+- the binding methods it calls;
+- the public Rust items those reach;
+- how it is built: the same name in Rust, another name or several Rust items,
+  in Python from other calls, or not resolved to a public Rust item;
+- the other Polars calls it is built from, when it has any.
+
+A binding call made through code the item delegates to is counted as the
+item's own: private helpers in any module; the engine or resolver object a
+helper returns or that the item makes; and class methods such as
+`pl.LazyFrame.from_lazyframe_resolver`. Take a flag that defaults to `False`
+or `None` and that the function never assigns. Where the call does not pass it,
+an `if` that tests it as `flag`, `not flag`, `flag is None` or
+`flag is not None` keeps only the branch the default takes. For example,
+`if background:` drops its body. Tests that combine the flag with anything else
+keep both branches. A call that spreads `*args` or `**kwargs` keeps every
+branch. The item's own public methods are not followed; they are listed as what
+it is built from.
+
+The header counts each kind and says what is not covered, such as the eager
+`DataFrame` and `Series`. The generator reads the Python with Python's own
+parser, through `python3` and
+[api/generator/python/inventory.py](../api/generator/python/inventory.py), so
+no Python package needs installing. The parser must read the syntax Polars is
+written in, so `python3` must be at least the oldest Python that Python
+Polars supports, 3.11 at this release. It reads the binding in
+`vendor/polars/crates/polars-python` with a Rust parser, and the Rust API from
+the other Polars audits as they are on disk. `--polars` refreshes those first;
+`--crate python` reads them as they are.
+
 Cargo's offline mode needs every crate in [Cargo.lock](../Cargo.lock) in the
 local cache, including crates for other platforms. If the check reports a
 crate it cannot download, fetch the locked crates once with
@@ -172,7 +207,8 @@ CARGO_NET_OFFLINE=true cargo run --offline --locked --manifest-path api/generato
 CARGO_NET_OFFLINE=true cargo run --offline --locked --manifest-path api/generator/Cargo.toml -- --polars
 ```
 
-Without a selector the command refreshes every audit. Read the diff and
+Without a selector the command refreshes every audit; `--polars` refreshes the
+Python audit after the Polars audits it reads. Read the diff and
 explain each change from its source change; a Polars upgrade shows every
 added, removed and changed item, and every feature that is turned on or off.
 Keep the source change and the refreshed audits in one review.
