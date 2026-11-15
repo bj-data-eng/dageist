@@ -156,3 +156,10 @@ and Facebook, Inc.:
 
 * License: [jemalloc license, BSD 2-Clause](licenses/jemalloc/COPYING)
 * Homepage: [jemalloc](https://jemalloc.net/)
+
+This product depends on toml 1.2.1, from the toml-rs project, under your choice
+of either license:
+
+* License: [Apache License 2.0](licenses/toml/LICENSE-APACHE)
+* License: [MIT License](licenses/toml/LICENSE-MIT)
+* Homepage: [toml](https://github.com/toml-rs/toml)
