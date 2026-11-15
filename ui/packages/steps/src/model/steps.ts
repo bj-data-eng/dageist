@@ -101,12 +101,14 @@ export interface SortStep {
   readonly options: Options;
 }
 
-/** `.select(columns…)`: keeps some of the columns, in the order given. */
+/**
+ * `.select(exprs…)`: keeps some of the columns, in the order given. The
+ * expressions are the list `exprs` of `options`.
+ */
 export interface SelectStep {
   /** Stays with the step while it is moved or edited. */
   readonly id: string;
   readonly verb: 'select';
-  readonly columns: readonly string[];
   readonly options: Options;
 }
 
@@ -300,13 +302,23 @@ function sort(catalogue: Catalogue, frame: Frame, step: SortStep): StepResult {
   return { frame: reordered(frame, order), problem: null, added: [] };
 }
 
-function select(frame: Frame, step: SelectStep): StepResult {
-  if (step.columns.length === 0) return failed(frame, 'Pick the fields to keep.');
-  // Polars refuses to select one column twice.
-  const twice = step.columns.find((name, at) => step.columns.indexOf(name) !== at);
-  if (twice !== undefined) return failed(frame, `"${twice}" is selected twice.`);
+function select(catalogue: Catalogue, frame: Frame, step: SelectStep): StepResult {
+  const names: string[] = [];
+  for (const key of keysOf(step.options, 'exprs')) {
+    // The preview keeps fields; any other expression it does not work out.
+    if (key.kind !== 'column') {
+      return failed(
+        frame,
+        `The preview does not include selecting ${keyText(catalogue, key)}, only fields.`,
+      );
+    }
+    // Polars refuses to select one column twice.
+    if (names.includes(key.column)) return failed(frame, `"${key.column}" is selected twice.`);
+    names.push(key.column);
+  }
+  if (names.length === 0) return failed(frame, 'Pick the fields to keep.');
   const kept: Column[] = [];
-  for (const name of step.columns) {
+  for (const name of names) {
     const column = findColumn(frame, name);
     if (column === null) return failed(frame, `There is no column "${name}".`);
     kept.push(column);
@@ -515,6 +527,7 @@ const COVERED: Readonly<Record<Verb, readonly string[]>> = {
   filter: ['predicates'],
   // The fields to order by are one list, so a second one for more fields is not offered.
   sort: ['by', 'more_by'],
+  // The fields to keep are one list, so another expression is not offered by name.
   select: ['exprs'],
   rename: ['mapping'],
   // The keys of the two tables are one list each, so `on` for a shared key is not offered.
@@ -603,7 +616,7 @@ function runStep(catalogue: Catalogue, frame: Frame, step: Step): StepResult {
     case 'filter':
       return filter(catalogue, frame, step);
     case 'select':
-      return select(frame, step);
+      return select(catalogue, frame, step);
     case 'rename':
       return rename(frame, step);
     case 'join':
@@ -649,7 +662,11 @@ export function defaultStep(verb: Verb, frame: Frame): Step {
       // The first key is still to be picked.
       return { id, verb, options: { by: { kind: 'list', items: [UNSET] } } };
     case 'select':
-      return { id, verb, columns: frame.map((column) => column.name), options };
+      return {
+        id,
+        verb,
+        options: { exprs: fieldKeys(frame.map((column) => column.name)) },
+      };
     case 'rename':
       return { id, verb, options: { mapping: { kind: 'pairs', entries: [] } } };
     case 'filter':
@@ -803,7 +820,7 @@ export function stepText(catalogue: Catalogue, step: Step): string {
       )})`;
     case 'select':
       return `.select(${callText(
-        step.columns.map((name) => quoted(name)),
+        keysOf(step.options, 'exprs').map((key) => keyText(catalogue, key)),
         settings,
       )})`;
     case 'rename': {

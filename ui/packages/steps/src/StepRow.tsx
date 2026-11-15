@@ -29,7 +29,6 @@ import { useCatalogue } from './CatalogueProvider';
 import { FreshContext } from './Lists';
 import {
   ColumnDrawing,
-  ColumnsDrawing,
   OptionRows,
   ParameterDrawing,
   TableDrawing,
@@ -197,16 +196,7 @@ function SortHead({ step, frame, onChange }: HeadProps<SortStep>): React.JSX.Ele
 
 function SelectHead({ step, frame, onChange }: HeadProps<SelectStep>): React.JSX.Element {
   return (
-    <ColumnsDrawing
-      frame={frame}
-      names={step.columns}
-      empty="no fields"
-      describedAs="The fields that are kept"
-      openId={step.id}
-      onChange={(columns) => {
-        onChange({ ...step, columns });
-      }}
-    />
+    <StepParameter step={step} name="exprs" frame={frame} keyPrefix={step.id} onChange={onChange} />
   );
 }
 

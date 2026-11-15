@@ -60,7 +60,7 @@ export function stepDetail(step: Step): string {
     case 'sort':
       return `by ${fieldList(keysOf(step.options, 'by').map((key) => valueSummary(key)))}`;
     case 'select':
-      return fieldList(step.columns);
+      return fieldList(keysOf(step.options, 'exprs').map((key) => valueSummary(key)));
     case 'rename': {
       const names = pairsOf(step.options, 'mapping').map(({ key, value }) => ({
         from: textOf(key) ?? 'field',
