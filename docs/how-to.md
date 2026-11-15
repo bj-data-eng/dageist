@@ -221,18 +221,27 @@ Otherwise it prints each difference and fails:
 - a Polars crate only one of the builds compiles;
 - a package a Polars crate uses at another version or from another source
   than the release, as when a crate patch in the root
-  [Cargo.toml](../Cargo.toml) differs from Polars' own.
+  [Cargo.toml](../Cargo.toml) differs from Polars' own;
+- a package Polars' crates use, compiled with features the release does not
+  turn on, or without features it does. One program shares one copy of each
+  package, so features another part of the program turns on reach Polars too.
 
 A few differences are expected, and the generator lists them in its source
-with the reason for each. These are the Python binding's own features and
-crates, which connect Polars to Python, and `objc2-exception-helper`, which a
-feature Tauri turns on in `objc2` adds. A listed exception that no longer
-applies is reported too, so the list stays current.
+with the reason for each:
+
+- the Python binding's own features and crates, which connect Polars to
+  Python;
+- `objc2-exception-helper`, which a feature Tauri turns on in `objc2` adds;
+- features Tauri turns on in packages Polars also uses, such as `serde_json`'s
+  `raw_value`;
+- `std` in `ndarray` and the numeric crates it builds on, which `numpy`, used
+  by the Python binding, turns on in the release.
+
+A listed exception that no longer applies is reported too, so the list stays
+current.
 
 The check reads both builds for the platform it runs on, so a difference that
-only another platform's build has is not covered. It compares the features of
-Polars' own crates; the other packages they use are compared by version and
-source.
+only another platform's build has is not covered.
 
 ## Move Polars To A New Release
 
