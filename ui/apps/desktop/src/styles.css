@@ -49,8 +49,38 @@
   --color-verb-rename: #f08fb0;
   --color-verb-join: #cbbcff;
   --color-verb-pivot: #7fc4e8;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+/*
+ * The application's two typefaces. Inter is the face of everything that is
+ * not code or data: one file that holds every weight. JetBrains Mono is the
+ * face every piece of code and data is set in. Their files are served from
+ * `public/fonts/`, each with the licence it comes under.
+ */
+@font-face {
+  font-style: normal;
+  font-weight: 100 900;
+  src: url('/fonts/inter/InterVariable.woff2') format('woff2');
+  font-family: 'Inter';
+  font-display: swap;
+}
+
+@font-face {
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/jetbrains-mono/JetBrainsMono-Regular.woff2') format('woff2');
+  font-family: 'JetBrains Mono';
+  font-display: swap;
+}
+
+@font-face {
+  font-style: normal;
+  font-weight: 600;
+  src: url('/fonts/jetbrains-mono/JetBrainsMono-SemiBold.woff2') format('woff2');
+  font-family: 'JetBrains Mono';
+  font-display: swap;
 }
 
 /* The dotted canvas the application's panels sit on. */
