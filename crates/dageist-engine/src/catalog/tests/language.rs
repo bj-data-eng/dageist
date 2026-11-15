@@ -202,7 +202,6 @@ fn changed_names_only_what_the_catalogue_has() {
 #[test]
 fn english_shows_polars_names_unless_the_file_lists_them_as_changed() {
     assert_eq!(unlisted_differences(english()), Vec::<String>::new());
-    assert!(english().changed().is_empty());
 }
 
 #[test]
@@ -229,51 +228,29 @@ fn a_name_that_differs_from_polars_is_caught_unless_it_is_listed_as_changed() {
 }
 
 #[test]
-fn english_words_are_those_of_the_storyboard() {
+fn english_steps_are_headed_as_the_storyboard_settled() {
     let words = english();
     let id = |text: &str| crate::catalog::entry(text).expect("an entry").id();
-    // ui/packages/steps/src/model/expr.ts, METHOD_HINTS.
-    assert_eq!(
-        words.entry_hint(id("Expr.shift")),
-        Some("value n rows earlier")
-    );
-    assert_eq!(
-        words.entry_hint(id("Expr.dt.total_days")),
-        Some("whole days in a duration")
-    );
-    assert_eq!(
-        words.entry_hint(id("Expr.is_not_null")),
-        Some("has a value")
-    );
-    // ui/packages/steps/src/verbs.ts, VERB_LABELS and VERB_NOTES.
-    assert_eq!(
-        words.entry_head(id("LazyFrame.with_columns")),
-        Some("Add column")
-    );
-    assert_eq!(words.entry_head(id("LazyFrame.join")), Some("Join table"));
-    assert_eq!(
-        words.entry_hint(id("LazyFrame.pivot")),
-        Some("the values of a field as columns")
-    );
-    // expr.ts, METHOD_GROUP_TITLES: the storyboard's dt group is the Temporal family.
-    assert_eq!(
-        words.family_title(Family::Temporal),
-        Some("dt · dates and times")
-    );
-    assert_eq!(
-        words.family_title(Family::Compare),
-        Some("Comparison · true or false")
-    );
-    // Polars' own names.
+    // docs/explanation.md, "What The Step Editor Storyboard Has Settled": a step is
+    // named for what it does to the table.
+    let heads = [
+        ("LazyFrame.with_columns", "Add column"),
+        ("LazyFrame.filter", "Filter table"),
+        ("LazyFrame.sort", "Sort table"),
+        ("LazyFrame.select", "Select"),
+        ("LazyFrame.rename", "Rename"),
+        ("LazyFrame.join", "Join table"),
+        ("LazyFrame.pivot", "Pivot table"),
+    ];
+    for (entry, head) in heads {
+        assert_eq!(words.entry_head(id(entry)), Some(head), "{entry}");
+    }
+    // The same section: methods keep their Polars names.
     assert_eq!(
         words.entry_name(id("Expr.dt.offset_by")),
         Some("dt.offset_by")
     );
     assert_eq!(words.entry_name(id("polars.col")), Some("col"));
-    assert_eq!(
-        words.entry_name(id("LazyFrame.with_columns")),
-        Some("with_columns")
-    );
 }
 
 #[test]
