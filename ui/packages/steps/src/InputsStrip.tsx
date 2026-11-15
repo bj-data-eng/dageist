@@ -4,7 +4,7 @@
  * no variables.
  */
 
-import { Hint } from '@dageist/design';
+import { Peek } from '@dageist/design';
 
 import { formatCell } from './format';
 import type { Input } from './model/inputs';
@@ -24,7 +24,7 @@ function detail(input: Input): string {
   }
 }
 
-/** Returns the lines of an input's hover note: where it comes from and what it holds. */
+/** Returns the lines that describe an input: where it comes from and what it holds. */
 export function inputLines(input: Input): string[] {
   const from = `from ${input.from}`;
   switch (input.kind) {
@@ -53,19 +53,17 @@ export function InputsStrip(): React.JSX.Element {
     <div className="dg-ground mb-3 flex flex-wrap items-center gap-1.5 text-xs">
       <span className="pr-1 font-semibold tracking-wide text-muted">Inputs</span>
       {INPUTS.map((input) => (
-        <Hint key={input.name} lines={inputLines(input)} code={false}>
-          <span className="inline-flex items-center gap-px">
-            <span
-              data-tone={input.kind === 'table' ? 'table' : 'input'}
-              className="dg-block dg-fixed"
-            >
-              {input.name}
-            </span>
-            <span data-tone="ink" className="dg-block dg-fixed text-[11px] opacity-70">
-              {detail(input)}
-            </span>
-          </span>
-        </Hint>
+        <Peek
+          key={input.name}
+          describedAs={`Input ${input.name}: show what it holds`}
+          lines={inputLines(input)}
+          code={false}
+        >
+          <span data-tone={input.kind === 'table' ? 'table' : 'input'} className="text-(--tone)">
+            {input.name}
+          </span>{' '}
+          <span className="text-[11px] text-muted">{detail(input)}</span>
+        </Peek>
       ))}
     </div>
   );
