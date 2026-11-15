@@ -101,7 +101,7 @@ behavior yet. The decisions below are the ones the core is expected to carry.
   after it, so the table can be followed step by step, and a step is dragged
   to another place in the list. The steps themselves are edited in a window
   of their own, opened by a button or a double click on a step, which shows
-  every step as its blocks beside the same list. The step chosen in either
+  every step written out beside the same list. The step chosen in either
   window is the one whose rows the table shows, and a change in one window
   shows in the other at once.
 - **Words.** A step is named for what it does to the table: Add column,
@@ -110,35 +110,50 @@ behavior yet. The decisions below are the ones the core is expected to carry.
   plainer word would only rename them. A type is always shown by its exact
   dtype name, such as `Int64`, because dtypes decide which tables and values
   can meet.
-- **Blocks.** Everything that can be pressed is a block in the colour of what
-  it names: a field, a method, a value, a comparison, a connected input. A
-  click on a block opens a searched list of what it can hold, in groups from
-  the shortest to the longest, and a choice that does not fit says why. A
-  step's head and a method stand in square brackets. Pointing at one parts
-  its brackets: a cross removes it and a plus adds one after it. A click is
-  for what is inside; pointing is for the step or method itself.
+- **Text, not boxes.** A step is written as a line of code in a monospaced
+  face. A word that can be changed is drawn as nothing but its letters, in
+  the colour of what it names: a field, a method, a value, a comparison, a
+  connected input. There are no fills, brackets, rails or animations. An
+  earlier version drew every word as a filled block in brackets that parted
+  when pointed at; all of it together was tiring to look at, and something
+  moved wherever the pointer went. Now the only thing that answers to
+  pointing is a faint flat fill on a word that can be pressed.
+- **One click, one list.** A click marks a word and opens a searched list of
+  what it can be changed to, in groups from the shortest to the longest, and
+  a choice that does not fit says why. The top of the list says what is known
+  about the word: a field's dtype and the step it comes from, what a method
+  does and the dtypes it turns into each other, a step's Polars text. The
+  foot of the list holds what can be done to the thing the word names: adding
+  after it and taking it away. A step's name names the step, a method's name
+  the method, a comparison's sign its line, and the word a chain starts from
+  the chain.
 - **Chains.** A column's expression is a chain: what it starts from, then
-  methods, each behind a caret. A chain too long for its row breaks before a
-  caret. A method is moved by dragging its name. A function such as `when`
-  is not called on a value, so it can only stand where a chain starts.
-- **Lists under a step.** A step's head is one row. Whatever it takes that is
-  more than one thing is a numbered list beneath it, and a list inside a
-  list is numbered from its line, as 9.1.2 is under 9.1. The cases of a
-  `when` are lines of a condition, then a value, with `otherwise` last. A
-  chain used as a value is three dots where it stands, with its own line in
-  the list. Several fields in one step, as in Sort table or Select, stay on
-  the row and fold to the room there is, with a count of the rest.
-- **Conditions.** A comparison is a field, a comparison and a value. A row
-  holds one comparison. More than one is a list headed `all of` or `any of`,
-  and a group is a list inside the list. Nothing depends on whether `and` or
-  `or` binds tighter, because the two are never mixed in one list.
-- **Adding.** A faint word waits where the next thing goes: `step` after the
-  last step, `method` at the end of a chain, `when` after the last case, and
-  `and` or `or` at the end of a condition's list. What is added starts from
-  stand-ins that say what is still to be picked.
+  methods, each behind a caret. A chain too long for its row carries on set
+  in, breaking before a caret. A method is moved by dragging its name. A
+  function such as `when` is not called on a value, so it can only stand
+  where a chain starts.
+- **Lines under a step.** Whatever a step takes that is more than one thing
+  is set out on lines beneath it, each set in under what it belongs to, as
+  code is. A `when` is its condition, then `then` and `otherwise` with the
+  values they give, then the rest of the chain. A `when` holds one condition;
+  a further case is a `when` after `otherwise`. Several fields in one step,
+  as in Sort table or Select, stay on the row and fold to the room there is,
+  with a count of the rest.
+- **Conditions.** A comparison is a field, a comparison and a value. A
+  condition is always a list of lines under `all of` or `any of`, even when
+  it has one line, and a group is a list set in again. Nothing depends on
+  whether `and` or `or` binds tighter, because the two are never mixed in one
+  list. A line can also be a chain of its own that ends in a comparison
+  method, such as `gt`. A condition can be taken away whole, which leaves an
+  empty place that offers how to start one again.
+- **Missing things are marked at once.** What is still to be picked is
+  written in the colour of a mistake as soon as it exists, and the step says
+  what it lacks.
 - **Values.** A value is typed into the search box of its list, where it is
-  offered as a number or as text. Text is shown between quotation marks that
-  are drawn, not typed.
+  offered as a number or as text, or picked from the connected inputs and the
+  fields. Text is shown between quotation marks that are drawn, not typed.
+  The list never offers the values a field holds, since a column can hold
+  millions of them.
 - **Inputs, not variables.** A node declares no variables. What its steps can
   use arrives from the nodes connected to it: tables, single values and
   lists, each with a name, its dtypes and the node it comes from. Logic is
@@ -160,8 +175,7 @@ execution, previews from the core and canvas interactions are not implemented
 yet.
 
 A third tab shows the Pieces page. It is a design prototype, not a feature:
-a static page in plain HTML, CSS and JavaScript where the blocks the step
-editor is written with are tried out in several versions before one is
-built. It works on made-up samples of its own, shares no code with the view's
+a static page in plain HTML, CSS and JavaScript where the way the step
+editor is drawn is tried out in several versions before one is built. It works on made-up samples of its own, shares no code with the view's
 packages and calls no host command. The tab that is open is kept in the
 page's address, so reloading the page returns to it.
