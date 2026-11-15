@@ -13,6 +13,7 @@ import type { Look, Offer, OfferGroup, Tone } from '@dageist/design';
 import { Hint, OfferList, Piece, Popover, Slot } from '@dageist/design';
 
 import { ChainBlocks } from './Chain';
+import { COMPARISON_SIGNS } from './comparisons';
 import { inputLines } from './InputsStrip';
 import { FreshContext, Line, Lines } from './Lists';
 import { anyField, counted, fieldOffers, matches, offer, titled } from './offers';
@@ -35,21 +36,6 @@ const COMPARISON_WORDS: Readonly<Record<Comparison, string>> = {
   '<': 'less than',
   '<=': 'at most',
   is_in: 'one of a list',
-};
-
-/**
- * How each comparison is written in a step. Two-character comparisons that
- * have a sign of their own are written as that sign, so they stay one
- * character wide and read as they do on paper.
- */
-const COMPARISON_SIGNS: Readonly<Record<Comparison, string>> = {
-  '==': '==',
-  '!=': '≠',
-  '>': '>',
-  '>=': '≥',
-  '<': '<',
-  '<=': '≤',
-  is_in: 'is_in',
 };
 
 /** Returns how a typed value is shown as a block. */
@@ -330,7 +316,12 @@ function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Eleme
           titled(
             'Comparison',
             COMPARISONS.filter((comparison) =>
-              matches(typed, comparison, COMPARISON_WORDS[comparison]),
+              matches(
+                typed,
+                comparison,
+                COMPARISON_SIGNS[comparison],
+                COMPARISON_WORDS[comparison],
+              ),
             ).map((comparison) =>
               offer(
                 COMPARISON_SIGNS[comparison],

@@ -143,9 +143,9 @@ behavior yet. The decisions below are the ones the core is expected to carry.
   with a count of the rest.
 - **Signs as they are typed.** The code face is set without ligatures, so
   two signs side by side are never drawn as one: `==` is two equals signs.
-  In a step, a comparison that has a sign of its own is written as it: `≠`,
-  `≥` and `≤`, each one character wide. The Polars text of a step keeps
-  `!=`, `>=` and `<=`.
+  In a step and in the list of steps, a comparison that has a sign of its
+  own is written as it: `≠`, `≥` and `≤`, each one character wide. The
+  Polars text of a step keeps `!=`, `>=` and `<=`.
 - **Conditions.** A comparison is a field, a comparison and a value. A
   condition is always a list of lines under `all of` or `any of`, even when
   it has one line, and a group is a list set in again. Nothing depends on
