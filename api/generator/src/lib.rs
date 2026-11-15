@@ -1666,6 +1666,117 @@ mod tests {
         );
     }
 
+    /// Compares two trees under `upstream`.
+    fn compared_trees(ours: &str, release: &str, upstream: &Upstream<'_>) -> Vec<String> {
+        compare(
+            &parse_graph(ours).unwrap(),
+            &parse_graph(release).unwrap(),
+            upstream,
+            Path::new(UP),
+        )
+    }
+
+    /// A release whose up-core uses one copy of `zlib`, compiled with `alloc` and `std`.
+    const RELEASE_WITH_ZLIB: &str = concat!(
+        "0up-runtime v1.0.0 (/work/vendor/up/runtime)|default\n",
+        "1up-core v1.0.0 (/work/vendor/up/core)|a\n",
+        "2zlib v1.0.0|alloc,std\n",
+    );
+
+    #[test]
+    fn a_package_compiled_twice_is_compared_by_the_features_of_both_copies() {
+        // Here zlib is compiled once for the program and once for build-time code, with the
+        // release's features split between the copies.
+        let ours = concat!(
+            "0app-host v0.1.0 (/work/crates/app-host)|\n",
+            "1up-core v1.0.0 (/work/vendor/up/core)|a\n",
+            "2zlib v1.0.0|alloc\n",
+            "2build-tool v1.0.0|\n",
+            "3zlib v1.0.0|std\n",
+        );
+        let upstream = Upstream {
+            left_out_features: &[],
+            left_out_crates: &[],
+            extra_packages: &[Listed {
+                name: "build-tool",
+                reason: "test",
+            }],
+            ..UPSTREAM
+        };
+
+        assert_eq!(
+            compared_trees(ours, RELEASE_WITH_ZLIB, &upstream),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn an_expected_release_side_difference_passes_and_a_stale_one_is_named() {
+        let ours = concat!(
+            "0app-host v0.1.0 (/work/crates/app-host)|\n",
+            "1up-core v1.0.0 (/work/vendor/up/core)|a\n",
+            "2zlib v1.0.0|alloc\n",
+        );
+        let upstream = Upstream {
+            left_out_features: &[],
+            left_out_crates: &[],
+            extra_packages: &[],
+            expected_features: &[ExpectedFeatures {
+                package: "zlib",
+                only_here: &[],
+                only_in_release: &["std"],
+                reason: "test",
+            }],
+            ..UPSTREAM
+        };
+        assert_eq!(
+            compared_trees(ours, RELEASE_WITH_ZLIB, &upstream),
+            Vec::<String>::new()
+        );
+
+        let same = RELEASE_WITH_ZLIB.replace("|alloc,std\n", "|alloc\n");
+        assert_eq!(
+            compared_trees(ours, &same, &upstream),
+            [
+                "the expected feature std of zlib in the release no longer differs; remove it from the list"
+            ],
+        );
+    }
+
+    #[test]
+    fn an_expected_difference_on_one_version_of_a_package_is_not_called_stale() {
+        // zlib is used at two versions; only 1.0.0 differs, and it sorts first.
+        let release = concat!(
+            "0up-runtime v1.0.0 (/work/vendor/up/runtime)|default\n",
+            "1up-core v1.0.0 (/work/vendor/up/core)|a\n",
+            "2zlib v1.0.0|std\n",
+            "2zlib v2.0.0|std\n",
+        );
+        let ours = concat!(
+            "0app-host v0.1.0 (/work/crates/app-host)|\n",
+            "1up-core v1.0.0 (/work/vendor/up/core)|a\n",
+            "2zlib v1.0.0|std,extra\n",
+            "2zlib v2.0.0|std\n",
+        );
+        let upstream = Upstream {
+            left_out_features: &[],
+            left_out_crates: &[],
+            extra_packages: &[],
+            expected_features: &[ExpectedFeatures {
+                package: "zlib",
+                only_here: &["extra"],
+                only_in_release: &[],
+                reason: "test",
+            }],
+            ..UPSTREAM
+        };
+
+        assert_eq!(
+            compared_trees(ours, release, &upstream),
+            Vec::<String>::new()
+        );
+    }
+
     #[test]
     fn a_package_only_a_left_out_crate_uses_in_the_release_is_not_compared() {
         // In the release only the binding uses zlib; here up-core uses it with other features.
