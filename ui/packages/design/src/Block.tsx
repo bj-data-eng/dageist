@@ -80,8 +80,19 @@ export function Block({
  * A quiet word that names the parameter after it, as `by` does after Sort
  * table. It is not pressed.
  */
-export function Word({ children }: { readonly children: string }): React.JSX.Element {
-  return <i className="dg-quiet">{children}</i>;
+export function Word({
+  children,
+  title,
+}: {
+  readonly children: string;
+  /** A note on the word, shown when it is pointed at. */
+  readonly title?: string;
+}): React.JSX.Element {
+  return (
+    <i className="dg-quiet" title={title}>
+      {children}
+    </i>
+  );
 }
 
 /** The caret between one part of a chain and the next. */
