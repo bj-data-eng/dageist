@@ -16,7 +16,7 @@ mod release;
 
 pub use python::{
     Binding, Kind, PythonAudit, PythonItem, Reached, RustApi, Traced, parse_inventory,
-    read_binding_source, render_python_artifact, trace_body, trace_item,
+    read_binding_sources, render_python_artifact, trace_body, trace_item,
 };
 
 pub use release::{
@@ -2058,15 +2058,15 @@ mod tests {
             "pub fn polars_lazy::frame::LazyJsonLineReader::finish(self) -> polars_error::PolarsResult<polars_lazy::frame::LazyFrame>\n",
             "pub fn polars_lazy::frame::LazyFrame::with_row_index(self, name: &str) -> Self\n",
             "pub fn polars_lazy::frame::LazyFrame::cache(self) -> Self\n",
+            "pub fn polars_plan::dsl::functions::empty() -> polars_plan::dsl::Selector\n",
+            "pub fn polars_plan::plans::DslPlan::serialize_versioned<W>(&self, writer: W) -> polars_error::PolarsResult<()>\n",
             "pub struct polars_plan::dsl::Expr\n",
         ));
         api
     }
 
     fn binding_of(source: &str) -> Binding {
-        let mut binding = Binding::new();
-        read_binding_source(source, &small_api(), &mut binding).unwrap();
-        binding
+        read_binding_sources(&[source.to_owned()], &small_api()).unwrap()
     }
 
     fn reached(binding: &Binding, owner: &str, name: &str) -> Vec<String> {
@@ -2206,6 +2206,57 @@ mod tests {
         assert_eq!(
             reached(&binding, "PyChainedWhen", "then"),
             ["ChainedWhen::then"]
+        );
+    }
+
+    #[test]
+    fn a_sibling_method_a_typed_field_and_a_qualified_path_are_read_as_they_are() {
+        let binding = binding_of(
+            r#"
+            #[pymethods]
+            impl PyExpr {
+                fn str_upper(&self) -> Self {
+                    self.uppercase()
+                }
+                fn uppercase(&self) -> Self {
+                    self.inner.clone().str().to_uppercase().into()
+                }
+            }
+            #[pymethods]
+            impl PyLazyFrame {
+                fn serialize(&self, writer: Writer) {
+                    self.ldf.read().logical_plan.serialize_versioned(writer);
+                }
+                fn collect(&self) -> PyDataFrame {
+                    let frame = DataFrame::empty();
+                    frame.into()
+                }
+            }
+            #[pyfunction]
+            fn dtype_of(e: PyExpr) -> PyDataTypeExpr {
+                DataTypeExpr::OfExpr(Box::new(e.inner)).into()
+            }
+            "#,
+        );
+
+        assert_eq!(
+            reached(&binding, "PyExpr", "str_upper"),
+            ["Expr::str", "StringNameSpace::to_uppercase"],
+            "a helper method of the same binding type is followed"
+        );
+        assert_eq!(
+            reached(&binding, "PyLazyFrame", "serialize"),
+            ["DslPlan::serialize_versioned"],
+            "a lazy frame's logical plan is a DslPlan"
+        );
+        assert!(
+            reached(&binding, "PyLazyFrame", "collect").is_empty(),
+            "DataFrame::empty is not the free function empty"
+        );
+        let dtype_of = &binding[&("module".to_owned(), "dtype_of".to_owned())];
+        assert!(
+            dtype_of.internals,
+            "naming a variant of a Polars expression enum builds internals"
         );
     }
 
@@ -2423,7 +2474,11 @@ mod tests {
             "expr/expr.py",
             concat!(
                 "from polars._plr import arg_where as py_arg_where\n",
+                "from polars._utils.parse.expr import parse_into_expression\n",
                 "class Expr:\n",
+                "    def __rand__(self, other):\n        other_expr = parse_into_expression(other)\n        return wrap_expr(other_expr.and_(self._pyexpr))\n",
+                "    def map_batches(self, function):\n        return wrap_expr(self._pyexpr.map_batches(function))\n",
+                "    def map_elements(self, function, strategy='thread_local'):\n        if strategy == 'threading':\n            return wrap_expr(plr.collect_all(function))\n        return self.map_batches(function)\n",
                 "    def abs(self):\n        return wrap_expr(self._pyexpr.abs())\n",
                 "    def head(self, n=10):\n        return self.slice(0, n)\n",
                 "    def slice(self, offset, length=None, /):\n        return wrap_expr(self._pyexpr.slice(offset, length))\n",
@@ -2440,10 +2495,20 @@ mod tests {
             ),
         );
         fixture.file(
+            "_utils/parse/expr.py",
+            "def parse_into_expression(value) -> PyExpr:\n    return value\n",
+        );
+        fixture.file(
+            "lazyframe/resolver.py",
+            "import polars._reexport as pl\nclass Resolver:\n    def lazy(self):\n        return pl.LazyFrame.from_resolver(self)\n",
+        );
+        fixture.file(
             "lazyframe/frame.py",
             concat!(
                 "from polars.lazyframe.engine_config import _select_engine\n",
                 "class LazyFrame:\n",
+                "    @classmethod\n    def from_resolver(cls, resolver):\n        return wrap_ldf(PyLazyFrame.from_lazyframe_resolver(resolver))\n",
+                "    def execute(self, *, engine='auto'):\n        return _select_engine(engine).execute(self)\n",
                 "    def filter(self, *predicates):\n        return self._filter(predicates)\n",
                 "    def _filter(self, predicates):\n        return self._from_pyldf(self._ldf.filter(predicates))\n",
                 "    def explain(self):\n        ldf = self._ldf.with_optimizations(1)\n        return ldf.describe_plan()\n",
@@ -2457,6 +2522,7 @@ mod tests {
                 "class _LocalEngine(Engine):\n",
                 "    @overload\n    def collect(self, lf): ...\n",
                 "    def collect(self, lf):\n        ldf = lf._ldf.with_optimizations(0)\n        return wrap_df(ldf.collect())\n",
+                "    def execute(self, lf):\n        return self.collect(lf)\n",
                 "class Unrelated:\n    def collect(self, lf):\n        return lf._ldf.unrelated()\n",
             ),
         );
@@ -2471,7 +2537,7 @@ mod tests {
             "functions/__init__.py",
             concat!(
                 "from polars.functions.col import col\n",
-                "from polars.functions.lazy import coalesce, count, dtype_of, arrow_reader\n",
+                "from polars.functions.lazy import coalesce, count, dtype_of, arrow_reader, scan_thing\n",
                 "from polars.functions.lazy import _private\n",
             ),
         );
@@ -2492,6 +2558,7 @@ mod tests {
                 "def count(*columns):\n    return F.col(*columns).count()\n",
                 "def dtype_of(expr):\n    from polars._plr import PyDataTypeExpr\n    return PyDataTypeExpr.of_expr(expr._pyexpr)\n",
                 "def arrow_reader(source):\n    return wrap_ldf(plr.PyArrowCStreamReader(source).read())\n",
+                "def scan_thing():\n    from polars.lazyframe.resolver import Resolver\n    return Resolver().lazy()\n",
                 "def _private():\n    pass\n",
             ),
         );
@@ -2542,11 +2609,35 @@ mod tests {
         );
         assert_eq!(
             find("Expr", "arg_true").binding,
-            calls(&[("PyExpr", "_pyexpr"), ("module", "arg_where")])
-                .into_iter()
-                .filter(|(kind, _)| kind == "module")
-                .collect::<Vec<_>>(),
+            calls(&[("module", "arg_where")]),
             "a binding function imported under another name is a binding call"
+        );
+        assert_eq!(
+            find("Expr", "__rand__").binding,
+            calls(&[("PyExpr", "and_")]),
+            "a local made by a function annotated to return a binding object holds one"
+        );
+        assert_eq!(
+            find("Expr", "map_elements").binding,
+            calls(&[("module", "collect_all")])
+        );
+        assert_eq!(
+            find("Expr", "map_elements").uses,
+            ["map_batches"],
+            "a public method of the item's own class is listed as used, not followed"
+        );
+        assert_eq!(
+            find("LazyFrame", "execute").binding,
+            calls(&[
+                ("PyLazyFrame", "collect"),
+                ("PyLazyFrame", "with_optimizations")
+            ]),
+            "in a class reached by delegation, its own public methods are followed"
+        );
+        assert_eq!(
+            find("polars", "scan_thing").binding,
+            calls(&[("PyLazyFrame", "from_lazyframe_resolver")]),
+            "a method of a class made there, and a class method through pl, are followed"
         );
         assert_eq!(find("Expr", "__add__").kind, "operator");
         assert_eq!(

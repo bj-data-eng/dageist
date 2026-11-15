@@ -216,6 +216,20 @@ def binding_root(node):
             return None
 
 
+def annotation_name(annotation):
+    """Returns the name an annotation gives, reading a string annotation too."""
+    if isinstance(annotation, ast.Constant) and isinstance(annotation.value, str):
+        try:
+            annotation = ast.parse(annotation.value, mode="eval").body
+        except SyntaxError:
+            return None
+    if isinstance(annotation, ast.Name):
+        return annotation.id
+    if isinstance(annotation, ast.Attribute):
+        return annotation.attr
+    return None
+
+
 # Python's operators, and the method of the binding object each calls.
 BINARY = {
     ast.Add: "add", ast.Sub: "sub", ast.Mult: "mul", ast.Div: "truediv",
@@ -225,6 +239,26 @@ BINARY = {
 UNARY = {ast.USub: "__neg__", ast.UAdd: "__pos__", ast.Invert: "__invert__"}
 
 
+def held_bindings(package, module, node):
+    """Returns the local names `node` assigns a binding object to, with its binding type:
+    from a binding object, or from a function annotated to return one, such as
+    `other = parse_into_expression(other)`."""
+    held = {}
+    for child in ast.walk(node):
+        if not (isinstance(child, ast.Assign) and len(child.targets) == 1 and isinstance(child.targets[0], ast.Name)):
+            continue
+        kind = binding_root(child.value)
+        if kind is None and isinstance(child.value, ast.Call) and isinstance(child.value.func, ast.Name):
+            found = package.resolve(module, child.value.func.id)
+            if found and isinstance(found[1], ast.FunctionDef):
+                returned = annotation_name(found[1].returns)
+                if returned in BINDING_ATTRIBUTES.values():
+                    kind = returned
+        if kind is not None:
+            held[child.targets[0].id] = kind
+    return held
+
+
 def binding_type_of(node, held):
     """Returns the binding type `node` evaluates to: a binding object, or a local holding one."""
     if isinstance(node, ast.Name):
@@ -232,14 +266,9 @@ def binding_type_of(node, held):
     return binding_root(node)
 
 
-def binding_calls(node, module):
+def binding_calls(package, module, node):
     """Returns the binding calls in `node`, as (binding type or "module", name) pairs."""
-    held = {}
-    for child in ast.walk(node):
-        if isinstance(child, ast.Assign) and len(child.targets) == 1 and isinstance(child.targets[0], ast.Name):
-            kind = binding_root(child.value)
-            if kind is not None:
-                held[child.targets[0].id] = kind
+    held = held_bindings(package, module, node)
     calls = set()
     for child in ast.walk(node):
         if isinstance(child, ast.Attribute):
@@ -287,20 +316,29 @@ def binding_calls(node, module):
     return calls
 
 
-def polars_calls_used(node, own):
-    """Returns the Polars calls `node` is built from: functions called through `F` or `pl`,
-    methods called on their results, and the public methods in `own` it calls on `self`."""
+def polars_calls_used(package, module, node, own):
+    """Returns the Polars calls `node` is built from: functions called through `F` or `pl`
+    or imported from the package, methods called on their results, and the public methods
+    in `own` it calls on `self`."""
     used = set()
     for child in ast.walk(node):
-        if isinstance(child, ast.Call) and isinstance(child.func, ast.Attribute):
-            holder = child.func.value
+        if not isinstance(child, ast.Call):
+            continue
+        func = child.func
+        if isinstance(func, ast.Attribute):
+            holder = func.value
             if isinstance(holder, ast.Name) and holder.id in POLARS_MODULES:
-                used.add(child.func.attr)
+                used.add(func.attr)
             elif isinstance(holder, ast.Call):
-                used.add(child.func.attr)
-            elif isinstance(holder, ast.Name) and holder.id == "self" and child.func.attr in own:
-                used.add(child.func.attr)
-    return used
+                used.add(func.attr)
+            elif isinstance(holder, ast.Name) and holder.id == "self" and func.attr in own:
+                used.add(func.attr)
+        elif isinstance(func, ast.Name) and not func.id.startswith("_") and func.id in module.imports:
+            target, original = module.imports[func.id]
+            found = package.resolve(module, func.id)
+            if found and isinstance(found[1], ast.FunctionDef) and target.startswith("polars.functions"):
+                used.add(original)
+    return {name for name in used if not name.startswith("_")}
 
 
 def subclasses(module, cls):
@@ -319,43 +357,97 @@ def subclasses(module, cls):
     return found
 
 
-def methods_named(classes, name):
-    for cls in classes:
-        for item in cls.body:
-            if isinstance(item, ast.FunctionDef) and item.name == name and not is_overload(item):
-                yield item, cls
+def method_of(package, module, cls, name, seen=None):
+    """Returns the module, method and class that define `name` for `cls`, looking in its
+    bases too, or None."""
+    seen = seen or set()
+    if (module.name, cls.name) in seen:
+        return None
+    seen.add((module.name, cls.name))
+    for item in cls.body:
+        if isinstance(item, ast.FunctionDef) and item.name == name and not is_overload(item):
+            return module, item, cls
+    for base in cls.bases:
+        base_name = annotation_name(base)
+        if base_name is None:
+            continue
+        found = package.resolve(module, base_name)
+        if found and isinstance(found[1], ast.ClassDef):
+            located = method_of(package, found[0], found[1], name, seen)
+            if located:
+                return located
+    return None
+
+
+def known_class(package, module, node):
+    """Returns the module and class an expression names: a name that resolves to a class,
+    or `pl.LazyFrame` and the like for the classes this reader lists."""
+    if isinstance(node, ast.Name):
+        found = package.resolve(module, node.id)
+        if found and isinstance(found[1], ast.ClassDef):
+            return found
+    if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.value.id in POLARS_MODULES:
+        for _, relative, class_name in CLASSES:
+            if class_name == node.attr:
+                home = package.module("polars." + relative.removesuffix(".py").replace("/", "."))
+                return home, home.classes[class_name]
+    return None
 
 
 def returned_classes(package, module, helper):
     """Returns the module and classes a helper's return annotation names, with their
     subclasses there; otherwise every class of the helper's own module."""
-    annotation = helper.returns
-    if isinstance(annotation, ast.Constant) and isinstance(annotation.value, str):
-        annotation = ast.parse(annotation.value, mode="eval").body
-    if isinstance(annotation, ast.Name):
-        found = package.resolve(module, annotation.id)
+    name = annotation_name(helper.returns)
+    if name is not None:
+        found = package.resolve(module, name)
         if found and isinstance(found[1], ast.ClassDef):
             return found[0], subclasses(found[0], found[1])
     return module, list(module.classes.values())
 
 
+def receiver_targets(package, module, receiver, method):
+    """Returns what calling `method` on `receiver` runs, when `receiver` is something the
+    reader can follow: what a private helper returns, an instance of a known class made
+    there, or a known class itself."""
+    targets = []
+    if isinstance(receiver, ast.Call) and isinstance(receiver.func, ast.Name):
+        name = receiver.func.id
+        found = package.resolve(module, name)
+        if found and isinstance(found[1], ast.FunctionDef) and name.startswith("_"):
+            targets.append((found[0], found[1], None))
+            home, classes = returned_classes(package, found[0], found[1])
+            for cls in classes:
+                located = method_of(package, home, cls, method)
+                if located:
+                    targets.append(located)
+        elif found and isinstance(found[1], ast.ClassDef):
+            located = method_of(package, found[0], found[1], method)
+            if located:
+                targets.append(located)
+    else:
+        found = known_class(package, module, receiver)
+        if found:
+            located = method_of(package, found[0], found[1], method)
+            if located:
+                targets.append(located)
+    return targets
+
+
 def follow(package, module, node, own_class=None):
-    """Returns the binding calls of `node` and of the private code it reaches, transitively:
-    private functions of its module or imported from another, the private methods of its
-    class called on `self`, and the methods called on what such a function returns."""
-    calls, seen, waiting = set(), set(), [(module, node, own_class)]
+    """Returns the binding calls of `node` and of the code it delegates to, transitively:
+    private functions of its module or imported from another; the private methods of its
+    class called on `self`; methods called on what a private helper returns, on an instance
+    made of a class, or on a class; and, in a class reached that way, the public methods it
+    calls on `self` too. Public methods of the item's own class are not followed: the item
+    is then built from them in Python."""
+    calls = set()
+    seen = set()
+    waiting = [(module, node, own_class, False)]
     while waiting:
-        current_module, current, cls = waiting.pop()
-        calls |= binding_calls(current, current_module)
-        private = {}
-        if cls is not None:
-            private = {
-                item.name: item
-                for item in cls.body
-                if isinstance(item, ast.FunctionDef) and item.name.startswith("_") and not is_overload(item)
-            }
-        # Locals that hold what a private helper returns.
-        helper_results = {}
+        current_module, current, cls, delegated = waiting.pop()
+        calls |= binding_calls(package, current_module, current)
+        # Locals holding what a private helper returns or an instance of a class.
+        receivers = {}
         for child in ast.walk(current):
             if (
                 isinstance(child, ast.Assign)
@@ -363,49 +455,34 @@ def follow(package, module, node, own_class=None):
                 and isinstance(child.targets[0], ast.Name)
                 and isinstance(child.value, ast.Call)
                 and isinstance(child.value.func, ast.Name)
-                and child.value.func.id.startswith("_")
             ):
-                helper_results[child.targets[0].id] = child.value.func.id
+                receivers[child.targets[0].id] = child.value
+        targets = []
         for child in ast.walk(current):
             if not isinstance(child, ast.Call):
                 continue
             func = child.func
-            targets = []
-            helper = None
-            if isinstance(func, ast.Attribute):
-                if (
-                    isinstance(func.value, ast.Call)
-                    and isinstance(func.value.func, ast.Name)
-                    and func.value.func.id.startswith("_")
-                ):
-                    helper = func.value.func.id
-                elif isinstance(func.value, ast.Name) and func.value.id in helper_results:
-                    helper = helper_results[func.value.id]
             if isinstance(func, ast.Name) and func.id.startswith("_"):
                 found = package.resolve(current_module, func.id)
                 if found and isinstance(found[1], ast.FunctionDef):
-                    targets.append((found[0], found[1], None))
-            elif (
-                isinstance(func, ast.Attribute)
-                and isinstance(func.value, ast.Name)
-                and func.value.id == "self"
-                and func.attr in private
-            ):
-                targets.append((current_module, private[func.attr], cls))
-            elif helper is not None:
-                # A method called on what a private helper returns: that method of the
-                # class the helper's return annotation names and of its subclasses.
-                found = package.resolve(current_module, helper)
-                if found and isinstance(found[1], ast.FunctionDef):
-                    targets.append((found[0], found[1], None))
-                    home, classes = returned_classes(package, found[0], found[1])
-                    for item, candidate in methods_named(classes, func.attr):
-                        targets.append((home, item, candidate))
-            for target in targets:
-                key = (target[0].name, id(target[1]))
-                if key not in seen:
-                    seen.add(key)
-                    waiting.append(target)
+                    targets.append((found[0], found[1], None, True))
+            elif isinstance(func, ast.Attribute):
+                receiver = func.value
+                if isinstance(receiver, ast.Name) and receiver.id == "self" and cls is not None:
+                    if func.attr.startswith("_") or delegated:
+                        located = method_of(package, current_module, cls, func.attr)
+                        if located:
+                            targets.append((*located, delegated))
+                    continue
+                if isinstance(receiver, ast.Name) and receiver.id in receivers:
+                    receiver = receivers[receiver.id]
+                for located in receiver_targets(package, current_module, receiver, func.attr):
+                    targets.append((*located, True))
+        for target in targets:
+            key = (target[0].name, id(target[1]))
+            if key not in seen:
+                seen.add(key)
+                waiting.append(target)
     return calls
 
 
@@ -436,7 +513,7 @@ def read_classes(package):
             if kind == "property" and owner == "Expr" and method.name in namespaces:
                 continue  # a namespace accessor; the namespace is listed as an owner of its own
             calls = follow(package, module, method, cls)
-            uses = set() if calls else polars_calls_used(method, public) - {method.name}
+            uses = polars_calls_used(package, module, method, public) - {method.name}
             entries.append(entry(owner, method.name, method, calls, uses, kind))
     return entries
 
@@ -488,7 +565,7 @@ def read_functions(package, name, prefix=""):
             raise SystemExit(f"{public} is exported from {name} but no function was found for it")
         module, function, cls = located
         calls = follow(package, module, function, cls)
-        uses = set() if calls else polars_calls_used(function, set())
+        uses = polars_calls_used(package, module, function, set())
         entries.append(entry("polars", public, function, calls, uses, "function"))
     return entries
 

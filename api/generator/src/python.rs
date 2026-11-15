@@ -218,11 +218,18 @@ const WRAPPED: &[(&str, &str)] = &[
     ("lgb", "LazyGroupBy"),
 ];
 
+/// Public fields of Polars types the binding reads, and the type each holds.
+const FIELDS: &[(&str, &str, &str)] = &[("LazyFrame", "logical_plan", "DslPlan")];
+
 /// Follows one binding body.
 struct Trace<'a> {
     api: &'a RustApi,
     /// The Rust type the binding object's own wrapped field holds, such as `Expr` for `PyExpr`.
     own: Option<String>,
+    /// The other methods of the same binding type, which a body may call on `self`.
+    siblings: &'a HashMap<String, &'a syn::Block>,
+    /// The sibling methods already followed, so that recursion ends.
+    followed: BTreeSet<String>,
     locals: HashMap<String, Option<String>>,
     reached: Reached,
 }
@@ -235,6 +242,15 @@ impl Trace<'_> {
                 let syn::Member::Named(name) = &field.member else {
                     return None;
                 };
+                if let Some((_, _, held)) = FIELDS.iter().find(|(owner, field_name, _)| {
+                    name == field_name && self.type_of(&field.base).as_deref() == Some(*owner)
+                }) {
+                    return self
+                        .api
+                        .methods
+                        .contains_key(*held)
+                        .then(|| (*held).to_owned());
+                }
                 let (_, other) = WRAPPED.iter().find(|(wrapped, _)| name == wrapped)?;
                 let on_self = matches!(field.base.as_ref(), syn::Expr::Path(path) if path.path.is_ident("self"))
                     || matches!(field.base.as_ref(), syn::Expr::MethodCall(call)
@@ -296,8 +312,19 @@ impl Trace<'_> {
             .map(|_| (owner, function))
     }
 
+    /// Returns the name of a free function of the Rust API that `path` calls. A path
+    /// through a type, such as `DataFrame::empty`, is that type's function, not a free one.
     fn free_function(&self, path: &syn::Path) -> Option<String> {
-        let name = path.segments.last()?.ident.to_string();
+        let segments = path.segments.iter().collect::<Vec<_>>();
+        if let [.., parent, _] = segments.as_slice()
+            && parent
+                .ident
+                .to_string()
+                .starts_with(|character: char| character.is_ascii_uppercase())
+        {
+            return None;
+        }
+        let name = segments.last()?.ident.to_string();
         self.api.functions.contains_key(&name).then_some(name)
     }
 
@@ -314,6 +341,16 @@ impl Trace<'_> {
 
 impl<'ast> Visit<'ast> for Trace<'_> {
     fn visit_expr_method_call(&mut self, call: &'ast syn::ExprMethodCall) {
+        // A call to another method of the same binding type is followed into it.
+        let method = call.method.to_string();
+        if matches!(call.receiver.as_ref(), syn::Expr::Path(path) if path.path.is_ident("self"))
+            && let Some(body) = self.siblings.get(&method).copied()
+            && self.followed.insert(method)
+        {
+            let outer = std::mem::take(&mut self.locals);
+            self.visit_block(body);
+            self.locals = outer;
+        }
         if let Some(owner) = self.type_of(&call.receiver) {
             let method = call.method.to_string();
             if self.api.method(&owner, &method).is_some() {
@@ -358,14 +395,14 @@ impl<'ast> Visit<'ast> for Trace<'_> {
             .iter()
             .map(|segment| segment.ident.to_string())
             .collect::<Vec<_>>();
+        // Using Polars' plan builder or its arena, or naming a variant of one of its
+        // expression or plan enums, such as `Expr::Function` or `DataTypeExpr::OfExpr`.
         let builds = segments.iter().enumerate().any(|(at, segment)| {
-            matches!(
-                segment.as_str(),
-                "FunctionExpr" | "DslPlan" | "DslBuilder" | "AExpr"
-            ) || (segment == "Expr"
-                && segments.get(at + 1).is_some_and(|variant| {
-                    variant.starts_with(|character: char| character.is_ascii_uppercase())
-                }))
+            matches!(segment.as_str(), "DslBuilder" | "AExpr")
+                || ((segment.ends_with("Expr") || segment == "DslPlan")
+                    && segments.get(at + 1).is_some_and(|variant| {
+                        variant.starts_with(|character: char| character.is_ascii_uppercase())
+                    }))
         });
         self.reached.internals |= builds;
         visit::visit_path(self, path);
@@ -379,11 +416,19 @@ fn wrapped_type(binding_type: &str, api: &RustApi) -> Option<String> {
     api.methods.contains_key(name).then(|| name.to_owned())
 }
 
-/// Follows a binding body and returns what it reaches.
-pub fn trace_body(body: &syn::Block, binding_type: &str, api: &RustApi) -> Reached {
+/// Follows a binding body and returns what it reaches. `siblings` are the other
+/// methods of the same binding type, followed when the body calls them on `self`.
+pub fn trace_body(
+    body: &syn::Block,
+    binding_type: &str,
+    api: &RustApi,
+    siblings: &HashMap<String, &syn::Block>,
+) -> Reached {
     let mut trace = Trace {
         api,
         own: wrapped_type(binding_type, api),
+        siblings,
+        followed: BTreeSet::new(),
         locals: HashMap::new(),
         reached: Reached::default(),
     };
@@ -441,47 +486,36 @@ fn add(binding: &mut Binding, key: (String, String), reached: Reached) {
     entry.internals |= reached.internals;
 }
 
-fn read_items(items: &[syn::Item], api: &RustApi, binding: &mut Binding) {
+/// The methods of each binding type, wherever they are defined.
+type Methods<'a> = BTreeMap<String, Vec<&'a syn::ImplItemFn>>;
+
+fn collect_items<'a>(
+    items: &'a [syn::Item],
+    methods: &mut Methods<'a>,
+    functions: &mut Vec<&'a syn::ItemFn>,
+) {
     for item in items {
         match item {
             syn::Item::Impl(block) if has_attribute(&block.attrs, "pymethods") => {
                 let syn::Type::Path(owner) = block.self_ty.as_ref() else {
                     continue;
                 };
-                let Some(owner) = owner
-                    .path
-                    .segments
-                    .last()
-                    .map(|segment| segment.ident.to_string())
-                else {
+                let Some(owner) = owner.path.segments.last() else {
                     continue;
                 };
+                let entry = methods.entry(owner.ident.to_string()).or_default();
                 for member in &block.items {
                     if let syn::ImplItem::Fn(method) = member {
-                        let reached = trace_body(&method.block, &owner, api);
-                        if has_attribute(&method.attrs, "new") {
-                            add(
-                                binding,
-                                (owner.clone(), "__new__".to_owned()),
-                                reached.clone(),
-                            );
-                        }
-                        let name = python_name(&method.attrs, &method.sig.ident);
-                        add(binding, (owner.clone(), name), reached);
+                        entry.push(method);
                     }
                 }
             }
             syn::Item::Fn(function) if has_attribute(&function.attrs, "pyfunction") => {
-                let name = python_name(&function.attrs, &function.sig.ident);
-                add(
-                    binding,
-                    ("module".to_owned(), name),
-                    trace_body(&function.block, "module", api),
-                );
+                functions.push(function);
             }
             syn::Item::Mod(module) => {
                 if let Some((_, inner)) = &module.content {
-                    read_items(inner, api, binding);
+                    collect_items(inner, methods, functions);
                 }
             }
             _ => {}
@@ -489,15 +523,58 @@ fn read_items(items: &[syn::Item], api: &RustApi, binding: &mut Binding) {
     }
 }
 
-/// Reads one source file of the binding.
-pub fn read_binding_source(
-    source: &str,
+fn trace_items(
+    methods: &Methods<'_>,
+    functions: &[&syn::ItemFn],
     api: &RustApi,
     binding: &mut Binding,
-) -> Result<(), String> {
-    let file = syn::parse_file(source).map_err(|error| format!("parse the binding: {error}"))?;
-    read_items(&file.items, api, binding);
-    Ok(())
+) {
+    for (owner, members) in methods {
+        let siblings = members
+            .iter()
+            .map(|method| (method.sig.ident.to_string(), &method.block))
+            .collect::<HashMap<_, _>>();
+        for method in members {
+            let reached = trace_body(&method.block, owner, api, &siblings);
+            if has_attribute(&method.attrs, "new") {
+                add(
+                    binding,
+                    (owner.clone(), "__new__".to_owned()),
+                    reached.clone(),
+                );
+            }
+            let name = python_name(&method.attrs, &method.sig.ident);
+            add(binding, (owner.clone(), name), reached);
+        }
+    }
+    let none = HashMap::new();
+    for function in functions {
+        let name = python_name(&function.attrs, &function.sig.ident);
+        add(
+            binding,
+            ("module".to_owned(), name),
+            trace_body(&function.block, "module", api, &none),
+        );
+    }
+}
+
+/// Reads binding source files, given as their text. A binding type's methods
+/// may be spread over several files, and each can call the others on `self`.
+pub fn read_binding_sources(sources: &[String], api: &RustApi) -> Result<Binding, String> {
+    let files = sources
+        .iter()
+        .map(|source| {
+            syn::parse_file(source).map_err(|error| format!("parse the binding: {error}"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut methods = Methods::new();
+    let mut functions = Vec::new();
+    for file in &files {
+        collect_items(&file.items, &mut methods, &mut functions);
+    }
+    let mut binding = Binding::new();
+    trace_items(&methods, &functions, api, &mut binding);
+    Ok(binding)
 }
 
 fn rust_files(directory: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
@@ -519,14 +596,14 @@ pub fn read_binding(directory: &Path, api: &RustApi) -> Result<Binding, String> 
     let mut files = Vec::new();
     rust_files(directory, &mut files)?;
     files.sort();
-    let mut binding = Binding::new();
-    for file in files {
-        let source = std::fs::read_to_string(&file)
-            .map_err(|error| format!("read {}: {error}", file.display()))?;
-        read_binding_source(&source, api, &mut binding)
-            .map_err(|error| format!("{}: {error}", file.display()))?;
-    }
-    Ok(binding)
+    let sources = files
+        .iter()
+        .map(|file| {
+            std::fs::read_to_string(file)
+                .map_err(|error| format!("read {}: {error}", file.display()))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    read_binding_sources(&sources, api)
 }
 
 /// Runs `python/inventory.py` on the package at `package` and reads what it prints.
@@ -698,10 +775,15 @@ pub fn trace_item(item: &PythonItem, binding: &Binding) -> Traced {
     } else {
         rust.join(", ")
     };
+    let uses = if item.uses.is_empty() {
+        String::new()
+    } else {
+        format!(" | also uses {}", item.uses.join(", "))
+    };
     Traced {
         kind,
         line: format!(
-            "{signature} | {} | {rust} | {}",
+            "{signature} | {} | {rust} | {}{uses}",
             calls.join(", "),
             kind.label()
         ),
@@ -725,7 +807,8 @@ pub fn render_python_artifact(source: Option<&str>, traced: &[Traced]) -> String
          #   Not the eager DataFrame and Series, selectors, configuration or the read_* functions.\n",
     );
     output.push_str(
-        "# each line: item(parameters) | binding calls | public Rust items reached | how\n",
+        "# each line: item(parameters) | binding calls | public Rust items reached | how\n\
+         #   [| also uses: the other Polars calls it is built from]\n",
     );
     for kind in [
         Kind::SameName,
