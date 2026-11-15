@@ -34,8 +34,10 @@ webview configuration, IPC commands and the view it serves.
 
 `vendor/polars` is the Polars project's source, pinned to a Python Polars
 release tag. This repository owns which release it is pinned to, not its
-content; never edit files inside it. Moving it to another release follows
-[the how-to](docs/how-to.md#move-polars-to-a-new-release).
+content; never edit files inside it. The engine builds Polars from it with the
+same features, crate patches, dependency versions and toolchain as that
+release, checked by the API generator's release check. Moving it to another
+release follows [the how-to](docs/how-to.md#move-polars-to-a-new-release).
 
 ## Discover The Current Structure
 
@@ -44,7 +46,8 @@ and current source establishes behavior.
 
 | Fact | Authoritative source |
 | --- | --- |
-| Root identity, MSRV, lints, workspace/default members | [Cargo.toml](Cargo.toml) |
+| Root identity, MSRV, lints, workspace/default members, Polars' crate patches | [Cargo.toml](Cargo.toml) |
+| Rust toolchain | [rust-toolchain.toml](rust-toolchain.toml) |
 | Rust dependency resolution | [Cargo.lock](Cargo.lock) |
 | Host identity and dependencies | [crates/dageist-tauri/Cargo.toml](crates/dageist-tauri/Cargo.toml) |
 | Window, bundle, view location and content security policy | [crates/dageist-tauri/tauri.conf.json](crates/dageist-tauri/tauri.conf.json) |
@@ -177,13 +180,19 @@ cargo test --offline --locked -p dageist-tauri
 cargo clippy --offline --locked -p dageist-tauri --all-targets --no-deps -- -F unsafe-code -D warnings
 ```
 
-API audit checks from the repository root. The audits need the nightly
-toolchain the generator pins; the tool's own tests and its two fixtures that
-run rustdoc are in the [audit procedures](docs/how-to.md#check-the-api-tool):
+API audit checks from the repository root. The tool's own tests and its
+fixtures that run Cargo and rustdoc are in the
+[audit procedures](docs/how-to.md#check-the-api-tool):
 
 ```sh
 CARGO_NET_OFFLINE=true cargo run --offline --locked --manifest-path api/generator/Cargo.toml -- --check
+CARGO_NET_OFFLINE=true cargo run --offline --locked --manifest-path api/generator/Cargo.toml -- --check-release
 ```
+
+Run the release check after any change to a manifest, `Cargo.lock`,
+`rust-toolchain.toml` or `vendor/polars`. Polars' crates are built from
+`vendor/polars` by path, so Cargo prints their own compiler warnings; they are
+Polars', not dageist's, and do not fail the checks.
 
 `cargo run --offline --locked -p dageist-tauri` opens the native application
 window and runs until it is closed. It is not a finite check; do not supervise

@@ -4,8 +4,9 @@
 [MIT License](LICENSE). This notice records attribution for the direct Rust
 dependencies declared in
 [crates/dageist-tauri/Cargo.toml](crates/dageist-tauri/Cargo.toml) and
-[crates/dageist-engine/Cargo.toml](crates/dageist-engine/Cargo.toml) at the
-versions resolved by [Cargo.lock](Cargo.lock), for the direct dependencies of
+[crates/dageist-engine/Cargo.toml](crates/dageist-engine/Cargo.toml) and the
+crates patched in the root [Cargo.toml](Cargo.toml), at the versions resolved
+by [Cargo.lock](Cargo.lock), for the direct dependencies of
 the public API audit generator declared in
 [api/generator/Cargo.toml](api/generator/Cargo.toml) at the versions resolved
 by [its lock file](api/generator/Cargo.lock), and for the libraries and the
@@ -82,8 +83,19 @@ Project Authors:
 * License: [SIL Open Font License 1.1](licenses/jetbrains-mono/OFL.txt)
 * Homepage: [JetBrains Mono](https://www.jetbrains.com/lp/mono/)
 
-This product depends on polars 0.55.2, distributed by Ritchie Vink, with some
-portions by NVIDIA Corporation and affiliates:
+This product depends on hashbrown 0.17.1, as patched by the Polars project at
+revision `d76a6f81abd8f388676aff15068236a8d21c7e1a` of
+[pola-rs/hashbrown](https://github.com/pola-rs/hashbrown), distributed by
+Amanieu d'Antras, under your choice of either license:
+
+* License: [Apache License 2.0](licenses/hashbrown/LICENSE-APACHE)
+* License: [MIT License](licenses/hashbrown/LICENSE-MIT)
+* Homepage: [hashbrown](https://github.com/rust-lang/hashbrown)
+
+This product depends on Polars, built from the source of Python Polars 2.1.0 in
+[vendor/polars](vendor/polars) (the crates `polars`, `polars-lazy` and
+`polars-ooc` and the Polars crates they use, at version 0.55.1), distributed by
+Ritchie Vink, with some portions by NVIDIA Corporation and affiliates:
 
 * License: [MIT License](licenses/polars/LICENSE)
 * Homepage: [Polars](https://www.pola.rs/)
@@ -102,7 +114,7 @@ David Tolnay, under your choice of either license:
 * License: [MIT License](licenses/serde/LICENSE-MIT)
 * Homepage: [Serde](https://serde.rs)
 
-This product's tests depend on serde_json 1.0.154, from the same upstream
+This product's tests depend on serde_json 1.0.151, from the same upstream
 project, under your choice of either license:
 
 * License: [Apache License 2.0](licenses/serde/LICENSE-APACHE)
@@ -116,3 +128,23 @@ your choice of either license:
 * License: [Apache License 2.0](licenses/tauri/LICENSE-APACHE-2.0)
 * License: [MIT License](licenses/tauri/LICENSE-MIT)
 * Homepage: [Tauri](https://tauri.app/)
+
+This product depends on tikv-jemalloc-sys 0.7.1, as patched by the Polars
+project at revision `0d683dfb157097e2075d5e0eaf25f71f514a7552` of
+[pola-rs/jemallocator](https://github.com/pola-rs/jemallocator), distributed by
+Alex Crichton, Gonzalo Brito Gadeschi and The TiKV Project Developers, and on
+tikv-jemallocator 0.7.0 from the same upstream project, through which Polars'
+allocator uses it, distributed by Alex Crichton, Gonzalo Brito Gadeschi, Simon
+Sapin, Steven Fackler and The TiKV Project Developers, each under your choice
+of either license:
+
+* License: [Apache License 2.0](licenses/jemallocator/LICENSE-APACHE)
+* License: [MIT License](licenses/jemallocator/LICENSE-MIT)
+* Homepage: [jemallocator](https://github.com/tikv/jemallocator)
+
+On macOS and Linux, tikv-jemalloc-sys builds the jemalloc 5.3.1 memory
+allocator into this product, distributed by Jason Evans, the Mozilla Foundation
+and Facebook, Inc.:
+
+* License: [jemalloc license, BSD 2-Clause](licenses/jemalloc/COPYING)
+* Homepage: [jemalloc](https://jemalloc.net/)

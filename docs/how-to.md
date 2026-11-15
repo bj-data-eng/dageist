@@ -134,9 +134,7 @@ formatted.
 The files under `api/` record the public API of the core, of each library
 crate under `crates/` and of the Polars crates the steps are built from, one
 line per public item. The generator in `api/generator/` writes them from
-rustdoc JSON. It needs the nightly toolchain named in its source,
-`nightly-2026-09-01`, which only these procedures use. Install it once with
-`rustup toolchain install nightly-2026-09-01`.
+rustdoc JSON, with the nightly toolchain the whole workspace uses.
 
 To see what is audited, and to check every audit against the current source:
 
@@ -181,7 +179,8 @@ Keep the source change and the refreshed audits in one review.
 
 ### Check The API Tool
 
-The generator's tests use its own workspace:
+The generator's tests use its own workspace. The workspace's toolchain applies
+to it too:
 
 ```sh
 cargo test --offline --locked --manifest-path api/generator/Cargo.toml
@@ -189,15 +188,51 @@ cargo clippy --offline --locked --manifest-path api/generator/Cargo.toml --all-t
 cargo fmt --manifest-path api/generator/Cargo.toml -- --check
 ```
 
-Two further tests run the pinned rustdoc on a small workspace of their own:
-one shows that a dependency is documented with the features its release
-package turns on and no others, and the other that the generator refuses a
-dependency whose features differ from that build. Run them when the
-generator's Cargo or rustdoc handling changes:
+Three further tests run the pinned Cargo and rustdoc on small workspaces of
+their own. One shows that a dependency is documented with the features its
+release package turns on and no others. Another shows that the generator
+refuses a dependency whose features differ from that build. The third shows
+that the release check passes a matching build and names a feature that
+differs. Run them when the generator's Cargo or rustdoc handling changes:
 
 ```sh
 env -u CARGO_TARGET_DIR CARGO_NET_OFFLINE=true cargo test --offline --locked --manifest-path api/generator/Cargo.toml --lib -- --ignored
 ```
+
+## Check The Build Against The Polars Release
+
+The engine builds Polars from `vendor/polars` with the same features, crate
+patches, dependency versions and toolchain as the Python Polars release there.
+That release is `polars-runtime-32`, the runtime a plain `pip install polars`
+installs. The release check compares the two builds:
+
+```sh
+CARGO_NET_OFFLINE=true cargo run --offline --locked --manifest-path api/generator/Cargo.toml -- --check-release
+```
+
+It prints `dageist-tauri builds the crates of vendor/polars as
+polars-runtime-32 does` and exits successfully when the builds match.
+Otherwise it prints each difference and fails:
+
+- a toolchain in [rust-toolchain.toml](../rust-toolchain.toml) other than the
+  release's, or than the one the generator runs Cargo with;
+- a Polars crate built with features the release does not turn on, or
+  without features it does;
+- a Polars crate only one of the builds compiles;
+- a package a Polars crate uses at another version or from another source
+  than the release, as when a crate patch in the root
+  [Cargo.toml](../Cargo.toml) differs from Polars' own.
+
+A few differences are expected, and the generator lists them in its source
+with the reason for each. These are the Python binding's own features and
+crates, which connect Polars to Python, and `objc2-exception-helper`, which a
+feature Tauri turns on in `objc2` adds. A listed exception that no longer
+applies is reported too, so the list stays current.
+
+The check reads both builds for the platform it runs on, so a difference that
+only another platform's build has is not covered. It compares the features of
+Polars' own crates; the other packages they use are compared by version and
+source.
 
 ## Move Polars To A New Release
 
@@ -215,9 +250,35 @@ git add vendor/polars
 ```
 
 `git submodule status` then shows the new commit with the tag beside it, and
-`git diff --cached --submodule=short` the commit it replaces. Update the tag
-and commit in the [reference](reference.md#vendored-sources), commit the move
-on its own, and name the tag in the commit message.
+`git diff --cached --submodule=short` the commit it replaces. Then bring the
+build into line with the new release:
+
+1. Set the toolchain in [rust-toolchain.toml](../rust-toolchain.toml) and the
+   generator's `RUSTDOC_TOOLCHAIN` to the one in
+   `vendor/polars/rust-toolchain.toml`.
+2. Copy the `hashbrown` and `tikv-jemalloc-sys` entries of `[patch.crates-io]`
+   in `vendor/polars/Cargo.toml` into the root manifest, and add any new patch
+   of a crate dageist builds.
+3. List the features the release builds the `polars` crate with, and set them
+   in [crates/dageist-engine/Cargo.toml](../crates/dageist-engine/Cargo.toml):
+
+   ```sh
+   cd vendor/polars
+   cargo tree --offline --locked -p polars-runtime-32 -e normal --prefix none --format '{p}|{f}' | grep '^polars v'
+   cd ../..
+   ```
+
+4. Run the [release check](#check-the-build-against-the-polars-release). It
+   names every remaining difference. A package at another version than the
+   release's is moved with
+   `cargo update --offline -p <name>@<version> --precise <release version>`.
+   A feature the Python binding turns on in a Polars crate directly is added
+   to the engine's dependency on that crate, unless it only connects Polars to
+   Python.
+5. Build and test the engine, and [refresh the Polars audits](#refresh-the-audits-after-a-change).
+
+Update the tag and commit in the [reference](reference.md#vendored-sources),
+and name the tag in the commit message.
 
 To confirm that the pinned commit is the release's, compare it with the tag
 on the Polars repository:

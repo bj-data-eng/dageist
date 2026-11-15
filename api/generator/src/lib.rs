@@ -11,8 +11,15 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// The toolchain whose rustdoc writes the JSON. The parser's minimum nightly
-/// predates the workspace's MSRV, so a compatible rustdoc is pinned.
+mod release;
+
+pub use release::{
+    Graph, LeftOutFeature, Listed, Origin, Package, Unit, Upstream, check_release, compare,
+    parse_graph, parse_tree_line, toolchain_channel, toolchain_problems,
+};
+
+/// The toolchain whose rustdoc writes the JSON, and whose Cargo reads the
+/// builds. It is the toolchain the workspace and the upstream release build with.
 const RUSTDOC_TOOLCHAIN: &str = "nightly-2026-09-01";
 
 /// What the generator audits in a workspace.
@@ -28,7 +35,12 @@ pub struct Workspace<'a> {
     pub dependency_directory: &'a str,
     /// The dependencies that are audited, by package name.
     pub dependencies: &'a [&'a str],
+    /// The upstream project whose release build the workspace builds its dependencies like.
+    pub upstream: Upstream<'a>,
 }
+
+/// Why the Python binding's own features are left out: they connect Polars to Python.
+const PYTHON_GLUE: &str = "connects Polars to Python for the Python binding";
 
 /// What dageist audits: its own crates, and the Polars crates whose API its steps are built from.
 pub const DAGEIST: Workspace<'static> = Workspace {
@@ -37,6 +49,86 @@ pub const DAGEIST: Workspace<'static> = Workspace {
     release_package: "dageist-tauri",
     dependency_directory: "polars",
     dependencies: &["polars", "polars-lazy", "polars-plan"],
+    upstream: Upstream {
+        root: "vendor/polars",
+        package: "polars-runtime-32",
+        left_out_features: &[
+            LeftOutFeature {
+                krate: "polars-core",
+                feature: "python",
+                reason: PYTHON_GLUE,
+            },
+            LeftOutFeature {
+                krate: "polars-error",
+                feature: "python",
+                reason: PYTHON_GLUE,
+            },
+            LeftOutFeature {
+                krate: "polars-io",
+                feature: "pyo3",
+                reason: PYTHON_GLUE,
+            },
+            LeftOutFeature {
+                krate: "polars-io",
+                feature: "python",
+                reason: PYTHON_GLUE,
+            },
+            LeftOutFeature {
+                krate: "polars-lazy",
+                feature: "pyo3",
+                reason: PYTHON_GLUE,
+            },
+            LeftOutFeature {
+                krate: "polars-lazy",
+                feature: "python",
+                reason: PYTHON_GLUE,
+            },
+            LeftOutFeature {
+                krate: "polars-mem-engine",
+                feature: "pyo3",
+                reason: PYTHON_GLUE,
+            },
+            LeftOutFeature {
+                krate: "polars-mem-engine",
+                feature: "python",
+                reason: PYTHON_GLUE,
+            },
+            LeftOutFeature {
+                krate: "polars-plan",
+                feature: "python",
+                reason: PYTHON_GLUE,
+            },
+            LeftOutFeature {
+                krate: "polars-stream",
+                feature: "pyo3",
+                reason: PYTHON_GLUE,
+            },
+            LeftOutFeature {
+                krate: "polars-stream",
+                feature: "python",
+                reason: PYTHON_GLUE,
+            },
+            LeftOutFeature {
+                krate: "polars-utils",
+                feature: "python",
+                reason: PYTHON_GLUE,
+            },
+        ],
+        left_out_crates: &[
+            Listed {
+                name: "polars-python",
+                reason: "the Python binding itself",
+            },
+            Listed {
+                name: "polars-io-ext-ffi",
+                reason: "used only by the Python binding, to hand Iceberg reads to Python",
+            },
+        ],
+        extra_packages: &[Listed {
+            name: "objc2-exception-helper",
+            reason: "Tauri turns on objc2's exception feature, and Polars' sysinfo uses objc2",
+        }],
+    },
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -51,6 +143,8 @@ pub enum Action {
     Generate,
     Check,
     List,
+    /// Checks the release package's build against the upstream release build.
+    CheckRelease,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -95,6 +189,7 @@ impl Cli {
                 }
                 "--list" => set_action(&mut action, Action::List)?,
                 "--check" => set_action(&mut action, Action::Check)?,
+                "--check-release" => set_action(&mut action, Action::CheckRelease)?,
                 unknown if unknown.starts_with("--") => {
                     return Err(format!("unknown flag {unknown}"));
                 }
@@ -104,6 +199,11 @@ impl Cli {
             }
         }
 
+        if action == Some(Action::CheckRelease) && selection.is_some() {
+            return Err(
+                "--check-release checks the whole build and takes no target selector".to_owned(),
+            );
+        }
         Ok(Self {
             action: action.unwrap_or(Action::Generate),
             selection: selection.unwrap_or(TargetSelection::All),
@@ -284,17 +384,17 @@ where
     S: Into<String>,
 {
     let cli = Cli::parse(args)?;
-    let targets = select_targets(root, workspace, cli.selection)?;
 
     match cli.action {
+        Action::CheckRelease => check_release(root, workspace.release_package, &workspace.upstream),
         Action::List => {
-            for target in targets {
+            for target in select_targets(root, workspace, cli.selection)? {
                 println!("{}", render_list_line(root, &target));
             }
             Ok(())
         }
         Action::Generate => {
-            for target in targets {
+            for target in select_targets(root, workspace, cli.selection)? {
                 let generated = generate_target_artifact(&target, workspace)?;
                 write_artifact(&target, &generated)?;
                 println!("wrote {}", target.artifact_path().display());
@@ -303,7 +403,7 @@ where
         }
         Action::Check => {
             let mut stale = Vec::new();
-            for target in targets {
+            for target in select_targets(root, workspace, cli.selection)? {
                 let generated = generate_target_artifact(&target, workspace)?;
                 match compare_artifact(&target, &generated)? {
                     ArtifactCheck::Current => {
@@ -343,6 +443,9 @@ pub fn render_list_line(root: &Path, target: &ApiTarget) -> String {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Resolved {
     pub version: String,
+    /// Where it comes from, as Cargo writes it between brackets: a path or a git
+    /// revision. `None` for the default registry.
+    pub source: Option<String>,
     /// The enabled features, sorted.
     pub features: Vec<String>,
 }
@@ -357,11 +460,16 @@ pub fn find_resolved(tree: &str, name: &str) -> Option<Resolved> {
     tree.lines().find_map(|line| {
         let line = line.trim_end().trim_end_matches(" (*)");
         let (package, features) = line.split_once('|')?;
-        let mut words = package.split_whitespace();
+        let package = package.trim_end().trim_end_matches(" (proc-macro)");
+        let mut words = package.splitn(3, ' ');
         if words.next()? != name {
             return None;
         }
         let version = words.next()?.strip_prefix('v')?.to_owned();
+        let source = match words.next() {
+            None => None,
+            Some(rest) => Some(rest.strip_prefix('(')?.strip_suffix(')')?.to_owned()),
+        };
         let mut features = features
             .split(',')
             .map(str::trim)
@@ -369,7 +477,11 @@ pub fn find_resolved(tree: &str, name: &str) -> Option<Resolved> {
             .map(str::to_owned)
             .collect::<Vec<_>>();
         features.sort();
-        Some(Resolved { version, features })
+        Some(Resolved {
+            version,
+            source,
+            features,
+        })
     })
 }
 
@@ -478,10 +590,51 @@ pub fn generate_target_artifact(
             target.name(),
             workspace.release_package,
             &resolved,
+            describe_source(target.root(), &workspace.upstream, &resolved)?.as_deref(),
             &public_api.to_string(),
             &missing_item_ids,
         ),
     })
+}
+
+/// Says where a dependency is built from, without anything particular to
+/// this machine: the upstream checkout and its commit for a crate inside it,
+/// or the git revision Cargo names. `None` for the default registry, or for
+/// a path outside the upstream checkout.
+fn describe_source(
+    root: &Path,
+    upstream: &Upstream<'_>,
+    resolved: &Resolved,
+) -> Result<Option<String>, String> {
+    let Some(source) = &resolved.source else {
+        return Ok(None);
+    };
+    if !source.starts_with('/') {
+        return Ok(Some(source.clone()));
+    }
+    let checkout = root.join(upstream.root);
+    let inside = checkout
+        .canonicalize()
+        .is_ok_and(|checkout| Path::new(source).starts_with(&checkout))
+        || Path::new(source).starts_with(&checkout);
+    if !inside {
+        return Ok(None);
+    }
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(&checkout)
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .map_err(|error| format!("run git in {}: {error}", checkout.display()))?;
+    if !output.status.success() {
+        return Err(format!(
+            "read the commit of {}: {}",
+            checkout.display(),
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    let commit = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    Ok(Some(format!("{} at {commit}", upstream.root)))
 }
 
 pub fn render_api_artifact(name: &str, api: &str, missing_item_ids: &[String]) -> String {
@@ -496,12 +649,14 @@ pub fn render_api_artifact(name: &str, api: &str, missing_item_ids: &[String]) -
     output
 }
 
-/// Writes a dependency's audit: its version and the features a release
-/// builds it with, one to a line, before its public API.
+/// Writes a dependency's audit: its version, where it is built from when
+/// that is not the default registry, and the features a release builds it
+/// with, one to a line, before its public API.
 pub fn render_dependency_artifact(
     name: &str,
     release_package: &str,
     resolved: &Resolved,
+    source: Option<&str>,
     api: &str,
     missing_item_ids: &[String],
 ) -> String {
@@ -513,6 +668,11 @@ pub fn render_dependency_artifact(
     output.push_str("# version: ");
     output.push_str(&resolved.version);
     output.push('\n');
+    if let Some(source) = source {
+        output.push_str("# source: ");
+        output.push_str(source);
+        output.push('\n');
+    }
     output.push_str("# features a build of ");
     output.push_str(release_package);
     output.push_str(" enables:");
@@ -594,6 +754,16 @@ mod tests {
         release_package: "app-host",
         dependency_directory: "deps",
         dependencies: &["dep-facade", "dep"],
+        upstream: NO_UPSTREAM,
+    };
+
+    /// An upstream that a fixture does not check out.
+    const NO_UPSTREAM: Upstream<'static> = Upstream {
+        root: "vendor/up",
+        package: "up-runtime",
+        left_out_features: &[],
+        left_out_crates: &[],
+        extra_packages: &[],
     };
 
     #[test]
@@ -652,6 +822,15 @@ mod tests {
         let error = Cli::parse(["generator", "--target", "dageist-engine"]).unwrap_err();
 
         assert!(error.contains("unknown flag --target"));
+    }
+
+    #[test]
+    fn the_release_check_takes_no_target_selector() {
+        let cli = Cli::parse(["generator", "--check-release"]).unwrap();
+        assert_eq!(cli.action, Action::CheckRelease);
+
+        let error = Cli::parse(["generator", "--check-release", "--polars"]).unwrap_err();
+        assert!(error.contains("takes no target selector"));
     }
 
     #[test]
@@ -834,6 +1013,7 @@ mod tests {
             find_resolved(tree, "polars-plan"),
             Some(Resolved {
                 version: "0.55.2".to_owned(),
+                source: None,
                 features: vec!["abs".to_owned(), "cse".to_owned(), "strings".to_owned()],
             }),
         );
@@ -841,6 +1021,7 @@ mod tests {
             find_resolved(tree, "polars"),
             Some(Resolved {
                 version: "0.55.2".to_owned(),
+                source: None,
                 features: vec!["lazy".to_owned(), "parquet".to_owned()],
             }),
             "a name that starts another package's name must not match it",
@@ -849,6 +1030,7 @@ mod tests {
             find_resolved(tree, "app-host"),
             Some(Resolved {
                 version: "0.1.0".to_owned(),
+                source: Some("/work/crates/app-host".to_owned()),
                 features: Vec::new(),
             }),
         );
@@ -859,10 +1041,12 @@ mod tests {
     fn features_that_differ_from_the_release_are_named() {
         let released = Resolved {
             version: "0.55.2".to_owned(),
+            source: None,
             features: vec!["abs".to_owned(), "strings".to_owned()],
         };
         let documented = Resolved {
             version: "0.55.2".to_owned(),
+            source: None,
             features: vec!["cum_agg".to_owned(), "strings".to_owned()],
         };
 
@@ -914,6 +1098,7 @@ mod tests {
     fn a_dependency_artifact_records_its_version_and_release_features() {
         let resolved = Resolved {
             version: "0.55.2".to_owned(),
+            source: None,
             features: vec!["abs".to_owned(), "strings".to_owned()],
         };
 
@@ -921,6 +1106,7 @@ mod tests {
             "polars-plan",
             "dageist-tauri",
             &resolved,
+            Some("vendor/polars at 7f902bd3ffd27ff82d14278a09a295ff2f7aed92"),
             "pub enum polars_plan::dsl::Expr\n",
             &["4".to_owned()],
         );
@@ -931,6 +1117,7 @@ mod tests {
                 "# polars-plan public API\n",
                 "# generated by Dageist public API artifact tooling\n",
                 "# version: 0.55.2\n",
+                "# source: vendor/polars at 7f902bd3ffd27ff82d14278a09a295ff2f7aed92\n",
                 "# features a build of dageist-tauri enables:\n",
                 "#   abs\n",
                 "#   strings\n",
@@ -944,8 +1131,10 @@ mod tests {
             "app-host",
             &Resolved {
                 version: "1.0.0".to_owned(),
+                source: None,
                 features: Vec::new(),
             },
+            None,
             "pub struct dep::Shared\n",
             &[],
         );
@@ -1079,6 +1268,7 @@ mod tests {
         release_package: "app-host",
         dependency_directory: "deps",
         dependencies: &["dep"],
+        upstream: NO_UPSTREAM,
     };
 
     #[test]
@@ -1140,6 +1330,335 @@ mod tests {
         assert!(error.contains("dep would not be documented as a release builds it"));
         assert!(error.contains("features only in the audit: [unwanted]"));
         assert!(!root.join("api/deps/dep.txt").exists());
+    }
+
+    /// The upstream directory the release-check tests name crates under.
+    const UP: &str = "/work/vendor/up";
+
+    /// An upstream whose release turns on `glue` in `up-core`, which the workspace leaves out.
+    const UPSTREAM: Upstream<'static> = Upstream {
+        root: "vendor/up",
+        package: "up-runtime",
+        left_out_features: &[LeftOutFeature {
+            krate: "up-core",
+            feature: "glue",
+            reason: "test",
+        }],
+        left_out_crates: &[Listed {
+            name: "up-binding",
+            reason: "test",
+        }],
+        extra_packages: &[Listed {
+            name: "host-only",
+            reason: "test",
+        }],
+    };
+
+    /// The release build: its runtime uses `up-core` and `up-binding`, which use registry crates.
+    const RELEASE_TREE: &str = concat!(
+        "0up-runtime v1.0.0 (/work/vendor/up/runtime)|default\n",
+        "1up-core v1.0.0 (/work/vendor/up/core)|a,glue\n",
+        "2hashbrown v0.17.1 (https://example.com/fork?rev=1#1)|default\n",
+        "2libc v0.2.1|std\n",
+        "1up-binding v1.0.0 (/work/vendor/up/binding)|\n",
+        "2libc v0.2.1|std (*)\n",
+    );
+
+    /// The workspace's build: its host uses `up-core`, which here also uses
+    /// `host-only` because a crate of the host turns on a feature that needs
+    /// it, and `tauri`, which the check does not look at.
+    fn our_tree(core: &str, extra: &str) -> String {
+        format!(
+            "0app-host v0.1.0 (/work/crates/app-host)|\n\
+             1up-core v1.0.0 (/work/vendor/up/core)|{core}\n\
+             2hashbrown v0.17.1 (https://example.com/fork?rev=1#1)|default\n\
+             2libc v0.2.1|std\n\
+             2host-only v1.0.0|\n\
+             {extra}\
+             1tauri v2.0.0|\n\
+             2libc v0.2.1|std (*)\n\
+             2tauri-only v1.0.0|\n"
+        )
+    }
+
+    fn compared(ours: &str) -> Vec<String> {
+        compare(
+            &parse_graph(ours).unwrap(),
+            &parse_graph(RELEASE_TREE).unwrap(),
+            &UPSTREAM,
+            Path::new(UP),
+        )
+    }
+
+    #[test]
+    fn reads_the_channel_of_a_toolchain_file() {
+        let text = "# The release's toolchain.\n[toolchain]\nchannel = \"nightly-2026-09-01\"\ncomponents = [\"clippy\"]\n";
+
+        assert_eq!(toolchain_channel(text), Some("nightly-2026-09-01"));
+        assert_eq!(toolchain_channel("[toolchain]\n"), None);
+    }
+
+    #[test]
+    fn a_toolchain_unlike_the_release_or_the_generator_is_named() {
+        let generator = "nightly-2026-09-01";
+
+        assert!(toolchain_problems(Some(generator), Some(generator), generator).is_empty());
+        assert!(toolchain_problems(None, None, generator).is_empty());
+        assert_eq!(
+            toolchain_problems(Some("nightly-2026-08-01"), Some(generator), generator),
+            [
+                "the workspace builds with nightly-2026-08-01 and the release with nightly-2026-09-01",
+                "the workspace builds with nightly-2026-08-01 and the generator runs Cargo with nightly-2026-09-01",
+            ],
+        );
+        assert_eq!(
+            toolchain_problems(None, Some(generator), generator),
+            ["the workspace pins no toolchain and the release builds with nightly-2026-09-01"],
+        );
+    }
+
+    #[test]
+    fn reads_a_tree_line_of_each_source() {
+        let (depth, package, features) =
+            parse_tree_line("3hashbrown v0.17.1 (https://example.com/fork?rev=1#1)|a,b (*)")
+                .unwrap();
+        assert_eq!(depth, 3);
+        assert_eq!(package.name, "hashbrown");
+        assert_eq!(package.version, "0.17.1");
+        assert_eq!(
+            package.origin,
+            Origin::Other("https://example.com/fork?rev=1#1".to_owned())
+        );
+        assert_eq!(features.into_iter().collect::<Vec<_>>(), ["a", "b"]);
+
+        let (_, package, _) =
+            parse_tree_line("12serde_derive v1.0.229 (proc-macro)|default").unwrap();
+        assert_eq!(package.origin, Origin::Registry);
+        assert_eq!(package.name, "serde_derive");
+
+        let (_, package, features) = parse_tree_line("0up v1.0.0 (/work/vendor/up)|").unwrap();
+        assert_eq!(
+            package.origin,
+            Origin::Path(PathBuf::from("/work/vendor/up"))
+        );
+        assert!(features.is_empty());
+
+        assert!(parse_tree_line("[build-dependencies]").is_none());
+    }
+
+    #[test]
+    fn a_graph_keeps_the_dependencies_of_a_package_printed_once() {
+        let graph = parse_graph(RELEASE_TREE).unwrap();
+        let binding = graph
+            .uses
+            .keys()
+            .find(|unit| unit.package.name == "up-binding")
+            .unwrap();
+
+        assert!(
+            graph.uses[binding]
+                .iter()
+                .any(|unit| unit.package.name == "libc"),
+            "a repeated package is still used where it repeats"
+        );
+        assert_eq!(graph.uses.len(), 5);
+        assert!(
+            parse_graph("2deep v1.0.0|\n").is_err(),
+            "a line deeper than its parent is refused"
+        );
+    }
+
+    #[test]
+    fn a_package_compiled_twice_with_different_features_is_two_units() {
+        // The program's digest uses nothing; the build-time copy of it uses block-buffer.
+        let graph = parse_graph(concat!(
+            "0app v0.1.0|\n",
+            "1digest v0.10.7|alloc\n",
+            "1codegen v1.0.0|\n",
+            "2digest v0.10.7|alloc,block-buffer\n",
+            "3block-buffer v0.10.4|\n",
+        ))
+        .unwrap();
+
+        let digests = graph
+            .uses
+            .iter()
+            .filter(|(unit, _)| unit.package.name == "digest")
+            .map(|(_, used)| used.len())
+            .collect::<Vec<_>>();
+        assert_eq!(digests, [0, 1]);
+    }
+
+    #[test]
+    fn a_build_that_matches_the_release_apart_from_listed_exceptions_passes() {
+        assert_eq!(compared(&our_tree("a", "")), Vec::<String>::new());
+    }
+
+    #[test]
+    fn features_built_unlike_the_release_are_named() {
+        let problems = compared(&our_tree("a,b", ""));
+        assert_eq!(
+            problems,
+            ["up-core is built with features the release does not turn on: b"]
+        );
+
+        let problems = compared(&our_tree("", ""));
+        assert!(
+            problems
+                .contains(&"up-core is built without features the release turns on: a".to_owned())
+        );
+    }
+
+    #[test]
+    fn a_package_at_another_version_or_source_is_named_with_the_release_version() {
+        let ours = our_tree("a", "").replace(
+            "2hashbrown v0.17.1 (https://example.com/fork?rev=1#1)",
+            "2hashbrown v0.17.1",
+        );
+
+        assert_eq!(
+            compared(&ours),
+            [
+                "hashbrown 0.17.1 is used here; the release uses hashbrown 0.17.1 (https://example.com/fork?rev=1#1)"
+            ],
+        );
+    }
+
+    #[test]
+    fn a_package_the_release_does_not_use_is_named() {
+        let problems = compared(&our_tree("a", "2zstd v0.13.4|\n"));
+
+        assert_eq!(
+            problems,
+            ["zstd 0.13.4 is used here and not by the release"]
+        );
+    }
+
+    #[test]
+    fn a_crate_of_the_workspace_outside_the_upstream_crates_is_not_compared() {
+        // tauri and tauri-only are not used by an upstream crate, so they are not checked.
+        let problems = compared(&our_tree("a", ""));
+
+        assert!(problems.iter().all(|problem| !problem.contains("tauri")));
+    }
+
+    #[test]
+    fn listed_exceptions_that_no_longer_apply_are_named() {
+        // The release no longer turns on glue, builds up-binding, or differs on host-only.
+        let release = RELEASE_TREE.replace("|a,glue\n", "|a\n").replace(
+            "1up-binding v1.0.0 (/work/vendor/up/binding)|\n2libc v0.2.1|std (*)\n",
+            "",
+        );
+        let ours = our_tree("a", "").replace("2host-only v1.0.0|\n", "");
+        let problems = compare(
+            &parse_graph(&ours).unwrap(),
+            &parse_graph(&release).unwrap(),
+            &UPSTREAM,
+            Path::new(UP),
+        );
+
+        assert_eq!(
+            problems,
+            [
+                "the left-out feature glue of up-core no longer applies; remove it from the list",
+                "the left-out crate up-binding no longer applies; remove it from the list",
+                "the extra package host-only no longer applies; remove it from the list",
+            ],
+        );
+    }
+
+    #[test]
+    fn a_crate_the_release_builds_and_the_workspace_does_not_must_be_listed() {
+        let upstream = Upstream {
+            left_out_crates: &[],
+            ..UPSTREAM
+        };
+
+        let problems = compare(
+            &parse_graph(&our_tree("a", "")).unwrap(),
+            &parse_graph(RELEASE_TREE).unwrap(),
+            &upstream,
+            Path::new(UP),
+        );
+
+        assert_eq!(
+            problems,
+            ["up-binding is built by the release and not here"]
+        );
+    }
+
+    /// Lays out a workspace whose host builds `up-core` from an upstream
+    /// workspace under `vendor/up`, whose own runtime builds it with `a` and
+    /// `glue`. The host turns on `host_features`.
+    fn release_fixture(name: &str, host_features: &str) -> TempFixture {
+        let fixture = TempFixture::new(name);
+        fixture.file(
+            "Cargo.toml",
+            "[package]\nname = \"app\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\n\
+             [workspace]\nmembers = [\"crates/app-host\"]\nexclude = [\"vendor\"]\nresolver = \"3\"\n",
+        );
+        fixture.file("src/lib.rs", "pub struct App;\n");
+        fixture.file(
+            "crates/app-host/Cargo.toml",
+            &format!(
+                "[package]\nname = \"app-host\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\
+                 [dependencies]\nup-core = {{ path = \"../../vendor/up/core\", features = [{host_features}] }}\n"
+            ),
+        );
+        fixture.file("crates/app-host/src/main.rs", "fn main() {}\n");
+        fixture.file(
+            "vendor/up/Cargo.toml",
+            "[workspace]\nmembers = [\"core\", \"runtime\"]\nresolver = \"3\"\n",
+        );
+        fixture.file(
+            "vendor/up/core/Cargo.toml",
+            "[package]\nname = \"up-core\"\nversion = \"1.0.0\"\nedition = \"2024\"\n\
+             [features]\na = []\nb = []\nglue = []\n",
+        );
+        fixture.file("vendor/up/core/src/lib.rs", "pub struct Core;\n");
+        fixture.file(
+            "vendor/up/runtime/Cargo.toml",
+            "[package]\nname = \"up-runtime\"\nversion = \"1.0.0\"\nedition = \"2024\"\n\
+             [dependencies]\nup-core = { path = \"../core\", features = [\"a\", \"glue\"] }\n",
+        );
+        fixture.file("vendor/up/runtime/src/lib.rs", "pub struct Runtime;\n");
+        for manifest in ["Cargo.toml", "vendor/up/Cargo.toml"] {
+            let status = Command::new("cargo")
+                .args(["generate-lockfile", "--offline", "--manifest-path"])
+                .arg(fixture.path().join(manifest))
+                .status()
+                .unwrap();
+            assert!(status.success(), "the fixture's lock files must be written");
+        }
+        fixture
+    }
+
+    /// The fixture's upstream: the runtime's `glue` feature is the binding's own.
+    const FIXTURE_UPSTREAM: Upstream<'static> = Upstream {
+        root: "vendor/up",
+        package: "up-runtime",
+        left_out_features: &[LeftOutFeature {
+            krate: "up-core",
+            feature: "glue",
+            reason: "test",
+        }],
+        left_out_crates: &[],
+        extra_packages: &[],
+    };
+
+    #[test]
+    #[ignore = "runs pinned nightly Cargo on a fixture workspace; select explicitly with offline Cargo"]
+    fn a_build_of_the_upstream_crates_is_checked_against_the_release_build() {
+        let fixture = release_fixture("dageist-api-release-check", "\"a\"");
+
+        check_release(fixture.path(), "app-host", &FIXTURE_UPSTREAM).unwrap();
+
+        let fixture = release_fixture("dageist-api-release-mismatch", "\"a\", \"b\"");
+        let error = check_release(fixture.path(), "app-host", &FIXTURE_UPSTREAM).unwrap_err();
+        assert_eq!(
+            error,
+            "app-host does not build the crates of vendor/up as up-runtime does: 1 differences",
+        );
     }
 
     struct TempFixture {

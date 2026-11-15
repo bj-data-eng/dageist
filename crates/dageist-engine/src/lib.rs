@@ -18,3 +18,12 @@ pub use error::EngineError;
 pub use sample::{SampleSpec, claims_generated, generate_claims};
 pub use stored::ParquetTable;
 pub use table::Table;
+
+/// Polars' own allocator is the global allocator of every program that links
+/// the engine, as it is in the Python Polars release the engine is built
+/// like. It keeps count of the memory Polars uses, which Polars' streaming
+/// engine reads to decide when to spill to disk, and allocates through
+/// jemalloc on macOS and Linux and mimalloc elsewhere. Because the engine
+/// declares it, a program that links the engine cannot choose another one.
+#[global_allocator]
+static ALLOCATOR: polars_ooc::Allocator = polars_ooc::Allocator;

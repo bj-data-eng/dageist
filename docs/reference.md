@@ -5,12 +5,16 @@
 The root [Cargo.toml](../Cargo.toml) declares `dageist` 0.1.0, Rust edition
 2024, MSRV 1.99.1 and the MIT license. It forbids `unsafe` code for every
 workspace member through `[workspace.lints.rust]`. The workspace uses
-`default-members = ["."]` and one committed root [Cargo.lock](../Cargo.lock).
+`default-members = ["."]`, excludes `vendor/`, and has one committed root
+[Cargo.lock](../Cargo.lock). Its `[patch.crates-io]` applies the crate patches
+of the Polars release in `vendor/polars`: Polars' forks of `hashbrown` and
+`tikv-jemalloc-sys`. [rust-toolchain.toml](../rust-toolchain.toml) selects
+`nightly-2026-09-01`, the toolchain that release is built with.
 
 | Package | Path | Role |
 | --- | --- | --- |
 | `dageist` | [src/](../src/lib.rs) | Host-independent core library. |
-| `dageist-engine` | [crates/dageist-engine/](../crates/dageist-engine/Cargo.toml) | Dataframe engine on Polars: sample data, working windows, stored results and Arrow output. Not published. |
+| `dageist-engine` | [crates/dageist-engine/](../crates/dageist-engine/Cargo.toml) | Dataframe engine on Polars, built from `vendor/polars` as the release there is built, with Polars' allocator as the global allocator: sample data, working windows, stored results and Arrow output. Not published. |
 | `dageist-tauri` | [crates/dageist-tauri/](../crates/dageist-tauri/Cargo.toml) | Tauri 2 host; builds the `dageist` binary. Not published. |
 | `dageist-ui` | [ui/](../ui/package.json) | Private npm workspace for the React view; see [View Packages](#view-packages). |
 | `dageist-api-generator` | [api/generator/](../api/generator/Cargo.toml) | Writes and checks the [public API audits](#public-api-audits). A workspace of its own with its own lock file, outside the product workspace. Not published. |
@@ -21,9 +25,11 @@ workspace member through `[workspace.lints.rust]`. The workspace uses
 | --- | --- | --- |
 | `vendor/polars` | [pola-rs/polars](https://github.com/pola-rs/polars), as a shallow Git submodule declared in [.gitmodules](../.gitmodules) | Python Polars `py-2.1.0`, commit `7f902bd3ffd27ff82d14278a09a295ff2f7aed92`. |
 
-The engine still builds the Polars crates published on crates.io, at the
-version in [Cargo.lock](../Cargo.lock). The submodule holds the Rust and
-Python source of the release it is pinned to; nothing builds from it yet.
+The engine builds Polars from the submodule, with the features, crate
+patches, dependency versions and toolchain of that release's
+`polars-runtime-32`. The
+[release check](how-to.md#check-the-build-against-the-polars-release) compares
+the two builds.
 
 ## Public API Audits
 
@@ -35,7 +41,7 @@ check and refresh them.
 | --- | --- |
 | [api/public-api.txt](../api/public-api.txt) | The core, `dageist`. |
 | [api/crates/](../api/crates/dageist-engine.txt) | Each `crates/dageist-*` crate that has a library. The host has only a binary and is not audited. |
-| [api/polars/](../api/polars/polars-plan.txt) | `polars`, `polars-lazy` and `polars-plan`, with the version and the features a build of `dageist-tauri` resolves for each. `polars-plan` holds expressions and their functions, `polars-lazy` the lazy frame, and `polars` the preludes that re-export them. |
+| [api/polars/](../api/polars/polars-plan.txt) | `polars`, `polars-lazy` and `polars-plan`, with the version, the `vendor/polars` commit they are built from and the features a build of `dageist-tauri` resolves for each. `polars-plan` holds expressions and their functions, `polars-lazy` the lazy frame, and `polars` the preludes that re-export them. |
 
 ## Core API
 

@@ -12,7 +12,7 @@ label updates within the
 user's authority. Honor execution pauses under
 [Pause And Resume](#pause-and-resume).
 Use PISCT's focused skills for engineering and review.
-Use the latest stable Rust release and keep the workspace's declared Rust version aligned with it.
+Build with the toolchain in `rust-toolchain.toml`: the nightly the Python Polars release in `vendor/polars` is built with, moved with each Polars release. Keep the workspace's declared Rust version at or below that toolchain's version.
 
 ## Work And Ownership
 

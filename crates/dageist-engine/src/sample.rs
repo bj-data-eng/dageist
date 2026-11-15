@@ -54,7 +54,7 @@ impl SampleSpec {
 }
 
 fn seeded(value: Expr, seed: u64) -> Expr {
-    value.hash(seed, seed.wrapping_mul(31), 7, 11)
+    value.hash(seed)
 }
 
 fn pick(value: Expr, seed: u64, choices: &[&str], name: &str) -> PolarsResult<(Expr, LazyFrame)> {
@@ -161,31 +161,31 @@ fn claims_for_keys(first_key: i64, key_count: i64, filler_columns: u16) -> Polar
             [col("slot")],
             [col("slot")],
             JoinArgs::new(JoinType::Left),
-        )
+        )?
         .join(
             previous_step_names,
             [col("slot")],
             [col("slot")],
             JoinArgs::new(JoinType::Left),
-        )
+        )?
         .join(
             workflow_from_names,
             [col("workflow_from_index")],
             [col("workflow_from_index")],
             JoinArgs::new(JoinType::Left),
-        )
+        )?
         .join(
             workflow_to_names,
             [col("workflow_to_index")],
             [col("workflow_to_index")],
             JoinArgs::new(JoinType::Left),
-        )
+        )?
         .join(
             doctype_names,
             [col("doctype_index")],
             [col("doctype_index")],
             JoinArgs::new(JoinType::Left),
-        )
+        )?
         .sort(["key", "slot"], SortMultipleOptions::default())
         .select(columns))
 }
