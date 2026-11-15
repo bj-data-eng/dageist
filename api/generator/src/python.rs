@@ -1,12 +1,14 @@
 //! Writes the audit of the Python API of the upstream release: each public
-//! Python method and function, the binding methods it calls, and the public
-//! Rust items those reach.
+//! Python method, property, operator and function, the binding calls it
+//! makes, and the public Rust items those reach.
 //!
 //! The Python package is read with Python's own parser by
 //! `python/inventory.py`, so no Python package needs installing. The binding
-//! is read with `syn`. A binding method's calls are followed only on values
-//! that come from the Polars object it wraps, so a call on anything else,
-//! such as an `Option`, is not mistaken for a Polars method.
+//! is read with `syn`. A binding body's calls are followed by the Rust type
+//! of the value they are made on: the type the binding object wraps, then the
+//! return type the Rust audit gives each method or function it calls. A call
+//! counts only when that type has the method, so a call on an `Option`, or a
+//! method of the same name on another type, is not mistaken for it.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
@@ -25,12 +27,14 @@ pub struct PythonAudit<'a> {
     pub rust_audits: &'a [&'a str],
 }
 
-/// One public Python method or function, as `python/inventory.py` reads it.
+/// One public Python item, as `python/inventory.py` reads it.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PythonItem {
     /// The class it belongs to, such as `Expr.str`, or `polars` for a function.
     pub owner: String,
     pub name: String,
+    /// `method`, `property`, `operator` or `function`.
+    pub kind: String,
     /// Its parameters as written, with their defaults.
     pub parameters: Vec<String>,
     pub deprecated: bool,
@@ -40,15 +44,107 @@ pub struct PythonItem {
     pub uses: Vec<String>,
 }
 
-/// The public Rust API: methods by the type they belong to, and free functions.
+/// The public Rust API: each type's methods and each free function, with the
+/// type each returns when the audit names one the API has.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct RustApi {
-    pub methods: BTreeMap<String, BTreeSet<String>>,
-    pub functions: BTreeSet<String>,
+    pub methods: BTreeMap<String, BTreeMap<String, Option<String>>>,
+    pub functions: BTreeMap<String, Option<String>>,
+}
+
+/// Returns the index of the parenthesis that closes the one at `open`.
+fn closing(text: &str, open: usize) -> Option<usize> {
+    let mut depth = 0usize;
+    for (at, character) in text.char_indices().skip_while(|(at, _)| *at < open) {
+        match character {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(at);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Returns the type a return type names, looking through `Result`, `Option`
+/// and `Box`: `PolarsResult<polars_lazy::frame::LazyFrame>` names `LazyFrame`.
+fn named_type(text: &str, owner: Option<&str>) -> Option<String> {
+    let mut text = text
+        .trim()
+        .trim_start_matches('&')
+        .trim_start_matches("mut ")
+        .trim();
+    loop {
+        let (head, generics) = match text.find('<') {
+            Some(at) => (&text[..at], Some(&text[at + 1..text.rfind('>')?])),
+            None => (text, None),
+        };
+        let name = head.rsplit("::").next()?.trim();
+        match (name, generics) {
+            ("Result" | "PolarsResult" | "Option" | "Box", Some(inner)) => {
+                let mut depth = 0usize;
+                let end = inner
+                    .char_indices()
+                    .find(|(_, character)| match character {
+                        '<' => {
+                            depth += 1;
+                            false
+                        }
+                        '>' => {
+                            depth = depth.saturating_sub(1);
+                            false
+                        }
+                        ',' => depth == 0,
+                        _ => false,
+                    })
+                    .map_or(inner.len(), |(at, _)| at);
+                text = inner[..end].trim();
+            }
+            ("Self", _) => return owner.map(str::to_owned),
+            _ => {
+                return name
+                    .chars()
+                    .all(|character| character.is_alphanumeric() || character == '_')
+                    .then(|| name.to_owned());
+            }
+        }
+    }
+}
+
+/// Splits an audit line such as `pub fn polars_plan::dsl::Expr::abs(self) -> Self`
+/// into its path and its return type, as written.
+fn split_signature(rest: &str) -> Option<(&str, Option<&str>)> {
+    // The parameters open at the first parenthesis outside the generics.
+    let mut depth = 0usize;
+    let mut open = None;
+    let bytes = rest.as_bytes();
+    for (at, character) in rest.char_indices() {
+        match character {
+            '<' => depth += 1,
+            '>' if at > 0 && bytes[at - 1] != b'-' => depth = depth.saturating_sub(1),
+            '(' if depth == 0 => {
+                open = Some(at);
+                break;
+            }
+            _ => {}
+        }
+    }
+    let open = open?;
+    let path = rest[..open].split('<').next()?;
+    let after = rest[closing(rest, open)? + 1..].trim_start();
+    let returned = after.strip_prefix("->").map(|returned| {
+        let returned = returned.trim();
+        returned.split(" where ").next().unwrap_or(returned)
+    });
+    Some((path, returned))
 }
 
 impl RustApi {
-    /// Reads the public functions of an audit, such as `pub fn polars_plan::dsl::Expr::abs(self) -> Self`.
+    /// Reads the public functions of an audit.
     pub fn read(&mut self, audit: &str) {
         for line in audit.lines() {
             let Some(rest) = [
@@ -61,26 +157,43 @@ impl RustApi {
             .find_map(|prefix| line.strip_prefix(prefix)) else {
                 continue;
             };
-            let path = rest.split(['<', '(']).next().unwrap_or_default();
+            let Some((path, returned)) = split_signature(rest) else {
+                continue;
+            };
             let segments = path.split("::").collect::<Vec<_>>();
             let [.., parent, name] = segments.as_slice() else {
                 continue;
             };
             if parent.starts_with(|character: char| character.is_ascii_uppercase()) {
+                let returned = returned.and_then(|returned| named_type(returned, Some(parent)));
                 self.methods
                     .entry((*parent).to_owned())
                     .or_default()
-                    .insert((*name).to_owned());
+                    .insert((*name).to_owned(), returned);
             } else {
-                self.functions.insert((*name).to_owned());
+                let returned = returned.and_then(|returned| named_type(returned, None));
+                self.functions.insert((*name).to_owned(), returned);
             }
         }
     }
 
-    fn has_method(&self, owner: &str, name: &str) -> bool {
-        self.methods
-            .get(owner)
-            .is_some_and(|methods| methods.contains(name))
+    /// Returns what `owner::method` returns, if the API has it: the type, when that is a type of the API.
+    fn method(&self, owner: &str, method: &str) -> Option<Option<&str>> {
+        let returned = self.methods.get(owner)?.get(method)?;
+        Some(
+            returned
+                .as_deref()
+                .filter(|returned| self.methods.contains_key(*returned)),
+        )
+    }
+
+    fn function(&self, name: &str) -> Option<Option<&str>> {
+        let returned = self.functions.get(name)?;
+        Some(
+            returned
+                .as_deref()
+                .filter(|returned| self.methods.contains_key(*returned)),
+        )
     }
 }
 
@@ -92,139 +205,103 @@ pub struct Reached {
     pub internals: bool,
 }
 
-/// The accessors that open an expression namespace, and the namespace type each opens.
-const NAMESPACES: &[(&str, &str)] = &[
-    ("str", "StringNameSpace"),
-    ("dt", "DateLikeNameSpace"),
-    ("list", "ListNameSpace"),
-    ("arr", "ArrayNameSpace"),
-    ("cat", "CategoricalNameSpace"),
-    ("name", "ExprNameNameSpace"),
-    ("struct_", "StructNameSpace"),
-    ("binary", "BinaryNameSpace"),
-    ("meta", "MetaNameSpace"),
-];
-
 /// Methods that hand on the value they are called on, such as cloning it.
 const PASSING_ON: &[&str] = &[
     "clone", "read", "write", "into", "to_owned", "as_ref", "borrow", "unwrap", "expect", "take",
 ];
 
-/// Fields of a binding object that hold the Polars value it wraps.
-const WRAPPED: &[&str] = &["inner", "ldf", "lgb"];
+/// The fields of a binding object that hold the Polars value it wraps, and the
+/// type that value has when the field is not on `self`.
+const WRAPPED: &[(&str, &str)] = &[
+    ("inner", "Expr"),
+    ("ldf", "LazyFrame"),
+    ("lgb", "LazyGroupBy"),
+];
 
-/// Returns the Rust types whose methods a binding type's methods call.
-fn rust_types(binding_type: &str) -> &'static [&'static str] {
-    match binding_type {
-        "PyExpr" => &["Expr"],
-        "PyLazyFrame" => &[
-            "LazyFrame",
-            "JoinBuilder",
-            "LazyGroupBy",
-            "LazyCsvReader",
-            "LazyJsonLineReader",
-            "LazyFileListReader",
-        ],
-        "PyLazyGroupBy" => &["LazyGroupBy"],
-        "PyWhen" | "PyThen" | "PyChainedWhen" | "PyChainedThen" => {
-            &["When", "Then", "ChainedWhen", "ChainedThen"]
-        }
-        _ => &["Expr", "LazyFrame"],
-    }
-}
-
-/// What an expression in a binding method evaluates to, as far as the trace needs to know.
-#[derive(Clone, Debug, Eq, PartialEq)]
-enum Value {
-    /// A Polars value, such as the expression a binding object wraps.
-    Polars,
-    /// An expression namespace of the given type.
-    Namespace(&'static str),
-    /// Anything else.
-    Other,
-}
-
-/// Follows one binding method's body.
+/// Follows one binding body.
 struct Trace<'a> {
     api: &'a RustApi,
-    types: &'static [&'static str],
-    locals: HashMap<String, Value>,
+    /// The Rust type the binding object's own wrapped field holds, such as `Expr` for `PyExpr`.
+    own: Option<String>,
+    locals: HashMap<String, Option<String>>,
     reached: Reached,
 }
 
 impl Trace<'_> {
-    fn value_of(&self, expr: &syn::Expr) -> Value {
+    /// Returns the Rust type of the API that `expr` evaluates to, if it is one.
+    fn type_of(&self, expr: &syn::Expr) -> Option<String> {
         match expr {
-            syn::Expr::Field(field) => match &field.member {
-                syn::Member::Named(name) if WRAPPED.contains(&name.to_string().as_str()) => {
-                    Value::Polars
+            syn::Expr::Field(field) => {
+                let syn::Member::Named(name) = &field.member else {
+                    return None;
+                };
+                let (_, other) = WRAPPED.iter().find(|(wrapped, _)| name == wrapped)?;
+                let on_self = matches!(field.base.as_ref(), syn::Expr::Path(path) if path.path.is_ident("self"))
+                    || matches!(field.base.as_ref(), syn::Expr::MethodCall(call)
+                        if matches!(call.receiver.as_ref(), syn::Expr::Path(path) if path.path.is_ident("self")));
+                if on_self {
+                    self.own.clone()
+                } else {
+                    Some((*other).to_owned())
                 }
-                _ => Value::Other,
-            },
+            }
             syn::Expr::Path(path) => path
                 .path
                 .get_ident()
-                .and_then(|ident| self.locals.get(&ident.to_string()).cloned())
-                .unwrap_or(Value::Other),
+                .and_then(|ident| self.locals.get(&ident.to_string()).cloned().flatten()),
             syn::Expr::Call(call) => match call.func.as_ref() {
-                syn::Expr::Path(path)
-                    if self.is_function(&path.path) || self.associated(&path.path).is_some() =>
-                {
-                    Value::Polars
-                }
-                _ => Value::Other,
+                syn::Expr::Path(path) => match self.associated(&path.path) {
+                    Some((owner, function)) => self
+                        .api
+                        .method(&owner, &function)
+                        .flatten()
+                        .map(str::to_owned),
+                    None => self
+                        .free_function(&path.path)
+                        .and_then(|name| self.api.function(&name).flatten().map(str::to_owned)),
+                },
+                _ => None,
             },
             syn::Expr::MethodCall(call) => {
+                let owner = self.type_of(&call.receiver)?;
                 let method = call.method.to_string();
-                match self.value_of(&call.receiver) {
-                    Value::Polars if PASSING_ON.contains(&method.as_str()) => Value::Polars,
-                    Value::Polars if call.args.is_empty() => namespace(&method)
-                        .map(Value::Namespace)
-                        .or_else(|| self.method_owner(&method).map(|_| Value::Polars))
-                        .unwrap_or(Value::Other),
-                    Value::Polars if self.method_owner(&method).is_some() => Value::Polars,
-                    Value::Namespace(owner) if self.api.has_method(owner, &method) => Value::Polars,
-                    _ => Value::Other,
+                if PASSING_ON.contains(&method.as_str()) {
+                    return Some(owner);
                 }
+                self.api
+                    .method(&owner, &method)
+                    .flatten()
+                    .map(str::to_owned)
             }
-            syn::Expr::Paren(inner) => self.value_of(&inner.expr),
-            syn::Expr::Group(inner) => self.value_of(&inner.expr),
-            syn::Expr::Reference(inner) => self.value_of(&inner.expr),
-            syn::Expr::Try(inner) => self.value_of(&inner.expr),
-            syn::Expr::Unary(inner) => self.value_of(&inner.expr),
-            syn::Expr::Cast(inner) => self.value_of(&inner.expr),
-            _ => Value::Other,
+            syn::Expr::Paren(inner) => self.type_of(&inner.expr),
+            syn::Expr::Group(inner) => self.type_of(&inner.expr),
+            syn::Expr::Reference(inner) => self.type_of(&inner.expr),
+            syn::Expr::Try(inner) => self.type_of(&inner.expr),
+            syn::Expr::Unary(inner) => self.type_of(&inner.expr),
+            syn::Expr::Cast(inner) => self.type_of(&inner.expr),
+            _ => None,
         }
     }
 
-    /// Returns the Rust type among this binding type's whose method `method` is.
-    fn method_owner(&self, method: &str) -> Option<&'static str> {
-        self.types
-            .iter()
-            .copied()
-            .find(|owner| self.api.has_method(owner, method))
-    }
-
-    /// Returns `Type::function` when `path` names an associated function of the Rust API,
-    /// such as `LazyCsvReader::new_with_sources`.
-    fn associated(&self, path: &syn::Path) -> Option<String> {
+    /// Returns the type and function when `path` names an associated function of
+    /// the Rust API, such as `LazyCsvReader::new_with_sources`.
+    fn associated(&self, path: &syn::Path) -> Option<(String, String)> {
         let segments = path.segments.iter().collect::<Vec<_>>();
         let [.., owner, function] = segments.as_slice() else {
             return None;
         };
         let (owner, function) = (owner.ident.to_string(), function.ident.to_string());
         self.api
-            .has_method(&owner, &function)
-            .then(|| format!("{owner}::{function}"))
+            .method(&owner, &function)
+            .map(|_| (owner, function))
     }
 
-    fn is_function(&self, path: &syn::Path) -> bool {
-        path.segments
-            .last()
-            .is_some_and(|segment| self.api.functions.contains(&segment.ident.to_string()))
+    fn free_function(&self, path: &syn::Path) -> Option<String> {
+        let name = path.segments.last()?.ident.to_string();
+        self.api.functions.contains_key(&name).then_some(name)
     }
 
-    fn bind(&mut self, pattern: &syn::Pat, value: Value) {
+    fn bind(&mut self, pattern: &syn::Pat, value: Option<String>) {
         match pattern {
             syn::Pat::Ident(ident) => {
                 self.locals.insert(ident.ident.to_string(), value);
@@ -235,60 +312,44 @@ impl Trace<'_> {
     }
 }
 
-/// Returns the namespace type an accessor opens, if it is one.
-fn namespace(accessor: &str) -> Option<&'static str> {
-    NAMESPACES
-        .iter()
-        .find(|(name, _)| *name == accessor)
-        .map(|(_, owner)| *owner)
-}
-
 impl<'ast> Visit<'ast> for Trace<'_> {
     fn visit_expr_method_call(&mut self, call: &'ast syn::ExprMethodCall) {
-        let method = call.method.to_string();
-        match self.value_of(&call.receiver) {
-            Value::Polars if !(call.args.is_empty() && namespace(&method).is_some()) => {
-                if let Some(owner) = self.method_owner(&method) {
-                    self.reached.items.insert(format!("{owner}::{method}"));
-                }
-            }
-            Value::Namespace(owner) if self.api.has_method(owner, &method) => {
+        if let Some(owner) = self.type_of(&call.receiver) {
+            let method = call.method.to_string();
+            if self.api.method(&owner, &method).is_some() {
                 self.reached.items.insert(format!("{owner}::{method}"));
             }
-            _ => {}
         }
         visit::visit_expr_method_call(self, call);
     }
 
     fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
         if let syn::Expr::Path(path) = call.func.as_ref() {
-            if let Some(associated) = self.associated(&path.path) {
-                self.reached.items.insert(associated);
-            } else if self.is_function(&path.path)
-                && let Some(segment) = path.path.segments.last()
-            {
-                self.reached.items.insert(format!("{}()", segment.ident));
+            if let Some((owner, function)) = self.associated(&path.path) {
+                self.reached.items.insert(format!("{owner}::{function}"));
+            } else if let Some(name) = self.free_function(&path.path) {
+                self.reached.items.insert(format!("{name}()"));
             }
         }
         visit::visit_expr_call(self, call);
+    }
+
+    fn visit_local(&mut self, local: &'ast syn::Local) {
+        if let Some(init) = &local.init {
+            let value = self.type_of(&init.expr);
+            self.bind(&local.pat, value);
+        }
+        visit::visit_local(self, local);
     }
 
     fn visit_expr_assign(&mut self, assign: &'ast syn::ExprAssign) {
         if let syn::Expr::Path(path) = assign.left.as_ref()
             && let Some(ident) = path.path.get_ident()
         {
-            let value = self.value_of(&assign.right);
+            let value = self.type_of(&assign.right);
             self.locals.insert(ident.to_string(), value);
         }
         visit::visit_expr_assign(self, assign);
-    }
-
-    fn visit_local(&mut self, local: &'ast syn::Local) {
-        if let Some(init) = &local.init {
-            let value = self.value_of(&init.expr);
-            self.bind(&local.pat, value);
-        }
-        visit::visit_local(self, local);
     }
 
     fn visit_path(&mut self, path: &'ast syn::Path) {
@@ -311,11 +372,18 @@ impl<'ast> Visit<'ast> for Trace<'_> {
     }
 }
 
+/// Returns the Rust type a binding type wraps: its name without `Py`, when the
+/// API has that type, as `Expr` for `PyExpr`.
+fn wrapped_type(binding_type: &str, api: &RustApi) -> Option<String> {
+    let name = binding_type.strip_prefix("Py")?;
+    api.methods.contains_key(name).then(|| name.to_owned())
+}
+
 /// Follows a binding body and returns what it reaches.
 pub fn trace_body(body: &syn::Block, binding_type: &str, api: &RustApi) -> Reached {
     let mut trace = Trace {
         api,
-        types: rust_types(binding_type),
+        own: wrapped_type(binding_type, api),
         locals: HashMap::new(),
         reached: Reached::default(),
     };
@@ -324,7 +392,8 @@ pub fn trace_body(body: &syn::Block, binding_type: &str, api: &RustApi) -> Reach
 }
 
 /// The binding: what each of its methods and module functions reaches, keyed
-/// by the binding type, or `module`, and the name Python calls it by.
+/// by the binding type, or `module`, and the name Python calls it by. A
+/// constructor is also listed as `__new__`.
 pub type Binding = BTreeMap<(String, String), Reached>;
 
 /// Returns whether `attributes` hold the attribute `name`, such as `pymethods`.
@@ -365,6 +434,13 @@ fn python_name(attributes: &[syn::Attribute], own: &syn::Ident) -> String {
     own.to_string()
 }
 
+/// Adds what an item reaches under `key`, joining it with anything already there.
+fn add(binding: &mut Binding, key: (String, String), reached: Reached) {
+    let entry = binding.entry(key).or_default();
+    entry.items.extend(reached.items);
+    entry.internals |= reached.internals;
+}
+
 fn read_items(items: &[syn::Item], api: &RustApi, binding: &mut Binding) {
     for item in items {
         match item {
@@ -382,17 +458,23 @@ fn read_items(items: &[syn::Item], api: &RustApi, binding: &mut Binding) {
                 };
                 for member in &block.items {
                     if let syn::ImplItem::Fn(method) = member {
+                        let reached = trace_body(&method.block, &owner, api);
+                        if has_attribute(&method.attrs, "new") {
+                            add(
+                                binding,
+                                (owner.clone(), "__new__".to_owned()),
+                                reached.clone(),
+                            );
+                        }
                         let name = python_name(&method.attrs, &method.sig.ident);
-                        binding.insert(
-                            (owner.clone(), name),
-                            trace_body(&method.block, &owner, api),
-                        );
+                        add(binding, (owner.clone(), name), reached);
                     }
                 }
             }
             syn::Item::Fn(function) if has_attribute(&function.attrs, "pyfunction") => {
                 let name = python_name(&function.attrs, &function.sig.ident);
-                binding.insert(
+                add(
+                    binding,
                     ("module".to_owned(), name),
                     trace_body(&function.block, "module", api),
                 );
@@ -480,6 +562,13 @@ fn strings(value: &serde_json::Value, field: &str) -> Result<Vec<String>, String
         .collect()
 }
 
+fn text(value: &serde_json::Value, field: &str) -> Result<String, String> {
+    value[field]
+        .as_str()
+        .map(str::to_owned)
+        .ok_or_else(|| format!("an inventory item has no {field}"))
+}
+
 /// Reads the JSON `python/inventory.py` prints.
 pub fn parse_inventory(json: &str) -> Result<Vec<PythonItem>, String> {
     let value: serde_json::Value =
@@ -501,14 +590,9 @@ pub fn parse_inventory(json: &str) -> Result<Vec<PythonItem>, String> {
                 })
                 .collect::<Result<Vec<_>, String>>()?;
             Ok(PythonItem {
-                owner: item["owner"]
-                    .as_str()
-                    .ok_or("an inventory item has no owner")?
-                    .to_owned(),
-                name: item["name"]
-                    .as_str()
-                    .ok_or("an inventory item has no name")?
-                    .to_owned(),
+                owner: text(item, "owner")?,
+                name: text(item, "name")?,
+                kind: text(item, "kind")?,
                 parameters: strings(item, "parameters")?,
                 deprecated: item["deprecated"]
                     .as_bool()
@@ -553,13 +637,19 @@ pub struct Traced {
 
 /// Traces one Python item through the binding.
 pub fn trace_item(item: &PythonItem, binding: &Binding) -> Traced {
-    let signature = format!(
-        "{}.{}({}){}",
-        item.owner,
-        item.name,
-        item.parameters.join(", "),
-        if item.deprecated { " deprecated" } else { "" }
-    );
+    let mut signature = if item.kind == "property" {
+        format!("{}.{} property", item.owner, item.name)
+    } else {
+        format!(
+            "{}.{}({})",
+            item.owner,
+            item.name,
+            item.parameters.join(", ")
+        )
+    };
+    if item.deprecated {
+        signature.push_str(" deprecated");
+    }
     if item.binding.is_empty() {
         let uses = if item.uses.is_empty() {
             String::new()
@@ -629,8 +719,10 @@ pub fn render_python_artifact(source: Option<&str>, traced: &[Traced]) -> String
         output.push('\n');
     }
     output.push_str(
-        "# covers: Expr and its namespaces, when/then, LazyFrame, LazyGroupBy, the functions of\n\
-         #   polars.functions and the scan_* functions; not the eager DataFrame and Series\n",
+        "# covers: the public methods, properties and operators of Expr and its namespaces str,\n\
+         #   dt, list, arr, cat, name, struct, bin, meta, map and ext; of when/then, LazyFrame and\n\
+         #   LazyGroupBy; and the functions polars.functions exports and the scan_* functions.\n\
+         #   Not the eager DataFrame and Series, selectors, configuration or the read_* functions.\n",
     );
     output.push_str(
         "# each line: item(parameters) | binding calls | public Rust items reached | how\n",

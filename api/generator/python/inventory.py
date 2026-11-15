@@ -1,15 +1,25 @@
 """Lists the public Python API of a Polars source tree, read with Python's own parser.
 
-For each public method and function it prints the parameters with their
-defaults, whether it is deprecated, the calls it makes into the Rust binding
-(through a binding object such as ``self._pyexpr``, a binding class such as
-``PyLazyFrame``, or the binding module ``plr``), and, for one that makes no
-such call, the public methods of its own class it uses instead.
+For each public method, property, operator and function it prints the
+parameters with their defaults, whether it is deprecated, the calls it makes
+into the Rust binding, and, for one that makes no such call, the Polars calls
+it is built from instead.
+
+A binding call is a call on a binding object (such as ``self._pyexpr``, or a
+local variable holding one), on a binding class (``PyLazyFrame.new_from_csv``,
+``plr.PyDataTypeExpr.of_expr``), to a binding class itself (a constructor,
+recorded as ``__new__``), or to a binding module function (``plr.col``, or a
+name imported from ``polars._plr``). Private helpers are followed, in the same
+module or imported from another, as are the methods of objects such helpers
+return: ``_select_engine(engine).collect(self)`` follows ``collect`` on the
+classes of the module ``_select_engine`` is defined in.
 
 Usage: python3 -I inventory.py <path to py-polars/src/polars>
 
-Nothing is imported from the tree, so no Python package needs installing.
-The output is JSON, sorted so that it does not depend on the order of files.
+Nothing is imported from the tree, so no Python package needs installing. The
+parser must read the syntax Polars is written in, so the Python running this
+must be at least the oldest Python Polars supports. The output is JSON, sorted
+so that it does not depend on the order of files.
 """
 
 import ast
@@ -17,8 +27,10 @@ import json
 import pathlib
 import sys
 
-# The classes read, in the order they are written: the name the audit gives
-# them, their file, the class, and the attributes that hold their binding object.
+# Python Polars requires this version at the release this reader was written for.
+MINIMUM_PYTHON = (3, 11)
+
+# The classes read: the name the audit gives them, their file and the class.
 CLASSES = [
     ("Expr", "expr/expr.py", "Expr"),
     ("Expr.str", "expr/string.py", "ExprStringNameSpace"),
@@ -30,6 +42,8 @@ CLASSES = [
     ("Expr.struct", "expr/struct.py", "ExprStructNameSpace"),
     ("Expr.bin", "expr/binary.py", "ExprBinaryNameSpace"),
     ("Expr.meta", "expr/meta.py", "ExprMetaNameSpace"),
+    ("Expr.map", "expr/map.py", "ExprMapNameSpace"),
+    ("Expr.ext", "expr/ext.py", "ExprExtensionNameSpace"),
     ("When", "expr/whenthen.py", "When"),
     ("Then", "expr/whenthen.py", "Then"),
     ("ChainedWhen", "expr/whenthen.py", "ChainedWhen"),
@@ -49,9 +63,57 @@ BINDING_ATTRIBUTES = {
     "_chained_then": "PyChainedThen",
 }
 
-# The names under which the binding module and binding classes are used.
-BINDING_MODULE = "plr"
-BINDING_CLASSES = set(BINDING_ATTRIBUTES.values())
+# The module the binding is, and the name it is imported under.
+BINDING_MODULE = "polars._plr"
+BINDING_MODULE_NAME = "plr"
+
+# The modules Polars' own Python API is used through inside the package.
+POLARS_MODULES = {"F", "pl"}
+
+# The operators a class can define, listed as part of its public API.
+OPERATORS = {
+    "__add__", "__radd__", "__sub__", "__rsub__", "__mul__", "__rmul__",
+    "__truediv__", "__rtruediv__", "__floordiv__", "__rfloordiv__", "__mod__",
+    "__rmod__", "__pow__", "__rpow__", "__neg__", "__pos__", "__abs__",
+    "__invert__", "__and__", "__rand__", "__or__", "__ror__", "__xor__",
+    "__rxor__", "__eq__", "__ne__", "__lt__", "__le__", "__gt__", "__ge__",
+    "__getitem__", "__contains__",
+}
+
+
+def decorator_names(function):
+    names = []
+    for decorator in function.decorator_list:
+        called = decorator.func if isinstance(decorator, ast.Call) else decorator
+        names.append(called.attr if isinstance(called, ast.Attribute) else getattr(called, "id", ""))
+    return names
+
+
+def is_overload(function):
+    return "overload" in decorator_names(function)
+
+
+def is_property(function):
+    return "property" in decorator_names(function)
+
+
+def is_deprecated(function):
+    """Returns whether `function` itself is deprecated, by `@deprecated`; deprecating one
+    of its parameters does not count."""
+    return "deprecated" in decorator_names(function)
+
+
+def is_listed(function):
+    """Returns whether `function` belongs in the inventory: public or an operator, not an
+    overload stub or a property setter."""
+    if function.name.startswith("_") and function.name not in OPERATORS:
+        return False
+    if is_overload(function):
+        return False
+    return not any(
+        isinstance(decorator, ast.Attribute) and decorator.attr in ("setter", "deleter")
+        for decorator in function.decorator_list
+    )
 
 
 def parameters(function):
@@ -61,10 +123,9 @@ def parameters(function):
     defaults = [None] * (len(positional) - len(arguments.defaults)) + list(arguments.defaults)
     out = []
     for index, (argument, default) in enumerate(zip(positional, defaults)):
-        if index == 0 and argument.arg in ("self", "cls"):
-            continue
-        out.append(argument.arg if default is None else f"{argument.arg}={ast.unparse(default)}")
-        if arguments.posonlyargs and argument is arguments.posonlyargs[-1]:
+        if not (index == 0 and argument.arg in ("self", "cls")):
+            out.append(argument.arg if default is None else f"{argument.arg}={ast.unparse(default)}")
+        if arguments.posonlyargs and argument is arguments.posonlyargs[-1] and out:
             out.append("/")
     if arguments.vararg:
         out.append(f"*{arguments.vararg.arg}")
@@ -77,26 +138,68 @@ def parameters(function):
     return out
 
 
-def is_deprecated(function):
-    """Returns whether `function` itself is deprecated, by `@deprecated`; deprecating one
-    of its parameters does not count."""
-    for decorator in function.decorator_list:
-        called = decorator.func if isinstance(decorator, ast.Call) else decorator
-        name = called.attr if isinstance(called, ast.Attribute) else getattr(called, "id", "")
-        if name == "deprecated":
-            return True
-    return False
+class Module:
+    """One module of the package: its tree, its functions and classes, and what it imports."""
+
+    def __init__(self, root, name):
+        self.name = name
+        path = root.joinpath(*name.split(".")[1:])
+        path = path.with_suffix(".py") if path.with_suffix(".py").exists() else path / "__init__.py"
+        self.tree = ast.parse(path.read_text(encoding="utf-8"))
+        self.functions = {}
+        self.classes = {}
+        for node in self.tree.body:
+            if isinstance(node, ast.FunctionDef) and not is_overload(node):
+                self.functions[node.name] = node
+            elif isinstance(node, ast.ClassDef):
+                self.classes[node.name] = node
+        # Imports anywhere in the module, including under `if TYPE_CHECKING:` and in functions.
+        self.imports = {}
+        self.binding_names = {}
+        for node in ast.walk(self.tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                for alias in node.names:
+                    local = alias.asname or alias.name
+                    if node.module == BINDING_MODULE:
+                        self.binding_names[local] = alias.name
+                    elif node.module.startswith("polars."):
+                        self.imports[local] = (node.module, alias.name)
 
 
-def is_listed(function):
-    """Returns whether `function` belongs in the inventory: public, not a property, not an overload stub."""
-    if function.name.startswith("_"):
-        return False
-    for decorator in function.decorator_list:
-        text = ast.unparse(decorator)
-        if text in ("property", "overload", "typing.overload") or text.endswith(".setter"):
-            return False
-    return True
+class Package:
+    """The package, with its modules read once each."""
+
+    def __init__(self, root):
+        self.root = root
+        self.modules = {}
+
+    def module(self, name):
+        if name not in self.modules:
+            self.modules[name] = Module(self.root, name)
+        return self.modules[name]
+
+    def resolve(self, module, name):
+        """Returns the module and definition `name` means in `module`, following imports."""
+        seen = set()
+        while (module.name, name) not in seen:
+            seen.add((module.name, name))
+            if name in module.functions:
+                return module, module.functions[name]
+            if name in module.classes:
+                return module, module.classes[name]
+            if name not in module.imports:
+                return None
+            target, original = module.imports[name]
+            try:
+                module = self.module(target)
+            except FileNotFoundError:
+                return None
+            name = original
+        return None
+
+
+def binding_class(name):
+    return name.startswith("Py")
 
 
 def binding_root(node):
@@ -113,143 +216,236 @@ def binding_root(node):
             return None
 
 
-def binding_locals(node):
-    """Returns the local names `node` assigns a binding object to, with its binding type."""
+# Python's operators, and the method of the binding object each calls.
+BINARY = {
+    ast.Add: "add", ast.Sub: "sub", ast.Mult: "mul", ast.Div: "truediv",
+    ast.FloorDiv: "floordiv", ast.Mod: "mod", ast.Pow: "pow", ast.BitAnd: "and",
+    ast.BitOr: "or", ast.BitXor: "xor",
+}
+UNARY = {ast.USub: "__neg__", ast.UAdd: "__pos__", ast.Invert: "__invert__"}
+
+
+def binding_type_of(node, held):
+    """Returns the binding type `node` evaluates to: a binding object, or a local holding one."""
+    if isinstance(node, ast.Name):
+        return held.get(node.id)
+    return binding_root(node)
+
+
+def binding_calls(node, module):
+    """Returns the binding calls in `node`, as (binding type or "module", name) pairs."""
     held = {}
     for child in ast.walk(node):
         if isinstance(child, ast.Assign) and len(child.targets) == 1 and isinstance(child.targets[0], ast.Name):
             kind = binding_root(child.value)
             if kind is not None:
                 held[child.targets[0].id] = kind
-    return held
-
-
-def binding_calls(node):
-    """Returns the binding calls in `node`, as (binding type or "module", name) pairs."""
     calls = set()
-    held = binding_locals(node)
     for child in ast.walk(node):
-        if not isinstance(child, ast.Attribute):
-            continue
-        holder = child.value
-        if isinstance(holder, ast.Attribute) and holder.attr in BINDING_ATTRIBUTES:
-            calls.add((BINDING_ATTRIBUTES[holder.attr], child.attr))
-        elif isinstance(holder, ast.Name) and holder.id in held:
-            calls.add((held[holder.id], child.attr))
-        elif isinstance(holder, ast.Name) and holder.id == BINDING_MODULE:
-            # A binding class reached through the module, as plr.PyExpr, is not a module function.
-            if not child.attr.startswith("Py"):
-                calls.add(("module", child.attr))
-        elif (
-            isinstance(holder, ast.Attribute)
-            and isinstance(holder.value, ast.Name)
-            and holder.value.id == BINDING_MODULE
-            and holder.attr.startswith("Py")
-        ):
-            calls.add((holder.attr, child.attr))
-        elif isinstance(holder, ast.Name) and holder.id in BINDING_CLASSES:
-            calls.add((holder.id, child.attr))
+        if isinstance(child, ast.Attribute):
+            holder = child.value
+            if isinstance(holder, ast.Attribute) and holder.attr in BINDING_ATTRIBUTES:
+                calls.add((BINDING_ATTRIBUTES[holder.attr], child.attr))
+            elif isinstance(holder, ast.Name) and holder.id in held:
+                calls.add((held[holder.id], child.attr))
+            elif isinstance(holder, ast.Name) and holder.id == BINDING_MODULE_NAME:
+                if not binding_class(child.attr):
+                    calls.add(("module", child.attr))
+            elif (
+                isinstance(holder, ast.Attribute)
+                and isinstance(holder.value, ast.Name)
+                and holder.value.id == BINDING_MODULE_NAME
+                and binding_class(holder.attr)
+            ):
+                calls.add((holder.attr, child.attr))
+            elif isinstance(holder, ast.Name) and binding_class(module.binding_names.get(holder.id, "")):
+                calls.add((module.binding_names[holder.id], child.attr))
+            elif isinstance(holder, ast.Name) and holder.id in BINDING_ATTRIBUTES.values():
+                calls.add((holder.id, child.attr))
+        elif isinstance(child, ast.BinOp) and type(child.op) in BINARY:
+            # Python turns the other operand into a binding object first, so the binding's
+            # own operator method is called whichever side the binding object is on.
+            kind = binding_type_of(child.left, held) or binding_type_of(child.right, held)
+            if kind is not None:
+                calls.add((kind, f"__{BINARY[type(child.op)]}__"))
+        elif isinstance(child, ast.UnaryOp) and type(child.op) in UNARY:
+            operand = binding_type_of(child.operand, held)
+            if operand is not None:
+                calls.add((operand, UNARY[type(child.op)]))
+        elif isinstance(child, ast.Call):
+            func = child.func
+            if isinstance(func, ast.Name) and func.id in module.binding_names:
+                original = module.binding_names[func.id]
+                calls.add((original, "__new__") if binding_class(original) else ("module", original))
+            elif (
+                isinstance(func, ast.Attribute)
+                and isinstance(func.value, ast.Name)
+                and func.value.id == BINDING_MODULE_NAME
+                and binding_class(func.attr)
+            ):
+                calls.add((func.attr, "__new__"))
     return calls
 
 
-def own_methods_used(node, public):
-    """Returns the public methods of the same class that `node` calls on `self`."""
-    return {
-        child.attr
-        for child in ast.walk(node)
-        if isinstance(child, ast.Attribute)
-        and isinstance(child.value, ast.Name)
-        and child.value.id == "self"
-        and child.attr in public
-    }
+def polars_calls_used(node, own):
+    """Returns the Polars calls `node` is built from: functions called through `F` or `pl`,
+    methods called on their results, and the public methods in `own` it calls on `self`."""
+    used = set()
+    for child in ast.walk(node):
+        if isinstance(child, ast.Call) and isinstance(child.func, ast.Attribute):
+            holder = child.func.value
+            if isinstance(holder, ast.Name) and holder.id in POLARS_MODULES:
+                used.add(child.func.attr)
+            elif isinstance(holder, ast.Call):
+                used.add(child.func.attr)
+            elif isinstance(holder, ast.Name) and holder.id == "self" and child.func.attr in own:
+                used.add(child.func.attr)
+    return used
 
 
-def module_helpers(tree):
-    """Returns the private top-level functions of a module by name."""
-    return {
-        node.name: node
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name.startswith("_")
-    }
+def subclasses(module, cls):
+    """Returns `cls` and the classes of `module` that derive from it, directly or not."""
+    found, names, changed = [cls], {cls.name}, True
+    while changed:
+        changed = False
+        for candidate in module.classes.values():
+            if candidate.name in names:
+                continue
+            bases = {base.id for base in candidate.bases if isinstance(base, ast.Name)}
+            if bases & names:
+                found.append(candidate)
+                names.add(candidate.name)
+                changed = True
+    return found
 
 
-def with_helpers(node, helpers, own=None):
-    """Returns the binding calls of `node` and of the private functions it calls,
-    transitively: module functions, and the private methods in `own` it calls on `self`."""
-    own = own or {}
-    calls, seen, waiting = set(), set(), [node]
+def methods_named(classes, name):
+    for cls in classes:
+        for item in cls.body:
+            if isinstance(item, ast.FunctionDef) and item.name == name and not is_overload(item):
+                yield item, cls
+
+
+def returned_classes(package, module, helper):
+    """Returns the module and classes a helper's return annotation names, with their
+    subclasses there; otherwise every class of the helper's own module."""
+    annotation = helper.returns
+    if isinstance(annotation, ast.Constant) and isinstance(annotation.value, str):
+        annotation = ast.parse(annotation.value, mode="eval").body
+    if isinstance(annotation, ast.Name):
+        found = package.resolve(module, annotation.id)
+        if found and isinstance(found[1], ast.ClassDef):
+            return found[0], subclasses(found[0], found[1])
+    return module, list(module.classes.values())
+
+
+def follow(package, module, node, own_class=None):
+    """Returns the binding calls of `node` and of the private code it reaches, transitively:
+    private functions of its module or imported from another, the private methods of its
+    class called on `self`, and the methods called on what such a function returns."""
+    calls, seen, waiting = set(), set(), [(module, node, own_class)]
     while waiting:
-        current = waiting.pop()
-        calls |= binding_calls(current)
+        current_module, current, cls = waiting.pop()
+        calls |= binding_calls(current, current_module)
+        private = {}
+        if cls is not None:
+            private = {
+                item.name: item
+                for item in cls.body
+                if isinstance(item, ast.FunctionDef) and item.name.startswith("_") and not is_overload(item)
+            }
+        # Locals that hold what a private helper returns.
+        helper_results = {}
+        for child in ast.walk(current):
+            if (
+                isinstance(child, ast.Assign)
+                and len(child.targets) == 1
+                and isinstance(child.targets[0], ast.Name)
+                and isinstance(child.value, ast.Call)
+                and isinstance(child.value.func, ast.Name)
+                and child.value.func.id.startswith("_")
+            ):
+                helper_results[child.targets[0].id] = child.value.func.id
         for child in ast.walk(current):
             if not isinstance(child, ast.Call):
                 continue
             func = child.func
-            if isinstance(func, ast.Name) and func.id in helpers:
-                found = ("module", func.id, helpers[func.id])
+            targets = []
+            helper = None
+            if isinstance(func, ast.Attribute):
+                if (
+                    isinstance(func.value, ast.Call)
+                    and isinstance(func.value.func, ast.Name)
+                    and func.value.func.id.startswith("_")
+                ):
+                    helper = func.value.func.id
+                elif isinstance(func.value, ast.Name) and func.value.id in helper_results:
+                    helper = helper_results[func.value.id]
+            if isinstance(func, ast.Name) and func.id.startswith("_"):
+                found = package.resolve(current_module, func.id)
+                if found and isinstance(found[1], ast.FunctionDef):
+                    targets.append((found[0], found[1], None))
             elif (
                 isinstance(func, ast.Attribute)
                 and isinstance(func.value, ast.Name)
                 and func.value.id == "self"
-                and func.attr in own
+                and func.attr in private
             ):
-                found = ("own", func.attr, own[func.attr])
-            else:
-                continue
-            if found[:2] not in seen:
-                seen.add(found[:2])
-                waiting.append(found[2])
+                targets.append((current_module, private[func.attr], cls))
+            elif helper is not None:
+                # A method called on what a private helper returns: that method of the
+                # class the helper's return annotation names and of its subclasses.
+                found = package.resolve(current_module, helper)
+                if found and isinstance(found[1], ast.FunctionDef):
+                    targets.append((found[0], found[1], None))
+                    home, classes = returned_classes(package, found[0], found[1])
+                    for item, candidate in methods_named(classes, func.attr):
+                        targets.append((home, item, candidate))
+            for target in targets:
+                key = (target[0].name, id(target[1]))
+                if key not in seen:
+                    seen.add(key)
+                    waiting.append(target)
     return calls
 
 
-def entry(owner, name, function, calls, uses):
+def entry(owner, name, function, calls, uses, kind):
     return {
         "owner": owner,
         "name": name,
-        "parameters": parameters(function),
+        "kind": kind,
+        "parameters": [] if kind == "property" else parameters(function),
         "deprecated": is_deprecated(function),
-        "binding": sorted([kind, called] for kind, called in calls),
+        "binding": sorted([binding, called] for binding, called in calls),
         "uses": sorted(uses),
     }
 
 
-def read_classes(root):
+def read_classes(package):
     entries = []
+    namespaces = {owner.split(".")[1] for owner, _, _ in CLASSES if owner.startswith("Expr.")}
     for owner, relative, class_name in CLASSES:
-        tree = ast.parse((root / relative).read_text(encoding="utf-8"))
-        helpers = module_helpers(tree)
-        cls = next(
-            (node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == class_name),
-            None,
-        )
+        module = package.module("polars." + relative.removesuffix(".py").replace("/", "."))
+        cls = module.classes.get(class_name)
         if cls is None:
             raise SystemExit(f"class {class_name} not found in {relative}")
         methods = [node for node in cls.body if isinstance(node, ast.FunctionDef) and is_listed(node)]
         public = {method.name for method in methods}
-        private = {
-            node.name: node
-            for node in cls.body
-            if isinstance(node, ast.FunctionDef) and node.name.startswith("_") and not node.name.startswith("__")
-        }
         for method in methods:
-            calls = with_helpers(method, helpers, private)
-            uses = set() if calls else own_methods_used(method, public) - {method.name}
-            entries.append(entry(owner, method.name, method, calls, uses))
+            kind = "property" if is_property(method) else "operator" if method.name in OPERATORS else "method"
+            if kind == "property" and owner == "Expr" and method.name in namespaces:
+                continue  # a namespace accessor; the namespace is listed as an owner of its own
+            calls = follow(package, module, method, cls)
+            uses = set() if calls else polars_calls_used(method, public) - {method.name}
+            entries.append(entry(owner, method.name, method, calls, uses, kind))
     return entries
 
 
-def module_file(root, module):
-    """Returns the file of a module of the package, such as `polars.functions.col`."""
-    parts = module.split(".")[1:]
-    path = root.joinpath(*parts)
-    return path.with_suffix(".py") if path.with_suffix(".py").exists() else path / "__init__.py"
-
-
-def exported(root, package, prefix=""):
-    """Returns the public names a package's `__init__.py` imports, with the module and name each comes from."""
-    tree = ast.parse(module_file(root, package).read_text(encoding="utf-8"))
+def exported(package, name, prefix=""):
+    """Returns the public names a package's `__init__.py` imports, with where each comes from."""
+    module = package.module(name)
     names = []
-    for node in tree.body:
+    for node in module.tree.body:
         if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("polars."):
             for alias in node.names:
                 public = alias.asname or alias.name
@@ -258,23 +454,14 @@ def exported(root, package, prefix=""):
     return names
 
 
-def is_overload(function):
-    return any(ast.unparse(decorator) in ("overload", "typing.overload") for decorator in function.decorator_list)
-
-
-def find_function(root, module, name):
-    """Returns the module tree and the function `name` defines in `module`, following
-    re-exports; or the `__call__` of the class an instance `name` is made from."""
-    tree = ast.parse(module_file(root, module).read_text(encoding="utf-8"))
-    for node in tree.body:
-        if isinstance(node, ast.FunctionDef) and node.name == name and not is_overload(node):
-            return tree, node
-    for node in tree.body:
-        if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("polars."):
-            for alias in node.names:
-                if (alias.asname or alias.name) == name:
-                    return find_function(root, node.module, alias.name)
-    for node in tree.body:
+def callable_of(package, module, name):
+    """Returns the module, function and class of what `name` is in `module`: a function, or
+    the `__call__` of the class an instance `name` is made from."""
+    found = package.resolve(module, name)
+    if found and isinstance(found[1], ast.FunctionDef):
+        return found[0], found[1], None
+    home = found[0] if found else module
+    for node in home.tree.body:
         target = node.target if isinstance(node, ast.AnnAssign) else None
         if isinstance(node, ast.Assign) and len(node.targets) == 1:
             target = node.targets[0]
@@ -284,68 +471,37 @@ def find_function(root, module, name):
             and target.id == name
             and isinstance(value, ast.Call)
             and isinstance(value.func, ast.Name)
+            and value.func.id in home.classes
         ):
-            for cls in tree.body:
-                if isinstance(cls, ast.ClassDef) and cls.name == value.func.id:
-                    for method in cls.body:
-                        if isinstance(method, ast.FunctionDef) and method.name == "__call__":
-                            return tree, (method, cls)
+            cls = home.classes[value.func.id]
+            for method in cls.body:
+                if isinstance(method, ast.FunctionDef) and method.name == "__call__":
+                    return home, method, cls
     return None
 
 
-# The names under which Polars' own Python API is used inside the package.
-POLARS_MODULES = {"F", "pl"}
-
-
-def polars_calls_used(node):
-    """Returns the Polars functions `node` calls through `F` or `pl`, and the methods it calls on their results."""
-    used = set()
-    for child in ast.walk(node):
-        if isinstance(child, ast.Call) and isinstance(child.func, ast.Attribute):
-            holder = child.func.value
-            if isinstance(holder, ast.Name) and holder.id in POLARS_MODULES:
-                used.add(child.func.attr)
-            elif isinstance(holder, ast.Call):
-                used.add(child.func.attr)
-    return used
-
-
-def read_functions(root, package, prefix=""):
+def read_functions(package, name, prefix=""):
     entries = []
-    for public, module, name in exported(root, package, prefix):
-        located = find_function(root, module, name)
+    for public, module_name, original in exported(package, name, prefix):
+        located = callable_of(package, package.module(module_name), original)
         if located is None:
-            raise SystemExit(f"{public} is exported from {package} but no function was found for it")
-        tree, found = located
-        helpers = module_helpers(tree)
-        if isinstance(found, tuple):
-            function, cls = found
-            # An instance called as a function also reaches the binding through its class's helpers.
-            for method in cls.body:
-                if isinstance(method, ast.FunctionDef) and method.name.startswith("_"):
-                    helpers.setdefault(method.name, method)
-            calls = with_helpers(function, helpers)
-            for child in ast.walk(function):
-                if (
-                    isinstance(child, ast.Attribute)
-                    and isinstance(child.value, ast.Name)
-                    and child.value.id == "self"
-                    and child.attr in helpers
-                ):
-                    calls |= with_helpers(helpers[child.attr], helpers)
-        else:
-            function = found
-            calls = with_helpers(function, helpers)
-        uses = set() if calls else polars_calls_used(function) - {public}
-        entries.append(entry("polars", public, function, calls, uses))
+            raise SystemExit(f"{public} is exported from {name} but no function was found for it")
+        module, function, cls = located
+        calls = follow(package, module, function, cls)
+        uses = set() if calls else polars_calls_used(function, set())
+        entries.append(entry("polars", public, function, calls, uses, "function"))
     return entries
 
 
 def main():
-    root = pathlib.Path(sys.argv[1])
-    entries = read_classes(root)
-    entries += read_functions(root, "polars.functions")
-    entries += read_functions(root, "polars.io", prefix="scan_")
+    if sys.version_info < MINIMUM_PYTHON:
+        raise SystemExit(
+            "reading Polars needs Python {}.{} or newer, the oldest Python Polars supports".format(*MINIMUM_PYTHON)
+        )
+    package = Package(pathlib.Path(sys.argv[1]))
+    entries = read_classes(package)
+    entries += read_functions(package, "polars.functions")
+    entries += read_functions(package, "polars.io", prefix="scan_")
     order = {owner: index for index, (owner, _, _) in enumerate(CLASSES)}
     order["polars"] = len(order)
     seen, unique = set(), []
