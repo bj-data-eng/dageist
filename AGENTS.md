@@ -119,6 +119,7 @@ Source remains authoritative; never hand-edit generated artifacts.
 | Raster icons in `crates/dageist-tauri/icons/` | [icon procedure](docs/how-to.md#regenerate-the-application-icons) from `icon.svg` |
 | `ui/package-lock.json` | npm, from [ui/package.json](ui/package.json) |
 | `ui/dist/` (ignored) | `npm --prefix ui run build` |
+| `ui/apps/desktop/src/catalogue.json` | the host's catalogue view, written by its snapshot test; [refresh procedure](docs/how-to.md#refresh-the-catalogue-snapshot) |
 | `crates/dageist-tauri/gen/` (ignored) | `tauri-build`, during any build of `dageist-tauri` |
 | `api/public-api.txt`, `api/crates/*.txt`, `api/polars/*.txt` | [api/generator/](api/generator/src/lib.rs); [audit procedures](docs/how-to.md#check-the-public-api-audits) |
 | `api/generator/Cargo.lock` | Cargo, from [api/generator/Cargo.toml](api/generator/Cargo.toml) |
