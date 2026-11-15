@@ -202,6 +202,74 @@ def binding_class(name):
     return name.startswith("Py")
 
 
+def flag_test(test, dead):
+    """Returns which branch of an `if` on a flag that is off can run: "orelse" when the
+    test is `flag` or `flag is not None`, "body" when it is `not flag` or `flag is None`,
+    or None when the test is about something else."""
+    if isinstance(test, ast.Name) and test.id in dead:
+        return "orelse"
+    if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
+        inner = flag_test(test.operand, dead)
+        return {"orelse": "body", "body": "orelse"}.get(inner)
+    if (
+        isinstance(test, ast.Compare)
+        and isinstance(test.left, ast.Name)
+        and test.left.id in dead
+        and len(test.ops) == 1
+        and isinstance(test.comparators[0], ast.Constant)
+        and test.comparators[0].value is None
+    ):
+        if isinstance(test.ops[0], ast.IsNot):
+            return "orelse"
+        if isinstance(test.ops[0], ast.Is):
+            return "body"
+    return None
+
+
+def walk(node, dead=frozenset()):
+    """Walks `node` like `ast.walk`, leaving out the branch an `if` on a flag in `dead`
+    cannot take: a flag that is off because the call did not pass it."""
+    waiting = [node]
+    while waiting:
+        current = waiting.pop()
+        yield current
+        if isinstance(current, (ast.If, ast.IfExp)) and dead:
+            runs = flag_test(current.test, dead)
+            if runs is not None:
+                waiting.append(current.test)
+                branch = current.body if runs == "body" else current.orelse
+                waiting.extend(branch if isinstance(branch, list) else [branch])
+                continue
+        waiting.extend(ast.iter_child_nodes(current))
+
+
+def dead_flags(function, call):
+    """Returns the parameters of `function` that default to False or None and that `call`
+    does not pass, so they are off wherever the function runs from that call."""
+    if any(keyword.arg is None for keyword in call.keywords) or any(
+        isinstance(argument, ast.Starred) for argument in call.args
+    ):
+        return frozenset()
+    arguments = function.args
+    positional = arguments.posonlyargs + arguments.args
+    offset = 1 if positional and positional[0].arg in ("self", "cls") else 0
+    defaults = dict(
+        zip([argument.arg for argument in positional[len(positional) - len(arguments.defaults):]], arguments.defaults)
+    )
+    defaults.update(
+        (argument.arg, default)
+        for argument, default in zip(arguments.kwonlyargs, arguments.kw_defaults)
+        if default is not None
+    )
+    passed = {keyword.arg for keyword in call.keywords}
+    passed |= {argument.arg for argument in positional[offset : offset + len(call.args)]}
+    return frozenset(
+        name
+        for name, default in defaults.items()
+        if name not in passed and isinstance(default, ast.Constant) and default.value in (False, None)
+    )
+
+
 def binding_root(node):
     """Returns the binding type an expression's value comes from, such as
     `self._ldf.with_optimizations(...)`, or None."""
@@ -239,12 +307,12 @@ BINARY = {
 UNARY = {ast.USub: "__neg__", ast.UAdd: "__pos__", ast.Invert: "__invert__"}
 
 
-def held_bindings(package, module, node):
+def held_bindings(package, module, node, dead=frozenset()):
     """Returns the local names `node` assigns a binding object to, with its binding type:
     from a binding object, or from a function annotated to return one, such as
     `other = parse_into_expression(other)`."""
     held = {}
-    for child in ast.walk(node):
+    for child in walk(node, dead):
         if not (isinstance(child, ast.Assign) and len(child.targets) == 1 and isinstance(child.targets[0], ast.Name)):
             continue
         kind = binding_root(child.value)
@@ -266,11 +334,12 @@ def binding_type_of(node, held):
     return binding_root(node)
 
 
-def binding_calls(package, module, node):
-    """Returns the binding calls in `node`, as (binding type or "module", name) pairs."""
-    held = held_bindings(package, module, node)
+def binding_calls(package, module, node, dead=frozenset()):
+    """Returns the binding calls in `node`, as (binding type or "module", name) pairs,
+    leaving out branches that flags in `dead` keep from running."""
+    held = held_bindings(package, module, node, dead)
     calls = set()
-    for child in ast.walk(node):
+    for child in walk(node, dead):
         if isinstance(child, ast.Attribute):
             holder = child.value
             if isinstance(holder, ast.Attribute) and holder.attr in BINDING_ATTRIBUTES:
@@ -333,6 +402,8 @@ def polars_calls_used(package, module, node, own):
                 used.add(func.attr)
             elif isinstance(holder, ast.Name) and holder.id == "self" and func.attr in own:
                 used.add(func.attr)
+        elif isinstance(func, ast.Name) and not func.id.startswith("_") and func.id in module.functions:
+            used.add(func.id)
         elif isinstance(func, ast.Name) and not func.id.startswith("_") and func.id in module.imports:
             target, original = module.imports[func.id]
             found = package.resolve(module, func.id)
@@ -442,13 +513,13 @@ def follow(package, module, node, own_class=None):
     is then built from them in Python."""
     calls = set()
     seen = set()
-    waiting = [(module, node, own_class, False)]
+    waiting = [(module, node, own_class, False, frozenset())]
     while waiting:
-        current_module, current, cls, delegated = waiting.pop()
-        calls |= binding_calls(package, current_module, current)
+        current_module, current, cls, delegated, dead = waiting.pop()
+        calls |= binding_calls(package, current_module, current, dead)
         # Locals holding what a private helper returns or an instance of a class.
         receivers = {}
-        for child in ast.walk(current):
+        for child in walk(current, dead):
             if (
                 isinstance(child, ast.Assign)
                 and len(child.targets) == 1
@@ -458,28 +529,28 @@ def follow(package, module, node, own_class=None):
             ):
                 receivers[child.targets[0].id] = child.value
         targets = []
-        for child in ast.walk(current):
+        for child in walk(current, dead):
             if not isinstance(child, ast.Call):
                 continue
             func = child.func
             if isinstance(func, ast.Name) and func.id.startswith("_"):
                 found = package.resolve(current_module, func.id)
                 if found and isinstance(found[1], ast.FunctionDef):
-                    targets.append((found[0], found[1], None, True))
+                    targets.append((found[0], found[1], None, True, dead_flags(found[1], child)))
             elif isinstance(func, ast.Attribute):
                 receiver = func.value
                 if isinstance(receiver, ast.Name) and receiver.id == "self" and cls is not None:
                     if func.attr.startswith("_") or delegated:
                         located = method_of(package, current_module, cls, func.attr)
                         if located:
-                            targets.append((*located, delegated))
+                            targets.append((*located, delegated, dead_flags(located[1], child)))
                     continue
                 if isinstance(receiver, ast.Name) and receiver.id in receivers:
                     receiver = receivers[receiver.id]
                 for located in receiver_targets(package, current_module, receiver, func.attr):
-                    targets.append((*located, True))
+                    targets.append((*located, True, dead_flags(located[1], child)))
         for target in targets:
-            key = (target[0].name, id(target[1]))
+            key = (target[0].name, id(target[1]), target[4])
             if key not in seen:
                 seen.add(key)
                 waiting.append(target)
@@ -513,7 +584,7 @@ def read_classes(package):
             if kind == "property" and owner == "Expr" and method.name in namespaces:
                 continue  # a namespace accessor; the namespace is listed as an owner of its own
             calls = follow(package, module, method, cls)
-            uses = polars_calls_used(package, module, method, public) - {method.name}
+            uses = polars_calls_used(package, module, method, public)
             entries.append(entry(owner, method.name, method, calls, uses, kind))
     return entries
 

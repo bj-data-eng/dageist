@@ -2236,6 +2236,22 @@ mod tests {
             fn dtype_of(e: PyExpr) -> PyDataTypeExpr {
                 DataTypeExpr::OfExpr(Box::new(e.inner)).into()
             }
+            #[pyfunction]
+            fn plan_filter(input: Arc<DslPlan>) -> PyLazyFrame {
+                DslPlan::Filter { input, predicate: col("a") }.into()
+            }
+            #[pyfunction]
+            fn arena_node(arena: &mut Arena<AExpr>) {
+                arena.add(AExpr::Len);
+            }
+            #[pyfunction]
+            fn built(plan: DslPlan) -> PyLazyFrame {
+                DslBuilder::from(plan).build().into()
+            }
+            #[pyfunction]
+            fn plain_call(plan: DslPlan) -> PyLazyFrame {
+                plan.into()
+            }
             "#,
         );
 
@@ -2253,6 +2269,13 @@ mod tests {
             reached(&binding, "PyLazyFrame", "collect").is_empty(),
             "DataFrame::empty is not the free function empty"
         );
+        for name in ["plan_filter", "arena_node", "built"] {
+            assert!(
+                binding[&("module".to_owned(), name.to_owned())].internals,
+                "{name} builds Polars' internals"
+            );
+        }
+        assert!(!binding[&("module".to_owned(), "plain_call".to_owned())].internals);
         let dtype_of = &binding[&("module".to_owned(), "dtype_of".to_owned())];
         assert!(
             dtype_of.internals,
@@ -2512,7 +2535,7 @@ mod tests {
                 "    def filter(self, *predicates):\n        return self._filter(predicates)\n",
                 "    def _filter(self, predicates):\n        return self._from_pyldf(self._ldf.filter(predicates))\n",
                 "    def explain(self):\n        ldf = self._ldf.with_optimizations(1)\n        return ldf.describe_plan()\n",
-                "    def collect(self, *, engine='auto'):\n        engine_ = _select_engine(engine)\n        return engine_.collect(self)\n",
+                "    def collect(self, *, engine='auto', background=False):\n        engine_ = _select_engine(engine)\n        return engine_.collect(self, background=background)\n",
             ),
         );
         fixture.file(
@@ -2521,7 +2544,7 @@ mod tests {
                 "class Engine:\n    def collect(self, lf):\n        raise NotImplementedError\n",
                 "class _LocalEngine(Engine):\n",
                 "    @overload\n    def collect(self, lf): ...\n",
-                "    def collect(self, lf):\n        ldf = lf._ldf.with_optimizations(0)\n        return wrap_df(ldf.collect())\n",
+                "    def collect(self, lf, background=False):\n        ldf = lf._ldf.with_optimizations(0)\n        if background:\n            return ldf.collect_concurrently()\n        return wrap_df(ldf.collect())\n",
                 "    def execute(self, lf):\n        return self.collect(lf)\n",
                 "class Unrelated:\n    def collect(self, lf):\n        return lf._ldf.unrelated()\n",
             ),
@@ -2632,7 +2655,8 @@ mod tests {
                 ("PyLazyFrame", "collect"),
                 ("PyLazyFrame", "with_optimizations")
             ]),
-            "in a class reached by delegation, its own public methods are followed"
+            "in a class reached by delegation, its own public methods are followed, \
+             and a branch on a flag the call leaves off is not"
         );
         assert_eq!(
             find("polars", "scan_thing").binding,
@@ -2684,6 +2708,7 @@ mod tests {
             find("LazyFrame", "collect").binding,
             calls(&[
                 ("PyLazyFrame", "collect"),
+                ("PyLazyFrame", "collect_concurrently"),
                 ("PyLazyFrame", "with_optimizations")
             ]),
             "the method of the class a private helper of another module is annotated to return, \
