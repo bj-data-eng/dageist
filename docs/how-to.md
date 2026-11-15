@@ -135,7 +135,8 @@ The files under `api/` record the public API of the core, of each library
 crate under `crates/` and of the Polars crates the steps are built from, one
 line per public item. The generator in `api/generator/` writes them from
 rustdoc JSON. It needs the nightly toolchain named in its source,
-`nightly-2026-09-01`, which only these procedures use.
+`nightly-2026-09-01`, which only these procedures use. Install it once with
+`rustup toolchain install nightly-2026-09-01`.
 
 To see what is audited, and to check every audit against the current source:
 

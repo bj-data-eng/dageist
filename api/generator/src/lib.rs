@@ -350,7 +350,9 @@ pub struct Resolved {
 /// Finds the package `name` in the output of `cargo tree --prefix none
 /// --format "{p}|{f}"` and returns its version and features, or `None` when
 /// the tree does not hold it. A line names one package, as
-/// `name vVERSION [(source)]|feature,feature`.
+/// `name vVERSION [(source)]|feature,feature`. The first line for `name` is
+/// taken: should a tree hold `name` at two versions, the build of `name` on
+/// its own is ambiguous and fails, so no audit is written from the wrong one.
 pub fn find_resolved(tree: &str, name: &str) -> Option<Resolved> {
     tree.lines().find_map(|line| {
         let line = line.trim_end().trim_end_matches(" (*)");
@@ -372,7 +374,9 @@ pub fn find_resolved(tree: &str, name: &str) -> Option<Resolved> {
 }
 
 /// Returns how the package `name` is resolved in a build of `spec` in the
-/// workspace whose manifest is `manifest`.
+/// workspace whose manifest is `manifest`. Only normal dependencies on the
+/// host are followed, as `cargo rustdoc` builds the library for the host;
+/// both sides of the release check are read the same way.
 fn resolve_in_build(manifest: &Path, spec: &str, name: &str) -> Result<Resolved, String> {
     let output = Command::new("rustup")
         .args([
