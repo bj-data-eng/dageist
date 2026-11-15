@@ -163,13 +163,13 @@ parameter is written inline. Any other parameter of a method or step is an
 option: the list its name opens offers the rest by name, and an option is
 written into the Polars text only when it differs from its default. A step's
 own parameters are drawn by kind too: sort's keys and their per-item
-`descending`, join's table, keys and `how`, a rename's pairs, and a pivot's
-aggregate, which is a chain from `pl.element()`. A new column's name and chain
-and a filter's conditions keep the lines the storyboard settled, which lay out
-an expression list one item to a line, and a pivot's output columns stay
-pinned values until the graph supplies tables. Previews still run on the
-storyboard's sample rows, and a set option a preview cannot apply is named
-under the step instead of being ignored.
+`descending`, select's expressions, join's table, keys and `how`, a rename's
+pairs, and a pivot's aggregate, which is a chain from `pl.element()`. A new
+column's name and chain and a filter's conditions keep the lines the
+storyboard settled, which lay out an expression list one item to a line, and a
+pivot's output columns stay pinned values until the graph supplies tables.
+Previews still run on the storyboard's sample rows, and a set option a preview
+cannot apply is named under the step instead of being ignored.
 
 ## What The Step Editor Storyboard Has Settled
 
