@@ -1744,18 +1744,13 @@ mod tests {
     }
 
     #[test]
-    fn an_expected_difference_on_one_version_of_a_package_is_not_called_stale() {
-        // zlib is used at two versions; only 1.0.0 differs, and it sorts first.
+    fn an_expected_difference_on_any_version_of_a_package_is_not_called_stale() {
+        // zlib is used at two versions, and only one of them differs: first the one that sorts
+        // first, then the one that sorts last.
         let release = concat!(
             "0up-runtime v1.0.0 (/work/vendor/up/runtime)|default\n",
             "1up-core v1.0.0 (/work/vendor/up/core)|a\n",
             "2zlib v1.0.0|std\n",
-            "2zlib v2.0.0|std\n",
-        );
-        let ours = concat!(
-            "0app-host v0.1.0 (/work/crates/app-host)|\n",
-            "1up-core v1.0.0 (/work/vendor/up/core)|a\n",
-            "2zlib v1.0.0|std,extra\n",
             "2zlib v2.0.0|std\n",
         );
         let upstream = Upstream {
@@ -1771,10 +1766,28 @@ mod tests {
             ..UPSTREAM
         };
 
-        assert_eq!(
-            compared_trees(ours, release, &upstream),
-            Vec::<String>::new()
-        );
+        for differing in ["1.0.0", "2.0.0"] {
+            let features = |version: &str| {
+                if version == differing {
+                    "std,extra"
+                } else {
+                    "std"
+                }
+            };
+            let ours = format!(
+                "0app-host v0.1.0 (/work/crates/app-host)|\n\
+                 1up-core v1.0.0 (/work/vendor/up/core)|a\n\
+                 2zlib v1.0.0|{}\n\
+                 2zlib v2.0.0|{}\n",
+                features("1.0.0"),
+                features("2.0.0"),
+            );
+            assert_eq!(
+                compared_trees(&ours, release, &upstream),
+                Vec::<String>::new(),
+                "zlib {differing} differs",
+            );
+        }
     }
 
     #[test]
