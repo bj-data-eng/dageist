@@ -32,6 +32,11 @@ dataframe engine and the host adapters under `crates/`, the React view in
 Root owns workspace wiring and the core. The Tauri host owns its window,
 webview configuration, IPC commands and the view it serves.
 
+`vendor/polars` is the Polars project's source, pinned to a Python Polars
+release tag. This repository owns which release it is pinned to, not its
+content; never edit files inside it. Moving it to another release follows
+[the how-to](docs/how-to.md#move-polars-to-a-new-release).
+
 ## Discover The Current Structure
 
 Read the relevant sources below; manifests establish package/dependency facts
@@ -55,6 +60,7 @@ and current source establishes behavior.
 | Documentation navigation and source locations | [README.md](README.md), [docs/reference.md](docs/reference.md) |
 | Licensing and dependency attribution | [LICENSE](LICENSE), [NOTICE.md](NOTICE.md) |
 | Public API audits, their targets and the pinned rustdoc toolchain | [api/generator/](api/generator/src/lib.rs) |
+| Polars release source and the tag it is pinned to | [.gitmodules](.gitmodules), the submodule's commit, [vendored sources](docs/reference.md#vendored-sources) |
 
 When sources disagree, report exact paths and revisions. Do not guess, silently
 rewrite another authority, or widen the task to reconcile them.
