@@ -8,13 +8,16 @@
  * validation and previews; nothing here is meant to survive.
  */
 
+import type { Catalogue } from './catalogue';
 import type { Method } from './expr';
 import {
+  acceptanceMisfit,
   applyWithin,
   argumentProblem,
+  isGiven,
   methodDtype,
-  methodRequirement,
   methodText,
+  readArgument,
   rowGroups,
 } from './expr';
 import type { Cell, Dtype, Frame } from './frame';
@@ -24,8 +27,10 @@ import {
   findColumn,
   isNumeric,
   keysFit,
+  literalDtype,
   quoted,
   supertype,
+  withLiteral,
 } from './frame';
 import { findInput } from './inputs';
 
@@ -166,31 +171,8 @@ function rowsOf(frame: Frame): number[] {
   return Array.from({ length: frame[0]?.cells.length ?? 0 }, (_unused, row) => row);
 }
 
-/** The largest whole number an Int32 and a UInt32 hold. */
-const INT32_MAX = 2_147_483_647;
-const UINT32_MAX = 4_294_967_295;
-
-/** Returns the dtype a whole number written on its own has: Int32, or Int64 when Int32 cannot hold it. */
-function literalDtype(value: number): Dtype {
-  return value >= -INT32_MAX - 1 && value <= INT32_MAX ? 'Int32' : 'Int64';
-}
-
-/**
- * Returns the dtype a column of integer `dtype` and the whole number `value`
- * meet in: the column's when it holds the number, and a wider one when it
- * does not. Returns null for a number past a UInt32 column's range, which
- * meets it in UInt64, a dtype this storyboard does not have.
- */
-function withLiteral(dtype: Dtype, value: number): Dtype | null {
-  if (dtype === 'UInt32') {
-    if (value < 0) return 'Int64';
-    return value > UINT32_MAX ? null : dtype;
-  }
-  return dtype === 'Int32' ? literalDtype(value) : dtype;
-}
-
 /** Returns the dtype `value` gives on `frame`, or why it gives none. */
-export function checkValue(value: Value, frame: Frame): SourceCheck {
+export function checkValue(catalogue: Catalogue, value: Value, frame: Frame): SourceCheck {
   if (value.kind === 'unset') return { dtype: null, problem: 'Pick a value.' };
   if (value.kind === 'input') {
     const input = findInput(value.name);
@@ -204,7 +186,7 @@ export function checkValue(value: Value, frame: Frame): SourceCheck {
     return { dtype: input.dtype, problem: null };
   }
   if (value.kind === 'chain') {
-    const check = checkChain(value.chain, frame);
+    const check = checkChain(catalogue, value.chain, frame);
     return check.problem === null
       ? { dtype: check.dtypes.at(-1) ?? null, problem: null }
       : { dtype: null, problem: check.problem.message };
@@ -240,8 +222,8 @@ export function valueExprText(value: Value): string {
 }
 
 /** Returns the cell `value` gives on every row of `frame`. */
-export function cellsOf(value: Value, frame: Frame): readonly Cell[] {
-  if (value.kind === 'chain') return evaluateChain(value.chain, frame) ?? [];
+export function cellsOf(catalogue: Catalogue, value: Value, frame: Frame): readonly Cell[] {
+  if (value.kind === 'chain') return evaluateChain(catalogue, value.chain, frame) ?? [];
   if (value.kind === 'column') return findColumn(frame, value.column)?.cells ?? [];
   if (value.kind === 'input') {
     const input = findInput(value.name);
@@ -256,17 +238,21 @@ export function dtypesAgree(left: Dtype, right: Dtype): boolean {
 }
 
 /** Returns why `condition` cannot be worked out on `frame`, or `null` when it can. */
-export function conditionProblem(condition: Condition, frame: Frame): string | null {
+export function conditionProblem(
+  catalogue: Catalogue,
+  condition: Condition,
+  frame: Frame,
+): string | null {
   if (condition.kind === 'group') {
     if (condition.items.length === 0) return 'Pick a condition.';
     for (const item of condition.items) {
-      const problem = conditionProblem(item, frame);
+      const problem = conditionProblem(catalogue, item, frame);
       if (problem !== null) return problem;
     }
     return null;
   }
   if (condition.kind === 'chain') {
-    const check = checkChain(condition.chain, frame);
+    const check = checkChain(catalogue, condition.chain, frame);
     if (check.problem !== null) return check.problem.message;
     const dtype = check.dtypes.at(-1);
     return dtype === 'Boolean'
@@ -283,7 +269,7 @@ export function conditionProblem(condition: Condition, frame: Frame): string | n
       ? null
       : `"${column.name}" is ${column.dtype}, but "${list.name}" holds ${list.dtype}.`;
   }
-  const value = checkValue(condition.value, frame);
+  const value = checkValue(catalogue, condition.value, frame);
   if (value.problem !== null) return value.problem;
   if (value.dtype !== null && !dtypesAgree(column.dtype, value.dtype)) {
     return `"${column.name}" is ${column.dtype}, but ${valueText(condition.value)} is ${value.dtype}.`;
@@ -314,9 +300,9 @@ function holds(comparison: Comparison, left: Cell, right: Cell): boolean {
 }
 
 /** Reports, for every row of `frame`, whether `condition` is true on it. */
-export function conditionRows(condition: Condition, frame: Frame): boolean[] {
+export function conditionRows(catalogue: Catalogue, condition: Condition, frame: Frame): boolean[] {
   if (condition.kind === 'group') {
-    const items = condition.items.map((item) => conditionRows(item, frame));
+    const items = condition.items.map((item) => conditionRows(catalogue, item, frame));
     return rowsOf(frame).map((row) =>
       condition.every
         ? items.every((item) => item[row] === true)
@@ -324,7 +310,7 @@ export function conditionRows(condition: Condition, frame: Frame): boolean[] {
     );
   }
   if (condition.kind === 'chain') {
-    const cells = evaluateChain(condition.chain, frame) ?? [];
+    const cells = evaluateChain(catalogue, condition.chain, frame) ?? [];
     return rowsOf(frame).map((row) => cells[row] === 'true');
   }
   const left = findColumn(frame, condition.column)?.cells ?? [];
@@ -335,10 +321,10 @@ export function conditionRows(condition: Condition, frame: Frame): boolean[] {
   }
   // Both sides are compared as the dtype they meet in.
   const column = findColumn(frame, condition.column)?.dtype ?? null;
-  const value = checkValue(condition.value, frame).dtype;
+  const value = checkValue(catalogue, condition.value, frame).dtype;
   const met = column !== null && value !== null ? supertype(column, value) : null;
   const compared = castCells(left, column, met);
-  const right = castCells(cellsOf(condition.value, frame), value, met);
+  const right = castCells(cellsOf(catalogue, condition.value, frame), value, met);
   return rowsOf(frame).map((row) =>
     holds(condition.comparison, compared[row] ?? null, right[row] ?? null),
   );
@@ -375,9 +361,9 @@ function differing(first: Dtype, second: Dtype): SourceCheck {
   };
 }
 
-function checkWhen(source: WhenSource, frame: Frame): SourceCheck {
+function checkWhen(catalogue: Catalogue, source: WhenSource, frame: Frame): SourceCheck {
   for (const arm of source.arms) {
-    const problem = conditionProblem(arm.condition, frame);
+    const problem = conditionProblem(catalogue, arm.condition, frame);
     if (problem !== null) return { dtype: null, problem };
   }
   // A literal has no dtype of its own beside a column: it takes the column's,
@@ -392,7 +378,7 @@ function checkWhen(source: WhenSource, frame: Frame): SourceCheck {
       else if (value.value !== null) text = true;
       continue;
     }
-    const checked = checkValue(value, frame);
+    const checked = checkValue(catalogue, value, frame);
     if (checked.problem !== null) return checked;
     if (checked.dtype === null) continue;
     if (typed === null) {
@@ -429,8 +415,8 @@ function checkWhen(source: WhenSource, frame: Frame): SourceCheck {
 }
 
 /** Returns the dtype `source` gives on `frame`, or why it gives none. */
-export function checkSource(source: Source, frame: Frame): SourceCheck {
-  if (source.kind === 'when') return checkWhen(source, frame);
+export function checkSource(catalogue: Catalogue, source: Source, frame: Frame): SourceCheck {
+  if (source.kind === 'when') return checkWhen(catalogue, source, frame);
   if (source.column === '') {
     return { dtype: null, problem: 'Pick the field the chain starts from.' };
   }
@@ -441,14 +427,14 @@ export function checkSource(source: Source, frame: Frame): SourceCheck {
 }
 
 /** Works `source` out on the rows of `frame`. */
-function evaluateSource(source: Source, frame: Frame): readonly Cell[] {
+function evaluateSource(catalogue: Catalogue, source: Source, frame: Frame): readonly Cell[] {
   if (source.kind === 'column') return findColumn(frame, source.column)?.cells ?? [];
   // Every value is returned as the dtype they all meet in.
-  const result = checkWhen(source, frame).dtype;
+  const result = checkWhen(catalogue, source, frame).dtype;
   const returned = (value: Value): readonly Cell[] =>
-    castCells(cellsOf(value, frame), checkValue(value, frame).dtype, result);
+    castCells(cellsOf(catalogue, value, frame), checkValue(catalogue, value, frame).dtype, result);
   const arms = source.arms.map((arm) => ({
-    holds: conditionRows(arm.condition, frame),
+    holds: conditionRows(catalogue, arm.condition, frame),
     cells: returned(arm.returns),
   }));
   const otherwise = returned(source.otherwise);
@@ -468,8 +454,8 @@ function sourceText(source: Source): string {
 }
 
 /** Checks that the source of `chain` works and every method accepts the dtype handed to it. */
-export function checkChain(chain: Chain, frame: Frame): ChainCheck {
-  const start = checkSource(chain.source, frame);
+export function checkChain(catalogue: Catalogue, chain: Chain, frame: Frame): ChainCheck {
+  const start = checkSource(catalogue, chain.source, frame);
   if (start.problem !== null || start.dtype === null) {
     const message = start.problem ?? 'This chain has no dtype.';
     return { dtypes: [], problem: { index: -1, message } };
@@ -477,13 +463,14 @@ export function checkChain(chain: Chain, frame: Frame): ChainCheck {
   const dtypes: Dtype[] = [start.dtype];
   let current = start.dtype;
   for (const [index, method] of chain.methods.entries()) {
-    const operand = findColumn(frame, method.argument ?? '')?.dtype ?? null;
-    const next = methodDtype(method.name, current, operand);
+    const refused = acceptanceMisfit(catalogue, method.name, current);
+    if (refused !== null) return { dtypes, problem: { index, message: refused.message } };
+    const reading = readArgument(method.argument, frame);
+    const next = methodDtype(method.name, current, isGiven(reading) ? reading : null);
     if (next === null) {
-      const message = `${method.name} needs ${methodRequirement(method.name)}, but it is given ${current}.`;
-      return { dtypes, problem: { index, message } };
+      return { dtypes, problem: { index, message: `${method.name} gives no dtype here.` } };
     }
-    const wrongArgument = argumentProblem(method, frame, current);
+    const wrongArgument = argumentProblem(catalogue, method, frame, current);
     // The dtype fits even when the argument is wrong, so it is still reported.
     dtypes.push(next);
     if (wrongArgument !== null) return { dtypes, problem: { index, message: wrongArgument } };
@@ -496,10 +483,14 @@ export function checkChain(chain: Chain, frame: Frame): ChainCheck {
 const UINT32_SPAN = 4_294_967_296;
 
 /** Works `chain` out on the rows of `frame`, or returns null when it has a problem. */
-export function evaluateChain(chain: Chain, frame: Frame): readonly Cell[] | null {
-  const check = checkChain(chain, frame);
+export function evaluateChain(
+  catalogue: Catalogue,
+  chain: Chain,
+  frame: Frame,
+): readonly Cell[] | null {
+  const check = checkChain(catalogue, chain, frame);
   if (check.problem !== null) return null;
-  let values = evaluateSource(chain.source, frame);
+  let values = evaluateSource(catalogue, chain.source, frame);
   const rowCount = frame[0]?.cells.length ?? 0;
   const apply = (index: number, groups: readonly number[][]): void => {
     const method = chain.methods[index];
@@ -516,7 +507,10 @@ export function evaluateChain(chain: Chain, frame: Frame): readonly Cell[] | nul
   let waiting: number[] = [];
   for (const [index, method] of chain.methods.entries()) {
     if (method.name === 'over') {
-      const keys = findColumn(frame, method.argument ?? '')?.cells ?? null;
+      // A value written out is the same on every row, so it puts every row in one group.
+      const reading = readArgument(method.argument, frame);
+      const keys =
+        reading.kind === 'field' ? (findColumn(frame, reading.name)?.cells ?? null) : null;
       const groups = rowGroups(keys, rowCount);
       for (const earlier of waiting) apply(earlier, groups);
       waiting = [];

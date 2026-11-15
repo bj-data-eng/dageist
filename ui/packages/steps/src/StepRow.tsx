@@ -25,6 +25,7 @@ import {
   cx,
 } from '@dageist/design';
 
+import { useCatalogue } from './CatalogueProvider';
 import { FreshContext } from './Lists';
 import { ConditionBlocks, ValueSlot } from './Values';
 import { formatCell } from './format';
@@ -53,26 +54,38 @@ import {
   stepBreak,
   stepText,
 } from './model/steps';
+import type { Catalogue } from './model/catalogue';
+import { verbEntry, verbId } from './model/catalogue';
 import { TABLES, findTable } from './model/tables';
-import { VERB_COLOURS, VERB_LABELS, VERB_NOTES } from './verbs';
+import { VERB_COLOURS, verbHead, verbNote } from './verbs';
 
 /** The sortable group every step row belongs to. */
 export const STEP_GROUP = 'steps';
 
-/** Lists the steps that can be added or changed to. */
-export function verbOffers(typed: string, onPick: (verb: Verb) => void): OfferGroup[] {
+/** Lists the steps that can be added or changed to, in the words of the catalogue. */
+export function verbOffers(
+  catalogue: Catalogue,
+  typed: string,
+  onPick: (verb: Verb) => void,
+): OfferGroup[] {
   return [
     titled(
       'Step',
-      VERBS.filter((verb) => matches(typed, VERB_LABELS[verb], VERB_NOTES[verb])).map((verb) =>
+      VERBS.filter((verb) =>
+        matches(typed, verbHead(catalogue, verb), verbNote(catalogue, verb)),
+      ).map((verb) =>
         offer(
-          VERB_LABELS[verb],
+          verbHead(catalogue, verb),
           'ink',
-          VERB_NOTES[verb],
+          verbNote(catalogue, verb),
           () => {
             onPick(verb);
           },
-          { look: 'verb' },
+          {
+            look: 'verb',
+            // A verb the storyboard has and the catalogue lacks cannot be chosen.
+            reason: verbEntry(catalogue, verb) === null ? 'not in the catalogue' : null,
+          },
         ),
       ),
     ),
@@ -727,6 +740,7 @@ export function StepRow({
   onRemove,
   onInsertAfter,
 }: StepRowProps): React.JSX.Element {
+  const catalogue = useCatalogue();
   const { ref, handleRef, isDragSource } = useSortable({
     id: step.id,
     index,
@@ -740,7 +754,8 @@ export function StepRow({
   }, []);
   const broken = stepBreak(step);
   const number = String(index + 1);
-  const name = VERB_LABELS[step.verb];
+  const name = verbHead(catalogue, step.verb);
+  const missing = verbEntry(catalogue, step.verb) === null;
   return (
     <div
       ref={ref}
@@ -787,7 +802,7 @@ export function StepRow({
                 describedAs={`Step ${number}: ${name}. Change what the step does`}
                 placeholder="Search the steps"
                 offers={(typed) =>
-                  verbOffers(typed, (verb) => {
+                  verbOffers(catalogue, typed, (verb) => {
                     if (verb !== step.verb) {
                       onChange({ ...defaultStep(verb, frame), id: step.id });
                     }
@@ -797,6 +812,11 @@ export function StepRow({
             </Hint>
           </Piece>
           <Head step={step} frame={frame} onChange={onChange} />
+          {missing && (
+            <span className="dg-line font-sans text-xs text-wrong">
+              {`The catalogue has no entry ${verbId(step.verb)}, so this step has no words to show.`}
+            </span>
+          )}
           {result.problem !== null && (
             <span className="dg-line font-sans text-xs text-wrong">{result.problem}</span>
           )}
@@ -809,7 +829,7 @@ export function StepRow({
         <Popover anchor={adding} onDismiss={closeList}>
           <OfferList
             placeholder="Search the steps"
-            groups={(typed) => verbOffers(typed, onInsertAfter)}
+            groups={(typed) => verbOffers(catalogue, typed, onInsertAfter)}
             keepOpen={false}
             wide={false}
             onDone={closeList}

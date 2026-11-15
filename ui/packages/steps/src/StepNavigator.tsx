@@ -14,9 +14,10 @@ import { useMemo } from 'react';
 import { cx } from '@dageist/design';
 
 import { dragSettingsFor } from './Chain';
+import { useCatalogue } from './CatalogueProvider';
 import type { Step, StepResult } from './model/steps';
 import { stepDetail } from './summary';
-import { VERB_COLOURS, VERB_LABELS } from './verbs';
+import { VERB_COLOURS, verbHead } from './verbs';
 
 /** The sortable group the names of the steps belong to. */
 const NAME_GROUP = 'step-names';
@@ -51,6 +52,7 @@ function StepName({
   onSelect,
   onOpen,
 }: StepNameProps): React.JSX.Element {
+  const catalogue = useCatalogue();
   const { ref, isDragSource } = useSortable({
     id: step.id,
     index,
@@ -78,7 +80,9 @@ function StepName({
         <span className="w-5 shrink-0 text-right font-mono text-[11px] text-muted">
           {index + 1}
         </span>
-        <span className="shrink-0 font-semibold text-(--verb)">{VERB_LABELS[step.verb]}</span>
+        <span className="shrink-0 font-semibold text-(--verb)">
+          {verbHead(catalogue, step.verb)}
+        </span>
         <span
           className={cx(
             'min-w-0 truncate font-mono text-[12.5px]',

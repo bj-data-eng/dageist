@@ -10,6 +10,7 @@ import { useMemo, useState } from 'react';
 
 import { Slot } from '@dageist/design';
 
+import { useCatalogue } from './CatalogueProvider';
 import { DragSettingsContext, dragSettingsFor, moved } from './Chain';
 import type { Fresh } from './Lists';
 import { FreshContext } from './Lists';
@@ -47,6 +48,7 @@ export function StepList({
   styleNonce,
   onChange,
 }: StepListProps): React.JSX.Element {
+  const catalogue = useCatalogue();
   // What was just added, so that its first slot opens or its name is typed straight away.
   const [freshId, setFreshId] = useState<string | null>(null);
   const fresh = useMemo((): Fresh => ({ id: freshId, mark: setFreshId }), [freshId]);
@@ -129,7 +131,7 @@ export function StepList({
               describedAs="Add a step at the end"
               placeholder="Search the steps"
               offers={(typed) =>
-                verbOffers(typed, (verb) => {
+                verbOffers(catalogue, typed, (verb) => {
                   addStep(verb, steps.length - 1);
                 })
               }

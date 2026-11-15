@@ -10,6 +10,7 @@ import { useEffect } from 'react';
 import { Panel } from '@dageist/design';
 import type { Host } from '@dageist/host';
 
+import { CatalogueProvider, useCatalogue } from './CatalogueProvider';
 import { moved } from './Chain';
 import { InputsStrip } from './InputsStrip';
 import { StepList } from './StepList';
@@ -28,10 +29,19 @@ export interface StepsWindowProps {
   readonly styleNonce: string | null;
 }
 
-/** Draws every step of the sample claims so that it can be edited. */
+/** Draws every step of the sample claims so that it can be edited, once the catalogue is there. */
 export function StepsWindow({ host, styleNonce }: StepsWindowProps): React.JSX.Element {
+  return (
+    <CatalogueProvider host={host} title="Steps · Claim timing">
+      <Editor host={host} styleNonce={styleNonce} />
+    </CatalogueProvider>
+  );
+}
+
+function Editor({ host, styleNonce }: StepsWindowProps): React.JSX.Element {
+  const catalogue = useCatalogue();
   const { steps, selectedId, change } = useSharedSteps(host, 'steps');
-  const results = runSteps(steps);
+  const results = runSteps(catalogue, steps);
 
   // The chosen step is brought into view, whichever window chose it.
   useEffect(() => {

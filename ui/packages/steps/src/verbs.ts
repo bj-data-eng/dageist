@@ -1,30 +1,25 @@
 /**
- * @file What the steps are called and the colour each is written in.
+ * @file What the steps are called, from the catalogue, and the colour each is
+ * written in.
  */
 
+import type { Catalogue } from './model/catalogue';
+import { verbEntry } from './model/catalogue';
 import type { Verb } from './model/steps';
 
-/** What each step is called: Polars' own word where it has one, in a plain phrase. */
-export const VERB_LABELS: Readonly<Record<Verb, string>> = {
-  with_columns: 'Add column',
-  filter: 'Filter table',
-  sort: 'Sort table',
-  select: 'Select',
-  rename: 'Rename',
-  join: 'Join table',
-  pivot: 'Pivot table',
-};
+/**
+ * Returns what the catalogue calls the step `verb`: its head, such as "Add
+ * column". A verb the catalogue lacks is called by its Polars name.
+ */
+export function verbHead(catalogue: Catalogue, verb: Verb): string {
+  const entry = verbEntry(catalogue, verb);
+  return entry?.head ?? entry?.name ?? verb;
+}
 
-/** What each step does, for someone choosing one. */
-export const VERB_NOTES: Readonly<Record<Verb, string>> = {
-  with_columns: 'a new column from a chain',
-  filter: 'the rows where a condition holds',
-  sort: 'the rows in the order of some fields',
-  select: 'some of the columns',
-  rename: 'columns under new names',
-  join: 'columns from another table, by a key',
-  pivot: 'the values of a field as columns',
-};
+/** Returns what the catalogue says the step `verb` does, or the empty text for a verb it lacks. */
+export function verbNote(catalogue: Catalogue, verb: Verb): string {
+  return verbEntry(catalogue, verb)?.hint ?? '';
+}
 
 /** The colour each step is written in, so the kind of a step shows at a glance. */
 export const VERB_COLOURS: Readonly<Record<Verb, string>> = {

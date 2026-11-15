@@ -20,6 +20,7 @@ import {
   reordered,
 } from './frame';
 import { nextId } from './ids';
+import type { Catalogue } from './catalogue';
 import type { Condition, Value } from './source';
 import {
   cellsOf,
@@ -177,13 +178,17 @@ function failed(frame: Frame, problem: string): StepResult {
   return { frame, problem, added: [] };
 }
 
-function withColumns(frame: Frame, step: WithColumnsStep): StepResult {
+function withColumns(catalogue: Catalogue, frame: Frame, step: WithColumnsStep): StepResult {
   const { alias, value } = step;
   if (alias.trim() === '') return failed(frame, 'alias needs a name.');
-  const check = checkValue(value, frame);
+  const check = checkValue(catalogue, value, frame);
   if (check.problem !== null) return failed(frame, check.problem);
   if (check.dtype === null) return failed(frame, 'None alone has no dtype to make a column of.');
-  const column: Column = { name: alias, dtype: check.dtype, cells: cellsOf(value, frame) };
+  const column: Column = {
+    name: alias,
+    dtype: check.dtype,
+    cells: cellsOf(catalogue, value, frame),
+  };
   const replaced = frame.some((existing) => existing.name === alias);
   return {
     frame: replaced
@@ -254,10 +259,12 @@ function rename(frame: Frame, step: RenameStep): StepResult {
   return { frame: next, problem: null, added: [...renamed.values()] };
 }
 
-function filter(frame: Frame, step: FilterStep): StepResult {
-  const problem = conditionProblem(step.condition, frame);
+function filter(catalogue: Catalogue, frame: Frame, step: FilterStep): StepResult {
+  const problem = conditionProblem(catalogue, step.condition, frame);
   if (problem !== null) return failed(frame, problem);
-  const kept = conditionRows(step.condition, frame).flatMap((holds, row) => (holds ? [row] : []));
+  const kept = conditionRows(catalogue, step.condition, frame).flatMap((holds, row) =>
+    holds ? [row] : [],
+  );
   return { frame: reordered(frame, kept), problem: null, added: [] };
 }
 
@@ -382,14 +389,14 @@ function pivot(frame: Frame, step: PivotStep): StepResult {
   };
 }
 
-function runStep(frame: Frame, step: Step): StepResult {
+function runStep(catalogue: Catalogue, frame: Frame, step: Step): StepResult {
   switch (step.verb) {
     case 'with_columns':
-      return withColumns(frame, step);
+      return withColumns(catalogue, frame, step);
     case 'sort':
       return sort(frame, step);
     case 'filter':
-      return filter(frame, step);
+      return filter(catalogue, frame, step);
     case 'select':
       return select(frame, step);
     case 'rename':
@@ -407,11 +414,11 @@ function runStep(frame: Frame, step: Step): StepResult {
  * Works every step out in order, starting from the source frame. A step with
  * a problem passes its frame on unchanged, so later steps still show something.
  */
-export function runSteps(steps: readonly Step[]): readonly StepResult[] {
+export function runSteps(catalogue: Catalogue, steps: readonly Step[]): readonly StepResult[] {
   const results: StepResult[] = [];
   let frame = SOURCE_FRAME;
   for (const step of steps) {
-    const result = runStep(frame, step);
+    const result = runStep(catalogue, frame, step);
     results.push(result);
     frame = result.frame;
   }

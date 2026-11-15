@@ -88,6 +88,34 @@ export function isNumeric(dtype: Dtype): boolean {
   return dtype === 'Int32' || dtype === 'Int64' || dtype === 'UInt32';
 }
 
+/** Reports whether `dtype` is a date, a time or a duration. */
+export function isTemporal(dtype: Dtype): boolean {
+  return dtype === 'Datetime' || dtype === 'Date' || dtype === 'Time' || dtype === 'Duration';
+}
+
+/** The largest whole number an Int32 and a UInt32 hold. */
+const INT32_MAX = 2_147_483_647;
+const UINT32_MAX = 4_294_967_295;
+
+/** Returns the dtype a whole number written on its own has: Int32, or Int64 when Int32 cannot hold it. */
+export function literalDtype(value: number): Dtype {
+  return value >= -INT32_MAX - 1 && value <= INT32_MAX ? 'Int32' : 'Int64';
+}
+
+/**
+ * Returns the dtype a column of integer `dtype` and the whole number `value`
+ * meet in: the column's when it holds the number, and a wider one when it
+ * does not. Returns null for a number past a UInt32 column's range, which
+ * meets it in UInt64, a dtype this storyboard does not have.
+ */
+export function withLiteral(dtype: Dtype, value: number): Dtype | null {
+  if (dtype === 'UInt32') {
+    if (value < 0) return 'Int64';
+    return value > UINT32_MAX ? null : dtype;
+  }
+  return dtype === 'Int32' ? literalDtype(value) : dtype;
+}
+
 /**
  * Returns the dtype Polars gives two dtypes that meet, as in a comparison or
  * the values of one `when`, or null when it gives none. Two different integer

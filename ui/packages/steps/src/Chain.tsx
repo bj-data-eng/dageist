@@ -17,32 +17,31 @@ import { isSortable, useSortable } from '@dnd-kit/react/sortable';
 import { createContext, useCallback, useContext, useState } from 'react';
 
 import type { Look, Offer, OfferGroup, Tone } from '@dageist/design';
-import { Hint, OfferList, Piece, Popover, Seam, Slot, TypedBlock, Word } from '@dageist/design';
+import { Hint, OfferList, Piece, Popover, Seam, Slot, Word } from '@dageist/design';
 
+import { useCatalogue } from './CatalogueProvider';
 import { FreshContext, Line, Lines } from './Lists';
 import { ConditionBlocks, ValueSlot, emptyTest } from './Values';
 import { anyField, counted, fieldOffers, matches, offer, titled } from './offers';
 import { useFieldHint } from './origins';
-import type { Method, MethodName } from './model/expr';
+import type { Catalogue } from './model/catalogue';
+import { methodEntry, methodId } from './model/catalogue';
+import type { ArgumentRule, Method, MethodName } from './model/expr';
 import {
-  ARGUMENT_KINDS,
-  METHOD_GROUPS,
-  METHOD_GROUP_ORDER,
-  METHOD_GROUP_TITLES,
-  METHOD_HINTS,
-  METHOD_NAMES,
+  acceptanceMisfit,
+  argumentMisfit,
+  argumentRule,
   defaultArgument,
   literalComparand,
-  methodDtype,
-  methodRequirement,
-  operandFits,
+  previewedMethods,
   readComparand,
+  swappedArgument,
 } from './model/expr';
 import type { Dtype, Frame } from './model/frame';
-import { findColumn, isNumeric } from './model/frame';
+import { findColumn } from './model/frame';
 import { nextId } from './model/ids';
 import type { Arm, Chain, ChainCheck, Source, Value } from './model/source';
-import { checkChain, dtypesAgree } from './model/source';
+import { checkChain } from './model/source';
 
 /** How every drag-and-drop area in the editor is set up. */
 export interface DragSettings {
@@ -104,37 +103,40 @@ function withMethodMoved(chain: Chain, from: number, to: number): Chain {
 }
 
 /**
- * Lists the methods that can be handed `input`, in their groups from the
- * shortest to the longest. A method that does not fit says what it needs.
+ * Lists the methods the catalogue offers and the storyboard can preview that
+ * can be handed `input`, under the catalogue's families from the shortest to
+ * the longest. A method that does not fit says what it needs.
  */
 function methodOffers(
+  catalogue: Catalogue,
   typed: string,
   input: Dtype | null,
   onPick: (name: MethodName) => void,
 ): OfferGroup[] {
-  const groups = METHOD_GROUP_ORDER.map((group) =>
-    counted(
-      METHOD_GROUP_TITLES[group],
-      METHOD_NAMES.filter(
-        (name) => METHOD_GROUPS[name] === group && matches(typed, name, METHOD_HINTS[name]),
-      ).map((name) => {
-        let reason: string | null = null;
-        if (input === null) reason = 'fix the marked part first';
-        else if (methodDtype(name, input, null) === null) {
-          reason = `needs ${methodRequirement(name)}`;
-        }
-        return offer(
-          name,
-          'function',
-          METHOD_HINTS[name],
-          () => {
-            onPick(name);
-          },
-          { reason },
-        );
-      }),
-    ),
-  );
+  const methods = previewedMethods(catalogue);
+  const groups = catalogue.view.families
+    .map((family) =>
+      counted(
+        family.title,
+        methods
+          .filter(
+            ({ entry }) => entry.family === family.key && matches(typed, entry.name, entry.hint),
+          )
+          .map(({ name, entry }) => {
+            const misfit = input === null ? null : acceptanceMisfit(catalogue, name, input);
+            return offer(
+              entry.name,
+              'function',
+              entry.hint,
+              () => {
+                onPick(name);
+              },
+              { reason: input === null ? 'fix the marked part first' : (misfit?.short ?? null) },
+            );
+          }),
+      ),
+    )
+    .filter((group) => group.offers.length > 0);
   groups.sort((left, right) => left.offers.length - right.offers.length);
   return groups;
 }
@@ -144,10 +146,12 @@ function emptyArm(): Arm {
   return { id: nextId('arm'), condition: emptyTest(), returns: { kind: 'unset' } };
 }
 
-interface ComparandSlotProps {
+interface ArgumentSlotProps {
   readonly method: Method;
+  /** What the catalogue says the method's argument is. */
+  readonly rule: ArgumentRule;
   readonly frame: Frame;
-  /** The dtype the comparison is handed, when it is known. */
+  /** The dtype the method is handed, when it is known. */
   readonly input: Dtype | null;
   /** Whether the chain's problem is at this method. */
   readonly wrong: boolean;
@@ -155,23 +159,28 @@ interface ComparandSlotProps {
 }
 
 /**
- * Draws what a comparison is given: a field, a number or text. It opens the
- * list it is picked from, where a value can be typed.
+ * Draws an argument that takes an expression: a field, or a value typed in.
+ * It opens the list it is picked from, which offers the values and the fields
+ * whose dtype the parameter takes. Every method's argument of this kind is
+ * drawn here.
  */
-function ComparandSlot({
+function ArgumentSlot({
   method,
+  rule,
   frame,
   input,
   wrong,
   onCommit,
-}: ComparandSlotProps): React.JSX.Element {
+}: ArgumentSlotProps): React.JSX.Element {
+  const catalogue = useCatalogue();
   const fresh = useContext(FreshContext);
   const fieldHint = useFieldHint();
   const comparand = readComparand(method.argument);
   const column = comparand.kind === 'column' ? findColumn(frame, comparand.column) : null;
+  const rows = frame[0]?.cells.length ?? 0;
   let shown: { label: string; tone: Tone; look: Look };
   if (comparand.kind === 'unset') {
-    shown = { label: 'value', tone: 'value', look: 'none' };
+    shown = { label: rule.parameter.shown, tone: 'value', look: 'none' };
   } else if (comparand.kind === 'column') {
     shown = { label: comparand.column, tone: 'column', look: 'plain' };
   } else if (typeof comparand.value === 'number') {
@@ -179,6 +188,9 @@ function ComparandSlot({
   } else {
     shown = { label: comparand.value, tone: 'value', look: 'quoted' };
   }
+  // Why a value or a field does not go with what the method is handed, or `null` when it does.
+  const reasonFor = (given: Parameters<typeof argumentMisfit>[3]): string | null =>
+    input === null ? null : (argumentMisfit(catalogue, rule, input, given, rows)?.short ?? null);
   const offers = (typed: string): OfferGroup[] => {
     const written: Offer[] = [];
     const text = typed.trim();
@@ -191,10 +203,7 @@ function ComparandSlot({
           () => {
             onCommit(literalComparand(Number(text)));
           },
-          {
-            id: 'number',
-            reason: input !== null && !isNumeric(input) ? 'a different dtype' : null,
-          },
+          { id: 'number', reason: reasonFor({ kind: 'number', value: Number(text) }) },
         ),
       );
     }
@@ -207,11 +216,7 @@ function ComparandSlot({
           () => {
             onCommit(literalComparand(typed));
           },
-          {
-            id: 'text',
-            look: 'quoted',
-            reason: input !== null && input !== 'String' ? 'a different dtype' : null,
-          },
+          { id: 'text', look: 'quoted', reason: reasonFor({ kind: 'text', value: typed }) },
         ),
       );
     }
@@ -221,8 +226,7 @@ function ComparandSlot({
         'Fields',
         fieldOffers(frame, typed, {
           ...anyField(onCommit),
-          reasonFor: (dtype) =>
-            input === null || dtypesAgree(input, dtype) ? null : 'a different dtype',
+          reasonFor: (dtype) => reasonFor({ kind: 'field', name: '', dtype }),
         }),
       ),
     ];
@@ -235,7 +239,7 @@ function ComparandSlot({
         look={shown.look}
         wrong={wrong || comparand.kind === 'unset'}
         openNow={fresh.id === method.id}
-        describedAs={`What ${method.name} compares with`}
+        describedAs={`${rule.shown}: ${rule.parameter.label}`}
         placeholder="Type a value, or search the fields"
         offers={offers}
       />
@@ -267,10 +271,11 @@ function MethodLink({
   onChange,
   onAddAfter,
 }: MethodLinkProps): React.JSX.Element {
-  const fresh = useContext(FreshContext);
-  const fieldHint = useFieldHint();
-  const kind = ARGUMENT_KINDS[method.name];
-  const argument = method.argument ?? '';
+  const catalogue = useCatalogue();
+  const entry = methodEntry(catalogue, method.name);
+  const rule = argumentRule(catalogue, method.name);
+  // What the catalogue calls the method; a method it lacks keeps its Polars name.
+  const shown = entry?.name ?? method.name;
   const input = check.dtypes[index] ?? null;
   const output = check.dtypes[index + 1] ?? null;
   const wrong = check.problem?.index === index;
@@ -290,26 +295,16 @@ function MethodLink({
       ),
     );
   };
-  const commit = (value: string): void => {
-    replace({ id: method.id, name: method.name, argument: value });
-  };
   const swap = (name: MethodName): void => {
-    // The argument is kept when both methods take the same kind of one.
-    const keeps = ARGUMENT_KINDS[name] !== null && ARGUMENT_KINDS[name] === kind;
-    replace({
-      id: method.id,
-      name,
-      argument: keeps ? method.argument : defaultArgument(name, frame, input),
-    });
+    replace({ id: method.id, name, argument: swappedArgument(catalogue, method, name, frame) });
   };
-  const field = findColumn(frame, argument);
   return (
     <span ref={ref} className="dg-link">
       <Seam />
       <Piece
         dragged={isDragSource}
         remove={{
-          label: `Remove ${method.name}`,
+          label: `Remove ${shown}`,
           onPress: () => {
             onChange(
               withMethods(
@@ -319,73 +314,41 @@ function MethodLink({
             );
           },
         }}
-        add={{ label: `Add a method after ${method.name}`, onPress: onAddAfter }}
+        add={{ label: `Add a method after ${shown}`, onPress: onAddAfter }}
       >
         <Hint
           lines={[
-            `${method.name} · ${METHOD_HINTS[method.name]}`,
+            `${shown} · ${entry?.hint ?? 'not in the catalogue'}`,
             ...(input === null ? [] : [`${input} → ${output ?? 'does not fit'}`]),
           ]}
           code={false}
         >
           <Slot
-            label={method.name}
+            label={shown}
             tone="function"
             look="plain"
             wrong={wrong}
             names
-            describedAs={`Method ${method.name}: swap it, or drag it to another place`}
+            describedAs={`Method ${shown}: swap it, or drag it to another place`}
             placeholder="Search the methods"
-            offers={(typed) => methodOffers(typed, input, swap)}
+            offers={(typed) => methodOffers(catalogue, typed, input, swap)}
             buttonRef={handleRef}
           />
         </Hint>
-        {(kind === 'operand' || kind === 'column') && (
-          <Hint lines={fieldHint(field)} code={false}>
-            <Slot
-              label={argument === '' ? 'field' : argument}
-              tone={argument === '' ? 'value' : 'column'}
-              look={argument === '' ? 'none' : 'plain'}
-              wrong={wrong && argument !== ''}
-              openNow={fresh.id === method.id}
-              describedAs={`The field ${method.name} works with`}
-              placeholder="Search the fields"
-              offers={(typed) => [
-                counted(
-                  'Fields',
-                  fieldOffers(frame, typed, {
-                    ...anyField(commit),
-                    reasonFor: (dtype) =>
-                      kind === 'column' || input === null || operandFits(input, dtype)
-                        ? null
-                        : 'a different dtype',
-                  }),
-                ),
-              ]}
-            />
-          </Hint>
-        )}
-        {kind === 'comparand' && (
-          <ComparandSlot
+        {rule !== null && (
+          <ArgumentSlot
             method={method}
+            rule={rule}
             frame={frame}
             input={input}
             wrong={wrong}
-            onCommit={commit}
-          />
-        )}
-        {(kind === 'integer' || kind === 'duration') && (
-          <TypedBlock
-            value={argument}
-            kind={kind === 'integer' ? 'number' : 'text'}
-            label={kind === 'integer' ? `How many rows ${method.name} moves by` : 'A duration'}
-            wrong={wrong}
-            focusNow={fresh.id === method.id}
-            accepts={(typed) => kind === 'duration' || WHOLE_NUMBER.test(typed.trim())}
-            onCommit={(typed) => {
-              commit(typed.trim());
+            onCommit={(argument) => {
+              replace({ id: method.id, name: method.name, argument });
             }}
           />
+        )}
+        {entry === null && (
+          <span className="font-sans text-xs text-wrong">{`not in the catalogue as ${methodId(method.name)}`}</span>
         )}
       </Piece>
     </span>
@@ -423,9 +386,10 @@ export function ChainBlocks({
   onChange,
 }: ChainBlocksProps): React.JSX.Element {
   const settings = useContext(DragSettingsContext);
+  const catalogue = useCatalogue();
   const fresh = useContext(FreshContext);
   const fieldHint = useFieldHint();
-  const check = checkChain(chain, frame);
+  const check = checkChain(catalogue, chain, frame);
   const [insertion, setInsertion] = useState<Insertion | null>(null);
   // A chain made by carrying a field on opens its list of methods as soon as it is shown.
   const [opensMethods, setOpensMethods] = useState(() => fresh.id === `${chainId}:method`);
@@ -438,8 +402,7 @@ export function ChainBlocks({
     onChange({ source: next, methods: chain.methods });
   };
   const insert = (at: number, name: MethodName): void => {
-    const input = check.dtypes[at] ?? null;
-    const method = { id: nextId('method'), name, argument: defaultArgument(name, frame, input) };
+    const method = { id: nextId('method'), name, argument: defaultArgument(catalogue, name) };
     const methods = [...chain.methods];
     methods.splice(at, 0, method);
     onChange(withMethods(chain, methods));
@@ -622,7 +585,7 @@ export function ChainBlocks({
           <OfferList
             placeholder="Search the methods"
             groups={(typed) =>
-              methodOffers(typed, check.dtypes[adding.at] ?? null, (name) => {
+              methodOffers(catalogue, typed, check.dtypes[adding.at] ?? null, (name) => {
                 insert(adding.at, name);
               })
             }
