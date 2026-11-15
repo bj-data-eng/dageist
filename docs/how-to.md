@@ -225,6 +225,9 @@ Otherwise it prints each difference and fails:
 - a package Polars' crates use, compiled with features the release does not
   turn on, or without features it does. One program shares one copy of each
   package, so features another part of the program turns on reach Polars too.
+  Only the Polars crates both builds compile count as users, not the Python
+  binding's, and a package compiled both for the program and for build-time
+  code is compared by the features of its copies together.
 
 A few differences are expected, and the generator lists them in its source
 with the reason for each:
@@ -234,8 +237,9 @@ with the reason for each:
 - `objc2-exception-helper`, which a feature Tauri turns on in `objc2` adds;
 - features Tauri turns on in packages Polars also uses, such as `serde_json`'s
   `raw_value`;
-- `std` and the default features of `ndarray` and the numeric crates it builds
-  on, which `numpy`, used by the Python binding, turns on in the release.
+- `std` in `ndarray` and the numeric crates it builds on, and the default
+  features of `ndarray`, `num-complex` and `num-integer`, which `numpy`, used by
+  the Python binding, turns on in the release.
 
 A listed exception that no longer applies is reported too, so the list stays
 current.
