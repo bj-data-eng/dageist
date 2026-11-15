@@ -15,7 +15,7 @@ mod release;
 
 pub use release::{
     Graph, LeftOutFeature, Listed, Origin, Package, Unit, Upstream, check_release, compare,
-    parse_graph, parse_tree_line,
+    parse_graph, parse_tree_line, toolchain_channel, toolchain_problems,
 };
 
 /// The toolchain whose rustdoc writes the JSON, and whose Cargo reads the
@@ -1388,6 +1388,33 @@ mod tests {
             &UPSTREAM,
             Path::new(UP),
         )
+    }
+
+    #[test]
+    fn reads_the_channel_of_a_toolchain_file() {
+        let text = "# The release's toolchain.\n[toolchain]\nchannel = \"nightly-2026-09-01\"\ncomponents = [\"clippy\"]\n";
+
+        assert_eq!(toolchain_channel(text), Some("nightly-2026-09-01"));
+        assert_eq!(toolchain_channel("[toolchain]\n"), None);
+    }
+
+    #[test]
+    fn a_toolchain_unlike_the_release_or_the_generator_is_named() {
+        let generator = "nightly-2026-09-01";
+
+        assert!(toolchain_problems(Some(generator), Some(generator), generator).is_empty());
+        assert!(toolchain_problems(None, None, generator).is_empty());
+        assert_eq!(
+            toolchain_problems(Some("nightly-2026-08-01"), Some(generator), generator),
+            [
+                "the workspace builds with nightly-2026-08-01 and the release with nightly-2026-09-01",
+                "the workspace builds with nightly-2026-08-01 and the generator runs Cargo with nightly-2026-09-01",
+            ],
+        );
+        assert_eq!(
+            toolchain_problems(None, Some(generator), generator),
+            ["the workspace pins no toolchain and the release builds with nightly-2026-09-01"],
+        );
     }
 
     #[test]

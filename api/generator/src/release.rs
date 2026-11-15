@@ -412,8 +412,64 @@ fn build_graph(manifest: &Path, package: &str) -> Result<Graph, String> {
     parse_graph(&String::from_utf8_lossy(&output.stdout)).map(|graph| with_resolved_paths(&graph))
 }
 
+/// Returns the toolchain a `rust-toolchain.toml` names in its `channel`, if any.
+pub fn toolchain_channel(text: &str) -> Option<&str> {
+    text.lines().find_map(|line| {
+        let value = line
+            .trim()
+            .strip_prefix("channel")?
+            .trim_start()
+            .strip_prefix('=')?;
+        value.trim().strip_prefix('"')?.strip_suffix('"')
+    })
+}
+
+/// Names the problems with the toolchains: the workspace's must be the
+/// upstream release's when the release pins one, and must be the one this
+/// generator runs Cargo with.
+pub fn toolchain_problems(
+    ours: Option<&str>,
+    release: Option<&str>,
+    generator: &str,
+) -> Vec<String> {
+    let mut problems = Vec::new();
+    if let Some(release) = release {
+        match ours {
+            Some(ours) if ours == release => {}
+            Some(ours) => problems.push(format!(
+                "the workspace builds with {ours} and the release with {release}"
+            )),
+            None => problems.push(format!(
+                "the workspace pins no toolchain and the release builds with {release}"
+            )),
+        }
+    }
+    if let Some(ours) = ours
+        && ours != generator
+    {
+        problems.push(format!(
+            "the workspace builds with {ours} and the generator runs Cargo with {generator}"
+        ));
+    }
+    problems
+}
+
+/// Reads the channel of the `rust-toolchain.toml` in `dir`, or `None` when there is none.
+fn read_channel(dir: &Path) -> Result<Option<String>, String> {
+    let path = dir.join("rust-toolchain.toml");
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let text = std::fs::read_to_string(&path)
+        .map_err(|error| format!("read {}: {error}", path.display()))?;
+    toolchain_channel(&text)
+        .map(|channel| Some(channel.to_owned()))
+        .ok_or_else(|| format!("{} names no channel", path.display()))
+}
+
 /// Checks the build of `release_package` in the workspace at `root` against
-/// the upstream release build.
+/// the upstream release build: the toolchain, and the crates as [`compare`]
+/// compares them.
 pub fn check_release(
     root: &Path,
     release_package: &str,
@@ -432,7 +488,12 @@ pub fn check_release(
         .map_err(|error| format!("resolve {}: {error}", upstream_dir.display()))?;
     let ours = build_graph(&root.join("Cargo.toml"), release_package)?;
     let release = build_graph(&upstream_manifest, upstream.package)?;
-    let problems = compare(&ours, &release, upstream, &upstream_dir);
+    let mut problems = toolchain_problems(
+        read_channel(root)?.as_deref(),
+        read_channel(&upstream_dir)?.as_deref(),
+        RUSTDOC_TOOLCHAIN,
+    );
+    problems.extend(compare(&ours, &release, upstream, &upstream_dir));
     if problems.is_empty() {
         println!(
             "{release_package} builds the crates of {} as {} does",
