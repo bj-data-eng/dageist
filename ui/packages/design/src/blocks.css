@@ -148,10 +148,6 @@
   --tone: var(--color-add);
 }
 
-[data-tone='remove'] {
-  --tone: var(--color-remove);
-}
-
 /* How a word is written: a step's name, text between quotation marks, nothing yet. */
 .dg-block[data-look='verb'] {
   font-weight: 600;

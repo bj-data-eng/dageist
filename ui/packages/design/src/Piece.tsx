@@ -33,25 +33,15 @@ export const PieceContext = createContext<PieceActions>({ remove: null, add: nul
 export interface PieceProps extends PieceActions {
   /** Whether the piece is being dragged to another place. */
   readonly dragged?: boolean;
-  /** Receives the piece, for a caller that drags it. */
-  readonly pieceRef?: (element: HTMLElement | null) => void;
   readonly children: React.ReactNode;
 }
 
 /** Holds `children` as one piece. */
-export function Piece({
-  remove,
-  add,
-  dragged = false,
-  pieceRef,
-  children,
-}: PieceProps): React.JSX.Element {
+export function Piece({ remove, add, dragged = false, children }: PieceProps): React.JSX.Element {
   const actions = useMemo(() => ({ remove, add }), [remove, add]);
   return (
     <PieceContext.Provider value={actions}>
-      <span ref={pieceRef} className={cx('dg-piece', dragged && 'dg-dragged')}>
-        {children}
-      </span>
+      <span className={cx(dragged && 'dg-dragged')}>{children}</span>
     </PieceContext.Provider>
   );
 }

@@ -180,7 +180,6 @@ export function ValueSlot({
         chainId={value.id}
         chain={value.chain}
         frame={frame}
-        opensNew
         onRemove={() => {
           onChange({ kind: 'unset' });
         }}
@@ -251,14 +250,14 @@ export function ValueSlot({
 }
 
 /** What a comparison shows and reports. */
-export interface TestBlocksProps {
+interface TestBlocksProps {
   readonly test: Test;
   readonly frame: Frame;
   readonly onChange: (test: Test) => void;
 }
 
 /** Draws a comparison as three blocks: a field, a comparison and a value. */
-export function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Element {
+function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Element {
   const fresh = useContext(FreshContext);
   const fieldHint = useFieldHint();
   const column = findColumn(frame, test.column);
@@ -507,7 +506,6 @@ function GroupLines({ group, frame, nested, onChange }: GroupLinesProps): React.
                 chainId={item.id}
                 chain={item.chain}
                 frame={frame}
-                opensNew
                 onRemove={without}
                 onChange={(chain) => {
                   withItem({ ...item, chain }, item.id);
@@ -613,7 +611,6 @@ export function ConditionBlocks({
             chainId={condition.id}
             chain={condition.chain}
             frame={frame}
-            opensNew
             onRemove={() => {
               onChange({ kind: 'group', id: nextId('group'), every: true, items: [] });
             }}

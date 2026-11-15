@@ -6,8 +6,8 @@
  * methods carrying on from it on a last line. The word that names a thing,
  * a method's name or the chain's start, opens the list it is swapped from
  * and ends that list with adding a method after it and taking it away. A
- * method's name also drags it to another place in the chain. Where a chain
- * is a value, taking away what it starts from takes the whole chain away.
+ * method's name also drags it to another place in the chain. Taking away
+ * what a chain starts from takes the whole chain away.
  */
 
 import type { Plugins } from '@dnd-kit/abstract';
@@ -137,13 +137,6 @@ function methodOffers(
   );
   groups.sort((left, right) => left.offers.length - right.offers.length);
   return groups;
-}
-
-/** Returns the field `source` is most about: its own, or the one a `when` gives. */
-function columnBehind(source: Source): string {
-  if (source.kind === 'column') return source.column;
-  const returned = source.arms.map((arm) => arm.returns).find((value) => value.kind === 'column');
-  return returned?.kind === 'column' ? returned.column : '';
 }
 
 /** Returns a condition with nothing picked yet, and the value it gives. */
@@ -412,17 +405,8 @@ export interface ChainBlocksProps {
   readonly chain: Chain;
   /** The frame the chain is worked out on. */
   readonly frame: Frame;
-  /**
-   * Whether a chain that was just added opens the list of what it starts
-   * from. A step's chain does not: its name is typed first.
-   */
-  readonly opensNew: boolean;
-  /**
-   * Takes the whole chain away, where it stands as a value and something else
-   * could stand there. `null` where there must be a chain, as in a step: its
-   * start cannot then be removed, and a `when` gives way to a field.
-   */
-  readonly onRemove: (() => void) | null;
+  /** Takes the whole chain away, leaving its place for something else. */
+  readonly onRemove: () => void;
   readonly onChange: (chain: Chain) => void;
 }
 
@@ -435,7 +419,6 @@ export function ChainBlocks({
   chainId,
   chain,
   frame,
-  opensNew,
   onRemove,
   onChange,
 }: ChainBlocksProps): React.JSX.Element {
@@ -470,7 +453,7 @@ export function ChainBlocks({
   };
   const startsWrong = check.problem?.index === -1;
   // A chain is taken away by the word it starts from.
-  const removeChain = onRemove === null ? null : { label: 'Remove this chain', onPress: onRemove };
+  const removeChain = { label: 'Remove this chain', onPress: onRemove };
   const column = source.kind === 'column' ? findColumn(frame, source.column) : null;
   const unset = source.kind === 'column' && source.column === '';
   // The word the chain starts from, which that first list of methods opens against.
@@ -540,7 +523,7 @@ export function ChainBlocks({
                 look={unset ? 'none' : 'plain'}
                 wrong={startsWrong}
                 names
-                openNow={opensNew && fresh.id === chainId}
+                openNow={fresh.id === chainId}
                 buttonRef={setStart}
                 describedAs="What the chain starts from"
                 placeholder="Search the fields and functions"
@@ -583,14 +566,7 @@ export function ChainBlocks({
         <Lines>
           <Line>
             <Piece
-              remove={
-                removeChain ?? {
-                  label: 'Remove when: start the chain from a field',
-                  onPress: () => {
-                    withSource({ kind: 'column', column: columnBehind(source) });
-                  },
-                }
-              }
+              remove={removeChain}
               add={{ label: 'Add a method after when', onPress: addAt(0) }}
             >
               <Slot

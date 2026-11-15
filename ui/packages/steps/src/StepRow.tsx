@@ -425,7 +425,6 @@ function cellLabel(cell: Cell): string {
 function PivotHead({ step, frame, onChange }: HeadProps<PivotStep>): React.JSX.Element {
   const field = (
     word: string,
-    first: boolean,
     current: string,
     describedAs: string,
     update: (name: string) => PivotStep,
@@ -457,17 +456,17 @@ function PivotHead({ step, frame, onChange }: HeadProps<PivotStep>): React.JSX.E
   const values = distinctValues(frame, step.on);
   return (
     <>
-      {field('on', true, step.on, 'The field whose values become columns', (on) => ({
+      {field('on', step.on, 'The field whose values become columns', (on) => ({
         ...step,
         on,
         // Pinned columns are values of the old field, so pin the new field's instead.
         pinned: step.columnsFrom === 'pinned' ? distinctValues(frame, on) : [],
       }))}
-      {field('index', false, step.index, 'The field that stays as rows', (index) => ({
+      {field('index', step.index, 'The field that stays as rows', (index) => ({
         ...step,
         index,
       }))}
-      {field('values', false, step.values, 'The field the cells are filled from', (chosen) => ({
+      {field('values', step.values, 'The field the cells are filled from', (chosen) => ({
         ...step,
         values: chosen,
       }))}

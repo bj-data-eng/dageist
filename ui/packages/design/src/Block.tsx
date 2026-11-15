@@ -2,9 +2,9 @@
  * @file The word: a button written as nothing but its letters, in the colour
  * of what it names. Everything that can be changed in a line of "code" is
  * one, so a column, a method, a value and a comparison are told apart by
- * colour, as in a code editor, and not by a box. Nothing about a word
- * changes when it is pointed at. The quiet things that stand between words
- * are here too: a word that names a parameter, a caret and an equals sign.
+ * colour, as in a code editor, and not by a box. A word that is pointed at
+ * takes a faint flat fill and nothing else. The quiet things that stand
+ * between words are here too: a word that names a parameter, a caret and an equals sign.
  */
 
 import { cx } from './cx';
@@ -19,8 +19,7 @@ export type Tone =
   | 'table'
   | 'ink'
   | 'verb'
-  | 'add'
-  | 'remove';
+  | 'add';
 
 /**
  * How a block is written: plainly, as a verb, as a comparison, as text
