@@ -213,7 +213,7 @@ export function ColumnDrawing({
 }
 
 /** What a list of fields shows and reports. */
-export interface ColumnsDrawingProps {
+interface ColumnsDrawingProps {
   /** The rows the fields are picked from. */
   readonly frame: Frame;
   readonly names: readonly string[];
@@ -236,7 +236,7 @@ function noReason(): null {
  * Draws several fields of the rows, in the order they are picked, folded to
  * the room on the line with a count of the rest.
  */
-export function ColumnsDrawing({
+function ColumnsDrawing({
   frame,
   names,
   empty,
