@@ -1,0 +1,17 @@
+[package]
+name = "dageist-api-generator"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Generates and checks the public API audits of dageist and the Polars crates it builds on."
+publish = false
+
+# The generator is maintenance tooling, kept out of the product workspace and its lock file.
+[workspace]
+
+[dependencies]
+public-api = "=0.50.0"
+rustdoc-json = "=0.9.7"
+
+[lints.rust]
+unsafe_code = "forbid"

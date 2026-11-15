@@ -1,4 +1,5 @@
 /target
+/api/generator/target/
 /crates/*/Cargo.lock
 /crates/dageist-tauri/gen/
 /ui/**/node_modules/
