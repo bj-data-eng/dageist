@@ -50,6 +50,10 @@ export type MethodName =
   | 'shift'
   | 'first'
   | 'last'
+  | 'sum'
+  | 'min'
+  | 'max'
+  | 'len'
   | 'cum_sum'
   | 'cum_count'
   | 'cum_max'
@@ -69,6 +73,10 @@ const PREVIEWED: Readonly<Record<MethodName, true>> = {
   shift: true,
   first: true,
   last: true,
+  sum: true,
+  min: true,
+  max: true,
+  len: true,
   cum_sum: true,
   cum_count: true,
   cum_max: true,
@@ -115,6 +123,10 @@ const PREVIEWED_OPTIONS: Readonly<Record<MethodName, readonly string[]>> = {
   shift: ['fill_value'],
   first: ['ignore_nulls'],
   last: ['ignore_nulls'],
+  sum: [],
+  min: [],
+  max: [],
+  len: [],
   cum_sum: ['reverse'],
   cum_count: ['reverse'],
   cum_max: ['reverse'],
@@ -277,7 +289,16 @@ export function methodDtype(name: MethodName, input: Dtype, given: Given | null)
     case 'over':
       return input;
     case 'cum_count':
+    case 'len':
       return 'UInt32';
+    case 'sum':
+      // Polars widens only integers narrower than 32 bits before summing.
+      return isNumeric(input) || input === 'Duration' ? input : null;
+    case 'min':
+    case 'max':
+      return isNumeric(input) || isTemporal(input) || input === 'String' || input === 'Boolean'
+        ? input
+        : null;
     case 'cum_sum':
       // Polars widens only integers narrower than 32 bits before summing.
       return isNumeric(input) || input === 'Duration' ? input : null;
@@ -442,6 +463,41 @@ function fillOf(setting: Setting | null): Cell | undefined {
     return input?.kind === 'value' ? input.value : undefined;
   }
   return undefined;
+}
+
+/**
+ * Returns what a `shift` fills with, as the words and dtype of the value it
+ * is given: `null` for None, which fits every dtype, or `undefined` when the
+ * preview cannot tell, as for a field.
+ */
+function fillValue(setting: Setting): { label: string; dtype: Dtype } | null | undefined {
+  if (setting.kind !== 'expression') return undefined;
+  const { value } = setting;
+  if (value.kind === 'literal') {
+    if (value.value === null) return null;
+    return typeof value.value === 'number'
+      ? { label: String(value.value), dtype: literalDtype(value.value) }
+      : { label: quoted(value.value), dtype: 'String' };
+  }
+  if (value.kind === 'input') {
+    const input = findInput(value.name);
+    return input?.kind === 'value' ? { label: value.name, dtype: input.dtype } : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Returns why the `fill_value` a `shift` is set with does not go with the
+ * `input` dtype it shifts, or `null` when it does, when it is not set, or when
+ * the preview cannot tell.
+ */
+export function fillProblem(method: Method, input: Dtype): string | null {
+  if (method.name !== 'shift') return null;
+  const setting = optionOf(method.options, 'fill_value');
+  if (setting === null || !isComplete(setting)) return null;
+  const fill = fillValue(setting);
+  if (fill === null || fill === undefined || supertype(input, fill.dtype) !== null) return null;
+  return `shift is given ${input}, but its fill_value ${fill.label} is ${fill.dtype}.`;
 }
 
 /** Reports whether a column of `operand` dtype can be taken from a value of `input` dtype. */
@@ -671,6 +727,40 @@ function fromTheEnd(
   return reverse ? backwards(work(backwards(values))) : work(values);
 }
 
+/** Returns `value` on every row, as an aggregate that gives one value is the same on each. */
+function broadcast(values: readonly Cell[], value: Cell): Cell[] {
+  return values.map(() => value);
+}
+
+/** Returns the total of the numbers in `cells`; a null adds nothing, and no cells total 0. */
+function summed(cells: readonly Cell[]): number {
+  return cells.reduce<number>((total, cell) => total + (typeof cell === 'number' ? cell : 0), 0);
+}
+
+/** Returns the highest cell of `cells` when `side` is 1, or the lowest when it is -1; a null is skipped. */
+function extreme(cells: readonly Cell[], side: 1 | -1): Cell {
+  const present = cells.filter((cell) => cell !== null);
+  const [first] = present;
+  if (first === undefined) return null;
+  return present.reduce((best, cell) => (compareCells(cell, best) * side > 0 ? cell : best), first);
+}
+
+/** The methods that give one value for all the values they are handed. */
+const AGGREGATING: readonly MethodName[] = ['first', 'last', 'sum', 'min', 'max', 'len'];
+
+/** Reports whether the method `name` gives one value for all the values it is handed. */
+export function isAggregating(name: MethodName): boolean {
+  return AGGREGATING.includes(name);
+}
+
+/**
+ * Returns what the aggregate `name` gives no values at all: 0 for a count or a
+ * total, and null for the others.
+ */
+export function emptyAggregate(name: MethodName): Cell {
+  return name === 'len' || name === 'sum' ? 0 : null;
+}
+
 function applyAcrossGroup(
   method: Method,
   values: readonly Cell[],
@@ -709,6 +799,14 @@ function applyAcrossGroup(
       const last = ignoreNulls ? present.at(-1) : values.at(-1);
       return values.map(() => last ?? null);
     }
+    case 'sum':
+      return broadcast(values, summed(values));
+    case 'min':
+      return broadcast(values, extreme(values, -1));
+    case 'max':
+      return broadcast(values, extreme(values, 1));
+    case 'len':
+      return broadcast(values, values.length);
     case 'cum_count':
       return fromTheEnd(reverse, values, (ordered) => {
         let count = 0;

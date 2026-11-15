@@ -19,12 +19,20 @@ import { inputLines } from './InputsStrip';
 import { FreshContext, Line, Lines } from './Lists';
 import { anyField, counted, fieldOffers, matches, offer, titled } from './offers';
 import { useFieldHint } from './origins';
-import { groupWords, groupsHold } from './model/catalogue';
+import { elementEntry, groupWords, groupsHold } from './model/catalogue';
 import type { Cell, Dtype, Frame } from './model/frame';
 import { findColumn, keysFit, literalDtype } from './model/frame';
 import { nextId } from './model/ids';
 import { INPUTS, findInput } from './model/inputs';
-import type { ChainCondition, Comparison, Condition, Group, Test, Value } from './model/source';
+import type {
+  ChainCondition,
+  Comparison,
+  Condition,
+  ElementScope,
+  Group,
+  Test,
+  Value,
+} from './model/source';
 import { COMPARISONS, dtypesAgree } from './model/source';
 
 const WHOLE_NUMBER = /^-?\d+$/;
@@ -93,6 +101,11 @@ export interface ValueSlotProps {
   readonly expected: Dtype | null;
   /** The dtype groups the value may have, when its parameter limits them. */
   readonly takes?: readonly string[] | undefined;
+  /**
+   * Set when the value is worked out for the values of one pivot cell, which
+   * `element` stands for: then a chain can only start from `element`.
+   */
+  readonly within?: ElementScope | undefined;
   /** The id that, when it is what was just added, opens the slot's list as soon as it is shown. */
   readonly openId?: string | undefined;
   /** Takes the value away from where it stands, when it is one of several; otherwise it can only be unset. */
@@ -113,6 +126,7 @@ export function ValueSlot({
   lists,
   expected,
   takes,
+  within,
   openId,
   onRemove,
   onChange,
@@ -135,6 +149,37 @@ export function ValueSlot({
   };
 
   const offers = (typed: string): OfferGroup[] => {
+    if (within !== undefined) {
+      // The values of a pivot cell are what is combined, so a chain starts from them.
+      const start = elementEntry(catalogue);
+      const name = start?.name ?? 'element';
+      const hint = start?.hint ?? 'not in the catalogue';
+      return [
+        titled(
+          'Functions',
+          matches(typed, name, hint)
+            ? [
+                offer(
+                  name,
+                  'function',
+                  hint,
+                  () => {
+                    const id = nextId('chain');
+                    onChange({
+                      kind: 'chain',
+                      id,
+                      chain: { source: { kind: 'element' }, methods: [] },
+                    });
+                    // Its first method is the next thing to pick.
+                    fresh.mark(`${id}:method`);
+                  },
+                  { reason: start === null ? 'not in the catalogue' : null },
+                ),
+              ]
+            : [],
+        ),
+      ];
+    }
     const connected = INPUTS.flatMap((input) =>
       input.kind === (lists ? 'list' : 'value') ? [input] : [],
     )
@@ -209,6 +254,7 @@ export function ValueSlot({
         chainId={value.id}
         chain={value.chain}
         frame={frame}
+        element={within}
         onRemove={
           onRemove ??
           (() => {
@@ -284,7 +330,13 @@ export function ValueSlot({
           openNow={openId !== undefined && fresh.id === openId}
           names
           describedAs={label}
-          placeholder={lists ? 'Search the lists' : 'Type a value, or search'}
+          placeholder={
+            within !== undefined
+              ? 'Search the functions'
+              : lists
+                ? 'Search the lists'
+                : 'Type a value, or search'
+          }
           offers={offers}
         />
       </Hint>

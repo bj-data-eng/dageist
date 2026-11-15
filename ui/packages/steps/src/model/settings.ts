@@ -153,6 +153,24 @@ export function atDefault(parameter: ParameterView, setting: Setting): boolean {
   }
 }
 
+/**
+ * Reports whether `setting` is what `parameter` holds when it is not given,
+ * for the `items` of the parameter it follows: an item with no setting of its
+ * own is at the default, and settings of items that are no longer there do
+ * not count.
+ */
+export function atDefaultOver(
+  parameter: ParameterView,
+  setting: Setting,
+  items: readonly string[],
+): boolean {
+  if (setting.kind !== 'each') return atDefault(parameter, setting);
+  return items.every((item) => {
+    const own = Object.hasOwn(setting.items, item) ? setting.items[item] : undefined;
+    return own === undefined || atDefault(parameter, own);
+  });
+}
+
 /** One parameter that is set, with what it is set to. */
 export interface SetParameter {
   readonly parameter: ParameterView;
@@ -233,4 +251,26 @@ export function flagFor(options: Options, name: string, item: string): boolean {
 export function wordOf(options: Options, name: string): string | null {
   const setting = optionOf(options, name);
   return setting?.kind === 'word' || setting?.kind === 'text' ? setting.value : null;
+}
+
+/** Returns `options` without the parameters called `names`. */
+export function withoutOptions(options: Options, names: readonly string[]): Options {
+  return Object.fromEntries(Object.entries(options).filter(([key]) => !names.includes(key)));
+}
+
+/** Returns the items of the parameter `name` when it holds a list, and no items when it is not set to one. */
+export function itemsOf(options: Options, name: string): readonly Setting[] {
+  const setting = optionOf(options, name);
+  return setting?.kind === 'list' ? setting.items : [];
+}
+
+/** Returns the entries of the parameter `name` when it holds pairs, and none when it is not set to them. */
+export function pairsOf(options: Options, name: string): readonly PairSetting[] {
+  const setting = optionOf(options, name);
+  return setting?.kind === 'pairs' ? setting.entries : [];
+}
+
+/** Returns the word or text `setting` holds, or `null` when it holds neither. */
+export function textOf(setting: Setting): string | null {
+  return setting.kind === 'word' || setting.kind === 'text' ? setting.value : null;
 }

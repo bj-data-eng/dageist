@@ -11,7 +11,7 @@
 import { useSortable } from '@dnd-kit/react/sortable';
 import { useCallback, useContext, useState } from 'react';
 
-import type { Entry, OfferGroup } from '@dageist/design';
+import type { OfferGroup } from '@dageist/design';
 import {
   Hint,
   ManySlot,
@@ -31,14 +31,15 @@ import {
   ColumnDrawing,
   ColumnsDrawing,
   OptionRows,
+  ParameterDrawing,
   TableDrawing,
   optionOffers,
 } from './Parameters';
 import { ConditionBlocks, ValueSlot } from './Values';
 import { formatCell } from './format';
-import { counted, fieldOffers, matches, offer, titled } from './offers';
+import { counted, matches, offer, titled } from './offers';
 import type { Cell, Frame } from './model/frame';
-import { distinctValues, findColumn, keysFit } from './model/frame';
+import { distinctValues, findColumn } from './model/frame';
 import type {
   ColumnsFrom,
   FilterStep,
@@ -53,16 +54,18 @@ import type {
   WithColumnsStep,
 } from './model/steps';
 import {
-  AGGREGATES,
   COLUMNS_FROM,
   VERBS,
   defaultStep,
+  fieldKeys,
   skippedStepOptions,
   stepBreak,
   stepItems,
   stepOptionParameters,
   stepText,
 } from './model/steps';
+import type { ElementScope } from './model/source';
+import { optionOf, starterSetting, withOption } from './model/settings';
 import type { Catalogue } from './model/catalogue';
 import { verbEntry, verbId } from './model/catalogue';
 import { findTable } from './model/tables';
@@ -137,20 +140,57 @@ function AddColumnHead({ step, frame, onChange }: HeadProps<WithColumnsStep>): R
   );
 }
 
+interface StepParameterProps {
+  readonly step: Step;
+  /** The Python name of the parameter, which the step holds in its options. */
+  readonly name: string;
+  /** The rows the parameter's fields are picked from. */
+  readonly frame: Frame;
+  /** Where `element` is meant, for a parameter worked out for the values of one pivot cell. */
+  readonly element?: ElementScope | undefined;
+  /** Tells what was just added from the rest. */
+  readonly keyPrefix: string;
+  readonly onChange: (step: Step) => void;
+}
+
+/** Draws the parameter `name` of `step` by its kind and shape, as the catalogue gives them. */
+function StepParameter({
+  step,
+  name,
+  frame,
+  element,
+  keyPrefix,
+  onChange,
+}: StepParameterProps): React.JSX.Element {
+  const catalogue = useCatalogue();
+  const parameter = verbEntry(catalogue, step.verb)?.parameters.find(
+    (candidate) => candidate.name === name,
+  );
+  if (parameter === undefined) {
+    return (
+      <span className="font-sans text-xs text-wrong">
+        {`The catalogue has no parameter ${name} of ${verbId(step.verb)}.`}
+      </span>
+    );
+  }
+  return (
+    <ParameterDrawing
+      parameter={parameter}
+      setting={optionOf(step.options, name) ?? starterSetting(parameter)}
+      around={{ frame, items: (of) => stepItems(catalogue, step, of), element }}
+      keyPrefix={keyPrefix}
+      onChange={(setting) => {
+        onChange({ ...step, options: withOption(step.options, name, setting) });
+      }}
+    />
+  );
+}
+
 function SortHead({ step, frame, onChange }: HeadProps<SortStep>): React.JSX.Element {
   return (
     <>
       <Word>by</Word>
-      <ColumnsDrawing
-        frame={frame}
-        names={step.by}
-        empty="no fields"
-        describedAs="The fields the rows are ordered by"
-        openId={step.id}
-        onChange={(by) => {
-          onChange({ ...step, by });
-        }}
-      />
+      <StepParameter step={step} name="by" frame={frame} keyPrefix={step.id} onChange={onChange} />
     </>
   );
 }
@@ -171,67 +211,13 @@ function SelectHead({ step, frame, onChange }: HeadProps<SelectStep>): React.JSX
 }
 
 function RenameHead({ step, frame, onChange }: HeadProps<RenameStep>): React.JSX.Element {
-  const fresh = useContext(FreshContext);
-  const entries: Entry[] = step.names.map(({ from, to }) => ({
-    id: from,
-    wrong: findColumn(frame, from) === null || to === '',
-    blocks: [
-      { label: from, tone: 'column', look: 'plain' },
-      { label: to === '' ? 'name' : to, tone: 'ink', look: to === '' ? 'none' : 'plain' },
-    ],
-  }));
   return (
-    <ManySlot
-      entries={entries}
-      empty="no fields"
-      describedAs="The fields that are given new names"
-      placeholder="Search the fields"
-      wide
-      openNow={fresh.id === step.id}
-      offers={(typed) => [
-        counted(
-          'Fields',
-          fieldOffers(frame, typed, {
-            reasonFor: () => null,
-            chosen: step.names.map((naming) => naming.from),
-            renderExtra: (name) => {
-              const naming = step.names.find((candidate) => candidate.from === name);
-              if (naming === undefined) return null;
-              // A setting that can be anything is typed in a field inside the list.
-              return (
-                <>
-                  <span className="dg-arrow">→</span>
-                  <input
-                    type="text"
-                    aria-label={`New name for ${name}`}
-                    className="dg-given"
-                    spellCheck={false}
-                    value={naming.to}
-                    onChange={(event) => {
-                      const to = event.currentTarget.value;
-                      onChange({
-                        ...step,
-                        names: step.names.map((other) =>
-                          other.from === name ? { from: name, to } : other,
-                        ),
-                      });
-                    }}
-                  />
-                </>
-              );
-            },
-            onPick: (name) => {
-              const has = step.names.some((naming) => naming.from === name);
-              onChange({
-                ...step,
-                names: has
-                  ? step.names.filter((naming) => naming.from !== name)
-                  : [...step.names, { from: name, to: name }],
-              });
-            },
-          }),
-        ),
-      ]}
+    <StepParameter
+      step={step}
+      name="mapping"
+      frame={frame}
+      keyPrefix={step.id}
+      onChange={onChange}
     />
   );
 }
@@ -259,35 +245,34 @@ function JoinHead({ step, frame, onChange }: HeadProps<JoinStep>): React.JSX.Ele
         onChange={(name) => {
           const joined = findTable(name);
           // The keys belonged to the old table, so start from the new table's first field.
-          onChange({ ...step, table: name, rightOn: [joined?.frame[0]?.name ?? ''] });
+          onChange({
+            ...step,
+            table: name,
+            options: withOption(
+              step.options,
+              'right_on',
+              fieldKeys([joined?.frame[0]?.name ?? '']),
+            ),
+          });
         }}
       />
       <Word>on</Word>
-      <ColumnsDrawing
+      <StepParameter
+        step={step}
+        name="left_on"
         frame={frame}
-        names={step.leftOn}
-        empty="field"
-        describedAs="The fields of these rows that are matched"
-        onChange={(leftOn) => {
-          onChange({ ...step, leftOn });
-        }}
+        keyPrefix={`${step.id}:left_on`}
+        onChange={onChange}
       />
       <span data-tone="compare" data-look="compare" className="dg-block dg-fixed">
         ==
       </span>
-      <ColumnsDrawing
+      <StepParameter
+        step={step}
+        name="right_on"
         frame={table?.frame ?? []}
-        names={step.rightOn}
-        empty="field"
-        describedAs={`The fields of ${step.table} that are matched`}
-        reasonFor={(dtype) => {
-          // Each key is matched with the one at its place on the other side.
-          const left = findColumn(frame, step.leftOn[step.rightOn.length] ?? '')?.dtype;
-          return left === undefined || keysFit(dtype, left) ? null : 'a different dtype';
-        }}
-        onChange={(rightOn) => {
-          onChange({ ...step, rightOn });
-        }}
+        keyPrefix={`${step.id}:right_on`}
+        onChange={onChange}
       />
     </>
   );
@@ -334,23 +319,14 @@ function PivotHead({ step, frame, onChange }: HeadProps<PivotStep>): React.JSX.E
         ...step,
         values: chosen,
       }))}
-      <Word>aggregate</Word>
-      <Slot
-        label={step.aggregate}
-        tone="value"
-        look="plain"
-        describedAs="How the values that land in one cell are combined"
-        placeholder="Search"
-        offers={(typed) => [
-          titled(
-            'Aggregate',
-            AGGREGATES.filter((aggregate) => matches(typed, aggregate)).map((aggregate) =>
-              offer(aggregate, 'value', '', () => {
-                onChange({ ...step, aggregate });
-              }),
-            ),
-          ),
-        ]}
+      <Word>aggregate_function</Word>
+      <StepParameter
+        step={step}
+        name="aggregate_function"
+        frame={frame}
+        element={{ dtype: findColumn(frame, step.values)?.dtype ?? null }}
+        keyPrefix={`${step.id}:aggregate_function`}
+        onChange={onChange}
       />
       {step.columnsFrom === 'pinned' && (
         <>
@@ -680,7 +656,7 @@ export function StepRow({
             entry={entry}
             parameters={parameters}
             options={step.options}
-            around={{ frame, items: (of) => stepItems(step, of) }}
+            around={{ frame, items: (of) => stepItems(catalogue, step, of) }}
             skipped={skippedStepOptions(catalogue, step)}
             layout="lines"
             onChange={(options) => {

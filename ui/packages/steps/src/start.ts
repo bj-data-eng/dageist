@@ -3,9 +3,10 @@
  */
 
 import { nextId } from './model/ids';
-import { NO_OPTIONS } from './model/settings';
+import { NO_OPTIONS, expressionSetting } from './model/settings';
 import type { Chain, Value } from './model/source';
 import type { Step } from './model/steps';
+import { elementChain, fieldKeys } from './model/steps';
 
 /** Returns `chain` as what a column holds: a field alone is that field, anything more is a chain. */
 function chainValue(chain: Chain): Value {
@@ -19,8 +20,7 @@ export const START: readonly Step[] = [
   {
     id: nextId('step'),
     verb: 'sort',
-    by: ['dcn', 'timestamp'],
-    options: NO_OPTIONS,
+    options: { by: fieldKeys(['dcn', 'timestamp']) },
   },
   {
     id: nextId('step'),
@@ -114,9 +114,11 @@ export const START: readonly Step[] = [
     id: nextId('step'),
     verb: 'join',
     table: 'step_sla',
-    leftOn: ['step_to'],
-    rightOn: ['step'],
-    options: { how: { kind: 'word', value: 'left' } },
+    options: {
+      left_on: fieldKeys(['step_to']),
+      right_on: fieldKeys(['step']),
+      how: { kind: 'word', value: 'left' },
+    },
   },
   {
     id: nextId('step'),
@@ -199,9 +201,15 @@ export const START: readonly Step[] = [
     on: 'step_to',
     index: 'dcn',
     values: 'row_days',
-    aggregate: 'sum',
     columnsFrom: 'collect',
     pinned: [],
-    options: NO_OPTIONS,
+    options: {
+      aggregate_function: expressionSetting({
+        kind: 'chain',
+        id: nextId('chain'),
+        // Each cell holds one row, so the first value is the only one.
+        chain: elementChain('first'),
+      }),
+    },
   },
 ];

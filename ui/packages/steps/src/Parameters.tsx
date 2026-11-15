@@ -26,9 +26,10 @@ import { DTYPES, findColumn } from './model/frame';
 import type { Dtype, Frame } from './model/frame';
 import { INPUTS, findInput } from './model/inputs';
 import type { Options, PairSetting, SetParameter, Setting } from './model/settings';
+import type { ElementScope } from './model/source';
 import {
   UNSET,
-  atDefault,
+  atDefaultOver,
   defaultSetting,
   emptyPair,
   isComplete,
@@ -57,6 +58,8 @@ export interface Surroundings {
   readonly frame: Frame;
   /** Returns the items of the parameter named `of`, for a parameter that holds one value for each. */
   readonly items: (of: string) => readonly string[];
+  /** Where `element` is meant, for an expression that is worked out for the values of one pivot cell. */
+  readonly element?: ElementScope | undefined;
 }
 
 /** Returns how `setting` is written as a word. */
@@ -184,9 +187,14 @@ export function ColumnDrawing({
   openId,
   value,
   onChange,
-}: DrawingProps<string | null> & { readonly frame: Frame }): React.JSX.Element {
+}: DrawingProps<string | null> & {
+  readonly frame: Frame;
+}): React.JSX.Element {
   const fieldHint = useFieldHint();
   const column = value === null ? null : findColumn(frame, value);
+  const fields = (typed: string): OfferGroup => {
+    return counted('Fields', fieldOffers(frame, typed, anyField(onChange)));
+  };
   return (
     <Hint lines={fieldHint(column)} code={false}>
       <Slot
@@ -198,7 +206,7 @@ export function ColumnDrawing({
         openNow={useIsFresh(openId)}
         describedAs={describedAs}
         placeholder="Search the fields"
-        offers={(typed) => [counted('Fields', fieldOffers(frame, typed, anyField(onChange)))]}
+        offers={(typed) => [fields(typed)]}
       />
     </Hint>
   );
@@ -527,6 +535,7 @@ function OneDrawing({
           lists={false}
           expected={null}
           takes={kind.dtypes}
+          within={around.element}
           openId={openId}
           onRemove={onRemove}
           onChange={(value) => {
@@ -1073,9 +1082,12 @@ export function OptionRows({
           onChange(withOption(options, parameter.name, next));
         }}
       />
-      {isComplete(setting) && atDefault(parameter, setting) && (
-        <span className="font-sans text-xs text-muted">same as the default</span>
-      )}
+      {isComplete(setting) &&
+        atDefaultOver(
+          parameter,
+          setting,
+          parameter.shape.shape === 'perItem' ? around.items(parameter.shape.of) : [],
+        ) && <span className="font-sans text-xs text-muted">same as the default</span>}
     </Row>
   ));
   const note =

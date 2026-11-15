@@ -27,7 +27,13 @@ import { anyField, counted, fieldOffers, matches, offer, titled } from './offers
 import { useFieldHint } from './origins';
 import type { Catalogue } from './model/catalogue';
 import type { ConditionWord } from './model/catalogue';
-import { conditionEntry, conditionId, methodEntry, methodId } from './model/catalogue';
+import {
+  conditionEntry,
+  conditionId,
+  elementEntry,
+  methodEntry,
+  methodId,
+} from './model/catalogue';
 import type { ArgumentRule, Method, MethodName } from './model/expr';
 import {
   acceptanceMisfit,
@@ -45,7 +51,7 @@ import type { Dtype, Frame } from './model/frame';
 import { findColumn } from './model/frame';
 import { nextId } from './model/ids';
 import { NO_OPTIONS, carriedOptions } from './model/settings';
-import type { Arm, Chain, ChainCheck, Source, Value } from './model/source';
+import type { Arm, Chain, ChainCheck, ElementScope, Source, Value } from './model/source';
 import { checkChain } from './model/source';
 
 /** How every drag-and-drop area in the editor is set up. */
@@ -405,6 +411,8 @@ export interface ChainBlocksProps {
   readonly chain: Chain;
   /** The frame the chain is worked out on. */
   readonly frame: Frame;
+  /** Where `element` is meant, when the chain is worked out for the values of one pivot cell. */
+  readonly element?: ElementScope | undefined;
   /** Takes the whole chain away, leaving its place for something else. */
   readonly onRemove: () => void;
   readonly onChange: (chain: Chain) => void;
@@ -419,6 +427,7 @@ export function ChainBlocks({
   chainId,
   chain,
   frame,
+  element,
   onRemove,
   onChange,
 }: ChainBlocksProps): React.JSX.Element {
@@ -426,7 +435,7 @@ export function ChainBlocks({
   const catalogue = useCatalogue();
   const fresh = useContext(FreshContext);
   const fieldHint = useFieldHint();
-  const check = checkChain(catalogue, chain, frame);
+  const check = checkChain(catalogue, chain, frame, element ?? null);
   const [insertion, setInsertion] = useState<Insertion | null>(null);
   // A chain made by carrying a field on opens its list of methods as soon as it is shown.
   const [opensMethods, setOpensMethods] = useState(() => fresh.id === `${chainId}:method`);
@@ -522,9 +531,43 @@ export function ChainBlocks({
     />
   );
   const [arm] = source.kind === 'when' ? source.arms : [];
+  // The word `element` comes from the catalogue; one it lacks keeps its Polars name and says so.
+  const elementStart = elementEntry(catalogue);
+  const elementWord = elementStart?.name ?? 'element';
+  const elementHint = elementStart?.hint ?? 'not in the catalogue';
 
   return (
     <>
+      {source.kind === 'element' && (
+        <>
+          <Piece
+            remove={removeChain}
+            add={{ label: `Add a method after ${elementWord}`, onPress: addAt(0) }}
+          >
+            <Hint lines={[`${elementWord} · ${elementHint}`]} code={false}>
+              <Slot
+                label={elementWord}
+                tone="function"
+                look="plain"
+                wrong={startsWrong || elementStart === null}
+                names
+                buttonRef={setStart}
+                describedAs="The function the chain starts from"
+                placeholder="Search the functions"
+                offers={(typed) => [
+                  titled(
+                    'Functions',
+                    matches(typed, elementWord, elementHint)
+                      ? [offer(elementWord, 'function', elementHint, () => undefined)]
+                      : [],
+                  ),
+                ]}
+              />
+            </Hint>
+          </Piece>
+          {methods}
+        </>
+      )}
       {source.kind === 'column' && (
         <>
           <Piece

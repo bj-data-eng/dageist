@@ -124,3 +124,11 @@ export function conditionId(word: ConditionWord): string {
 export function conditionEntry(catalogue: Catalogue, word: ConditionWord): EntryView | null {
   return catalogue.entries.get(conditionId(word)) ?? null;
 }
+
+/** The identifier the catalogue gives `element`, which stands for the values of one cell of a pivot. */
+export const ELEMENT_ID = 'polars.element';
+
+/** Returns the catalogue entry of `element`, or `null` when there is none. */
+export function elementEntry(catalogue: Catalogue): EntryView | null {
+  return catalogue.entries.get(ELEMENT_ID) ?? null;
+}
