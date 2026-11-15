@@ -598,7 +598,7 @@
       "applies": "expression",
       "family": "arithmetic",
       "name": "sub",
-      "hint": "minus another column",
+      "hint": "minus another value",
       "head": null,
       "accepts": ["numeric", "temporal"],
       "lazy": true,
