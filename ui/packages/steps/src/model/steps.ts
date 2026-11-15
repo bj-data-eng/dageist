@@ -7,6 +7,8 @@
  * validation and previews; nothing here is meant to survive.
  */
 
+import type { ParameterView } from '@dageist/host';
+
 import type { Cell, Column, Frame } from './frame';
 import {
   SOURCE_FRAME,
@@ -21,6 +23,17 @@ import {
 } from './frame';
 import { nextId } from './ids';
 import type { Catalogue } from './catalogue';
+import { verbEntry } from './catalogue';
+import type { Options } from './settings';
+import {
+  NO_OPTIONS,
+  atDefault,
+  flagFor,
+  isComplete,
+  optionParameters,
+  setParameters,
+  wordOf,
+} from './settings';
 import type { Condition, Value } from './source';
 import {
   cellsOf,
@@ -29,6 +42,8 @@ import {
   conditionRows,
   conditionText,
   literalText,
+  optionTexts,
+  optionsProblem,
   valueExprText,
 } from './source';
 import { TABLES, findTable } from './tables';
@@ -56,20 +71,22 @@ export interface WithColumnsStep {
   readonly alias: string;
   /** What the column holds: a field, a value written out, an input, or a chain. */
   readonly value: Value;
+  /** The other parameters of `with_columns` that are set. */
+  readonly options: Options;
 }
 
-/** One column a sort orders by, and which way. */
-export interface SortKey {
-  readonly column: string;
-  readonly descending: boolean;
-}
-
-/** `.sort(by…, descending=[…])`: orders the rows by one column after another. */
+/**
+ * `.sort(by…, descending=[…], nulls_last=[…])`: orders the rows by one column
+ * after another. Which way each is ordered, and where the empty values go,
+ * are parameters that are set for each column in `options`.
+ */
 export interface SortStep {
   /** Stays with the step while it is moved or edited. */
   readonly id: string;
   readonly verb: 'sort';
-  readonly by: readonly SortKey[];
+  /** The columns the rows are ordered by. */
+  readonly by: readonly string[];
+  readonly options: Options;
 }
 
 /** `.select(columns…)`: keeps some of the columns, in the order given. */
@@ -78,6 +95,7 @@ export interface SelectStep {
   readonly id: string;
   readonly verb: 'select';
   readonly columns: readonly string[];
+  readonly options: Options;
 }
 
 /** One column a rename gives a new name. */
@@ -92,6 +110,7 @@ export interface RenameStep {
   readonly id: string;
   readonly verb: 'rename';
   readonly names: readonly Renaming[];
+  readonly options: Options;
 }
 
 /** `.filter(condition)`: keeps the rows where the condition is true. */
@@ -100,24 +119,25 @@ export interface FilterStep {
   readonly id: string;
   readonly verb: 'filter';
   readonly condition: Condition;
+  readonly options: Options;
 }
 
-/** Which rows a join keeps, as Polars names it. */
-export type How = 'left' | 'inner';
-
-/** Every way of joining, in the order it is offered. */
-export const HOWS: readonly How[] = ['left', 'inner'];
-
-/** `.join(table, left_on=…, right_on=…, how=…)`: brings in another table's columns by a key. */
+/**
+ * `.join(table, left_on=…, right_on=…, how=…)`: brings in another table's
+ * columns by their keys. Which rows it keeps, `how`, and the other
+ * parameters that are set are in `options`.
+ */
 export interface JoinStep {
   /** Stays with the step while it is moved or edited. */
   readonly id: string;
   readonly verb: 'join';
   /** The name of the other table. */
   readonly table: string;
-  readonly leftOn: string;
-  readonly rightOn: string;
-  readonly how: How;
+  /** The columns of these rows that are matched, each with the one at its place in `rightOn`. */
+  readonly leftOn: readonly string[];
+  /** The columns of the other table that are matched. */
+  readonly rightOn: readonly string[];
+  readonly options: Options;
 }
 
 /** How a pivot combines the values that land in one cell, as Polars names it. */
@@ -149,6 +169,7 @@ export interface PivotStep {
   readonly columnsFrom: ColumnsFrom;
   /** The values of `on` that become columns when the columns are pinned. */
   readonly pinned: readonly Cell[];
+  readonly options: Options;
 }
 
 /** One step of the list. */
@@ -200,11 +221,19 @@ function withColumns(catalogue: Catalogue, frame: Frame, step: WithColumnsStep):
 }
 
 function sort(frame: Frame, step: SortStep): StepResult {
-  const keys: Array<{ readonly cells: readonly Cell[]; readonly descending: boolean }> = [];
-  for (const key of step.by) {
-    const column = findColumn(frame, key.column);
-    if (column === null) return failed(frame, `There is no column "${key.column}".`);
-    keys.push({ cells: column.cells, descending: key.descending });
+  const keys: Array<{
+    readonly cells: readonly Cell[];
+    readonly descending: boolean;
+    readonly nullsLast: boolean;
+  }> = [];
+  for (const name of step.by) {
+    const column = findColumn(frame, name);
+    if (column === null) return failed(frame, `There is no column "${name}".`);
+    keys.push({
+      cells: column.cells,
+      descending: flagFor(step.options, 'descending', name),
+      nullsLast: flagFor(step.options, 'nulls_last', name),
+    });
   }
   if (keys.length === 0) return failed(frame, 'Pick the fields to sort by.');
   const order = Array.from({ length: frame[0]?.cells.length ?? 0 }, (_unused, row) => row);
@@ -212,11 +241,14 @@ function sort(frame: Frame, step: SortStep): StepResult {
     for (const key of keys) {
       const first = key.cells[left] ?? null;
       const second = key.cells[right] ?? null;
+      if (first === null || second === null) {
+        // Empty values go first, or last when the column says so, whichever way the values are ordered.
+        if (first === second) continue;
+        return (first === null) === key.nullsLast ? 1 : -1;
+      }
       const compared = compareCells(first, second);
       if (compared === 0) continue;
-      // Polars keeps nulls first whichever way the values are ordered.
-      const reverses = key.descending && first !== null && second !== null;
-      return reverses ? -compared : compared;
+      return key.descending ? -compared : compared;
     }
     return left - right;
   });
@@ -268,45 +300,70 @@ function filter(catalogue: Catalogue, frame: Frame, step: FilterStep): StepResul
   return { frame: reordered(frame, kept), problem: null, added: [] };
 }
 
-/** Returns the name a joined-in column gets: its own, or with `_right` when the frame has it already. */
-function joinedName(frame: Frame, name: string): string {
-  return findColumn(frame, name) === null ? name : `${name}_right`;
+/** How a join names a column it brings in when the frame has one of that name already. */
+const DEFAULT_SUFFIX = '_right';
+
+/** Returns the name a joined-in column gets: its own, or with `suffix` when the frame has it already. */
+function joinedName(frame: Frame, name: string, suffix: string): string {
+  return findColumn(frame, name) === null ? name : `${name}${suffix}`;
 }
 
 function join(frame: Frame, step: JoinStep): StepResult {
   const table = findTable(step.table);
   if (table === null) return failed(frame, `There is no table "${step.table}".`);
-  const leftKey = findColumn(frame, step.leftOn);
-  if (leftKey === null) return failed(frame, `There is no column "${step.leftOn}".`);
-  const rightKey = findColumn(table.frame, step.rightOn);
-  if (rightKey === null) {
-    return failed(frame, `"${step.table}" has no column "${step.rightOn}".`);
-  }
-  if (!keysFit(leftKey.dtype, rightKey.dtype)) {
+  if (step.leftOn.length === 0) return failed(frame, 'Pick the fields to match.');
+  if (step.leftOn.length !== step.rightOn.length) {
     return failed(
       frame,
-      `"${leftKey.name}" is ${leftKey.dtype}, but "${step.table}.${rightKey.name}" is ${rightKey.dtype}.`,
+      `${String(step.leftOn.length)} fields of these rows are matched with ${String(step.rightOn.length)} of "${step.table}".`,
     );
   }
-  // Each left row is paired with every right row whose key matches. A left
+  const keys: Array<{ readonly left: Column; readonly right: Column }> = [];
+  for (const [at, leftName] of step.leftOn.entries()) {
+    const rightName = step.rightOn[at] ?? '';
+    const left = findColumn(frame, leftName);
+    if (left === null) return failed(frame, `There is no column "${leftName}".`);
+    const right = findColumn(table.frame, rightName);
+    if (right === null) return failed(frame, `"${step.table}" has no column "${rightName}".`);
+    if (!keysFit(left.dtype, right.dtype)) {
+      return failed(
+        frame,
+        `"${left.name}" is ${left.dtype}, but "${step.table}.${right.name}" is ${right.dtype}.`,
+      );
+    }
+    keys.push({ left, right });
+  }
+  // The preview keeps the rows of the joins it knows; any other kind is said not to be previewed.
+  const how = wordOf(step.options, 'how') ?? 'inner';
+  if (how !== 'left' && how !== 'inner') {
+    return failed(frame, `The preview does not include how="${how}".`);
+  }
+  const suffix = wordOf(step.options, 'suffix') ?? DEFAULT_SUFFIX;
+  // Each left row is paired with every right row whose keys all match. A left
   // join keeps a left row with no match, paired with nulls.
   const pairs: Array<readonly [number, number | null]> = [];
-  for (const [row, key] of leftKey.cells.entries()) {
-    const matches = rightKey.cells.flatMap((other, at) =>
-      key !== null && other === key ? [at] : [],
+  const rows = frame[0]?.cells.length ?? 0;
+  for (let row = 0; row < rows; row += 1) {
+    const matches = (table.frame[0]?.cells ?? []).flatMap((_cell, at) =>
+      keys.every(({ left, right }) => {
+        const key = left.cells[row] ?? null;
+        return key !== null && right.cells[at] === key;
+      })
+        ? [at]
+        : [],
     );
-    if (matches.length === 0 && step.how === 'left') pairs.push([row, null]);
+    if (matches.length === 0 && how === 'left') pairs.push([row, null]);
     for (const match of matches) pairs.push([row, match]);
   }
   const kept = reordered(
     frame,
     pairs.map(([row]) => row),
   );
-  // Polars keeps one key column, so the right table's key is not brought in.
+  // Polars keeps the left key columns, so the right table's keys are not brought in.
   const brought: Column[] = table.frame
-    .filter((column) => column.name !== step.rightOn)
+    .filter((column) => !step.rightOn.includes(column.name))
     .map((column) => ({
-      name: joinedName(frame, column.name),
+      name: joinedName(frame, column.name, suffix),
       dtype: column.dtype,
       cells: pairs.map(([, match]) => (match === null ? null : (column.cells[match] ?? null))),
     }));
@@ -389,7 +446,61 @@ function pivot(frame: Frame, step: PivotStep): StepResult {
   };
 }
 
+/** The parameters each step's own structure draws, which are not offered as options. */
+const COVERED: Readonly<Record<Verb, readonly string[]>> = {
+  // A column and what it holds are the step's own structure.
+  with_columns: ['exprs', 'named_exprs'],
+  filter: ['predicates'],
+  // The fields to order by are one list, so a second one for more fields is not offered.
+  sort: ['by', 'more_by'],
+  select: ['exprs'],
+  rename: ['mapping'],
+  // The keys of the two tables are one list each, so `on` for a shared key is not offered.
+  join: ['other', 'on', 'left_on', 'right_on'],
+  pivot: ['on', 'on_columns', 'index', 'values', 'aggregate_function'],
+};
+
+/** Returns the parameters of the step `verb` that can be added to it as options. */
+export function stepOptionParameters(catalogue: Catalogue, verb: Verb): readonly ParameterView[] {
+  const entry = verbEntry(catalogue, verb);
+  return entry === null ? [] : optionParameters(entry, COVERED[verb]);
+}
+
+/** Returns the items a parameter of `step` that follows the parameter `of` holds one value for each of. */
+export function stepItems(step: Step, of: string): readonly string[] {
+  return step.verb === 'sort' && of === 'by' ? step.by : [];
+}
+
+/** The parameters of each step the preview applies when they are set. */
+const PREVIEWED_OPTIONS: Readonly<Record<Verb, readonly string[]>> = {
+  with_columns: [],
+  filter: [],
+  sort: ['descending', 'nulls_last'],
+  select: [],
+  rename: [],
+  join: ['how', 'suffix'],
+  pivot: [],
+};
+
+/**
+ * Returns the Polars names of the parameters `step` is set with that the
+ * preview does not apply, so that the step can say so.
+ */
+export function skippedStepOptions(catalogue: Catalogue, step: Step): string[] {
+  const entry = verbEntry(catalogue, step.verb);
+  if (entry === null) return [];
+  const applied = PREVIEWED_OPTIONS[step.verb];
+  return setParameters(entry, step.options)
+    .filter(
+      ({ parameter, setting }) =>
+        isComplete(setting) && !atDefault(parameter, setting) && !applied.includes(parameter.name),
+    )
+    .map(({ parameter }) => parameter.name);
+}
+
 function runStep(catalogue: Catalogue, frame: Frame, step: Step): StepResult {
+  const problem = optionsProblem(catalogue, verbEntry(catalogue, step.verb), step.options, frame);
+  if (problem !== null) return failed(frame, problem);
   switch (step.verb) {
     case 'with_columns':
       return withColumns(catalogue, frame, step);
@@ -429,6 +540,7 @@ export function runSteps(catalogue: Catalogue, steps: readonly Step[]): readonly
 export function defaultStep(verb: Verb, frame: Frame): Step {
   const first = frame[0]?.name ?? '';
   const id = nextId('step');
+  const options = NO_OPTIONS;
   switch (verb) {
     case 'with_columns':
       return {
@@ -437,13 +549,14 @@ export function defaultStep(verb: Verb, frame: Frame): Step {
         alias: 'new_column',
         // What the column holds is still to be picked.
         value: { kind: 'unset' },
+        options,
       };
     case 'sort':
-      return { id, verb, by: [] };
+      return { id, verb, by: [], options };
     case 'select':
-      return { id, verb, columns: frame.map((column) => column.name) };
+      return { id, verb, columns: frame.map((column) => column.name), options };
     case 'rename':
-      return { id, verb, names: [] };
+      return { id, verb, names: [], options };
     case 'filter':
       return {
         id,
@@ -456,6 +569,7 @@ export function defaultStep(verb: Verb, frame: Frame): Step {
           comparison: '==',
           value: { kind: 'unset' },
         },
+        options,
       };
     case 'join': {
       // Start from the first lookup table and a pair of key columns whose dtypes agree.
@@ -466,9 +580,10 @@ export function defaultStep(verb: Verb, frame: Frame): Step {
         id,
         verb,
         table: table?.name ?? '',
-        leftOn: leftOn?.name ?? first,
-        rightOn: rightOn?.name ?? '',
-        how: 'left',
+        leftOn: [leftOn?.name ?? first],
+        rightOn: [rightOn?.name ?? ''],
+        // Rows with no match are kept, which is not what Polars does unless it is asked.
+        options: { how: { kind: 'word', value: 'left' } },
       };
     }
     case 'pivot': {
@@ -483,6 +598,7 @@ export function defaultStep(verb: Verb, frame: Frame): Step {
         aggregate: 'first',
         columnsFrom: 'collect',
         pinned: [],
+        options,
       };
     }
     default:
@@ -490,46 +606,66 @@ export function defaultStep(verb: Verb, frame: Frame): Step {
   }
 }
 
+/** Returns `args` as the arguments of a call, then the text of the parameters that are set. */
+function callText(args: readonly string[], settings: readonly string[]): string {
+  return [...args, ...settings].join(', ');
+}
+
 /** Returns the Polars text of a pivot, with whatever has to come before it. */
-function pivotText(step: PivotStep): string {
-  const settings = `index=${quoted(step.index)}, values=${quoted(step.values)}, aggregate_function=${quoted(step.aggregate)}`;
+function pivotText(step: PivotStep, settings: readonly string[]): string {
+  const given = `index=${quoted(step.index)}, values=${quoted(step.values)}, aggregate_function=${quoted(step.aggregate)}`;
+  const rest = callText([given], settings);
   switch (step.columnsFrom) {
     case 'pinned': {
       const columns = step.pinned.map((value) => literalText(value)).join(', ');
-      return `.pivot(${quoted(step.on)}, on_columns=[${columns}], ${settings})`;
+      return `.pivot(${quoted(step.on)}, on_columns=[${columns}], ${rest})`;
     }
     case 'collect':
-      return `.collect().pivot(${quoted(step.on)}, ${settings}).lazy()`;
+      return `.collect().pivot(${quoted(step.on)}, ${rest}).lazy()`;
     case 'sink':
-      return `.sink_parquet("scratch.parquet"); pl.read_parquet("scratch.parquet").pivot(${quoted(step.on)}, ${settings}).lazy()`;
+      return `.sink_parquet("scratch.parquet"); pl.read_parquet("scratch.parquet").pivot(${quoted(step.on)}, ${rest}).lazy()`;
     default:
       return assertNever(step.columnsFrom);
   }
 }
 
+/** Returns `names` as the argument of a call: the one name, or a list of them. */
+function namesText(names: readonly string[]): string {
+  const [only] = names;
+  return names.length === 1 && only !== undefined
+    ? quoted(only)
+    : `[${names.map((name) => quoted(name)).join(', ')}]`;
+}
+
 /** Returns the Polars method call `step` stands for. */
-export function stepText(step: Step): string {
+export function stepText(catalogue: Catalogue, step: Step): string {
+  // Only the parameters that are set and differ from their default are written.
+  const settings = optionTexts(catalogue, verbEntry(catalogue, step.verb), step.options, (of) =>
+    stepItems(step, of),
+  );
   switch (step.verb) {
     case 'with_columns':
-      return `.with_columns(${valueExprText(step.value)}.alias(${quoted(step.alias)}))`;
-    case 'sort': {
-      const columns = step.by.map((key) => quoted(key.column)).join(', ');
-      if (!step.by.some((key) => key.descending)) return `.sort(${columns})`;
-      const ways = step.by.map((key) => (key.descending ? 'True' : 'False')).join(', ');
-      return `.sort(${columns}, descending=[${ways}])`;
-    }
+      return `.with_columns(${callText([`${valueExprText(catalogue, step.value)}.alias(${quoted(step.alias)})`], settings)})`;
+    case 'sort':
+      return `.sort(${callText(
+        step.by.map((name) => quoted(name)),
+        settings,
+      )})`;
     case 'select':
-      return `.select(${step.columns.map((name) => quoted(name)).join(', ')})`;
+      return `.select(${callText(
+        step.columns.map((name) => quoted(name)),
+        settings,
+      )})`;
     case 'rename': {
       const names = step.names.map(({ from, to }) => `${quoted(from)}: ${quoted(to)}`);
-      return `.rename({${names.join(', ')}})`;
+      return `.rename(${callText([`{${names.join(', ')}}`], settings)})`;
     }
     case 'filter':
-      return `.filter(${conditionText(step.condition)})`;
+      return `.filter(${callText([conditionText(catalogue, step.condition)], settings)})`;
     case 'join':
-      return `.join(${step.table}, left_on=${quoted(step.leftOn)}, right_on=${quoted(step.rightOn)}, how=${quoted(step.how)})`;
+      return `.join(${callText([step.table, `left_on=${namesText(step.leftOn)}`, `right_on=${namesText(step.rightOn)}`], settings)})`;
     case 'pivot':
-      return pivotText(step);
+      return pivotText(step, settings);
     default:
       return assertNever(step);
   }

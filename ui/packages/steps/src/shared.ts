@@ -42,7 +42,7 @@ type Message =
   | { readonly kind: 'gone' }
   | ({ readonly kind: 'state' } & Held);
 
-/** Reports whether `value` has the marks of a step: an id and a known verb. It looks no deeper. */
+/** Reports whether `value` has the marks of a step: an id, a known verb and its options. It looks no deeper. */
 function isStep(value: unknown): value is Step {
   return (
     typeof value === 'object' &&
@@ -50,7 +50,9 @@ function isStep(value: unknown): value is Step {
     'id' in value &&
     typeof value.id === 'string' &&
     'verb' in value &&
-    VERBS.some((verb) => verb === value.verb)
+    VERBS.some((verb) => verb === value.verb) &&
+    'options' in value &&
+    typeof value.options === 'object'
   );
 }
 

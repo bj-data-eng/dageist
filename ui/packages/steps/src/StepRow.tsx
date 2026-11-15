@@ -27,9 +27,16 @@ import {
 
 import { useCatalogue } from './CatalogueProvider';
 import { FreshContext } from './Lists';
+import {
+  ColumnDrawing,
+  ColumnsDrawing,
+  OptionRows,
+  TableDrawing,
+  optionOffers,
+} from './Parameters';
 import { ConditionBlocks, ValueSlot } from './Values';
 import { formatCell } from './format';
-import { anyField, counted, fieldOffers, matches, offer, titled } from './offers';
+import { counted, fieldOffers, matches, offer, titled } from './offers';
 import type { Cell, Frame } from './model/frame';
 import { distinctValues, findColumn, keysFit } from './model/frame';
 import type {
@@ -48,15 +55,17 @@ import type {
 import {
   AGGREGATES,
   COLUMNS_FROM,
-  HOWS,
   VERBS,
   defaultStep,
+  skippedStepOptions,
   stepBreak,
+  stepItems,
+  stepOptionParameters,
   stepText,
 } from './model/steps';
 import type { Catalogue } from './model/catalogue';
 import { verbEntry, verbId } from './model/catalogue';
-import { TABLES, findTable } from './model/tables';
+import { findTable } from './model/tables';
 import { VERB_COLOURS, verbHead, verbNote } from './verbs';
 
 /** The sortable group every step row belongs to. */
@@ -129,104 +138,34 @@ function AddColumnHead({ step, frame, onChange }: HeadProps<WithColumnsStep>): R
 }
 
 function SortHead({ step, frame, onChange }: HeadProps<SortStep>): React.JSX.Element {
-  const fresh = useContext(FreshContext);
-  const entries: Entry[] = step.by.map((key) => ({
-    id: key.column,
-    wrong: findColumn(frame, key.column) === null,
-    blocks: [
-      { label: key.column, tone: 'column', look: 'plain' },
-      { label: key.descending ? 'descending' : 'ascending', tone: 'value', look: 'plain' },
-    ],
-  }));
   return (
     <>
       <Word>by</Word>
-      <ManySlot
-        entries={entries}
+      <ColumnsDrawing
+        frame={frame}
+        names={step.by}
         empty="no fields"
         describedAs="The fields the rows are ordered by"
-        placeholder="Search the fields"
-        wide
-        openNow={fresh.id === step.id}
-        offers={(typed) => [
-          counted(
-            'Fields',
-            fieldOffers(frame, typed, {
-              reasonFor: () => null,
-              chosen: step.by.map((key) => key.column),
-              renderExtra: (name) => {
-                const key = step.by.find((candidate) => candidate.column === name);
-                if (key === undefined) return null;
-                // A setting with a few fixed answers is chosen from a list inside the list.
-                return (
-                  <select
-                    aria-label={`Which way ${name} is ordered`}
-                    className="dg-given"
-                    value={key.descending ? 'descending' : 'ascending'}
-                    onChange={(event) => {
-                      const descending = event.currentTarget.value === 'descending';
-                      onChange({
-                        ...step,
-                        by: step.by.map((other) =>
-                          other.column === name ? { column: name, descending } : other,
-                        ),
-                      });
-                    }}
-                  >
-                    <option>ascending</option>
-                    <option>descending</option>
-                  </select>
-                );
-              },
-              onPick: (name) => {
-                const has = step.by.some((key) => key.column === name);
-                onChange({
-                  ...step,
-                  by: has
-                    ? step.by.filter((key) => key.column !== name)
-                    : [...step.by, { column: name, descending: false }],
-                });
-              },
-            }),
-          ),
-        ]}
+        openId={step.id}
+        onChange={(by) => {
+          onChange({ ...step, by });
+        }}
       />
     </>
   );
 }
 
 function SelectHead({ step, frame, onChange }: HeadProps<SelectStep>): React.JSX.Element {
-  const fresh = useContext(FreshContext);
-  const entries: Entry[] = step.columns.map((name) => ({
-    id: name,
-    wrong: findColumn(frame, name) === null,
-    blocks: [{ label: name, tone: 'column', look: 'plain' }],
-  }));
   return (
-    <ManySlot
-      entries={entries}
+    <ColumnsDrawing
+      frame={frame}
+      names={step.columns}
       empty="no fields"
       describedAs="The fields that are kept"
-      placeholder="Search the fields"
-      openNow={fresh.id === step.id}
-      offers={(typed) => [
-        counted(
-          'Fields',
-          fieldOffers(frame, typed, {
-            reasonFor: () => null,
-            chosen: step.columns,
-            renderExtra: () => null,
-            onPick: (name) => {
-              onChange({
-                ...step,
-                columns: step.columns.includes(name)
-                  ? step.columns.filter((other) => other !== name)
-                  : [...step.columns, name],
-              });
-            },
-          }),
-        ),
-      ]}
+      openId={step.id}
+      onChange={(columns) => {
+        onChange({ ...step, columns });
+      }}
     />
   );
 }
@@ -312,119 +251,43 @@ function FilterHead({ step, frame, onChange }: HeadProps<FilterStep>): React.JSX
 
 function JoinHead({ step, frame, onChange }: HeadProps<JoinStep>): React.JSX.Element {
   const table = findTable(step.table);
-  const leftDtype = findColumn(frame, step.leftOn)?.dtype;
-  const described = (table?.frame ?? []).map((column) => `${column.name} · ${column.dtype}`);
   return (
     <>
-      <Hint
-        lines={[`${step.table}: ${String(table?.frame[0]?.cells.length ?? 0)} rows`, ...described]}
-        code
-      >
-        <Slot
-          label={step.table}
-          tone="table"
-          look="plain"
-          wrong={table === null}
-          describedAs="The table that is joined"
-          placeholder="Search the tables"
-          offers={(typed) => [
-            counted(
-              'Tables',
-              TABLES.filter((candidate) => matches(typed, candidate.name)).map((candidate) =>
-                offer(
-                  candidate.name,
-                  'table',
-                  `${String(candidate.frame[0]?.cells.length ?? 0)} × ${String(candidate.frame.length)}`,
-                  () => {
-                    // The key belonged to the old table, so start from the new table's first field.
-                    onChange({
-                      ...step,
-                      table: candidate.name,
-                      rightOn: candidate.frame[0]?.name ?? '',
-                    });
-                  },
-                ),
-              ),
-            ),
-          ]}
-        />
-      </Hint>
+      <TableDrawing
+        describedAs="The table that is joined"
+        value={step.table}
+        onChange={(name) => {
+          const joined = findTable(name);
+          // The keys belonged to the old table, so start from the new table's first field.
+          onChange({ ...step, table: name, rightOn: [joined?.frame[0]?.name ?? ''] });
+        }}
+      />
       <Word>on</Word>
-      <Slot
-        label={step.leftOn}
-        tone="column"
-        look="plain"
-        wrong={findColumn(frame, step.leftOn) === null}
-        describedAs="The field of these rows that is matched"
-        placeholder="Search the fields"
-        offers={(typed) => [
-          counted(
-            'Fields',
-            fieldOffers(
-              frame,
-              typed,
-              anyField((leftOn) => {
-                onChange({ ...step, leftOn });
-              }),
-            ),
-          ),
-        ]}
+      <ColumnsDrawing
+        frame={frame}
+        names={step.leftOn}
+        empty="field"
+        describedAs="The fields of these rows that are matched"
+        onChange={(leftOn) => {
+          onChange({ ...step, leftOn });
+        }}
       />
       <span data-tone="compare" data-look="compare" className="dg-block dg-fixed">
         ==
       </span>
-      <Slot
-        label={step.rightOn}
-        tone="table"
-        look="plain"
-        describedAs={`The field of ${step.table} that is matched`}
-        placeholder="Search the fields"
-        offers={(typed) => [
-          counted(
-            `Fields of ${step.table}`,
-            (table?.frame ?? [])
-              .filter((column) => matches(typed, column.name))
-              .map((column) =>
-                offer(
-                  column.name,
-                  'table',
-                  column.dtype,
-                  () => {
-                    onChange({ ...step, rightOn: column.name });
-                  },
-                  {
-                    reason:
-                      leftDtype === undefined || keysFit(column.dtype, leftDtype)
-                        ? null
-                        : 'a different dtype',
-                  },
-                ),
-              ),
-          ),
-        ]}
-      />
-      <Word>how</Word>
-      <Slot
-        label={step.how}
-        tone="value"
-        look="plain"
-        describedAs="Which rows the join keeps"
-        placeholder="Search"
-        offers={(typed) => [
-          titled(
-            'Keep',
-            HOWS.filter((how) => matches(typed, how)).map((how) =>
-              offer(
-                how,
-                'value',
-                how === 'left' ? 'every row, matched or not' : 'only the rows that match',
-                () => {
-                  onChange({ ...step, how });
-                },
-              ),
-            ),
-          ),
-        ]}
+      <ColumnsDrawing
+        frame={table?.frame ?? []}
+        names={step.rightOn}
+        empty="field"
+        describedAs={`The fields of ${step.table} that are matched`}
+        reasonFor={(dtype) => {
+          // Each key is matched with the one at its place on the other side.
+          const left = findColumn(frame, step.leftOn[step.rightOn.length] ?? '')?.dtype;
+          return left === undefined || keysFit(dtype, left) ? null : 'a different dtype';
+        }}
+        onChange={(rightOn) => {
+          onChange({ ...step, rightOn });
+        }}
       />
     </>
   );
@@ -444,25 +307,13 @@ function PivotHead({ step, frame, onChange }: HeadProps<PivotStep>): React.JSX.E
   ): React.JSX.Element => (
     <>
       <Word>{word}</Word>
-      <Slot
-        label={current}
-        tone="column"
-        look="plain"
-        wrong={findColumn(frame, current) === null}
+      <ColumnDrawing
+        frame={frame}
         describedAs={describedAs}
-        placeholder="Search the fields"
-        offers={(typed) => [
-          counted(
-            'Fields',
-            fieldOffers(
-              frame,
-              typed,
-              anyField((name) => {
-                onChange(update(name));
-              }),
-            ),
-          ),
-        ]}
+        value={current}
+        onChange={(name) => {
+          onChange(update(name));
+        }}
       />
     </>
   );
@@ -741,6 +592,7 @@ export function StepRow({
   onInsertAfter,
 }: StepRowProps): React.JSX.Element {
   const catalogue = useCatalogue();
+  const fresh = useContext(FreshContext);
   const { ref, handleRef, isDragSource } = useSortable({
     id: step.id,
     index,
@@ -755,7 +607,9 @@ export function StepRow({
   const broken = stepBreak(step);
   const number = String(index + 1);
   const name = verbHead(catalogue, step.verb);
-  const missing = verbEntry(catalogue, step.verb) === null;
+  const entry = verbEntry(catalogue, step.verb);
+  const missing = entry === null;
+  const parameters = stepOptionParameters(catalogue, step.verb);
   return (
     <div
       ref={ref}
@@ -793,7 +647,7 @@ export function StepRow({
             remove={{ label: `Remove ${name}`, onPress: onRemove }}
             add={{ label: `Add a step after ${name}`, onPress: setAdding }}
           >
-            <Hint lines={[stepText(step)]} code>
+            <Hint lines={[stepText(catalogue, step)]} code>
               <Slot
                 label={name}
                 tone="verb"
@@ -801,17 +655,38 @@ export function StepRow({
                 names
                 describedAs={`Step ${number}: ${name}. Change what the step does`}
                 placeholder="Search the steps"
-                offers={(typed) =>
-                  verbOffers(catalogue, typed, (verb) => {
+                offers={(typed) => [
+                  // The parameters the step can be given, then the steps it can be changed to.
+                  ...(parameters.length === 0
+                    ? []
+                    : [
+                        optionOffers(parameters, step.options, typed, (options, added) => {
+                          onChange({ ...step, options });
+                          if (added !== null) fresh.mark(`${step.id}:${added}`);
+                        }),
+                      ]),
+                  ...verbOffers(catalogue, typed, (verb) => {
                     if (verb !== step.verb) {
                       onChange({ ...defaultStep(verb, frame), id: step.id });
                     }
-                  })
-                }
+                  }),
+                ]}
               />
             </Hint>
           </Piece>
           <Head step={step} frame={frame} onChange={onChange} />
+          <OptionRows
+            ownerId={step.id}
+            entry={entry}
+            parameters={parameters}
+            options={step.options}
+            around={{ frame, items: (of) => stepItems(step, of) }}
+            skipped={skippedStepOptions(catalogue, step)}
+            layout="lines"
+            onChange={(options) => {
+              onChange({ ...step, options });
+            }}
+          />
           {missing && (
             <span className="dg-line font-sans text-xs text-wrong">
               {`The catalogue has no entry ${verbId(step.verb)}, so this step has no words to show.`}

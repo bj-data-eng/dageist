@@ -8,7 +8,10 @@
  * validation and previews; nothing here is meant to survive.
  */
 
+import type { EntryView, KindView, ParameterView } from '@dageist/host';
+
 import type { Catalogue } from './catalogue';
+import { methodEntry } from './catalogue';
 import type { Method } from './expr';
 import {
   acceptanceMisfit,
@@ -22,6 +25,7 @@ import {
 } from './expr';
 import type { Cell, Dtype, Frame } from './frame';
 import {
+  assertNever,
   castCells,
   compareCells,
   findColumn,
@@ -33,6 +37,8 @@ import {
   withLiteral,
 } from './frame';
 import { findInput } from './inputs';
+import type { Options, Setting } from './settings';
+import { atDefault, defaultSetting, isComplete, setParameters } from './settings';
 
 /** Returns `value` as Python would write it. */
 export function literalText(value: Cell): string {
@@ -205,8 +211,8 @@ export function checkValue(catalogue: Catalogue, value: Value, frame: Frame): So
 }
 
 /** Returns the Polars text of `value` where a column or expression is expected. */
-export function valueText(value: Value): string {
-  if (value.kind === 'chain') return chainText(value.chain);
+export function valueText(catalogue: Catalogue, value: Value): string {
+  if (value.kind === 'chain') return chainText(catalogue, value.chain);
   // What is still to be picked is written as `None`, which is what Polars would be given.
   if (value.kind === 'unset') return 'None';
   // An input is named in the code as it is in the editor.
@@ -215,10 +221,10 @@ export function valueText(value: Value): string {
 }
 
 /** Returns the Polars text of `value` as an expression, where a bare value would not be one. */
-export function valueExprText(value: Value): string {
+export function valueExprText(catalogue: Catalogue, value: Value): string {
   return value.kind === 'column' || value.kind === 'chain'
-    ? valueText(value)
-    : `pl.lit(${valueText(value)})`;
+    ? valueText(catalogue, value)
+    : `pl.lit(${valueText(catalogue, value)})`;
 }
 
 /** Returns the cell `value` gives on every row of `frame`. */
@@ -272,7 +278,7 @@ export function conditionProblem(
   const value = checkValue(catalogue, condition.value, frame);
   if (value.problem !== null) return value.problem;
   if (value.dtype !== null && !dtypesAgree(column.dtype, value.dtype)) {
-    return `"${column.name}" is ${column.dtype}, but ${valueText(condition.value)} is ${value.dtype}.`;
+    return `"${column.name}" is ${column.dtype}, but ${valueText(catalogue, condition.value)} is ${value.dtype}.`;
   }
   return null;
 }
@@ -331,25 +337,25 @@ export function conditionRows(catalogue: Catalogue, condition: Condition, frame:
 }
 
 /** Returns the Polars text of `condition`. */
-export function conditionText(condition: Condition): string {
+export function conditionText(catalogue: Catalogue, condition: Condition): string {
   if (condition.kind === 'group') {
     // Every item stands in brackets, so the text says what the lists say.
-    const joined = condition.items.map((item) => `(${conditionText(item)})`);
+    const joined = condition.items.map((item) => `(${conditionText(catalogue, item)})`);
     return joined.join(condition.every ? ' & ' : ' | ');
   }
-  if (condition.kind === 'chain') return chainText(condition.chain);
+  if (condition.kind === 'chain') return chainText(catalogue, condition.chain);
   if (condition.comparison === 'is_in') {
-    return `pl.col(${quoted(condition.column)}).is_in(${valueText(condition.value)})`;
+    return `pl.col(${quoted(condition.column)}).is_in(${valueText(catalogue, condition.value)})`;
   }
-  return `pl.col(${quoted(condition.column)}) ${condition.comparison} ${valueText(condition.value)}`;
+  return `pl.col(${quoted(condition.column)}) ${condition.comparison} ${valueText(catalogue, condition.value)}`;
 }
 
 /** Returns the Polars text of a value passed to `then` or `otherwise`. */
-function returnedText(value: Value): string {
+function returnedText(catalogue: Catalogue, value: Value): string {
   // A bare string there would be read as a column name.
   return value.kind === 'literal' && typeof value.value === 'string'
     ? `pl.lit(${quoted(value.value)})`
-    : valueText(value);
+    : valueText(catalogue, value);
 }
 
 const STRING: SourceCheck = { dtype: 'String', problem: null };
@@ -445,12 +451,15 @@ function evaluateSource(catalogue: Catalogue, source: Source, frame: Frame): rea
 }
 
 /** Returns the Polars text `source` starts a chain with. */
-function sourceText(source: Source): string {
+function sourceText(catalogue: Catalogue, source: Source): string {
   if (source.kind === 'column') return `pl.col(${quoted(source.column)})`;
   const arms = source.arms
-    .map((arm) => `.when(${conditionText(arm.condition)}).then(${returnedText(arm.returns)})`)
+    .map(
+      (arm) =>
+        `.when(${conditionText(catalogue, arm.condition)}).then(${returnedText(catalogue, arm.returns)})`,
+    )
     .join('');
-  return `pl${arms}.otherwise(${returnedText(source.otherwise)})`;
+  return `pl${arms}.otherwise(${returnedText(catalogue, source.otherwise)})`;
 }
 
 /** Checks that the source of `chain` works and every method accepts the dtype handed to it. */
@@ -470,7 +479,9 @@ export function checkChain(catalogue: Catalogue, chain: Chain, frame: Frame): Ch
     if (next === null) {
       return { dtypes, problem: { index, message: `${method.name} gives no dtype here.` } };
     }
-    const wrongArgument = argumentProblem(catalogue, method, frame, current);
+    const wrongArgument =
+      argumentProblem(catalogue, method, frame, current) ??
+      optionsProblem(catalogue, methodEntry(catalogue, method.name), method.options, frame);
     // The dtype fits even when the argument is wrong, so it is still reported.
     dtypes.push(next);
     if (wrongArgument !== null) return { dtypes, problem: { index, message: wrongArgument } };
@@ -524,6 +535,170 @@ export function evaluateChain(
 }
 
 /** Returns the Polars text of `chain`. */
-export function chainText(chain: Chain): string {
-  return `${sourceText(chain.source)}${chain.methods.map((method) => methodText(method)).join('')}`;
+export function chainText(catalogue: Catalogue, chain: Chain): string {
+  const methods = chain.methods.map((method) => methodCall(catalogue, method));
+  return `${sourceText(catalogue, chain.source)}${methods.join('')}`;
+}
+
+/** Returns the Polars text of an expression given as an argument: a field, a number or text, a chain. */
+function argumentValueText(catalogue: Catalogue, value: Value): string {
+  if (value.kind === 'literal' && typeof value.value === 'string') {
+    return `pl.lit(${quoted(value.value)})`;
+  }
+  return valueText(catalogue, value);
+}
+
+/** Returns the Polars text of `setting` as a parameter of `kind` holds it. */
+function settingText(
+  catalogue: Catalogue,
+  kind: KindView,
+  setting: Setting,
+  items: readonly string[],
+  parameter: ParameterView,
+): string {
+  switch (setting.kind) {
+    case 'unset':
+      return 'None';
+    case 'flag':
+      return setting.value ? 'True' : 'False';
+    case 'number':
+      return String(setting.value);
+    case 'text':
+      return quoted(setting.value);
+    case 'word':
+      if (kind.kind === 'dtype') return `pl.${setting.value}`;
+      return kind.kind === 'table' ? setting.value : quoted(setting.value);
+    case 'expression':
+      return argumentValueText(catalogue, setting.value);
+    case 'list':
+      return `[${setting.items.map((item) => settingText(catalogue, kind, item, items, parameter)).join(', ')}]`;
+    case 'pairs': {
+      const key = kind.kind === 'pairs' ? kind.key : kind;
+      const value = kind.kind === 'pairs' ? kind.value : kind;
+      const pairs = setting.entries.map(
+        (entry) =>
+          `${settingText(catalogue, key, entry.key, [], parameter)}: ${settingText(catalogue, value, entry.value, [], parameter)}`,
+      );
+      return `{${pairs.join(', ')}}`;
+    }
+    case 'each': {
+      // Every item has its place in the list; one with no setting of its own is at the default.
+      const fallback = defaultSetting(parameter);
+      const each = items.map((item) => {
+        const own = Object.hasOwn(setting.items, item) ? setting.items[item] : undefined;
+        const one = own ?? fallback;
+        return one === null || one === undefined
+          ? 'None'
+          : settingText(catalogue, kind, one, [], parameter);
+      });
+      return `[${each.join(', ')}]`;
+    }
+    default:
+      return assertNever(setting);
+  }
+}
+
+/**
+ * Returns how `parameter` is written in a call when it is set to `setting`.
+ * Extra positional arguments are written as they are and extra keyword
+ * arguments as a dictionary of them; anything else is named.
+ */
+function parameterText(
+  catalogue: Catalogue,
+  parameter: ParameterView,
+  setting: Setting,
+  items: readonly string[],
+): string {
+  const text = settingText(catalogue, parameter.kind, setting, items, parameter);
+  if (parameter.default.kind === 'empty') {
+    if (setting.kind === 'list') {
+      return setting.items
+        .map((item) => settingText(catalogue, parameter.kind, item, items, parameter))
+        .join(', ');
+    }
+    if (setting.kind === 'pairs') return `**${text}`;
+  }
+  return `${parameter.name}=${text}`;
+}
+
+/**
+ * Returns how each parameter of `entry` that `options` sets is written in a
+ * call: only those that are given everything they need and differ from their
+ * default. `items` are what a parameter that follows another is aligned with.
+ */
+export function optionTexts(
+  catalogue: Catalogue,
+  entry: EntryView | null,
+  options: Options,
+  items: (of: string) => readonly string[],
+): string[] {
+  if (entry === null) return [];
+  return setParameters(entry, options)
+    .filter(({ parameter, setting }) => isComplete(setting) && !atDefault(parameter, setting))
+    .map(({ parameter, setting }) =>
+      parameterText(
+        catalogue,
+        parameter,
+        setting,
+        parameter.shape.shape === 'perItem' ? items(parameter.shape.of) : [],
+      ),
+    );
+}
+
+/** Returns the Polars text of one method call, with the parameters it is set with. */
+function methodCall(catalogue: Catalogue, method: Method): string {
+  const settings = optionTexts(
+    catalogue,
+    methodEntry(catalogue, method.name),
+    method.options,
+    () => [],
+  );
+  return methodText(method, settings);
+}
+
+/** Returns why one parameter cannot be worked out as `setting` sets it, or `null` when it can. */
+function parameterProblem(
+  catalogue: Catalogue,
+  parameter: ParameterView,
+  setting: Setting,
+  frame: Frame,
+): string | null {
+  if (!isComplete(setting)) return `Give ${parameter.shown} a value (${parameter.label}).`;
+  switch (setting.kind) {
+    case 'expression':
+      return checkValue(catalogue, setting.value, frame).problem;
+    case 'word':
+      if (parameter.kind.kind === 'column' && findColumn(frame, setting.value) === null) {
+        return `There is no column "${setting.value}".`;
+      }
+      return parameter.kind.kind === 'table' && findInput(setting.value)?.kind !== 'table'
+        ? `There is no table "${setting.value}".`
+        : null;
+    case 'list':
+      for (const item of setting.items) {
+        const problem = parameterProblem(catalogue, parameter, item, frame);
+        if (problem !== null) return problem;
+      }
+      return null;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Returns why the parameters `options` sets for `entry` cannot be worked
+ * out, or `null` when they can.
+ */
+export function optionsProblem(
+  catalogue: Catalogue,
+  entry: EntryView | null,
+  options: Options,
+  frame: Frame,
+): string | null {
+  if (entry === null) return null;
+  for (const { parameter, setting } of setParameters(entry, options)) {
+    const problem = parameterProblem(catalogue, parameter, setting, frame);
+    if (problem !== null) return problem;
+  }
+  return null;
 }

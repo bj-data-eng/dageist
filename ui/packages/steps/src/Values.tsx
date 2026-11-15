@@ -12,14 +12,16 @@ import { useCallback, useContext, useState } from 'react';
 import type { Look, Offer, OfferGroup, Tone } from '@dageist/design';
 import { Hint, OfferList, Piece, Popover, Slot } from '@dageist/design';
 
+import { useCatalogue } from './CatalogueProvider';
 import { ChainBlocks } from './Chain';
 import { COMPARISON_SIGNS } from './comparisons';
 import { inputLines } from './InputsStrip';
 import { FreshContext, Line, Lines } from './Lists';
 import { anyField, counted, fieldOffers, matches, offer, titled } from './offers';
 import { useFieldHint } from './origins';
+import { groupWords, groupsHold } from './model/catalogue';
 import type { Cell, Dtype, Frame } from './model/frame';
-import { findColumn, keysFit } from './model/frame';
+import { findColumn, keysFit, literalDtype } from './model/frame';
 import { nextId } from './model/ids';
 import { INPUTS, findInput } from './model/inputs';
 import type { ChainCondition, Comparison, Condition, Group, Test, Value } from './model/source';
@@ -89,6 +91,12 @@ export interface ValueSlotProps {
   readonly lists: boolean;
   /** The dtype the value is compared with, when it is compared with one. */
   readonly expected: Dtype | null;
+  /** The dtype groups the value may have, when its parameter limits them. */
+  readonly takes?: readonly string[] | undefined;
+  /** The id that, when it is what was just added, opens the slot's list as soon as it is shown. */
+  readonly openId?: string | undefined;
+  /** Takes the value away from where it stands, when it is one of several; otherwise it can only be unset. */
+  readonly onRemove?: (() => void) | undefined;
   readonly onChange: (value: Value) => void;
 }
 
@@ -104,13 +112,22 @@ export function ValueSlot({
   label,
   lists,
   expected,
+  takes,
+  openId,
+  onRemove,
   onChange,
 }: ValueSlotProps): React.JSX.Element {
+  const catalogue = useCatalogue();
   const fresh = useContext(FreshContext);
   const fieldHint = useFieldHint();
   const fits = lists ? keysFit : dtypesAgree;
-  const reasonFor = (dtype: Dtype): string | null =>
-    expected === null || fits(expected, dtype) ? null : 'a different dtype';
+  // Why a value of `dtype` is not taken: the parameter's dtypes, or the dtype it is compared with.
+  const reasonFor = (dtype: Dtype): string | null => {
+    if (takes !== undefined && !groupsHold(takes, dtype)) {
+      return `needs ${groupWords(catalogue, takes)}`;
+    }
+    return expected === null || fits(expected, dtype) ? null : 'a different dtype';
+  };
   const literal = (cell: Cell): (() => void) => {
     return () => {
       onChange({ kind: 'literal', value: cell });
@@ -153,10 +170,21 @@ export function ValueSlot({
     const written: Offer[] = [];
     const text = typed.trim();
     if (WHOLE_NUMBER.test(text) && Number.isSafeInteger(Number(text))) {
-      written.push(offer(text, 'value', 'a number', literal(Number(text)), { id: 'number' }));
+      written.push(
+        offer(text, 'value', 'a number', literal(Number(text)), {
+          id: 'number',
+          reason: reasonFor(literalDtype(Number(text))),
+        }),
+      );
     }
     if (typed !== '') {
-      written.push(offer(typed, 'value', 'String', literal(typed), { id: 'text', look: 'quoted' }));
+      written.push(
+        offer(typed, 'value', 'String', literal(typed), {
+          id: 'text',
+          look: 'quoted',
+          reason: reasonFor('String'),
+        }),
+      );
     }
     written.push(offer('None', 'value', 'no value', literal(null), { id: 'none', look: 'none' }));
     const fields = fieldOffers(frame, typed, {
@@ -181,9 +209,12 @@ export function ValueSlot({
         chainId={value.id}
         chain={value.chain}
         frame={frame}
-        onRemove={() => {
-          onChange({ kind: 'unset' });
-        }}
+        onRemove={
+          onRemove ??
+          (() => {
+            onChange({ kind: 'unset' });
+          })
+        }
         onChange={(chain) => {
           onChange({ kind: 'chain', id: value.id, chain });
         }}
@@ -233,13 +264,24 @@ export function ValueSlot({
         }
       : null;
   return (
-    <Piece remove={null} add={carryOn}>
+    <Piece
+      remove={
+        onRemove === undefined
+          ? null
+          : {
+              label: 'Remove this one',
+              onPress: onRemove,
+            }
+      }
+      add={carryOn}
+    >
       <Hint lines={shown.lines} code={false}>
         <Slot
           label={shown.label}
           tone={shown.tone}
           look={shown.look}
           wrong={shown.wrong}
+          openNow={openId !== undefined && fresh.id === openId}
           names
           describedAs={label}
           placeholder={lists ? 'Search the lists' : 'Type a value, or search'}

@@ -10,7 +10,7 @@
 import type { CatalogueView, EntryView, ParameterView } from '@dageist/host';
 
 import type { Dtype } from './frame';
-import { isNumeric, isTemporal } from './frame';
+import { assertNever, isNumeric, isTemporal } from './frame';
 
 /** The catalogue as the editor reads it. */
 export interface Catalogue {
@@ -101,4 +101,26 @@ export function groupWords(catalogue: Catalogue, groups: readonly string[]): str
   const last = titles.at(-1);
   if (last === undefined) return 'nothing';
   return titles.length === 1 ? last : `${titles.slice(0, -1).join(', ')} or ${last}`;
+}
+
+/** The words of a condition that the catalogue gives entries to. */
+export type ConditionWord = 'when' | 'then' | 'otherwise';
+
+/** The identifier the catalogue gives each word of a condition. */
+export function conditionId(word: ConditionWord): string {
+  switch (word) {
+    case 'when':
+      return 'polars.when';
+    case 'then':
+      return 'When.then';
+    case 'otherwise':
+      return 'Then.otherwise';
+    default:
+      return assertNever(word);
+  }
+}
+
+/** Returns the catalogue entry of the word `word` of a condition, or `null` when there is none. */
+export function conditionEntry(catalogue: Catalogue, word: ConditionWord): EntryView | null {
+  return catalogue.entries.get(conditionId(word)) ?? null;
 }

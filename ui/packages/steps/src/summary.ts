@@ -56,7 +56,7 @@ export function stepDetail(step: Step): string {
     case 'filter':
       return conditionSummary(step.condition);
     case 'sort':
-      return `by ${fieldList(step.by.map((key) => key.column))}`;
+      return `by ${fieldList(step.by)}`;
     case 'select':
       return fieldList(step.columns);
     case 'rename':
@@ -64,7 +64,7 @@ export function stepDetail(step: Step): string {
         ? step.names.map(({ from, to }) => `${from} → ${to}`).join(', ')
         : fieldList(step.names.map((naming) => naming.from));
     case 'join':
-      return `${step.table} on ${step.leftOn}`;
+      return `${step.table} on ${step.leftOn.join(', ')}`;
     case 'pivot':
       return `on ${step.on}`;
     default:

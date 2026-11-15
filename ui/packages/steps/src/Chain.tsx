@@ -21,11 +21,13 @@ import { Hint, OfferList, Piece, Popover, Seam, Slot, Word } from '@dageist/desi
 
 import { useCatalogue } from './CatalogueProvider';
 import { FreshContext, Line, Lines } from './Lists';
+import { OptionRows, optionOffers } from './Parameters';
 import { ConditionBlocks, ValueSlot, emptyTest } from './Values';
 import { anyField, counted, fieldOffers, matches, offer, titled } from './offers';
 import { useFieldHint } from './origins';
 import type { Catalogue } from './model/catalogue';
-import { methodEntry, methodId } from './model/catalogue';
+import type { ConditionWord } from './model/catalogue';
+import { conditionEntry, conditionId, methodEntry, methodId } from './model/catalogue';
 import type { ArgumentRule, Method, MethodName } from './model/expr';
 import {
   acceptanceMisfit,
@@ -33,13 +35,16 @@ import {
   argumentRule,
   defaultArgument,
   literalComparand,
+  methodOptionParameters,
   previewedMethods,
   readComparand,
+  skippedOptions,
   swappedArgument,
 } from './model/expr';
 import type { Dtype, Frame } from './model/frame';
 import { findColumn } from './model/frame';
 import { nextId } from './model/ids';
+import { NO_OPTIONS, carriedOptions } from './model/settings';
 import type { Arm, Chain, ChainCheck, Source, Value } from './model/source';
 import { checkChain } from './model/source';
 
@@ -272,6 +277,7 @@ function MethodLink({
   onAddAfter,
 }: MethodLinkProps): React.JSX.Element {
   const catalogue = useCatalogue();
+  const fresh = useContext(FreshContext);
   const entry = methodEntry(catalogue, method.name);
   const rule = argumentRule(catalogue, method.name);
   // What the catalogue calls the method; a method it lacks keeps its Polars name.
@@ -296,8 +302,16 @@ function MethodLink({
     );
   };
   const swap = (name: MethodName): void => {
-    replace({ id: method.id, name, argument: swappedArgument(catalogue, method, name, frame) });
+    const next = methodEntry(catalogue, name);
+    replace({
+      id: method.id,
+      name,
+      argument: swappedArgument(catalogue, method, name, frame),
+      // What is set carries over to a method that takes the same parameter.
+      options: next === null ? NO_OPTIONS : carriedOptions(method.options, entry, next),
+    });
   };
+  const parameters = methodOptionParameters(catalogue, method.name);
   return (
     <span ref={ref} className="dg-link">
       <Seam />
@@ -331,7 +345,18 @@ function MethodLink({
             names
             describedAs={`Method ${shown}: swap it, or drag it to another place`}
             placeholder="Search the methods"
-            offers={(typed) => methodOffers(catalogue, typed, input, swap)}
+            offers={(typed) => [
+              // The parameters the method can be given, then the methods it can be swapped for.
+              ...(parameters.length === 0
+                ? []
+                : [
+                    optionOffers(parameters, method.options, typed, (options, added) => {
+                      replace({ ...method, options });
+                      if (added !== null) fresh.mark(`${method.id}:${added}`);
+                    }),
+                  ]),
+              ...methodOffers(catalogue, typed, input, swap),
+            ]}
             buttonRef={handleRef}
           />
         </Hint>
@@ -343,10 +368,22 @@ function MethodLink({
             input={input}
             wrong={wrong}
             onCommit={(argument) => {
-              replace({ id: method.id, name: method.name, argument });
+              replace({ ...method, argument });
             }}
           />
         )}
+        <OptionRows
+          ownerId={method.id}
+          entry={entry}
+          parameters={parameters}
+          options={method.options}
+          around={{ frame, items: () => [] }}
+          skipped={skippedOptions(catalogue, method)}
+          layout="inline"
+          onChange={(options) => {
+            replace({ ...method, options });
+          }}
+        />
         {entry === null && (
           <span className="font-sans text-xs text-wrong">{`not in the catalogue as ${methodId(method.name)}`}</span>
         )}
@@ -402,7 +439,12 @@ export function ChainBlocks({
     onChange({ source: next, methods: chain.methods });
   };
   const insert = (at: number, name: MethodName): void => {
-    const method = { id: nextId('method'), name, argument: defaultArgument(catalogue, name) };
+    const method = {
+      id: nextId('method'),
+      name,
+      argument: defaultArgument(catalogue, name),
+      options: NO_OPTIONS,
+    };
     const methods = [...chain.methods];
     methods.splice(at, 0, method);
     onChange(withMethods(chain, methods));
@@ -415,6 +457,19 @@ export function ChainBlocks({
     };
   };
   const startsWrong = check.problem?.index === -1;
+  // The words of a condition come from the catalogue; one it lacks keeps its Polars name and says so.
+  const word = (which: ConditionWord): { text: string; hint: string; lacking: boolean } => {
+    const found = conditionEntry(catalogue, which);
+    return {
+      text: found?.name ?? which,
+      hint: found?.hint ?? 'not in the catalogue',
+      lacking: found === null,
+    };
+  };
+  const [whenWord, thenWord, otherwiseWord] = [word('when'), word('then'), word('otherwise')];
+  const lacking = (['when', 'then', 'otherwise'] as const)
+    .filter((which) => conditionEntry(catalogue, which) === null)
+    .map((which) => conditionId(which));
   // A chain is taken away by the word it starts from.
   const removeChain = { label: 'Remove this chain', onPress: onRemove };
   const column = source.kind === 'column' ? findColumn(frame, source.column) : null;
@@ -493,17 +548,23 @@ export function ChainBlocks({
                 offers={(typed) => [
                   titled(
                     'Functions',
-                    matches(typed, 'when', 'one value or another, by a condition')
+                    matches(typed, whenWord.text, whenWord.hint)
                       ? [
-                          offer('when', 'function', 'one value or another, by a condition', () => {
-                            const made = emptyArm();
-                            withSource({
-                              kind: 'when',
-                              arms: [made],
-                              otherwise: { kind: 'unset' },
-                            });
-                            fresh.mark(made.condition.id);
-                          }),
+                          offer(
+                            whenWord.text,
+                            'function',
+                            whenWord.hint,
+                            () => {
+                              const made = emptyArm();
+                              withSource({
+                                kind: 'when',
+                                arms: [made],
+                                otherwise: { kind: 'unset' },
+                              });
+                              fresh.mark(made.condition.id);
+                            },
+                            { reason: whenWord.lacking ? 'not in the catalogue' : null },
+                          ),
                         ]
                       : [],
                   ),
@@ -530,31 +591,26 @@ export function ChainBlocks({
           <Line>
             <Piece
               remove={removeChain}
-              add={{ label: 'Add a method after when', onPress: addAt(0) }}
+              add={{ label: `Add a method after ${whenWord.text}`, onPress: addAt(0) }}
             >
-              <Slot
-                label="when"
-                tone="function"
-                look="plain"
-                names
-                describedAs="The function the chain starts from"
-                placeholder="Search the functions"
-                offers={(typed) => [
-                  titled(
-                    'Functions',
-                    matches(typed, 'when', 'one value or another, by a condition')
-                      ? [
-                          offer(
-                            'when',
-                            'function',
-                            'one value or another, by a condition',
-                            () => undefined,
-                          ),
-                        ]
-                      : [],
-                  ),
-                ]}
-              />
+              <Hint lines={[`${whenWord.text} · ${whenWord.hint}`]} code={false}>
+                <Slot
+                  label={whenWord.text}
+                  tone="function"
+                  look="plain"
+                  names
+                  describedAs="The function the chain starts from"
+                  placeholder="Search the functions"
+                  offers={(typed) => [
+                    titled(
+                      'Functions',
+                      matches(typed, whenWord.text, whenWord.hint)
+                        ? [offer(whenWord.text, 'function', whenWord.hint, () => undefined)]
+                        : [],
+                    ),
+                  ]}
+                />
+              </Hint>
             </Piece>
             <ConditionBlocks
               condition={arm.condition}
@@ -566,17 +622,22 @@ export function ChainBlocks({
             />
           </Line>
           <Line>
-            <Word>then</Word>
+            <Word title={thenWord.hint}>{thenWord.text}</Word>
             {given(arm.returns, 'The value where the condition holds', (returns) => {
               withSource({ ...source, arms: [{ ...arm, returns }] });
             })}
           </Line>
           <Line>
-            <Word>otherwise</Word>
+            <Word title={otherwiseWord.hint}>{otherwiseWord.text}</Word>
             {given(source.otherwise, 'The value where the condition does not hold', (otherwise) => {
               withSource({ ...source, otherwise });
             })}
           </Line>
+          {lacking.length > 0 && (
+            <Line>
+              <span className="font-sans text-xs text-wrong">{`not in the catalogue as ${lacking.join(', ')}`}</span>
+            </Line>
+          )}
           {chain.methods.length > 0 && <Line>{methods}</Line>}
         </Lines>
       )}
