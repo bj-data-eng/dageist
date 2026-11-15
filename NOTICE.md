@@ -5,7 +5,10 @@
 dependencies declared in
 [crates/dageist-tauri/Cargo.toml](crates/dageist-tauri/Cargo.toml) and
 [crates/dageist-engine/Cargo.toml](crates/dageist-engine/Cargo.toml) at the
-versions resolved by [Cargo.lock](Cargo.lock), and for the libraries and the
+versions resolved by [Cargo.lock](Cargo.lock), for the direct dependencies of
+the public API audit generator declared in
+[api/generator/Cargo.toml](api/generator/Cargo.toml) at the versions resolved
+by [its lock file](api/generator/Cargo.lock), and for the libraries and the
 typefaces copied into the view. It does not enumerate the Rust dependencies'
 transitive, optional, platform, or compiled dependencies, and it is not a
 complete inventory for a distributed application bundle.
@@ -15,6 +18,8 @@ oxlint-tsgolint, oxfmt and the React and Node type declarations, declared in
 [ui/package.json](ui/package.json), are development-only tools and are not
 redistributed. The view in `ui/dist/` contains this repository's compiled
 source bundled with the libraries listed below, and the typefaces' files.
+The public API audit generator is maintenance tooling: it is built and run
+from the repository and is not part of the application.
 
 ## Dependencies
 
@@ -82,6 +87,13 @@ portions by NVIDIA Corporation and affiliates:
 
 * License: [MIT License](licenses/polars/LICENSE)
 * Homepage: [Polars](https://www.pola.rs/)
+
+This product's public API audit generator depends on public-api 0.50.0 and
+rustdoc-json 0.9.7, distributed by the contributors to cargo-public-api:
+
+* License: [MIT License](licenses/cargo-public-api/LICENSE)
+* Homepage: [public-api](https://github.com/cargo-public-api/cargo-public-api/tree/main/public-api)
+* Homepage: [rustdoc-json](https://github.com/cargo-public-api/cargo-public-api/tree/main/rustdoc-json)
 
 This product depends on serde 1.0.229, distributed by Erick Tryzelaar and
 David Tolnay, under your choice of either license:
