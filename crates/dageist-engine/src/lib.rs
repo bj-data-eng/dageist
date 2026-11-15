@@ -23,6 +23,7 @@ pub use table::Table;
 /// the engine, as it is in the Python Polars release the engine is built
 /// like. It keeps count of the memory Polars uses, which Polars' streaming
 /// engine reads to decide when to spill to disk, and allocates through
-/// jemalloc on macOS and Linux and mimalloc elsewhere.
+/// jemalloc on macOS and Linux and mimalloc elsewhere. Because the engine
+/// declares it, a program that links the engine cannot choose another one.
 #[global_allocator]
 static ALLOCATOR: polars_ooc::Allocator = polars_ooc::Allocator;

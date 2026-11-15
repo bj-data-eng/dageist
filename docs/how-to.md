@@ -201,10 +201,10 @@ env -u CARGO_TARGET_DIR CARGO_NET_OFFLINE=true cargo test --offline --locked --m
 
 ## Check The Build Against The Polars Release
 
-The engine builds Polars from `vendor/polars` exactly as the Python Polars
-release there is built. That release is `polars-runtime-32`, the runtime a
-plain `pip install polars` installs. The release check compares the two
-builds:
+The engine builds Polars from `vendor/polars` with the same features, crate
+patches, dependency versions and toolchain as the Python Polars release there.
+That release is `polars-runtime-32`, the runtime a plain `pip install polars`
+installs. The release check compares the two builds:
 
 ```sh
 CARGO_NET_OFFLINE=true cargo run --offline --locked --manifest-path api/generator/Cargo.toml -- --check-release
@@ -214,6 +214,8 @@ It prints `dageist-tauri builds the crates of vendor/polars as
 polars-runtime-32 does` and exits successfully when the builds match.
 Otherwise it prints each difference and fails:
 
+- a toolchain in [rust-toolchain.toml](../rust-toolchain.toml) other than the
+  release's, or than the one the generator runs Cargo with;
 - a Polars crate built with features the release does not turn on, or
   without features it does;
 - a Polars crate only one of the builds compiles;
@@ -226,6 +228,11 @@ with the reason for each. These are the Python binding's own features and
 crates, which connect Polars to Python, and `objc2-exception-helper`, which a
 feature Tauri turns on in `objc2` adds. A listed exception that no longer
 applies is reported too, so the list stays current.
+
+The check reads both builds for the platform it runs on, so a difference that
+only another platform's build has is not covered. It compares the features of
+Polars' own crates; the other packages they use are compared by version and
+source.
 
 ## Move Polars To A New Release
 
@@ -246,8 +253,9 @@ git add vendor/polars
 `git diff --cached --submodule=short` the commit it replaces. Then bring the
 build into line with the new release:
 
-1. Set the toolchain in [rust-toolchain.toml](../rust-toolchain.toml) to the
-   one in `vendor/polars/rust-toolchain.toml`.
+1. Set the toolchain in [rust-toolchain.toml](../rust-toolchain.toml) and the
+   generator's `RUSTDOC_TOOLCHAIN` to the one in
+   `vendor/polars/rust-toolchain.toml`.
 2. Copy the `hashbrown` and `tikv-jemalloc-sys` entries of `[patch.crates-io]`
    in `vendor/polars/Cargo.toml` into the root manifest, and add any new patch
    of a crate dageist builds.

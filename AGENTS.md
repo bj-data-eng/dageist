@@ -34,11 +34,10 @@ webview configuration, IPC commands and the view it serves.
 
 `vendor/polars` is the Polars project's source, pinned to a Python Polars
 release tag. This repository owns which release it is pinned to, not its
-content; never edit files inside it. The engine builds Polars from it exactly
-as that release is built: the same features, crate patches, dependency
-versions and toolchain, checked by the API generator's release check. Moving
-it to another release follows
-[the how-to](docs/how-to.md#move-polars-to-a-new-release).
+content; never edit files inside it. The engine builds Polars from it with the
+same features, crate patches, dependency versions and toolchain as that
+release, checked by the API generator's release check. Moving it to another
+release follows [the how-to](docs/how-to.md#move-polars-to-a-new-release).
 
 ## Discover The Current Structure
 

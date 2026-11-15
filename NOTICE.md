@@ -132,8 +132,11 @@ your choice of either license:
 This product depends on tikv-jemalloc-sys 0.7.1, as patched by the Polars
 project at revision `0d683dfb157097e2075d5e0eaf25f71f514a7552` of
 [pola-rs/jemallocator](https://github.com/pola-rs/jemallocator), distributed by
-Alex Crichton, Gonzalo Brito Gadeschi and The TiKV Project Developers, under
-your choice of either license:
+Alex Crichton, Gonzalo Brito Gadeschi and The TiKV Project Developers, and on
+tikv-jemallocator 0.7.0 from the same upstream project, through which Polars'
+allocator uses it, distributed by Alex Crichton, Gonzalo Brito Gadeschi, Simon
+Sapin, Steven Fackler and The TiKV Project Developers, each under your choice
+of either license:
 
 * License: [Apache License 2.0](licenses/jemallocator/LICENSE-APACHE)
 * License: [MIT License](licenses/jemallocator/LICENSE-MIT)
