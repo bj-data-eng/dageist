@@ -4,7 +4,9 @@
 
 use std::collections::BTreeSet;
 
-use crate::catalog::{Default, Kind, Parameter, Reason, Shape, entries, entry, left_out};
+use crate::catalog::{
+    Applies, Family, Kind, Parameter, ParameterDefault, Reason, Shape, entries, entry, left_out,
+};
 
 const INVENTORY: &str = include_str!("../../../../../api/polars/python.txt");
 
@@ -77,10 +79,10 @@ pub(super) fn items() -> Vec<Item> {
 fn written(parameter: &Parameter) -> String {
     let name = parameter.name();
     match (parameter.default(), parameter.shape(), parameter.kind()) {
-        (Default::Required, _, _) => name.to_owned(),
-        (Default::Python("()"), Shape::Many, _) => format!("*{name}"),
-        (Default::Python("{}"), Shape::One, Kind::Pairs(..)) => format!("**{name}"),
-        (Default::Python(text), _, _) => {
+        (ParameterDefault::Required, _, _) => name.to_owned(),
+        (ParameterDefault::Python("()"), Shape::Many, _) => format!("*{name}"),
+        (ParameterDefault::Python("{}"), Shape::One, Kind::Pairs(..)) => format!("**{name}"),
+        (ParameterDefault::Python(text), _, _) => {
             assert!(
                 text != "()" && text != "{}",
                 "{name} has the default of a starred parameter without being one"
@@ -114,26 +116,83 @@ fn a_choice_default_is_one_of_its_words_and_a_flag_default_is_a_python_bool() {
         for parameter in entry.parameters() {
             let context = format!("{} {}", entry.id().as_str(), parameter.name());
             match (parameter.kind(), parameter.default()) {
-                (Kind::Choice(words), Default::Python(text)) if text != "None" => {
+                (Kind::Choice(words), ParameterDefault::Python(text)) if text != "None" => {
                     let word = text.trim_matches('\'');
                     assert!(
                         text.starts_with('\'') && text.ends_with('\'') && words.contains(&word),
                         "{context}: {text} is not one of {words:?}"
                     );
                 }
-                (Kind::Flag, Default::Python(text)) => {
+                (Kind::Flag, ParameterDefault::Python(text)) => {
                     assert!(
                         ["True", "False", "None"].contains(&text),
                         "{context}: {text}"
                     );
                 }
-                (Kind::Choice(words), _) => {
-                    let unique: BTreeSet<_> = words.iter().collect();
-                    assert_eq!(unique.len(), words.len(), "{context}: repeated words");
-                }
                 _ => {}
             }
         }
+    }
+}
+
+/// Every `Kind::Choice` held by `kind`, including those inside pairs.
+fn choices(kind: Kind) -> Vec<&'static [&'static str]> {
+    match kind {
+        Kind::Choice(words) => vec![words],
+        Kind::Pairs(key, value) => choices(*key).into_iter().chain(choices(*value)).collect(),
+        _ => Vec::new(),
+    }
+}
+
+#[test]
+fn a_choice_has_words_and_none_is_empty_or_repeated() {
+    for entry in entries() {
+        for parameter in entry.parameters() {
+            for words in choices(parameter.kind()) {
+                let context = format!("{} {}", entry.id().as_str(), parameter.name());
+                assert!(!words.is_empty(), "{context}: a choice without words");
+                assert!(
+                    words.iter().all(|word| !word.is_empty()),
+                    "{context}: an empty word"
+                );
+                let unique: BTreeSet<_> = words.iter().collect();
+                assert_eq!(unique.len(), words.len(), "{context}: repeated words");
+            }
+        }
+    }
+}
+
+#[test]
+fn only_expression_methods_accept_dtypes_and_each_of_them_does() {
+    for entry in entries() {
+        assert_eq!(
+            !entry.accepts().is_empty(),
+            entry.applies() == Applies::Expression,
+            "{}: the dtypes an entry accepts belong to an expression method and to nothing else",
+            entry.id().as_str()
+        );
+    }
+}
+
+#[test]
+fn a_family_holds_the_entries_that_apply_to_what_it_is_for() {
+    for entry in entries() {
+        let id = entry.id().as_str();
+        assert_eq!(
+            entry.family() == Family::Steps,
+            entry.applies() == Applies::Frame,
+            "{id}: the Steps family is the frame entries"
+        );
+        assert_eq!(
+            entry.family() == Family::Start,
+            entry.applies() == Applies::Function,
+            "{id}: the Start family is the functions"
+        );
+        assert_eq!(
+            entry.family() == Family::Condition,
+            entry.applies() == Applies::Condition,
+            "{id}: the Condition family is the conditions"
+        );
     }
 }
 
