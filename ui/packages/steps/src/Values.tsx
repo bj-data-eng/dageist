@@ -13,6 +13,7 @@ import type { Look, Offer, OfferGroup, Tone } from '@dageist/design';
 import { Hint, OfferList, Piece, Popover, Slot } from '@dageist/design';
 
 import { ChainBlocks } from './Chain';
+import { COMPARISON_SIGNS } from './comparisons';
 import { inputLines } from './InputsStrip';
 import { FreshContext, Line, Lines } from './Lists';
 import { anyField, counted, fieldOffers, matches, offer, titled } from './offers';
@@ -305,7 +306,7 @@ function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Eleme
         />
       </Hint>
       <Slot
-        label={test.comparison}
+        label={COMPARISON_SIGNS[test.comparison]}
         tone="compare"
         look="compare"
         names
@@ -315,16 +316,21 @@ function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Eleme
           titled(
             'Comparison',
             COMPARISONS.filter((comparison) =>
-              matches(typed, comparison, COMPARISON_WORDS[comparison]),
+              matches(
+                typed,
+                comparison,
+                COMPARISON_SIGNS[comparison],
+                COMPARISON_WORDS[comparison],
+              ),
             ).map((comparison) =>
               offer(
-                comparison,
+                COMPARISON_SIGNS[comparison],
                 'compare',
                 COMPARISON_WORDS[comparison],
                 () => {
                   compare(comparison);
                 },
-                { look: 'compare' },
+                { id: comparison, look: 'compare' },
               ),
             ),
           ),

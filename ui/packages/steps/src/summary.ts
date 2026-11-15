@@ -4,6 +4,7 @@
  * themselves.
  */
 
+import { COMPARISON_SIGNS } from './comparisons';
 import type { Condition, Value } from './model/source';
 import { literalText } from './model/source';
 import type { Step } from './model/steps';
@@ -37,7 +38,7 @@ function conditionSummary(condition: Condition): string {
   }
   if (condition.kind === 'chain') return '…';
   const field = condition.column === '' ? 'field' : condition.column;
-  return `${field} ${condition.comparison} ${valueSummary(condition.value)}`;
+  return `${field} ${COMPARISON_SIGNS[condition.comparison]} ${valueSummary(condition.value)}`;
 }
 
 /** Returns `names` as a short list, or how many there are when they are too many to list. */
