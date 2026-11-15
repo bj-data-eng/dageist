@@ -1,9 +1,11 @@
 /*
  * The words every feature writes its "code" with. A line of code is text: a
  * word that can be changed is a button drawn as nothing but its letters, in
- * the colour of what it names, as in a code editor. There are no fills,
- * brackets or rails, nothing is animated, and nothing changes when it is
- * pointed at. A click marks one word with a thin ring and opens its list.
+ * the colour of what it names, as in a code editor. There are no brackets or
+ * rails and nothing is animated. A word that can be pressed takes a faint
+ * flat fill while it is pointed at, the size a block used to be, and nothing
+ * else answers to pointing. A click marks one word with a thin ring and opens
+ * its list.
  *
  * The shell's stylesheet imports this file and defines the colours it uses.
  */
@@ -11,6 +13,11 @@
 .dg-ground {
   --ground: var(--color-panel);
   --tone: var(--color-ink);
+  /*
+   * The fill a word takes while it is pointed at. It is a wash over whatever
+   * the word stands on, so it shows as well on a chosen row as on any other.
+   */
+  --hover: color-mix(in srgb, var(--color-ink) 4.5%, transparent);
 }
 
 /* ------------------------------------------------------------------ */
@@ -47,18 +54,24 @@
   font-style: normal;
 }
 
-/* A space stands after every word, so that words set side by side read as text. */
-.dg-code :is(.dg-block, .dg-quiet, .dg-type, .dg-many) {
-  margin-right: 0.6ch;
+/*
+ * A word that can be pressed keeps room round its letters for the fill it
+ * takes when pointed at, and that room is what stands between two words. In
+ * a list the comma follows its word directly, tucked into that room.
+ */
+.dg-many .dg-entry > .dg-quiet {
+  margin-left: -6px;
 }
 
-/* In a list the comma follows its word directly, and the list keeps its own spacing. */
-.dg-code .dg-many :is(.dg-block, .dg-quiet) {
-  margin-right: 0;
+/* The second word of an entry, such as a field's direction, sits close to the first. */
+.dg-many .dg-entry > span + span > .dg-block {
+  margin-left: -6px;
 }
 
-.dg-many .dg-entry .dg-block {
-  padding-right: 0;
+/* A quiet word that starts a line stands where a word that can be pressed would. */
+.dg-line > .dg-quiet:first-child,
+.dg-line > .dg-link:first-child > .dg-quiet:first-child {
+  padding-left: 7px;
 }
 
 /* ------------------------------------------------------------------ */
@@ -69,14 +82,19 @@
   appearance: none;
   margin: 0;
   border: 0;
-  border-radius: 3px;
+  border-radius: 2px;
   background: none;
-  padding: 0 2px;
+  padding: 2px 7px;
   color: var(--tone);
   font: inherit;
+  line-height: 20px;
   text-indent: 0;
   white-space: nowrap;
   cursor: pointer;
+}
+
+.dg-block:hover:enabled {
+  background-color: var(--hover);
 }
 
 .dg-block[aria-expanded='true'] {
@@ -136,7 +154,6 @@
 
 /* How a word is written: a step's name, text between quotation marks, nothing yet. */
 .dg-block[data-look='verb'] {
-  padding-left: 0;
   font-weight: 600;
 }
 
@@ -168,6 +185,10 @@
   cursor: default;
 }
 
+.dg-block.dg-fixed:hover {
+  background: none;
+}
+
 /* The words of one thing. A piece that is being dragged to another place is faint. */
 .dg-dragged {
   opacity: 0.55;
@@ -191,8 +212,17 @@
 .dg-type {
   --tone: var(--color-value);
 
+  display: inline-block;
+  border-radius: 2px;
+  padding: 2px 7px;
   color: var(--tone);
+  line-height: 20px;
+  text-indent: 0;
   cursor: text;
+}
+
+.dg-type:hover {
+  background-color: var(--hover);
 }
 
 .dg-type[data-kind='name'] {
@@ -211,7 +241,7 @@
   border: 0;
   border-radius: 0;
   background: none;
-  padding: 0 2px;
+  padding: 0;
   min-width: 1ch;
   color: inherit;
   font: inherit;
@@ -241,7 +271,6 @@
 
 .dg-entry {
   display: inline-block;
-  padding-right: 0.6ch;
   text-indent: 0;
 }
 
@@ -368,8 +397,9 @@
   min-width: 0;
 }
 
-/* The row the keyboard is on. Rows do not answer to the pointer resting on them. */
-.dg-offer.dg-chosen {
+/* The row the keyboard is on, and the row the pointer is on. */
+.dg-offer.dg-chosen,
+.dg-offer:has(.dg-offer-pick:enabled:hover) {
   background-color: color-mix(in srgb, var(--color-ink) 9%, var(--color-raised));
 }
 
@@ -403,6 +433,7 @@
 .dg-offer-pick > .dg-block {
   flex: 0 1 auto;
   padding: 0;
+  line-height: inherit;
   min-width: 0;
   max-width: 75%;
   overflow: hidden;
@@ -500,6 +531,10 @@ select.dg-given {
   cursor: pointer;
 }
 
+.dg-act:hover {
+  background-color: color-mix(in srgb, var(--color-ink) 9%, var(--color-raised));
+}
+
 .dg-act:focus-visible {
   outline: 1px solid var(--color-accent);
 }
@@ -519,12 +554,17 @@ select.dg-given {
   appearance: none;
   margin: 0;
   border: 0;
-  border-radius: 3px;
+  border-radius: 2px;
   background: none;
-  padding: 0 2px;
+  padding: 2px 7px;
   color: inherit;
   font: inherit;
+  line-height: 20px;
   cursor: pointer;
+}
+
+.dg-peek:hover {
+  background-color: var(--hover);
 }
 
 .dg-peek[aria-expanded='true'] {
