@@ -1330,3 +1330,640 @@ body {
     animation: none;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Trays                                                               */
+/* ------------------------------------------------------------------ */
+
+/*
+ * A tray holds what a block opens: the chain that is a value, or the list a
+ * value is picked from. Every version is the same card. The first part here
+ * draws the steps and what is in a tray; then each version says where its
+ * trays go.
+ */
+.t-stage {
+  --ground: var(--panel);
+
+  position: relative;
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.t-step {
+  display: flex;
+  position: relative;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 12px 8px 8px;
+  font: 12.5px/20px var(--mono);
+  white-space: nowrap;
+}
+
+.t-step:last-of-type {
+  border-bottom: 0;
+}
+
+.t-step.is-chosen {
+  --ground: var(--raised);
+
+  background: var(--raised);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.t-num {
+  flex: none;
+  width: 22px;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.t-out {
+  margin-left: auto;
+  padding-left: 12px;
+  color: var(--dtype);
+}
+
+/* A block, in the colour of what it names. */
+.t-b {
+  appearance: none;
+  flex: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background-color: color-mix(in srgb, var(--tone) 18%, var(--ground));
+  padding: 2px 7px;
+  color: var(--tone);
+  font: 12.5px/20px var(--mono);
+  white-space: nowrap;
+}
+
+button.t-b {
+  cursor: pointer;
+}
+
+button.t-b:hover {
+  background-color: color-mix(in srgb, var(--tone) 28%, var(--ground));
+}
+
+.t-b[aria-expanded='true'] {
+  background-color: color-mix(in srgb, var(--tone) 30%, var(--ground));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 65%, transparent);
+}
+
+.t-col {
+  --tone: var(--column);
+}
+
+.t-fn {
+  --tone: var(--function);
+}
+
+.t-val {
+  --tone: var(--value);
+}
+
+.t-name {
+  --tone: var(--ink);
+}
+
+.t-cmp {
+  --tone: var(--operator);
+
+  font-weight: 700;
+}
+
+.t-verb {
+  --tone: var(--verb-add);
+
+  font: 600 12.5px/20px var(--sans);
+}
+
+.t-verb.t-join {
+  --tone: #b9a7f5;
+}
+
+.t-verb.t-filter {
+  --tone: var(--verb-filter);
+}
+
+/* A word inside the brackets names what follows it. */
+.t-w {
+  background-color: color-mix(in srgb, var(--function) 18%, var(--ground));
+  padding: 2px 7px;
+  color: color-mix(in srgb, var(--function) 62%, transparent);
+}
+
+/* A piece: blocks a hair apart between square brackets, or straight ones round a value. */
+.t-piece {
+  --ink: color-mix(in srgb, var(--function) 60%, var(--ground));
+
+  display: inline-flex;
+  position: relative;
+  flex: none;
+  gap: 1px;
+  margin: 0 4px;
+}
+
+.t-piece:has(> .t-verb) {
+  --ink: color-mix(in srgb, var(--verb-add) 70%, var(--ground));
+}
+
+.t-piece::before,
+.t-piece::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  border: 2px solid var(--ink);
+  width: 7px;
+  pointer-events: none;
+}
+
+.t-piece::before {
+  left: -3px;
+  border-right: 0;
+  border-radius: 5px 0 0 5px;
+}
+
+.t-piece::after {
+  right: -3px;
+  border-left: 0;
+  border-radius: 0 5px 5px 0;
+}
+
+.t-piece.is-straight::before,
+.t-piece.is-straight::after {
+  border: 0;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--column) 60%, var(--ground));
+  width: 2px;
+}
+
+/* The brackets round a comparison are in its colour, and round a group in a function's. */
+.t-piece.is-cmp::before,
+.t-piece.is-cmp::after {
+  background: color-mix(in srgb, var(--operator) 60%, var(--ground));
+}
+
+.t-piece.is-group::before,
+.t-piece.is-group::after {
+  background: color-mix(in srgb, var(--function) 60%, var(--ground));
+}
+
+/*
+ * The lines of a list, one level in. There is no rail beside them: each line
+ * stands between straight brackets, and those line up into one of their own.
+ */
+.t-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 6px 0 2px 26px;
+}
+
+/* A caret and the piece after it are one link, so a chain breaks only before a caret. */
+.t-link {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+
+/* Parts of the card that only some versions show. */
+.t-more,
+.t-nest {
+  display: none;
+}
+
+/* What is in a tray: a line of a chain, or a list to pick from. */
+.t-tray[hidden] {
+  display: none;
+}
+
+.t-line {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.t-mark {
+  flex: none;
+  margin-right: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.t-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding: 0 2px 6px;
+  color: var(--muted);
+  font: 12px/20px var(--sans);
+}
+
+.t-search::before {
+  content: '';
+  flex: none;
+  border: 1.5px solid var(--muted);
+  border-radius: 50%;
+  box-shadow: 4px 4px 0 -3px var(--muted);
+  width: 8px;
+  height: 8px;
+}
+
+.t-group {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 2px 4px;
+  color: var(--muted);
+  font: 600 10px/1 var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.t-group i {
+  font-style: normal;
+  font-weight: 400;
+}
+
+.t-offers {
+  display: grid;
+  gap: 1px 14px;
+}
+
+.t-offer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 3px;
+  padding: 2px 6px 2px 2px;
+}
+
+.t-offer:hover,
+.t-offer.is-picked {
+  background-color: color-mix(in srgb, var(--ink) 12%, var(--ground));
+}
+
+.t-offer i {
+  margin-left: auto;
+  color: var(--muted);
+  font: 11px/1 var(--sans);
+  font-style: normal;
+}
+
+/*
+ * Drawer under the row. A tray is a sunken band as wide as the row, with a
+ * notch under the block that owns it, and the steps below move down. A list
+ * a block opens is not a tray: it floats over the page from its block.
+ */
+[data-version^='tray-drawer'] .t-tray {
+  --ground: var(--canvas);
+
+  position: relative;
+  flex: 1 0 100%;
+  margin: 6px -12px -8px -8px;
+  box-shadow:
+    inset 0 3px 5px rgb(0 0 0 / 40%),
+    inset 0 -1px 0 var(--line);
+  background: var(--canvas);
+  padding: 12px 12px 10px 36px;
+}
+
+[data-version^='tray-drawer'] .t-tray::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: var(--notch, 60px);
+  transform: translateX(-50%) rotate(45deg);
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  background: var(--canvas);
+  width: 11px;
+  height: 11px;
+}
+
+[data-version^='tray-drawer'] .t-tray-list {
+  --ground: var(--panel);
+
+  position: absolute;
+  top: calc(100% - 6px);
+  left: var(--at, 60px);
+  z-index: 5;
+  flex: none;
+  margin: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  box-shadow: 0 8px 22px rgb(0 0 0 / 55%);
+  background: var(--panel);
+  padding: 8px 10px;
+  width: 250px;
+}
+
+[data-version^='tray-drawer'] .t-tray-list::before {
+  content: none;
+}
+
+/* Room is left under the steps for a list that floats below the last of them. */
+[data-version^='tray-drawer'] .t-stage {
+  margin-bottom: 60px;
+}
+
+/*
+ * Hanging from its block. The tray hangs from the block that owns it, in that
+ * block's colour along its top, and lies over what is below it. A list opened
+ * from a block in the tray hangs from that block in turn.
+ */
+[data-version^='tray-hang'] .t-tray {
+  position: absolute;
+  top: calc(100% - 6px);
+  left: var(--at, 60px);
+  z-index: 5;
+  border: 1px solid var(--line-strong);
+  border-top: 2px solid var(--function);
+  border-radius: 0 5px 5px 5px;
+  box-shadow: 0 8px 22px rgb(0 0 0 / 55%);
+  background: var(--panel);
+  padding: 10px 12px;
+}
+
+[data-version^='tray-hang'] .t-tray-list {
+  top: calc(100% - 8px);
+  z-index: 6;
+  border-top-color: var(--column);
+  width: 250px;
+}
+
+/* A tray that hangs is read on its own, away from the steps, so its lines carry no numbers. */
+[data-version^='tray-hang'] .t-mark {
+  display: none;
+}
+
+/* With no numbers to clear, its lines are set in by half as much. */
+[data-version^='tray-hang'] .t-sub {
+  margin-left: 13px;
+}
+
+/* Room is left under the steps for what hangs below the last of them. */
+[data-version^='tray-hang'] .t-stage {
+  margin-bottom: 150px;
+}
+
+/* The drawer with a chain too long for its row: it breaks before a caret, set in under its start. */
+[data-version='tray-drawer-wrap'] .t-more {
+  display: inline-flex;
+}
+
+[data-version='tray-drawer-wrap'] .t-line {
+  flex-wrap: wrap;
+  row-gap: 8px;
+  padding-left: 30px;
+}
+
+[data-version='tray-drawer-wrap'] .t-line > .t-mark {
+  margin-left: -30px;
+  width: 24px;
+}
+
+/* The drawer with a chain inside its chain: the field gives way to dots, and their chain shows. */
+[data-version='tray-drawer-nest'] .t-nest {
+  display: inline-flex;
+}
+
+[data-version='tray-drawer-nest'] .t-sub.t-nest {
+  display: flex;
+}
+
+[data-version='tray-drawer-nest'] [data-tray-for='list'] {
+  display: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* Calmer                                                              */
+/* ------------------------------------------------------------------ */
+
+/*
+ * The steps as text. There are no fills, brackets or rails: what a word is
+ * shows in the colour of its letters, as in a code editor, and what belongs
+ * under a step is set in on lines of its own. Nothing here changes when it
+ * is pointed at, and nothing is animated. A click marks one word with a thin
+ * ring and puts its list under it.
+ */
+.c-stage {
+  position: relative;
+  margin-top: 12px;
+  margin-bottom: 150px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 6px 0;
+  font: 13px/24px var(--mono);
+}
+
+.c-row {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 1px 14px 1px 10px;
+}
+
+.c-row.is-chosen {
+  background: color-mix(in srgb, var(--ink) 5%, var(--panel));
+}
+
+.c-num {
+  flex: none;
+  width: 18px;
+  color: color-mix(in srgb, var(--muted) 60%, var(--panel));
+  font-size: 11px;
+  text-align: right;
+  user-select: none;
+}
+
+/* A line too long for its row carries on set in, as a line of code does. */
+.c-code {
+  flex: 1;
+  padding-left: 3ch;
+  min-width: 0;
+  color: var(--muted);
+  text-indent: -3ch;
+}
+
+/* The quiet words: by, on, then, otherwise, the equals sign and the caret. */
+.c-code i {
+  color: var(--muted);
+  font-style: normal;
+}
+
+.c-out {
+  flex: none;
+  color: color-mix(in srgb, var(--dtype) 70%, var(--panel));
+  font-size: 12px;
+}
+
+/* A word that can be changed. It is a button, drawn as nothing but its letters. */
+.c-tok {
+  appearance: none;
+  margin: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  padding: 0 2px;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.c-tok.is-picked {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 55%, transparent);
+}
+
+.c-tok:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.c-col {
+  color: var(--column);
+}
+
+.c-val {
+  color: var(--value);
+}
+
+.c-op {
+  color: color-mix(in srgb, var(--operator) 80%, var(--panel));
+}
+
+.c-name {
+  color: var(--ink);
+}
+
+.c-fn {
+  color: color-mix(in srgb, var(--ink) 82%, var(--panel));
+}
+
+.c-verb {
+  padding-left: 0;
+  color: var(--verb-add);
+  font-weight: 600;
+}
+
+.c-verb.c-sort {
+  color: var(--verb-sort);
+}
+
+.c-verb.c-join {
+  color: #b9a7f5;
+}
+
+.c-verb.c-filter {
+  color: var(--verb-filter);
+}
+
+/* What a step takes that is more than one thing: each on a line of its own, set in. */
+.c-in {
+  display: block;
+  padding-left: 6ch;
+}
+
+.c-in.c-deep {
+  padding-left: 9ch;
+}
+
+/* A group of lines that belong to one word: the cases of a when, or a group in a condition. */
+.c-group {
+  display: block;
+}
+
+/* The quiet word after the last step, where the next step goes. */
+.c-more .c-num,
+.c-add {
+  color: color-mix(in srgb, var(--muted) 55%, var(--panel));
+}
+
+/* Something still to be picked, and what the step says about it. */
+.c-missing {
+  color: var(--wrong);
+  font-style: italic;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+.c-says {
+  color: color-mix(in srgb, var(--wrong) 75%, var(--panel));
+  font: 12px/22px var(--sans);
+}
+
+/* The list of the marked word. */
+.c-pop {
+  display: flex;
+  position: absolute;
+  text-indent: 0;
+  z-index: 5;
+  flex-direction: column;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--raised);
+  padding: 6px;
+  width: 230px;
+  font: 12.5px/22px var(--mono);
+}
+
+.c-pop[hidden] {
+  display: none;
+}
+
+.c-find {
+  border-bottom: 1px solid var(--line);
+  padding: 0 4px 4px;
+  color: var(--muted);
+  font: 12px/20px var(--sans);
+}
+
+.c-pick {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  border-radius: 3px;
+  padding: 0 4px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.c-pick b {
+  font-weight: 400;
+}
+
+.c-pick i {
+  margin-left: auto;
+  color: var(--muted);
+  font: 11px/1 var(--sans);
+  font-style: normal;
+}
+
+.c-pick.is-now {
+  background: color-mix(in srgb, var(--ink) 9%, var(--raised));
+}
+
+.c-pick.c-act {
+  color: var(--muted);
+  font-family: var(--sans);
+}
+
+.c-pick.c-act b {
+  color: var(--ink);
+  font-family: var(--mono);
+}
+
+.c-pop hr {
+  margin: 5px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  width: 100%;
+}

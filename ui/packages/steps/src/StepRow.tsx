@@ -1,10 +1,11 @@
 /**
- * @file One step of the list: its number, its head and what it returns. The
- * head is a bracketed piece in the step's colour that holds the verb and
- * what the step takes. Pointing at the head parts its brackets: a cross
- * removes the step and a plus adds one after it. Pointing at the row turns
- * the number into a grip to drag the step by. What a step takes that is more
- * than one thing is a list under the row.
+ * @file One step of the list, written as a line of code: its number, its
+ * name, what it takes, and at the end of the row what it returns. Nothing
+ * about the row changes when it is pointed at. The step's name is the word
+ * that names it: its list changes what the step does, and ends with adding
+ * a step after it and removing it. The number drags the step to another
+ * place. What a step takes that is more than one thing is set out on lines
+ * beneath it.
  */
 
 import { useSortable } from '@dnd-kit/react/sortable';
@@ -12,10 +13,10 @@ import { useCallback, useContext, useState } from 'react';
 
 import type { Entry, OfferGroup } from '@dageist/design';
 import {
-  Equals,
   Hint,
   ManySlot,
   OfferList,
+  Peek,
   Piece,
   Popover,
   Slot,
@@ -24,9 +25,8 @@ import {
   cx,
 } from '@dageist/design';
 
-import { ChainBlocks } from './Chain';
-import { FreshContext, ListOwner, useLineNumbers } from './Lists';
-import { ConditionBlocks } from './Values';
+import { FreshContext } from './Lists';
+import { ConditionBlocks, ValueSlot } from './Values';
 import { formatCell } from './format';
 import { anyField, counted, fieldOffers, matches, offer, titled } from './offers';
 import type { Cell, Frame } from './model/frame';
@@ -53,7 +53,6 @@ import {
   stepBreak,
   stepText,
 } from './model/steps';
-import { checkChain } from './model/source';
 import { TABLES, findTable } from './model/tables';
 import { VERB_COLOURS, VERB_LABELS, VERB_NOTES } from './verbs';
 
@@ -86,21 +85,33 @@ interface HeadProps<S extends Step> {
   readonly onChange: (step: Step) => void;
 }
 
-function AddColumnHead({ step, onChange }: HeadProps<WithColumnsStep>): React.JSX.Element {
+function AddColumnHead({ step, frame, onChange }: HeadProps<WithColumnsStep>): React.JSX.Element {
   const fresh = useContext(FreshContext);
-  const { expr } = step;
   return (
-    <TypedBlock
-      value={expr.alias}
-      kind="name"
-      label="Name of the new column"
-      wrong={expr.alias.trim() === ''}
-      focusNow={fresh.id === step.id}
-      accepts={(typed) => typed.trim() !== ''}
-      onCommit={(alias) => {
-        onChange({ ...step, expr: { ...expr, alias: alias.trim() } });
-      }}
-    />
+    <>
+      <TypedBlock
+        value={step.alias}
+        kind="name"
+        label="Name of the new column"
+        wrong={step.alias.trim() === ''}
+        focusNow={fresh.id === step.id}
+        accepts={(typed) => typed.trim() !== ''}
+        onCommit={(alias) => {
+          onChange({ ...step, alias: alias.trim() });
+        }}
+      />
+      <Word>=</Word>
+      <ValueSlot
+        value={step.value}
+        frame={frame}
+        label={`What ${step.alias === '' ? 'the column' : step.alias} holds`}
+        lists={false}
+        expected={null}
+        onChange={(value) => {
+          onChange({ ...step, value });
+        }}
+      />
+    </>
   );
 }
 
@@ -116,7 +127,7 @@ function SortHead({ step, frame, onChange }: HeadProps<SortStep>): React.JSX.Ele
   }));
   return (
     <>
-      <Word apart={false}>by</Word>
+      <Word>by</Word>
       <ManySlot
         entries={entries}
         empty="no fields"
@@ -279,7 +290,6 @@ function FilterHead({ step, frame, onChange }: HeadProps<FilterStep>): React.JSX
       condition={step.condition}
       frame={frame}
       tone="verb"
-      alone={false}
       onChange={(condition) => {
         onChange({ ...step, condition });
       }}
@@ -326,7 +336,7 @@ function JoinHead({ step, frame, onChange }: HeadProps<JoinStep>): React.JSX.Ele
           ]}
         />
       </Hint>
-      <Word apart>on</Word>
+      <Word>on</Word>
       <Slot
         label={step.leftOn}
         tone="column"
@@ -380,7 +390,7 @@ function JoinHead({ step, frame, onChange }: HeadProps<JoinStep>): React.JSX.Ele
           ),
         ]}
       />
-      <Word apart>how</Word>
+      <Word>how</Word>
       <Slot
         label={step.how}
         tone="value"
@@ -415,13 +425,12 @@ function cellLabel(cell: Cell): string {
 function PivotHead({ step, frame, onChange }: HeadProps<PivotStep>): React.JSX.Element {
   const field = (
     word: string,
-    first: boolean,
     current: string,
     describedAs: string,
     update: (name: string) => PivotStep,
   ): React.JSX.Element => (
     <>
-      <Word apart={!first}>{word}</Word>
+      <Word>{word}</Word>
       <Slot
         label={current}
         tone="column"
@@ -447,21 +456,21 @@ function PivotHead({ step, frame, onChange }: HeadProps<PivotStep>): React.JSX.E
   const values = distinctValues(frame, step.on);
   return (
     <>
-      {field('on', true, step.on, 'The field whose values become columns', (on) => ({
+      {field('on', step.on, 'The field whose values become columns', (on) => ({
         ...step,
         on,
         // Pinned columns are values of the old field, so pin the new field's instead.
         pinned: step.columnsFrom === 'pinned' ? distinctValues(frame, on) : [],
       }))}
-      {field('index', false, step.index, 'The field that stays as rows', (index) => ({
+      {field('index', step.index, 'The field that stays as rows', (index) => ({
         ...step,
         index,
       }))}
-      {field('values', false, step.values, 'The field the cells are filled from', (chosen) => ({
+      {field('values', step.values, 'The field the cells are filled from', (chosen) => ({
         ...step,
         values: chosen,
       }))}
-      <Word apart>aggregate</Word>
+      <Word>aggregate</Word>
       <Slot
         label={step.aggregate}
         tone="value"
@@ -481,7 +490,7 @@ function PivotHead({ step, frame, onChange }: HeadProps<PivotStep>): React.JSX.E
       />
       {step.columnsFrom === 'pinned' && (
         <>
-          <Word apart>columns</Word>
+          <Word>columns</Word>
           <ManySlot
             entries={step.pinned.map((value) => ({
               id: cellLabel(value),
@@ -582,7 +591,8 @@ function PivotOutcome({ step, frame, result, onChange }: PivotOutcomeProps): Rea
         />
       </Hint>
       {result.problem === null && (
-        <Hint
+        <Peek
+          describedAs="The columns the pivot returns"
           lines={[
             result.added.join(', '),
             fromData
@@ -592,13 +602,13 @@ function PivotOutcome({ step, frame, result, onChange }: PivotOutcomeProps): Rea
           code={false}
         >
           <span className="dg-dtype">{String(result.frame.length)} columns</span>
-        </Hint>
+        </Peek>
       )}
     </>
   );
 }
 
-/** How many values of a new column its hover note shows. */
+/** How many values of a new column are shown when its dtype is pressed. */
 const PEEK = 4;
 
 /** Returns the first values of the column called `name` in `result`, as one line of text. */
@@ -623,18 +633,23 @@ function Outcome({ step, frame, result, onChange }: OutcomeProps): React.JSX.Ele
   }
   if (result.problem !== null) return null;
   if (step.verb === 'with_columns') {
-    const dtype = checkChain(step.expr, frame).dtypes.at(-1);
+    const dtype = findColumn(result.frame, step.alias)?.dtype;
     if (dtype === undefined) return null;
     return (
-      <Hint lines={peek(result, result.added[0] ?? '')} code>
+      <Peek
+        describedAs={`${step.alias} is ${dtype}: show its first values`}
+        lines={peek(result, result.added[0] ?? '')}
+        code
+      >
         <span className="dg-dtype">{dtype}</span>
-      </Hint>
+      </Peek>
     );
   }
   if (step.verb === 'join') {
     const [only] = result.added;
     return (
-      <Hint
+      <Peek
+        describedAs="The columns the join adds: show their first values"
         lines={result.added.flatMap((name) => [
           `${name} · ${findColumn(result.frame, name)?.dtype ?? ''}`,
           ...peek(result, name),
@@ -649,7 +664,7 @@ function Outcome({ step, frame, result, onChange }: OutcomeProps): React.JSX.Ele
               : `${String(result.added.length)} columns`}
           </span>
         </span>
-      </Hint>
+      </Peek>
     );
   }
   if (step.verb === 'filter') {
@@ -720,104 +735,76 @@ export function StepRow({
     accept: 'step',
   });
   const [adding, setAdding] = useState<HTMLElement | null>(null);
-  const [root, setRoot] = useState<HTMLElement | null>(null);
-  useLineNumbers(root, String(index + 1));
   const closeList = useCallback(() => {
     setAdding(null);
   }, []);
   const broken = stepBreak(step);
-  const edge = result.problem === null ? 'var(--color-accent)' : 'var(--color-wrong)';
+  const number = String(index + 1);
+  const name = VERB_LABELS[step.verb];
   return (
     <div
-      ref={(element) => {
-        setRoot(element);
-        ref(element);
-      }}
+      ref={ref}
       data-step-id={step.id}
       className={cx(
-        'dg-ground group/step relative border-b border-line bg-panel first:rounded-t-lg last:rounded-b-lg last:border-b-0',
+        'dg-ground border-b border-line bg-panel first:rounded-t-lg last:rounded-b-lg last:border-b-0',
         VERB_COLOURS[step.verb],
         selected && 'bg-row [--ground:var(--color-row)]',
         isDragSource && 'opacity-60',
       )}
-      style={
-        selected || result.problem !== null ? { boxShadow: `inset 2px 0 0 ${edge}` } : undefined
-      }
       onPointerDownCapture={onSelect}
       onFocusCapture={onSelect}
     >
       {broken !== null && (
-        <div className="flex items-center gap-2 border-b border-dashed border-operator px-2 py-0.5 text-[11px] text-muted">
+        <div className="flex items-center gap-2 border-b border-dashed border-operator px-3 py-0.5 text-[11px] text-muted">
           <span className="rounded-sm bg-invalid px-1.5 font-mono font-semibold text-operator">
             {broken}
           </span>
           {BREAK_NOTES[broken]}
         </div>
       )}
-      <ListOwner outletClassName="ml-[60px]">
-        {(setRow) => (
-          <div ref={setRow} className="flex items-start gap-1.5 py-2 pr-3 pl-1">
-            <button
-              ref={handleRef}
-              type="button"
-              title="Drag to reorder"
-              aria-label={`Step ${String(index + 1)}: drag to reorder`}
-              className="inline-flex h-6 w-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-sm font-mono text-[11px] text-muted select-none hover:bg-hover hover:text-ink active:cursor-grabbing"
-            >
-              <span className="group-hover/step:hidden">{index + 1}</span>
-              <span aria-hidden="true" className="hidden text-sm group-hover/step:inline">
-                ⠿
-              </span>
-            </button>
-            <div data-dg-flow className="dg-flow flex-1">
-              <Piece
+      <div className="flex items-baseline gap-3 py-1 pr-4 pl-2">
+        <button
+          ref={handleRef}
+          type="button"
+          title="Drag to reorder"
+          aria-label={`Step ${number}: drag to reorder`}
+          className="w-6 shrink-0 cursor-grab touch-none text-right font-mono text-[11px] text-muted select-none active:cursor-grabbing"
+        >
+          {number}
+        </button>
+        <div data-dg-flow className="dg-code">
+          {/* The step's name is the word that names it: its list adds a step after and removes it. */}
+          <Piece
+            remove={{ label: `Remove ${name}`, onPress: onRemove }}
+            add={{ label: `Add a step after ${name}`, onPress: setAdding }}
+          >
+            <Hint lines={[stepText(step)]} code>
+              <Slot
+                label={name}
                 tone="verb"
-                bracketed
-                remove={{ label: `Remove step ${String(index + 1)}`, onPress: onRemove }}
-                add={{ label: `Add a step after step ${String(index + 1)}`, onPress: setAdding }}
-              >
-                <Hint lines={[stepText(step)]} code>
-                  <Slot
-                    label={VERB_LABELS[step.verb]}
-                    tone="verb"
-                    look="verb"
-                    describedAs={`Step ${String(index + 1)}: ${VERB_LABELS[step.verb]}. Change what the step does`}
-                    placeholder="Search the steps"
-                    offers={(typed) =>
-                      verbOffers(typed, (verb) => {
-                        if (verb !== step.verb) {
-                          onChange({ ...defaultStep(verb, frame), id: step.id });
-                        }
-                      })
+                look="verb"
+                names
+                describedAs={`Step ${number}: ${name}. Change what the step does`}
+                placeholder="Search the steps"
+                offers={(typed) =>
+                  verbOffers(typed, (verb) => {
+                    if (verb !== step.verb) {
+                      onChange({ ...defaultStep(verb, frame), id: step.id });
                     }
-                  />
-                </Hint>
-                <Head step={step} frame={frame} onChange={onChange} />
-              </Piece>
-              {step.verb === 'with_columns' && (
-                <>
-                  <Equals />
-                  <ChainBlocks
-                    chainId={step.id}
-                    chain={step.expr}
-                    frame={frame}
-                    opensNew={false}
-                    onChange={(chain) => {
-                      onChange({ ...step, expr: { ...chain, alias: step.expr.alias } });
-                    }}
-                  />
-                </>
-              )}
-              <span data-dg-flow-end className="ml-auto inline-flex items-center gap-2 pl-3">
-                <Outcome step={step} frame={frame} result={result} onChange={onChange} />
-              </span>
-            </div>
-          </div>
-        )}
-      </ListOwner>
-      {result.problem !== null && (
-        <p className="m-0 pb-2 pl-[42px] text-[13px] text-wrong">{result.problem}</p>
-      )}
+                  })
+                }
+              />
+            </Hint>
+          </Piece>
+          <Head step={step} frame={frame} onChange={onChange} />
+          {result.problem !== null && (
+            <span className="dg-line font-sans text-xs text-wrong">{result.problem}</span>
+          )}
+        </div>
+        <span className="shrink-0 pl-3 text-xs text-muted">
+          <Outcome step={step} frame={frame} result={result} onChange={onChange} />
+        </span>
+      </div>
       {adding !== null && (
         <Popover anchor={adding} onDismiss={closeList}>
           <OfferList

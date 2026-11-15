@@ -15,7 +15,7 @@ import { moved } from './Chain';
 import { Pipeline } from './Pipeline';
 import { RowsPreview } from './RowsPreview';
 import { StepNavigator } from './StepNavigator';
-import { SOURCE_FRAME } from './model/frame';
+import { SOURCE_FRAME, SOURCE_NAME } from './model/frame';
 import { runSteps } from './model/steps';
 import { useSharedSteps } from './shared';
 
@@ -102,7 +102,7 @@ export function StepsWorkspace({ host, styleNonce }: StepsWorkspaceProps): React
               <RowsPreview frame={shown?.frame ?? SOURCE_FRAME} added={shown?.added ?? []} />
             ) : (
               <Pipeline
-                source="claims"
+                source={SOURCE_NAME}
                 steps={steps}
                 selectedId={selectedId}
                 onSelect={(id) => {

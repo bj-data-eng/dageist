@@ -3,7 +3,15 @@
  */
 
 import { nextId } from './model/ids';
+import type { Chain, Value } from './model/source';
 import type { Step } from './model/steps';
+
+/** Returns `chain` as what a column holds: a field alone is that field, anything more is a chain. */
+function chainValue(chain: Chain): Value {
+  return chain.source.kind === 'column' && chain.methods.length === 0
+    ? { kind: 'column', column: chain.source.column }
+    : { kind: 'chain', id: nextId('chain'), chain };
+}
 
 /** Sort, then added columns; later ones build on columns earlier steps add. */
 export const START: readonly Step[] = [
@@ -18,61 +26,62 @@ export const START: readonly Step[] = [
   {
     id: nextId('step'),
     verb: 'with_columns',
-    expr: {
+    alias: 'step_index',
+    value: chainValue({
       source: { kind: 'column', column: 'dcn' },
       methods: [
         { id: nextId('method'), name: 'cum_count', argument: null },
         { id: nextId('method'), name: 'over', argument: 'dcn' },
       ],
-      alias: 'step_index',
-    },
+    }),
   },
   {
     id: nextId('step'),
     verb: 'with_columns',
-    expr: {
+    alias: 'resolved_at',
+    value: chainValue({
       source: { kind: 'column', column: 'timestamp' },
       methods: [
         { id: nextId('method'), name: 'shift', argument: '1' },
         { id: nextId('method'), name: 'over', argument: 'dcn' },
       ],
-      alias: 'resolved_at',
-    },
+    }),
   },
   {
     id: nextId('step'),
     verb: 'with_columns',
-    expr: {
+    alias: 'received_at',
+    value: chainValue({
       source: { kind: 'column', column: 'timestamp' },
       methods: [],
-      alias: 'received_at',
-    },
+    }),
   },
   {
     id: nextId('step'),
     verb: 'with_columns',
-    expr: {
+    alias: 'resolved_day',
+    value: chainValue({
       source: { kind: 'column', column: 'resolved_at' },
       methods: [{ id: nextId('method'), name: 'dt.date', argument: null }],
-      alias: 'resolved_day',
-    },
+    }),
   },
   {
     id: nextId('step'),
     verb: 'with_columns',
-    expr: {
+    alias: 'days_open',
+    value: chainValue({
       source: { kind: 'column', column: 'received_at' },
       methods: [
         { id: nextId('method'), name: 'sub', argument: 'resolved_at' },
         { id: nextId('method'), name: 'dt.total_days', argument: null },
       ],
-      alias: 'days_open',
-    },
+    }),
   },
   {
     id: nextId('step'),
     verb: 'with_columns',
-    expr: {
+    alias: 'a_days',
+    value: chainValue({
       source: {
         kind: 'when',
         arms: [
@@ -94,8 +103,7 @@ export const START: readonly Step[] = [
         { id: nextId('method'), name: 'cum_sum', argument: null },
         { id: nextId('method'), name: 'over', argument: 'dcn' },
       ],
-      alias: 'a_days',
-    },
+    }),
   },
   {
     id: nextId('step'),
@@ -108,7 +116,8 @@ export const START: readonly Step[] = [
   {
     id: nextId('step'),
     verb: 'with_columns',
-    expr: {
+    alias: 'sla_status',
+    value: chainValue({
       source: {
         kind: 'when',
         arms: [
@@ -127,13 +136,13 @@ export const START: readonly Step[] = [
         otherwise: { kind: 'literal', value: 'late' },
       },
       methods: [],
-      alias: 'sla_status',
-    },
+    }),
   },
   {
     id: nextId('step'),
     verb: 'with_columns',
-    expr: {
+    alias: 'flag',
+    value: chainValue({
       source: {
         kind: 'when',
         arms: [
@@ -148,23 +157,34 @@ export const START: readonly Step[] = [
             },
             returns: { kind: 'literal', value: 'holiday' },
           },
-          {
-            id: nextId('arm'),
-            condition: {
-              kind: 'test',
-              id: nextId('test'),
-              column: 'row_days',
-              comparison: '>',
-              value: { kind: 'input', name: 'sla_cutoff' },
-            },
-            returns: { kind: 'literal', value: 'over' },
-          },
         ],
-        otherwise: { kind: 'literal', value: 'ok' },
+        otherwise: {
+          kind: 'chain',
+          id: nextId('chain'),
+          chain: {
+            source: {
+              kind: 'when',
+              arms: [
+                {
+                  id: nextId('arm'),
+                  condition: {
+                    kind: 'test',
+                    id: nextId('test'),
+                    column: 'row_days',
+                    comparison: '>',
+                    value: { kind: 'input', name: 'sla_cutoff' },
+                  },
+                  returns: { kind: 'literal', value: 'over' },
+                },
+              ],
+              otherwise: { kind: 'literal', value: 'ok' },
+            },
+            methods: [],
+          },
+        },
       },
       methods: [],
-      alias: 'flag',
-    },
+    }),
   },
   {
     id: nextId('step'),

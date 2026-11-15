@@ -99,8 +99,19 @@ export interface Group {
   readonly items: readonly Condition[];
 }
 
-/** What a filter keeps rows by, and what a `when` decides by. */
-export type Condition = Test | Group;
+/** A condition written as a chain of its own, which must give a Boolean. */
+export interface ChainCondition {
+  readonly kind: 'chain';
+  /** Stays with the chain while it is edited. */
+  readonly id: string;
+  readonly chain: Chain;
+}
+
+/**
+ * What a filter keeps rows by, and what a `when` decides by. A group with no
+ * items is a condition that is still to be picked.
+ */
+export type Condition = Test | Group | ChainCondition;
 
 /** One `.when(condition).then(value)` pair. */
 export interface Arm {
@@ -130,11 +141,6 @@ export type Source = ColumnSource | WhenSource;
 export interface Chain {
   readonly source: Source;
   readonly methods: readonly Method[];
-}
-
-/** A chain with a final `.alias(alias)`: what an Add column step holds. */
-export interface Expr extends Chain {
-  readonly alias: string;
 }
 
 /** Why a chain cannot be worked out, and at which method. Index -1 is the source. */
@@ -183,7 +189,8 @@ function withLiteral(dtype: Dtype, value: number): Dtype | null {
   return dtype === 'Int32' ? literalDtype(value) : dtype;
 }
 
-function checkValue(value: Value, frame: Frame): SourceCheck {
+/** Returns the dtype `value` gives on `frame`, or why it gives none. */
+export function checkValue(value: Value, frame: Frame): SourceCheck {
   if (value.kind === 'unset') return { dtype: null, problem: 'Pick a value.' };
   if (value.kind === 'input') {
     const input = findInput(value.name);
@@ -225,8 +232,15 @@ export function valueText(value: Value): string {
   return value.kind === 'column' ? `pl.col(${quoted(value.column)})` : literalText(value.value);
 }
 
+/** Returns the Polars text of `value` as an expression, where a bare value would not be one. */
+export function valueExprText(value: Value): string {
+  return value.kind === 'column' || value.kind === 'chain'
+    ? valueText(value)
+    : `pl.lit(${valueText(value)})`;
+}
+
 /** Returns the cell `value` gives on every row of `frame`. */
-function cellsOf(value: Value, frame: Frame): readonly Cell[] {
+export function cellsOf(value: Value, frame: Frame): readonly Cell[] {
   if (value.kind === 'chain') return evaluateChain(value.chain, frame) ?? [];
   if (value.kind === 'column') return findColumn(frame, value.column)?.cells ?? [];
   if (value.kind === 'input') {
@@ -244,12 +258,20 @@ export function dtypesAgree(left: Dtype, right: Dtype): boolean {
 /** Returns why `condition` cannot be worked out on `frame`, or `null` when it can. */
 export function conditionProblem(condition: Condition, frame: Frame): string | null {
   if (condition.kind === 'group') {
-    if (condition.items.length === 0) return 'A group needs at least one condition.';
+    if (condition.items.length === 0) return 'Pick a condition.';
     for (const item of condition.items) {
       const problem = conditionProblem(item, frame);
       if (problem !== null) return problem;
     }
     return null;
+  }
+  if (condition.kind === 'chain') {
+    const check = checkChain(condition.chain, frame);
+    if (check.problem !== null) return check.problem.message;
+    const dtype = check.dtypes.at(-1);
+    return dtype === 'Boolean'
+      ? null
+      : `A condition is true or false, but this chain gives ${dtype ?? 'nothing'}. End it with a comparison.`;
   }
   if (condition.column === '') return 'Pick the field to compare.';
   const column = findColumn(frame, condition.column);
@@ -301,6 +323,10 @@ export function conditionRows(condition: Condition, frame: Frame): boolean[] {
         : items.some((item) => item[row] === true),
     );
   }
+  if (condition.kind === 'chain') {
+    const cells = evaluateChain(condition.chain, frame) ?? [];
+    return rowsOf(frame).map((row) => cells[row] === 'true');
+  }
   const left = findColumn(frame, condition.column)?.cells ?? [];
   if (condition.comparison === 'is_in') {
     const list = condition.value.kind === 'input' ? findInput(condition.value.name) : null;
@@ -325,6 +351,7 @@ export function conditionText(condition: Condition): string {
     const joined = condition.items.map((item) => `(${conditionText(item)})`);
     return joined.join(condition.every ? ' & ' : ' | ');
   }
+  if (condition.kind === 'chain') return chainText(condition.chain);
   if (condition.comparison === 'is_in') {
     return `pl.col(${quoted(condition.column)}).is_in(${valueText(condition.value)})`;
   }
@@ -505,9 +532,4 @@ export function evaluateChain(chain: Chain, frame: Frame): readonly Cell[] | nul
 /** Returns the Polars text of `chain`. */
 export function chainText(chain: Chain): string {
   return `${sourceText(chain.source)}${chain.methods.map((method) => methodText(method)).join('')}`;
-}
-
-/** Returns the Polars text of `expr`: its chain and its alias. */
-export function exprText(expr: Expr): string {
-  return `${chainText(expr)}.alias(${quoted(expr.alias)})`;
 }

@@ -1,64 +1,109 @@
 /*
- * The blocks every feature writes its "code" with: a button in the colour of
- * what it names, the piece that brackets it and holds its two side panels,
- * the caret between two blocks of a chain, the block that is typed in, the
- * list a block opens, and the numbered lines under a row.
+ * The words every feature writes its "code" with. A line of code is text: a
+ * word that can be changed is a button drawn as nothing but its letters, in
+ * the colour of what it names, as in a code editor. There are no brackets or
+ * rails and nothing is animated. A word that can be pressed takes a faint
+ * flat fill while it is pointed at, the size a block used to be, and nothing
+ * else answers to pointing. A click marks one word with a thin ring and opens
+ * its list.
  *
  * The shell's stylesheet imports this file and defines the colours it uses.
- * Everything here is mixed from `--tone`, the colour of the block being
- * drawn, into `--ground`, the surface it lies on, so a block that slides over
- * something hides it.
  */
 
 .dg-ground {
   --ground: var(--color-panel);
-  --radius: 2px;
-  --side: 18px;
-  /* How far apart two blocks of a chain stand: a side panel and a little more. */
-  --seam-space: calc(var(--side) + 2px);
-  --seam-ink: color-mix(in srgb, var(--color-function) 32%, transparent);
-  --tone: var(--color-column-ink);
+  --tone: var(--color-ink);
+  /*
+   * The fill a word takes while it is pointed at. It is a wash over whatever
+   * the word stands on, so it shows as well on a chosen row as on any other.
+   */
+  --hover: color-mix(in srgb, var(--color-ink) 4.5%, transparent);
 }
 
 /* ------------------------------------------------------------------ */
-/* The block                                                           */
+/* A line of code                                                      */
+/* ------------------------------------------------------------------ */
+
+/*
+ * The text of one step. A line too long for its row carries on set in, as a
+ * line of code does. What a step takes that is more than one thing is set
+ * out on lines of its own beneath, each set in under what it belongs to.
+ */
+.dg-code {
+  flex: 1;
+  padding-left: 3ch;
+  min-width: 0;
+  color: var(--color-muted);
+  font: 13px/24px var(--font-mono);
+  text-indent: -3ch;
+}
+
+.dg-lines {
+  display: block;
+}
+
+.dg-line {
+  display: block;
+  padding-left: 3ch;
+  text-indent: -3ch;
+}
+
+/* The quiet words: by, on, then, otherwise, a comma, the equals sign and the caret. */
+.dg-quiet {
+  color: var(--color-muted);
+  font-style: normal;
+}
+
+/*
+ * A word that can be pressed keeps room round its letters for the fill it
+ * takes when pointed at, and that room is what stands between two words. In
+ * a list the comma follows its word directly, tucked into that room.
+ */
+.dg-many .dg-entry > .dg-quiet {
+  margin-left: -6px;
+}
+
+/* The second word of an entry, such as a field's direction, sits close to the first. */
+.dg-many .dg-entry > span + span > .dg-block {
+  margin-left: -6px;
+}
+
+/* A quiet word that starts a line stands where a word that can be pressed would. */
+.dg-line > .dg-quiet:first-child,
+.dg-line > .dg-link:first-child > .dg-quiet:first-child {
+  padding-left: 7px;
+}
+
+/* ------------------------------------------------------------------ */
+/* The word                                                            */
 /* ------------------------------------------------------------------ */
 
 .dg-block {
   appearance: none;
-  position: relative;
-  flex: none;
   margin: 0;
   border: 0;
-  border-radius: var(--radius);
-  background-color: color-mix(in srgb, var(--tone) 18%, var(--ground));
+  border-radius: 2px;
+  background: none;
   padding: 2px 7px;
   color: var(--tone);
-  font: 12.5px/20px var(--font-mono);
+  font: inherit;
+  line-height: 20px;
+  text-indent: 0;
   white-space: nowrap;
   cursor: pointer;
-  transition:
-    background-color 90ms ease-out,
-    box-shadow 90ms ease-out;
 }
 
 .dg-block:hover:enabled {
-  background-color: color-mix(in srgb, var(--tone) 28%, var(--ground));
-}
-
-.dg-block:active:enabled {
-  background-color: color-mix(in srgb, var(--tone) 38%, var(--ground));
+  background-color: var(--hover);
 }
 
 .dg-block[aria-expanded='true'] {
-  background-color: color-mix(in srgb, var(--tone) 30%, var(--ground));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 65%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-ink) 55%, transparent);
 }
 
 .dg-block:focus-visible {
-  z-index: 1;
-  outline: 2px solid var(--color-accent);
-  outline-offset: -2px;
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
 }
 
 .dg-block:disabled {
@@ -66,13 +111,13 @@
   cursor: default;
 }
 
-/* What a block names decides its colour. */
+/* What a word names decides its colour. */
 [data-tone='column'] {
   --tone: var(--color-column-ink);
 }
 
 [data-tone='function'] {
-  --tone: var(--color-function);
+  --tone: color-mix(in srgb, var(--color-ink) 82%, var(--ground));
 }
 
 [data-tone='value'] {
@@ -80,7 +125,7 @@
 }
 
 [data-tone='compare'] {
-  --tone: var(--color-compare);
+  --tone: color-mix(in srgb, var(--color-compare) 80%, var(--ground));
 }
 
 [data-tone='input'] {
@@ -103,340 +148,77 @@
   --tone: var(--color-add);
 }
 
-[data-tone='remove'] {
-  --tone: var(--color-remove);
-}
-
-/* How a block is written: a verb, a comparison, text between drawn quotes, nothing, three dots. */
+/* How a word is written: a step's name, text between quotation marks, nothing yet. */
 .dg-block[data-look='verb'] {
   font-weight: 600;
-  font-family: var(--font-sans);
-}
-
-.dg-block[data-look='compare'] {
-  padding-right: 6px;
-  padding-left: 6px;
-  font-weight: 700;
 }
 
 .dg-block[data-look='quoted']::before,
 .dg-block[data-look='quoted']::after {
   content: '"';
-  color: color-mix(in srgb, var(--tone) 50%, var(--ground));
 }
 
 .dg-block[data-look='none'] {
   font-style: italic;
 }
 
-.dg-block[data-look='dots'] {
-  letter-spacing: 1px;
-}
-
-/* Something that cannot be worked out is in the colour of a mistake, and ringed. */
+/* Something that is missing or cannot be worked out is in the colour of a mistake. */
 .dg-block.dg-wrong,
 .dg-type.dg-wrong {
   --tone: var(--color-wrong);
 
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-wrong) 70%, transparent);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
 }
 
-/* A word that waits where the next thing goes: no fill until it is pointed at. */
-.dg-block.dg-waits:not([aria-expanded='true'], :hover, :focus-visible) {
-  background-color: transparent;
-  color: color-mix(in srgb, var(--tone) 34%, transparent);
+/* A word that waits where the next thing goes. */
+.dg-block.dg-waits:not([aria-expanded='true']) {
+  color: color-mix(in srgb, var(--color-muted) 55%, var(--ground));
 }
 
-/* ------------------------------------------------------------------ */
-/* The piece                                                           */
-/* ------------------------------------------------------------------ */
-
-/*
- * The piece: a body of blocks and the panel that slides out of each side
- * when it is pointed at. The panels lie over what is beside the piece, so
- * nothing in the row moves. `--open` is 0 or 1 and everything that moves is
- * worked out from it. A piece is open when it is pointed at or reached by the
- * keyboard, though not while something in it is being typed.
- */
-.dg-piece {
-  --open: 0;
-  --bracket-ink: color-mix(in srgb, var(--tone) 60%, var(--ground));
-
-  display: inline-flex;
-  position: relative;
-  flex: none;
+/* A word that only shows something, such as the == of a join: it is not pressed. */
+.dg-block.dg-fixed {
+  cursor: default;
 }
 
-.dg-piece:is(:hover, :has(:focus-visible:not(input))):not(:has(input:focus)) {
-  --open: 1;
-  --bracket-ink: var(--tone);
-
-  z-index: 2;
+.dg-block.dg-fixed:hover {
+  background: none;
 }
 
-.dg-piece:has([aria-expanded='true']) {
-  --bracket-ink: var(--tone);
-}
-
-/* The body holds the blocks, a hair apart and square where they meet. An open piece lifts it. */
-.dg-body {
-  display: inline-flex;
-  position: relative;
-  z-index: 1;
-  align-items: stretch;
-  gap: 1px;
-  border-radius: var(--radius);
-  box-shadow:
-    0 0 0 1px rgb(0 0 0 / calc(var(--open) * 28%)),
-    0 1px 2px rgb(0 0 0 / calc(var(--open) * 45%)),
-    0 3px 7px rgb(0 0 0 / calc(var(--open) * 35%));
-  overflow: hidden;
-  transition: box-shadow 140ms ease-out;
-}
-
-.dg-body :is(.dg-block, .dg-type),
-.dg-run :is(.dg-block, .dg-type) {
-  border-radius: 0;
-}
-
-/* A run of blocks that stands on its own, such as a comparison on a line. */
-.dg-run {
-  display: inline-flex;
-  flex: none;
-  align-items: stretch;
-  gap: 1px;
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-/* The side panels: remove on the left, add on the right. */
-.dg-side {
-  appearance: none;
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  margin: 0;
-  border: 0;
-  background-color: var(--color-side);
-  padding: 0;
-  width: var(--side);
-  color: var(--color-side-ink);
-  font: 13px/1 var(--font-mono);
-  text-align: center;
-  cursor: pointer;
-  transition:
-    clip-path 140ms ease-out,
-    background-color 90ms ease-out,
-    color 90ms ease-out;
-}
-
-.dg-side-remove {
-  right: 100%;
-  border-radius: var(--radius) 0 0 var(--radius);
-  clip-path: inset(0 0 0 calc((1 - var(--open)) * 100%));
-}
-
-.dg-side-add {
-  left: 100%;
-  border-radius: 0 var(--radius) var(--radius) 0;
-  clip-path: inset(0 calc((1 - var(--open)) * 100%) 0 0);
-}
-
-.dg-side-remove:is(:hover, :focus-visible) {
-  background-color: var(--color-remove);
-  color: #fff;
-}
-
-.dg-side-add:is(:hover, :focus-visible) {
-  background-color: var(--color-add);
-  color: #fff;
-}
-
-.dg-side:focus-visible {
-  outline: 0;
-}
-
-/*
- * Brackets: a square bracket outside each end of the piece, whose arms reach
- * back over its corners. An open piece moves each bracket outward by the
- * width of a side panel, which is what uncovers the panel.
- *   --gap     the space between the piece's end and the bracket's upright
- *   --wrap    how far the arms reach over the piece
- *   --rise    how far the bracket stands above and below the piece
- *   --weight  how thick its line is
- *   --round   how round its two outer corners are
- */
-.dg-piece.dg-bracketed {
-  --gap: 1px;
-  --wrap: 4px;
-  --weight: 2px;
-  --rise: calc(var(--gap) + var(--weight));
-  --round: calc(var(--radius) + var(--gap) + var(--weight));
-
-  margin: 0 calc(var(--gap) + var(--weight) + 1px);
-}
-
-.dg-piece.dg-bracketed::before,
-.dg-piece.dg-bracketed::after {
-  content: '';
-  position: absolute;
-  top: calc(-1 * var(--rise));
-  bottom: calc(-1 * var(--rise));
-  border: var(--weight) solid var(--bracket-ink);
-  width: calc(var(--gap) + var(--weight) + var(--wrap));
-  pointer-events: none;
-  transition:
-    border-color 90ms ease-out,
-    transform 140ms ease-out;
-}
-
-.dg-piece.dg-bracketed::before {
-  left: calc(-1 * (var(--gap) + var(--weight)));
-  transform: translateX(calc(var(--open) * -1 * var(--side)));
-  border-right: 0;
-  border-radius: var(--round) 0 0 var(--round);
-}
-
-.dg-piece.dg-bracketed::after {
-  right: calc(-1 * (var(--gap) + var(--weight)));
-  transform: translateX(calc(var(--open) * var(--side)));
-  border-left: 0;
-  border-radius: 0 var(--round) var(--round) 0;
-}
-
-/* A piece that is being dragged to another place in its chain. */
+/* The words of one thing. A piece that is being dragged to another place is faint. */
 .dg-dragged {
   opacity: 0.55;
 }
 
-/*
- * A word inside the brackets names the parameter that follows it, as `by`
- * does after Sort table. It is not a button. It carries on the block before
- * it in the same fill, in a lighter voice.
- */
-.dg-word {
-  flex: none;
-  margin-left: -1px;
-  background-color: color-mix(in srgb, var(--tone) 18%, var(--ground));
-  padding: 2px 7px 2px 1px;
-  color: color-mix(in srgb, var(--tone) 62%, transparent);
-  font: 12.5px/20px var(--font-mono);
-  white-space: nowrap;
-}
-
-/* After a value the word starts a block of its own. */
-.dg-word.dg-apart {
-  margin-left: 0;
-  padding-left: 7px;
-}
-
-/* ------------------------------------------------------------------ */
-/* Chains                                                              */
-/* ------------------------------------------------------------------ */
-
-/*
- * The seam: a heavy chevron between one block of a chain and the next,
- * pointing the way the value flows. Every seam is as wide as a side panel
- * and a little more, so a block that opens does not reach the one beside it.
- */
-.dg-seam {
-  display: inline-grid;
-  flex: none;
-  place-items: center;
-  width: var(--seam-space);
-  height: 24px;
-}
-
-.dg-seam::before {
-  --wide: 7px;
-  --tall: 10px;
-  --cut: 3.1px;
-
-  content: '';
-  background-color: var(--seam-ink);
-  width: var(--wide);
-  height: var(--tall);
-  clip-path: polygon(
-    0 0,
-    var(--cut) 0,
-    100% 50%,
-    var(--cut) 100%,
-    0 100%,
-    calc(100% - var(--cut)) 50%
-  );
-}
-
-.dg-seam.dg-waits {
-  opacity: 0.45;
-}
-
-/* A caret and the block after it are one link, so a chain breaks only before a caret. */
+/* A caret and the piece after it are one link, so a chain breaks only before a caret. */
 .dg-link {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-}
-
-/* The equals sign is two bars in the weight and colour of the seam. */
-.dg-equals {
-  display: inline-grid;
-  flex: none;
-  place-items: center;
-  margin: 0 4px;
-  width: 13px;
-  height: 24px;
-}
-
-.dg-equals::before {
-  content: '';
-  box-sizing: border-box;
-  border-top: 2px solid var(--seam-ink);
-  border-bottom: 2px solid var(--seam-ink);
-  width: 8px;
-  height: 5px;
-}
-
-/*
- * A row of blocks that wraps: the head of a step, an equals sign, then a
- * chain. A line that carries on starts with a caret, under where the row
- * started.
- */
-.dg-flow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  row-gap: 6px;
-  min-width: 0;
-  font: 12.5px/20px var(--font-mono);
   white-space: nowrap;
 }
 
 /* ------------------------------------------------------------------ */
-/* The block that is typed in                                          */
+/* The word that is typed in                                           */
 /* ------------------------------------------------------------------ */
 
 /*
  * A name, a text value or a number. It holds a real field, kept as wide as
  * what is in it. Text is shown between quotation marks that are drawn, not
- * typed. Typing empties its fill and rings it in its own colour, and what
- * cannot be taken turns it the colour of a mistake.
+ * typed. Typing underlines it, and what cannot be taken turns it the colour
+ * of a mistake.
  */
 .dg-type {
   --tone: var(--color-value);
 
-  display: inline-flex;
-  position: relative;
-  flex: none;
-  align-items: center;
-  border-radius: var(--radius);
-  background-color: color-mix(in srgb, var(--tone) 18%, var(--ground));
+  display: inline-block;
+  border-radius: 2px;
   padding: 2px 7px;
   color: var(--tone);
-  font: 12.5px/20px var(--font-mono);
+  line-height: 20px;
+  text-indent: 0;
   cursor: text;
-  transition:
-    background-color 90ms ease-out,
-    box-shadow 90ms ease-out;
+}
+
+.dg-type:hover {
+  background-color: var(--hover);
 }
 
 .dg-type[data-kind='name'] {
@@ -449,9 +231,11 @@
 
 .dg-type input {
   appearance: none;
+  box-sizing: content-box;
   margin: 0;
   outline: 0;
   border: 0;
+  border-radius: 0;
   background: none;
   padding: 0;
   min-width: 1ch;
@@ -463,38 +247,27 @@
 .dg-type[data-kind='text']::before,
 .dg-type[data-kind='text']::after {
   content: '"';
-  color: color-mix(in srgb, var(--tone) 50%, var(--ground));
 }
 
-.dg-type:hover {
-  background-color: color-mix(in srgb, var(--tone) 28%, var(--ground));
-}
-
-.dg-type:focus-within {
-  background-color: var(--ground);
-  box-shadow: inset 0 0 0 1px var(--tone);
+.dg-type:focus-within input {
+  box-shadow: 0 1px 0 var(--tone);
 }
 
 /* ------------------------------------------------------------------ */
-/* Several values, folded to the room they have                        */
+/* Several values, folded to the room on their line                    */
 /* ------------------------------------------------------------------ */
 
 /*
- * A list or a dictionary too long for the line never wraps. As many entries
- * show as there is room for, then a count of the rest. A dictionary's entry
- * is a pair: a field and what it is given, as two blocks that touch.
+ * A list is written with commas. One too long for its line is cut short: as
+ * many entries show as there is room for, then a count of the rest.
  */
 .dg-many {
-  display: inline-flex;
-  flex: none;
-  align-items: stretch;
-  gap: 1px;
+  white-space: nowrap;
 }
 
-.dg-pair {
-  display: inline-flex;
-  flex: none;
-  align-items: stretch;
+.dg-entry {
+  display: inline-block;
+  text-indent: 0;
 }
 
 .dg-many .dg-extra {
@@ -502,48 +275,55 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* The list a block opens                                              */
+/* The list a word opens                                               */
 /* ------------------------------------------------------------------ */
 
 /*
- * A search box, then groups from the shortest to the longest. Each row is
- * the thing on offer as a block and a word on what it is, a dtype where it
- * has one. A row that cannot be picked says why. A list that takes several
- * ticks them and stays open.
+ * A note about the word, a search box, then groups from the shortest to the
+ * longest. Each row is the thing on offer and a few words on what it is, a
+ * dtype where it has one. A row that cannot be picked says why. A list that
+ * takes several ticks them and stays open. At the foot is what can be done
+ * to the thing the word names.
  */
 .dg-offers {
-  --ground: var(--color-panel);
+  --ground: var(--color-raised);
 
   display: flex;
   flex-direction: column;
-  width: 290px;
+  width: 270px;
   /* The popover says how much room it has, and the list of rows shrinks to it. */
   max-height: var(--popover-room, none);
-  font: 12.5px/20px var(--font-mono);
+  font: 12.5px/22px var(--font-mono);
 }
 
 .dg-offers.dg-wide {
   width: 380px;
 }
 
+.dg-about {
+  flex: none;
+  border-bottom: 1px solid var(--color-line);
+  padding: 5px 10px;
+  color: var(--color-muted);
+  font: 11.5px/18px var(--font-sans);
+}
+
+.dg-about > :first-child {
+  color: var(--color-ink);
+}
+
+.dg-about.dg-code-note {
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
 .dg-search {
   display: flex;
   flex: none;
   align-items: center;
-  gap: 8px;
   border-bottom: 1px solid var(--color-line);
-  padding: 6px 9px;
+  padding: 4px 10px;
   cursor: text;
-}
-
-.dg-search::before {
-  content: '';
-  flex: none;
-  border: 1.5px solid var(--color-muted);
-  border-radius: 50%;
-  box-shadow: 4px 4px 0 -3px var(--color-muted);
-  width: 8px;
-  height: 8px;
 }
 
 .dg-search input {
@@ -567,9 +347,9 @@
 
 .dg-offer-list {
   display: flex;
+  flex: 0 1 auto;
   flex-direction: column;
   gap: 4px;
-  flex: 0 1 auto;
   padding: 5px;
   min-height: 0;
   max-height: 320px;
@@ -581,13 +361,12 @@
 .dg-group {
   display: flex;
   flex-direction: column;
-  gap: 1px;
 }
 
 .dg-group-head {
   display: flex;
   justify-content: space-between;
-  padding: 4px 6px 3px;
+  padding: 4px 5px 2px;
   color: var(--color-muted);
   font: 600 10px/1 var(--font-sans);
   letter-spacing: 0.06em;
@@ -610,26 +389,27 @@
   align-items: center;
   gap: 6px;
   border-radius: 3px;
-  padding-right: 6px;
+  padding-right: 5px;
   min-width: 0;
 }
 
+/* The row the keyboard is on, and the row the pointer is on. */
 .dg-offer.dg-chosen,
 .dg-offer:has(.dg-offer-pick:enabled:hover) {
-  background-color: color-mix(in srgb, var(--color-ink) 12%, var(--color-panel));
+  background-color: color-mix(in srgb, var(--color-ink) 9%, var(--color-raised));
 }
 
-/* The part of a row that is pressed to pick it: its tick, its block and its note. */
+/* The part of a row that is pressed to pick it: its tick, its word and its note. */
 .dg-offer-pick {
   appearance: none;
   display: flex;
   flex: 1 1 auto;
-  align-items: center;
-  gap: 6px;
+  align-items: baseline;
+  gap: 8px;
   margin: 0;
   border: 0;
   background: none;
-  padding: 2px 0 2px 2px;
+  padding: 0 0 0 3px;
   min-width: 0;
   color: inherit;
   font: inherit;
@@ -645,9 +425,11 @@
   opacity: 0.45;
 }
 
-/* In a row the block is a picture of what is on offer: the row is what is pressed. */
+/* In a row the word is a picture of what is on offer: the row is what is pressed. */
 .dg-offer-pick > .dg-block {
   flex: 0 1 auto;
+  padding: 0;
+  line-height: inherit;
   min-width: 0;
   max-width: 75%;
   overflow: hidden;
@@ -655,7 +437,7 @@
   pointer-events: none;
 }
 
-/* The note gives way before the block does: a long note is cut short, not the name beside it. */
+/* The note gives way before the word does: a long note is cut short, not the name beside it. */
 .dg-offer-note {
   flex: 1 1 0;
   min-width: 0;
@@ -678,8 +460,8 @@
 .dg-tick {
   display: grid;
   flex: none;
+  align-self: center;
   place-items: center;
-  margin-left: 3px;
   border: 1px solid var(--color-line-strong);
   border-radius: 2px;
   width: 12px;
@@ -704,8 +486,8 @@
   margin: 0;
   outline: 0;
   border: 0;
-  border-radius: var(--radius);
-  background-color: color-mix(in srgb, var(--color-ink) 14%, var(--color-panel));
+  border-radius: 2px;
+  background-color: color-mix(in srgb, var(--color-ink) 12%, var(--color-raised));
   padding: 0 6px;
   width: 124px;
   color: var(--color-ink);
@@ -720,167 +502,72 @@ select.dg-given {
 }
 
 .dg-given:focus {
-  background-color: var(--color-panel);
   box-shadow: inset 0 0 0 1px var(--color-ink);
 }
 
-/* ------------------------------------------------------------------ */
-/* Lists under a row                                                   */
-/* ------------------------------------------------------------------ */
-
-/*
- * What a row takes that is more than one thing is a list beneath it: lines
- * behind a rail, numbered from the row's own number. A list inside a list is
- * set in again and numbered from its line. Whoever draws the lines writes
- * each number on its line as `data-number`.
- */
-.dg-lines {
+/* What can be done to the thing the word names: adding after it and taking it away. */
+.dg-acts {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  margin: 2px 0 6px 30px;
-  border-left: 2px solid color-mix(in srgb, var(--color-function) 30%, var(--ground));
-  padding: 4px 0 4px 10px;
-  font: 12.5px/20px var(--font-mono);
-  white-space: nowrap;
-}
-
-.dg-lines:empty {
-  display: none;
-}
-
-.dg-lines .dg-lines {
-  margin: 0 0 0 30px;
-}
-
-/* A line and the lists under it are one item of its list. */
-.dg-item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-}
-
-.dg-line {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 24px;
-}
-
-/*
- * A line's number. Pointing at a line that can be taken away turns its number
- * into the cross that removes it, as a step's number turns into its grip.
- */
-.dg-mark {
-  appearance: none;
   flex: none;
+  flex-direction: column;
+  border-top: 1px solid var(--color-line);
+  padding: 5px;
+}
+
+.dg-act {
+  appearance: none;
   margin: 0;
   border: 0;
-  border-radius: var(--radius);
+  border-radius: 3px;
   background: none;
-  padding: 0 2px;
-  min-width: 20px;
-  color: var(--color-muted);
-  font: 11px/24px var(--font-mono);
+  padding: 0 5px;
+  color: var(--color-ink);
+  font: 12px/22px var(--font-sans);
   text-align: left;
-}
-
-.dg-mark::before {
-  content: attr(data-number);
-}
-
-button.dg-mark {
   cursor: pointer;
 }
 
-.dg-line:hover > button.dg-mark::before,
-button.dg-mark:focus-visible::before {
-  content: '×';
-  display: inline-block;
-  min-width: 16px;
-  color: var(--color-side-ink);
-  font-size: 13px;
-  text-align: center;
+.dg-act:hover {
+  background-color: color-mix(in srgb, var(--color-ink) 9%, var(--color-raised));
 }
 
-button.dg-mark:is(:hover, :focus-visible) {
-  outline: 0;
-  background-color: var(--color-remove);
+.dg-act:focus-visible {
+  outline: 1px solid var(--color-accent);
 }
 
-button.dg-mark:is(:hover, :focus-visible)::before {
-  color: #fff;
-}
+/* ------------------------------------------------------------------ */
+/* What stands at the end of a row                                     */
+/* ------------------------------------------------------------------ */
 
-/* A line that waits to add the next one has no number. */
-.dg-line.dg-waits > .dg-mark {
-  visibility: hidden;
-}
-
-/* A word in a line that is not a block: then, otherwise. */
-.dg-label {
-  flex: none;
-  color: var(--color-muted);
-  font: 12.5px/24px var(--font-mono);
-}
-
-/* What stands at the end of a row: the dtype it returns, or what it adds. */
+/* The dtype a step returns, or what it adds. */
 .dg-dtype {
-  color: var(--color-dtype);
-  font: 12.5px/20px var(--font-mono);
+  color: color-mix(in srgb, var(--color-dtype) 70%, var(--ground));
+  font: 12px/24px var(--font-mono);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .dg-block,
-  .dg-body,
-  .dg-side,
-  .dg-type,
-  .dg-piece::before,
-  .dg-piece::after {
-    transition: none;
-  }
+/* A word that shows something more when it is pressed, and changes nothing. */
+.dg-peek {
+  appearance: none;
+  margin: 0;
+  border: 0;
+  border-radius: 2px;
+  background: none;
+  padding: 2px 7px;
+  color: inherit;
+  font: inherit;
+  line-height: 20px;
+  cursor: pointer;
 }
 
-/* A block that only shows something, such as the == of a join: it is not pressed. */
-.dg-block.dg-fixed {
-  cursor: default;
+.dg-peek:hover {
+  background-color: var(--hover);
 }
 
-/*
- * Cases: a condition, then a value, in columns, so that the values line up.
- * A list under one of the cases runs the full width, clear of the columns.
- */
-.dg-cases {
-  display: grid;
-  grid-template-columns: repeat(4, max-content);
-  justify-content: start;
-  justify-items: start;
-  align-items: center;
-  gap: 4px 8px;
+.dg-peek[aria-expanded='true'] {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-ink) 55%, transparent);
 }
 
-.dg-cases > .dg-item,
-.dg-cases > .dg-item > .dg-line {
-  display: grid;
-  grid-template-columns: subgrid;
-  grid-column: 1 / -1;
-  justify-items: start;
-  align-items: center;
-}
-
-.dg-cases > .dg-item {
-  row-gap: 4px;
-}
-
-.dg-cases > .dg-item > .dg-lines {
-  grid-column: 1 / -1;
-}
-
-/* One cell of a line laid out in columns: a comparison and the word that waits after it. */
-.dg-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.dg-peek:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 1px;
 }

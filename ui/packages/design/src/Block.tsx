@@ -1,8 +1,10 @@
 /**
- * @file The block: a button in the colour of what it names. Everything that
- * can be pressed in a row of "code" is one, so a column, a method, a value
- * and a comparison are told apart by colour and not by shape. The small
- * things that stand between blocks are here too: a word, a caret and an
+ * @file The word: a button written as nothing but its letters, in the colour
+ * of what it names. Everything that can be changed in a line of "code" is
+ * one, so a column, a method, a value and a comparison are told apart by
+ * colour, as in a code editor, and not by a box. A word that is pointed at
+ * takes a faint flat fill and nothing else. The quiet things that stand
+ * between words are here too: a word that names a parameter, a caret and an
  * equals sign.
  */
 
@@ -18,8 +20,7 @@ export type Tone =
   | 'table'
   | 'ink'
   | 'verb'
-  | 'add'
-  | 'remove';
+  | 'add';
 
 /**
  * How a block is written: plainly, as a verb, as a comparison, as text
@@ -45,7 +46,7 @@ export interface BlockProps {
   readonly onPress: (button: HTMLButtonElement) => void;
 }
 
-/** Shows `label` as a block that can be pressed. */
+/** Shows `label` as a word that can be pressed. */
 export function Block({
   label,
   tone,
@@ -75,31 +76,24 @@ export function Block({
   );
 }
 
-/** What a word shows. */
-export interface WordProps {
-  /** Whether the word follows a value, so that it starts a block of its own. */
-  readonly apart: boolean;
-  readonly children: string;
-}
-
 /**
- * A word inside a piece that names the parameter after it, as `by` does
- * after Sort table. It is not pressed: it carries on the block before it.
+ * A quiet word that names the parameter after it, as `by` does after Sort
+ * table. It is not pressed.
  */
-export function Word({ apart, children }: WordProps): React.JSX.Element {
-  return <span className={cx('dg-word', apart && 'dg-apart')}>{children}</span>;
+export function Word({ children }: { readonly children: string }): React.JSX.Element {
+  return <i className="dg-quiet">{children}</i>;
 }
 
-/** The caret between one block of a chain and the next. A faint one leads a word that waits. */
-export function Seam({ waits }: { readonly waits: boolean }): React.JSX.Element {
-  return <span aria-hidden="true" className={cx('dg-seam', waits && 'dg-waits')} />;
-}
-
-/** The equals sign between the name a step makes and the chain that makes it. */
-export function Equals(): React.JSX.Element {
+/** The caret between one part of a chain and the next. */
+export function Seam(): React.JSX.Element {
   return (
-    <span className="dg-equals">
-      <span className="sr-only">is</span>
-    </span>
+    <i aria-hidden="true" className="dg-quiet">
+      ›
+    </i>
   );
+}
+
+/** The equals sign between the name a step makes and what it holds. */
+export function Equals(): React.JSX.Element {
+  return <i className="dg-quiet">=</i>;
 }

@@ -19,27 +19,19 @@
   --color-danger: #e5566e;
   --color-accent: #f08a3c;
   --color-hover: #343945;
-  --color-column: #1e3a5c;
   --color-column-ink: #9cc8ff;
   --color-operator: #f3b27a;
-  --color-table: #3a2f63;
   --color-table-ink: #cbbcff;
-  --color-input: #1d4640;
   --color-input-ink: #8fe3d0;
-  --color-chain: #252931;
   --color-invalid: #43262c;
   --color-fresh: #2f2a22;
-  /* What a block names: a function or method, a plain value, a comparison, a dtype. */
-  --color-function: #d7dbe2;
+  /* What a word names: a plain value, a comparison, a dtype. */
   --color-value: #f3c98b;
   --color-compare: #ff9d5c;
   --color-dtype: #7fd6a4;
   /* Something that cannot be worked out. */
   --color-wrong: #ff7385;
-  /* The panels at the sides of a block, and what they turn to: take away, and add. */
-  --color-side: #3a3f49;
-  --color-side-ink: #c3c8d1;
-  --color-remove: #f0203c;
+  /* Something that is as it should be, such as a pivot that stays lazy. */
   --color-add: #0cae4f;
   /* The colour each kind of step is written in. */
   --color-verb-add: #f08a3c;

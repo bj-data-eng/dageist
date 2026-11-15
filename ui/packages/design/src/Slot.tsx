@@ -1,16 +1,20 @@
 /**
  * @file The slot: a place that takes a value. At rest it shows what it holds
- * as a block, or several things as several blocks. A click opens the list it
- * is filled from. A slot that holds several folds them to the room it has on
- * its line and counts the rest, so a long list never wraps.
+ * as a word, or several things as several words. A click opens the list it
+ * is filled from. A slot whose word names the piece it stands in also offers,
+ * at the foot of that list, what can be done to the piece. A slot that holds
+ * several folds them to the room on its line and counts the rest, so a long
+ * list is cut short before it would wrap.
  */
 
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useLayoutEffect, useState } from 'react';
 
 import type { Look, Tone } from './Block';
 import { Block } from './Block';
-import type { OfferGroup } from './OfferList';
+import { HintContext } from './Hint';
+import type { ListAction, OfferGroup } from './OfferList';
 import { OfferList } from './OfferList';
+import { PieceContext } from './Piece';
 import { Popover } from './Popover';
 
 /** What every slot needs to open its list. */
@@ -36,11 +40,16 @@ export interface SlotProps extends Listing {
   readonly look: Look;
   /** Whether the slot is a faint word that waits where the next thing goes. */
   readonly waits?: boolean;
-  /** Receives the slot's block, for a caller that drags by it. */
+  /**
+   * Whether the slot's word names the piece it stands in, as a method's name
+   * does. Its list then ends with what can be done to that piece.
+   */
+  readonly names?: boolean;
+  /** Receives the slot's word, for a caller that drags by it or places a list against it. */
   readonly buttonRef?: (element: HTMLButtonElement | null) => void;
 }
 
-/** Shows what the slot holds as a block that opens the list it is filled from. */
+/** Shows what the slot holds as a word that opens the list it is filled from. */
 export function Slot({
   label,
   tone,
@@ -51,11 +60,14 @@ export function Slot({
   wide = false,
   wrong = false,
   waits = false,
+  names = false,
   openNow = false,
   buttonRef,
 }: SlotProps): React.JSX.Element {
   const [open, setOpen] = useState(openNow);
   const [button, setButton] = useState<HTMLButtonElement | null>(null);
+  const note = useContext(HintContext);
+  const piece = useContext(PieceContext);
   const keepButton = useCallback(
     (element: HTMLButtonElement | null) => {
       setButton(element);
@@ -66,6 +78,18 @@ export function Slot({
   const close = useCallback(() => {
     setOpen(false);
   }, []);
+  const actions: ListAction[] = [];
+  if (names && button !== null) {
+    for (const action of [piece.add, piece.remove]) {
+      if (action === null) continue;
+      actions.push({
+        label: action.label,
+        onPress: () => {
+          action.onPress(button);
+        },
+      });
+    }
+  }
   return (
     <>
       <Block
@@ -84,6 +108,9 @@ export function Slot({
       {open && button !== null && (
         <Popover anchor={button} onDismiss={close}>
           <OfferList
+            about={note.lines}
+            aboutCode={note.code}
+            actions={actions}
             placeholder={placeholder}
             groups={offers}
             keepOpen={false}
@@ -96,7 +123,7 @@ export function Slot({
   );
 }
 
-/** One of the several things a slot holds: a block, or a pair of blocks that touch. */
+/** One of the several things a slot holds: a word, or two words that belong together. */
 export interface Entry {
   /** Tells the entry from the others in its slot. */
   readonly id: string;
@@ -114,45 +141,45 @@ export interface ManySlotProps extends Listing {
   readonly entries: readonly Entry[];
   /** What the slot says while it holds nothing. */
   readonly empty: string;
+  /** What stands between the two words of an entry, such as an arrow. A space when not given. */
+  readonly between?: string;
 }
 
-/** The room a count takes at the end of a folded slot, and the room a bracket takes after it. */
-const COUNT_ROOM = 44;
-const BRACKET_ROOM = 10;
+/** The room a count takes at the end of a folded slot. */
+const COUNT_ROOM = 40;
 
 /**
- * Returns the room the entries of `slot` have: from where the slot starts to
- * the end of the row it is in, less what stands at the row's end, the bracket
- * that closes its piece, and whatever follows the slot inside the piece.
+ * Returns the room the entries of `slot` have on their line: from where the
+ * slot starts to the end of the line of code it is in, less whatever follows
+ * the slot on that line. What follows on lines of its own, such as a step's
+ * problem, takes no room on this one.
  */
 function roomFor(slot: HTMLElement): number {
   const flow = slot.closest('[data-dg-flow]');
   if (flow === null) return Number.POSITIVE_INFINITY;
-  const end = flow.querySelector('[data-dg-flow-end]');
-  const kept = end === null ? 0 : end.getBoundingClientRect().width + 14;
   let after = 0;
   for (let next = slot.nextElementSibling; next !== null; next = next.nextElementSibling) {
+    if (getComputedStyle(next).display === 'block') continue;
     after += next.getBoundingClientRect().width;
   }
-  const limit = flow.getBoundingClientRect().right - kept - BRACKET_ROOM - after;
-  return limit - slot.getBoundingClientRect().left;
+  return flow.getBoundingClientRect().right - after - slot.getBoundingClientRect().left;
 }
 
 /**
- * Folds `slot` to the room it has: shows as many of its entries as fit, and
- * a count of the rest. The entries are measured, not counted, so long names
- * fold sooner than short ones.
+ * Folds `slot` to the room it has: shows as many of its entries as fit on
+ * the line, and a count of the rest, so a long list is cut short before it
+ * would wrap. The entries are measured, not counted, so long names fold
+ * sooner than short ones.
  */
 function fold(slot: HTMLElement): void {
   const entries = [...slot.querySelectorAll('[data-dg-entry]')];
   const count = slot.querySelector('[data-dg-count]');
   if (count === null) return;
   for (const entry of entries) entry.classList.remove('dg-extra');
-  // A hair stands between two entries.
-  const widths = entries.map((entry) => entry.getBoundingClientRect().width + 1);
+  const widths = entries.map((entry) => entry.getBoundingClientRect().width);
   const needed = widths.reduce((sum, width) => sum + width, 0);
-  // With every entry out of the way the piece sits where it will once it is folded, which is
-  // where its room has to be measured from.
+  // With every entry out of the way the slot stands where its line starts, which is where its
+  // room has to be measured from.
   for (const entry of entries) entry.classList.add('dg-extra');
   count.classList.remove('dg-extra');
   const room = roomFor(slot);
@@ -177,10 +204,15 @@ function fold(slot: HTMLElement): void {
   count.textContent = `+${String(entries.length - shown)}`;
 }
 
-/** Shows what the slot holds as blocks, folded to the room there is, that open its list. */
+/**
+ * Shows what the slot holds as words with commas between them, as a list is
+ * written, folded to the room on its line with a count of the rest. Any of
+ * them opens the list, which takes several and stays open.
+ */
 export function ManySlot({
   entries,
   empty,
+  between = ' ',
   describedAs,
   placeholder,
   offers,
@@ -197,7 +229,7 @@ export function ManySlot({
     setOpen(!open);
   };
 
-  // What is drawn is folded after every drawing, and again whenever the row changes size.
+  // What is drawn is folded after every drawing, and again whenever the line changes size.
   useLayoutEffect(() => {
     if (slot !== null) fold(slot);
   });
@@ -216,21 +248,24 @@ export function ManySlot({
   return (
     <>
       <span ref={setSlot} className="dg-many">
-        {entries.map((entry) => (
-          <span key={entry.id} data-dg-entry className="dg-pair">
+        {entries.map((entry, at) => (
+          <span key={entry.id} data-dg-entry className="dg-entry">
             {entry.blocks.map((block, part) => (
-              <Block
-                // A pair's blocks keep their places.
-                key={part}
-                label={block.label}
-                tone={block.tone}
-                look={block.look}
-                describedAs={`${describedAs}: ${block.label}`}
-                wrong={wrong || entry.wrong}
-                expanded={open}
-                onPress={toggle}
-              />
+              // The words of an entry keep their places.
+              <span key={part}>
+                {part > 0 && <i className="dg-quiet">{between}</i>}
+                <Block
+                  label={block.label}
+                  tone={block.tone}
+                  look={block.look}
+                  describedAs={`${describedAs}: ${block.label}`}
+                  wrong={wrong || entry.wrong}
+                  expanded={open}
+                  onPress={toggle}
+                />
+              </span>
             ))}
+            {at < entries.length - 1 && <i className="dg-quiet">,</i>}
           </span>
         ))}
         {entries.length === 0 && (

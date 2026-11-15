@@ -9,12 +9,54 @@
  * @property {string} id A short name that tells it from the other versions.
  * @property {string} name What its card is headed.
  * @property {string} note One line on what sets it apart.
- * @property {'add' | 'fmt-lists' | 'cond' | 'cond-chain' | 'nest' | 'fold' | 'pick' | 'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind
+ * @property {'calm' | 'tray' | 'add' | 'fmt-lists' | 'cond' | 'cond-chain' | 'nest' | 'fold' | 'pick' | 'type' | 'list-settled' | 'head' | 'button' | 'function' | 'seam'} kind
  *   What its card shows.
+ * @property {string[]} [open] The trays a tray card starts with open: chain, list or lines.
  */
 
 /** @type {Version[]} */
 const VERSIONS = [
+  {
+    id: 'calm-text',
+    name: 'Steps as text',
+    note: 'No boxes, brackets, rails or numbers on lines: a step is written out, and colour is only in the letters. Pointing at something changes nothing. Click a word to mark it and open its list, which also holds what the brackets used to do: add after it, and remove it. A step that takes several things sets them in on lines of their own. Click anywhere else to put the list away.',
+    kind: 'calm',
+  },
+  {
+    id: 'tray-drawer',
+    name: 'Drawer under the row',
+    note: 'The tray is a sunken band across the row, with a notch under the block that owns it. What is below moves down. A list a block opens is not a tray: it floats over the page from its block, as it does now. Click the dots of step 7 or 9, or the field resolved_at, to shut and open them.',
+    kind: 'tray',
+    open: ['chain', 'list'],
+  },
+  {
+    id: 'tray-hang',
+    name: 'Hanging from its block',
+    note: 'The tray hangs from the block that owns it and lies over what is below, so no row changes height. A chain is a tray like a list is, and a list opened from the chain hangs from its own block in turn.',
+    kind: 'tray',
+    open: ['chain', 'list'],
+  },
+  {
+    id: 'tray-hang-lines',
+    name: 'Hanging, with a list in it',
+    note: "The same tray holding a condition's lines: the group that heads them, its lines one level in, and a group inside the group. It lies over the steps below for as long as it is open.",
+    kind: 'tray',
+    open: ['lines'],
+  },
+  {
+    id: 'tray-drawer-wrap',
+    name: 'Drawer, a line that wraps',
+    note: 'The same drawer with a chain too long for its row. The chain breaks before a caret, and the line that carries on starts with the caret, set in under the first block.',
+    kind: 'tray',
+    open: ['chain'],
+  },
+  {
+    id: 'tray-drawer-nest',
+    name: 'Drawer, a chain inside a chain',
+    note: 'What sub works with is a chain of its own, so it is dots, and that chain is a line under its line, one level in. The inner chain here holds another, a level further in again.',
+    kind: 'tray',
+    open: ['chain'],
+  },
   {
     id: 'add-wait',
     name: 'Adding',
@@ -108,6 +150,8 @@ const FIELDS = new Map([
 
 /** The template each kind of card is stamped from. */
 const CARDS = {
+  calm: '#card-calm',
+  tray: '#card-tray',
   add: '#card-add',
   'fmt-lists': '#card-fmt-lists',
   cond: '#card-cond',
@@ -314,6 +358,15 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
     fill(card, '.letter', String.fromCodePoint(65 + index));
     fill(card, '.name', version.name);
     fill(card, '.note', version.note);
+    // A card that several versions share is told apart by the version it shows.
+    card.dataset.version = version.id;
+    for (const owner of card.querySelectorAll('[data-tray-for]')) {
+      const name = owner.getAttribute('data-tray-for') ?? '';
+      const open = version.open?.includes(name) === true;
+      owner.setAttribute('aria-expanded', String(open));
+      const tray = card.querySelector(`.t-tray-${name}`);
+      if (tray instanceof HTMLElement) tray.hidden = !open;
+    }
     card.querySelector(version.kind === 'button' ? '.row-function' : '.row-button')?.remove();
     // The buttons written out in a row answer a click as the stamped pieces do.
     for (const part of card.querySelectorAll(':is(.row, .lines) .body > .btn')) {
@@ -337,13 +390,18 @@ if (pieceTemplate instanceof HTMLTemplateElement) {
       card.append(waitingStep());
     }
     lowerNests(card);
-    const section = version.kind.startsWith('add')
-      ? '#versions-add'
-      : version.kind.startsWith('fmt')
-        ? '#versions-format'
-        : version.kind.startsWith('cond')
-          ? '#versions-cond'
-          : '#versions-settled';
+    const section =
+      version.kind === 'calm'
+        ? '#versions-calm'
+        : version.kind === 'tray'
+          ? '#versions-tray'
+          : version.kind.startsWith('add')
+            ? '#versions-add'
+            : version.kind.startsWith('fmt')
+              ? '#versions-format'
+              : version.kind.startsWith('cond')
+                ? '#versions-cond'
+                : '#versions-settled';
     document.querySelector(section)?.append(card);
   }
 }
@@ -1909,4 +1967,396 @@ document.addEventListener('keydown', (event) => {
   // Enter ends the typing, as leaving the block does. An open slot has its own answer to Enter.
   const typing = event.target instanceof HTMLInputElement ? event.target : null;
   if (event.key === 'Enter' && typing !== null && typing.closest('.slot') === null) typing.blur();
+});
+
+/*
+ * Trays. A block that owns a tray shows and hides it on a click. Where a tray
+ * hangs from its block, or points at it with a notch, it has to know where
+ * the block is: `--at` is the block's left edge and `--notch` its middle,
+ * each measured from the tray's own frame.
+ */
+
+/**
+ * Tells every tray of `card` where the block that owns it stands.
+ * @param {Element} card
+ */
+function placeTrays(card) {
+  for (const owner of card.querySelectorAll('[data-tray-for]')) {
+    const tray = card.querySelector(`.t-tray-${owner.getAttribute('data-tray-for') ?? ''}`);
+    const frame = tray?.parentElement;
+    if (!(tray instanceof HTMLElement) || !(frame instanceof HTMLElement)) continue;
+    const block = owner.getBoundingClientRect();
+    tray.style.setProperty('--at', `${block.left - frame.getBoundingClientRect().left}px`);
+    // The tray may have moved to its block, so its own edge is read after that.
+    const edge = tray.getBoundingClientRect().left;
+    tray.style.setProperty('--notch', `${block.left + block.width / 2 - edge}px`);
+  }
+}
+
+function placeAllTrays() {
+  for (const card of document.querySelectorAll('.t-card')) placeTrays(card);
+}
+
+placeAllTrays();
+window.addEventListener('resize', placeAllTrays);
+// The blocks take their final widths once the fonts are in.
+void document.fonts.ready.then(placeAllTrays);
+
+document.addEventListener('click', (event) => {
+  const owner = event.target instanceof Element ? event.target.closest('[data-tray-for]') : null;
+  const card = owner?.closest('.t-card');
+  if (owner === null || owner === undefined || card === null || card === undefined) return;
+  const tray = card.querySelector(`.t-tray-${owner.getAttribute('data-tray-for') ?? ''}`);
+  if (!(tray instanceof HTMLElement)) return;
+  const open = owner.getAttribute('aria-expanded') !== 'true';
+  owner.setAttribute('aria-expanded', String(open));
+  tray.hidden = !open;
+  placeTrays(card);
+});
+
+/*
+ * The calm card. A click on a word marks it and puts its list under it; a
+ * click anywhere else in the card puts the list away. Nothing answers to
+ * pointing alone. The list offers what the word can be changed to and, for a
+ * word that names a thing, ends with adding after that thing and taking it
+ * away.
+ */
+
+/** What each kind of word can be changed to: a name, and a word on what it is. */
+const CALM_OFFERS = {
+  field: [
+    ['dcn', 'String'],
+    ['timestamp', 'Datetime'],
+    ['owner', 'String'],
+    ['row_days', 'Int64'],
+    ['resolved_at', 'Datetime'],
+  ],
+  method: [
+    ['sub', 'minus a field'],
+    ['shift', 'value n rows earlier'],
+    ['cum_sum', 'running total'],
+    ['over', 'within each group'],
+    ['dt.date', 'the date part'],
+  ],
+  step: [
+    ['Add column', 'a new column'],
+    ['Filter table', 'rows where a condition holds'],
+    ['Sort table', 'rows in the order of fields'],
+    ['Join table', 'columns from another table'],
+  ],
+  compare: [
+    ['==', 'equal to'],
+    ['!=', 'not equal to'],
+    ['>', 'greater than'],
+    ['<', 'less than'],
+  ],
+  group: [
+    ['all of', 'every line must hold'],
+    ['any of', 'one line is enough'],
+  ],
+  function: [
+    ['when', 'one value or another'],
+    ['coalesce', 'the first value there is'],
+  ],
+  value: [
+    ['0', 'a number'],
+    ['"Company A"', 'in owner'],
+    ['None', 'no value'],
+  ],
+};
+
+/** The colour class a word of each kind is written in. */
+const CALM_CLASS = {
+  field: 'c-col',
+  method: 'c-fn',
+  step: 'c-verb',
+  compare: 'c-op',
+  group: 'c-fn',
+  function: 'c-fn',
+  value: 'c-val',
+};
+
+/**
+ * Returns which kind of word `word` is, by how it is written.
+ * @param {Element} word
+ * @returns {keyof typeof CALM_OFFERS | 'name'}
+ */
+function calmKind(word) {
+  const acts = word.getAttribute('data-acts');
+  if (acts === 'step' || word.classList.contains('c-add')) return 'step';
+  if (acts === 'method') return 'method';
+  if (acts === 'list' || acts === 'group') return 'group';
+  if (acts === 'function') return 'function';
+  if (word.classList.contains('c-op')) return 'compare';
+  if (word.classList.contains('c-col')) return 'field';
+  if (word.classList.contains('c-name')) return 'name';
+  return word.getAttribute('data-kind') === 'field' ? 'field' : 'value';
+}
+
+/**
+ * Makes a word that can be changed.
+ * @param {string} text
+ * @param {string} classes
+ * @param {string} [acts] The thing the word names, when it names one.
+ * @returns {HTMLButtonElement}
+ */
+function calmWord(text, classes, acts) {
+  const word = document.createElement('button');
+  word.type = 'button';
+  word.className = `c-tok ${classes}`;
+  word.textContent = text;
+  if (acts !== undefined) word.dataset.acts = acts;
+  return word;
+}
+
+/**
+ * Makes an element of `tag` and `classes` that holds `parts`.
+ * @param {string} tag
+ * @param {string} classes
+ * @param {Array<Node | string>} parts
+ * @returns {HTMLElement}
+ */
+function calmBox(tag, classes, parts) {
+  const box = document.createElement(tag);
+  box.className = classes;
+  for (const [index, part] of parts.entries()) {
+    if (index > 0) box.append(' ');
+    box.append(part);
+  }
+  return box;
+}
+
+/**
+ * Makes a quiet word, such as the caret or the equals sign.
+ * @param {string} text
+ * @returns {HTMLElement}
+ */
+function calmQuiet(text) {
+  const quiet = document.createElement('i');
+  quiet.textContent = text;
+  return quiet;
+}
+
+/**
+ * Makes a word that is still to be picked.
+ * @param {string} text
+ * @param {string} kind What its list offers: a field, a value, a method or a step.
+ * @param {string} [acts] The thing the word names, when it names one.
+ * @returns {HTMLButtonElement}
+ */
+function calmMissing(text, kind, acts) {
+  const word = calmWord(text, 'c-missing', acts);
+  word.dataset.kind = kind;
+  return word;
+}
+
+/**
+ * Makes a line of a condition with nothing picked in it.
+ * @param {boolean} deep Whether the line belongs to a group inside the condition.
+ * @returns {HTMLElement}
+ */
+function calmLine(deep) {
+  return calmBox('span', deep ? 'c-in c-deep' : 'c-in', [
+    calmMissing('field', 'field'),
+    calmWord('==', 'c-op', 'line'),
+    calmMissing('value', 'value'),
+  ]);
+}
+
+/**
+ * Writes the steps' numbers again, after one was added or taken away.
+ * @param {Element} card
+ */
+function calmRenumber(card) {
+  let number = 0;
+  for (const row of card.querySelectorAll('.c-row:not(.c-more)')) {
+    number += 1;
+    const mark = row.querySelector('.c-num');
+    if (mark !== null) mark.textContent = String(number);
+  }
+}
+
+/**
+ * Marks `word` in `card`, and no other, and chooses its step.
+ * @param {Element} card
+ * @param {Element | null} word
+ */
+function calmMark(card, word) {
+  for (const marked of card.querySelectorAll('.c-tok.is-picked')) {
+    marked.classList.remove('is-picked');
+  }
+  word?.classList.add('is-picked');
+  const row = word?.closest('.c-row');
+  if (row !== null && row !== undefined && !row.classList.contains('c-more')) {
+    for (const chosen of card.querySelectorAll('.c-row.is-chosen')) {
+      chosen.classList.remove('is-chosen');
+    }
+    row.classList.add('is-chosen');
+  }
+  placeCalmList(card);
+}
+
+/**
+ * Adds after the thing `word` names, and marks what was added so it can be picked.
+ * @param {Element} card
+ * @param {Element} word
+ */
+function calmAddAfter(card, word) {
+  const acts = word.getAttribute('data-acts');
+  let added = null;
+  if (acts === 'method') {
+    added = calmMissing('method', 'method', 'method');
+    word.closest('.c-part')?.after(' ', calmBox('span', 'c-part', [calmQuiet('›'), added]));
+  } else if (acts === 'line') {
+    const line = word.closest('.c-in');
+    const made = calmLine(line?.classList.contains('c-deep') === true);
+    line?.after(made);
+    added = made.querySelector('.c-tok');
+  } else if (acts === 'list' || acts === 'group') {
+    // A line is added to the list the word heads: first in it, set in as its lines are.
+    const made = calmLine(acts === 'group');
+    (acts === 'group' ? word.closest('.c-in') : word)?.after(made);
+    added = made.querySelector('.c-tok');
+  } else if (acts === 'step' || word.classList.contains('c-add')) {
+    added = calmMissing('step', 'step', 'step');
+    const row = calmBox('div', 'c-row', [
+      calmBox('span', 'c-num', []),
+      calmBox('span', 'c-code', [added]),
+    ]);
+    const after = word.closest('.c-row');
+    if (after?.classList.contains('c-more') === true) after.before(row);
+    else after?.after(row);
+    calmRenumber(card);
+  }
+  calmMark(card, added);
+}
+
+/**
+ * Takes away the thing `word` names.
+ * @param {Element} card
+ * @param {Element} word
+ */
+function calmRemove(card, word) {
+  const acts = word.getAttribute('data-acts');
+  if (acts === 'method') {
+    word.closest('.c-part')?.remove();
+  } else if (acts === 'line') {
+    word.closest('.c-in')?.remove();
+  } else if (acts === 'group') {
+    word.closest('.c-group')?.remove();
+  } else if (acts === 'function') {
+    // What the function gave is still to be picked.
+    word.closest('.c-group')?.replaceWith(calmBox('span', 'c-in', [calmMissing('value', 'value')]));
+  } else if (acts === 'step') {
+    word.closest('.c-row')?.remove();
+    calmRenumber(card);
+  }
+  calmMark(card, null);
+}
+
+/**
+ * Makes one row of the list: a name, and a word on what it is.
+ * @param {string} name
+ * @param {string} note
+ * @param {boolean} now Whether it is what the word says now.
+ */
+function calmOffer(name, note, now) {
+  const row = calmBox('span', now ? 'c-pick is-now' : 'c-pick', []);
+  row.dataset.offer = name;
+  const shown = document.createElement('b');
+  shown.textContent = name;
+  row.append(shown, calmQuiet(note));
+  return row;
+}
+
+/**
+ * Makes one row at the foot of the list: something done to the thing the word names.
+ * @param {'add' | 'remove'} does
+ * @param {string} says
+ * @param {string} what
+ */
+function calmAct(does, says, what) {
+  const row = calmBox('span', 'c-pick c-act', [says]);
+  row.dataset.does = does;
+  const named = document.createElement('b');
+  named.textContent = what;
+  row.append(' ', named);
+  return row;
+}
+
+/**
+ * Fills the list of `card` for the word that is marked and puts it under that
+ * word, or hides it when no word is marked.
+ * @param {Element} card
+ */
+function placeCalmList(card) {
+  const list = card.querySelector('.c-pop');
+  const stage = card.querySelector('.c-stage');
+  const word = card.querySelector('.c-tok.is-picked');
+  if (!(list instanceof HTMLElement) || !(stage instanceof HTMLElement)) return;
+  list.hidden = word === null;
+  if (word === null) return;
+
+  const kind = calmKind(word);
+  const said = word.textContent ?? '';
+  const acts = word.getAttribute('data-acts');
+  const offers = kind === 'name' ? [] : CALM_OFFERS[kind];
+  list.replaceChildren(
+    calmBox('div', 'c-find', [kind === 'name' ? 'Type a name' : 'Search']),
+    ...offers.map(([name, note]) => calmOffer(name, note, name === said)),
+  );
+  const foot = [];
+  if (acts === 'method') foot.push(calmAct('add', 'Add a method after', said));
+  if (acts === 'line') foot.push(calmAct('add', 'Add a line after', 'this one'));
+  if (acts === 'list' || acts === 'group') foot.push(calmAct('add', 'Add a line to', said));
+  if (acts === 'step') foot.push(calmAct('add', 'Add a step after', said));
+  if (acts === 'line') foot.push(calmAct('remove', 'Remove', 'this line'));
+  else if (acts === 'group') foot.push(calmAct('remove', 'Remove', 'this group'));
+  else if (acts !== null && acts !== 'list') foot.push(calmAct('remove', 'Remove', said));
+  if (foot.length > 0) list.append(document.createElement('hr'), ...foot);
+
+  const frame = stage.getBoundingClientRect();
+  const box = word.getBoundingClientRect();
+  list.style.left = `${box.left - frame.left}px`;
+  list.style.top = `${box.bottom - frame.top + 4}px`;
+}
+
+function placeCalmLists() {
+  for (const card of document.querySelectorAll('.c-card')) placeCalmList(card);
+}
+
+placeCalmLists();
+window.addEventListener('resize', placeCalmLists);
+void document.fonts.ready.then(placeCalmLists);
+
+document.addEventListener('click', (event) => {
+  if (!(event.target instanceof Element)) return;
+  const card = event.target.closest('.c-card');
+  if (card === null) return;
+  const marked = card.querySelector('.c-tok.is-picked');
+  const row = event.target.closest('.c-pop .c-pick');
+  if (row instanceof HTMLElement && marked !== null) {
+    if (row.dataset.does === 'add') {
+      calmAddAfter(card, marked);
+    } else if (row.dataset.does === 'remove') {
+      calmRemove(card, marked);
+    } else if (row.dataset.offer !== undefined) {
+      // What is picked is written in the word's place, in the colour of its kind.
+      const kind = calmKind(marked);
+      marked.textContent = row.dataset.offer;
+      if (marked.classList.contains('c-missing') && kind !== 'name') {
+        marked.classList.replace('c-missing', CALM_CLASS[kind]);
+      }
+      calmMark(card, null);
+    }
+    return;
+  }
+  if (event.target.closest('.c-pop') !== null) return;
+  const word = event.target.closest('.c-tok');
+  if (word?.classList.contains('c-add') === true) {
+    // The quiet word after the last step adds a step there.
+    calmAddAfter(card, word);
+    return;
+  }
+  calmMark(card, word);
 });

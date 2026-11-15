@@ -18,6 +18,11 @@ import type { Frame } from './model/frame';
 import { SOURCE_FRAME } from './model/frame';
 import type { Step, StepResult, Verb } from './model/steps';
 import { defaultStep } from './model/steps';
+import type { Origins } from './origins';
+import { OriginsContext, originsBefore } from './origins';
+
+/** What a step with no results before it has: no field made by a step. */
+const NO_ORIGINS: Origins = new Map();
 
 /** What a step list shows and reports. */
 export interface StepListProps {
@@ -49,6 +54,8 @@ export function StepList({
   const dragSettings = useMemo(() => dragSettingsFor(styleNonce), [styleNonce]);
 
   const frameBefore = (index: number): Frame => results[index - 1]?.frame ?? SOURCE_FRAME;
+  // Where each step's fields come from, for the hints that say so.
+  const origins = originsBefore(results);
   const addStep = (verb: Verb, after: number): void => {
     const added = defaultStep(verb, results[after]?.frame ?? SOURCE_FRAME);
     onChange([...steps.slice(0, after + 1), added, ...steps.slice(after + 1)], added.id);
@@ -79,40 +86,41 @@ export function StepList({
                 const result = results[index];
                 if (result === undefined) return null;
                 return (
-                  <StepRow
-                    key={step.id}
-                    step={step}
-                    index={index}
-                    frame={frameBefore(index)}
-                    result={result}
-                    selected={step.id === selectedId}
-                    onSelect={() => {
-                      if (step.id !== selectedId) onChange(steps, step.id);
-                    }}
-                    onChange={(next) => {
-                      onChange(
-                        steps.map((existing) => (existing.id === next.id ? next : existing)),
-                        selectedId,
-                      );
-                    }}
-                    onRemove={() => {
-                      // The rows shown move to the step before, or the one after the first.
-                      const beside = (steps[index - 1] ?? steps[index + 1])?.id ?? null;
-                      onChange(
-                        steps.filter((existing) => existing.id !== step.id),
-                        step.id === selectedId ? beside : selectedId,
-                      );
-                    }}
-                    onInsertAfter={(verb) => {
-                      addStep(verb, index);
-                    }}
-                  />
+                  <OriginsContext.Provider key={step.id} value={origins[index] ?? NO_ORIGINS}>
+                    <StepRow
+                      step={step}
+                      index={index}
+                      frame={frameBefore(index)}
+                      result={result}
+                      selected={step.id === selectedId}
+                      onSelect={() => {
+                        if (step.id !== selectedId) onChange(steps, step.id);
+                      }}
+                      onChange={(next) => {
+                        onChange(
+                          steps.map((existing) => (existing.id === next.id ? next : existing)),
+                          selectedId,
+                        );
+                      }}
+                      onRemove={() => {
+                        // The rows shown move to the step before, or the one after the first.
+                        const beside = (steps[index - 1] ?? steps[index + 1])?.id ?? null;
+                        onChange(
+                          steps.filter((existing) => existing.id !== step.id),
+                          step.id === selectedId ? beside : selectedId,
+                        );
+                      }}
+                      onInsertAfter={(verb) => {
+                        addStep(verb, index);
+                      }}
+                    />
+                  </OriginsContext.Provider>
                 );
               })}
             </div>
           </DragDropProvider>
           {/* A faint step waits after the last one. */}
-          <div className="dg-ground mt-2 pl-[42px]">
+          <div className="dg-ground dg-code mt-1 pl-[44px] [text-indent:0]">
             <Slot
               label="step"
               tone="ink"
