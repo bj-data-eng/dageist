@@ -129,6 +129,75 @@ cargo fmt --all -- --check
 The command prints nothing and exits successfully when all Rust sources are
 formatted.
 
+## Check The Public API Audits
+
+The files under `api/` record the public API of the core, of each library
+crate under `crates/` and of the Polars crates the steps are built from, one
+line per public item. The generator in `api/generator/` writes them from
+rustdoc JSON. It needs the nightly toolchain named in its source,
+`nightly-2026-09-01`, which only these procedures use.
+
+To see what is audited, and to check every audit against the current source:
+
+```sh
+CARGO_NET_OFFLINE=true cargo run --offline --locked --manifest-path api/generator/Cargo.toml -- --list
+CARGO_NET_OFFLINE=true cargo run --offline --locked --manifest-path api/generator/Cargo.toml -- --check
+```
+
+The check prints `current` and the path of each audit and exits successfully.
+A stale or missing audit makes it fail with `stale API artifacts:` and the
+audits' names; it never writes. `--root`, `--polars` or `--crate <name>`
+limits either command to the core, the Polars audits or one audit.
+
+A Polars audit starts with the crate's version and, one per line, the features
+a build of `dageist-tauri` enables for it. Those are the features a release
+is built with, which can be more than
+[crates/dageist-engine/Cargo.toml](../crates/dageist-engine/Cargo.toml) names,
+because Polars' own crates turn features on for each other. The generator
+refuses to write a Polars audit when documenting the crate on its own would
+resolve other features than that build.
+
+Cargo's offline mode needs every crate in [Cargo.lock](../Cargo.lock) in the
+local cache, including crates for other platforms. If the check reports a
+crate it cannot download, fetch the locked crates once with
+`cargo fetch --locked`.
+
+### Refresh The Audits After A Change
+
+After a change to the public API of the core or a crate, or after a Polars
+upgrade or a change to the Polars features, refresh the affected audits from
+the changed source:
+
+```sh
+CARGO_NET_OFFLINE=true cargo run --offline --locked --manifest-path api/generator/Cargo.toml -- --crate dageist-engine
+CARGO_NET_OFFLINE=true cargo run --offline --locked --manifest-path api/generator/Cargo.toml -- --polars
+```
+
+Without a selector the command refreshes every audit. Read the diff and
+explain each change from its source change; a Polars upgrade shows every
+added, removed and changed item, and every feature that is turned on or off.
+Keep the source change and the refreshed audits in one review.
+
+### Check The API Tool
+
+The generator's tests use its own workspace:
+
+```sh
+cargo test --offline --locked --manifest-path api/generator/Cargo.toml
+cargo clippy --offline --locked --manifest-path api/generator/Cargo.toml --all-targets -- -F unsafe-code -D warnings
+cargo fmt --manifest-path api/generator/Cargo.toml -- --check
+```
+
+Two further tests run the pinned rustdoc on a small workspace of their own:
+one shows that a dependency is documented with the features its release
+package turns on and no others, and the other that the generator refuses a
+dependency whose features differ from that build. Run them when the
+generator's Cargo or rustdoc handling changes:
+
+```sh
+env -u CARGO_TARGET_DIR CARGO_NET_OFFLINE=true cargo test --offline --locked --manifest-path api/generator/Cargo.toml --lib -- --ignored
+```
+
 ## Regenerate The Application Icons
 
 `crates/dageist-tauri/icons/icon.svg` is the source of every raster icon. After

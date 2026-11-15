@@ -13,6 +13,19 @@ workspace member through `[workspace.lints.rust]`. The workspace uses
 | `dageist-engine` | [crates/dageist-engine/](../crates/dageist-engine/Cargo.toml) | Dataframe engine on Polars: sample data, working windows, stored results and Arrow output. Not published. |
 | `dageist-tauri` | [crates/dageist-tauri/](../crates/dageist-tauri/Cargo.toml) | Tauri 2 host; builds the `dageist` binary. Not published. |
 | `dageist-ui` | [ui/](../ui/package.json) | Private npm workspace for the React view; see [View Packages](#view-packages). |
+| `dageist-api-generator` | [api/generator/](../api/generator/Cargo.toml) | Writes and checks the [public API audits](#public-api-audits). A workspace of its own with its own lock file, outside the product workspace. Not published. |
+
+## Public API Audits
+
+Each audit lists one crate's public API, one line per item, as rustdoc JSON
+describes it. The [audit procedures](how-to.md#check-the-public-api-audits)
+check and refresh them.
+
+| Audit | Crate |
+| --- | --- |
+| [api/public-api.txt](../api/public-api.txt) | The core, `dageist`. |
+| [api/crates/](../api/crates/dageist-engine.txt) | Each `crates/dageist-*` crate that has a library. The host has only a binary and is not audited. |
+| [api/polars/](../api/polars/polars-plan.txt) | `polars`, `polars-lazy` and `polars-plan`, with the version and the features a build of `dageist-tauri` resolves for each. `polars-plan` holds expressions and their functions, `polars-lazy` the lazy frame, and `polars` the preludes that re-export them. |
 
 ## Core API
 

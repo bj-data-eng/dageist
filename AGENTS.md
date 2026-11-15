@@ -54,6 +54,7 @@ and current source establishes behavior.
 | Architecture and integration boundaries | [docs/explanation.md](docs/explanation.md) |
 | Documentation navigation and source locations | [README.md](README.md), [docs/reference.md](docs/reference.md) |
 | Licensing and dependency attribution | [LICENSE](LICENSE), [NOTICE.md](NOTICE.md) |
+| Public API audits, their targets and the pinned rustdoc toolchain | [api/generator/](api/generator/src/lib.rs) |
 
 When sources disagree, report exact paths and revisions. Do not guess, silently
 rewrite another authority, or widen the task to reconcile them.
@@ -110,6 +111,15 @@ Source remains authoritative; never hand-edit generated artifacts.
 | `ui/package-lock.json` | npm, from [ui/package.json](ui/package.json) |
 | `ui/dist/` (ignored) | `npm --prefix ui run build` |
 | `crates/dageist-tauri/gen/` (ignored) | `tauri-build`, during any build of `dageist-tauri` |
+| `api/public-api.txt`, `api/crates/*.txt`, `api/polars/*.txt` | [api/generator/](api/generator/src/lib.rs); [audit procedures](docs/how-to.md#check-the-public-api-audits) |
+| `api/generator/Cargo.lock` | Cargo, from [api/generator/Cargo.toml](api/generator/Cargo.toml) |
+
+API generation audits the root crate and each `crates/dageist-*` crate that has
+a library. It audits the Polars crates whose API the steps are built from, with
+the features a build of `dageist-tauri` resolves; a Polars upgrade or a change
+of those features is refreshed and reviewed with its source change. The
+generator is a separate workspace with its own lock file. API auditing is
+explicit maintenance, separate from normal product checks.
 
 ## Command Inventory
 
@@ -159,6 +169,14 @@ Host checks embed `ui/dist/`, so build the view first:
 ```sh
 cargo test --offline --locked -p dageist-tauri
 cargo clippy --offline --locked -p dageist-tauri --all-targets --no-deps -- -F unsafe-code -D warnings
+```
+
+API audit checks from the repository root. The audits need the nightly
+toolchain the generator pins; the tool's own tests and its two fixtures that
+run rustdoc are in the [audit procedures](docs/how-to.md#check-the-api-tool):
+
+```sh
+CARGO_NET_OFFLINE=true cargo run --offline --locked --manifest-path api/generator/Cargo.toml -- --check
 ```
 
 `cargo run --offline --locked -p dageist-tauri` opens the native application
