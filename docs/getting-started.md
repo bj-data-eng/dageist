@@ -13,8 +13,8 @@ shows the identity the Rust core reports.
   first time a Cargo command runs in the checkout.
 - A C compiler and `make`, which build the jemalloc allocator Polars uses on
   macOS and Linux.
-- Python 3.9 or newer as `python3`, for the API audits only; it needs no
-  packages.
+- Python 3.11 or newer as `python3`, for the API audits only, the oldest
+  Python that Python Polars supports; it needs no packages.
 - Node.js 20.19 or newer on the 20 line, or 22.12 or newer, with npm. The
   linter and formatter in [ui/package.json](../ui/package.json) set this floor.
 - The platform's Tauri 2 system dependencies: on macOS, the Xcode Command Line

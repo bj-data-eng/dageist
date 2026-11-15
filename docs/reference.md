@@ -42,7 +42,7 @@ check and refresh them.
 | [api/public-api.txt](../api/public-api.txt) | The core, `dageist`. |
 | [api/crates/](../api/crates/dageist-engine.txt) | Each `crates/dageist-*` crate that has a library. The host has only a binary and is not audited. |
 | [api/polars/](../api/polars/polars-plan.txt) | `polars`, `polars-lazy` and `polars-plan`, with the version, the `vendor/polars` commit they are built from and the features a build of `dageist-tauri` resolves for each. `polars-plan` holds expressions and their functions, `polars-lazy` the lazy frame, and `polars` the preludes that re-export them. |
-| [api/polars/python.txt](../api/polars/python.txt) | The Python API of the same release, each public method and function traced through the binding to the Rust items it reaches, with a count of how many keep the Rust name, use another, are written in Python, or are not resolved. |
+| [api/polars/python.txt](../api/polars/python.txt) | The Python API of the same release, each public method, property, operator and function traced through the binding to the Rust items it reaches, with a count of how many keep the Rust name, use another, are written in Python, or are not resolved. |
 
 ## Core API
 

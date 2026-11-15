@@ -157,9 +157,9 @@ refuses to write a Polars audit when documenting the crate on its own would
 resolve other features than that build.
 
 `api/polars/python.txt` traces the Python API of the same release. For each
-public method of `Expr` and its namespaces, `when`/`then`, `LazyFrame` and
-`LazyGroupBy`, and each function of `polars.functions` and `scan_*` function,
-one line gives:
+public method, property and operator of `Expr` and its namespaces,
+`when`/`then`, `LazyFrame` and `LazyGroupBy`, and each function of
+`polars.functions` and `scan_*` function, one line gives:
 
 - its parameters with their defaults;
 - the binding methods it calls;
@@ -167,14 +167,16 @@ one line gives:
 - how it is built: the same name in Rust, another name or several Rust items,
   in Python from other calls, or not resolved to a public Rust item.
 
-The header counts each kind. The eager `DataFrame` and `Series` are not
-covered. The generator reads the Python with Python's own parser, through
-`python3` 3.9 or newer and
+The header counts each kind and says what is not covered, such as the eager
+`DataFrame` and `Series`. The generator reads the Python with Python's own
+parser, through `python3` and
 [api/generator/python/inventory.py](../api/generator/python/inventory.py), so
-no Python package needs installing. It reads the binding in
+no Python package needs installing. The parser must read the syntax Polars is
+written in, so `python3` must be at least the oldest Python that Python
+Polars supports, 3.11 at this release. It reads the binding in
 `vendor/polars/crates/polars-python` with a Rust parser, and the Rust API from
-the other Polars audits, so those are refreshed first. A different Python
-version may write a parameter's default slightly differently.
+the other Polars audits as they are on disk. `--polars` refreshes those first;
+`--crate python` reads them as they are.
 
 Cargo's offline mode needs every crate in [Cargo.lock](../Cargo.lock) in the
 local cache, including crates for other platforms. If the check reports a
