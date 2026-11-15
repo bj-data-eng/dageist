@@ -109,7 +109,7 @@ Expr.ewm_std(*, com=None, span=None, half_life=None, alpha=None, adjust=True, bi
 Expr.ewm_sum(*, com=None, span=None, half_life=None, alpha=None, min_samples=1, ignore_nulls=False) | PyExpr.ewm_sum | Expr::ewm_sum | same name
 Expr.ewm_sum_by(by, *, half_life) | PyExpr.ewm_sum_by | Expr::ewm_sum_by | same name
 Expr.ewm_var(*, com=None, span=None, half_life=None, alpha=None, adjust=True, bias=False, min_samples=1, ignore_nulls=False) | PyExpr.ewm_var | Expr::ewm_var | same name
-Expr.exclude(columns, *more_columns) | in Python from as_expr
+Expr.exclude(columns, *more_columns) | in Python from as_expr, exclude
 Expr.exp() | PyExpr.exp | Expr::exp | same name
 Expr.explode(*, empty_as_null=False, keep_nulls=True) | PyExpr.explode | Expr::explode | same name
 Expr.extend_constant(value, n) | PyExpr.extend_constant | Expr::extend_constant | same name
@@ -160,7 +160,7 @@ Expr.log10() | in Python from log
 Expr.log1p() | PyExpr.log1p | Expr::log1p | same name
 Expr.lower_bound() | PyExpr.lower_bound | Expr::lower_bound | same name
 Expr.lt(other) | PyExpr.lt | Expr::lt | same name
-Expr.map_batches(function, return_dtype=None, *, is_elementwise=False, returns_scalar=False) | in Python
+Expr.map_batches(function, return_dtype=None, *, is_elementwise=False, returns_scalar=False) | in Python from map_batches
 Expr.map_elements(function, return_dtype=None, *, skip_nulls=True, pass_name=False, strategy='thread_local') | plr.collect_all, plr.set_query_monitoring | LazyFrame::collect_all_with_engine | other name | also uses col, concat, map_batches, select, to_series
 Expr.max() | PyExpr.max | Expr::max | same name
 Expr.max_by(by) | PyExpr.max_by | Expr::max_by | same name
@@ -185,7 +185,7 @@ Expr.pct_change(n=1) | PyExpr.pct_change | Expr::pct_change | same name
 Expr.peak_max() | PyExpr.peak_max | Expr::peak_max | same name
 Expr.peak_min() | PyExpr.peak_min | Expr::peak_min | same name
 Expr.pipe(function, *args, **kwargs) | in Python
-Expr.pipe_with_dtype(function) | in Python
+Expr.pipe_with_dtype(function) | in Python from pipe_with_dtype
 Expr.pow(exponent) | PyExpr.pow | Expr::pow | same name
 Expr.product() | PyExpr.product | Expr::product | same name
 Expr.qcut(quantiles, *, labels=None, left_closed=False, allow_duplicates=False, include_breaks=False) deprecated | PyExpr.qcut, PyExpr.qcut_uniform | Expr::qcut, Expr::qcut_uniform | same name
@@ -349,11 +349,11 @@ Expr.dt.weekday() | PyExpr.dt_weekday | DateLikeNameSpace::weekday, Expr::dt | s
 Expr.dt.year() | PyExpr.dt_year | DateLikeNameSpace::year, Expr::dt | same name
 Expr.list.__getitem__(item) | in Python from get
 Expr.list.agg(expr) | PyExpr.list_agg | Expr::list, ListNameSpace::agg | same name
-Expr.list.all(*, ignore_nulls=True) | in Python from agg, element
-Expr.list.any(*, ignore_nulls=True) | in Python from agg, element
+Expr.list.all(*, ignore_nulls=True) | in Python from agg, all, element
+Expr.list.any(*, ignore_nulls=True) | in Python from agg, any, element
 Expr.list.arg_max() | PyExpr.list_arg_max | Expr::list, ListNameSpace::arg_max | same name
 Expr.list.arg_min() | PyExpr.list_arg_min | Expr::list, ListNameSpace::arg_min | same name
-Expr.list.concat(other) | in Python from Series, concat_list
+Expr.list.concat(other) | in Python from Series, concat, concat_list
 Expr.list.contains(item, *, nulls_equal=True) | PyExpr.list_contains | Expr::list, ListNameSpace::contains | same name
 Expr.list.count_matches(element) | PyExpr.list_count_matches | Expr::list, ListNameSpace::count_matches | same name
 Expr.list.diff(n=1, null_behavior='ignore') | PyExpr.list_diff | Expr::list, ListNameSpace::diff | same name
@@ -366,7 +366,7 @@ Expr.list.gather(indices, *, null_on_oob=False) | PyExpr.list_gather | Expr::lis
 Expr.list.gather_every(n, offset=0) | PyExpr.list_gather_every | Expr::list, ListNameSpace::gather_every | same name
 Expr.list.get(index, *, null_on_oob=False) | PyExpr.list_get | Expr::list, ListNameSpace::get | same name
 Expr.list.head(n=5) | in Python from slice
-Expr.list.item(*, allow_empty=False) | in Python from agg, element
+Expr.list.item(*, allow_empty=False) | in Python from agg, element, item
 Expr.list.join(separator, *, ignore_nulls=True) | PyExpr.list_join | Expr::list, ListNameSpace::join | same name
 Expr.list.last() | in Python from get
 Expr.list.len() | PyExpr.list_len | Expr::list, ListNameSpace::len | same name
@@ -374,8 +374,8 @@ Expr.list.max() | PyExpr.list_max | Expr::list, ListNameSpace::max | same name
 Expr.list.mean() | PyExpr.list_mean | Expr::list, ListNameSpace::mean | same name
 Expr.list.median() | PyExpr.list_median | Expr::list, ListNameSpace::median | same name
 Expr.list.min() | PyExpr.list_min | Expr::list, ListNameSpace::min | same name
-Expr.list.n_unique() | in Python from agg, element
-Expr.list.reverse() | in Python from element, eval
+Expr.list.n_unique() | in Python from agg, element, n_unique
+Expr.list.reverse() | in Python from element, eval, reverse
 Expr.list.sample(n=None, *, fraction=None, with_replacement=False, shuffle=None, seed=None) | PyExpr.list_sample_fraction, PyExpr.list_sample_n | Expr::list, ListNameSpace::sample_fraction, ListNameSpace::sample_n | other name
 Expr.list.set_difference(other) | PyExpr.list_set_operation | Expr::list, ListNameSpace::set_difference, ListNameSpace::set_intersection, ListNameSpace::set_symmetric_difference, ListNameSpace::union | same name | also uses lit
 Expr.list.set_intersection(other) | PyExpr.list_set_operation | Expr::list, ListNameSpace::set_difference, ListNameSpace::set_intersection, ListNameSpace::set_symmetric_difference, ListNameSpace::union | same name | also uses lit
@@ -390,11 +390,11 @@ Expr.list.tail(n=5) | PyExpr.list_tail | Expr::list, ListNameSpace::tail | same 
 Expr.list.to_array(width) | PyExpr.list_to_array | Expr::list, ListNameSpace::to_array | same name
 Expr.list.to_map() | PyExpr.list_to_map | Expr::list, ListNameSpace::to_map | same name
 Expr.list.to_struct(fields) | PyExpr.list_to_struct | Expr::list, ListNameSpace::to_struct | same name
-Expr.list.unique(*, maintain_order=False) | in Python from element, eval
+Expr.list.unique(*, maintain_order=False) | in Python from element, eval, unique
 Expr.list.var(ddof=1) | PyExpr.list_var | Expr::list, ListNameSpace::var | same name
 Expr.arr.agg(expr) | PyExpr.arr_agg | ArrayNameSpace::agg, Expr::arr | same name
-Expr.arr.all(*, ignore_nulls=True) | in Python from agg, element
-Expr.arr.any(*, ignore_nulls=True) | in Python from agg, element
+Expr.arr.all(*, ignore_nulls=True) | in Python from agg, all, element
+Expr.arr.any(*, ignore_nulls=True) | in Python from agg, any, element
 Expr.arr.arg_max() | PyExpr.arr_arg_max | ArrayNameSpace::arg_max, Expr::arr | same name
 Expr.arr.arg_min() | PyExpr.arr_arg_min | ArrayNameSpace::arg_min, Expr::arr | same name
 Expr.arr.contains(item, *, nulls_equal=True) | PyExpr.arr_contains | ArrayNameSpace::contains, Expr::arr | same name
@@ -412,8 +412,8 @@ Expr.arr.max() | PyExpr.arr_max | ArrayNameSpace::max, Expr::arr | same name
 Expr.arr.mean() | PyExpr.arr_mean | ArrayNameSpace::mean, Expr::arr | same name
 Expr.arr.median() | PyExpr.arr_median | ArrayNameSpace::median, Expr::arr | same name
 Expr.arr.min() | PyExpr.arr_min | ArrayNameSpace::min, Expr::arr | same name
-Expr.arr.n_unique() | in Python from agg, element
-Expr.arr.reverse() | in Python from element, eval
+Expr.arr.n_unique() | in Python from agg, element, n_unique
+Expr.arr.reverse() | in Python from element, eval, reverse
 Expr.arr.shift(n=1) | PyExpr.arr_shift | ArrayNameSpace::shift, Expr::arr | same name
 Expr.arr.slice(offset, length=None, *, as_array=False) | PyExpr.arr_slice | ArrayNameSpace::slice, Expr::arr, lit() | same name
 Expr.arr.sort(*, descending=False, nulls_last=False) | PyExpr.arr_sort | ArrayNameSpace::sort, Expr::arr | same name
@@ -422,7 +422,7 @@ Expr.arr.sum() | PyExpr.arr_sum | ArrayNameSpace::sum, Expr::arr | same name
 Expr.arr.tail(n=5, *, as_array=False) | PyExpr.arr_tail | ArrayNameSpace::tail, Expr::arr | same name
 Expr.arr.to_list() | PyExpr.arr_to_list | ArrayNameSpace::to_list, Expr::arr | same name
 Expr.arr.to_struct(fields=None) | PyExpr.arr_to_struct | ArrayNameSpace::to_struct, Expr::arr | same name
-Expr.arr.unique(*, maintain_order=False) | in Python from element, eval
+Expr.arr.unique(*, maintain_order=False) | in Python from element, eval, unique
 Expr.arr.var(ddof=1) | PyExpr.arr_var | ArrayNameSpace::var, Expr::arr | same name
 Expr.cat.ends_with(suffix) | PyExpr.cat_ends_with | CategoricalNameSpace::ends_with, Expr::cat | same name
 Expr.cat.len_bytes() | PyExpr.cat_len_bytes | CategoricalNameSpace::len_bytes, Expr::cat | same name
@@ -509,10 +509,10 @@ LazyFrame.__ne__(other) | in Python
 LazyFrame.bottom_k(k, *, by, reverse=False) | PyLazyFrame.bottom_k | LazyFrame::bottom_k | same name
 LazyFrame.cache() | PyLazyFrame.cache | LazyFrame::cache | same name
 LazyFrame.cast(dtypes, *, strict=True) | PyLazyFrame.cast, PyLazyFrame.cast_all | LazyFrame::cast, LazyFrame::cast_all | same name
-LazyFrame.clear(n=0) | in Python from DataFrame, collect_schema, lazy, limit
+LazyFrame.clear(n=0) | in Python from DataFrame, clear, collect_schema, lazy, limit
 LazyFrame.clone() | PyLazyFrame.clone | - | not resolved
 LazyFrame.collect(*, engine='auto', background=False, optimizations=DEFAULT_QUERY_OPT_FLAGS, **_kwargs) | PyLazyFrame.collect, PyLazyFrame.collect_concurrently, PyLazyFrame.with_optimizations, plr.get_engine_affinity, plr.set_query_monitoring | LazyFrame::_collect_post_opt, LazyFrame::collect_concurrently, LazyFrame::collect_with_engine, LazyFrame::with_optimizations | other name
-LazyFrame.collect_async(*, gevent=False, engine='auto', optimizations=DEFAULT_QUERY_OPT_FLAGS) | PyLazyFrame.collect_with_callback, PyLazyFrame.with_optimizations, plr.get_engine_affinity, plr.set_query_monitoring | LazyFrame::collect_with_engine, LazyFrame::with_optimizations | other name
+LazyFrame.collect_async(*, gevent=False, engine='auto', optimizations=DEFAULT_QUERY_OPT_FLAGS) | PyLazyFrame.collect_with_callback, PyLazyFrame.with_optimizations, plr.get_engine_affinity, plr.set_query_monitoring | LazyFrame::collect_with_engine, LazyFrame::with_optimizations | other name | also uses collect_async
 LazyFrame.collect_batches(*, chunk_size=None, maintain_order=True, lazy=False, engine='auto', optimizations=DEFAULT_QUERY_OPT_FLAGS) | PyLazyFrame.collect_batches, PyLazyFrame.with_optimizations, plr.get_engine_affinity, plr.set_query_monitoring | LazyFrame::collect_batches, LazyFrame::with_optimizations | same name
 LazyFrame.collect_schema() | PyLazyFrame.collect_schema | LazyFrame::collect_schema | same name
 LazyFrame.columns property | in Python from collect_schema, names
@@ -522,17 +522,17 @@ LazyFrame.deserialize(source, *, format='binary') | PyLazyFrame.deserialize_bina
 LazyFrame.drop(*columns, strict=True) | PyLazyFrame.drop | LazyFrame::drop | same name
 LazyFrame.drop_nans(subset=None) | PyLazyFrame.drop_nans | LazyFrame::drop_nans | same name
 LazyFrame.drop_nulls(subset=None) | PyLazyFrame.drop_nulls | LazyFrame::drop_nulls | same name
-LazyFrame.dtypes property | in Python from collect_schema
-LazyFrame.execute(*, optimizations=DEFAULT_QUERY_OPT_FLAGS, engine='auto', **_kwargs) | PyLazyFrame.collect, PyLazyFrame.collect_concurrently, PyLazyFrame.with_optimizations, plr.get_engine_affinity, plr.set_query_monitoring | LazyFrame::_collect_post_opt, LazyFrame::collect_concurrently, LazyFrame::collect_with_engine, LazyFrame::with_optimizations | other name
+LazyFrame.dtypes property | in Python from collect_schema, dtypes
+LazyFrame.execute(*, optimizations=DEFAULT_QUERY_OPT_FLAGS, engine='auto', **_kwargs) | PyLazyFrame.collect, PyLazyFrame.with_optimizations, plr.get_engine_affinity, plr.set_query_monitoring | LazyFrame::_collect_post_opt, LazyFrame::collect_with_engine, LazyFrame::with_optimizations | other name | also uses execute
 LazyFrame.explain(*, format='plain', optimized=True, engine='auto', optimizations=DEFAULT_QUERY_OPT_FLAGS) | PyLazyFrame.describe_optimized_plan, PyLazyFrame.describe_optimized_plan_tree, PyLazyFrame.describe_plan, PyLazyFrame.describe_plan_tree, PyLazyFrame.with_optimizations, plr.get_engine_affinity | LazyFrame::describe_optimized_plan, LazyFrame::describe_optimized_plan_tree, LazyFrame::describe_plan, LazyFrame::describe_plan_tree, LazyFrame::with_optimizations | other name
 LazyFrame.explode(columns, *more_columns, empty_as_null=False, keep_nulls=True) | PyLazyFrame.explode | LazyFrame::explode | same name
 LazyFrame.fill_nan(value) | PyLazyFrame.fill_nan | LazyFrame::fill_nan | same name | also uses lit
-LazyFrame.fill_null(value=None, strategy=None, limit=None, *, matches_supertype=True) | in Python from col, with_columns
+LazyFrame.fill_null(value=None, strategy=None, limit=None, *, matches_supertype=True) | in Python from col, fill_null, with_columns
 LazyFrame.filter(*predicates, **constraints) | PyLazyFrame.filter, PyLazyFrame.remove | LazyFrame::filter, LazyFrame::remove | same name | also uses clear, clone
 LazyFrame.first() | in Python from slice
 LazyFrame.from_lazyframe_resolver(resolver) | PyLazyFrame.from_lazyframe_resolver | DslBuilder::build, DslBuilder::from_dsl_resolver, LazyFrame::from, builds internals | other name
 LazyFrame.gather(indices, *, null_on_oob=False) | PyLazyFrame.gather | LazyFrame::gather | same name | also uses Series, lit, select
-LazyFrame.gather_every(n, offset=0) | in Python from col
+LazyFrame.gather_every(n, offset=0) | in Python from col, gather_every
 LazyFrame.group_by(*by, maintain_order=False, **named_by) | PyLazyFrame.group_by | LazyFrame::group_by, LazyFrame::group_by_stable | same name
 LazyFrame.group_by_dynamic(index_column, *, every, period=None, offset=None, include_boundaries=False, closed='left', label='left', group_by=None, start_by='window') | PyLazyFrame.group_by_dynamic | LazyFrame::group_by_dynamic | same name
 LazyFrame.head(n=5) | in Python from slice
@@ -567,15 +567,15 @@ LazyFrame.select_seq(*exprs, **named_exprs) | PyLazyFrame.select_seq | LazyFrame
 LazyFrame.serialize(file=None, *, format='binary') | PyLazyFrame.serialize_binary, PyLazyFrame.serialize_json | DslPlan::serialize_json_into, DslPlan::serialize_versioned | other name
 LazyFrame.set_sorted(column, *more_columns, descending=False, nulls_last=False) | PyLazyFrame.hint_sorted | LazyFrame::hint | other name
 LazyFrame.shift(n=1, *, fill_value=None) | in Python
-LazyFrame.show(limit=5, *, ascii_tables=None, decimal_separator=None, thousands_separator=None, float_precision=None, fmt_float=None, fmt_str_lengths=None, fmt_table_cell_list_len=None, tbl_cell_alignment=None, tbl_cell_numeric_alignment=None, tbl_cols=None, tbl_column_data_type_inline=None, tbl_dataframe_shape_below=None, tbl_formatting=None, tbl_hide_column_data_types=None, tbl_hide_column_names=None, tbl_hide_dtype_separator=None, tbl_hide_dataframe_shape=None, tbl_width_chars=None, trim_decimal_zeros=True) | in Python from collect, head
+LazyFrame.show(limit=5, *, ascii_tables=None, decimal_separator=None, thousands_separator=None, float_precision=None, fmt_float=None, fmt_str_lengths=None, fmt_table_cell_list_len=None, tbl_cell_alignment=None, tbl_cell_numeric_alignment=None, tbl_cols=None, tbl_column_data_type_inline=None, tbl_dataframe_shape_below=None, tbl_formatting=None, tbl_hide_column_data_types=None, tbl_hide_column_names=None, tbl_hide_dtype_separator=None, tbl_hide_dataframe_shape=None, tbl_width_chars=None, trim_decimal_zeros=True) | in Python from collect, head, show
 LazyFrame.show_graph(*, optimized=True, show=True, output_path=None, raw_output=False, figsize=(16.0, 12.0), engine='auto', plan_stage='physical', optimizations=DEFAULT_QUERY_OPT_FLAGS) | PyLazyFrame.to_dot, PyLazyFrame.to_dot_streaming_phys, PyLazyFrame.with_optimizations, plr.get_engine_affinity | LazyFrame::to_dot, LazyFrame::to_dot_streaming_phys, LazyFrame::with_optimizations | other name
-LazyFrame.sink_batches(function, *, chunk_size=None, maintain_order=True, lazy=False, engine='auto', optimizations=DEFAULT_QUERY_OPT_FLAGS) | PyLazyFrame.collect, PyLazyFrame.collect_concurrently, PyLazyFrame.sink_batches, PyLazyFrame.with_optimizations, plr.get_engine_affinity, plr.set_query_monitoring | LazyFrame::_collect_post_opt, LazyFrame::collect_concurrently, LazyFrame::collect_with_engine, LazyFrame::sink_batches, LazyFrame::with_optimizations | same name
-LazyFrame.sink_csv(path, *, include_bom=False, compression='uncompressed', compression_level=None, check_extension=True, include_header=True, separator=',', line_terminator='\n', quote_char='"', batch_size=1024, datetime_format=None, date_format=None, time_format=None, float_scientific=None, float_precision=None, decimal_comma=False, null_value=None, quote_style=None, maintain_order=True, storage_options=None, credential_provider='auto', sync_on_close=None, mkdir=False, lazy=False, engine='auto', optimizations=DEFAULT_QUERY_OPT_FLAGS) | PyLazyFrame.collect, PyLazyFrame.collect_concurrently, PyLazyFrame.sink_csv, PyLazyFrame.with_optimizations, plr.get_engine_affinity, plr.set_query_monitoring | LazyFrame::_collect_post_opt, LazyFrame::collect_concurrently, LazyFrame::collect_with_engine, LazyFrame::sink, LazyFrame::with_optimizations | other name
+LazyFrame.sink_batches(function, *, chunk_size=None, maintain_order=True, lazy=False, engine='auto', optimizations=DEFAULT_QUERY_OPT_FLAGS) | PyLazyFrame.collect, PyLazyFrame.sink_batches, PyLazyFrame.with_optimizations, plr.get_engine_affinity, plr.set_query_monitoring | LazyFrame::_collect_post_opt, LazyFrame::collect_with_engine, LazyFrame::sink_batches, LazyFrame::with_optimizations | same name | also uses sink_batches
+LazyFrame.sink_csv(path, *, include_bom=False, compression='uncompressed', compression_level=None, check_extension=True, include_header=True, separator=',', line_terminator='\n', quote_char='"', batch_size=1024, datetime_format=None, date_format=None, time_format=None, float_scientific=None, float_precision=None, decimal_comma=False, null_value=None, quote_style=None, maintain_order=True, storage_options=None, credential_provider='auto', sync_on_close=None, mkdir=False, lazy=False, engine='auto', optimizations=DEFAULT_QUERY_OPT_FLAGS) | PyLazyFrame.collect, PyLazyFrame.sink_csv, PyLazyFrame.with_optimizations, plr.get_engine_affinity, plr.set_query_monitoring | LazyFrame::_collect_post_opt, LazyFrame::collect_with_engine, LazyFrame::sink, LazyFrame::with_optimizations | other name | also uses sink_csv
 LazyFrame.sink_delta(target, *, mode='error', storage_options=None, credential_provider='auto', delta_write_options=None, delta_merge_options=None, engine='auto', optimizations=DEFAULT_QUERY_OPT_FLAGS) | in Python from collect_batches, collect_schema, dtypes
 LazyFrame.sink_iceberg(target, *, mode, schema_mode=None, overwrite_filter=None, partition_overwrite=None, create_if_not_exists=False, create_namespace_if_not_exists=False, snapshot_properties=None, catalog=None, storage_options=None, compression='zstd', compression_level=None, row_group_size=None, maintain_order=True, engine='auto') | plr.gen_uuid_v7 | - | not resolved | also uses collect
-LazyFrame.sink_ipc(path, *, compression='uncompressed', compat_level=None, record_batch_size=None, maintain_order=True, storage_options=None, credential_provider='auto', sync_on_close=None, mkdir=False, lazy=False, engine='auto', optimizations=DEFAULT_QUERY_OPT_FLAGS, _record_batch_statistics=False, sinked_paths_callback=None) | PyLazyFrame.collect, PyLazyFrame.collect_concurrently, PyLazyFrame.sink_ipc, PyLazyFrame.with_optimizations, plr.get_engine_affinity, plr.set_query_monitoring | LazyFrame::_collect_post_opt, LazyFrame::collect_concurrently, LazyFrame::collect_with_engine, LazyFrame::sink, LazyFrame::with_optimizations | other name
-LazyFrame.sink_ndjson(path, *, compression='uncompressed', compression_level=None, check_extension=True, maintain_order=True, storage_options=None, credential_provider='auto', sync_on_close=None, mkdir=False, lazy=False, engine='auto', optimizations=DEFAULT_QUERY_OPT_FLAGS) | PyLazyFrame.collect, PyLazyFrame.collect_concurrently, PyLazyFrame.sink_ndjson, PyLazyFrame.with_optimizations, plr.get_engine_affinity, plr.set_query_monitoring | LazyFrame::_collect_post_opt, LazyFrame::collect_concurrently, LazyFrame::collect_with_engine, LazyFrame::sink, LazyFrame::with_optimizations | other name
-LazyFrame.sink_parquet(path, *, compression='zstd', compression_level=None, statistics=True, row_group_size=None, data_page_size=None, maintain_order=True, storage_options=None, credential_provider='auto', sync_on_close=None, metadata=None, arrow_schema=None, encryption=None, mkdir=False, lazy=False, engine='auto', optimizations=DEFAULT_QUERY_OPT_FLAGS, sinked_paths_callback=None) | PyLazyFrame.collect, PyLazyFrame.collect_concurrently, PyLazyFrame.sink_parquet, PyLazyFrame.with_optimizations, plr.get_engine_affinity, plr.set_query_monitoring | LazyFrame::_collect_post_opt, LazyFrame::collect_concurrently, LazyFrame::collect_with_engine, LazyFrame::sink, LazyFrame::with_optimizations | other name
+LazyFrame.sink_ipc(path, *, compression='uncompressed', compat_level=None, record_batch_size=None, maintain_order=True, storage_options=None, credential_provider='auto', sync_on_close=None, mkdir=False, lazy=False, engine='auto', optimizations=DEFAULT_QUERY_OPT_FLAGS, _record_batch_statistics=False, sinked_paths_callback=None) | PyLazyFrame.collect, PyLazyFrame.sink_ipc, PyLazyFrame.with_optimizations, plr.get_engine_affinity, plr.set_query_monitoring | LazyFrame::_collect_post_opt, LazyFrame::collect_with_engine, LazyFrame::sink, LazyFrame::with_optimizations | other name | also uses sink_ipc
+LazyFrame.sink_ndjson(path, *, compression='uncompressed', compression_level=None, check_extension=True, maintain_order=True, storage_options=None, credential_provider='auto', sync_on_close=None, mkdir=False, lazy=False, engine='auto', optimizations=DEFAULT_QUERY_OPT_FLAGS) | PyLazyFrame.collect, PyLazyFrame.sink_ndjson, PyLazyFrame.with_optimizations, plr.get_engine_affinity, plr.set_query_monitoring | LazyFrame::_collect_post_opt, LazyFrame::collect_with_engine, LazyFrame::sink, LazyFrame::with_optimizations | other name | also uses sink_ndjson
+LazyFrame.sink_parquet(path, *, compression='zstd', compression_level=None, statistics=True, row_group_size=None, data_page_size=None, maintain_order=True, storage_options=None, credential_provider='auto', sync_on_close=None, metadata=None, arrow_schema=None, encryption=None, mkdir=False, lazy=False, engine='auto', optimizations=DEFAULT_QUERY_OPT_FLAGS, sinked_paths_callback=None) | PyLazyFrame.collect, PyLazyFrame.sink_parquet, PyLazyFrame.with_optimizations, plr.get_engine_affinity, plr.set_query_monitoring | LazyFrame::_collect_post_opt, LazyFrame::collect_with_engine, LazyFrame::sink, LazyFrame::with_optimizations | other name | also uses sink_parquet
 LazyFrame.slice(offset, length=None) | PyLazyFrame.slice | LazyFrame::slice | same name
 LazyFrame.sort(by, *more_by, descending=False, nulls_last=False, maintain_order=False, multithreaded=True) | PyLazyFrame.sort, PyLazyFrame.sort_by_exprs | LazyFrame::sort, LazyFrame::sort_by_exprs | same name
 LazyFrame.sql(query, *, table_name='self') | in Python
@@ -593,20 +593,20 @@ LazyFrame.with_columns(*exprs, **named_exprs) | PyLazyFrame.with_columns | LazyF
 LazyFrame.with_columns_seq(*exprs, **named_exprs) | PyLazyFrame.with_columns_seq | LazyFrame::with_columns_seq | same name
 LazyFrame.with_row_index(name='index', offset=0) | PyLazyFrame.with_row_index | LazyFrame::with_row_index | same name
 LazyGroupBy.agg(*aggs, **named_aggs) | PyLazyGroupBy.agg | LazyGroupBy::agg | same name
-LazyGroupBy.all() | in Python from agg
-LazyGroupBy.first(*, ignore_nulls=False) | in Python from agg, all
+LazyGroupBy.all() | in Python from agg, all
+LazyGroupBy.first(*, ignore_nulls=False) | in Python from agg, all, first
 LazyGroupBy.having(*predicates) | PyLazyGroupBy.having | LazyGroupBy::having | same name
 LazyGroupBy.head(n=5) | PyLazyGroupBy.head | LazyGroupBy::head | same name
-LazyGroupBy.last(*, ignore_nulls=False) | in Python from agg, all
-LazyGroupBy.len(name=None) | in Python from agg
+LazyGroupBy.last(*, ignore_nulls=False) | in Python from agg, all, last
+LazyGroupBy.len(name=None) | in Python from agg, len
 LazyGroupBy.map_groups(function, schema) | PyLazyGroupBy.map_groups | LazyFrame::collect_schema, LazyFrame::from, LazyGroupBy::apply | other name
-LazyGroupBy.max() | in Python from agg, all
-LazyGroupBy.mean() | in Python from agg, all
-LazyGroupBy.median() | in Python from agg, all
-LazyGroupBy.min() | in Python from agg, all
-LazyGroupBy.n_unique() | in Python from agg, all
-LazyGroupBy.quantile(quantile, interpolation='nearest') | in Python from agg, all
-LazyGroupBy.sum() | in Python from agg, all
+LazyGroupBy.max() | in Python from agg, all, max
+LazyGroupBy.mean() | in Python from agg, all, mean
+LazyGroupBy.median() | in Python from agg, all, median
+LazyGroupBy.min() | in Python from agg, all, min
+LazyGroupBy.n_unique() | in Python from agg, all, n_unique
+LazyGroupBy.quantile(quantile, interpolation='nearest') | in Python from agg, all, quantile
+LazyGroupBy.sum() | in Python from agg, all, sum
 LazyGroupBy.tail(n=5) | PyLazyGroupBy.tail | LazyGroupBy::tail | same name
 polars.align_frames(*frames, on, how='full', select=None, descending=False) | plr.collect_all, plr.set_query_monitoring | LazyFrame::collect_all_with_engine | other name | also uses alias, col
 polars.all(*names, ignore_nulls=True) | in Python from all, col
@@ -614,12 +614,12 @@ polars.all_horizontal(*exprs) | plr.all_horizontal | all_horizontal() | same nam
 polars.any(*names, ignore_nulls=True) | in Python from any, col
 polars.any_horizontal(*exprs) | plr.any_horizontal | any_horizontal() | same name
 polars.approx_n_unique(*columns) | in Python from approx_n_unique, col
-polars.arange(start=0, end=None, step=1, *, dtype=Int64, eager=False) | in Python
+polars.arange(start=0, end=None, step=1, *, dtype=Int64, eager=False) | in Python from int_range
 polars.arctan2(y, x) | plr.arctan2 | Expr::arctan2 | same name | also uses col
 polars.arg_sort_by(exprs, *more_exprs, descending=False, nulls_last=False, multithreaded=True, maintain_order=False) | plr.arg_sort_by | arg_sort_by() | same name
-polars.arg_where(condition, *, eager=False) | plr.arg_where | arg_where() | same name | also uses col, select, to_series
+polars.arg_where(condition, *, eager=False) | plr.arg_where | arg_where() | same name | also uses arg_where, col, select, to_series
 polars.business_day_count(start, end, week_mask=(True, True, True, True, True, False, False), holidays=()) | plr.business_day_count | business_day_count() | same name
-polars.coalesce(exprs, *more_exprs, eager=False) | plr.coalesce | coalesce() | same name | also uses DataFrame, select, to_series
+polars.coalesce(exprs, *more_exprs, eager=False) | plr.coalesce | coalesce() | same name | also uses DataFrame, coalesce, select, to_series
 polars.col(name, *more_names) | plr.col | col() | same name
 polars.collect_all(lazy_frames, *, optimizations=DEFAULT_QUERY_OPT_FLAGS, engine='auto', lazy=False) | plr.collect_all, plr.collect_all_lazy, plr.get_engine_affinity, plr.set_query_monitoring | LazyFrame::collect_all_with_engine, LazyFrame::from_logical_plan, builds internals | other name | also uses collect_all
 polars.collect_all_async(lazy_frames, *, gevent=False, engine='auto', optimizations=DEFAULT_QUERY_OPT_FLAGS) | plr.collect_all_with_callback, plr.get_engine_affinity, plr.set_query_monitoring | LazyFrame::collect_all_with_engine | other name | also uses collect_all_async
@@ -627,15 +627,15 @@ polars.concat(items, *, how='vertical', rechunk=False, parallel=True, strict=Non
 polars.concat_arr(exprs, *more_exprs) | plr.concat_arr | concat_arr() | same name
 polars.concat_list(exprs, *more_exprs) | plr.concat_list | concat_list() | same name
 polars.concat_str(exprs, *more_exprs, separator='', ignore_nulls=False) | plr.concat_str | concat_str() | same name
-polars.corr(a, b, *, method='pearson', propagate_nans=False, eager=False) | plr.pearson_corr, plr.spearman_rank_corr | pearson_corr(), spearman_rank_corr() | other name | also uses DataFrame, to_series
+polars.corr(a, b, *, method='pearson', propagate_nans=False, eager=False) | plr.pearson_corr, plr.spearman_rank_corr | pearson_corr(), spearman_rank_corr() | other name | also uses DataFrame, corr, to_series
 polars.count(*columns) | in Python from col, count
-polars.cov(a, b, *, ddof=1, eager=False) | plr.cov | cov() | same name | also uses DataFrame, to_series
+polars.cov(a, b, *, ddof=1, eager=False) | plr.cov | cov() | same name | also uses DataFrame, cov, to_series
 polars.cum_count(*columns, reverse=False) | in Python from col, cum_count
 polars.cum_fold(acc, function, exprs, *, returns_scalar=False, return_dtype=None, include_init=False) | plr.cum_fold | cum_fold_exprs() | other name | also uses alias
 polars.cum_reduce(function, exprs, *, returns_scalar=False, return_dtype=None) | plr.cum_reduce | cum_reduce_exprs() | other name | also uses alias
 polars.cum_sum(*names) | in Python from col, cum_sum
 polars.cum_sum_horizontal(*exprs) | in Python from alias, cast, cum_fold, dtype_of, lit, sum_horizontal
-polars.date(year, month, day) | in Python from alias, cast
+polars.date(year, month, day) | in Python from alias, cast, datetime_
 polars.date_range(start, end, interval='1d', *, closed='both', eager=False) | plr.date_range | date_range() | same name | also uses parse_interval_argument, select, to_series
 polars.date_ranges(start, end, interval='1d', *, closed='both', eager=False) | plr.date_ranges | date_ranges() | same name | also uses parse_interval_argument, select, to_series
 polars.datetime(year, month, day, hour=None, minute=None, second=None, microsecond=None, *, time_unit='us', time_zone=None, ambiguous='raise') | plr.datetime | datetime() | same name
@@ -661,9 +661,9 @@ polars.len() | plr.len | len() | same name
 polars.linear_space(start, end, num_samples, *, closed='both', eager=False) | plr.linear_space | linear_space() | same name | also uses select, to_series
 polars.linear_spaces(start, end, num_samples, *, closed='both', as_array=False, eager=False) | plr.linear_spaces | linear_spaces() | same name | also uses select, to_series
 polars.list(exprs, *more_exprs) | plr.list | as_list() | other name
-polars.lit(value, dtype=None, *, allow_object=False) | plr.lit | LiteralValue::from, lit(), builds internals | same name | also uses Series, cast, utcoffset
+polars.lit(value, dtype=None, *, allow_object=False) | plr.lit | LiteralValue::from, lit(), builds internals | same name | also uses Series, cast, lit, utcoffset
 polars.map_batches(exprs, function, return_dtype=None, *, is_elementwise=False, returns_scalar=False) | plr.map_expr | - | not resolved
-polars.map_groups(exprs, function, return_dtype=None, *, is_elementwise=False, returns_scalar=False) | in Python
+polars.map_groups(exprs, function, return_dtype=None, *, is_elementwise=False, returns_scalar=False) | in Python from map_batches
 polars.max(*names) | in Python from col, max
 polars.max_horizontal(*exprs) | plr.max_horizontal | max_horizontal() | same name
 polars.mean(*columns) | in Python from col, mean
@@ -674,7 +674,7 @@ polars.min(*names) | in Python from col, min
 polars.min_horizontal(*exprs) | plr.min_horizontal | min_horizontal() | same name
 polars.n_unique(*columns) | in Python from col, n_unique
 polars.nth(*indices, strict=True) | in Python from as_expr
-polars.ones(n, dtype=Float64, *, eager=False) | in Python from alias
+polars.ones(n, dtype=Float64, *, eager=False) | in Python from alias, repeat
 polars.pipe_with_dtype(exprs, function) | plr.pipe_with_dtype | pipe_with_dtype() | same name
 polars.quantile(column, quantile, interpolation='nearest') | in Python from col, quantile
 polars.reduce(function, exprs, *, returns_scalar=False, return_dtype=None) | plr.reduce | reduce_exprs() | other name
@@ -703,10 +703,10 @@ polars.struct_with_fields(mapping) | PyDataTypeExpr.struct_with_fields | builds 
 polars.sum(*names) | in Python from col, sum
 polars.sum_horizontal(*exprs, ignore_nulls=True) | plr.sum_horizontal | sum_horizontal() | same name
 polars.tail(column, n=10) | in Python from col, tail
-polars.time(hour=None, minute=None, second=None, microsecond=None) | in Python from alias, cast
+polars.time(hour=None, minute=None, second=None, microsecond=None) | in Python from alias, cast, datetime_
 polars.time_range(start=None, end=None, interval='1h', *, closed='both', eager=False) | plr.time_range | time_range() | same name | also uses parse_interval_argument, select, to_series
 polars.time_ranges(start=None, end=None, interval='1h', *, closed='both', eager=False) | plr.time_ranges | time_ranges() | same name | also uses parse_interval_argument, select, to_series
 polars.union(items, *, how='vertical', strict=None) | plr.concat_df_horizontal, plr.concat_expr, plr.concat_lf, plr.concat_lf_diagonal, plr.concat_lf_horizontal, plr.concat_series | concat(), concat_expr(), concat_lf_diagonal(), concat_lf_horizontal() | other name | also uses select
 polars.var(column, ddof=1) | in Python from col, var
 polars.when(*predicates, **constraints) | plr.when | when() | same name | also uses When
-polars.zeros(n, dtype=Float64, *, eager=False) | in Python from alias
+polars.zeros(n, dtype=Float64, *, eager=False) | in Python from alias, repeat
