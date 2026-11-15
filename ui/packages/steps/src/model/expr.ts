@@ -9,6 +9,9 @@
 import type { Cell, Dtype, Frame } from './frame';
 import { assertNever, compareCells, findColumn, isNumeric, quoted, supertype } from './frame';
 
+/** The methods that compare a value with another and give a Boolean. */
+export type ComparisonMethod = 'eq' | 'ne' | 'gt' | 'ge' | 'lt' | 'le';
+
 /** Every expression method the prototype knows, by its Polars name. */
 export type MethodName =
   | 'shift'
@@ -23,7 +26,10 @@ export type MethodName =
   | 'dt.offset_by'
   | 'dt.month_start'
   | 'dt.total_days'
-  | 'over';
+  | 'over'
+  | ComparisonMethod
+  | 'is_null'
+  | 'is_not_null';
 
 /** Every method, in the order it is offered. */
 export const METHOD_NAMES: readonly MethodName[] = [
@@ -40,10 +46,18 @@ export const METHOD_NAMES: readonly MethodName[] = [
   'dt.month_start',
   'dt.total_days',
   'over',
+  'eq',
+  'ne',
+  'gt',
+  'ge',
+  'lt',
+  'le',
+  'is_null',
+  'is_not_null',
 ];
 
 /** A group of methods that can stand in for one another. */
-export type MethodGroup = 'rows' | 'cumulative' | 'arithmetic' | 'dt' | 'window';
+export type MethodGroup = 'rows' | 'cumulative' | 'arithmetic' | 'dt' | 'window' | 'compare';
 
 /** Every group, in the order it is offered. */
 export const METHOD_GROUP_ORDER: readonly MethodGroup[] = [
@@ -52,6 +66,7 @@ export const METHOD_GROUP_ORDER: readonly MethodGroup[] = [
   'arithmetic',
   'dt',
   'window',
+  'compare',
 ];
 
 /** Headings for the groups. */
@@ -61,6 +76,7 @@ export const METHOD_GROUP_TITLES: Readonly<Record<MethodGroup, string>> = {
   arithmetic: 'Arithmetic',
   dt: 'dt · dates and times',
   window: 'Window',
+  compare: 'Comparison · true or false',
 };
 
 /** The group each method belongs to. */
@@ -78,6 +94,14 @@ export const METHOD_GROUPS: Readonly<Record<MethodName, MethodGroup>> = {
   'dt.month_start': 'dt',
   'dt.total_days': 'dt',
   over: 'window',
+  eq: 'compare',
+  ne: 'compare',
+  gt: 'compare',
+  ge: 'compare',
+  lt: 'compare',
+  le: 'compare',
+  is_null: 'compare',
+  is_not_null: 'compare',
 };
 
 /** What each method does, for someone who does not know the name yet. */
@@ -95,10 +119,21 @@ export const METHOD_HINTS: Readonly<Record<MethodName, string>> = {
   'dt.month_start': 'first of the month',
   'dt.total_days': 'whole days in a duration',
   over: 'within each group',
+  eq: 'equal to',
+  ne: 'not equal to',
+  gt: 'greater than',
+  ge: 'at least',
+  lt: 'less than',
+  le: 'at most',
+  is_null: 'has no value',
+  is_not_null: 'has a value',
 };
 
-/** What a method's one argument is, or `null` when it takes none. */
-export type ArgumentKind = 'integer' | 'duration' | 'column' | 'operand';
+/**
+ * What a method's one argument is, or `null` when it takes none. A comparand
+ * is what a comparison is given: a field, or a value written out.
+ */
+export type ArgumentKind = 'integer' | 'duration' | 'column' | 'operand' | 'comparand';
 
 /** The kind of argument each method takes. */
 export const ARGUMENT_KINDS: Readonly<Record<MethodName, ArgumentKind | null>> = {
@@ -115,6 +150,14 @@ export const ARGUMENT_KINDS: Readonly<Record<MethodName, ArgumentKind | null>> =
   'dt.month_start': null,
   'dt.total_days': null,
   over: 'column',
+  eq: 'comparand',
+  ne: 'comparand',
+  gt: 'comparand',
+  ge: 'comparand',
+  lt: 'comparand',
+  le: 'comparand',
+  is_null: null,
+  is_not_null: null,
 };
 
 /** One method call. `argument` holds the argument as typed, or `null`. */
@@ -127,6 +170,37 @@ export interface Method {
 
 const DURATION = /^(?<amount>-?\d+)(?<unit>d|w|mo)$/;
 const INTEGER = /^-?\d+$/;
+
+/** What a comparison is given: a field, a number or text, or nothing yet. */
+export type Comparand =
+  | { readonly kind: 'column'; readonly column: string }
+  | { readonly kind: 'literal'; readonly value: string | number }
+  | { readonly kind: 'unset' };
+
+/**
+ * Reads the argument of a comparison. Digits are a number, text between
+ * double quotation marks is that text, nothing is nothing yet, and anything
+ * else names a field. So a field whose name is all digits, or starts with a
+ * quotation mark, cannot be compared with here.
+ */
+export function readComparand(argument: string | null): Comparand {
+  const text = argument ?? '';
+  if (text === '') return { kind: 'unset' };
+  if (INTEGER.test(text)) return { kind: 'literal', value: Number(text) };
+  if (text.length >= 2 && text.startsWith('"') && text.endsWith('"')) {
+    return { kind: 'literal', value: text.slice(1, -1) };
+  }
+  return { kind: 'column', column: text };
+}
+
+/** Writes a number or text as the argument of a comparison, for `readComparand` to read back. */
+export function literalComparand(value: string | number): string {
+  return typeof value === 'number' ? String(value) : `"${value}"`;
+}
+
+function isComparison(name: MethodName): name is ComparisonMethod {
+  return ARGUMENT_KINDS[name] === 'comparand';
+}
 
 function isTemporal(dtype: Dtype): boolean {
   return dtype === 'Datetime' || dtype === 'Date' || dtype === 'Time' || dtype === 'Duration';
@@ -187,6 +261,15 @@ export function methodDtype(name: MethodName, input: Dtype, operand: Dtype | nul
     case 'dt.offset_by':
     case 'dt.month_start':
       return input === 'Datetime' || input === 'Date' ? input : null;
+    case 'eq':
+    case 'ne':
+    case 'gt':
+    case 'ge':
+    case 'lt':
+    case 'le':
+    case 'is_null':
+    case 'is_not_null':
+      return 'Boolean';
     default:
       return assertNever(name);
   }
@@ -200,6 +283,14 @@ export function methodRequirement(name: MethodName): string {
     case 'last':
     case 'over':
     case 'cum_count':
+    case 'eq':
+    case 'ne':
+    case 'gt':
+    case 'ge':
+    case 'lt':
+    case 'le':
+    case 'is_null':
+    case 'is_not_null':
       return 'any dtype';
     case 'cum_sum':
       return 'a numeric dtype or Duration';
@@ -232,6 +323,26 @@ function operandProblem(method: Method, frame: Frame, input: Dtype): string | nu
     : `${method.name} is given ${input}, but "${column.name}" is ${column.dtype}.`;
 }
 
+function comparandProblem(method: Method, frame: Frame, input: Dtype): string | null {
+  const comparand = readComparand(method.argument);
+  if (comparand.kind === 'unset') return `${method.name} needs a value or a field to compare with.`;
+  if (comparand.kind === 'column') {
+    const column = findColumn(frame, comparand.column);
+    if (column === null) return `There is no column "${comparand.column}".`;
+    return supertype(input, column.dtype) === null
+      ? `${method.name} is given ${input}, but "${column.name}" is ${column.dtype}.`
+      : null;
+  }
+  if (typeof comparand.value === 'number') {
+    return isNumeric(input)
+      ? null
+      : `${method.name} is given ${input}, but ${String(comparand.value)} is a number.`;
+  }
+  return input === 'String'
+    ? null
+    : `${method.name} is given ${input}, but ${quoted(comparand.value)} is text.`;
+}
+
 /** Returns why `method`'s argument is wrong for a value of `input` dtype, or `null` when it is right. */
 export function argumentProblem(method: Method, frame: Frame, input: Dtype): string | null {
   const kind = ARGUMENT_KINDS[method.name];
@@ -249,6 +360,8 @@ export function argumentProblem(method: Method, frame: Frame, input: Dtype): str
       return findColumn(frame, argument) === null ? `There is no column "${argument}".` : null;
     case 'operand':
       return operandProblem(method, frame, input);
+    case 'comparand':
+      return comparandProblem(method, frame, input);
     default:
       return assertNever(kind);
   }
@@ -327,12 +440,47 @@ function difference(left: Cell, right: Cell): Cell {
   return minutesOf(left) - minutesOf(right);
 }
 
+/** Returns a Boolean as a cell holds it. */
+function booleanCell(value: boolean): Cell {
+  return value ? 'true' : 'false';
+}
+
+/** Compares two cells as `name` does. A comparison with a null is null. */
+function compared(name: ComparisonMethod, left: Cell, right: Cell): Cell {
+  if (left === null || right === null) return null;
+  const order = compareCells(left, right);
+  switch (name) {
+    case 'eq':
+      return booleanCell(order === 0);
+    case 'ne':
+      return booleanCell(order !== 0);
+    case 'gt':
+      return booleanCell(order > 0);
+    case 'ge':
+      return booleanCell(order >= 0);
+    case 'lt':
+      return booleanCell(order < 0);
+    case 'le':
+      return booleanCell(order <= 0);
+    default:
+      return assertNever(name);
+  }
+}
+
 function applyAcrossGroup(
   method: Method,
   values: readonly Cell[],
   operand: readonly Cell[],
 ): Cell[] {
+  const { name } = method;
+  if (isComparison(name)) {
+    return values.map((value, position) => compared(name, value, operand[position] ?? null));
+  }
   switch (method.name) {
+    case 'is_null':
+      return values.map((value) => booleanCell(value === null));
+    case 'is_not_null':
+      return values.map((value) => booleanCell(value !== null));
     case 'sub':
       return values.map((value, position) => difference(value, operand[position] ?? null));
     case 'dt.total_days':
@@ -385,6 +533,17 @@ export function rowGroups(keys: readonly Cell[] | null, rowCount: number): numbe
   return [...groups.values()];
 }
 
+/** Returns what a two-sided method is given on each of `rowCount` rows, or nothing for another method. */
+function otherSide(method: Method, rowCount: number, frame: Frame): readonly Cell[] {
+  const kind = ARGUMENT_KINDS[method.name];
+  if (kind === 'operand') return findColumn(frame, method.argument ?? '')?.cells ?? [];
+  if (kind !== 'comparand') return [];
+  const comparand = readComparand(method.argument);
+  if (comparand.kind === 'column') return findColumn(frame, comparand.column)?.cells ?? [];
+  const value = comparand.kind === 'literal' ? comparand.value : null;
+  return Array.from({ length: rowCount }, () => value);
+}
+
 /** Applies `method` to `values` separately within each of `groups`. */
 export function applyWithin(
   method: Method,
@@ -393,11 +552,8 @@ export function applyWithin(
   frame: Frame,
 ): Cell[] {
   const result: Cell[] = values.map(() => null);
-  // The other column of a two-sided method, row for row.
-  const other =
-    ARGUMENT_KINDS[method.name] === 'operand'
-      ? (findColumn(frame, method.argument ?? '')?.cells ?? [])
-      : [];
+  // The other side of a two-sided method, row for row.
+  const other = otherSide(method, values.length, frame);
   for (const members of groups) {
     const worked = applyAcrossGroup(
       method,
@@ -429,6 +585,9 @@ export function defaultArgument(
       return '-1d';
     case 'column':
       return frame[0]?.name ?? '';
+    case 'comparand':
+      // What it is compared with is still to be picked.
+      return '';
     default:
       return null;
   }
@@ -444,6 +603,15 @@ export function methodText(method: Method): string {
       return `.${method.name}(${quoted(method.argument ?? '')})`;
     case 'operand':
       return `.${method.name}(pl.col(${quoted(method.argument ?? '')}))`;
+    case 'comparand': {
+      const comparand = readComparand(method.argument);
+      if (comparand.kind === 'column') {
+        return `.${method.name}(pl.col(${quoted(comparand.column)}))`;
+      }
+      if (comparand.kind === 'unset') return `.${method.name}(None)`;
+      const { value } = comparand;
+      return `.${method.name}(${typeof value === 'number' ? String(value) : quoted(value)})`;
+    }
     default:
       return `.${method.name}()`;
   }

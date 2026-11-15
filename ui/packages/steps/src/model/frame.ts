@@ -6,7 +6,10 @@
  * validation and previews; nothing here is meant to survive.
  */
 
-/** One sample value. Dates and times are kept as ISO-like text, durations as whole minutes. */
+/**
+ * One sample value. Dates and times are kept as ISO-like text, durations as
+ * whole minutes, and a Boolean as the text `true` or `false`.
+ */
 export type Cell = string | number | null;
 
 /** The Polars dtypes the sample uses. */
@@ -18,7 +21,8 @@ export type Dtype =
   | 'Datetime'
   | 'Date'
   | 'Time'
-  | 'Duration';
+  | 'Duration'
+  | 'Boolean';
 
 /** One column of a frame. */
 export interface Column {
@@ -29,6 +33,9 @@ export interface Column {
 
 /** The rows at one point in the list. */
 export type Frame = readonly Column[];
+
+/** The name of the table the steps start from. */
+export const SOURCE_NAME = 'claims';
 
 /** The frame the first step is given: seven claim rows, not yet in any useful order. */
 export const SOURCE_FRAME: Frame = [

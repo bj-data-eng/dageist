@@ -46,7 +46,7 @@ export function StepsWindow({ host, styleNonce }: StepsWindowProps): React.JSX.E
       mark="ƒx"
       title="Steps · Claim timing"
       details={[
-        'Click a block to change what is in it. Point at a step or a method to part its brackets: × removes it, + adds one after it. A faint word waits where the next thing goes.',
+        'Click a word to change it. The list it opens also adds after the thing the word names, or removes it. Drag a step by its number.',
       ]}
     >
       <div className="flex min-h-0 flex-1">

@@ -28,8 +28,14 @@ function valueSummary(value: Value): string {
 
 function conditionSummary(condition: Condition): string {
   if (condition.kind === 'group') {
+    // A list of one comparison is named by that comparison.
+    const [only] = condition.items;
+    if (condition.items.length === 1 && only !== undefined) return conditionSummary(only);
+    // One with nothing in it is named by what is still to be picked.
+    if (condition.items.length === 0) return 'condition';
     return `${condition.every ? 'all of' : 'any of'} ${String(condition.items.length)} conditions`;
   }
+  if (condition.kind === 'chain') return '…';
   const field = condition.column === '' ? 'field' : condition.column;
   return `${field} ${condition.comparison} ${valueSummary(condition.value)}`;
 }
@@ -44,7 +50,7 @@ function fieldList(names: readonly string[]): string {
 export function stepDetail(step: Step): string {
   switch (step.verb) {
     case 'with_columns':
-      return step.expr.alias;
+      return step.alias;
     case 'filter':
       return conditionSummary(step.condition);
     case 'sort':

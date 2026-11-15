@@ -1,8 +1,11 @@
 /**
- * @file The list a block opens: a search box, then what is on offer in
- * groups. Each row shows the thing as the block it would become and a word
- * on what it is. A row that cannot be picked says why. What is typed narrows
- * the offer, and the caller may offer the typed text itself as a value.
+ * @file The list a word opens: a note about the word when there is one, a
+ * search box, then what is on offer in groups. Each row shows the thing as
+ * the word it would become and a few words on what it is. A row that cannot
+ * be picked says why. What is typed narrows the offer, and the caller may
+ * offer the typed text itself as a value. At its foot the list holds what
+ * can be done to the thing the word names: adding after it and taking it
+ * away.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -40,8 +43,20 @@ export interface OfferGroup {
   readonly offers: readonly Offer[];
 }
 
+/** Something done to the thing a word names, offered at the foot of its list. */
+export interface ListAction {
+  readonly label: string;
+  readonly onPress: () => void;
+}
+
 /** What an offer list shows and reports. */
 export interface OfferListProps {
+  /** A note about the word the list belongs to, shown above the search box. */
+  readonly about?: readonly string[];
+  /** Whether the note is code, and so set in the code font. */
+  readonly aboutCode?: boolean;
+  /** What can be done to the thing the word names, shown at the foot of the list. */
+  readonly actions?: readonly ListAction[];
   /** What the search box says while it is empty. */
   readonly placeholder: string;
   /** Returns what is on offer for the text typed so far. */
@@ -70,6 +85,9 @@ function placesOf(groups: readonly OfferGroup[]): ReadonlyMap<string, number> {
 
 /** Shows what is on offer and picks from it by pointer or keyboard. */
 export function OfferList({
+  about = [],
+  aboutCode = false,
+  actions = [],
   placeholder,
   groups,
   keepOpen,
@@ -121,6 +139,13 @@ export function OfferList({
 
   return (
     <div className={cx('dg-offers', wide && 'dg-wide')}>
+      {about.length > 0 && (
+        <div className={cx('dg-about', aboutCode && 'dg-code-note')}>
+          {about.map((line, at) => (
+            <div key={at}>{line}</div>
+          ))}
+        </div>
+      )}
       <label className="dg-search">
         <input
           ref={search}
@@ -189,6 +214,23 @@ export function OfferList({
         ))}
         {shown.length === 0 && <div className="dg-nothing">Nothing by that name.</div>}
       </div>
+      {actions.length > 0 && (
+        <div className="dg-acts">
+          {actions.map((action) => (
+            <button
+              key={action.label}
+              type="button"
+              className="dg-act"
+              onClick={() => {
+                onDone();
+                action.onPress();
+              }}
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

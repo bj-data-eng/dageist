@@ -1,34 +1,36 @@
 /**
- * @file The piece: a body of blocks, the square brackets round it when it is
- * a function or a step, and a panel at each side. Pointing at a piece parts
- * its brackets and uncovers the panels: a cross on the left takes the piece
- * away and a plus on the right adds something after it. A click is for what
- * is inside the piece; pointing is for the piece itself.
+ * @file The piece: the words that make up one thing, such as a method and
+ * what it works with, or a step and what it takes. A piece draws nothing of
+ * its own. It says what can be done to the thing as a whole, taking it away
+ * and adding something after it, and the word that names the thing offers
+ * both at the foot of its list.
  */
 
-import { useState } from 'react';
+import { createContext, useMemo } from 'react';
 
-import type { Tone } from './Block';
 import { cx } from './cx';
 
-/** What one side panel of a piece is called and does. */
+/** One thing that can be done to a piece as a whole. */
 export interface SideAction {
-  /** What the panel does, for assistive technology and as its title. */
+  /** What it does, as the list says it. */
   readonly label: string;
-  /** Called with the piece, so that a list can be placed against it. */
-  readonly onPress: (piece: HTMLElement) => void;
+  /** Called with the word that names the piece, so that a list can be placed against it. */
+  readonly onPress: (anchor: HTMLElement) => void;
 }
 
-/** What a piece shows and reports. */
-export interface PieceProps {
-  /** The colour of the piece's brackets, and of the blocks in it that name no colour. */
-  readonly tone: Tone;
-  /** Whether the piece stands in square brackets, as a function and a step do. */
-  readonly bracketed: boolean;
+/** What can be done to the piece a word stands in. */
+export interface PieceActions {
   /** Takes the piece away, or `null` when it cannot be taken away. */
   readonly remove: SideAction | null;
   /** Adds something after the piece, or `null` when nothing can follow it. */
   readonly add: SideAction | null;
+}
+
+/** What can be done to the nearest piece, for the word that names it. */
+export const PieceContext = createContext<PieceActions>({ remove: null, add: null });
+
+/** What a piece holds and what can be done to it. */
+export interface PieceProps extends PieceActions {
   /** Whether the piece is being dragged to another place. */
   readonly dragged?: boolean;
   /** Receives the piece, for a caller that drags it. */
@@ -36,53 +38,20 @@ export interface PieceProps {
   readonly children: React.ReactNode;
 }
 
-/** Draws `children` as one piece with its side panels. */
+/** Holds `children` as one piece. */
 export function Piece({
-  tone,
-  bracketed,
   remove,
   add,
   dragged = false,
   pieceRef,
   children,
 }: PieceProps): React.JSX.Element {
-  const [piece, setPiece] = useState<HTMLElement | null>(null);
+  const actions = useMemo(() => ({ remove, add }), [remove, add]);
   return (
-    <span
-      ref={(element) => {
-        setPiece(element);
-        pieceRef?.(element);
-      }}
-      data-tone={tone}
-      className={cx('dg-piece', bracketed && 'dg-bracketed', dragged && 'dg-dragged')}
-    >
-      {remove !== null && (
-        <button
-          type="button"
-          aria-label={remove.label}
-          title={remove.label}
-          className="dg-side dg-side-remove"
-          onClick={() => {
-            if (piece !== null) remove.onPress(piece);
-          }}
-        >
-          ×
-        </button>
-      )}
-      <span className="dg-body">{children}</span>
-      {add !== null && (
-        <button
-          type="button"
-          aria-label={add.label}
-          title={add.label}
-          className="dg-side dg-side-add"
-          onClick={() => {
-            if (piece !== null) add.onPress(piece);
-          }}
-        >
-          +
-        </button>
-      )}
-    </span>
+    <PieceContext.Provider value={actions}>
+      <span ref={pieceRef} className={cx('dg-piece', dragged && 'dg-dragged')}>
+        {children}
+      </span>
+    </PieceContext.Provider>
   );
 }

@@ -20,15 +20,15 @@ import {
   reordered,
 } from './frame';
 import { nextId } from './ids';
-import type { Condition, Expr } from './source';
+import type { Condition, Value } from './source';
 import {
-  checkChain,
+  cellsOf,
+  checkValue,
   conditionProblem,
   conditionRows,
   conditionText,
-  evaluateChain,
-  exprText,
   literalText,
+  valueExprText,
 } from './source';
 import { TABLES, findTable } from './tables';
 
@@ -46,12 +46,15 @@ export const VERBS: readonly Verb[] = [
   'pivot',
 ];
 
-/** `.with_columns(expr)`: adds a column, or replaces one of the same name. */
+/** `.with_columns(value.alias(alias))`: adds a column, or replaces one of the same name. */
 export interface WithColumnsStep {
   /** Stays with the step while it is moved or edited. */
   readonly id: string;
   readonly verb: 'with_columns';
-  readonly expr: Expr;
+  /** The name of the column. */
+  readonly alias: string;
+  /** What the column holds: a field, a value written out, an input, or a chain. */
+  readonly value: Value;
 }
 
 /** One column a sort orders by, and which way. */
@@ -175,22 +178,19 @@ function failed(frame: Frame, problem: string): StepResult {
 }
 
 function withColumns(frame: Frame, step: WithColumnsStep): StepResult {
-  const { expr } = step;
-  if (expr.alias.trim() === '') return failed(frame, 'alias needs a name.');
-  const check = checkChain(expr, frame);
-  const cells = evaluateChain(expr, frame);
-  const dtype = check.dtypes.at(-1);
-  if (check.problem !== null || cells === null || dtype === undefined) {
-    return failed(frame, check.problem?.message ?? 'This expression cannot be worked out.');
-  }
-  const column: Column = { name: expr.alias, dtype, cells };
-  const replaced = frame.some((existing) => existing.name === expr.alias);
+  const { alias, value } = step;
+  if (alias.trim() === '') return failed(frame, 'alias needs a name.');
+  const check = checkValue(value, frame);
+  if (check.problem !== null) return failed(frame, check.problem);
+  if (check.dtype === null) return failed(frame, 'None alone has no dtype to make a column of.');
+  const column: Column = { name: alias, dtype: check.dtype, cells: cellsOf(value, frame) };
+  const replaced = frame.some((existing) => existing.name === alias);
   return {
     frame: replaced
-      ? frame.map((existing) => (existing.name === expr.alias ? column : existing))
+      ? frame.map((existing) => (existing.name === alias ? column : existing))
       : [...frame, column],
     problem: null,
-    added: [expr.alias],
+    added: [alias],
   };
 }
 
@@ -427,8 +427,9 @@ export function defaultStep(verb: Verb, frame: Frame): Step {
       return {
         id,
         verb,
-        // The chain starts from a field that is still to be picked.
-        expr: { source: { kind: 'column', column: '' }, methods: [], alias: 'new_column' },
+        alias: 'new_column',
+        // What the column holds is still to be picked.
+        value: { kind: 'unset' },
       };
     case 'sort':
       return { id, verb, by: [] };
@@ -503,7 +504,7 @@ function pivotText(step: PivotStep): string {
 export function stepText(step: Step): string {
   switch (step.verb) {
     case 'with_columns':
-      return `.with_columns(${exprText(step.expr)})`;
+      return `.with_columns(${valueExprText(step.value)}.alias(${quoted(step.alias)}))`;
     case 'sort': {
       const columns = step.by.map((key) => quoted(key.column)).join(', ');
       if (!step.by.some((key) => key.descending)) return `.sort(${columns})`;
