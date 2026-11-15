@@ -18,7 +18,7 @@ import { FreshContext, Line, Lines } from './Lists';
 import { anyField, counted, fieldOffers, matches, offer, titled } from './offers';
 import { useFieldHint } from './origins';
 import type { Cell, Dtype, Frame } from './model/frame';
-import { distinctValues, findColumn, keysFit } from './model/frame';
+import { findColumn, keysFit } from './model/frame';
 import { nextId } from './model/ids';
 import { INPUTS, findInput } from './model/inputs';
 import type { ChainCondition, Comparison, Condition, Group, Test, Value } from './model/source';
@@ -82,8 +82,6 @@ function chainOffer(onAdd: (condition: ChainCondition) => void): Offer {
 export interface ValueSlotProps {
   readonly value: Value;
   readonly frame: Frame;
-  /** The field whose values are worth offering by name, such as the one compared with. */
-  readonly suggestFrom: string | null;
   /** What the value is for, for assistive technology. */
   readonly label: string;
   /** Whether the slot takes a connected list, as `is_in` does, instead of a single value. */
@@ -94,15 +92,14 @@ export interface ValueSlotProps {
 }
 
 /**
- * Draws a value as a block in the colour of what it is, which opens the list
- * it is picked from: a chain of its own, something typed, a value of the
- * compared field, a connected input, or a field. A chain is three dots, with
- * its own list under the row.
+ * Draws a value as a word in the colour of what it is, which opens the list
+ * it is picked from: a chain of its own, something typed, a connected input,
+ * or a field. The list never offers the values a field holds: a column can
+ * hold millions of them. A chain is written where the value stands.
  */
 export function ValueSlot({
   value,
   frame,
-  suggestFrom,
   label,
   lists,
   expected,
@@ -161,18 +158,6 @@ export function ValueSlot({
       written.push(offer(typed, 'value', 'String', literal(typed), { id: 'text', look: 'quoted' }));
     }
     written.push(offer('None', 'value', 'no value', literal(null), { id: 'none', look: 'none' }));
-    const known =
-      suggestFrom === null
-        ? []
-        : distinctValues(frame, suggestFrom)
-            .filter((cell) => cell !== null && matches(typed, String(cell)))
-            .map((cell) => {
-              const block = literalBlock(cell);
-              return offer(block.label, 'value', `in ${suggestFrom}`, literal(cell), {
-                id: `known:${block.label}`,
-                look: block.look,
-              });
-            });
     const fields = fieldOffers(frame, typed, {
       ...anyField((column) => {
         onChange({ kind: 'column', column });
@@ -184,7 +169,6 @@ export function ValueSlot({
       titled(null, typed === '' ? [chain] : []),
       titled('Value', written),
       counted('Inputs', connected),
-      counted(suggestFrom === null ? 'Values' : `Values of ${suggestFrom}`, known),
       counted('Fields', fields),
     ];
   };
@@ -350,7 +334,6 @@ export function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JS
       <ValueSlot
         value={test.value}
         frame={frame}
-        suggestFrom={unset ? null : test.column}
         label={unset ? 'The value it is compared with' : `Value compared with ${test.column}`}
         lists={test.comparison === 'is_in'}
         expected={expected}

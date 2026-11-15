@@ -104,7 +104,6 @@ function AddColumnHead({ step, frame, onChange }: HeadProps<WithColumnsStep>): R
       <ValueSlot
         value={step.value}
         frame={frame}
-        suggestFrom={null}
         label={`What ${step.alias === '' ? 'the column' : step.alias} holds`}
         lists={false}
         expected={null}

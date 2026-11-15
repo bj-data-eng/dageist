@@ -512,7 +512,6 @@ export function ChainBlocks({
     <ValueSlot
       value={value}
       frame={frame}
-      suggestFrom={null}
       label={label}
       lists={false}
       expected={null}
