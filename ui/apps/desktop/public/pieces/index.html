@@ -16,6 +16,20 @@
     </header>
 
     <main>
+      <h2 class="section">
+        Calmer
+        <span
+          >the same steps as text: colour only in the letters, and nothing moves until a click</span
+        >
+      </h2>
+      <div id="versions-calm" class="versions"></div>
+
+      <h2 class="section">
+        Trays
+        <span>where a list a block opens, and a chain that is a value, are shown</span>
+      </h2>
+      <div id="versions-tray" class="versions"></div>
+
       <h2 class="section">Adding <span>a method to a chain, and a step to the steps</span></h2>
       <div id="versions-add" class="versions"></div>
 
@@ -1109,6 +1123,423 @@
     </template>
 
     <!-- The head of a step, for a step that is added. pieces.js writes its verb and what it takes. -->
+    <!--
+      A card for the calm version: steps written as text. A word that can be changed is a
+      button with no box round it. Clicking one marks it and opens its list beneath it. The
+      word that names a thing also carries what the brackets used to: `data-acts` says which
+      thing it names (a step, a method, a line of a condition, a group, a function), and its
+      list ends with adding after that thing and taking it away.
+    -->
+    <template id="card-calm">
+      <section class="card c-card">
+        <h3><span class="letter"></span><span class="name"></span></h3>
+        <p class="note"></p>
+
+        <div class="c-stage">
+          <div class="c-row">
+            <span class="c-num">1</span>
+            <span class="c-code">
+              <button type="button" class="c-tok c-verb c-sort" data-acts="step">Sort table</button>
+              <i>by</i> <button type="button" class="c-tok c-col">dcn</button>,
+              <button type="button" class="c-tok c-col">timestamp</button>
+            </span>
+          </div>
+
+          <div class="c-row">
+            <span class="c-num">2</span>
+            <span class="c-code">
+              <button type="button" class="c-tok c-verb" data-acts="step">Add column</button>
+              <button type="button" class="c-tok c-name">step_index</button> <i>=</i>
+              <button type="button" class="c-tok c-col">dcn</button>
+              <span class="c-part"
+                ><i>›</i>
+                <button type="button" class="c-tok c-fn" data-acts="method">cum_count</button></span
+              >
+              <span class="c-part"
+                ><i>›</i> <button type="button" class="c-tok c-fn" data-acts="method">over</button>
+                <button type="button" class="c-tok c-col">dcn</button></span
+              >
+            </span>
+            <span class="c-out">UInt32</span>
+          </div>
+
+          <div class="c-row">
+            <span class="c-num">3</span>
+            <span class="c-code">
+              <button type="button" class="c-tok c-verb" data-acts="step">Add column</button>
+              <button type="button" class="c-tok c-name">received_at</button> <i>=</i>
+              <button type="button" class="c-tok c-col">timestamp</button>
+            </span>
+            <span class="c-out">Datetime</span>
+          </div>
+
+          <div class="c-row is-chosen">
+            <span class="c-num">4</span>
+            <span class="c-code">
+              <button type="button" class="c-tok c-verb" data-acts="step">Add column</button>
+              <button type="button" class="c-tok c-name">days_open</button> <i>=</i>
+              <button type="button" class="c-tok c-col">received_at</button>
+              <span class="c-part"
+                ><i>›</i>
+                <button type="button" class="c-tok c-fn is-picked" data-acts="method">sub</button>
+                <button type="button" class="c-tok c-col">resolved_at</button></span
+              >
+              <span class="c-part"
+                ><i>›</i>
+                <button type="button" class="c-tok c-fn" data-acts="method">
+                  dt.total_days
+                </button></span
+              >
+            </span>
+            <span class="c-out">Int64</span>
+          </div>
+
+          <div class="c-row">
+            <span class="c-num">5</span>
+            <span class="c-code">
+              <button type="button" class="c-tok c-verb" data-acts="step">Add column</button>
+              <button type="button" class="c-tok c-name">a_days</button> <i>=</i>
+              <span class="c-group">
+                <span class="c-in"
+                  ><button type="button" class="c-tok c-fn" data-acts="function">when</button>
+                  <button type="button" class="c-tok c-col">owner</button>
+                  <button type="button" class="c-tok c-op">==</button>
+                  <button type="button" class="c-tok c-val">"Company A"</button></span
+                >
+                <span class="c-in"
+                  ><i>then</i> <button type="button" class="c-tok c-col">row_days</button></span
+                >
+                <span class="c-in"
+                  ><i>otherwise</i> <button type="button" class="c-tok c-val">0</button></span
+                >
+              </span>
+              <span class="c-in"
+                ><span class="c-part"
+                  ><i>›</i>
+                  <button type="button" class="c-tok c-fn" data-acts="method">cum_sum</button></span
+                >
+                <span class="c-part"
+                  ><i>›</i>
+                  <button type="button" class="c-tok c-fn" data-acts="method">over</button>
+                  <button type="button" class="c-tok c-col">dcn</button></span
+                ></span
+              >
+            </span>
+            <span class="c-out">Int64</span>
+          </div>
+
+          <div class="c-row">
+            <span class="c-num">6</span>
+            <span class="c-code">
+              <button type="button" class="c-tok c-verb c-join" data-acts="step">Join table</button>
+              <button type="button" class="c-tok c-val">step_sla</button> <i>on</i>
+              <button type="button" class="c-tok c-col">step_to</button>
+              <button type="button" class="c-tok c-op">==</button>
+              <button type="button" class="c-tok c-col">step</button> <i>how</i>
+              <button type="button" class="c-tok c-val">left</button>
+            </span>
+            <span class="c-out">adds sla_days</span>
+          </div>
+
+          <div class="c-row">
+            <span class="c-num">7</span>
+            <span class="c-code">
+              <button type="button" class="c-tok c-verb c-filter" data-acts="step">
+                Filter table
+              </button>
+              <button type="button" class="c-tok c-fn" data-acts="list">all of</button>
+              <span class="c-in"
+                ><button type="button" class="c-tok c-col">owner</button>
+                <button type="button" class="c-tok c-op" data-acts="line">==</button>
+                <button type="button" class="c-tok c-val">"Company A"</button></span
+              >
+              <span class="c-in"
+                ><button type="button" class="c-tok c-col">row_days</button>
+                <button type="button" class="c-tok c-op" data-acts="line">&gt;</button>
+                <button type="button" class="c-tok c-val">3</button></span
+              >
+              <span class="c-group">
+                <span class="c-in"
+                  ><button type="button" class="c-tok c-fn" data-acts="group">any of</button></span
+                >
+                <span class="c-in c-deep"
+                  ><button type="button" class="c-tok c-col">step_to</button>
+                  <button type="button" class="c-tok c-op" data-acts="line">==</button>
+                  <button type="button" class="c-tok c-val">"Review"</button></span
+                >
+                <span class="c-in c-deep"
+                  ><button type="button" class="c-tok c-col">step_to</button>
+                  <button type="button" class="c-tok c-op" data-acts="line">==</button>
+                  <button type="button" class="c-tok c-val">"Pending"</button></span
+                >
+              </span>
+            </span>
+            <span class="c-out">keeps 5 of 7 rows</span>
+          </div>
+
+          <div class="c-row is-wrong">
+            <span class="c-num">8</span>
+            <span class="c-code">
+              <button type="button" class="c-tok c-verb" data-acts="step">Add column</button>
+              <button type="button" class="c-tok c-name">flag</button> <i>=</i>
+              <button type="button" class="c-tok c-missing">value</button>
+              <span class="c-in c-says">Pick a value.</span>
+            </span>
+          </div>
+
+          <!-- Where the next step goes: one quiet word after the last step. -->
+          <div class="c-row c-more">
+            <span class="c-num">+</span>
+            <span class="c-code"><button type="button" class="c-tok c-add">step</button></span>
+          </div>
+
+          <!-- The list of whatever is marked. It is the only thing that appears, and only on a click. -->
+          <div class="c-pop" hidden></div>
+        </div>
+      </section>
+    </template>
+
+    <!--
+      A card for a tray: four steps. One has a chain as its value: its dots own the tray that
+      holds the chain, and a field in that chain owns the tray that holds its list. Another has
+      a condition: its dots own the tray that holds the condition's lines. Every version is
+      this one card, laid out by its own styles, with the trays it names open.
+    -->
+    <template id="card-tray">
+      <section class="card t-card">
+        <h3><span class="letter"></span><span class="name"></span></h3>
+        <p class="note"></p>
+
+        <div class="t-stage">
+          <div class="t-step">
+            <span class="t-num">6</span>
+            <span class="t-piece">
+              <button type="button" class="t-b t-verb">Add column</button>
+              <button type="button" class="t-b t-name">received_at</button>
+              <span class="t-w">=</span>
+              <button type="button" class="t-b t-col">timestamp</button>
+            </span>
+            <span class="t-out">Datetime</span>
+          </div>
+
+          <div class="t-step is-chosen">
+            <span class="t-num">7</span>
+            <span class="t-piece">
+              <button type="button" class="t-b t-verb">Add column</button>
+              <button type="button" class="t-b t-name">days_open</button>
+              <span class="t-w">=</span>
+              <button
+                type="button"
+                class="t-b t-fn"
+                data-tray-for="chain"
+                aria-expanded="true"
+                aria-label="What days_open holds: a chain of its own"
+              >
+                …
+              </button>
+            </span>
+            <span class="t-out">Int64</span>
+
+            <div class="t-tray t-tray-chain">
+              <div class="t-line">
+                <span class="t-mark">7.1</span>
+                <span class="t-piece is-straight">
+                  <button type="button" class="t-b t-col">received_at</button>
+                </span>
+                <span class="t-link">
+                  <span class="seam"></span>
+                  <span class="t-piece">
+                    <button type="button" class="t-b t-fn">sub</button>
+                    <button
+                      type="button"
+                      class="t-b t-col"
+                      data-tray-for="list"
+                      aria-expanded="true"
+                      aria-label="The field sub works with"
+                    >
+                      resolved_at
+                    </button>
+                    <button type="button" class="t-b t-fn t-nest" aria-expanded="true">…</button>
+                  </span>
+                </span>
+                <span class="t-link">
+                  <span class="seam"></span>
+                  <span class="t-piece">
+                    <button type="button" class="t-b t-fn">dt.total_days</button>
+                  </span>
+                </span>
+                <!-- More of the chain, for the version that shows a line too long for its row. -->
+                <span class="t-link t-more">
+                  <span class="seam"></span>
+                  <span class="t-piece">
+                    <button type="button" class="t-b t-fn">cum_max</button>
+                  </span>
+                </span>
+                <span class="t-link t-more">
+                  <span class="seam"></span>
+                  <span class="t-piece">
+                    <button type="button" class="t-b t-fn">shift</button>
+                    <button type="button" class="t-b t-val">1</button>
+                  </span>
+                </span>
+                <span class="t-link t-more">
+                  <span class="seam"></span>
+                  <span class="t-piece">
+                    <button type="button" class="t-b t-fn">over</button>
+                    <button type="button" class="t-b t-col">dcn</button>
+                  </span>
+                </span>
+                <span class="t-link t-more">
+                  <span class="seam"></span>
+                  <span class="t-piece">
+                    <button type="button" class="t-b t-fn">cum_sum</button>
+                  </span>
+                </span>
+              </div>
+              <!-- A chain inside the chain, for the version that shows one. -->
+              <div class="t-sub t-nest">
+                <div class="t-line">
+                  <span class="t-mark">7.1.1</span>
+                  <span class="t-piece is-straight">
+                    <button type="button" class="t-b t-col">resolved_at</button>
+                  </span>
+                  <span class="seam"></span>
+                  <span class="t-piece">
+                    <button type="button" class="t-b t-fn">shift</button>
+                    <button type="button" class="t-b t-val">1</button>
+                  </span>
+                  <span class="seam"></span>
+                  <span class="t-piece">
+                    <button type="button" class="t-b t-fn">over</button>
+                    <button type="button" class="t-b t-col">dcn</button>
+                  </span>
+                </div>
+                <div class="t-sub">
+                  <div class="t-line">
+                    <span class="t-mark">7.1.1.1</span>
+                    <span class="t-piece is-straight">
+                      <button type="button" class="t-b t-col">timestamp</button>
+                    </span>
+                    <span class="seam"></span>
+                    <span class="t-piece">
+                      <button type="button" class="t-b t-fn">dt.date</button>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="t-tray t-tray-list">
+                <div class="t-search">Search the fields</div>
+                <div class="t-group">Fields <i>6</i></div>
+                <div class="t-offers">
+                  <span class="t-offer"
+                    ><span class="t-b t-col">dcn</span><i>a different dtype</i></span
+                  >
+                  <span class="t-offer"
+                    ><span class="t-b t-col">timestamp</span><i>Datetime</i></span
+                  >
+                  <span class="t-offer"
+                    ><span class="t-b t-col">step_to</span><i>a different dtype</i></span
+                  >
+                  <span class="t-offer is-picked"
+                    ><span class="t-b t-col">resolved_at</span><i>Datetime</i></span
+                  >
+                  <span class="t-offer"
+                    ><span class="t-b t-col">received_at</span><i>Datetime</i></span
+                  >
+                  <span class="t-offer"
+                    ><span class="t-b t-col">resolved_day</span><i>Date</i></span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="t-step">
+            <span class="t-num">8</span>
+            <span class="t-piece">
+              <button type="button" class="t-b t-verb t-join">Join table</button>
+              <button type="button" class="t-b t-val">step_sla</button>
+              <span class="t-w">on</span>
+              <button type="button" class="t-b t-col">step_to</button>
+              <span class="t-b t-cmp">==</span>
+              <button type="button" class="t-b t-col">step</button>
+            </span>
+            <span class="t-out">adds sla_days</span>
+          </div>
+
+          <div class="t-step">
+            <span class="t-num">9</span>
+            <span class="t-piece">
+              <button type="button" class="t-b t-verb t-filter">Filter table</button>
+              <button
+                type="button"
+                class="t-b t-fn"
+                data-tray-for="lines"
+                aria-expanded="false"
+                aria-label="The condition: show or hide it"
+              >
+                …
+              </button>
+            </span>
+            <span class="t-out">keeps 5 of 7 rows</span>
+
+            <div class="t-tray t-tray-lines" hidden>
+              <div class="t-line">
+                <span class="t-piece is-straight is-group">
+                  <button type="button" class="t-b t-fn">all of</button>
+                  <button type="button" class="t-b t-fn" aria-expanded="true">…</button>
+                </span>
+              </div>
+              <div class="t-sub">
+                <div class="t-line">
+                  <span class="t-mark">9.1</span>
+                  <span class="t-piece is-straight is-cmp">
+                    <button type="button" class="t-b t-col">owner</button>
+                    <button type="button" class="t-b t-cmp">==</button>
+                    <button type="button" class="t-b t-val">"Company A"</button>
+                  </span>
+                </div>
+                <div class="t-line">
+                  <span class="t-mark">9.2</span>
+                  <span class="t-piece is-straight is-cmp">
+                    <button type="button" class="t-b t-col">row_days</button>
+                    <button type="button" class="t-b t-cmp">&gt;</button>
+                    <button type="button" class="t-b t-val">3</button>
+                  </span>
+                </div>
+                <div class="t-line">
+                  <span class="t-mark">9.3</span>
+                  <span class="t-piece is-straight is-group">
+                    <button type="button" class="t-b t-fn">any of</button>
+                    <button type="button" class="t-b t-fn" aria-expanded="true">…</button>
+                  </span>
+                </div>
+                <div class="t-sub">
+                  <div class="t-line">
+                    <span class="t-mark">9.3.1</span>
+                    <span class="t-piece is-straight is-cmp">
+                      <button type="button" class="t-b t-col">step_to</button>
+                      <button type="button" class="t-b t-cmp">==</button>
+                      <button type="button" class="t-b t-val">"Review"</button>
+                    </span>
+                  </div>
+                  <div class="t-line">
+                    <span class="t-mark">9.3.2</span>
+                    <span class="t-piece is-straight is-cmp">
+                      <button type="button" class="t-b t-col">step_to</button>
+                      <button type="button" class="t-b t-cmp">==</button>
+                      <button type="button" class="t-b t-val">"Pending"</button>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </template>
+
     <template id="step-head">
       <span class="piece head is-bracketed"
         ><button type="button" class="side side-remove" aria-label="Remove step">×</button
