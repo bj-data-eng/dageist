@@ -234,8 +234,8 @@ with the reason for each:
 - `objc2-exception-helper`, which a feature Tauri turns on in `objc2` adds;
 - features Tauri turns on in packages Polars also uses, such as `serde_json`'s
   `raw_value`;
-- `std` in `ndarray` and the numeric crates it builds on, which `numpy`, used
-  by the Python binding, turns on in the release.
+- `std` and the default features of `ndarray` and the numeric crates it builds
+  on, which `numpy`, used by the Python binding, turns on in the release.
 
 A listed exception that no longer applies is reported too, so the list stays
 current.
