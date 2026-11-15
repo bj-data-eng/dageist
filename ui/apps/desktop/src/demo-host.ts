@@ -6,8 +6,18 @@
 
 import { tableFromArrays, tableToIPC } from '@uwdata/flechette';
 
-import type { BlockRequest, ColumnView, Host, TableView } from '@dageist/host';
+import type { BlockRequest, CatalogueView, ColumnView, Host, TableView } from '@dageist/host';
 import { deliverMessage, sealMessage } from '@dageist/host';
+
+import snapshot from './catalogue.json';
+
+/**
+ * What the host's `operation_catalogue` command returns, as a snapshot of it. TypeScript
+ * types the JSON by its text, where each tag is a plain `string`, so the contract is asserted
+ * here. A host test keeps the file equal to the Rust view that the contract mirrors.
+ */
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the JSON is the serialized Rust view, kept equal to it by a host test; its tags only read as `string` here
+const CATALOGUE = snapshot as CatalogueView;
 
 const COLUMNS: readonly ColumnView[] = [
   { name: 'dcn', dataType: 'str' },
@@ -44,6 +54,7 @@ export function demoHost(): Host {
   };
   return {
     coreIdentity: async () => Promise.resolve({ name: 'Browser preview', version: 'made-up data' }),
+    operationCatalogue: async () => Promise.resolve(CATALOGUE),
     openSampleWindow: async () => Promise.resolve(open(WINDOW_ROWS)),
     openSampleResult: async () => Promise.resolve(open(RESULT_ROWS)),
     fetchTableBlock: async (request) => Promise.resolve(makeBlock(request, rows)),

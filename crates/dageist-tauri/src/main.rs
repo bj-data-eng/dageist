@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod catalogue;
 mod sample_table;
 mod windows;
 
@@ -37,6 +38,7 @@ fn main() {
         .on_window_event(windows::close_with_main)
         .invoke_handler(tauri::generate_handler![
             core_identity,
+            catalogue::operation_catalogue,
             sample_table::open_sample_window,
             sample_table::open_sample_result,
             sample_table::table_block,
