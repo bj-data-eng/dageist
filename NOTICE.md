@@ -114,12 +114,20 @@ David Tolnay, under your choice of either license:
 * License: [MIT License](licenses/serde/LICENSE-MIT)
 * Homepage: [Serde](https://serde.rs)
 
-This product's tests depend on serde_json 1.0.151, from the same upstream
-project, under your choice of either license:
+This product's tests depend on serde_json 1.0.151, and its public API audit
+generator on serde_json 1.0.150, from the same upstream project, under your
+choice of either license:
 
 * License: [Apache License 2.0](licenses/serde/LICENSE-APACHE)
 * License: [MIT License](licenses/serde/LICENSE-MIT)
 * Homepage: [serde_json](https://github.com/serde-rs/json)
+
+This product's public API audit generator depends on syn 2.0.118, distributed
+by David Tolnay, under your choice of either license:
+
+* License: [Apache License 2.0](licenses/syn/LICENSE-APACHE)
+* License: [MIT License](licenses/syn/LICENSE-MIT)
+* Homepage: [syn](https://github.com/dtolnay/syn)
 
 This product depends on tauri 2.12.5 and its build-time companion tauri-build
 2.7.4, distributed by the Tauri Programme within The Commons Conservancy, under
