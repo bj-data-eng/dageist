@@ -564,8 +564,8 @@ fn rename_gives_columns_their_new_names() {
     let given = Arguments::new().with(
         "mapping",
         pairs(vec![
-            (columns(&["i"]), columns(&["index"])),
-            (columns(&["s"]), columns(&["label"])),
+            (columns(&["i"]), text("index")),
+            (columns(&["s"]), text("label")),
         ]),
     );
     let renamed = step("LazyFrame.rename", sample(), &given).unwrap();
@@ -577,7 +577,7 @@ fn rename_gives_columns_their_new_names() {
 
 #[test]
 fn rename_of_a_column_the_table_lacks_fails_only_when_strict() {
-    let mapping = pairs(vec![(columns(&["nope"]), columns(&["other"]))]);
+    let mapping = pairs(vec![(columns(&["nope"]), text("other"))]);
     let strict = Arguments::new().with("mapping", mapping.clone());
     let renamed = step("LazyFrame.rename", sample(), &strict).unwrap();
     assert!(renamed.clone().collect_schema().is_err());
@@ -926,10 +926,8 @@ fn an_argument_of_the_wrong_kind_names_the_parameter_and_what_was_given() {
         ),
         ("other", "a table", "a whole number")
     );
-    let two_names = Arguments::new().with(
-        "mapping",
-        pairs(vec![(columns(&["a", "b"]), columns(&["c"]))]),
-    );
+    let two_names =
+        Arguments::new().with("mapping", pairs(vec![(columns(&["a", "b"]), text("c"))]));
     assert_eq!(
         wrong(
             step("LazyFrame.rename", sample(), &two_names)

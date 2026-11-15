@@ -8,6 +8,9 @@ changed = []
 [families.steps]
 title = "Steps · change the table"
 
+[families.aggregate]
+title = "Aggregate · one value"
+
 [families.rows]
 title = "Rows"
 
@@ -556,3 +559,19 @@ label = "conditions"
 [entries."polars.when".parameters.constraints]
 name = "constraints"
 label = "columns equal to"
+
+[entries."Expr.len"]
+name = "len"
+hint = "number of values"
+
+[entries."Expr.max"]
+name = "max"
+hint = "highest value"
+
+[entries."Expr.min"]
+name = "min"
+hint = "lowest value"
+
+[entries."Expr.sum"]
+name = "sum"
+hint = "total"

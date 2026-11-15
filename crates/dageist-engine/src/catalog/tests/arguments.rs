@@ -250,8 +250,8 @@ fn a_word_that_is_not_one_of_the_choices_is_refused_before_building() {
 
 #[test]
 fn pairs_are_checked_on_each_side() {
-    // `LazyFrame.rename(mapping)`: a column name to a column name.
-    let ok = pairs(vec![(columns(&["i"]), columns(&["index"]))]);
+    // `LazyFrame.rename(mapping)`: a column name to a new name, which is text.
+    let ok = pairs(vec![(columns(&["i"]), text("index"))]);
     assert!(given("LazyFrame.rename", vec![("mapping", ok)]).is_ok());
     let value = pairs(vec![(columns(&["i"]), expression_arg(col("i")))]);
     let error = given("LazyFrame.rename", vec![("mapping", value)])
@@ -262,13 +262,13 @@ fn pairs_are_checked_on_each_side() {
             error,
             BuildError::WrongKind {
                 parameter: "mapping",
-                expected: "column names",
+                expected: "text",
                 found: "an expression"
             }
         ),
         "{error}"
     );
-    let key = pairs(vec![(text("i"), columns(&["index"]))]);
+    let key = pairs(vec![(text("i"), text("index"))]);
     assert!(given("LazyFrame.rename", vec![("mapping", key)]).is_err());
     // `LazyFrame.with_columns(**named_exprs)`: a column name to an expression.
     let named = pairs(vec![(columns(&["x"]), expression_arg(col("i")))]);

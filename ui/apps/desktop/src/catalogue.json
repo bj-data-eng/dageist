@@ -17,6 +17,10 @@
       "title": "Arithmetic"
     },
     {
+      "key": "aggregate",
+      "title": "Aggregate · one value"
+    },
+    {
       "key": "temporal",
       "title": "dt · dates and times"
     },
@@ -550,6 +554,17 @@
       ]
     },
     {
+      "id": "Expr.len",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "len",
+      "hint": "number of values",
+      "head": null,
+      "accepts": ["any"],
+      "lazy": true,
+      "parameters": []
+    },
+    {
       "id": "Expr.lt",
       "applies": "expression",
       "family": "compare",
@@ -576,6 +591,28 @@
           "python": null
         }
       ]
+    },
+    {
+      "id": "Expr.max",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "max",
+      "hint": "highest value",
+      "head": null,
+      "accepts": ["numeric", "temporal", "String", "Boolean"],
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.min",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "min",
+      "hint": "lowest value",
+      "head": null,
+      "accepts": ["numeric", "temporal", "String", "Boolean"],
+      "lazy": true,
+      "parameters": []
     },
     {
       "id": "Expr.ne",
@@ -799,6 +836,17 @@
           "python": null
         }
       ]
+    },
+    {
+      "id": "Expr.sum",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "sum",
+      "hint": "total",
+      "head": null,
+      "accepts": ["numeric", "Boolean", "Duration"],
+      "lazy": true,
+      "parameters": []
     },
     {
       "id": "LazyFrame.filter",
@@ -1327,7 +1375,8 @@
               "kind": "column"
             },
             "value": {
-              "kind": "column"
+              "kind": "value",
+              "type": "string"
             }
           },
           "shape": {

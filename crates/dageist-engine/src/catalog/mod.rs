@@ -71,6 +71,8 @@ pub enum Family {
     Cumulative,
     /// Arithmetic between two values.
     Arithmetic,
+    /// One value for a whole group: `sum`, `min`, `max`, `len`.
+    Aggregate,
     /// Dates and times: the `dt` namespace.
     Temporal,
     /// Working within groups: `over`.
@@ -85,11 +87,12 @@ pub enum Family {
 
 impl Family {
     /// Every family, in the order they are offered.
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::Steps,
         Self::Rows,
         Self::Cumulative,
         Self::Arithmetic,
+        Self::Aggregate,
         Self::Temporal,
         Self::Window,
         Self::Compare,
@@ -105,6 +108,7 @@ impl Family {
             Self::Rows => "rows",
             Self::Cumulative => "cumulative",
             Self::Arithmetic => "arithmetic",
+            Self::Aggregate => "aggregate",
             Self::Temporal => "temporal",
             Self::Window => "window",
             Self::Compare => "compare",

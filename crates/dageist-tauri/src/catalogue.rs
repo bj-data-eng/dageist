@@ -619,6 +619,7 @@ mod tests {
                 "rows",
                 "cumulative",
                 "arithmetic",
+                "aggregate",
                 "temporal",
                 "window",
                 "compare",

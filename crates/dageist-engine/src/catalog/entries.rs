@@ -219,6 +219,22 @@ fn shift(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
     })
 }
 
+fn sum(expr: Expr, _arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.sum())
+}
+
+fn min(expr: Expr, _arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.min())
+}
+
+fn max(expr: Expr, _arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.max())
+}
+
+fn len(expr: Expr, _arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.len())
+}
+
 fn first(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
     Ok(if arguments.flag("ignore_nulls", false)? {
         expr.first_non_null()
@@ -450,7 +466,10 @@ fn rename(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildErr
     let (mut existing, mut new) = (Vec::new(), Vec::new());
     for (from, to) in arguments.pairs("mapping")? {
         existing.push(name_of("mapping", &from)?);
-        new.push(name_of("mapping", &to)?);
+        new.push(match to {
+            Argument::String(name) => name,
+            other => return Err(Arguments::wrong("mapping", "a new name", &other)),
+        });
     }
     Ok(frame.rename(existing, new, arguments.flag("strict", true)?))
 }
@@ -793,12 +812,36 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(le),
     },
     Entry {
+        id: EntryId("Expr.len"),
+        family: Family::Aggregate,
+        accepts: ANY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(len),
+    },
+    Entry {
         id: EntryId("Expr.lt"),
         family: Family::Compare,
         accepts: ANY,
         parameters: &[OTHER],
         laziness: Laziness::Lazy,
         build: Build::Expression(lt),
+    },
+    Entry {
+        id: EntryId("Expr.max"),
+        family: Family::Aggregate,
+        accepts: CUM_MAX,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(max),
+    },
+    Entry {
+        id: EntryId("Expr.min"),
+        family: Family::Aggregate,
+        accepts: CUM_MAX,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(min),
     },
     Entry {
         id: EntryId("Expr.ne"),
@@ -846,6 +889,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[OTHER],
         laziness: Laziness::Lazy,
         build: Build::Expression(sub),
+    },
+    Entry {
+        id: EntryId("Expr.sum"),
+        family: Family::Aggregate,
+        accepts: CUM_SUM,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(sum),
     },
     Entry {
         id: EntryId("LazyFrame.filter"),
@@ -924,7 +975,7 @@ pub(super) const ENTRIES: &[Entry] = &[
             // Python also takes a function from the old name to the new; a step holds none.
             required(
                 "mapping",
-                Kind::Pairs(&Kind::Column, &Kind::Column),
+                Kind::Pairs(&Kind::Column, &Kind::Value(ValueType::String)),
                 Shape::One,
             ),
             flag("strict", "True"),
