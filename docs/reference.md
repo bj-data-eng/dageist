@@ -15,6 +15,16 @@ workspace member through `[workspace.lints.rust]`. The workspace uses
 | `dageist-ui` | [ui/](../ui/package.json) | Private npm workspace for the React view; see [View Packages](#view-packages). |
 | `dageist-api-generator` | [api/generator/](../api/generator/Cargo.toml) | Writes and checks the [public API audits](#public-api-audits). A workspace of its own with its own lock file, outside the product workspace. Not published. |
 
+## Vendored Sources
+
+| Path | Source | Pinned to |
+| --- | --- | --- |
+| `vendor/polars` | [pola-rs/polars](https://github.com/pola-rs/polars), as a shallow Git submodule declared in [.gitmodules](../.gitmodules) | Python Polars `py-2.1.0`, commit `7f902bd3ffd27ff82d14278a09a295ff2f7aed92`. |
+
+The engine still builds the Polars crates published on crates.io, at the
+version in [Cargo.lock](../Cargo.lock). The submodule holds the Rust and
+Python source of the release it is pinned to; nothing builds from it yet.
+
 ## Public API Audits
 
 Each audit lists one crate's public API, one line per item, as rustdoc JSON

@@ -1,0 +1,4 @@
+[submodule "polars"]
+	path = vendor/polars
+	url = https://github.com/pola-rs/polars.git
+	shallow = true

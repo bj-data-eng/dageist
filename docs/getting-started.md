@@ -21,12 +21,23 @@ packages.
 
 ## Prepare The Checkout
 
-1. Clone the repository:
+1. Clone the repository, then fetch its submodule, the Polars source in
+   `vendor/polars`:
 
    ```sh
    git clone https://github.com/bj-data-eng/dageist.git
    cd dageist
+   git submodule update --init --depth 1
    ```
+
+   The last command fetches about 13 MB: the Polars commit the repository is
+   pinned to, and the newest commit of Polars' main branch, which Git fetches
+   first. It takes no history and no other branches or tags. The checked-out
+   files take about 27 MB more. The same command fills `vendor/polars` in an
+   existing clone. Without `--depth 1`, Git fetches the pinned commit's
+   whole history, about 190 MB.
+   `git clone --recurse-submodules` instead fetches the newest commit of
+   every Polars branch and tag, about 150 MB, and grows as Polars adds tags.
 
 2. Retrieve the locked Rust dependencies into the local Cargo cache:
 

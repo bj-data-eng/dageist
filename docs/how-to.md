@@ -199,6 +199,37 @@ generator's Cargo or rustdoc handling changes:
 env -u CARGO_TARGET_DIR CARGO_NET_OFFLINE=true cargo test --offline --locked --manifest-path api/generator/Cargo.toml --lib -- --ignored
 ```
 
+## Move Polars To A New Release
+
+`vendor/polars` holds the Polars source at the commit of one Python Polars
+release tag, such as `py-2.1.0`. Python Polars and Polars' Rust crates are
+released separately and from different commits, so a `py-*` tag is the only
+source that matches a Python release. To move to another release, fetch its
+tag into the submodule and check it out; `--depth 1` keeps the submodule
+without history:
+
+```sh
+git -C vendor/polars fetch --depth 1 origin tag py-2.2.0
+git -C vendor/polars checkout --detach py-2.2.0
+git add vendor/polars
+```
+
+`git submodule status` then shows the new commit with the tag beside it, and
+`git diff --cached --submodule=short` the commit it replaces. Update the tag
+and commit in the [reference](reference.md#vendored-sources), commit the move
+on its own, and name the tag in the commit message.
+
+To confirm that the pinned commit is the release's, compare it with the tag
+on the Polars repository:
+
+```sh
+git submodule status vendor/polars
+git -C vendor/polars ls-remote --tags origin py-2.1.0
+```
+
+The two commits are the same. A fresh clone fetches no Polars tags, so there
+`git submodule status` shows the commit without its tag.
+
 ## Regenerate The Application Icons
 
 `crates/dageist-tauri/icons/icon.svg` is the source of every raster icon. After
