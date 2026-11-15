@@ -37,6 +37,21 @@ const COMPARISON_WORDS: Readonly<Record<Comparison, string>> = {
   is_in: 'one of a list',
 };
 
+/**
+ * How each comparison is written in a step. Two-character comparisons that
+ * have a sign of their own are written as that sign, so they stay one
+ * character wide and read as they do on paper.
+ */
+const COMPARISON_SIGNS: Readonly<Record<Comparison, string>> = {
+  '==': '==',
+  '!=': '≠',
+  '>': '>',
+  '>=': '≥',
+  '<': '<',
+  '<=': '≤',
+  is_in: 'is_in',
+};
+
 /** Returns how a typed value is shown as a block. */
 function literalBlock(value: Cell): { label: string; look: Look } {
   if (value === null) return { label: 'None', look: 'none' };
@@ -305,7 +320,7 @@ function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Eleme
         />
       </Hint>
       <Slot
-        label={test.comparison}
+        label={COMPARISON_SIGNS[test.comparison]}
         tone="compare"
         look="compare"
         names
@@ -318,13 +333,13 @@ function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Eleme
               matches(typed, comparison, COMPARISON_WORDS[comparison]),
             ).map((comparison) =>
               offer(
-                comparison,
+                COMPARISON_SIGNS[comparison],
                 'compare',
                 COMPARISON_WORDS[comparison],
                 () => {
                   compare(comparison);
                 },
-                { look: 'compare' },
+                { id: comparison, look: 'compare' },
               ),
             ),
           ),
