@@ -9,6 +9,7 @@ export type {
   CatalogueView,
   ChoiceView,
   ColumnView,
+  DefaultView,
   EntryView,
   Host,
   IdentityView,

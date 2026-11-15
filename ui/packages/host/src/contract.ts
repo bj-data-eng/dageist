@@ -58,6 +58,22 @@ export type ShapeView =
   | { readonly shape: 'many' }
   | { readonly shape: 'perItem'; readonly of: string };
 
+/**
+ * What a parameter holds when it is not given, mirroring `DefaultView` in
+ * crates/dageist-tauri/src/catalogue.rs. `none` is Python's `None`: unset,
+ * which leaves the choice to Polars. `empty` is an empty `*` or `**`
+ * parameter. `other` is a default the engine does not read as a value.
+ */
+export type DefaultView =
+  | { readonly kind: 'required' }
+  | { readonly kind: 'none' }
+  | { readonly kind: 'flag'; readonly value: boolean }
+  | { readonly kind: 'integer'; readonly value: number }
+  | { readonly kind: 'float'; readonly value: number }
+  | { readonly kind: 'text'; readonly value: string }
+  | { readonly kind: 'empty' }
+  | { readonly kind: 'other' };
+
 /** Mirrors `ParameterView` in crates/dageist-tauri/src/catalogue.rs. */
 export interface ParameterView {
   /** Python's name, which identifies the parameter. */
@@ -67,15 +83,18 @@ export interface ParameterView {
   readonly label: string;
   readonly kind: KindView;
   readonly shape: ShapeView;
+  /** Polars' default, read by the engine. */
+  readonly default: DefaultView;
   /** Polars' default as Python writes it, or `null` when it must be given. */
-  readonly default: string | null;
+  readonly python: string | null;
 }
 
 /** Mirrors `EntryView` in crates/dageist-tauri/src/catalogue.rs. */
 export interface EntryView {
   /** The stable identifier saved steps keep, such as `Expr.shift`. */
   readonly id: string;
-  readonly applies: 'expression' | 'frame' | 'function';
+  /** `condition` is one link of `when`, `then` and `otherwise`. */
+  readonly applies: 'expression' | 'frame' | 'function' | 'condition';
   /** The key of the family it is swapped within. */
   readonly family: string;
   /** The name shown for it; in English, Polars' own name. */

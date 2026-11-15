@@ -81,6 +81,112 @@
   ],
   "entries": [
     {
+      "id": "ChainedThen.otherwise",
+      "applies": "condition",
+      "family": "condition",
+      "name": "otherwise",
+      "hint": "the value where no condition holds",
+      "head": null,
+      "accepts": [],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "statement",
+          "shown": "statement",
+          "label": "value when none holds",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "python": null
+        }
+      ]
+    },
+    {
+      "id": "ChainedThen.when",
+      "applies": "condition",
+      "family": "condition",
+      "name": "when",
+      "hint": "another condition",
+      "head": null,
+      "accepts": [],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "predicates",
+          "shown": "predicates",
+          "label": "conditions",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["Boolean"]
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": {
+            "kind": "empty"
+          },
+          "python": "()"
+        },
+        {
+          "name": "constraints",
+          "shown": "constraints",
+          "label": "columns equal to",
+          "kind": {
+            "kind": "pairs",
+            "key": {
+              "kind": "column"
+            },
+            "value": {
+              "kind": "expression",
+              "dtypes": ["any"]
+            }
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "empty"
+          },
+          "python": "{}"
+        }
+      ]
+    },
+    {
+      "id": "ChainedWhen.then",
+      "applies": "condition",
+      "family": "condition",
+      "name": "then",
+      "hint": "the value where that condition holds",
+      "head": null,
+      "accepts": [],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "statement",
+          "shown": "statement",
+          "label": "value when it holds",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "python": null
+        }
+      ]
+    },
+    {
       "id": "Expr.cum_count",
       "applies": "expression",
       "family": "cumulative",
@@ -100,7 +206,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "False"
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "python": "False"
         }
       ]
     },
@@ -124,7 +234,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "False"
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "python": "False"
         }
       ]
     },
@@ -148,7 +262,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "False"
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "python": "False"
         }
       ]
     },
@@ -195,7 +313,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": null
+          "default": {
+            "kind": "required"
+          },
+          "python": null
         }
       ]
     },
@@ -230,7 +351,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "False"
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "python": "False"
         }
       ]
     },
@@ -255,7 +380,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": null
+          "default": {
+            "kind": "required"
+          },
+          "python": null
         }
       ]
     },
@@ -279,7 +407,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "False"
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "python": "False"
         }
       ]
     },
@@ -304,7 +436,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": null
+          "default": {
+            "kind": "required"
+          },
+          "python": null
         }
       ]
     },
@@ -329,7 +464,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": null
+          "default": {
+            "kind": "required"
+          },
+          "python": null
         }
       ]
     },
@@ -375,7 +513,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "False"
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "python": "False"
         }
       ]
     },
@@ -400,7 +542,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": null
+          "default": {
+            "kind": "required"
+          },
+          "python": null
         }
       ]
     },
@@ -425,7 +570,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": null
+          "default": {
+            "kind": "required"
+          },
+          "python": null
         }
       ]
     },
@@ -450,7 +598,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": null
+          "default": {
+            "kind": "required"
+          },
+          "python": null
         }
       ]
     },
@@ -475,7 +626,10 @@
           "shape": {
             "shape": "many"
           },
-          "default": "None"
+          "default": {
+            "kind": "none"
+          },
+          "python": "None"
         },
         {
           "name": "more_exprs",
@@ -488,7 +642,10 @@
           "shape": {
             "shape": "many"
           },
-          "default": "()"
+          "default": {
+            "kind": "empty"
+          },
+          "python": "()"
         },
         {
           "name": "order_by",
@@ -501,7 +658,10 @@
           "shape": {
             "shape": "many"
           },
-          "default": "None"
+          "default": {
+            "kind": "none"
+          },
+          "python": "None"
         },
         {
           "name": "descending",
@@ -513,7 +673,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "False"
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "python": "False"
         },
         {
           "name": "nulls_last",
@@ -525,7 +689,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "False"
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "python": "False"
         },
         {
           "name": "mapping_strategy",
@@ -551,7 +719,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "'group_to_rows'"
+          "default": {
+            "kind": "text",
+            "value": "group_to_rows"
+          },
+          "python": "'group_to_rows'"
         }
       ]
     },
@@ -576,7 +748,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "1"
+          "default": {
+            "kind": "integer",
+            "value": 1
+          },
+          "python": "1"
         },
         {
           "name": "fill_value",
@@ -589,7 +765,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": "None"
+          "default": {
+            "kind": "none"
+          },
+          "python": "None"
         }
       ]
     },
@@ -614,7 +793,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": null
+          "default": {
+            "kind": "required"
+          },
+          "python": null
         }
       ]
     },
@@ -639,7 +821,10 @@
           "shape": {
             "shape": "many"
           },
-          "default": "()"
+          "default": {
+            "kind": "empty"
+          },
+          "python": "()"
         },
         {
           "name": "constraints",
@@ -658,7 +843,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": "{}"
+          "default": {
+            "kind": "empty"
+          },
+          "python": "{}"
         }
       ]
     },
@@ -682,7 +870,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": null
+          "default": {
+            "kind": "required"
+          },
+          "python": null
         },
         {
           "name": "on",
@@ -695,7 +886,10 @@
           "shape": {
             "shape": "many"
           },
-          "default": "None"
+          "default": {
+            "kind": "none"
+          },
+          "python": "None"
         },
         {
           "name": "how",
@@ -737,7 +931,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "'inner'"
+          "default": {
+            "kind": "text",
+            "value": "inner"
+          },
+          "python": "'inner'"
         },
         {
           "name": "left_on",
@@ -750,7 +948,10 @@
           "shape": {
             "shape": "many"
           },
-          "default": "None"
+          "default": {
+            "kind": "none"
+          },
+          "python": "None"
         },
         {
           "name": "right_on",
@@ -763,7 +964,10 @@
           "shape": {
             "shape": "many"
           },
-          "default": "None"
+          "default": {
+            "kind": "none"
+          },
+          "python": "None"
         },
         {
           "name": "suffix",
@@ -776,7 +980,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "'_right'"
+          "default": {
+            "kind": "text",
+            "value": "_right"
+          },
+          "python": "'_right'"
         },
         {
           "name": "validate",
@@ -806,7 +1014,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "'m:m'"
+          "default": {
+            "kind": "text",
+            "value": "m:m"
+          },
+          "python": "'m:m'"
         },
         {
           "name": "nulls_equal",
@@ -818,7 +1030,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "False"
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "python": "False"
         },
         {
           "name": "coalesce",
@@ -830,7 +1046,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": "None"
+          "default": {
+            "kind": "none"
+          },
+          "python": "None"
         },
         {
           "name": "maintain_order",
@@ -864,7 +1083,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": "None"
+          "default": {
+            "kind": "none"
+          },
+          "python": "None"
         },
         {
           "name": "build_side",
@@ -898,7 +1120,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "'auto'"
+          "default": {
+            "kind": "text",
+            "value": "auto"
+          },
+          "python": "'auto'"
         },
         {
           "name": "allow_parallel",
@@ -910,7 +1136,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "True"
+          "default": {
+            "kind": "flag",
+            "value": true
+          },
+          "python": "True"
         },
         {
           "name": "force_parallel",
@@ -922,7 +1152,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "False"
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "python": "False"
         }
       ]
     },
@@ -946,7 +1180,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": null
+          "default": {
+            "kind": "required"
+          },
+          "python": null
         },
         {
           "name": "on_columns",
@@ -958,7 +1195,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": null
+          "default": {
+            "kind": "required"
+          },
+          "python": null
         },
         {
           "name": "index",
@@ -970,7 +1210,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": "None"
+          "default": {
+            "kind": "none"
+          },
+          "python": "None"
         },
         {
           "name": "values",
@@ -982,7 +1225,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": "None"
+          "default": {
+            "kind": "none"
+          },
+          "python": "None"
         },
         {
           "name": "aggregate_function",
@@ -995,7 +1241,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": "None"
+          "default": {
+            "kind": "none"
+          },
+          "python": "None"
         },
         {
           "name": "maintain_order",
@@ -1007,7 +1256,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "False"
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "python": "False"
         },
         {
           "name": "separator",
@@ -1020,7 +1273,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "'_'"
+          "default": {
+            "kind": "text",
+            "value": "_"
+          },
+          "python": "'_'"
         },
         {
           "name": "column_naming",
@@ -1042,7 +1299,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "'auto'"
+          "default": {
+            "kind": "text",
+            "value": "auto"
+          },
+          "python": "'auto'"
         }
       ]
     },
@@ -1072,7 +1333,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": null
+          "default": {
+            "kind": "required"
+          },
+          "python": null
         },
         {
           "name": "strict",
@@ -1084,7 +1348,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "True"
+          "default": {
+            "kind": "flag",
+            "value": true
+          },
+          "python": "True"
         }
       ]
     },
@@ -1109,7 +1377,10 @@
           "shape": {
             "shape": "many"
           },
-          "default": "()"
+          "default": {
+            "kind": "empty"
+          },
+          "python": "()"
         },
         {
           "name": "named_exprs",
@@ -1128,7 +1399,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": "{}"
+          "default": {
+            "kind": "empty"
+          },
+          "python": "{}"
         }
       ]
     },
@@ -1153,7 +1427,10 @@
           "shape": {
             "shape": "many"
           },
-          "default": null
+          "default": {
+            "kind": "required"
+          },
+          "python": null
         },
         {
           "name": "more_by",
@@ -1166,7 +1443,10 @@
           "shape": {
             "shape": "many"
           },
-          "default": "()"
+          "default": {
+            "kind": "empty"
+          },
+          "python": "()"
         },
         {
           "name": "descending",
@@ -1179,7 +1459,11 @@
             "shape": "perItem",
             "of": "by"
           },
-          "default": "False"
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "python": "False"
         },
         {
           "name": "nulls_last",
@@ -1192,7 +1476,11 @@
             "shape": "perItem",
             "of": "by"
           },
-          "default": "False"
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "python": "False"
         },
         {
           "name": "maintain_order",
@@ -1204,7 +1492,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "False"
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "python": "False"
         },
         {
           "name": "multithreaded",
@@ -1216,7 +1508,11 @@
           "shape": {
             "shape": "one"
           },
-          "default": "True"
+          "default": {
+            "kind": "flag",
+            "value": true
+          },
+          "python": "True"
         }
       ]
     },
@@ -1241,7 +1537,10 @@
           "shape": {
             "shape": "many"
           },
-          "default": "()"
+          "default": {
+            "kind": "empty"
+          },
+          "python": "()"
         },
         {
           "name": "named_exprs",
@@ -1260,7 +1559,116 @@
           "shape": {
             "shape": "one"
           },
-          "default": "{}"
+          "default": {
+            "kind": "empty"
+          },
+          "python": "{}"
+        }
+      ]
+    },
+    {
+      "id": "Then.otherwise",
+      "applies": "condition",
+      "family": "condition",
+      "name": "otherwise",
+      "hint": "the value where no condition holds",
+      "head": null,
+      "accepts": [],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "statement",
+          "shown": "statement",
+          "label": "value when none holds",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "python": null
+        }
+      ]
+    },
+    {
+      "id": "Then.when",
+      "applies": "condition",
+      "family": "condition",
+      "name": "when",
+      "hint": "another condition",
+      "head": null,
+      "accepts": [],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "predicates",
+          "shown": "predicates",
+          "label": "conditions",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["Boolean"]
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": {
+            "kind": "empty"
+          },
+          "python": "()"
+        },
+        {
+          "name": "constraints",
+          "shown": "constraints",
+          "label": "columns equal to",
+          "kind": {
+            "kind": "pairs",
+            "key": {
+              "kind": "column"
+            },
+            "value": {
+              "kind": "expression",
+              "dtypes": ["any"]
+            }
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "empty"
+          },
+          "python": "{}"
+        }
+      ]
+    },
+    {
+      "id": "When.then",
+      "applies": "condition",
+      "family": "condition",
+      "name": "then",
+      "hint": "the value where the condition holds",
+      "head": null,
+      "accepts": [],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "statement",
+          "shown": "statement",
+          "label": "value when it holds",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["any"]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "python": null
         }
       ]
     },
@@ -1284,7 +1692,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": null
+          "default": {
+            "kind": "required"
+          },
+          "python": null
         },
         {
           "name": "more_names",
@@ -1296,9 +1707,23 @@
           "shape": {
             "shape": "many"
           },
-          "default": "()"
+          "default": {
+            "kind": "empty"
+          },
+          "python": "()"
         }
       ]
+    },
+    {
+      "id": "polars.element",
+      "applies": "function",
+      "family": "start",
+      "name": "element",
+      "hint": "each value of the cell being combined",
+      "head": null,
+      "accepts": [],
+      "lazy": true,
+      "parameters": []
     },
     {
       "id": "polars.lit",
@@ -1321,7 +1746,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": null
+          "default": {
+            "kind": "required"
+          },
+          "python": null
         },
         {
           "name": "dtype",
@@ -1333,7 +1761,10 @@
           "shape": {
             "shape": "one"
           },
-          "default": "None"
+          "default": {
+            "kind": "none"
+          },
+          "python": "None"
         },
         {
           "name": "allow_object",
@@ -1345,7 +1776,61 @@
           "shape": {
             "shape": "one"
           },
-          "default": "False"
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "python": "False"
+        }
+      ]
+    },
+    {
+      "id": "polars.when",
+      "applies": "condition",
+      "family": "condition",
+      "name": "when",
+      "hint": "choose a value by a condition",
+      "head": null,
+      "accepts": [],
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "predicates",
+          "shown": "predicates",
+          "label": "conditions",
+          "kind": {
+            "kind": "expression",
+            "dtypes": ["Boolean"]
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": {
+            "kind": "empty"
+          },
+          "python": "()"
+        },
+        {
+          "name": "constraints",
+          "shown": "constraints",
+          "label": "columns equal to",
+          "kind": {
+            "kind": "pairs",
+            "key": {
+              "kind": "column"
+            },
+            "value": {
+              "kind": "expression",
+              "dtypes": ["any"]
+            }
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "empty"
+          },
+          "python": "{}"
         }
       ]
     }
