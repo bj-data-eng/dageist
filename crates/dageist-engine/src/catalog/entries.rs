@@ -78,7 +78,7 @@ const fn double_starred(name: &'static str) -> Parameter {
     optional(name, NAMED_EXPRESSIONS, Shape::One, "{}")
 }
 
-/// A flag that is on or off, never left to Polars.
+/// A flag with Python's default text, which may be `None` where Polars decides.
 const fn flag(name: &'static str, default: &'static str) -> Parameter {
     optional(name, Kind::Flag, Shape::One, default)
 }
@@ -803,7 +803,8 @@ pub(super) const ENTRIES: &[Entry] = &[
                 "'auto'",
             ),
         ],
-        laziness: Laziness::Lazy,
+        // Building the step collects the table given for `on_columns`, which runs its query.
+        laziness: Laziness::NeedsCollect,
         build: Build::Frame(pivot),
     },
     Entry {

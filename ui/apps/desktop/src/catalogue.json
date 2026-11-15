@@ -934,7 +934,7 @@
       "hint": "the values of a field as columns",
       "head": "Pivot table",
       "accepts": [],
-      "lazy": true,
+      "lazy": false,
       "parameters": [
         {
           "name": "on",
