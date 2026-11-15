@@ -165,7 +165,14 @@ public method, property and operator of `Expr` and its namespaces,
 - the binding methods it calls;
 - the public Rust items those reach;
 - how it is built: the same name in Rust, another name or several Rust items,
-  in Python from other calls, or not resolved to a public Rust item.
+  in Python from other calls, or not resolved to a public Rust item;
+- the other Polars calls it is built from, when it has any.
+
+A binding call made through code the item delegates to is counted as the
+item's own: private helpers in any module; the engine or resolver object a
+helper returns or that the item makes; and class methods such as
+`pl.LazyFrame.from_lazyframe_resolver`. The item's own public methods are not
+followed; they are listed as what it is built from.
 
 The header counts each kind and says what is not covered, such as the eager
 `DataFrame` and `Series`. The generator reads the Python with Python's own
