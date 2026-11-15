@@ -62,8 +62,8 @@ pub fn left_out() -> &'static [LeftOut] {
 //   a `TypeError`: a lazy frame has no value to compare until it is collected.
 // - `LazyFrame.__contains__` is Python's `in`: it asks whether a column name is in the
 //   schema and gives a bool, not a table or an expression.
-// - `LazyFrame.__getitem__` is Python's subscript syntax for `slice`, which has the
-//   operation; the other subscripts it names it does not support.
+// - `LazyFrame.__getitem__` is Python's subscript syntax for `LazyFrame.slice`, which
+//   is the item to catalogue for that operation; it supports no other subscript.
 // - `LazyFrame.clone` and `LazyFrame.lazy` return the frame they are given, unchanged.
 // - `LazyFrame.collect`, `collect_async`, `collect_batches`, `execute`, and
 //   `polars.collect_all` and `collect_all_async` run a query and hand the rows to
