@@ -90,6 +90,7 @@ impl dageist_engine::catalog::Dtypes
 pub const dageist_engine::catalog::Dtypes::ALL: [Self; 10]
 pub const fn dageist_engine::catalog::Dtypes::key(self) -> &'static str
 pub enum dageist_engine::catalog::Family
+pub dageist_engine::catalog::Family::Aggregate
 pub dageist_engine::catalog::Family::Arithmetic
 pub dageist_engine::catalog::Family::Compare
 pub dageist_engine::catalog::Family::Condition
@@ -100,7 +101,7 @@ pub dageist_engine::catalog::Family::Steps
 pub dageist_engine::catalog::Family::Temporal
 pub dageist_engine::catalog::Family::Window
 impl dageist_engine::catalog::Family
-pub const dageist_engine::catalog::Family::ALL: [Self; 9]
+pub const dageist_engine::catalog::Family::ALL: [Self; 10]
 pub const fn dageist_engine::catalog::Family::key(self) -> &'static str
 pub enum dageist_engine::catalog::Kind
 pub dageist_engine::catalog::Kind::Choice(&'static [&'static str])
