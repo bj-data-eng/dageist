@@ -4,7 +4,8 @@
  * one, so a column, a method, a value and a comparison are told apart by
  * colour, as in a code editor, and not by a box. A word that is pointed at
  * takes a faint flat fill and nothing else. The quiet things that stand
- * between words are here too: a word that names a parameter, a caret and an equals sign.
+ * between words are here too: a word that names a parameter, a caret and an
+ * equals sign.
  */
 
 import { cx } from './cx';

@@ -2,7 +2,8 @@
  * @file A short note about something: its dtype, where it comes from, what a
  * method does. Nothing appears when the thing is pointed at. The note is
  * handed to the word it is about, which shows it at the top of the list the
- * word opens.
+ * word opens. Only a slot reads the note, so a hint around anything else
+ * shows nothing; a word without a list shows its lines as a peek instead.
  */
 
 import { createContext, useMemo } from 'react';
