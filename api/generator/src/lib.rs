@@ -2245,6 +2245,11 @@ mod tests {
                 arena.add(AExpr::Len);
             }
             #[pyfunction]
+            fn arena_only(node: Node) -> bool {
+                let arena: Arena<AExpr> = Arena::new();
+                arena.get(node).is_some()
+            }
+            #[pyfunction]
             fn built(plan: DslPlan) -> PyLazyFrame {
                 DslBuilder::from(plan).build().into()
             }
@@ -2269,7 +2274,7 @@ mod tests {
             reached(&binding, "PyLazyFrame", "collect").is_empty(),
             "DataFrame::empty is not the free function empty"
         );
-        for name in ["plan_filter", "arena_node", "built"] {
+        for name in ["plan_filter", "arena_node", "arena_only", "built"] {
             assert!(
                 binding[&("module".to_owned(), name.to_owned())].internals,
                 "{name} builds Polars' internals"
@@ -2741,6 +2746,176 @@ mod tests {
             items
                 .iter()
                 .all(|item| item.name != "read_csv" && item.name != "_private")
+        );
+    }
+
+    #[test]
+    fn the_python_reader_leaves_out_only_branches_an_unset_flag_cannot_take() {
+        let fixture = python_fixture();
+        fixture.file(
+            "functions/__init__.py",
+            "from polars.functions.flags import (unset, positional, keyword, spread, starred, both, \
+             both_reversed, false_default, rebound, method_passed, receiver_helper, pruned_receiver, \
+             held, calls_public)\n",
+        );
+        fixture.file(
+            "lazyframe/group_by.py",
+            "class LazyGroupBy:\n    def agg(self, *aggs):\n        return F.agg(aggs)\n",
+        );
+        fixture.file(
+            "functions/flags.py",
+            concat!(
+                "def _helper(x, flag=False, other=None, *, kw=None):\n",
+                "    if flag:\n        plr.flag_on()\n",
+                "    if not flag:\n        plr.flag_off()\n",
+                "    if other is None:\n        plr.other_unset()\n",
+                "    if other is not None:\n        plr.other_set()\n",
+                "    if kw:\n        plr.kw_on()\n",
+                "    return plr.flag_on_expr() if flag else plr.flag_off_expr()\n",
+                "def _false_default(flag=False):\n",
+                "    if flag is not None:\n        plr.false_is_not_none()\n",
+                "    if flag is None:\n        plr.false_is_none()\n",
+                "def _rebound(flag=None):\n",
+                "    if flag is None:\n        flag = True\n",
+                "    if flag:\n        plr.rebound_on()\n",
+                "class _Runner:\n",
+                "    def run(self, flag=False):\n        if flag:\n            plr.run_flag_on()\n",
+                "def _make(flag=False) -> _Runner:\n",
+                "    if flag:\n        plr.make_flag_on()\n",
+                "    return _Runner()\n",
+                "def _held(x, flag=False):\n",
+                "    value = x\n",
+                "    if flag:\n        value = x._pyexpr\n",
+                "    return value.held_method()\n",
+                "def _pruned_receiver(flag=False):\n",
+                "    runner = None\n",
+                "    if flag:\n        runner = _Runner()\n",
+                "    return runner.run(True)\n",
+                "def unset(x):\n    return _helper(x)\n",
+                "def positional(x):\n    return _helper(x, True, 1)\n",
+                "def keyword(x):\n    return _helper(x, kw=True)\n",
+                "def spread(x, **options):\n    return _helper(x, **options)\n",
+                "def starred(x, *rest):\n    return _helper(x, *rest)\n",
+                "def both(x):\n    _helper(x)\n    return _helper(x, True)\n",
+                "def both_reversed(x):\n    _helper(x, True)\n    return _helper(x)\n",
+                "def false_default():\n    return _false_default()\n",
+                "def rebound():\n    return _rebound()\n",
+                "def method_passed():\n    return _Runner().run(True)\n",
+                "def receiver_helper():\n    return _make().run(True)\n",
+                "def pruned_receiver():\n    return _pruned_receiver()\n",
+                "def held(x):\n    return _held(x)\n",
+                "def calls_public(x):\n    return unset(x)\n",
+            ),
+        );
+
+        let items = python::read_python(fixture.path()).unwrap();
+        let calls = |name: &str| -> Vec<&str> {
+            let item = items
+                .iter()
+                .find(|item| item.owner == "polars" && item.name == name)
+                .unwrap_or_else(|| panic!("polars.{name} is listed"));
+            item.binding.iter().map(|(_, call)| call.as_str()).collect()
+        };
+        let uses = |owner: &str, name: &str| {
+            items
+                .iter()
+                .find(|item| item.owner == owner && item.name == name)
+                .unwrap_or_else(|| panic!("{owner}.{name} is listed"))
+                .uses
+                .clone()
+        };
+        let all = [
+            "flag_off",
+            "flag_off_expr",
+            "flag_on",
+            "flag_on_expr",
+            "kw_on",
+            "other_set",
+            "other_unset",
+        ];
+
+        assert_eq!(
+            calls("unset"),
+            ["flag_off", "flag_off_expr", "other_unset"],
+            "`if flag`, `not flag`, `is None`, `is not None` and a conditional expression \
+             each keep only the branch an unset flag takes, keyword-only flags included"
+        );
+        assert_eq!(
+            calls("positional"),
+            [
+                "flag_off",
+                "flag_off_expr",
+                "flag_on",
+                "flag_on_expr",
+                "other_set",
+                "other_unset"
+            ],
+            "a flag passed by position keeps both branches"
+        );
+        assert_eq!(
+            calls("keyword"),
+            ["flag_off", "flag_off_expr", "kw_on", "other_unset"]
+        );
+        assert_eq!(
+            calls("spread"),
+            all,
+            "a call spreading keywords may pass any flag"
+        );
+        assert_eq!(
+            calls("starred"),
+            all,
+            "a call spreading positions may pass any flag"
+        );
+        for name in ["both", "both_reversed"] {
+            assert_eq!(
+                calls(name),
+                [
+                    "flag_off",
+                    "flag_off_expr",
+                    "flag_on",
+                    "flag_on_expr",
+                    "other_unset"
+                ],
+                "a helper called with and without a flag keeps both branches"
+            );
+        }
+        assert_eq!(
+            calls("false_default"),
+            ["false_is_not_none"],
+            "a flag that defaults to False is not None"
+        );
+        assert_eq!(
+            calls("rebound"),
+            ["rebound_on"],
+            "a flag the function assigns is not known to stay off"
+        );
+        assert_eq!(
+            calls("method_passed"),
+            ["run_flag_on"],
+            "`self` takes no argument of the call"
+        );
+        assert_eq!(
+            calls("receiver_helper"),
+            ["run_flag_on"],
+            "a helper a method is called on keeps the flags of its own call"
+        );
+        assert!(
+            calls("pruned_receiver").is_empty(),
+            "an instance made only in a branch that cannot run is not followed"
+        );
+        assert!(
+            calls("held").is_empty(),
+            "a binding object held only in a branch that cannot run is not followed"
+        );
+        assert_eq!(
+            uses("polars", "calls_public"),
+            ["unset"],
+            "a public function of the same module is listed as used"
+        );
+        assert_eq!(
+            uses("LazyGroupBy", "agg"),
+            ["agg"],
+            "a method built from a function of the same name lists it"
         );
     }
 
