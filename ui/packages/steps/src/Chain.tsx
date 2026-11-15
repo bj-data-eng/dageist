@@ -444,8 +444,11 @@ export function ChainBlocks({
   const fieldHint = useFieldHint();
   const check = checkChain(chain, frame);
   const [insertion, setInsertion] = useState<Insertion | null>(null);
+  // A chain made by carrying a field on opens its list of methods as soon as it is shown.
+  const [opensMethods, setOpensMethods] = useState(() => fresh.id === `${chainId}:method`);
   const closeList = useCallback(() => {
     setInsertion(null);
+    setOpensMethods(false);
   }, []);
   const { source } = chain;
   const withSource = (next: Source): void => {
@@ -461,6 +464,7 @@ export function ChainBlocks({
   };
   const addAt = (at: number): ((anchor: HTMLElement) => void) => {
     return (anchor) => {
+      setOpensMethods(false);
       setInsertion({ at, anchor });
     };
   };
@@ -469,13 +473,11 @@ export function ChainBlocks({
   const removeChain = onRemove === null ? null : { label: 'Remove this chain', onPress: onRemove };
   const column = source.kind === 'column' ? findColumn(frame, source.column) : null;
   const unset = source.kind === 'column' && source.column === '';
-  // The word the chain starts from, for a list of methods that opens as soon as the chain is made.
+  // The word the chain starts from, which that first list of methods opens against.
   const [start, setStart] = useState<HTMLElement | null>(null);
   const adding: Insertion | null =
     insertion ??
-    (start !== null && fresh.id === `${chainId}:method`
-      ? { at: chain.methods.length, anchor: start }
-      : null);
+    (opensMethods && start !== null ? { at: chain.methods.length, anchor: start } : null);
 
   // Each chain sorts its own methods, so a method cannot leave its chain.
   const methods = (
