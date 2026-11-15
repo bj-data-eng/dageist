@@ -126,9 +126,11 @@ Source remains authoritative; never hand-edit generated artifacts.
 API generation audits the root crate and each `crates/dageist-*` crate that has
 a library. It audits the Polars crates whose API the steps are built from, with
 the features a build of `dageist-tauri` resolves; a Polars upgrade or a change
-of those features is refreshed and reviewed with its source change. The
-generator is a separate workspace with its own lock file. API auditing is
-explicit maintenance, separate from normal product checks.
+of those features is refreshed and reviewed with its source change. It also
+traces the Python API of that release through its binding to those crates, in
+`api/polars/python.txt`, reading the Python with `python3`. The generator is a
+separate workspace with its own lock file. API auditing is explicit
+maintenance, separate from normal product checks.
 
 ## Command Inventory
 
