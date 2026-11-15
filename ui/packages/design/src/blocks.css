@@ -35,6 +35,7 @@
   min-width: 0;
   color: var(--color-muted);
   font: 13px/24px var(--font-mono);
+  font-variant-ligatures: none;
   text-indent: -3ch;
 }
 
@@ -294,6 +295,7 @@
   /* The popover says how much room it has, and the list of rows shrinks to it. */
   max-height: var(--popover-room, none);
   font: 12.5px/22px var(--font-mono);
+  font-variant-ligatures: none;
 }
 
 .dg-offers.dg-wide {
@@ -314,6 +316,7 @@
 
 .dg-about.dg-code-note {
   font-family: var(--font-mono);
+  font-variant-ligatures: none;
   overflow-wrap: anywhere;
 }
 
@@ -492,6 +495,7 @@
   width: 124px;
   color: var(--color-ink);
   font: 12.5px/20px var(--font-mono);
+  font-variant-ligatures: none;
   caret-color: var(--color-accent);
 }
 
@@ -543,6 +547,7 @@ select.dg-given {
 .dg-dtype {
   color: color-mix(in srgb, var(--color-dtype) 70%, var(--ground));
   font: 12px/24px var(--font-mono);
+  font-variant-ligatures: none;
 }
 
 /* A word that shows something more when it is pressed, and changes nothing. */

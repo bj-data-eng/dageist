@@ -43,6 +43,8 @@
   --color-verb-pivot: #7fc4e8;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  /* Code is set as it is typed: two signs side by side are never drawn as one. */
+  --font-mono--font-feature-settings: 'calt' 0, 'liga' 0;
 }
 
 /*
