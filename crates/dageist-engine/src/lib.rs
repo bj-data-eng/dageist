@@ -8,6 +8,7 @@
 #![forbid(unsafe_code)]
 
 mod block;
+pub mod catalog;
 mod error;
 mod sample;
 mod stored;
