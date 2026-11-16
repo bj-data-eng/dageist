@@ -112,7 +112,10 @@ pub enum Limit {
     /// A condition with a predicate made of literals alone is decided before it
     /// is run: Polars takes the branch it selects and drops the others, so what
     /// the predicates and values it drops would refuse, it does not. A predicate
-    /// that only starts from a literal, and goes on to a column, is not this.
+    /// that only starts from a literal, and goes on to a column, is not this. Of
+    /// the named rules it excuses only the refusal of what follows the first value
+    /// of a condition that a literal true decides, when that value reads a column
+    /// or the whole condition is literals.
     ADecidedCondition,
     /// A value of a condition runs on the rows its predicate selects, and a
     /// predicate after the first on the rows left to it. On the rows of the
@@ -780,6 +783,40 @@ fn leaves_only_nulls(links: &[Call]) -> bool {
     shifted >= rows
 }
 
+/// Whether a condition is decided true by a literal that is its only first
+/// predicate, and its first value reads a column, or the whole condition is
+/// literals: Polars evaluates that value and not what follows it. A first value
+/// that is a literal leaves the later predicates to be evaluated.
+fn is_true_before_its_value(condition: &Expression) -> bool {
+    let Start::Call(start) = condition.start() else {
+        return false;
+    };
+    if !is(start, "polars.when") {
+        return false;
+    }
+    let predicates: Vec<&Expression> = operands(start)
+        .into_iter()
+        .filter(|(parameter, _)| *parameter == "predicates")
+        .map(|(_, predicate)| predicate)
+        .collect();
+    let decided_true = matches!(predicates.as_slice(), [only]
+        if only.links().is_empty()
+            && matches!(only.start(), Start::Call(lit)
+                if is(lit, "polars.lit")
+                    && matches!(lit.argument("value"), Some(Value::Flag(Some(true))))));
+    let first_value = condition
+        .links()
+        .first()
+        .filter(|link| is_a_value_link(link))
+        .and_then(|link| match link.argument("statement") {
+            Some(Value::Expression(value)) => Some(value),
+            _ => None,
+        });
+    decided_true
+        && (only_literals(condition)
+            || first_value.is_some_and(|value| any_call(value, &|call| is(call, "polars.col"))))
+}
+
 /// Whether a `len` is why a place is not evaluated: in a `select` whose every
 /// item is one value, Polars does not read what a `len` counts. `with_columns`,
 /// `filter` and a `select` with an item that is a column evaluate it.
@@ -815,8 +852,9 @@ fn held_by(place: &Place, name: &str) -> bool {
 /// campaign case and a replay of it without the cause: a fold of a null drops
 /// the predicate, which the walk says ([`Walk::evaluation_at`]); a sort key that
 /// is one value, or a window's `order_by` that is, is dropped, and Polars
-/// refuses the same key elsewhere or when it is not one value; and a `len` in a
-/// `select` of one values is not given what it counts.
+/// refuses the same key elsewhere or when it is not one value; a `len` in a
+/// `select` of one values is not given what it counts; and a condition that a
+/// literal true decides drops what follows its first value.
 fn applies_to_a_rule(
     limit: Limit,
     rule: &str,
@@ -831,6 +869,18 @@ fn applies_to_a_rule(
     match limit {
         Limit::ALiteral => {
             predicate_rule && walk.evaluation_at(&refused.place) == Evaluation::Dropped
+        }
+        Limit::ADecidedCondition => {
+            let locus = locate(case, &refused.place);
+            predicate_rule
+                && locus
+                    .inside
+                    .iter()
+                    .zip(&locus.reach)
+                    .any(|(holder, reach)| {
+                        matches!(reach, Reach::Operand(at) | Reach::At(at) if *at >= 1)
+                            && is_true_before_its_value(holder)
+                    })
         }
         Limit::AnAggregateGivesOneValue => {
             let locus = locate(case, &refused.place);
