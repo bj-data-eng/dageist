@@ -43,7 +43,7 @@ pub use model::{Call, Document, EmptyStepId, Expression, Given, Start, Step, Ste
 pub use run::{
     ExpressionDtypes, Outcome, Report, Resolution, RowsError, RunCause, StepRefusal, StepReport,
 };
-pub use walk::{Standing, Walk, WalkRefusal, WalkedExpression};
+pub use walk::{Evaluation, Standing, Walk, WalkRefusal, WalkedExpression};
 
 /// The version of the document format this engine reads and writes.
 pub const VERSION: u32 = 1;

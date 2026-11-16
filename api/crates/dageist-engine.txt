@@ -432,6 +432,11 @@ impl core::error::Error for dageist_engine::document::DtypeError
 pub fn dageist_engine::document::DtypeError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
 impl core::fmt::Display for dageist_engine::document::DtypeError
 pub fn dageist_engine::document::DtypeError::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum dageist_engine::document::Evaluation
+pub dageist_engine::document::Evaluation::Dropped
+pub dageist_engine::document::Evaluation::Evaluated
+pub dageist_engine::document::Evaluation::Folded
+pub dageist_engine::document::Evaluation::OnANull
 pub enum dageist_engine::document::Outcome
 pub dageist_engine::document::Outcome::NotRun
 pub dageist_engine::document::Outcome::NotRun::blocked_by: dageist_engine::document::StepId
@@ -599,6 +604,7 @@ pub const fn dageist_engine::document::Report::source(&self) -> &polars_core::sc
 pub fn dageist_engine::document::Report::steps(&self) -> &[dageist_engine::document::StepReport]
 pub struct dageist_engine::document::Standing
 impl dageist_engine::document::Standing
+pub const fn dageist_engine::document::Standing::evaluation(&self) -> dageist_engine::document::Evaluation
 pub const fn dageist_engine::document::Standing::follows(&self) -> core::option::Option<dageist_engine::allowed::After>
 pub const fn dageist_engine::document::Standing::verdict(&self) -> core::option::Option<&dageist_engine::allowed::Verdict>
 pub struct dageist_engine::document::Step
@@ -640,6 +646,7 @@ impl core::fmt::Display for dageist_engine::document::SyntaxError
 pub fn dageist_engine::document::SyntaxError::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub struct dageist_engine::document::Walk
 impl dageist_engine::document::Walk
+pub fn dageist_engine::document::Walk::evaluation_at(&self, place: &dageist_engine::document::Place) -> dageist_engine::document::Evaluation
 pub fn dageist_engine::document::Walk::expressions(&self) -> &[dageist_engine::document::WalkedExpression]
 pub fn dageist_engine::document::Walk::not_known(&self) -> core::option::Option<&str>
 pub const fn dageist_engine::document::Walk::refusal(&self) -> core::option::Option<&dageist_engine::document::WalkRefusal>
@@ -653,6 +660,8 @@ impl dageist_engine::document::WalkedExpression
 pub fn dageist_engine::document::WalkedExpression::calls(&self) -> &[dageist_engine::document::Standing]
 pub const fn dageist_engine::document::WalkedExpression::context(&self) -> core::option::Option<dageist_engine::allowed::Context>
 pub const fn dageist_engine::document::WalkedExpression::ending(&self) -> core::option::Option<&dageist_engine::allowed::Ending>
+pub const fn dageist_engine::document::WalkedExpression::evaluation(&self) -> dageist_engine::document::Evaluation
+pub const fn dageist_engine::document::WalkedExpression::folds_a_null(&self) -> bool
 pub const fn dageist_engine::document::WalkedExpression::place(&self) -> &dageist_engine::document::Place
 pub fn dageist_engine::document::WalkedExpression::places(&self) -> alloc::vec::Vec<core::option::Option<dageist_engine::allowed::Place>>
 pub const dageist_engine::document::MAX_NESTING: usize
