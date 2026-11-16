@@ -27,10 +27,12 @@ independent integration review.
 ## Repository Identity And Ownership
 
 This repository owns the host-independent `dageist` core in `src/`, the
-dataframe engine and the host adapters under `crates/`, the React view in
-`ui/`, their contracts, manifests, tests, documentation and shared tooling.
-Root owns workspace wiring and the core. The Tauri host owns its window,
-webview configuration, IPC commands and the view it serves.
+dataframe engine, the fuzz framework and the host adapters under `crates/`,
+the React view in `ui/`, their contracts, manifests, tests, documentation and
+shared tooling. Root owns workspace wiring and the core. The Tauri host owns
+its window, webview configuration, IPC commands and the view it serves. The
+fuzz framework owns bounded generation, reduction, replay and failure
+evidence; the domain cases stay with their consumers.
 
 `vendor/polars` is the Polars project's source, pinned to a Python Polars
 release tag. This repository owns which release it is pinned to, not its
@@ -53,6 +55,8 @@ and current source establishes behavior.
 | Window, bundle, view location and content security policy | [crates/dageist-tauri/tauri.conf.json](crates/dageist-tauri/tauri.conf.json) |
 | Webview permissions | [crates/dageist-tauri/capabilities/](crates/dageist-tauri/capabilities/) |
 | Engine identity, dependencies and Polars features | [crates/dageist-engine/Cargo.toml](crates/dageist-engine/Cargo.toml) |
+| Fuzz framework identity, features and dependencies | [crates/dageist-fuzz/Cargo.toml](crates/dageist-fuzz/Cargo.toml) |
+| Fuzz framework front door, provenance and verification guidance | [crates/dageist-fuzz/src/lib.rs](crates/dageist-fuzz/src/lib.rs), [README](crates/dageist-fuzz/README.md), [crate guide](crates/dageist-fuzz/AGENTS.md) |
 | The operations the step editor offers, their parameter kinds and shown words | [crates/dageist-engine/src/catalog/](crates/dageist-engine/src/catalog/mod.rs), its language file [en.toml](crates/dageist-engine/src/catalog/en.toml) |
 | IPC commands and their serialized views | [crates/dageist-tauri/src/](crates/dageist-tauri/src/main.rs) |
 | The view's IPC calls and their shapes | [ui/packages/host/src/](ui/packages/host/src/contract.ts) |
@@ -122,6 +126,7 @@ Source remains authoritative; never hand-edit generated artifacts.
 | `ui/dist/` (ignored) | `npm --prefix ui run build` |
 | `ui/apps/desktop/src/catalogue.json` | the host's catalogue view, written by its snapshot test; [refresh procedure](docs/how-to.md#refresh-the-catalogue-snapshot) |
 | `crates/dageist-tauri/gen/` (ignored) | `tauri-build`, during any build of `dageist-tauri` |
+| `crates/dageist-fuzz/tests/fixtures/subject/Cargo.lock` | Cargo, from the standalone fixture workspace's manifests; refresh it with the fixture's own Cargo command, never through the root workspace |
 | `api/public-api.txt`, `api/crates/*.txt`, `api/polars/*.txt` | [api/generator/](api/generator/src/lib.rs); [audit procedures](docs/how-to.md#check-the-public-api-audits) |
 | `api/generator/Cargo.lock` | Cargo, from [api/generator/Cargo.toml](api/generator/Cargo.toml) |
 
@@ -176,6 +181,19 @@ npm --prefix ui run build
 
 The lint denies warnings and reports unused suppressions.
 `npm --prefix ui run format` rewrites files; `format:check` only reports.
+
+Fuzz framework checks from the repository root. The crate is a workspace
+member outside `default-members`, so name it. No production crate depends on
+it; consumers use it through a dev-dependency or an owner-local `fuzz/` package.
+The [crate guide](crates/dageist-fuzz/AGENTS.md) and
+[README](crates/dageist-fuzz/README.md) own the campaign and sanitizer
+procedures:
+
+```sh
+cargo test --offline --locked -p dageist-fuzz
+cargo test --offline --locked -p dageist-fuzz --all-features
+cargo clippy --offline --locked -p dageist-fuzz --all-targets --all-features --no-deps -- -F unsafe-code -D warnings
+```
 
 Host checks embed `ui/dist/`, so build the view first:
 

@@ -1,15 +1,16 @@
 # Dageist
 
-[Dageist](https://github.com/bj-data-eng/dageist) is licensed under its own
-[MIT License](LICENSE). This notice records attribution for the direct Rust
+[Dageist](https://github.com/bj-data-eng/dageist) is licensed under its own [MIT
+License](LICENSE). This notice records attribution for the direct Rust
 dependencies declared in
-[crates/dageist-tauri/Cargo.toml](crates/dageist-tauri/Cargo.toml) and
-[crates/dageist-engine/Cargo.toml](crates/dageist-engine/Cargo.toml) and the
-crates patched in the root [Cargo.toml](Cargo.toml), at the versions resolved
-by [Cargo.lock](Cargo.lock), for the direct dependencies of
-the public API audit generator declared in
-[api/generator/Cargo.toml](api/generator/Cargo.toml) at the versions resolved
-by [its lock file](api/generator/Cargo.lock), and for the libraries and the
+[crates/dageist-tauri/Cargo.toml](crates/dageist-tauri/Cargo.toml),
+[crates/dageist-engine/Cargo.toml](crates/dageist-engine/Cargo.toml) and
+[crates/dageist-fuzz/Cargo.toml](crates/dageist-fuzz/Cargo.toml), including the
+fuzz framework's optional dependencies, and the crates patched in the root
+[Cargo.toml](Cargo.toml), at the versions resolved by [Cargo.lock](Cargo.lock),
+for the direct dependencies of the public API audit generator declared in
+[api/generator/Cargo.toml](api/generator/Cargo.toml) at the versions resolved by
+[its lock file](api/generator/Cargo.lock), and for the libraries and the
 typefaces copied into the view. It does not enumerate the Rust dependencies'
 transitive, optional, platform, or compiled dependencies, and it is not a
 complete inventory for a distributed application bundle.
@@ -114,8 +115,9 @@ David Tolnay, under your choice of either license:
 * License: [MIT License](licenses/serde/LICENSE-MIT)
 * Homepage: [Serde](https://serde.rs)
 
-This product's tests depend on serde_json 1.0.151, and its public API audit
-generator on serde_json 1.0.150, from the same upstream project, under your
+This product's tests and fuzz framework depend on serde_json 1.0.151, and its
+public API audit generator on serde_json 1.0.150, from the same upstream
+project, under your
 choice of either license:
 
 * License: [Apache License 2.0](licenses/serde/LICENSE-APACHE)
@@ -163,3 +165,55 @@ of either license:
 * License: [Apache License 2.0](licenses/toml/LICENSE-APACHE)
 * License: [MIT License](licenses/toml/LICENSE-MIT)
 * Homepage: [toml](https://github.com/toml-rs/toml)
+
+The fuzz framework `dageist-fuzz` is a verification tool and is not part of the
+application. It was ported from Surgeist's `surgeist-fuzz` (see its
+[README](crates/dageist-fuzz/README.md)) and adds the following direct
+dependencies, each under your choice of either license unless stated otherwise.
+
+The framework depends on sha2 0.10.9, distributed by the RustCrypto Developers:
+
+* License: [Apache License 2.0](licenses/sha2/LICENSE-APACHE)
+* License: [MIT License](licenses/sha2/LICENSE-MIT)
+* Homepage: [sha2](https://github.com/RustCrypto/hashes)
+
+The framework depends on rustix 1.1.4, distributed by Dan Gohman and Jakub
+Konka, under your choice of the Apache License 2.0 with the LLVM exception, the
+Apache License 2.0 or the MIT license:
+
+* License: [Apache License 2.0 with LLVM exception](licenses/rustix/LICENSE-Apache-2.0_WITH_LLVM-exception)
+* License: [Apache License 2.0](licenses/rustix/LICENSE-APACHE)
+* License: [MIT License](licenses/rustix/LICENSE-MIT)
+* Additional material: [COPYRIGHT](licenses/rustix/COPYRIGHT)
+* Homepage: [rustix](https://github.com/bytecodealliance/rustix)
+
+The framework's `property` feature depends on proptest 1.11.0, distributed by
+Jason Lingle, and proptest-state-machine 0.8.0, distributed by Tomáš Zemanovič,
+from the same upstream project:
+
+* License: [Apache License 2.0](licenses/proptest/LICENSE-APACHE)
+* License: [MIT License](licenses/proptest/LICENSE-MIT)
+* License of proptest-state-machine: [Apache License 2.0](licenses/proptest-state-machine/LICENSE-APACHE)
+* License of proptest-state-machine: [MIT License](licenses/proptest-state-machine/LICENSE-MIT)
+* Homepage: [proptest](https://proptest-rs.github.io/proptest/proptest/index.html)
+* Homepage: [proptest-state-machine](https://proptest-rs.github.io/proptest/proptest/state-machine.html)
+
+The framework's `coverage` feature depends on arbitrary 1.5.0, distributed by
+the Rust-Fuzz Project Developers:
+
+* License: [Apache License 2.0](licenses/arbitrary/LICENSE-APACHE)
+* License: [MIT License](licenses/arbitrary/LICENSE-MIT)
+* Homepage: [arbitrary](https://github.com/rust-fuzz/arbitrary/)
+
+The framework's `execution` feature depends on clap 4.6.7, distributed by its
+individual contributors, and ctrlc 3.5.0, distributed by Antti Keränen:
+
+* License: [Apache License 2.0](licenses/clap/LICENSE-APACHE)
+* License: [MIT License](licenses/clap/LICENSE-MIT)
+* Homepage: [clap](https://github.com/clap-rs/clap)
+* License of ctrlc: [Apache License 2.0](licenses/ctrlc/LICENSE-APACHE)
+* License of ctrlc: [MIT License](licenses/ctrlc/LICENSE-MIT)
+* Homepage: [ctrlc](https://github.com/Detegr/rust-ctrlc)
+
+The framework's own controlled author fixture is a standalone test workspace
+with its own [notice](crates/dageist-fuzz/tests/fixtures/subject/NOTICE.md).
