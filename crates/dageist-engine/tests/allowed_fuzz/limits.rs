@@ -46,8 +46,9 @@ pub enum Limit {
     /// the case are what gate it; the tables refusing is placed, inside an
     /// expression that holds an `explode`.
     AnExplodeChangesTheLengths,
-    /// A literal is one value, which Polars broadcasts and casts as it
-    /// does not a column: it accepts a text compared with a typed number, or a
+    /// A literal's length over a window is a constant to Polars, which does not
+    /// evaluate what follows a comparison of a value with it. A literal is one
+    /// value, which Polars broadcasts and casts as it does not a column: it accepts a text compared with a typed number, or a
     /// window over a constant, where a column of the dtype is refused, and joins
     /// it with a column of other length. The tables measure an argument as a
     /// column of the dtype, except the values of `shift` and a pivot's group.
@@ -669,6 +670,34 @@ fn leaves_only_nulls(links: &[Call]) -> bool {
     shifted >= rows
 }
 
+/// Whether the refused call follows a comparison of a value with the length of a
+/// literal over a window, which Polars takes for a constant: it does not evaluate
+/// what follows, where the tables refuse it when they run rows. The value is one
+/// value, as an aggregate is; a sum, a window by a column and no window are
+/// evaluated.
+fn after_a_constant_window(locus: &Locus, refused: &Refused) -> bool {
+    let length_over_a_window = |operand: &Expression| {
+        starts_from_a_literal(operand)
+            && links_where(operand, &|link| is(link, "Expr.len"))
+                .first()
+                .is_some_and(|len| {
+                    links_where(operand, &|link| is(link, "Expr.over"))
+                        .first()
+                        .is_some_and(|over| over > len)
+                })
+            && wholly_single(operand, operand.links().len(), true)
+    };
+    refused.stage == Some(TableStage::Rows)
+        && locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
+            (0..at.min(chain.links().len())).any(|compared| {
+                operands(&chain.links()[compared])
+                    .into_iter()
+                    .any(|(_, operand)| length_over_a_window(operand))
+                    && wholly_single(chain, compared, true)
+            })
+        })
+}
+
 /// Whether the limit is why the tables and Polars disagree.
 fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
     let step = case.document.steps()[0].call();
@@ -717,7 +746,10 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
                     .any(|(holder, reach)| {
                         matches!(reach, Reach::Operand(_)) && starts_from_a_literal(holder)
                     });
-            chain_starts || operand || given_to_a_literal
+            chain_starts
+                || operand
+                || given_to_a_literal
+                || after_a_constant_window(&locus, refused)
         }
         (Limit::AGroupAggregate, Disagreement::PolarsRefuses(refusal)) => {
             // A table with no rows has no groups, and the values of an
