@@ -141,7 +141,7 @@ pub fn dageist_engine::allowed::Context::all() -> alloc::vec::Vec<Self>
 pub fn dageist_engine::allowed::Context::from_name(name: &str) -> core::option::Option<Self>
 pub fn dageist_engine::allowed::Context::from_positions(positions: &[dageist_engine::allowed::Position]) -> core::option::Option<Self>
 pub const fn dageist_engine::allowed::Context::inside(outer: dageist_engine::allowed::Outer, nested: dageist_engine::allowed::Nested) -> Self
-pub const fn dageist_engine::allowed::Context::is_key(&self) -> bool
+pub const fn dageist_engine::allowed::Context::is_join_key(&self) -> bool
 pub fn dageist_engine::allowed::Context::name(&self) -> alloc::string::String
 pub const fn dageist_engine::allowed::Context::nested(&self) -> core::option::Option<dageist_engine::allowed::Nested>
 pub const fn dageist_engine::allowed::Context::outer(&self) -> dageist_engine::allowed::Outer

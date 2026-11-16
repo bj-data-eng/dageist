@@ -9,7 +9,7 @@
 //! the arguments chosen for its expression parameters, the options it is given,
 //! and, for a start, the dtype of the column or literal it reads. Every
 //! expression that a position holds is asked whether it may end there, and a
-//! key whether it holds a single value beside a column. The options a step is
+//! join's key whether it holds an aggregate beside a column. The options a step is
 //! given are asked of [`allowed::options`].
 //!
 //! The tables are measured, so what they cannot say is not guessed: a chain
@@ -19,7 +19,7 @@
 use polars::prelude::{Schema, SchemaRef};
 
 use crate::allowed::{
-    self, After, Chosen, ConditionState, Context, Ending, Outer, Place as OfferPlace,
+    self, After, Chosen, ConditionState, Context, Ending, Nested, Outer, Place as OfferPlace,
     Position as Slot, Refusal, Representative, Shape, Verdict,
 };
 use crate::catalog::{Applies, Kind};
@@ -198,7 +198,7 @@ impl Step {
             refusal: None,
             not_known: None,
         };
-        walker.arguments(self.call());
+        walker.arguments(self.call(), false);
         walker.step_options(self.call());
         Walk {
             expressions: walker.walked,
@@ -338,8 +338,10 @@ impl Walker<'_> {
     }
 
     /// Walks the arguments of `call`, and gives what each expression it holds
-    /// has, by the parameter that holds it.
-    fn arguments(&mut self, call: &Call) -> Vec<(String, Operand)> {
+    /// has, by the parameter that holds it. `values_end` says whether the values
+    /// of a condition that `call` is a link of end the predicate: the condition
+    /// is all the expression is.
+    fn arguments(&mut self, call: &Call, values_end: bool) -> Vec<(String, Operand)> {
         let entry = call.entry().id().as_str();
         let mut found = Vec::new();
         for given in call.arguments() {
@@ -347,7 +349,19 @@ impl Walker<'_> {
                 .push(Segment::Parameter(given.parameter().to_owned()));
             let slot = Slot::of_parameter(entry, given.parameter());
             self.slots.extend(slot);
-            self.value(given.value(), given.parameter(), slot.is_some(), &mut found);
+            // What an expression held here ends: a filter's predicate does, and
+            // a value of a condition does when the condition does.
+            let ends = match slot {
+                Some(Slot::Outer(Outer::Filter)) => true,
+                Some(Slot::Nested(Nested::ConditionValue)) => values_end,
+                _ => false,
+            };
+            self.value(
+                given.value(),
+                given.parameter(),
+                slot.is_some().then_some(ends),
+                &mut found,
+            );
             if slot.is_some() {
                 self.slots.pop();
             }
@@ -360,7 +374,7 @@ impl Walker<'_> {
         &mut self,
         value: &Value,
         parameter: &str,
-        held: bool,
+        held: Option<bool>,
         found: &mut Vec<(String, Operand)>,
     ) {
         match value {
@@ -426,7 +440,17 @@ impl Walker<'_> {
         }
     }
 
-    fn expression(&mut self, expression: &Expression, held: bool) -> Operand {
+    /// Walks `expression`, which a position holds when `held` says whether it ends
+    /// the predicate there, and which is an argument of a call otherwise.
+    fn expression(&mut self, expression: &Expression, held: Option<bool>) -> Operand {
+        // The values of a condition end the predicate where the condition is
+        // all the expression is: a method that goes on from it is what ends it.
+        let values_end = held == Some(true)
+            && matches!(expression.start(), Start::Call(start) if start.entry().applies() == Applies::Condition)
+            && expression
+                .links()
+                .iter()
+                .all(|link| link.entry().applies() == Applies::Condition);
         let place = self.here();
         let context = Context::from_positions(&self.slots);
         let unsaid = Operand {
@@ -440,7 +464,7 @@ impl Walker<'_> {
         match expression.start() {
             Start::Call(start) => {
                 self.path.push(Segment::Start);
-                start_arguments = self.arguments(start);
+                start_arguments = self.arguments(start, values_end);
                 self.path.pop();
             }
             Start::Input(_) => self.blind("a connected input starts the chain"),
@@ -506,23 +530,29 @@ impl Walker<'_> {
         }
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
-            let arguments = self.arguments(link);
+            let arguments = self.arguments(link, values_end);
             let (next, standing) = self.link(link, &arguments, context, cur, &mut last_end);
             cur = next;
             calls.push(standing);
             self.path.pop();
         }
         let mut ending = None;
-        if held && !matches!(cur, Cur::Dead) {
-            ending = last_end;
+        if held.is_some() && !matches!(cur, Cur::Dead) {
+            // A value of a condition in a filter need be a Boolean only where
+            // the condition ends the predicate.
+            let asked = held == Some(true)
+                || context != Context::inside(Outer::Filter, Nested::ConditionValue);
+            if asked {
+                ending = last_end;
+            }
             if let Some(Ending::Refused(refusal)) = &ending {
                 self.refuse(&refusal.clone(), true);
             } else if let Some(Ending::NotKnown(unknown)) = &ending {
                 self.blind(format!("whether it may end is not known: {unknown}"));
             }
-            // A key that holds a single value beside a column is not
+            // A join's key that holds an aggregate beside a column is not
             // elementwise, which only the whole key shows.
-            if holds_a_single_value_beside_a_column(expression)
+            if holds_an_aggregate_beside_a_column(expression)
                 && let Err(refusal) = allowed::rule_forbids_mixed_key(context)
             {
                 self.refuse(&refusal, true);
@@ -726,23 +756,6 @@ impl Walker<'_> {
 // ---------------------------------------------------------------------------
 // Keys
 
-/// The calls of an expression, and of the expressions inside it, as far as
-/// `found` says, which is asked of each.
-fn any_call(expression: &Expression, found: &dyn Fn(&Call) -> bool) -> bool {
-    let calls = std::iter::once(expression.start())
-        .filter_map(|start| match start {
-            Start::Call(call) => Some(call),
-            Start::Input(_) => None,
-        })
-        .chain(expression.links());
-    calls.into_iter().any(|call| {
-        found(call)
-            || operands(call)
-                .into_iter()
-                .any(|inside| any_call(inside, found))
-    })
-}
-
 /// The expressions a call is given.
 fn operands(call: &Call) -> Vec<&Expression> {
     fn collect<'a>(value: &'a Value, found: &mut Vec<&'a Expression>) {
@@ -776,14 +789,6 @@ fn is_one_value(call: &Call) -> bool {
     ONE_VALUE.contains(&call.entry().id().as_str())
 }
 
-/// Whether `call` is a single value that Polars does not take as elementwise:
-/// an aggregate, or a null literal.
-fn is_a_single_value(call: &Call) -> bool {
-    is_one_value(call)
-        || (call.entry().id().as_str() == "polars.lit"
-            && matches!(call.argument("value"), Some(Value::Flag(None))))
-}
-
 /// Whether the first `upto` links of `expression` give one value and nothing
 /// beside them does not: an aggregate among them with only single values after
 /// it; with `literals`, a start made of literals too; or a condition whose parts
@@ -809,9 +814,49 @@ fn wholly_single(expression: &Expression, upto: usize, literals: bool) -> bool {
     }
 }
 
-/// Whether a key holds a single value that is no column, an aggregate or a null
-/// literal, beside what is not one: a key that is wholly one is the whole key,
-/// which the tables measured.
-fn holds_a_single_value_beside_a_column(key: &Expression) -> bool {
-    any_call(key, &is_a_single_value) && !wholly_single(key, key.links().len(), true)
+/// The comparisons, which with a null literal give a null.
+const COMPARISONS: [&str; 6] = [
+    "Expr.eq", "Expr.ne", "Expr.gt", "Expr.ge", "Expr.lt", "Expr.le",
+];
+
+/// Whether `call` compares with a null literal.
+fn compares_with_a_null(call: &Call) -> bool {
+    COMPARISONS.contains(&call.entry().id().as_str())
+        && operands(call).into_iter().any(|operand| {
+            operand.links().is_empty()
+                && matches!(
+                    operand.start(),
+                    Start::Call(start)
+                        if start.entry().id().as_str() == "polars.lit"
+                            && matches!(start.argument("value"), Some(Value::Flag(None)))
+                )
+        })
+}
+
+/// Whether an expression holds an aggregate. What a comparison with a null
+/// literal follows is dropped, for the comparison is a null, and so is any
+/// aggregate in it.
+fn holds_an_aggregate(expression: &Expression) -> bool {
+    let from = expression
+        .links()
+        .iter()
+        .rposition(compares_with_a_null)
+        .map_or(0, |at| at + 1);
+    let links = &expression.links()[from..];
+    let start = match expression.start() {
+        Start::Call(call) if from == 0 => Some(call),
+        _ => None,
+    };
+    links.iter().any(is_one_value)
+        || start
+            .into_iter()
+            .chain(links)
+            .any(|call| operands(call).into_iter().any(holds_an_aggregate))
+}
+
+/// Whether a key holds an aggregate beside what is not one value: a key that is
+/// wholly one is the whole key, which the tables measured. Polars takes the null
+/// literal beside a column as elementwise, and an aggregate as not.
+fn holds_an_aggregate_beside_a_column(key: &Expression) -> bool {
+    holds_an_aggregate(key) && !wholly_single(key, key.links().len(), true)
 }

@@ -28,8 +28,7 @@ pub enum Rule {
     FilterPredicateIsBoolean,
     /// `polars.element` stands only in a pivot's aggregate.
     ElementOnlyInPivotAggregate,
-    /// A join's or a window's key is elementwise: it holds no single value, an
-    /// aggregate or a null literal, beside what is not one.
+    /// A join's own key is elementwise: it holds no aggregate beside a column.
     KeyIsElementwise,
 }
 
@@ -74,7 +73,7 @@ impl Rule {
             }
             Self::FilterPredicateIsBoolean => "a filter's predicate must be Boolean",
             Self::KeyIsElementwise => {
-                "a key must be elementwise: a single value, an aggregate or a null, may not stand in it beside a column"
+                "a join's key must be elementwise: an aggregate may not stand in it beside a column"
             }
         }
     }
@@ -88,7 +87,7 @@ impl Rule {
         match self {
             Self::ElementOnlyInPivotAggregate => entry == "polars.element",
             Self::PivotAggregateGivesOneValue => context == Context::step(Outer::PivotAggregate),
-            Self::KeyIsElementwise => context.is_key(),
+            Self::KeyIsElementwise => context.is_join_key(),
             Self::ConditionPredicateIsBoolean | Self::FilterPredicateIsBoolean => {
                 self.needs_boolean_end(context)
             }
@@ -113,12 +112,12 @@ impl Rule {
             .then_some(Self::ElementOnlyInPivotAggregate)
     }
 
-    /// The rule that forbids a key that holds a single value beside a column,
-    /// where `context` is a key, if it does. Whether the key holds one is a
+    /// The rule that forbids a key that holds an aggregate beside a column,
+    /// where `context` is a join's own key, if it does. Whether the key holds one is a
     /// matter of the whole expression, which the caller found.
     #[must_use]
     pub(super) fn forbids_mixed_key(context: Context) -> Option<Self> {
-        context.is_key().then_some(Self::KeyIsElementwise)
+        context.is_join_key().then_some(Self::KeyIsElementwise)
     }
 
     /// The rule that forbids a chain to end in `context` with a value of the

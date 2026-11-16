@@ -286,7 +286,7 @@ and referenced from the lines of the context table they govern:
 | `condition-predicate-is-boolean` | A condition's predicate is a `Boolean`. Polars finds a whole number there only when rows run. |
 | `filter-predicate-is-boolean` | A filter's predicate is a `Boolean`, and so is what a condition in it gives. Polars refuses a chain that ends in anything else, but a method that is not a `Boolean` may stand partway through one. |
 | `element-only-in-pivot-aggregate` | `polars.element` stands only in a pivot's aggregate. Polars refuses it elsewhere, but as a panic when the table is sorted. |
-| `key-is-elementwise` | A join's or a window's key holds no single value, an aggregate or a null literal, beside a column. Polars refuses such a key as not elementwise, and allows one that is wholly a single value. The context table measured an entry as the whole key, and what a key holds is a matter of the whole expression, so the caller that walks it asks `rule_forbids_mixed_key`. |
+| `key-is-elementwise` | A join's own key holds no aggregate beside a column. Polars refuses such a key as not elementwise, and allows one that is wholly an aggregate, a null literal beside a column, and, in the key of a window in a select, a filter or a sort, an aggregate beside a column. The context table measured an entry as the whole key, and what a key holds is a matter of the whole expression, so the caller that walks it asks `rule_forbids_mixed_key`. |
 
 `dageist_engine::allowed::offers` answers which entries may stand at a place,
 given the context and what the expression has so far: nothing, a value of a
@@ -334,8 +334,10 @@ dtypes of the arguments, the options, and for a start the dtype of its column in
 the table the expression is read against (a join's `right_on` is read against
 the other table), of a literal given a dtype, of what a pivot's group holds, and
 for a condition that ends the dtype its values have. It asks whether an
-expression that a position holds may end there, and whether a key holds a single
-value beside a column. For each expression it reports the context, the place of
+expression that a position holds may end there, and whether a join's key holds an
+aggregate beside a column. A value of a condition in a filter is asked to be a
+`Boolean` only where the condition is all the predicate is, and not where a method
+or an operand goes on from it. For each expression it reports the context, the place of
 each link and where a link added at the end would stand, the verdict on each
 call, and whether it may end; for the step the first refusal, and why the tables
 could not be asked past a point, where they could not: it does not ask where the
@@ -384,7 +386,7 @@ excused a gap of `offer`, and are corrected: a place deeper than two positions
 judged by its first two, a start judged on the dtype it was measured on, the
 options chosen not told, and a single value beside a column in a key offered. Their
 cases are kept, as replays that check. The second kind is a limit. There are
-thirteen. Each is named in the target, counted when it excuses a case, and has a
+fourteen. Each is named in the target, counted when it excuses a case, and has a
 kept case that the normal tests replay, which only that limit excuses; each has
 a test that the same feature elsewhere in the case excuses nothing.
 
@@ -400,20 +402,24 @@ the rows, an overflow, a panic, a window over a window, an explode, the empty ta
 of a pivot) say so below. Two limits may both explain one case, and it is then
 excused by both.
 
-One thing the target does not do: it compares nothing more of a case that a named rule
-refuses and Polars allows. The dtypes before the refusal are compared, but whether Polars
-allows the rest is not. The rule `pivot-aggregate-gives-one-value` is stricter than Polars
+A named rule is dageist's, and may be stricter than Polars only where it is so by design,
+which the target names: `pivot-aggregate-gives-one-value`, since Polars lets a running
+value stand in a pivot's aggregate. Any other rule that refuses what Polars allows is a
+disagreement, unless a limit says Polars did not evaluate it. The target compares nothing
+more of a case that the rule by design refuses and Polars allows: the dtypes before the
+refusal are compared, but whether Polars allows the rest is not. That rule is stricter
 wherever it refuses, which is about a third of the pivot cases (54 of the 151 of the fixed
-seed, and the same share in longer campaigns), so those pivot aggregates are checked little;
-the tally counts the pivot cases and those the rule refuses apart.
+seed, and the same share in longer campaigns), so those pivot aggregates are checked
+little; the tally counts the pivot cases and those the rule refuses apart.
 
 | Limit | Excuses |
 | --- | --- |
 | An `explode` changes the lengths | `Expr.over`'s `mapping_strategy` as `explode` gives other lengths, which meet those of what follows it. The tables do not measure what meets them. Polars refusing the rows, with a reason about lengths, in a case with an `explode` (no place: the reason and the `explode` gate it); and the tables refusing, with a reason about lengths, at the window or at a call after it, or in the arguments of a link after it, in the same chain, which Polars allows; not before the window, not in its own arguments, and not an `explode` in another operand or item. |
 | A literal | An argument or a start is measured as a column of the dtype, except the values of `shift` and the arguments of a pivot's group. A literal, or a condition of literals, is one value, which Polars casts and broadcasts as it does not a column. A comparison or a subtraction with a null literal is null, so that Polars does not evaluate what it follows or what it is given, and does evaluate the arguments of the calls after it. The tables refusing at a call that follows a literal or is given one, or at what a null comparison follows, is given, or at the calls from it on, which Polars allows. |
 | A single value | Polars does not evaluate what it does not need for one value. The tables refusing at a call whose receiver in its chain is one value (an aggregate with only single values after it), or inside a sort key or a window's key that is one value (a literal is one), which is dropped, or in what a `len` follows, or in the arguments of the links before it, which it does not count; Polars allows it. A `len` before an unrelated later argument excuses nothing there. |
-| A pivot's aggregate | It is run on the values of each group, with kernels of its own, and on no groups when the table is empty. Polars refusing the empty table, with a reason that an operation is not supported or that a dtype is null (no place); and the tables refusing, with a reason about a dtype an operation does not support, a comparison, an operation, an evaluation, a cast, a struct field or lengths of a window over a group, at a call of the aggregate, which Polars allows. |
-| A single value in a key | A key that is wholly a single value, an aggregate or a null, is not one that has to be elementwise in what it holds: Polars allows a running count under a `last` there. The context table measured the entry as the whole key. The tables refusing, with a reason about a key not being elementwise, inside a key that is wholly single, which Polars allows. A key that holds a single value beside a column is refused by the rule above, and is not this. |
+| A pivot's aggregate | It is run on the values of each group, with kernels of its own, and on no groups when the table is empty. Polars refusing the empty table, with a reason that an operation is not supported or that a dtype is null (no place); and the tables refusing, with a reason about a dtype an operation does not support, a comparison, an operation, an evaluation, a cast, a struct field or lengths of a window over a group, at a call of the aggregate, which Polars allows; and the rule that a condition's predicate is a `Boolean`, which the kernels meet by taking a group's values as one, at a predicate in the aggregate. |
+| A single value in a key | A key that is wholly a single value, an aggregate or a null, is not one that has to be elementwise in what it holds: Polars allows a running count under a `last` there. The context table measured the entry as the whole key. The tables refusing, with a reason about a key not being elementwise, inside a key that is wholly single, which Polars allows. A comparison with a null literal in a join key is a null, a key with no column, which Polars refuses as not elementwise where the tables allow it: Polars refusing the join with that reason, in a case whose join key has such a comparison (no place). A key that holds an aggregate beside a column is refused by the rule above, and is not this. |
+| A join key's dtype | The other table's key is made of the dtype the chain gives on its own, and the join may resolve the chain to another, as the precision of a decimal a null is taken from. Polars refusing the join, with a reason that names a decimal (no place). |
 | The lengths of the rows | Whether lists, or other values, of different lengths combine depends on the rows. Polars refusing the rows with a reason about lengths, in a case with no `explode` (no place). |
 | An overflow | A debug build of Polars panics where a release build wraps. Polars panicking so (no place). |
 | Branches that are one | A condition whose values are one expression is simplified to it, and its predicates are dropped. The tables refusing inside a predicate of such a condition, which Polars allows. |

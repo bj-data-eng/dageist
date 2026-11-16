@@ -130,7 +130,10 @@ fn a_place_is_judged_by_its_outer_position_and_its_innermost_nested_one() {
 
 #[test]
 fn only_a_joins_own_keys_are_contexts_that_hold_a_key() {
-    let keys: Vec<Context> = Context::all().into_iter().filter(Context::is_key).collect();
+    let keys: Vec<Context> = Context::all()
+        .into_iter()
+        .filter(Context::is_join_key)
+        .collect();
     assert_eq!(
         keys,
         vec![

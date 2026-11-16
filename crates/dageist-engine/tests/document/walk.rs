@@ -375,6 +375,39 @@ fn a_join_key_that_holds_a_null_beside_a_column_is_not_refused() {
 }
 
 #[test]
+fn a_join_key_whose_aggregate_is_compared_with_a_null_is_not_refused() {
+    // The comparison is a null, and the aggregate it follows goes with it.
+    let key = field_then(
+        "k",
+        vec![call(
+            "Expr.sub",
+            json!({ "other": chain(
+                call("polars.lit", json!({ "value": { "integer": 1 } })),
+                vec![
+                    call("Expr.last", json!({})),
+                    call(
+                        "Expr.eq",
+                        json!({ "other": chain(
+                            call("polars.lit", json!({ "value": { "flag": null } })),
+                            vec![],
+                        ) }),
+                    ),
+                ],
+            ) }),
+        )],
+    );
+    let walk = walk_of(
+        "LazyFrame.join",
+        json!({
+            "other": { "table": "other" },
+            "left_on": many(vec![key]),
+            "right_on": many(vec![field("rk")]),
+        }),
+    );
+    assert_eq!(walk.refusal(), None);
+}
+
+#[test]
 fn the_values_of_a_condition_need_be_boolean_in_a_filter_only_where_it_ends_the_predicate() {
     let condition = |links: Vec<Value>| {
         let mut all = vec![

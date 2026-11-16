@@ -227,14 +227,13 @@ impl Context {
         Some(Self { outer, nested })
     }
 
-    /// Whether an expression that stands here is a key: a join's, or a
-    /// window's, where Polars needs it to be elementwise.
+    /// Whether an expression that stands here is one of a join's own keys,
+    /// where Polars needs it to be elementwise. The key of a window is not: it
+    /// stands in a select, a filter or a sort key, and Polars accepts one that
+    /// is not elementwise.
     #[must_use]
-    pub const fn is_key(&self) -> bool {
-        match self.nested {
-            Some(nested) => matches!(nested, Nested::PartitionBy | Nested::OrderBy),
-            None => matches!(self.outer, Outer::JoinLeft | Outer::JoinRight),
-        }
+    pub const fn is_join_key(&self) -> bool {
+        self.nested.is_none() && matches!(self.outer, Outer::JoinLeft | Outer::JoinRight)
     }
 
     /// The position of the step.
