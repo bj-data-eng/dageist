@@ -1,6 +1,7 @@
 //! A step Polars refuses is reported with where in the step it is and Polars'
 //! own reason, and the steps after it are not run.
 
+use dageist_engine::allowed::{RefusalSource, Rule};
 use dageist_engine::catalog::BuildError;
 use dageist_engine::document::{
     Document, Outcome, Report, Resolution, RowsError, RunCause, Segment, StepId, StepRefusal,
@@ -405,4 +406,79 @@ fn a_date_part_of_text_passes_schema_resolution_and_fails_when_rows_are_collecte
         .rows(&inputs(), &claims(), &id, 10)
         .expect_err("Polars cannot take the date of text");
     assert!(matches!(error, RowsError::Polars(_)), "{error}");
+}
+
+#[test]
+fn element_outside_a_pivots_aggregate_is_refused_at_its_start_by_the_rule() {
+    let report = run(vec![
+        step(
+            "bad",
+            "LazyFrame.with_columns",
+            json!({ "named_exprs": named(vec![(
+                "x",
+                chain(
+                    call("polars.element", json!({})),
+                    vec![call("Expr.first", json!({}))],
+                ),
+            )]) }),
+        ),
+        step("after", "LazyFrame.select", json!({})),
+    ]);
+    let refusal = refusal_of(&report, "bad");
+    assert_eq!(
+        refusal.place().path(),
+        [parameter("named_exprs"), Segment::Value(0), Segment::Start]
+    );
+    let RunCause::NotAllowed(not_allowed) = refusal.cause() else {
+        panic!("not the rule's reason: {refusal}");
+    };
+    assert_eq!(
+        not_allowed.source(),
+        RefusalSource::Rule(Rule::ElementOnlyInPivotAggregate)
+    );
+    assert!(refusal.to_string().contains("element"), "{refusal}");
+    // Polars itself refuses `element` on a table's columns.
+    assert!(
+        claims()
+            .lazy()
+            .select([element().first()])
+            .collect_schema()
+            .is_err()
+    );
+}
+
+#[test]
+fn a_joins_right_keys_are_read_against_the_other_table_not_the_one_the_step_starts_from() {
+    let join = |left_on: &str, right_on: &str| {
+        run(vec![step(
+            "join",
+            "LazyFrame.join",
+            json!({
+                "other": { "table": "step_sla" },
+                "left_on": many(vec![field(left_on)]),
+                "right_on": many(vec![field(right_on)]),
+            }),
+        )])
+    };
+    // `step` is a column of the other table only, and `step_to` of the claims only.
+    let report = join("step_to", "step");
+    assert!(
+        matches!(report.steps()[0].outcome(), Outcome::Valid { .. }),
+        "{:?}",
+        report.steps()[0].outcome()
+    );
+    let report = join("step_to", "step_to");
+    let refusal = refusal_of(&report, "join");
+    assert_eq!(
+        refusal.place().path(),
+        [parameter("right_on"), Segment::Item(0), Segment::Start]
+    );
+    assert!(matches!(refusal.cause(), RunCause::Polars(_)), "{refusal}");
+    assert!(refusal.to_string().contains("step_to"), "{refusal}");
+    // And `left_on` is read against the claims: the other table's column is not found there.
+    let report = join("step", "step");
+    assert_eq!(
+        refusal_of(&report, "join").place().path(),
+        [parameter("left_on"), Segment::Item(0), Segment::Start]
+    );
 }

@@ -1,0 +1,39 @@
+//! Which combinations the catalogue's entries may stand in, found by running
+//! Polars and kept as tables.
+//!
+//! Polars' schema resolution does not refuse every invalid combination:
+//! `dt.date` of a `String` column has a schema, and fails only when rows are
+//! read. So the tables are built by running each combination on a few rows of
+//! the dtype, including a null, and on an empty table, and a combination is
+//! allowed only when the schema and both runs succeed. There are three, each a
+//! text artifact under `api/catalogue/`, one combination to a line, sorted:
+//!
+//! - the **dtype table**: each expression method on a receiver of each
+//!   [representative dtype](Representative), and, for each expression
+//!   parameter, with an argument of each of them;
+//! - the **context table**: each entry in each [context](Context), a place
+//!   that holds an expression, up to two levels deep;
+//! - the **option table**: each entry with each pair of its options, the flags
+//!   and the words of a choice.
+//!
+//! Some rules are not Polars' to hold, and are named in [`Rule`] and applied
+//! beside the tables. [`offers`] and [`offer`] answer, from the committed
+//! tables embedded in the engine and those rules, whether an entry may stand
+//! at a [`Place`], and give a reason for each refusal, without running Polars.
+
+mod context;
+mod dtype;
+mod offers;
+mod rules;
+mod table;
+#[cfg(test)]
+mod tests;
+
+pub use context::{Context, Nested, Outer, Position};
+pub use dtype::{Representative, ResultDtype, dtype_name};
+pub use offers::{
+    After, Allowance, ConditionState, Offer, Place, Refusal, RefusalSource, Verdict,
+    argument_dtypes, offer, offers, options,
+};
+pub use rules::Rule;
+pub use table::{Outcome, Produces, Reason, Shape, Stage};

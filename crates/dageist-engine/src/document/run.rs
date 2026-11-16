@@ -13,6 +13,7 @@ use polars::prelude::{
     DataFrame, DataType, Expr, IdxSize, IntoLazy, LazyFrame, PolarsError, SchemaRef,
 };
 
+use crate::allowed::{self, After, Context, Place as Standing, Position, Refusal, Verdict};
 use crate::catalog::{Argument, Arguments, Build, BuildError, Conditional, Laziness};
 
 use super::error::{Place, Segment};
@@ -76,6 +77,10 @@ pub enum RunCause {
     /// The catalogue could not build the call: an argument is missing, or
     /// Polars refused it.
     Build(BuildError),
+    /// An entry stands where the tables of allowed combinations, or a named
+    /// rule beside them, do not let it, such as `element` outside a pivot's
+    /// aggregate.
+    NotAllowed(Refusal),
     /// Polars refused the step when it worked out its schema.
     Polars(PolarsError),
 }
@@ -88,6 +93,7 @@ impl fmt::Display for RunCause {
                 write!(formatter, "there is no connected value or list {name:?}")
             }
             Self::Build(error) => error.fmt(formatter),
+            Self::NotAllowed(refusal) => refusal.fmt(formatter),
             Self::Polars(error) => error.fmt(formatter),
         }
     }
@@ -97,6 +103,7 @@ impl std::error::Error for RunCause {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Build(error) => Some(error),
+            Self::NotAllowed(refusal) => Some(refusal),
             Self::Polars(error) => Some(error),
             _ => None,
         }
@@ -366,6 +373,7 @@ fn run_step(
         probe: trace.then(|| DataFrame::empty_with_schema(schema).lazy()),
         base: base.clone(),
         path: Vec::new(),
+        positions: Vec::new(),
         traces: Vec::new(),
     };
     let frame = match builder.step(step.call(), input) {
@@ -387,17 +395,6 @@ fn run_step(
     StepRun {
         expressions: builder.traces,
         result,
-    }
-}
-
-/// The parameter, of the same entry, that holds the table whose columns the
-/// expressions of `parameter` are evaluated against, when they are not the
-/// columns of the table the step starts from. The catalogue does not say
-/// this yet.
-fn evaluated_against(entry: &str, parameter: &str) -> Option<&'static str> {
-    match (entry, parameter) {
-        ("LazyFrame.join", "right_on") => Some("other"),
-        _ => None,
     }
 }
 
@@ -434,6 +431,9 @@ struct Builder<'a> {
     probe: Option<LazyFrame>,
     base: Place,
     path: Vec<Segment>,
+    /// The named positions, of a step and of the expressions inside it, that
+    /// hold the expression being built, outermost first.
+    positions: Vec<Position>,
     traces: Vec<ExpressionDtypes>,
 }
 
@@ -465,6 +465,21 @@ impl Builder<'_> {
         })
     }
 
+    /// Whether the function that starts an expression may stand in the named
+    /// positions that hold the expression, as the tables of allowed
+    /// combinations and the rules beside them say: `element` stands only in a
+    /// pivot's aggregate. Where no named position holds the expression, there
+    /// is nothing to ask and Polars decides.
+    fn stands_here(&self, call: &Call) -> Result<(), Stop> {
+        let Some(context) = Context::from_positions(&self.positions) else {
+            return Ok(());
+        };
+        match allowed::offer(call.entry(), &Standing::new(context, After::Start), &[]) {
+            Verdict::Allowed(_) => Ok(()),
+            Verdict::Refused(refusal) => self.stop(RunCause::NotAllowed(refusal)),
+        }
+    }
+
     /// A call of an entry that cannot stand where the document put it. A
     /// document cannot hold one, so this is not reached.
     fn misplaced<T>(&self, call: &Call) -> Result<T, Stop> {
@@ -484,18 +499,26 @@ impl Builder<'_> {
 
     /// The arguments of `call`, built, and checked as the catalogue checks them.
     fn arguments(&mut self, call: &Call) -> Result<Arguments, Stop> {
+        let entry = call.entry().id().as_str();
         let mut given: Vec<(&str, Argument)> = Vec::new();
         for argument in call.arguments() {
             self.path
                 .push(Segment::Parameter(argument.parameter().to_owned()));
-            let from_table = evaluated_against(call.entry().id().as_str(), argument.parameter())
-                .and_then(|table| call.argument(table))
-                .and_then(|table| match table {
-                    Value::Table(name) => self.inputs.table(name),
-                    _ => None,
-                });
+            let position = Position::of_parameter(entry, argument.parameter());
+            self.positions.extend(position);
+            // An expression in a position that is evaluated against another
+            // table's columns, as a join's `right_on` is, sees that table's.
+            let from_table = match position {
+                Some(Position::Outer(outer)) => outer
+                    .evaluated_against()
+                    .and_then(|table| call.argument(table))
+                    .and_then(|table| match table {
+                        Value::Table(name) => self.inputs.table(name),
+                        _ => None,
+                    }),
+                _ => None,
+            };
             let built = if let Some(table) = from_table {
-                // The expressions are evaluated against another table's columns.
                 let own = self.probe.take();
                 self.probe = own.as_ref().and_then(|_| probe_of(table));
                 let built = self.argument(argument.value());
@@ -505,6 +528,9 @@ impl Builder<'_> {
                 self.argument(argument.value())?
             };
             given.push((argument.parameter(), built));
+            if position.is_some() {
+                self.positions.pop();
+            }
             self.path.pop();
         }
         self.built(call.entry().arguments(given))
@@ -570,6 +596,7 @@ impl Builder<'_> {
                 None => return self.stop(RunCause::UnknownInput(name.clone())),
             },
             Start::Call(call) => {
+                self.stands_here(call)?;
                 let arguments = self.arguments(call)?;
                 match call.entry().build() {
                     Build::Function(build) => Built::Expr(self.built(build(&arguments))?),
