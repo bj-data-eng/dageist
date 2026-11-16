@@ -23,6 +23,7 @@ use dageist_fuzz::generation::Entropy;
 
 use super::case::{Case, STEP};
 use super::frames::{ON_COLUMNS, OTHER};
+use super::predict::option_words;
 
 /// Fewest bytes of entropy a case is made from. A shorter input is discarded,
 /// for what it lacks would be read as zeros, the same choice every time.
@@ -679,6 +680,11 @@ impl Gen<'_> {
                 .iter()
                 .filter_map(|(name, class)| class.map(|class| (name.as_str(), class)))
                 .collect();
+            let words = option_words(&call);
+            let words: Vec<(&str, &str)> = words
+                .iter()
+                .map(|(name, word)| (name.as_str(), word.as_str()))
+                .collect();
             let verdict = allowed::offer(
                 chosen,
                 &OfferPlace::new(
@@ -688,7 +694,9 @@ impl Gen<'_> {
                         shape,
                     },
                 ),
-                &Chosen::default().with_arguments(&given),
+                &Chosen::default()
+                    .with_arguments(&given)
+                    .with_options(&words),
             );
             match verdict {
                 OfferVerdict::Allowed(allowance) => {
@@ -730,6 +738,11 @@ impl Gen<'_> {
             .iter()
             .filter_map(|(name, class)| class.map(|class| (name.as_str(), class)))
             .collect();
+        let words = option_words(&call);
+        let words: Vec<(&str, &str)> = words
+            .iter()
+            .map(|(name, word)| (name.as_str(), word.as_str()))
+            .collect();
         match allowed::offer(
             chosen,
             &OfferPlace::new(
@@ -739,7 +752,9 @@ impl Gen<'_> {
                     shape,
                 },
             ),
-            &Chosen::default().with_arguments(&given),
+            &Chosen::default()
+                .with_arguments(&given)
+                .with_options(&words),
         ) {
             OfferVerdict::Allowed(allowance) => Some((
                 call,

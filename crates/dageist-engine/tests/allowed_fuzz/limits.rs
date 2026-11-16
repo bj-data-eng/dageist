@@ -33,15 +33,11 @@ use super::predict::{Prediction, Refused, Source, Verdict};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Limit {
     /// `Expr.over`'s `mapping_strategy` `explode` gives a different number of
-    /// rows, which meets another expression's with lengths that do not match.
-    /// `options.txt` records what it gives, but
-    /// [`allowed::offer`](dageist_engine::allowed::offer) is asked of a method
-    /// without its options. Polars refusing the rows, with a reason about
-    /// lengths, cannot be placed, so the reason and an `explode` in the case are
-    /// what gate it; the tables refusing is placed, inside an expression that
-    /// holds an `explode`. (That `join` gives a `List` and `fractional` a
-    /// `Float64` is not a limit but a stop: the prediction does not go past
-    /// them, and the tally counts it.)
+    /// rows, which meet another expression's with lengths that do not match. The
+    /// tables do not measure what meets them. Polars refusing the rows, with a
+    /// reason about lengths, cannot be placed, so the reason and an `explode` in
+    /// the case are what gate it; the tables refusing is placed, inside an
+    /// expression that holds an `explode`.
     OptionsChangeTheResult,
     /// A comparison or a subtraction with a null literal is null, and Polars does not evaluate
     /// the other side of it, wherever in the expression that comparison is. A
@@ -161,7 +157,7 @@ impl Limit {
     pub const fn statement(self) -> &'static str {
         match self {
             Self::OptionsChangeTheResult => {
-                "an option changes what a method gives (over's mapping_strategy, total_days' fractional), which offer is not told"
+                "an explode gives other lengths, which meet those of what follows it, as the tables did not measure"
             }
             Self::ALiteral => "a literal is one value, which the tables measured as a column",
             Self::TheLengthsOfTheRows => {
@@ -1014,7 +1010,6 @@ mod tests {
         Prediction {
             verdict,
             expressions,
-            stopped_by_options: false,
         }
     }
 

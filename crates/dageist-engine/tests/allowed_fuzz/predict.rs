@@ -16,7 +16,7 @@
 
 use dageist_engine::allowed::{
     self, After, Chosen, ConditionState, Context, Ending, Place as OfferPlace, Position as Slot,
-    RefusalSource, Representative, Shape, Unknown, Verdict as OfferVerdict,
+    RefusalSource, Representative, Shape, Verdict as OfferVerdict,
 };
 use dageist_engine::catalog::{Applies, Entry, Kind};
 use dageist_engine::document::{Call, Expression, Place, Segment, Start, Value};
@@ -73,10 +73,14 @@ pub struct Traced {
 pub struct Prediction {
     pub verdict: Verdict,
     pub expressions: Vec<Traced>,
-    /// Whether a call was given an option that changes what a method gives, so
-    /// that the dtype after it is not predicted (`over`'s `mapping_strategy` as
-    /// `join`, `dt.total_days`'s `fractional`, which `offer` is not told).
-    pub stopped_by_options: bool,
+}
+
+/// What an expression held by an argument has: the class it gives, if known, and
+/// whether it gives one value.
+#[derive(Clone, Copy)]
+struct Operand {
+    dtype: Option<Representative>,
+    shape: Shape,
 }
 
 /// What a chain has so far.
@@ -89,6 +93,9 @@ enum Cur {
     Condition {
         state: ConditionState,
         values: Vec<Option<Representative>>,
+        /// Whether every predicate and value so far gives one value, which a
+        /// condition of them gives too.
+        single: bool,
     },
     /// Refused: nothing more is asked of it.
     Dead,
@@ -102,7 +109,6 @@ struct Walker<'a> {
     traced: Vec<Traced>,
     refusal: Option<Refused>,
     undetermined: Option<String>,
-    stopped_by_options: bool,
 }
 
 pub fn predict(case: &Case) -> Prediction {
@@ -115,7 +121,6 @@ pub fn predict(case: &Case) -> Prediction {
         traced: Vec::new(),
         refusal: None,
         undetermined: None,
-        stopped_by_options: false,
     };
     walker.arguments(step.call());
     walker.step_options(step.call());
@@ -128,7 +133,6 @@ pub fn predict(case: &Case) -> Prediction {
     Prediction {
         verdict,
         expressions: walker.traced,
-        stopped_by_options: walker.stopped_by_options,
     }
 }
 
@@ -141,6 +145,24 @@ fn option_word(value: &Value) -> Option<String> {
         Value::Choice(word) => Some(word.clone()),
         _ => None,
     }
+}
+
+/// The options `call` was given, each by the parameter and its word as the
+/// option table writes it.
+pub fn option_words(call: &Call) -> Vec<(String, String)> {
+    let entry = call.entry();
+    call.arguments()
+        .iter()
+        .filter(|given| {
+            entry.parameters().iter().any(|parameter| {
+                parameter.name() == given.parameter()
+                    && matches!(parameter.kind(), Kind::Flag | Kind::Choice(_))
+            })
+        })
+        .filter_map(|given| {
+            option_word(given.value()).map(|word| (given.parameter().to_owned(), word))
+        })
+        .collect()
 }
 
 impl Walker<'_> {
@@ -169,28 +191,10 @@ impl Walker<'_> {
         }
     }
 
-    /// The options `call` was given, each by the parameter and its word as the
-    /// option table writes it.
-    fn chosen_options(call: &Call) -> Vec<(String, String)> {
-        let entry = call.entry();
-        call.arguments()
-            .iter()
-            .filter(|given| {
-                entry.parameters().iter().any(|parameter| {
-                    parameter.name() == given.parameter()
-                        && matches!(parameter.kind(), Kind::Flag | Kind::Choice(_))
-                })
-            })
-            .filter_map(|given| {
-                option_word(given.value()).map(|word| (given.parameter().to_owned(), word))
-            })
-            .collect()
-    }
-
     /// The options a step was given, asked of the option table. The options of
     /// a method are asked of [`allowed::offer`], with the call.
     fn step_options(&mut self, step: &Call) {
-        let chosen = Self::chosen_options(step);
+        let chosen = option_words(step);
         let chosen: Vec<(&str, &str)> = chosen
             .iter()
             .map(|(name, word)| (name.as_str(), word.as_str()))
@@ -202,7 +206,7 @@ impl Walker<'_> {
 
     /// Walks the arguments of `call`, and gives the dtype of each expression
     /// it holds, by the parameter that holds it.
-    fn arguments(&mut self, call: &Call) -> Vec<(String, Option<Representative>)> {
+    fn arguments(&mut self, call: &Call) -> Vec<(String, Operand)> {
         let entry = call.entry().id().as_str();
         let mut found = Vec::new();
         for given in call.arguments() {
@@ -224,12 +228,12 @@ impl Walker<'_> {
         value: &Value,
         parameter: &str,
         held: bool,
-        found: &mut Vec<(String, Option<Representative>)>,
+        found: &mut Vec<(String, Operand)>,
     ) {
         match value {
             Value::Expression(expression) => {
-                let dtype = self.expression(expression, held);
-                found.push((parameter.to_owned(), dtype));
+                let operand = self.expression(expression, held);
+                found.push((parameter.to_owned(), operand));
             }
             Value::Many(items) => {
                 for (at, item) in items.iter().enumerate() {
@@ -276,22 +280,26 @@ impl Walker<'_> {
         }
     }
 
-    fn expression(&mut self, expression: &Expression, held: bool) -> Option<Representative> {
+    fn expression(&mut self, expression: &Expression, held: bool) -> Operand {
         let place = self.here();
         let context = Context::from_positions(&self.slots);
         let mut start_class = None;
         let mut last_end: Option<Ending> = None;
         let mut cur = Cur::Dead;
+        let unsaid = Operand {
+            dtype: None,
+            shape: Shape::Many,
+        };
         let Start::Call(start) = expression.start() else {
             self.blind("a connected input starts the chain");
-            return None;
+            return unsaid;
         };
         self.path.push(Segment::Start);
-        self.arguments(start);
+        let start_arguments = self.arguments(start);
         self.path.pop();
         let Some(context) = context else {
             self.blind("no named position holds the expression");
-            return None;
+            return unsaid;
         };
         self.path.push(Segment::Start);
         let start_dtype = match start.entry().id().as_str() {
@@ -317,6 +325,9 @@ impl Walker<'_> {
                     cur = Cur::Condition {
                         state: ConditionState::When,
                         values: Vec::new(),
+                        single: start_arguments
+                            .iter()
+                            .all(|(_, operand)| operand.shape == Shape::One),
                     };
                 } else {
                     start_class = start_dtype;
@@ -354,9 +365,12 @@ impl Walker<'_> {
             links,
         });
         match cur {
-            Cur::Value { dtype, .. } => dtype,
-            Cur::Condition { values, .. } => unify(&values),
-            Cur::Dead => None,
+            Cur::Value { dtype, shape } => Operand { dtype, shape },
+            Cur::Condition { values, .. } => Operand {
+                dtype: unify(&values),
+                shape: Shape::Many,
+            },
+            Cur::Dead => unsaid,
         }
     }
 
@@ -387,7 +401,7 @@ impl Walker<'_> {
     fn link(
         &mut self,
         link: &Call,
-        arguments: Vec<(String, Option<Representative>)>,
+        arguments: Vec<(String, Operand)>,
         context: Context,
         cur: Cur,
         last_end: &mut Option<Ending>,
@@ -416,9 +430,9 @@ impl Walker<'_> {
         };
         let given: Vec<(&str, Representative)> = arguments
             .iter()
-            .filter_map(|(name, dtype)| dtype.map(|dtype| (name.as_str(), dtype)))
+            .filter_map(|(name, operand)| operand.dtype.map(|dtype| (name.as_str(), dtype)))
             .collect();
-        let words = Self::chosen_options(link);
+        let words = option_words(link);
         let words: Vec<(&str, &str)> = words
             .iter()
             .map(|(name, word)| (name.as_str(), word.as_str()))
@@ -451,13 +465,20 @@ impl Walker<'_> {
         let statement = arguments
             .iter()
             .find(|(name, _)| name == "statement")
-            .and_then(|(_, dtype)| *dtype);
+            .map(|(_, operand)| *operand);
+        let statement_class = statement.and_then(|operand| operand.dtype);
+        // Whether the predicates and the value this link is given give one
+        // value.
+        let given_single = arguments
+            .iter()
+            .filter(|(name, _)| matches!(name.as_str(), "predicates" | "statement"))
+            .all(|(_, operand)| operand.shape == Shape::One);
         // A condition that ends gives the dtype its values have, when they have
         // one.
         let gives = match (&cur, entry.id().as_str()) {
             (Cur::Condition { values, .. }, "Then.otherwise" | "ChainedThen.otherwise") => {
                 let mut all = values.clone();
-                all.push(statement);
+                all.push(statement_class);
                 unify(&all)
             }
             _ => None,
@@ -479,54 +500,41 @@ impl Walker<'_> {
         *last_end = Some(allowance.can_end().clone());
         match (entry.applies(), cur) {
             (Applies::Expression, _) => {
-                // Documented limit ([`super::limits::Limit::OptionsChangeTheResult`]):
-                // `options.txt` records that `over`'s `mapping_strategy=join` gives
-                // a `List` and `dt.total_days(fractional=true)` a `Float64`, but
-                // `offer` is asked of a method without its options and gives what
-                // it gives at their defaults, so the dtype after it is not asked of
-                // the tables.
-                let changed =
-                    matches!(
-                        link.argument("mapping_strategy"),
-                        Some(Value::Choice(word)) if word == "join"
-                    ) || matches!(link.argument("fractional"), Some(Value::Flag(Some(true))));
-                self.stopped_by_options |= changed;
-                // What `offer` says of how the chain ends was worked out for
-                // the dtype the method gives at its defaults.
-                if changed {
-                    *last_end = Some(Ending::NotKnown(Unknown::TheResultsDtype));
-                }
-                let dtype = allowance
-                    .result()
-                    .and_then(allowed::ResultDtype::class)
-                    .filter(|_| !changed);
+                let dtype = allowance.result().and_then(allowed::ResultDtype::class);
                 Cur::Value {
                     dtype,
                     shape: allowance.shape(),
                 }
             }
-            (Applies::Condition, Cur::Condition { mut values, .. }) => {
+            (
+                Applies::Condition,
+                Cur::Condition {
+                    mut values, single, ..
+                },
+            ) => {
+                let single = single && given_single;
                 let next = match entry.id().as_str() {
                     "When.then" => {
-                        values.push(statement);
+                        values.push(statement_class);
                         ConditionState::Then
                     }
                     "ChainedWhen.then" => {
-                        values.push(statement);
+                        values.push(statement_class);
                         ConditionState::ChainedThen
                     }
                     "Then.when" | "ChainedThen.when" => ConditionState::ChainedWhen,
                     _ => {
-                        values.push(statement);
+                        values.push(statement_class);
                         return Cur::Value {
                             dtype: unify(&values),
-                            shape: Shape::Many,
+                            shape: if single { Shape::One } else { Shape::Many },
                         };
                     }
                 };
                 Cur::Condition {
                     state: next,
                     values,
+                    single,
                 }
             }
             _ => Cur::Dead,

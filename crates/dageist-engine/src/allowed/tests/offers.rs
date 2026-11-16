@@ -487,12 +487,16 @@ fn a_method_is_offered_with_the_options_chosen_and_refused_for_one_it_does_not_h
 }
 
 /// What the method `id` gives after `receiver` at a `select` item, with the
-/// options `chosen` set.
+/// options `chosen` set, and for a window the partition it is measured with.
 fn given_options(id: &str, receiver: Representative, chosen: &[(&str, &str)]) -> Option<String> {
+    let partitioned = [("partition_by", Representative::Int64)];
+    let arguments: &[(&str, Representative)] = if id == "Expr.over" { &partitioned } else { &[] };
     let verdict = offer(
         entry(id),
         &select_after(receiver),
-        &Chosen::default().with_options(chosen),
+        &Chosen::default()
+            .with_arguments(arguments)
+            .with_options(chosen),
     );
     verdict
         .allowance()
@@ -527,6 +531,59 @@ fn a_window_that_joins_gives_a_list_and_the_other_strategies_what_it_follows() {
         over(Representative::String, "group_to_rows").as_deref(),
         Some("String")
     );
+}
+
+#[test]
+fn a_window_that_joins_after_one_value_is_not_known_to_give_a_list() {
+    // The option table was measured on a column. After an aggregate, a window
+    // that joins gives the value again, and Polars says so.
+    let place = Place::new(
+        Context::step(Outer::Select),
+        After::Value {
+            dtype: Representative::Int64,
+            shape: Shape::One,
+        },
+    );
+    let over = |options: &'static [(&'static str, &'static str)]| {
+        offer(
+            entry("Expr.over"),
+            &place,
+            &Chosen::default()
+                .with_arguments(&[("partition_by", Representative::Int64)])
+                .with_options(options),
+        )
+    };
+    let joined = over(&[("mapping_strategy", "join")]);
+    assert_eq!(result_of(&joined), None, "{joined:?}");
+    let grouped = over(&[("mapping_strategy", "group_to_rows")]);
+    assert_eq!(result_of(&grouped), Some("Int64"), "{grouped:?}");
+
+    let frames = Frames::new(
+        Representative::Int64,
+        Representative::Int64,
+        &DataType::Int64,
+    );
+    let mut frame = frames.rows.clone().lazy().select([col("a")
+        .sum()
+        .over_with_options(Some([col("k")]), None, WindowMapping::Join)
+        .expect("a window")]);
+    assert_eq!(
+        frame.collect_schema().expect("a schema").get("a"),
+        Some(&DataType::Int64)
+    );
+}
+
+#[test]
+fn a_window_without_a_partition_is_not_known_to_give_a_list_for_a_joining_strategy() {
+    // The option table measured a window with `partition_by`, and a window
+    // without one is not grouped.
+    let place = select_after(Representative::Int64);
+    let joined = offer(
+        entry("Expr.over"),
+        &place,
+        &Chosen::default().with_options(&[("mapping_strategy", "join")]),
+    );
+    assert_eq!(result_of(&joined), None, "{joined:?}");
 }
 
 #[test]

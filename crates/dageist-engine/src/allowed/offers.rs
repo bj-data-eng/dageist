@@ -9,6 +9,7 @@ use super::context::Context;
 use super::dtype::{Representative, ResultDtype};
 use super::rules::Rule;
 use super::table::{Outcome, Produces, Reason, Shape, Stage, Tables, is_method};
+use crate::catalog::DefaultValue;
 
 /// What an expression has so far, where an entry would follow it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -449,6 +450,123 @@ fn on_receiver(
     fit.ok_or_else(missing)
 }
 
+/// What the option table says the options chosen give.
+enum OptionsGive {
+    /// They change nothing the table records: no option is set to other than its
+    /// default.
+    Nothing,
+    /// The lines that bear on them agree on this, measured on a receiver of this
+    /// dtype.
+    Gives {
+        produces: Produces,
+        measured_on: Option<Representative>,
+    },
+    /// The lines that bear on them give different results.
+    Unknown,
+}
+
+/// The word the option table writes for the default of `parameter`, when it is
+/// a flag or a choice that has one.
+fn default_word(parameter: &catalog::Parameter) -> Option<String> {
+    match parameter.default().value() {
+        DefaultValue::Flag(flag) => Some(flag.to_string()),
+        DefaultValue::Unset => Some("unset".to_owned()),
+        DefaultValue::Text(word) => Some(word),
+        _ => None,
+    }
+}
+
+/// What the option table says the options `chosen` of `entry` give. An option
+/// set to its default is not a choice. One option chosen is read from the lines
+/// that set it with every other option at its default, and more from the line
+/// of each pair of them; where those lines give different results, the result
+/// is not known.
+fn read_options(entry: &Entry, chosen: &[(&str, &str)]) -> OptionsGive {
+    let tables = Tables::committed();
+    let id = entry.id().as_str();
+    let parameter = |name: &str| entry.parameters().iter().find(|found| found.name() == name);
+    let changed: Vec<(&str, &str)> = chosen
+        .iter()
+        .copied()
+        .filter(|(name, word)| {
+            parameter(name).is_some_and(|found| default_word(found).as_deref() != Some(word))
+        })
+        .collect();
+    let at_default = |(name, word): &(&str, String)| {
+        parameter(name).is_some_and(|found| default_word(found).as_deref() == Some(word.as_str()))
+    };
+    let is_chosen = |(name, word): &(&str, String)| {
+        changed
+            .iter()
+            .any(|(chosen_name, chosen_word)| chosen_name == name && chosen_word == word)
+    };
+    let mut gives: Vec<(&Produces, Option<Representative>)> = Vec::new();
+    for ((line_id, line), cell) in &tables.options {
+        let bears = match changed.as_slice() {
+            [] => false,
+            [_] => {
+                line.iter().any(is_chosen)
+                    && line
+                        .iter()
+                        .all(|option| is_chosen(option) || at_default(option))
+            }
+            _ => line.len() > 1 && line.iter().all(is_chosen),
+        };
+        if *line_id == id
+            && bears
+            && let Outcome::Allowed(Some(produces)) = &cell.outcome
+        {
+            gives.push((produces, cell.receiver));
+        }
+    }
+    let Some((first, measured_on)) = gives.first().copied() else {
+        return OptionsGive::Nothing;
+    };
+    if gives.iter().all(|(produces, _)| *produces == first) {
+        OptionsGive::Gives {
+            produces: first.clone(),
+            measured_on,
+        }
+    } else {
+        OptionsGive::Unknown
+    }
+}
+
+/// The expression parameters the option table was measured with, for an entry
+/// whose options mean nothing without them: a window is grouped by
+/// `partition_by`, and without it a mapping strategy changes nothing.
+fn measured_with(entry: &Entry) -> &'static [&'static str] {
+    match entry.id().as_str() {
+        "Expr.over" => &["partition_by"],
+        _ => &[],
+    }
+}
+
+/// The result an option gives where the method follows `receiver`, from the
+/// result `option` the table measured on `measured_on`, and the results the
+/// method gives at its default options on each. The option table was measured
+/// on one dtype: where the receiver is another, the option is read as it
+/// changes what the method gives there, which is to leave it, or to make a
+/// list of it, and not known where it does otherwise.
+fn changed_result(
+    receiver: Representative,
+    measured_on: Option<Representative>,
+    option: &ResultDtype,
+    default_there: Option<&ResultDtype>,
+    default_here: Option<&ResultDtype>,
+) -> Option<ResultDtype> {
+    if measured_on == Some(receiver) {
+        return Some(option.clone());
+    }
+    let there = default_there?;
+    if option == there {
+        return default_here.cloned();
+    }
+    (option.name() == format!("List({})", there.name()))
+        .then(|| default_here.map(|here| ResultDtype::from_name(&format!("List({})", here.name()))))
+        .flatten()
+}
+
 /// Whether the entry `entry` may stand at `place`, given what has been
 /// [chosen](Chosen) for it, the dtypes of the arguments for its expression
 /// parameters.
@@ -537,9 +655,55 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     }
     // What the dtype table says of a method on the value it follows.
     let (mut result, mut shape) = (None, Shape::Many);
-    if let (After::Value { dtype, .. }, true) = (place.after, is_method(entry)) {
+    if let (
+        After::Value {
+            dtype,
+            shape: receiver_shape,
+        },
+        true,
+    ) = (place.after, is_method(entry))
+    {
         let fit = on_receiver(entry, dtype, chosen.arguments)?;
-        (result, shape) = (fit.result, fit.shape);
+        (result, shape) = (fit.result.clone(), fit.shape);
+        // And of the options chosen, which the option table says what they give
+        // on the dtype it was measured on.
+        match read_options(entry, chosen.options) {
+            OptionsGive::Nothing => {}
+            OptionsGive::Unknown => result = None,
+            OptionsGive::Gives {
+                produces,
+                measured_on,
+            } => {
+                let there = measured_on.and_then(|measured| {
+                    on_receiver(entry, measured, chosen.arguments)
+                        .ok()
+                        .and_then(|fit| fit.result)
+                });
+                result = changed_result(
+                    dtype,
+                    measured_on,
+                    &produces.result,
+                    there.as_ref(),
+                    fit.result.as_ref(),
+                );
+                // The option table was measured on a column. What follows one
+                // value is another matter: a window that joins gives that value
+                // again, not a list of it. Where the option changes what the
+                // method gives, it is not known after one value.
+                if receiver_shape == Shape::One && result != fit.result {
+                    result = None;
+                }
+                // And the call has to be given what the table was measured
+                // with.
+                if measured_with(entry)
+                    .iter()
+                    .any(|parameter| !chosen.arguments.iter().any(|(name, _)| name == parameter))
+                {
+                    result = None;
+                }
+                shape = produces.shape;
+            }
+        }
     }
     // What the call says of what it gives, where the tables do not.
     if result.is_none() && !is_method(entry) {
@@ -694,8 +858,11 @@ pub fn options(entry: &Entry, chosen: &[(&str, &str)]) -> Result<(), Refusal> {
         named
     };
     let check = |key: Vec<(&'static str, String)>| match tables.options.get(&(id, key)) {
-        Some(Outcome::Refused(reason)) => Err(Refusal::polars(reason)),
-        _ => Ok(()),
+        Some(cell) => match &cell.outcome {
+            Outcome::Refused(reason) => Err(Refusal::polars(reason)),
+            Outcome::Allowed(_) => Ok(()),
+        },
+        None => Ok(()),
     };
     match named.as_slice() {
         [] => Ok(()),

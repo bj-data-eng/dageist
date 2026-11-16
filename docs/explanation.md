@@ -291,8 +291,8 @@ answers for one entry, with what has been chosen for it, `Chosen`: the dtypes of
 the arguments chosen for its expression parameters, and the dtype of the value
 a start or a condition gives where the call decides it, which the tables cannot
 (`Chosen::giving`: the column `col` reads, a literal given a dtype, the values
-of a condition that ends in `otherwise`). `options` answers for a set of
-options. They read the committed files, embedded in the engine, and the rules,
+of a condition that ends in `otherwise`), and the options set on the call
+(`Chosen::with_options`). `options` answers for a set of options alone. They read the committed files, embedded in the engine, and the rules,
 and never run Polars. Each refusal says who refused it, Polars at a stage or a
 rule or the shape of an expression, and gives the reason. A rule that forbids an
 entry here is applied first, so that its words explain the refusal. An entry may
@@ -309,6 +309,18 @@ decide whether it may end, it is not known to end until the call is told the
 dtype it gives, and the rules then judge it. A method whose result an argument
 decides is likewise not known to end a place that needs a `Boolean` until the
 argument is chosen.
+
+What the options chosen give, `offer` reads from the option table: a window whose
+`mapping_strategy` is `join` gives a `List` of what it follows, and `dt.total_days`
+with `fractional` true a `Float64`. An option set to its default is not a choice.
+One option chosen is read from the lines that set it with the others at their
+defaults, and more from the line of each pair of them; where those lines give
+different results the result is not known. The option table was measured on one
+dtype, on a column, and for a window given a `partition_by`, so what an option
+gives is read as a change of what the method gives at its defaults: the dtype it
+was measured on, and a `List` of what the method gives elsewhere. After a single
+value, or for a window without a `partition_by`, an option that changes the
+result leaves it not known.
 
 The tables hold what they were measured on. A method's context was measured on
 the receiver that fits it best, so a table cannot say that a predicate must be
@@ -365,22 +377,16 @@ the rows, an overflow, a panic, a window over a window, an explode, the empty ta
 of a pivot) say so below. Two limits may both explain one case, and it is then
 excused by both.
 
-Two things the target does not do. It stops predicting after a call given an option
-that changes what the method gives, which `offer` is not told: `over`'s
-`mapping_strategy` as `join` gives a `List`, and `dt.total_days`'s `fractional` as
-true a `Float64`. `options.txt` records them. The dtype after such a call, and so
-what follows it that needs one, is not asked of the tables, and the tally counts
-the cases that stopped so; it is not a limit, which excuses a disagreement. And it
-compares nothing more of a case that a named rule refuses and Polars allows: the
-dtypes before the refusal are compared, but whether Polars allows the rest is not.
-The rule `pivot-aggregate-gives-one-value` is stricter than Polars wherever it
-refuses, which is about a third of the pivot cases (55 of the 153 of the fixed seed,
-and the same share in longer campaigns), so those pivot aggregates are checked little;
+One thing the target does not do: it compares nothing more of a case that a named rule
+refuses and Polars allows. The dtypes before the refusal are compared, but whether Polars
+allows the rest is not. The rule `pivot-aggregate-gives-one-value` is stricter than Polars
+wherever it refuses, which is about a third of the pivot cases (55 of the 153 of the fixed
+seed, and the same share in longer campaigns), so those pivot aggregates are checked little;
 the tally counts the pivot cases and those the rule refuses apart.
 
 | Limit | Excuses |
 | --- | --- |
-| An option changes what a method gives | `Expr.over`'s `mapping_strategy` as `explode` gives other lengths, which meet those of what follows it. Polars refusing the rows, with a reason about lengths, in a case with an `explode` (no place: the reason and the `explode` gate it); and the tables refusing, with a reason about lengths, at the window or at a call after it, or in the arguments of a link after it, in the same chain, which Polars allows; not before the window, not in its own arguments, and not an `explode` in another operand or item. |
+| An `explode` changes the lengths | `Expr.over`'s `mapping_strategy` as `explode` gives other lengths, which meet those of what follows it. The tables do not measure what meets them. Polars refusing the rows, with a reason about lengths, in a case with an `explode` (no place: the reason and the `explode` gate it); and the tables refusing, with a reason about lengths, at the window or at a call after it, or in the arguments of a link after it, in the same chain, which Polars allows; not before the window, not in its own arguments, and not an `explode` in another operand or item. |
 | A literal | An argument or a start is measured as a column of the dtype, except the values of `shift` and the arguments of a pivot's group. A literal, or a condition of literals, is one value, which Polars casts and broadcasts as it does not a column. A comparison or a subtraction with a null literal is null, so that Polars does not evaluate what it follows or what it is given, and does evaluate the arguments of the calls after it. The tables refusing at a call that follows a literal or is given one, or at what a null comparison follows, is given, or at the calls from it on, which Polars allows. |
 | A single value | Polars does not evaluate what it does not need for one value. The tables refusing at a call whose receiver in its chain is one value (an aggregate with only single values after it), or inside a sort key or a window's key that is one value (a literal is one), which is dropped, or in what a `len` follows, or in the arguments of the links before it, which it does not count; Polars allows it. A `len` before an unrelated later argument excuses nothing there. |
 | A pivot's aggregate | It is run on the values of each group, with kernels of its own, and on no groups when the table is empty. Polars refusing the empty table, with a reason that an operation is not supported or that a dtype is null (no place); and the tables refusing, with a reason about a dtype an operation does not support, a comparison, an operation, an evaluation, a cast, a struct field or lengths of a window over a group, at a call of the aggregate, which Polars allows. |

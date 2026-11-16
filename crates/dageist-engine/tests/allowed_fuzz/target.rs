@@ -260,9 +260,6 @@ impl CaseTarget for AllowedTarget {
         let prediction = predict(case);
         let observed = observe(case);
         let allowed_by_polars = observed.refusal.is_none();
-        if prediction.stopped_by_options {
-            tally("prediction stops after an option that changes the dtype");
-        }
         if case.document.steps()[0].call().entry().id().as_str() == "LazyFrame.pivot" {
             tally("pivot case");
         }

@@ -507,12 +507,20 @@ fn cells(
         .collect()
 }
 
+/// What the option table says of an entry with options set: the dtype it was
+/// measured on, for a method, and what came of it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct OptionCell {
+    pub receiver: Option<Representative>,
+    pub outcome: Outcome,
+}
+
 /// The committed tables, read.
 #[derive(Debug)]
 pub(super) struct Tables {
     pub dtypes: HashMap<DtypeKey, Outcome>,
     pub contexts: HashMap<(&'static str, Context), ContextCell>,
-    pub options: HashMap<(&'static str, Vec<OptionValue>), Outcome>,
+    pub options: HashMap<(&'static str, Vec<OptionValue>), OptionCell>,
 }
 
 impl Tables {
@@ -538,7 +546,15 @@ impl Tables {
         let options = lines(options, OptionLine::parse)
             .map_err(named("options.txt"))?
             .into_iter()
-            .map(|line| ((line.entry, line.options), line.outcome))
+            .map(|line| {
+                (
+                    (line.entry, line.options),
+                    OptionCell {
+                        receiver: line.receiver,
+                        outcome: line.outcome,
+                    },
+                )
+            })
             .collect();
         Ok(Self {
             dtypes,
