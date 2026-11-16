@@ -1836,6 +1836,113 @@ mod tests {
         );
     }
 
+    #[test]
+    fn a_later_predicate_in_a_window_order_by_is_excused_for_rows_it_may_not_reach() {
+        // `a.over(order_by=[when(h.is_null()).then(k).when(g.is_not_null()).then(k)
+        // .when(h).then(1)])`: a window's `order_by` is evaluated on groups, where
+        // Polars does not evaluate a predicate that no row reaches, as the rows
+        // of the sample decide. It evaluates the same condition in `select`, in
+        // `sort`, and in a window's `partition_by` and `more_exprs`.
+        let condition = || {
+            chain_of(
+                when_of(vec![chain(column("h"), &["Expr.is_null"])]),
+                vec![
+                    then_of(chain(column("k"), &[])),
+                    also_when(vec![chain(column("g"), &["Expr.is_not_null"])]),
+                    call(
+                        "ChainedWhen.then",
+                        vec![("statement", Value::Expression(chain(column("k"), &[])))],
+                    ),
+                    call(
+                        "ChainedThen.when",
+                        vec![("predicates", many(vec![chain(column("h"), &[])]))],
+                    ),
+                    call(
+                        "ChainedWhen.then",
+                        vec![("statement", Value::Expression(chain(literal_of(1), &[])))],
+                    ),
+                ],
+            )
+        };
+        let window = |parameter_name: &str| {
+            let keys = vec![(parameter_name, many(vec![condition()]))];
+            let mut given = vec![("partition_by", many(vec![chain(column("k"), &[])]))];
+            given.retain(|(name, _)| *name != parameter_name);
+            given.extend(keys);
+            select(vec![chain_of(column("a"), vec![call("Expr.over", given)])])
+        };
+        let in_the_window = |parameter_name: &str, link: usize| {
+            at(&[
+                parameter("exprs"),
+                Segment::Item(0),
+                Segment::Link(0),
+                parameter(parameter_name),
+                Segment::Item(0),
+                Segment::Link(link),
+                parameter("predicates"),
+                Segment::Item(0),
+            ])
+        };
+        // The third predicate, and the second: the rows left to them may be none.
+        for link in [1, 3] {
+            assert_eq!(
+                rule_refuses(
+                    &window("order_by"),
+                    in_the_window("order_by", link),
+                    BOOLEAN_RULE,
+                    "a rule"
+                ),
+                vec![Limit::AValueThatRunsOnNoRows],
+                "link {link}"
+            );
+        }
+        // The first predicate is always evaluated.
+        let first = at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Link(0),
+            parameter("order_by"),
+            Segment::Item(0),
+            Segment::Start,
+            parameter("predicates"),
+            Segment::Item(0),
+        ]);
+        assert_eq!(
+            rule_refuses(&window("order_by"), first, BOOLEAN_RULE, "a rule"),
+            vec![]
+        );
+        for other in ["partition_by", "more_exprs"] {
+            assert_eq!(
+                rule_refuses(
+                    &window(other),
+                    in_the_window(other, 3),
+                    BOOLEAN_RULE,
+                    "a rule"
+                ),
+                vec![],
+                "{other}"
+            );
+        }
+        let plain = select(vec![condition()]);
+        let later = at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Link(3),
+            parameter("predicates"),
+            Segment::Item(0),
+        ]);
+        assert_eq!(rule_refuses(&plain, later, BOOLEAN_RULE, "a rule"), vec![]);
+        let sorted = sort(vec![condition()]);
+        let later = at(&[
+            parameter("by"),
+            Segment::Item(0),
+            Segment::Link(3),
+            parameter("predicates"),
+            Segment::Item(0),
+        ]);
+        assert_eq!(rule_refuses(&sorted, later, BOOLEAN_RULE, "a rule"), vec![]);
+    }
+
     /// A whole number of the dtype of `literal`, as a literal call.
     fn literal_of(value: i64) -> Call {
         call("polars.lit", vec![("value", Value::Integer(value))])
