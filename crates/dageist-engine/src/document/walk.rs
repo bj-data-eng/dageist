@@ -449,7 +449,7 @@ impl Walker<'_> {
     }
 
     /// The class of what a pivot's group holds, which `element` stands for: the
-    /// first column the pivot takes values from.
+    /// column the pivot takes values from, where it takes them from one.
     fn group_of(&self) -> Option<Representative> {
         if self.step.entry().id().as_str() != "LazyFrame.pivot" {
             return None;
@@ -457,7 +457,11 @@ impl Walker<'_> {
         let Some(Value::Columns(names)) = self.step.argument("values") else {
             return None;
         };
-        Representative::of(self.source.get(names.first()?)?)
+        // A group of several columns has the dtype of none of them alone.
+        let [name] = names.as_slice() else {
+            return None;
+        };
+        Representative::of(self.source.get(name)?)
     }
 
     /// The class a start gives, where its arguments decide it.
