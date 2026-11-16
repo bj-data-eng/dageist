@@ -38,7 +38,7 @@ pub enum Limit {
     /// reason about lengths, cannot be placed, so the reason and an `explode` in
     /// the case are what gate it; the tables refusing is placed, inside an
     /// expression that holds an `explode`.
-    OptionsChangeTheResult,
+    AnExplodeChangesTheLengths,
     /// A comparison or a subtraction with a null literal is null, and Polars does not evaluate
     /// the other side of it, wherever in the expression that comparison is. A
     /// literal is one value, which Polars broadcasts and casts as it does not
@@ -120,7 +120,7 @@ pub enum Limit {
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
     pub const ALL: [Self; 14] = [
-        Self::OptionsChangeTheResult,
+        Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AnAggregateGivesOneValue,
         Self::AGroupAggregate,
@@ -139,7 +139,7 @@ impl Limit {
     /// The name a kept case is filed under.
     pub const fn slug(self) -> &'static str {
         match self {
-            Self::OptionsChangeTheResult => "options-change-the-result",
+            Self::AnExplodeChangesTheLengths => "an-explode-changes-the-lengths",
             Self::ALiteral => "a-literal",
             Self::AnAggregateGivesOneValue => "an-aggregate-gives-one-value",
             Self::AGroupAggregate => "a-group-aggregate",
@@ -158,7 +158,7 @@ impl Limit {
 
     pub const fn statement(self) -> &'static str {
         match self {
-            Self::OptionsChangeTheResult => {
+            Self::AnExplodeChangesTheLengths => {
                 "an explode gives other lengths, which meet those of what follows it, as the tables did not measure"
             }
             Self::ALiteral => "a literal is one value, which the tables measured as a column",
@@ -657,12 +657,12 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
     let held = operands(step);
     let explodes_in = |expression: &Expression| any_call(expression, &has_explode);
     match (limit, disagreement) {
-        (Limit::OptionsChangeTheResult, Disagreement::PolarsRefuses(refusal)) => {
+        (Limit::AnExplodeChangesTheLengths, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
                 && is_lengths(&refusal.reason)
                 && held.iter().any(|(_, held)| explodes_in(held))
         }
-        (Limit::OptionsChangeTheResult, Disagreement::PolarsAllows(refused)) => {
+        (Limit::AnExplodeChangesTheLengths, Disagreement::PolarsAllows(refused)) => {
             // An `explode` changes the rows that what follows it meets, which
             // Polars refuses with a reason about lengths.
             is_lengths(&refused.reason) && {
@@ -1286,11 +1286,11 @@ mod tests {
         )]);
         assert_eq!(
             tables_refuse(&case, link_of("exprs", 0, 2), ROWS, LENGTHS),
-            vec![Limit::OptionsChangeTheResult]
+            vec![Limit::AnExplodeChangesTheLengths]
         );
         assert_eq!(
             tables_refuse(&case, in_operand(2, "other", 0), ROWS, LENGTHS),
-            vec![Limit::OptionsChangeTheResult]
+            vec![Limit::AnExplodeChangesTheLengths]
         );
         // Before the window, or in its own arguments, they are not.
         assert_eq!(
@@ -1337,7 +1337,7 @@ mod tests {
         let with = select(vec![chain_of(column("a"), vec![explode()])]);
         assert_eq!(
             polars_refuses(&with, None, Stage::Rows, reason, Vec::new()),
-            vec![Limit::OptionsChangeTheResult]
+            vec![Limit::AnExplodeChangesTheLengths]
         );
         let without = select(vec![chain(column("a"), &["Expr.cum_sum"])]);
         assert_eq!(
