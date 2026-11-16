@@ -214,6 +214,9 @@ impl Step {
 struct Operand {
     dtype: Option<Representative>,
     shape: Shape,
+    /// Whether the expression was walked to its end: a refused or unwalked one
+    /// has no shape either.
+    known: bool,
 }
 
 /// What a chain has so far.
@@ -229,6 +232,9 @@ enum Cur {
         /// Whether every predicate and value so far gives one value, which a
         /// condition of them gives too.
         single: bool,
+        /// Whether every predicate and value so far was walked to its end: a
+        /// refused one has no shape, so the condition has none.
+        known: bool,
     },
     /// Refused: nothing more is asked of it.
     Dead,
@@ -456,6 +462,7 @@ impl Walker<'_> {
         let unsaid = Operand {
             dtype: None,
             shape: Shape::Many,
+            known: false,
         };
         let mut calls: Vec<Standing> = Vec::new();
         let mut last_end: Option<Ending> = None;
@@ -505,6 +512,7 @@ impl Walker<'_> {
                                 single: start_arguments
                                     .iter()
                                     .all(|(_, operand)| operand.shape == Shape::One),
+                                known: start_arguments.iter().all(|(_, operand)| operand.known),
                             }
                         } else {
                             Cur::Value {
@@ -579,10 +587,15 @@ impl Walker<'_> {
             ending,
         });
         match cur {
-            Cur::Value { dtype, shape } => Operand { dtype, shape },
+            Cur::Value { dtype, shape } => Operand {
+                dtype,
+                shape,
+                known: true,
+            },
             Cur::Condition { values, .. } => Operand {
                 dtype: unify(&values),
                 shape: Shape::Many,
+                known: true,
             },
             Cur::Dead => unsaid,
         }
@@ -675,6 +688,10 @@ impl Walker<'_> {
         let statement_class = statement.and_then(|operand| operand.dtype);
         // Whether the predicates and the value this link is given give one
         // value.
+        let given_known = arguments
+            .iter()
+            .filter(|(name, _)| matches!(name.as_str(), "predicates" | "statement"))
+            .all(|(_, operand)| operand.known);
         let given_single = arguments
             .iter()
             .filter(|(name, _)| matches!(name.as_str(), "predicates" | "statement"))
@@ -717,10 +734,14 @@ impl Walker<'_> {
             (
                 Applies::Condition,
                 Cur::Condition {
-                    mut values, single, ..
+                    mut values,
+                    single,
+                    known,
+                    ..
                 },
             ) => {
                 let single = single && given_single;
+                let known = known && given_known;
                 let state = match entry.id().as_str() {
                     "When.then" => {
                         values.push(statement_class);
@@ -735,7 +756,7 @@ impl Walker<'_> {
                         values.push(statement_class);
                         return (
                             Cur::Value {
-                                dtype: unify(&values),
+                                dtype: if known { unify(&values) } else { None },
                                 shape: if single { Shape::One } else { Shape::Many },
                             },
                             standing,
@@ -746,6 +767,7 @@ impl Walker<'_> {
                     state,
                     values,
                     single,
+                    known,
                 }
             }
             _ => Cur::Dead,
@@ -872,20 +894,48 @@ fn reads_a_column(expression: &Expression) -> bool {
         .any(|call| operands(call).into_iter().any(reads_a_column))
 }
 
-/// Whether an expression is a null literal and no more.
-fn is_a_null(expression: &Expression) -> bool {
-    expression.links().is_empty()
-        && matches!(
+/// Whether the first `upto` calls of `expression` read a column.
+fn prefix_reads_a_column(expression: &Expression, upto: usize) -> bool {
+    let start = match expression.start() {
+        Start::Call(call) => Some(call),
+        Start::Input(_) => None,
+    };
+    matches!(start, Some(start) if start.entry().id().as_str() == "polars.col")
+        || start
+            .into_iter()
+            .chain(&expression.links()[..upto])
+            .any(|call| operands(call).into_iter().any(reads_a_column))
+}
+
+/// Whether the first `upto` calls of `expression` give a null that no column is
+/// left in: it starts from a null literal, or the last of them is a comparison,
+/// which with a null on either side is a null, and nothing in them reads a
+/// column.
+fn prefix_is_null(expression: &Expression, upto: usize) -> bool {
+    let Some(last) = upto.checked_sub(1) else {
+        return matches!(
             expression.start(),
             Start::Call(start)
                 if start.entry().id().as_str() == "polars.lit"
                     && matches!(start.argument("value"), Some(Value::Flag(None)))
-        )
+        );
+    };
+    let link = &expression.links()[last];
+    COMPARISONS.contains(&link.entry().id().as_str())
+        && !prefix_reads_a_column(expression, upto)
+        && (operands(link).into_iter().any(folds_to_null) || prefix_is_null(expression, last))
 }
 
-/// Whether an expression holds, at any depth, a comparison of a null literal
-/// with what reads a column. Polars folds it into a null, and a key with a null
-/// where a column was is not elementwise.
+/// Whether an expression is a null, as Polars folds it, that no column is left
+/// in: a null literal, or a comparison with one that reads no column.
+fn folds_to_null(expression: &Expression) -> bool {
+    prefix_is_null(expression, expression.links().len())
+}
+
+/// Whether an expression holds, at any depth, a comparison of a null, as Polars
+/// folds it, with what reads a column and is not one value. Polars folds the
+/// comparison into a null, and a key with a null where a column was is not
+/// elementwise.
 fn holds_a_null_comparison(expression: &Expression) -> bool {
     let start = match expression.start() {
         Start::Call(call) => Some(call),
@@ -898,15 +948,12 @@ fn holds_a_null_comparison(expression: &Expression) -> bool {
     for (at, link) in expression.links().iter().enumerate() {
         if COMPARISONS.contains(&link.entry().id().as_str()) {
             let given = operands(link);
-            let null_given = given.iter().any(|operand| is_a_null(operand));
-            let column_given = given.iter().any(|operand| reads_a_column(operand));
-            let null_start = at == 0
-                && matches!(
-                    expression.start(),
-                    Start::Call(start) if start.entry().id().as_str() == "polars.lit"
-                        && matches!(start.argument("value"), Some(Value::Flag(None)))
-                );
-            if (null_given && reads) || (null_start && column_given) {
+            let null_given = given.iter().any(|operand| folds_to_null(operand));
+            let column_given = given.iter().any(|operand| {
+                reads_a_column(operand) && !wholly_single(operand, operand.links().len(), true)
+            });
+            let column_before = reads && !wholly_single(expression, at, true);
+            if (null_given && column_before) || (prefix_is_null(expression, at) && column_given) {
                 return true;
             }
         }

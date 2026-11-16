@@ -70,6 +70,16 @@ pub enum Limit {
     /// a column compared with a null, is refused by a named rule, and is not
     /// this.
     ASingleValueInAKey,
+    /// Polars folds a comparison with a null literal into a null, before it asks
+    /// whether a join's key is elementwise, and what it leaves depends on the
+    /// dtypes and on what the comparison follows, which the tables did not
+    /// measure and the named rule, which holds what the evidence settles, does
+    /// not model: a column compared with a null is refused by the rule, and an
+    /// aggregate compared with a null, or a comparison that follows one, is
+    /// found by running. Polars refusing the join as not elementwise, with no
+    /// place, in a case whose join key holds a comparison with a null literal at
+    /// any depth.
+    ANullComparisonInAKey,
     /// Whether values of different lengths combine, as the lists of two rows
     /// do not, depends on the rows, which the tables measured on one sample.
     TheLengthsOfTheRows,
@@ -116,12 +126,13 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 14] = [
+    pub const ALL: [Self; 15] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AnAggregateGivesOneValue,
         Self::AGroupAggregate,
         Self::ASingleValueInAKey,
+        Self::ANullComparisonInAKey,
         Self::TheLengthsOfTheRows,
         Self::AnOverflow,
         Self::TheBranchesAreOne,
@@ -141,6 +152,7 @@ impl Limit {
             Self::AnAggregateGivesOneValue => "an-aggregate-gives-one-value",
             Self::AGroupAggregate => "a-group-aggregate",
             Self::ASingleValueInAKey => "a-single-value-in-a-key",
+            Self::ANullComparisonInAKey => "a-null-comparison-in-a-key",
             Self::TheLengthsOfTheRows => "the-lengths-of-the-rows",
             Self::AnOverflow => "an-overflow",
             Self::TheBranchesAreOne => "the-branches-are-one",
@@ -176,6 +188,9 @@ impl Limit {
             }
             Self::AGroupAggregate => {
                 "a pivot's aggregate is run on groups, with kernels of its own, not on a column in select"
+            }
+            Self::ANullComparisonInAKey => {
+                "Polars folds a comparison with a null in a join key into a null, which the rule does not wholly model"
             }
             Self::ASingleValueInAKey => {
                 "a key that is wholly a single value, an aggregate or a null, need not be elementwise in what it holds"
@@ -331,14 +346,38 @@ fn reached_by_a_null(holder: &Expression, reach: Reach) -> bool {
     let comparisons = [
         "Expr.eq", "Expr.ne", "Expr.gt", "Expr.ge", "Expr.lt", "Expr.le", "Expr.sub",
     ];
-    let null_start = matches!(holder.start(), Start::Call(start) if is_a_null(start));
+    let compares = |link: &Call| comparisons.contains(&link.entry().id().as_str());
+    let with_a_null = |link: &Call| {
+        compares(link)
+            && operands(link).into_iter().any(|(_, operand)| {
+                operand.links().is_empty()
+                    && matches!(operand.start(), Start::Call(start) if is_a_null(start))
+            })
+    };
+    // What a comparison with a null gives is a null, which the comparison that
+    // follows it compares.
+    fn null_before(
+        holder: &Expression,
+        at: usize,
+        with_a_null: &dyn Fn(&Call) -> bool,
+        compares: &dyn Fn(&Call) -> bool,
+    ) -> bool {
+        match at.checked_sub(1) {
+            None => matches!(holder.start(), Start::Call(start) if is_a_null(start)),
+            Some(before) => {
+                let link = &holder.links()[before];
+                compares(link)
+                    && (with_a_null(link) || null_before(holder, before, with_a_null, compares))
+            }
+        }
+    }
     holder.links().iter().enumerate().any(|(at, link)| {
-        let null_operand = operands(link).into_iter().any(|(_, operand)| {
-            operand.links().is_empty()
-                && matches!(operand.start(), Start::Call(start) if is_a_null(start))
-        });
-        comparisons.contains(&link.entry().id().as_str())
-            && (null_operand || (at == 0 && null_start))
+        compares(link)
+            && (with_a_null(link)
+                // A comparison folds what an earlier one folded, and a subtraction
+                // after it evaluates its argument.
+                || (link.entry().id().as_str() != "Expr.sub"
+                    && null_before(holder, at, &with_a_null, &compares)))
             && match reach {
                 Reach::Whole | Reach::Start | Reach::At(_) => true,
                 Reach::Operand(j) => j <= at,
@@ -617,6 +656,43 @@ fn keys(case: &Case, joins: bool) -> Vec<&Expression> {
     found
 }
 
+/// Whether a key holds, at any depth, a comparison with a null literal: one
+/// that is given it, or one that follows it.
+fn holds_a_null_comparison(key: &Expression) -> bool {
+    let comparisons = [
+        "Expr.eq", "Expr.ne", "Expr.gt", "Expr.ge", "Expr.lt", "Expr.le",
+    ];
+    let is_null = |expression: &Expression| {
+        expression.links().is_empty()
+            && matches!(expression.start(), Start::Call(start) if is_a_null(start))
+    };
+    let compares = |expression: &Expression| {
+        let null_start = matches!(expression.start(), Start::Call(start) if is_a_null(start));
+        expression.links().iter().enumerate().any(|(at, link)| {
+            comparisons.contains(&link.entry().id().as_str())
+                && ((null_start && at == 0)
+                    || operands(link)
+                        .into_iter()
+                        .any(|(_, operand)| is_null(operand)))
+        })
+    };
+    fn walk(expression: &Expression, compares: &dyn Fn(&Expression) -> bool) -> bool {
+        let calls = std::iter::once(expression.start())
+            .filter_map(|start| match start {
+                Start::Call(call) => Some(call),
+                Start::Input(_) => None,
+            })
+            .chain(expression.links());
+        compares(expression)
+            || calls.into_iter().any(|call| {
+                operands(call)
+                    .into_iter()
+                    .any(|(_, inside)| walk(inside, compares))
+            })
+    }
+    walk(key, &compares)
+}
+
 /// Whether an `over` has, before it in its chain, another window.
 fn window_over_a_window(expression: &Expression) -> bool {
     let calls: Vec<&Call> = std::iter::once(expression.start())
@@ -730,7 +806,8 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
             pivot
                 && refusal.stage == Stage::Empty
                 && (refusal.reason.contains("not supported")
-                    || refusal.reason.contains("got `null`"))
+                    || refusal.reason.contains("got `null`")
+                    || refusal.reason.contains("got null"))
         }
         (Limit::AGroupAggregate, Disagreement::PolarsAllows(refused)) => {
             // The kernels that take the values of a group accept what the ones of
@@ -750,6 +827,14 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
                 .iter()
                 .any(|words| refused.reason.contains(words))
                 && locate(case, &refused.place).call.is_some()
+        }
+        (Limit::ANullComparisonInAKey, Disagreement::PolarsRefuses(refusal)) => {
+            is(step, "LazyFrame.join")
+                && unplaced(refusal)
+                && refusal.reason.contains("elementwise")
+                && keys(case, true)
+                    .iter()
+                    .any(|key| holds_a_null_comparison(key))
         }
         (Limit::ASingleValueInAKey, Disagreement::PolarsAllows(refused)) => {
             // The key the tables refused is wholly one value.
@@ -795,7 +880,10 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
         (Limit::AValueThatRunsOnNoRows, Disagreement::PolarsAllows(refused)) => {
             // Only what the tables refused when it ran rows. A condition that is
             // decided has dropped its other branches, which is its own cause.
-            refused.stage == Some(TableStage::Rows)
+            // A rule that a condition's predicate is a `Boolean` is what Polars
+            // finds when it runs rows.
+            (refused.stage == Some(TableStage::Rows)
+                || refused.source == Source::Rule("condition-predicate-is-boolean"))
                 && locate(case, &refused.place)
                     .in_values
                     .iter()
@@ -1109,6 +1197,110 @@ mod tests {
             tables_refuse(&case, link_of("exprs", 0, 0), ROWS, "no"),
             vec![]
         );
+    }
+
+    #[test]
+    fn a_comparison_that_follows_a_comparison_with_a_null_compares_a_null() {
+        // `null == 1 <= b.max()`: the first comparison is a null, so the second
+        // is one, and what it is given is not evaluated.
+        let item = chain_of(
+            null(),
+            vec![
+                compared_with("Expr.eq", chain(literal(), &[])),
+                compared_with("Expr.le", chain(column("b"), &["Expr.max"])),
+            ],
+        );
+        let case = select(vec![item]);
+        let inside = at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Link(1),
+            parameter("other"),
+            Segment::Link(0),
+        ]);
+        assert_eq!(
+            tables_refuse(&case, inside, ROWS, "no"),
+            vec![Limit::ALiteral]
+        );
+        // With no null before it, the second comparison evaluates its argument.
+        let plain = chain_of(
+            column("a"),
+            vec![
+                compared_with("Expr.eq", chain(literal(), &[])),
+                compared_with("Expr.le", chain(column("b"), &["Expr.max"])),
+            ],
+        );
+        let inside = at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Link(1),
+            parameter("other"),
+            Segment::Link(0),
+        ]);
+        assert_eq!(
+            tables_refuse(&select(vec![plain]), inside, ROWS, "no"),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_rule_about_a_later_predicate_of_a_condition_is_excused_and_the_first_is_not() {
+        let condition = chain_of(
+            call(
+                "polars.when",
+                vec![("predicates", many(vec![chain(column("a"), &[])]))],
+            ),
+            vec![
+                call(
+                    "When.then",
+                    vec![("statement", Value::Expression(chain(column("k"), &[])))],
+                ),
+                call(
+                    "Then.when",
+                    vec![("predicates", many(vec![chain(column("b"), &[])]))],
+                ),
+                call(
+                    "ChainedWhen.then",
+                    vec![("statement", Value::Expression(chain(column("f"), &[])))],
+                ),
+            ],
+        );
+        let case = select(vec![condition]);
+        let rule = "condition-predicate-is-boolean";
+        let later = at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Link(1),
+            parameter("predicates"),
+            Segment::Item(0),
+        ]);
+        assert_eq!(
+            rule_refuses(&case, later, rule, "a rule"),
+            vec![Limit::AValueThatRunsOnNoRows]
+        );
+        let first = at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Start,
+            parameter("predicates"),
+            Segment::Item(0),
+        ]);
+        assert_eq!(rule_refuses(&case, first, rule, "a rule"), vec![]);
+    }
+
+    #[test]
+    fn the_empty_table_of_a_pivot_is_excused_for_a_null_dtype_however_it_is_quoted() {
+        let case = pivot(chain(column("a"), &["Expr.cum_sum"]));
+        for reason in [
+            "invalid series dtype: expected `Duration`, got `null` for series with name `a`",
+            "expected Date or Datetime, got null",
+        ] {
+            assert_eq!(
+                polars_refuses(&case, None, Stage::Empty, reason, Vec::new()),
+                vec![Limit::AGroupAggregate],
+                "{reason}"
+            );
+        }
     }
 
     // ----- Rules that refuse what Polars allows
@@ -1503,6 +1695,63 @@ mod tests {
         let select = select(vec![chain(column("a"), &[])]);
         assert_eq!(
             polars_refuses(&select, None, Stage::Schema, reason, Vec::new()),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_join_key_with_a_null_comparison_at_any_depth_excuses_the_refused_step() {
+        let reason = "all join key expressions must be elementwise.";
+        // The comparison is one level down, in an operand, and before another.
+        let nested = chain_of(
+            column("b"),
+            vec![compared_with(
+                "Expr.le",
+                chain_of(
+                    column("a"),
+                    vec![compared_with("Expr.gt", chain(null(), &[]))],
+                ),
+            )],
+        );
+        let after_one = chain_of(
+            column("rb"),
+            vec![
+                call("Expr.max", Vec::new()),
+                compared_with("Expr.le", chain(null(), &[])),
+                compared_with("Expr.eq", chain(column("rg"), &[])),
+            ],
+        );
+        for key in [nested, after_one] {
+            let case = join(key, chain(column("key"), &[]));
+            assert_eq!(
+                polars_refuses(&case, Some(step_place()), Stage::Schema, reason, Vec::new()),
+                vec![Limit::ANullComparisonInAKey]
+            );
+        }
+        // A key that compares nothing with a null, and another reason.
+        let plain = join(
+            chain(column("a"), &["Expr.cum_max"]),
+            chain(column("key"), &[]),
+        );
+        assert_eq!(
+            polars_refuses(
+                &plain,
+                Some(step_place()),
+                Stage::Schema,
+                reason,
+                Vec::new()
+            ),
+            vec![]
+        );
+        let case = join(
+            chain_of(
+                column("a"),
+                vec![compared_with("Expr.gt", chain(null(), &[]))],
+            ),
+            chain(column("key"), &[]),
+        );
+        assert_eq!(
+            polars_refuses(&case, Some(step_place()), Stage::Schema, "no", Vec::new()),
             vec![]
         );
     }
