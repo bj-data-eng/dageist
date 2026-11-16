@@ -1,8 +1,8 @@
 //! The case target: generating, the codec, the comparison of what the tables
 //! predict with what Polars does, and the smaller cases reduction tries.
 
+use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::sync::Mutex;
 
 use dageist_fuzz::registry::FuzzManifest;
 use dageist_fuzz::{
@@ -12,7 +12,7 @@ use dageist_fuzz::{
 
 use super::case::Case;
 use super::generate::generate;
-use super::limits::excuse;
+use super::limits::excuses;
 use super::observe::{Observed, Seen, observe};
 use super::predict::{Prediction, Source, Verdict, predict};
 use super::reduce::candidates;
@@ -48,20 +48,21 @@ impl AllowedTarget {
     }
 }
 
-/// How many cases ended each way, and why not when they did not check one.
-static TALLY: Mutex<BTreeMap<String, u64>> = Mutex::new(BTreeMap::new());
-
-fn tally(what: impl Into<String>) {
-    *TALLY
-        .lock()
-        .expect("the tally is not poisoned")
-        .entry(what.into())
-        .or_default() += 1;
+thread_local! {
+    /// How many cases ended each way, and why not when they did not check one,
+    /// on the thread that evaluates them, so that tests that run at once do not
+    /// count each other's.
+    static TALLY: RefCell<BTreeMap<String, u64>> = const { RefCell::new(BTreeMap::new()) };
 }
 
-/// What was tallied since the last call, one line each.
+fn tally(what: impl Into<String>) {
+    TALLY.with(|tally| *tally.borrow_mut().entry(what.into()).or_default() += 1);
+}
+
+/// What was tallied on this thread since the last call, one line each.
 pub fn take_tally() -> Vec<String> {
-    std::mem::take(&mut *TALLY.lock().expect("the tally is not poisoned"))
+    TALLY
+        .with(|tally| std::mem::take(&mut *tally.borrow_mut()))
         .into_iter()
         .map(|(what, count)| format!("{count:>6}  {what}"))
         .collect()
@@ -205,10 +206,17 @@ impl CaseTarget for AllowedTarget {
             )
         };
         let excused = |what: &str| -> Option<Result<CaseOutcome>> {
-            excuse(case, &prediction, &observed).map(|limit| {
-                tally(format!("not covered ({what}): {}", limit.statement()));
-                CaseOutcome::expected_rejection(Vec::new(), limit.statement())
-            })
+            let limits = excuses(case, &prediction, &observed);
+            if limits.is_empty() {
+                return None;
+            }
+            let statements: Vec<&str> = limits.iter().map(|limit| limit.statement()).collect();
+            let slugs: Vec<&str> = limits.iter().map(|limit| limit.slug()).collect();
+            tally(format!("not covered ({what}): {}", slugs.join(" and ")));
+            Some(CaseOutcome::expected_rejection(
+                Vec::new(),
+                statements.join("; "),
+            ))
         };
         // What the tables say of the dtypes is checked whatever the verdict.
         let dtype_checked = prediction

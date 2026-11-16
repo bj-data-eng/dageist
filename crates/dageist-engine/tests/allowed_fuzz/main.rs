@@ -102,7 +102,7 @@ fn on_a_large_stack<T: Send>(work: impl FnOnce() -> T + Send) -> T {
 
 /// Runs `cases` cases made from `seed`. When one disagrees, reduces it and
 /// keeps the result under the directory for kept evidence.
-fn campaign(seed: u64, cases: u32) -> Result<u64, Finding> {
+fn campaign(seed: u64, cases: u32) -> (Result<u64, Finding>, Vec<String>) {
     let target = AllowedTarget::new();
     let strategy = property::bytes(512, target.descriptor().limits());
     let config = PropertyConfig {
@@ -129,8 +129,10 @@ fn campaign(seed: u64, cases: u32) -> Result<u64, Finding> {
     };
     let report = run_property(&target, &strategy, config, &mut capture)
         .unwrap_or_else(|error| panic!("the property could not be run: {error:?}"));
+    // The tally is of the run, not of the reduction of what it found.
+    let tally = take_tally();
     let Some(found) = report.failure else {
-        return Ok(report.counts.evaluated());
+        return (Ok(report.counts.evaluated()), tally);
     };
     let key = found
         .outcome
@@ -156,11 +158,12 @@ fn campaign(seed: u64, cases: u32) -> Result<u64, Finding> {
         .expect("a reduced case is evaluated");
     let kept = directory.join(format!("{seed:016x}-{}.case", reduced.len()));
     std::fs::write(&kept, &reduced).expect("evidence is kept");
-    Err(Finding {
+    let finding = Finding {
         kept,
         reduced,
         detail: detail_of(&outcome),
-    })
+    };
+    (Err(finding), tally)
 }
 
 fn env_number<T: std::str::FromStr>(name: &str, default: T) -> T {
@@ -172,13 +175,12 @@ fn env_number<T: std::str::FromStr>(name: &str, default: T) -> T {
 
 #[test]
 fn the_tables_predict_what_polars_does_for_the_fixed_seed() {
-    let _ = take_tally();
     let started = Instant::now();
-    let result = on_a_large_stack(|| campaign(SEED, CASES));
+    let (result, tally) = on_a_large_stack(|| campaign(SEED, CASES));
     eprintln!(
         "{CASES} cases of seed {SEED:#x} took {:.1?}\n{}",
         started.elapsed(),
-        take_tally().join("\n")
+        tally.join("\n")
     );
     match result {
         Ok(evaluated) => assert!(
@@ -196,11 +198,11 @@ fn a_campaign() {
     let seed: u64 = env_number("DAGEIST_FUZZ_SEED", SEED);
     let cases: u32 = env_number("DAGEIST_FUZZ_CASES", 5_000);
     let started = Instant::now();
-    let result = on_a_large_stack(|| campaign(seed, cases));
+    let (result, tally) = on_a_large_stack(|| campaign(seed, cases));
     eprintln!(
         "{cases} cases of seed {seed:#x} took {:.1?}\n{}",
         started.elapsed(),
-        take_tally().join("\n")
+        tally.join("\n")
     );
     if let Err(finding) = result {
         panic!("{finding}");

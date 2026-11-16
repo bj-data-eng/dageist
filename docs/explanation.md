@@ -336,23 +336,34 @@ and to replay a case.
 A disagreement is either a defect of dageist or a combination the tables were not
 measured on. The first found while building the target was `offer` giving a
 `shift` the dtype of what it shifts when a `fill_value` of another dtype was
-chosen; it is corrected, and its case is kept. The second kind is a limit, and each
-is named in the target, counted when it excuses a case, and has a kept case that
-the normal tests replay. Where a limit says which way it excuses, it excuses only
-that: Polars accepting what the tables refuse, or Polars refusing what they allow.
+chosen; it is corrected, and its case is kept. The second kind is a limit. Each is
+named in the target, counted when it excuses a case, and has a kept case that the
+normal tests replay, which only that limit excuses. A limit excuses a disagreement
+only when it is the cause of it: the place where the tables refused, or where
+Polars did, lies in the expression that holds what the limit is about, and the
+reason says what the limit says. The same feature elsewhere in the case excuses
+nothing, and where Polars refused when it collected rows, which has no place, the
+reason and the feature in the case are what there is. Two limits may both explain
+one case, and it is then excused by both.
 
-| Limit | What the tables were not measured on |
+| Limit | Excuses |
 | --- | --- |
-| An option changes what a method gives | `Expr.over`'s `mapping_strategy` as `join` gives a `List` and as `explode` gives other lengths, and `Expr.dt.total_days`'s `fractional` gives a `Float64`. `options.txt` records them, but `offer` is asked of a method without its options. Both ways. |
-| A literal | An argument or a start is measured as a column of the dtype, except the values of `shift` and a pivot's group. A literal is one value, which Polars casts and broadcasts as it does not a column. Polars accepting what the tables refuse. |
-| A single value | An expression with an aggregate in it gives one value, and Polars need not evaluate what it does not need for one: a sort key of one value is dropped, and `len` does not read what it counts. Polars accepting what the tables refuse. |
-| A pivot's aggregate | It is run on the values of each group, with other kernels than `select` has, and on no groups when the table is empty. Both ways. |
-| An aggregate in a key | A join's key or a window's key that holds an aggregate beside a column is not elementwise; the context table measured the entry as the whole key. Polars refusing what the tables allow. |
-| The lengths of the rows | Whether lists, or other values, of different lengths combine depends on the rows. Polars refusing what the tables allow. |
-| An overflow | A debug build of Polars panics where a release build wraps. Polars refusing what the tables allow. |
-| Branches that are one | A condition whose values are one expression is simplified to it, and its predicates are dropped. Polars accepting what the tables refuse. |
-| A panic | One is an internal check that failed on the plan Polars made in `select`; another place, or a combination of what was measured singly, may not reach it, or may reach another. Both ways. |
-| A `Boolean` is needed and the dtype unknown | The dtype of a column, and one that the arguments decide, is the caller's to say, and `offer` is not told it, so a chain that is only a start, or ends in such a method, is not refused for being no `Boolean`. Polars refusing what the tables allow. |
+| An option changes what a method gives | `Expr.over`'s `mapping_strategy` as `join` gives a `List` and as `explode` gives other lengths, and `Expr.dt.total_days`'s `fractional` gives a `Float64`; `options.txt` records them, but `offer` is asked of a method without its options. Polars refusing, with a reason about lengths, a case with an `explode`; and the tables refusing inside an expression that holds an `explode`, which Polars allows. |
+| A literal | An argument or a start is measured as a column of the dtype, except the values of `shift` and the arguments of a pivot's group. A literal, or a condition of literals, is one value, which Polars casts and broadcasts as it does not a column. The tables refusing at a call that follows one, or is given a literal argument, which Polars allows. |
+| A single value | An expression with an aggregate in it gives one value, and Polars need not evaluate what it does not need for one: a sort key of one value is dropped, and `len` does not read what it counts. The tables refusing at a call after an aggregate in its chain, or inside an expression that holds one, which Polars allows. |
+| A pivot's aggregate | It is run on the values of each group, with kernels of its own, and on no groups when the table is empty. Polars refusing the empty table; and the tables refusing, with a reason about a dtype an operation does not support, a comparison, a cast, a window or a struct, at a call of the aggregate, which Polars allows. |
+| A single value in a key | A join's or a window's key that holds a single value beside a column, an aggregate or a null literal, is not elementwise; the context table measured the entry as the whole key. Polars refusing with that reason, and the tables refusing with it where the whole key is single. |
+| The lengths of the rows | Whether lists, or other values, of different lengths combine depends on the rows. Polars refusing with a reason about lengths, in a case with no `explode`. |
+| An overflow | A debug build of Polars panics where a release build wraps. Polars refusing with that panic. |
+| Branches that are one | A condition whose values are one expression is simplified to it, and its predicates are dropped. The tables refusing inside a predicate of such a condition, which Polars allows. |
+| A decided condition | A condition with a predicate made from a literal is decided before it is run, and the other branches are dropped. The tables refusing inside such a condition, which Polars allows. |
+| A value that runs on no rows | A value of a condition runs on the rows its predicate selects, and a predicate after the first on the rows left to it, which on the sample may be none. The tables refusing inside such a value or predicate, which Polars allows. |
+| A panic | One is an internal check that failed on the plan Polars made in `select`; another place, or a combination of what was measured singly, may not reach it, or may reach another. Polars panicking where the tables allow, and the tables recording a panic where Polars allows. |
+| A `Boolean` is needed and the dtype unknown | The dtype of a column, and one that the arguments decide, is the caller's to say, and `offer` is not told it, so a chain that is only a start, or ends in such a method, is not refused for being no `Boolean`; and a start is judged on the dtype it was measured on. Polars refusing for that, when a predicate of a filter or a condition has no dtype given; and the tables refusing a start, which Polars allows. |
+| A deeper place | A place more than two positions deep is judged by its first two, so a predicate inside a value of a condition is judged as a value, and a value inside a predicate as a predicate. Polars refusing, or the tables refusing, with a reason about a `Boolean`. |
+| A hidden schema | The tables refuse a method whose plan says another dtype than its rows give, as the `cum_sum` of a `UInt128` does; inside an expression that goes on from it or compares it, the rows of the step do not show it. The tables refusing with that reason inside such an expression, which Polars allows. |
+| A join key's dtype | The other table's key is made of the dtype the chain gives on its own, and the join may resolve the chain to another, as the precision of a decimal a null is taken from. Polars refusing the join for the keys' dtypes. |
+| A window over a window | The outer window runs the inner one in an aggregation context, where a key that is not elementwise is refused; the tables measured one window. Polars refusing with that reason, in a chain of two windows. |
 
 A case that the tables cannot be asked about, because the dtype of an argument or
 before a method is not known, is not predicted past that point and is counted. The

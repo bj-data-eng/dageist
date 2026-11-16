@@ -39,6 +39,8 @@ impl Stage {
 pub struct Refusal {
     pub stage: Stage,
     pub at: String,
+    /// Where in the document, when Polars said.
+    pub place: Option<Place>,
     pub reason: String,
 }
 
@@ -116,6 +118,7 @@ fn run_on(document: &Document, frames: &Frames) -> Observed {
             observed.refusal = Some(Refusal {
                 stage: Stage::Schema,
                 at: "the step".to_owned(),
+                place: None,
                 reason: panic_text(payload.as_ref()),
             });
             return observed;
@@ -124,6 +127,7 @@ fn run_on(document: &Document, frames: &Frames) -> Observed {
             observed.refusal = Some(Refusal {
                 stage: Stage::Schema,
                 at: "the table".to_owned(),
+                place: None,
                 reason: format!("the sample table has no schema: {error}"),
             });
             return observed;
@@ -144,6 +148,7 @@ fn run_on(document: &Document, frames: &Frames) -> Observed {
         observed.refusal = Some(Refusal {
             stage: Stage::Schema,
             at: refusal.place().to_string(),
+            place: Some(refusal.place().clone()),
             reason: first_line(&refusal.cause().to_string()),
         });
         return observed;
@@ -171,6 +176,7 @@ fn run_on(document: &Document, frames: &Frames) -> Observed {
         observed.refusal = Some(Refusal {
             stage,
             at: "the rows".to_owned(),
+            place: None,
             reason,
         });
         return observed;

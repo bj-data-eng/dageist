@@ -318,8 +318,8 @@ The tables are measured one combination at a time. A property target in
 `crates/dageist-engine/tests/allowed_fuzz/` makes the combinations they were not
 measured as and checks them against Polars, as
 [the explanation](explanation.md#what-the-tables-are-checked-against) says. It runs
-with the engine's tests, from a fixed seed, on 1000 cases in about eight
-seconds in a debug build:
+with the engine's tests, from a fixed seed, on 1000 cases, which takes
+seconds in a debug build and longer when the machine is short of memory:
 
 ```sh
 cargo test --offline --locked -p dageist-engine --test allowed_fuzz
