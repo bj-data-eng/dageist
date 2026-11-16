@@ -468,6 +468,25 @@ fn a_method_whose_result_the_arguments_decide_is_not_known_to_end_a_predicate() 
 }
 
 #[test]
+fn a_method_is_offered_with_the_options_chosen_and_refused_for_one_it_does_not_have() {
+    let place = select_after(Representative::Int64);
+    let chosen = |options: &'static [(&'static str, &'static str)]| {
+        offer(
+            entry("Expr.cum_sum"),
+            &place,
+            &Chosen::default().with_options(options),
+        )
+    };
+    let reversed = chosen(&[("reverse", "true")]);
+    assert_eq!(result_of(&reversed), Some("Int64"), "{reversed:?}");
+    let refusal = chosen(&[("backwards", "true")])
+        .refusal()
+        .cloned()
+        .expect("cum_sum has no such option");
+    assert_eq!(refusal.source(), RefusalSource::Structure);
+}
+
+#[test]
 fn a_method_gives_what_the_tables_say_whatever_it_is_told() {
     let place = select_after(Representative::Int64);
     let told = giving("Expr.cum_sum", &place, Representative::String);

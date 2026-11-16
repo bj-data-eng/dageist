@@ -65,14 +65,15 @@ impl ConditionState {
 
 /// What has been chosen for a call of an entry, so far as it decides what the
 /// entry gives: the dtypes of the arguments given to its expression
-/// parameters, and the dtype of the value an entry makes that the tables
-/// cannot give.
+/// parameters, the options set, and the dtype of the value an entry makes that
+/// the tables cannot give.
 ///
 /// Nothing chosen is the [`Default`]: an entry that takes an expression it needs is
 /// then judged for any dtype of argument that fits.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Chosen<'a> {
     arguments: &'a [(&'a str, Representative)],
+    options: &'a [(&'a str, &'a str)],
     gives: Option<Representative>,
 }
 
@@ -82,6 +83,16 @@ impl<'a> Chosen<'a> {
     #[must_use]
     pub const fn with_arguments(mut self, arguments: &'a [(&'a str, Representative)]) -> Self {
         self.arguments = arguments;
+        self
+    }
+
+    /// The options set, each by the parameter's name and the value as the
+    /// option table writes it (`true`, `false`, `unset`, or the word of a
+    /// choice), as [`options`] takes them. A method is refused for the options
+    /// that Polars refuses.
+    #[must_use]
+    pub const fn with_options(mut self, options: &'a [(&'a str, &'a str)]) -> Self {
+        self.options = options;
         self
     }
 
@@ -519,6 +530,10 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     // Polars' reason may be a panic.
     if let Some(rule) = Rule::forbids(id, place.context) {
         return Err(Refusal::rule(rule));
+    }
+    // What the options set are refused for.
+    if is_method(entry) {
+        options(entry, chosen.options)?;
     }
     // What the dtype table says of a method on the value it follows.
     let (mut result, mut shape) = (None, Shape::Many);

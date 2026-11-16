@@ -118,7 +118,7 @@ pub fn predict(case: &Case) -> Prediction {
         stopped_by_options: false,
     };
     walker.arguments(step.call());
-    walker.options(step.call());
+    walker.step_options(step.call());
     let verdict = match (walker.refusal, walker.undetermined) {
         (Some(refused), _) => Verdict::Refuses(refused),
         (None, Some(reason)) => Verdict::Undetermined(reason),
@@ -169,27 +169,33 @@ impl Walker<'_> {
         }
     }
 
-    /// The options `call` was given, asked of the option table.
-    fn options(&mut self, call: &Call) {
+    /// The options `call` was given, each by the parameter and its word as the
+    /// option table writes it.
+    fn chosen_options(call: &Call) -> Vec<(String, String)> {
         let entry = call.entry();
-        if !matches!(entry.applies(), Applies::Expression | Applies::Frame) {
-            return;
-        }
-        let mut chosen: Vec<(&str, String)> = Vec::new();
-        for given in call.arguments() {
-            let is_option = entry.parameters().iter().any(|parameter| {
-                parameter.name() == given.parameter()
-                    && matches!(parameter.kind(), Kind::Flag | Kind::Choice(_))
-            });
-            if is_option && let Some(word) = option_word(given.value()) {
-                chosen.push((given.parameter(), word));
-            }
-        }
+        call.arguments()
+            .iter()
+            .filter(|given| {
+                entry.parameters().iter().any(|parameter| {
+                    parameter.name() == given.parameter()
+                        && matches!(parameter.kind(), Kind::Flag | Kind::Choice(_))
+                })
+            })
+            .filter_map(|given| {
+                option_word(given.value()).map(|word| (given.parameter().to_owned(), word))
+            })
+            .collect()
+    }
+
+    /// The options a step was given, asked of the option table. The options of
+    /// a method are asked of [`allowed::offer`], with the call.
+    fn step_options(&mut self, step: &Call) {
+        let chosen = Self::chosen_options(step);
         let chosen: Vec<(&str, &str)> = chosen
             .iter()
-            .map(|(name, word)| (*name, word.as_str()))
+            .map(|(name, word)| (name.as_str(), word.as_str()))
             .collect();
-        if let Err(refusal) = allowed::options(entry, &chosen) {
+        if let Err(refusal) = allowed::options(step.entry(), &chosen) {
             self.refused(&refusal);
         }
     }
@@ -282,7 +288,6 @@ impl Walker<'_> {
         };
         self.path.push(Segment::Start);
         self.arguments(start);
-        self.options(start);
         self.path.pop();
         let Some(context) = context else {
             self.blind("no named position holds the expression");
@@ -327,7 +332,6 @@ impl Walker<'_> {
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
             let arguments = self.arguments(link);
-            self.options(link);
             cur = self.link(link, arguments, context, cur, &mut last_end);
             self.path.pop();
             links.push(match &cur {
@@ -414,6 +418,11 @@ impl Walker<'_> {
             .iter()
             .filter_map(|(name, dtype)| dtype.map(|dtype| (name.as_str(), dtype)))
             .collect();
+        let words = Self::chosen_options(link);
+        let words: Vec<(&str, &str)> = words
+            .iter()
+            .map(|(name, word)| (name.as_str(), word.as_str()))
+            .collect();
         // What the tables are not told is not guessed: an argument whose dtype
         // is not known leaves the call to be offered for any dtype that fits,
         // which says it stands, not that this argument fits.
@@ -427,7 +436,9 @@ impl Walker<'_> {
             if let OfferVerdict::Refused(refusal) = allowed::offer(
                 entry,
                 &OfferPlace::new(context, after),
-                &Chosen::default().with_arguments(&given),
+                &Chosen::default()
+                    .with_arguments(&given)
+                    .with_options(&words),
             ) {
                 self.refused(&refusal);
                 return Cur::Dead;
@@ -451,7 +462,9 @@ impl Walker<'_> {
             }
             _ => None,
         };
-        let chosen = Chosen::default().with_arguments(&given);
+        let chosen = Chosen::default()
+            .with_arguments(&given)
+            .with_options(&words);
         let chosen = match gives {
             Some(dtype) => chosen.giving(dtype),
             None => chosen,
