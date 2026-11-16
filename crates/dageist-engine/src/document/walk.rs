@@ -20,7 +20,7 @@ use polars::prelude::{Schema, SchemaRef};
 
 use crate::allowed::{
     self, After, Chosen, ConditionState, Context, Ending, Nested, Outer, Place as OfferPlace,
-    Position as Slot, Refusal, Representative, Shape, Verdict,
+    Position as Slot, Refusal, Representative, Shape, Unknown, Verdict,
 };
 use crate::catalog::{Applies, Kind};
 
@@ -411,12 +411,30 @@ impl Walker<'_> {
         }
     }
 
-    /// The class of the first column an argument names, in the table the
-    /// expression is evaluated against.
+    /// Whether a `col` names more than one column, which expands it to an
+    /// expression for each, whatever the first one is.
+    fn names_several(call: &Call) -> bool {
+        let several = |value: Option<&Value>| match value {
+            Some(Value::Columns(names)) => names.len() > 1,
+            _ => false,
+        };
+        let more = match call.argument("more_names") {
+            Some(Value::Many(items)) => !items.is_empty(),
+            Some(_) => true,
+            None => false,
+        };
+        call.entry().id().as_str() == "polars.col" && (several(call.argument("name")) || more)
+    }
+
+    /// The class of the column an argument names, in the table the expression
+    /// is evaluated against, where it names one.
     fn column_of(&self, call: &Call) -> Option<Representative> {
         let Some(Value::Columns(names)) = call.argument("name") else {
             return None;
         };
+        if Self::names_several(call) {
+            return None;
+        }
         let against_other = self.slots.first() == Some(&Slot::Outer(Outer::JoinRight));
         let schema = if against_other {
             self.other.as_deref()?
@@ -507,6 +525,11 @@ impl Walker<'_> {
                     Verdict::Refused(refusal) => self.refuse(refusal, false),
                     Verdict::Allowed(allowance) => {
                         last_end = Some(allowance.can_end().clone());
+                        // An expansion has a dtype for each column, so whether it
+                        // may end is not known, whatever the table measured.
+                        if Self::names_several(start) && last_end == Some(Ending::Allowed) {
+                            last_end = Some(Ending::NotKnown(Unknown::TheStartsDtype));
+                        }
                         cur = if start.entry().id().as_str() == "polars.when" {
                             Cur::Condition {
                                 state: ConditionState::When,
