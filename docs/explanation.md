@@ -197,8 +197,11 @@ reading and constructing a document both enforce.
 The engine runs a document on a source table and the graph's inputs. It
 builds each step through the catalogue and reports whether it is valid, with
 the place and reason when it is not, its result schema, and the dtype after
-each link of every expression, all without reading data. Steps after a
-refused one are reported as not run. The rows of any step come from running
+each link of every expression, all without reading data. For each expression it
+also gives the context it stands in and where each link stands, as the
+[walk](#which-combinations-polars-allows) of the tables finds them, so that a
+caller can ask for offers at any link. Steps after a refused one are reported
+as not run. The rows of any step come from running
 it on an in-memory working window. Polars' own message is the reason when
 Polars refuses. Some mistakes, such as `dt.date` on a String column, are only
 found when rows are read, not from the schema; the editor learns them in
@@ -323,6 +326,22 @@ was measured on, and a `List` of what the method gives elsewhere. After a single
 value, or for a window without a `partition_by`, an option that changes the
 result leaves it not known.
 
+`Step::walk` finds where every call of a step stands without building it in
+Polars. It follows the document as running it does: the arguments of a call
+first, each expression start by link, in the named positions that hold it. At
+each call it asks `offer` for the place the chain has come to, giving it the
+dtypes of the arguments, the options, and for a start the dtype of its column in
+the table the expression is read against (a join's `right_on` is read against
+the other table), of a literal given a dtype, of what a pivot's group holds, and
+for a condition that ends the dtype its values have. It asks whether an
+expression that a position holds may end there, and whether a key holds a single
+value beside a column. For each expression it reports the context, the place of
+each link and where a link added at the end would stand, the verdict on each
+call, and whether it may end; for the step the first refusal, and why the tables
+could not be asked past a point, where they could not: it does not ask where the
+dtype before a call is not known. The report of a run carries the walk, and
+gives each expression it built the context and the places of its links.
+
 The tables hold what they were measured on. A method's context was measured on
 the receiver that fits it best, so a table cannot say that a predicate must be
 `Boolean` for a receiver it was not measured on; the rule does. Arguments are
@@ -342,14 +361,13 @@ deep that start from a column of any representative dtype or from a typed
 literal, in each position that holds an expression (a select item, a filter's
 predicate, a sort key, either side of a join key, a pivot's aggregate), with
 conditions nested two deep and `over`'s keys inside them, and sets of the
-options of each call. For each it asks [`offer`](#which-combinations-polars-allows),
-at the place each call stands in, with the dtypes of the arguments the case chose
-and, for a start, the dtype of its column or typed literal, and for a condition
-the dtype of its values, whether the call may stand and what it gives; asks
-whether each expression a position holds may end there; and asks `options` of
-the options set. From those it predicts whether Polars allows the case and the
-dtype after each link. A case whose answer is not known, as whether a start may
-end where it was not told its dtype, is not predicted past that point.
+options of each call. For each it takes the engine's [walk](#which-combinations-polars-allows) of the
+case, which asks `offer` at the place each call stands in whether the call may
+stand and what it gives, whether each expression a position holds may end there,
+and `options` of the options a step is given. From that it predicts whether
+Polars allows the case and the dtype after each link. A case whose answer is not
+known, as whether a start may end where it was not told its dtype, is not
+predicted past that point.
 It then runs the case through the step document, as the editor does, on three rows
 with a null and on a table with no rows, and compares: a case is allowed only
 when the schema and both runs succeed, as the tables count it, and the dtype

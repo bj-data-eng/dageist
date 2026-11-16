@@ -602,13 +602,6 @@ fn keys(case: &Case, joins: bool) -> Vec<&Expression> {
     found
 }
 
-/// Whether a key holds a single value that is no column, an aggregate or a null
-/// literal, beside what is not one: a key that is wholly one is the whole key,
-/// which the tables measured.
-pub(super) fn holds_a_single_value_beside_a_column(key: &Expression) -> bool {
-    any_call(key, &is_a_single_value) && !wholly_single(key, key.links().len(), true)
-}
-
 /// Whether an `over` has, before it in its chain, another window.
 fn window_over_a_window(expression: &Expression) -> bool {
     let calls: Vec<&Call> = std::iter::once(expression.start())

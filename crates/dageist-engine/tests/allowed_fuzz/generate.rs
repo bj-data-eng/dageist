@@ -23,7 +23,6 @@ use dageist_fuzz::generation::Entropy;
 
 use super::case::{Case, STEP};
 use super::frames::{ON_COLUMNS, OTHER};
-use super::predict::option_words;
 
 /// Fewest bytes of entropy a case is made from. A shorter input is discarded,
 /// for what it lacks would be read as zeros, the same choice every time.
@@ -899,4 +898,29 @@ fn unify(values: &[Option<Representative>]) -> Option<Representative> {
         .iter()
         .all(|value| *value == Some(first))
         .then_some(first)
+}
+
+/// The options `call` was given, each by the parameter and its word as the
+/// option table writes it, which `offer` is asked with.
+fn option_words(call: &Call) -> Vec<(String, String)> {
+    let entry = call.entry();
+    call.arguments()
+        .iter()
+        .filter(|given| {
+            entry.parameters().iter().any(|parameter| {
+                parameter.name() == given.parameter()
+                    && matches!(parameter.kind(), Kind::Flag | Kind::Choice(_))
+            })
+        })
+        .filter_map(|given| {
+            let word = match given.value() {
+                Value::Flag(Some(true)) => "true".to_owned(),
+                Value::Flag(Some(false)) => "false".to_owned(),
+                Value::Flag(None) => "unset".to_owned(),
+                Value::Choice(word) => word.clone(),
+                _ => return None,
+            };
+            Some((given.parameter().to_owned(), word))
+        })
+        .collect()
 }

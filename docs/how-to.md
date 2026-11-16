@@ -310,7 +310,10 @@ A named rule is in `crates/dageist-engine/src/allowed/rules.rs`. Adding one
 changes the `rules` column of the context table, so refresh the tables with it.
 A rule of how a chain ends, which is about a dtype, also says in
 `Rule::forbids_end` what it makes of a result whose dtype is not known: it does
-not refuse it.
+not refuse it, and `offer` then reports that whether the chain may end is not
+known. A rule about a whole expression, such as `key-is-elementwise`, is asked by
+the walk in `crates/dageist-engine/src/document/walk.rs`, which finds what the
+expression holds.
 
 ## Check The Tables Against Polars
 

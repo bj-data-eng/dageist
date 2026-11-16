@@ -13,12 +13,13 @@ use polars::prelude::{
     DataFrame, DataType, Expr, IdxSize, IntoLazy, LazyFrame, PolarsError, SchemaRef,
 };
 
-use crate::allowed::{self, Context, Position, Refusal};
+use crate::allowed::{self, Context, Place as OfferPlace, Position, Refusal};
 use crate::catalog::{Argument, Arguments, Build, BuildError, Conditional, Laziness};
 
 use super::error::{Place, Segment};
 use super::inputs::Inputs;
 use super::model::{Call, Document, Expression, Start, Step, StepId, Value};
+use super::walk::Walk;
 
 /// What an expression has, up to one of its links.
 #[derive(Debug, Clone)]
@@ -41,8 +42,10 @@ pub enum Resolution {
 #[derive(Debug, Clone)]
 pub struct ExpressionDtypes {
     place: Place,
+    context: Option<Context>,
     start: Resolution,
     links: Vec<Resolution>,
+    places: Vec<Option<OfferPlace>>,
 }
 
 impl ExpressionDtypes {
@@ -51,6 +54,23 @@ impl ExpressionDtypes {
     #[must_use]
     pub const fn place(&self) -> &Place {
         &self.place
+    }
+
+    /// The context the expression stands in, as the tables of allowed
+    /// combinations have it. `None` when no named position holds it.
+    #[must_use]
+    pub const fn context(&self) -> Option<Context> {
+        self.context
+    }
+
+    /// The places the links stand in, in order, and after them the place a link
+    /// added at the end would stand in, as [`allowed::offers`] is asked at them.
+    /// `None` where what comes before is not known: the dtype the tables say
+    /// the chain has, which is not Polars', is what they follow. See
+    /// [`WalkedExpression::places`](super::WalkedExpression::places).
+    #[must_use]
+    pub fn places(&self) -> &[Option<OfferPlace>] {
+        &self.places
     }
 
     /// What the start alone has.
@@ -167,6 +187,7 @@ pub struct StepReport {
     id: StepId,
     laziness: Laziness,
     expressions: Vec<ExpressionDtypes>,
+    walk: Walk,
     outcome: Outcome,
 }
 
@@ -190,6 +211,14 @@ impl StepReport {
     #[must_use]
     pub fn expressions(&self) -> &[ExpressionDtypes] {
         &self.expressions
+    }
+
+    /// What the tables of allowed combinations say of the step: every
+    /// expression in it, including those Polars was not asked about because it
+    /// refused the step first. Empty for a step that was not run.
+    #[must_use]
+    pub const fn walk(&self) -> &Walk {
+        &self.walk
     }
 
     /// What came of the step.
@@ -284,6 +313,7 @@ impl Document {
                     id,
                     laziness,
                     expressions: Vec::new(),
+                    walk: Walk::default(),
                     outcome: Outcome::NotRun {
                         blocked_by: blocked_by.clone(),
                     },
@@ -308,6 +338,7 @@ impl Document {
                 id,
                 laziness,
                 expressions: run.expressions,
+                walk: run.walk,
                 outcome,
             });
         }
@@ -356,6 +387,7 @@ impl Document {
 /// the way.
 struct StepRun {
     expressions: Vec<ExpressionDtypes>,
+    walk: Walk,
     result: Result<(LazyFrame, SchemaRef), StepRefusal>,
 }
 
@@ -376,6 +408,28 @@ fn run_step(
         positions: Vec::new(),
         traces: Vec::new(),
     };
+    // What the tables say of the step does not depend on Polars building it.
+    let walk = if trace {
+        step.walk(index, schema, inputs)
+    } else {
+        Walk::default()
+    };
+    let expressions = |traces: Vec<ExpressionDtypes>| {
+        traces
+            .into_iter()
+            .map(|mut found| {
+                if let Some(walked) = walk
+                    .expressions()
+                    .iter()
+                    .find(|walked| walked.place() == found.place())
+                {
+                    found.context = walked.context();
+                    found.places = walked.places();
+                }
+                found
+            })
+            .collect()
+    };
     let frame = match builder.step(step.call(), input) {
         Ok(frame) => frame,
         Err(stop) => {
@@ -384,7 +438,8 @@ fn run_step(
                     place: stop.place(&base),
                     cause: stop.cause,
                 }),
-                expressions: builder.traces,
+                expressions: expressions(builder.traces),
+                walk,
             };
         }
     };
@@ -393,7 +448,8 @@ fn run_step(
         Err(error) => Err(builder.polars_refusal(error)),
     };
     StepRun {
-        expressions: builder.traces,
+        expressions: expressions(builder.traces),
+        walk,
         result,
     }
 }
@@ -637,8 +693,10 @@ impl Builder<'_> {
         if let (Some(start), true) = (start, self.probe.is_some()) {
             self.traces.push(ExpressionDtypes {
                 place,
+                context: None,
                 start,
                 links: links.into_iter().flatten().collect(),
+                places: Vec::new(),
             });
         }
         match state {

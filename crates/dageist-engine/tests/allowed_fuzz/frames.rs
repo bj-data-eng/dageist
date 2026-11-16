@@ -88,22 +88,30 @@ impl Frames {
     /// The tables with `a` of the class `receiver`, `b` of `argument`, and a
     /// `key` column of the dtype `key`, all null.
     pub fn new(receiver: Representative, argument: Representative, key: &DataType) -> Self {
+        Self::with_key(receiver, argument, Some(key))
+    }
+
+    /// The tables as [`Frames::new`] makes them, but with no `key` column when
+    /// `key` is `None`: its dtype is the join key's, which is known only when
+    /// the join is run, so a prediction made before that does not know it.
+    pub fn with_key(
+        receiver: Representative,
+        argument: Representative,
+        key: Option<&DataType>,
+    ) -> Self {
         let side = |names: [&str; 6]| {
             let [a, b, f, k, g, h] = names;
-            DataFrame::new(
-                3,
-                vec![
-                    column(receiver, a).into(),
-                    column(argument, b).into(),
-                    Series::new(f.into(), [Some(true), Some(false), Some(true)]).into(),
-                    Series::new(k.into(), [1_i64, 1, 2]).into(),
-                    Series::new(g.into(), ["x", "y", "x"]).into(),
-                    Series::new(h.into(), ["x", "x", "y"]).into(),
-                    Series::full_null("key".into(), 3, key).into(),
-                    Series::new("u".into(), [1_i64, 2, 3]).into(),
-                ],
-            )
-            .expect("columns of three rows")
+            let mut columns = vec![
+                column(receiver, a).into(),
+                column(argument, b).into(),
+                Series::new(f.into(), [Some(true), Some(false), Some(true)]).into(),
+                Series::new(k.into(), [1_i64, 1, 2]).into(),
+                Series::new(g.into(), ["x", "y", "x"]).into(),
+                Series::new(h.into(), ["x", "x", "y"]).into(),
+                Series::new("u".into(), [1_i64, 2, 3]).into(),
+            ];
+            columns.extend(key.map(|key| Series::full_null("key".into(), 3, key).into()));
+            DataFrame::new(3, columns).expect("columns of three rows")
         };
         let rows = side(["a", "b", "f", "k", "g", "h"]);
         let other_rows = side(["ra", "rb", "rf", "rk", "rg", "rh"]);
