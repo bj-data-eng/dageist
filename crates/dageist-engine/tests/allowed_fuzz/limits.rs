@@ -1657,6 +1657,135 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_condition_decided_true_drops_what_follows_a_first_value_that_reads_a_column() {
+        // `when(true).then(a).when(g).then(2).otherwise(3)`: Polars evaluates only
+        // the first value, and not the later predicate `g`, where that value
+        // reads a column, or where the whole condition is literals. A first value
+        // that is a literal leaves the later predicate to be evaluated, and so
+        // does a condition decided false or one that `g` starts.
+        let value = |at: i64| chain(literal_of(at), &[]);
+        let condition = |first: Expression, truthy: Expression, later: Expression| {
+            chain_of(
+                when_of(vec![first]),
+                vec![
+                    then_of(truthy),
+                    also_when(vec![later]),
+                    call(
+                        "ChainedWhen.then",
+                        vec![("statement", Value::Expression(value(2)))],
+                    ),
+                    call(
+                        "ChainedThen.otherwise",
+                        vec![("statement", Value::Expression(value(3)))],
+                    ),
+                ],
+            )
+        };
+        let g = || chain(column("g"), &[]);
+        let later_predicate = at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Link(1),
+            parameter("predicates"),
+            Segment::Item(0),
+        ]);
+        let literals_only = || chain(literal_of(5), &[]);
+        let excused = [
+            (
+                "a column first value",
+                condition(boolean(Some(true)), chain(column("a"), &[]), g()),
+            ),
+            (
+                "literals alone",
+                condition(boolean(Some(true)), value(1), literals_only()),
+            ),
+        ];
+        for (name, item) in excused {
+            assert_eq!(
+                rule_refuses(
+                    &select(vec![item]),
+                    later_predicate.clone(),
+                    BOOLEAN_RULE,
+                    "a rule"
+                ),
+                vec![Limit::ADecidedCondition],
+                "{name}"
+            );
+        }
+        let refused = [
+            (
+                "a literal first value",
+                condition(boolean(Some(true)), value(1), g()),
+            ),
+            (
+                "decided false",
+                condition(boolean(Some(false)), chain(column("a"), &[]), g()),
+            ),
+            (
+                "decided null",
+                condition(boolean(None), chain(column("a"), &[]), g()),
+            ),
+        ];
+        for (name, item) in refused {
+            assert_eq!(
+                rule_refuses(
+                    &select(vec![item]),
+                    later_predicate.clone(),
+                    BOOLEAN_RULE,
+                    "a rule"
+                ),
+                vec![],
+                "{name}"
+            );
+        }
+        // The first predicate itself, and the first value of the condition.
+        let item = condition(boolean(Some(true)), chain(column("a"), &[]), g());
+        assert_eq!(
+            rule_refuses(
+                &select(vec![item]),
+                start_predicate(0),
+                BOOLEAN_RULE,
+                "a rule"
+            ),
+            vec![]
+        );
+        // `when(true).then(when(true).then(a).when(g).then(2).otherwise(3))`: the
+        // inner condition is the first value of the outer one and is decided
+        // true itself; one that starts from `g` is not.
+        let nested = |first: Expression| {
+            select(vec![chain_of(
+                when_of(vec![boolean(Some(true))]),
+                vec![
+                    then_of(condition(first, chain(column("a"), &[]), g())),
+                    otherwise_of(value(1)),
+                ],
+            )])
+        };
+        let inner_later = at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Link(0),
+            parameter("statement"),
+            Segment::Link(1),
+            parameter("predicates"),
+            Segment::Item(0),
+        ]);
+        assert_eq!(
+            rule_refuses(
+                &nested(boolean(Some(true))),
+                inner_later.clone(),
+                BOOLEAN_RULE,
+                "a rule"
+            ),
+            vec![Limit::ADecidedCondition]
+        );
+        assert_eq!(
+            rule_refuses(&nested(g()), inner_later, BOOLEAN_RULE, "a rule"),
+            vec![]
+        );
+    }
+
     /// A whole number of the dtype of `literal`, as a literal call.
     fn literal_of(value: i64) -> Call {
         call("polars.lit", vec![("value", Value::Integer(value))])
