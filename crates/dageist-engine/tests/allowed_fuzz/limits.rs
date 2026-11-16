@@ -80,6 +80,13 @@ pub enum Limit {
     /// place, in a case whose join key holds a comparison with a null literal at
     /// any depth.
     ANullComparisonInAKey,
+    /// Shifts that total the sample's three rows or more, with no value to fill
+    /// them, leave every row null, and Polars does not meet a call after them
+    /// with a dtype that the tables refuse when they run rows: a comparison of a
+    /// list with a `Boolean` is refused after none, one or two shifts, and
+    /// allowed after three. The tables refusing, when they run rows, at a call
+    /// of a chain whose earlier links shift by three rows or more in all.
+    AShiftThatEmptiesTheSample,
     /// Whether values of different lengths combine, as the lists of two rows
     /// do not, depends on the rows, which the tables measured on one sample.
     TheLengthsOfTheRows,
@@ -126,13 +133,14 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 16] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AnAggregateGivesOneValue,
         Self::AGroupAggregate,
         Self::ASingleValueInAKey,
         Self::ANullComparisonInAKey,
+        Self::AShiftThatEmptiesTheSample,
         Self::TheLengthsOfTheRows,
         Self::AnOverflow,
         Self::TheBranchesAreOne,
@@ -153,6 +161,7 @@ impl Limit {
             Self::AGroupAggregate => "a-group-aggregate",
             Self::ASingleValueInAKey => "a-single-value-in-a-key",
             Self::ANullComparisonInAKey => "a-null-comparison-in-a-key",
+            Self::AShiftThatEmptiesTheSample => "a-shift-that-empties-the-sample",
             Self::TheLengthsOfTheRows => "the-lengths-of-the-rows",
             Self::AnOverflow => "an-overflow",
             Self::TheBranchesAreOne => "the-branches-are-one",
@@ -188,6 +197,9 @@ impl Limit {
             }
             Self::AGroupAggregate => {
                 "a pivot's aggregate is run on groups, with kernels of its own, not on a column in select"
+            }
+            Self::AShiftThatEmptiesTheSample => {
+                "shifts that total the sample's rows leave every row null, which Polars does not meet with the dtype the tables refuse"
             }
             Self::ANullComparisonInAKey => {
                 "Polars folds a comparison with a null in a join key into a null, which the rule does not wholly model"
@@ -752,6 +764,31 @@ fn folded_by_a_null(locus: &Locus) -> bool {
         .any(|(holder, reach)| reached_by_a_null(holder, *reach))
 }
 
+/// The rows of the sample tables the tables were measured on and the target
+/// runs cases on.
+const SAMPLE_ROWS: i64 = 3;
+
+/// How many rows the `shift`s among `links` move, those that fill the rows they
+/// move with nothing: a shift of a number that is not written as a whole number,
+/// or one given a value to fill with, counts for none.
+fn shifted_by(links: &[Call]) -> i64 {
+    links
+        .iter()
+        .filter(|link| is(link, "Expr.shift") && link.argument("fill_value").is_none())
+        .map(|link| match link.argument("n") {
+            None => 1,
+            Some(Value::Expression(n)) if n.links().is_empty() => match n.start() {
+                Start::Call(start) if is(start, "polars.lit") => match start.argument("value") {
+                    Some(Value::Integer(rows)) => rows.abs(),
+                    _ => 0,
+                },
+                _ => 0,
+            },
+            Some(_) => 0,
+        })
+        .sum()
+}
+
 /// Whether the limit is why Polars allows what the named rule refuses. A limit
 /// excuses a rule only for a cause it names, and the evidence for each is a
 /// campaign case: a later predicate of a condition runs on the rows left to it,
@@ -910,6 +947,13 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
                             .filter(|key| !holds_a_null_comparison(key))
                             .all(|key| !other_cause(key))
                 }
+        }
+        (Limit::AShiftThatEmptiesTheSample, Disagreement::PolarsAllows(refused)) => {
+            let locus = locate(case, &refused.place);
+            refused.stage == Some(TableStage::Rows)
+                && locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
+                    shifted_by(&chain.links()[..at.min(chain.links().len())]) >= SAMPLE_ROWS
+                })
         }
         (Limit::ASingleValueInAKey, Disagreement::PolarsAllows(refused)) => {
             // The key the tables refused is wholly one value.
@@ -1925,6 +1969,70 @@ mod tests {
             polars_refuses(&case, Some(step_place()), Stage::Schema, "no", Vec::new()),
             vec![]
         );
+    }
+
+    #[test]
+    fn shifts_that_total_the_sample_excuse_the_tables_refusing_what_follows_them() {
+        let shift = |rows: Option<i64>| {
+            call(
+                "Expr.shift",
+                rows.map(|rows| vec![("n", Value::Expression(chain_with_integer(rows)))])
+                    .unwrap_or_default(),
+            )
+        };
+        let compare = compared_with("Expr.gt", chain(column("b"), &[]));
+        let case = |shifts: Vec<Call>| {
+            let mut links = shifts;
+            links.push(compare.clone());
+            select(vec![chain_of(column("a"), links)])
+        };
+        let at_the_comparison = |shifts: usize| link_of("exprs", 0, shifts);
+        // Three shifts of one row, or one of three, empty the sample.
+        let three = case(vec![shift(None), shift(None), shift(None)]);
+        assert_eq!(
+            tables_refuse(&three, at_the_comparison(3), ROWS, "no"),
+            vec![Limit::AShiftThatEmptiesTheSample]
+        );
+        let one_of_three = case(vec![shift(Some(3))]);
+        assert_eq!(
+            tables_refuse(&one_of_three, at_the_comparison(1), ROWS, "no"),
+            vec![Limit::AShiftThatEmptiesTheSample]
+        );
+        // Fewer leave rows, and the tables' refusal stands.
+        let two = case(vec![shift(None), shift(None)]);
+        assert_eq!(
+            tables_refuse(&two, at_the_comparison(2), ROWS, "no"),
+            vec![]
+        );
+        // The rows are filled, or the refusal is of the schema, or is before them.
+        let filled = case(vec![
+            shift(None),
+            shift(None),
+            call(
+                "Expr.shift",
+                vec![("fill_value", Value::Expression(chain(literal(), &[])))],
+            ),
+        ]);
+        assert_eq!(
+            tables_refuse(&filled, at_the_comparison(3), ROWS, "no"),
+            vec![]
+        );
+        assert_eq!(
+            tables_refuse(&three, at_the_comparison(3), Some(TableStage::Schema), "no"),
+            vec![]
+        );
+        assert_eq!(
+            tables_refuse(&three, at_the_comparison(1), ROWS, "no"),
+            vec![]
+        );
+    }
+
+    /// A whole number as an expression: a literal of it.
+    fn chain_with_integer(rows: i64) -> Expression {
+        chain(
+            call("polars.lit", vec![("value", Value::Integer(rows))]),
+            &[],
+        )
     }
 
     #[test]
