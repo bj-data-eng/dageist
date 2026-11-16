@@ -126,7 +126,8 @@ pub enum Limit {
     /// what the tables refused when it ran rows is excused; what they refused
     /// when it built the step is refused whatever the rows. Of the named rules it
     /// excuses only the refusal of a later predicate in the `order_by` of a
-    /// window, which Polars evaluates on groups and skips where no row reaches it.
+    /// window, or its `partition_by` in a `sort`, which Polars evaluates on groups
+    /// and skips where no row reaches it.
     AValueThatRunsOnNoRows,
     /// The other table's key is made of the dtype its chain gives on its own,
     /// and the join may resolve the chain to another, as the precision of a
@@ -792,14 +793,16 @@ fn leaves_only_nulls(links: &[Call]) -> bool {
     shifted >= rows
 }
 
-/// Whether a place is inside a later predicate of a condition, in the `order_by`
-/// of a window. A window's `order_by` is evaluated on groups, where Polars does
-/// not evaluate a predicate that no row reaches, as the rows of the sample
-/// decide; `select`, `sort`, `partition_by` and `more_exprs` evaluate it.
-fn in_a_later_predicate_of_an_order_by(case: &Case, place: &Place) -> bool {
+/// Whether a place is inside a later predicate of a condition, in a key of a
+/// window that Polars evaluates on groups: its `order_by`, and its
+/// `partition_by` in a `sort`. There it does not evaluate a predicate that no
+/// row reaches, as the rows of the sample decide; `select`, `with_columns` and
+/// `filter` evaluate a `partition_by`, and the `more_exprs` of a window.
+fn in_a_later_predicate_of_a_key_on_groups(case: &Case, place: &Place) -> bool {
+    let sorted = is(case.document.steps()[0].call(), "LazyFrame.sort");
     keys(case, false).iter().any(|(key, _)| {
         place.path().starts_with(key.path())
-            && held_by(key, "order_by")
+            && (held_by(key, "order_by") || (sorted && held_by(key, "partition_by")))
             && place.path()[key.path().len()..].windows(2).any(|pair| {
                 matches!(pair, [Segment::Link(_), Segment::Parameter(name)] if name == "predicates")
             })
@@ -878,7 +881,8 @@ fn held_by(place: &Place, name: &str) -> bool {
 /// refuses the same key elsewhere or when it is not one value; a `len` in a
 /// `select` of one values is not given what it counts; and a condition that a
 /// literal true decides drops what follows its first value; a later predicate
-/// in a window's `order_by` is not evaluated where no row reaches it; and what
+/// in a window's key that is run on groups is not evaluated where no row reaches
+/// it; and what
 /// is inside the predicate of branches that are one is not evaluated.
 fn applies_to_a_rule(
     limit: Limit,
@@ -896,7 +900,7 @@ fn applies_to_a_rule(
             predicate_rule && walk.evaluation_at(&refused.place) == Evaluation::Dropped
         }
         Limit::AValueThatRunsOnNoRows => {
-            predicate_rule && in_a_later_predicate_of_an_order_by(case, &refused.place)
+            predicate_rule && in_a_later_predicate_of_a_key_on_groups(case, &refused.place)
         }
         Limit::TheBranchesAreOne => {
             let locus = locate(case, &refused.place);
