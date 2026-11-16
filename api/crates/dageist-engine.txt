@@ -205,6 +205,226 @@ pub fn dageist_engine::catalog::english() -> &'static dageist_engine::catalog::W
 pub fn dageist_engine::catalog::entries() -> &'static [dageist_engine::catalog::Entry]
 pub fn dageist_engine::catalog::entry(id: &str) -> core::option::Option<&'static dageist_engine::catalog::Entry>
 pub fn dageist_engine::catalog::left_out() -> &'static [dageist_engine::catalog::LeftOut]
+pub mod dageist_engine::document
+pub enum dageist_engine::document::Cause
+pub dageist_engine::document::Cause::ArgumentKeys(usize)
+pub dageist_engine::document::Cause::Arguments(dageist_engine::catalog::BuildError)
+pub dageist_engine::document::Cause::Dtype(dageist_engine::document::DtypeError)
+pub dageist_engine::document::Cause::DuplicateStep(dageist_engine::document::StepId)
+pub dageist_engine::document::Cause::EmptyStepId
+pub dageist_engine::document::Cause::MissingField(&'static str)
+pub dageist_engine::document::Cause::NotFinite
+pub dageist_engine::document::Cause::OutOfOrder
+pub dageist_engine::document::Cause::OutOfOrder::entry: &'static str
+pub dageist_engine::document::Cause::OutOfOrder::found: &'static str
+pub dageist_engine::document::Cause::OutOfOrder::needs: &'static str
+pub dageist_engine::document::Cause::PairSize(usize)
+pub dageist_engine::document::Cause::Shape
+pub dageist_engine::document::Cause::Shape::expected: &'static str
+pub dageist_engine::document::Cause::Shape::found: &'static str
+pub dageist_engine::document::Cause::Shape::what: &'static str
+pub dageist_engine::document::Cause::UnfinishedCondition
+pub dageist_engine::document::Cause::UnfinishedCondition::needs: &'static str
+pub dageist_engine::document::Cause::UnknownArgument(alloc::string::String)
+pub dageist_engine::document::Cause::UnknownEntry(alloc::string::String)
+pub dageist_engine::document::Cause::UnknownField(alloc::string::String)
+pub dageist_engine::document::Cause::UnsupportedVersion(alloc::string::String)
+pub dageist_engine::document::Cause::WrongPlace
+pub dageist_engine::document::Cause::WrongPlace::applies: dageist_engine::catalog::Applies
+pub dageist_engine::document::Cause::WrongPlace::entry: &'static str
+pub dageist_engine::document::Cause::WrongPlace::position: dageist_engine::document::Position
+impl core::error::Error for dageist_engine::document::Cause
+pub fn dageist_engine::document::Cause::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Display for dageist_engine::document::Cause
+pub fn dageist_engine::document::Cause::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum dageist_engine::document::DtypeError
+pub dageist_engine::document::DtypeError::TimeZone
+pub dageist_engine::document::DtypeError::TimeZone::source: polars_error::PolarsError
+pub dageist_engine::document::DtypeError::TimeZone::zone: alloc::string::String
+pub dageist_engine::document::DtypeError::Unknown(alloc::string::String)
+pub dageist_engine::document::DtypeError::Unsupported(polars_core::datatypes::dtype::DataType)
+pub dageist_engine::document::DtypeError::ZoneNotCanonical
+pub dageist_engine::document::DtypeError::ZoneNotCanonical::canonical: alloc::string::String
+pub dageist_engine::document::DtypeError::ZoneNotCanonical::written: alloc::string::String
+impl core::error::Error for dageist_engine::document::DtypeError
+pub fn dageist_engine::document::DtypeError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Display for dageist_engine::document::DtypeError
+pub fn dageist_engine::document::DtypeError::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum dageist_engine::document::Outcome
+pub dageist_engine::document::Outcome::NotRun
+pub dageist_engine::document::Outcome::NotRun::blocked_by: dageist_engine::document::StepId
+pub dageist_engine::document::Outcome::Refused(dageist_engine::document::StepRefusal)
+pub dageist_engine::document::Outcome::Valid
+pub dageist_engine::document::Outcome::Valid::schema: polars_core::schema::SchemaRef
+pub enum dageist_engine::document::Position
+pub dageist_engine::document::Position::Link
+pub dageist_engine::document::Position::Start
+pub dageist_engine::document::Position::Step
+pub enum dageist_engine::document::ReadError
+pub dageist_engine::document::ReadError::Refused(dageist_engine::document::Refusal)
+pub dageist_engine::document::ReadError::Syntax(serde_json::error::Error)
+impl core::convert::From<dageist_engine::document::Refusal> for dageist_engine::document::ReadError
+pub fn dageist_engine::document::ReadError::from(refusal: dageist_engine::document::Refusal) -> Self
+impl core::error::Error for dageist_engine::document::ReadError
+pub fn dageist_engine::document::ReadError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Display for dageist_engine::document::ReadError
+pub fn dageist_engine::document::ReadError::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum dageist_engine::document::Resolution
+pub dageist_engine::document::Resolution::Dtype(polars_core::datatypes::dtype::DataType)
+pub dageist_engine::document::Resolution::NoContext
+pub dageist_engine::document::Resolution::Refused(polars_error::PolarsError)
+pub dageist_engine::document::Resolution::Several(alloc::vec::Vec<polars_core::datatypes::dtype::DataType>)
+pub dageist_engine::document::Resolution::Unfinished
+pub enum dageist_engine::document::RowsError
+pub dageist_engine::document::RowsError::NoSuchStep(dageist_engine::document::StepId)
+pub dageist_engine::document::RowsError::Polars(polars_error::PolarsError)
+pub dageist_engine::document::RowsError::Refused(dageist_engine::document::StepRefusal)
+impl core::error::Error for dageist_engine::document::RowsError
+pub fn dageist_engine::document::RowsError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Display for dageist_engine::document::RowsError
+pub fn dageist_engine::document::RowsError::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum dageist_engine::document::RunCause
+pub dageist_engine::document::RunCause::Build(dageist_engine::catalog::BuildError)
+pub dageist_engine::document::RunCause::Polars(polars_error::PolarsError)
+pub dageist_engine::document::RunCause::UnknownInput(alloc::string::String)
+pub dageist_engine::document::RunCause::UnknownTable(alloc::string::String)
+impl core::error::Error for dageist_engine::document::RunCause
+pub fn dageist_engine::document::RunCause::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Display for dageist_engine::document::RunCause
+pub fn dageist_engine::document::RunCause::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum dageist_engine::document::Segment
+pub dageist_engine::document::Segment::Item(usize)
+pub dageist_engine::document::Segment::Key(usize)
+pub dageist_engine::document::Segment::Link(usize)
+pub dageist_engine::document::Segment::Parameter(alloc::string::String)
+pub dageist_engine::document::Segment::Start
+pub dageist_engine::document::Segment::Value(usize)
+pub enum dageist_engine::document::Start
+pub dageist_engine::document::Start::Call(dageist_engine::document::Call)
+pub dageist_engine::document::Start::Input(alloc::string::String)
+pub enum dageist_engine::document::Value
+pub dageist_engine::document::Value::Choice(alloc::string::String)
+pub dageist_engine::document::Value::Columns(alloc::vec::Vec<alloc::string::String>)
+pub dageist_engine::document::Value::Dtype(dageist_engine::document::Dtype)
+pub dageist_engine::document::Value::Duration(alloc::string::String)
+pub dageist_engine::document::Value::Expression(dageist_engine::document::Expression)
+pub dageist_engine::document::Value::Flag(core::option::Option<bool>)
+pub dageist_engine::document::Value::Float(f64)
+pub dageist_engine::document::Value::Integer(i64)
+pub dageist_engine::document::Value::Many(alloc::vec::Vec<dageist_engine::document::Value>)
+pub dageist_engine::document::Value::Pairs(alloc::vec::Vec<(dageist_engine::document::Value, dageist_engine::document::Value)>)
+pub dageist_engine::document::Value::Path(alloc::string::String)
+pub dageist_engine::document::Value::String(alloc::string::String)
+pub dageist_engine::document::Value::Table(alloc::string::String)
+pub struct dageist_engine::document::Call
+impl dageist_engine::document::Call
+pub fn dageist_engine::document::Call::argument(&self, parameter: &str) -> core::option::Option<&dageist_engine::document::Value>
+pub fn dageist_engine::document::Call::arguments(&self) -> &[dageist_engine::document::Given]
+pub const fn dageist_engine::document::Call::entry(&self) -> &'static dageist_engine::catalog::Entry
+pub fn dageist_engine::document::Call::new<'a>(entry: &'static dageist_engine::catalog::Entry, arguments: impl core::iter::traits::collect::IntoIterator<Item = (&'a str, dageist_engine::document::Value)>) -> core::result::Result<Self, dageist_engine::document::Refusal>
+impl core::cmp::PartialEq for dageist_engine::document::Call
+pub fn dageist_engine::document::Call::eq(&self, other: &Self) -> bool
+pub struct dageist_engine::document::Document
+impl dageist_engine::document::Document
+pub fn dageist_engine::document::Document::new(steps: alloc::vec::Vec<dageist_engine::document::Step>) -> core::result::Result<Self, dageist_engine::document::Refusal>
+pub fn dageist_engine::document::Document::steps(&self) -> &[dageist_engine::document::Step]
+impl dageist_engine::document::Document
+pub fn dageist_engine::document::Document::read(text: &str) -> core::result::Result<Self, dageist_engine::document::ReadError>
+impl dageist_engine::document::Document
+pub fn dageist_engine::document::Document::rows(&self, inputs: &dageist_engine::document::Inputs, working: &polars_core::frame::dataframe::DataFrame, through: &dageist_engine::document::StepId, limit: usize) -> core::result::Result<polars_core::frame::dataframe::DataFrame, dageist_engine::document::RowsError>
+pub fn dageist_engine::document::Document::run(&self, inputs: &dageist_engine::document::Inputs, source: polars_lazy::frame::LazyFrame) -> core::result::Result<dageist_engine::document::Report, polars_error::PolarsError>
+impl dageist_engine::document::Document
+pub fn dageist_engine::document::Document::write(&self) -> alloc::string::String
+pub struct dageist_engine::document::Dtype(_)
+impl dageist_engine::document::Dtype
+pub const fn dageist_engine::document::Dtype::as_polars(&self) -> &polars_core::datatypes::dtype::DataType
+pub fn dageist_engine::document::Dtype::into_polars(self) -> polars_core::datatypes::dtype::DataType
+pub fn dageist_engine::document::Dtype::new(dtype: polars_core::datatypes::dtype::DataType) -> core::result::Result<Self, dageist_engine::document::DtypeError>
+impl core::fmt::Display for dageist_engine::document::Dtype
+pub fn dageist_engine::document::Dtype::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::str::traits::FromStr for dageist_engine::document::Dtype
+pub type dageist_engine::document::Dtype::Err = dageist_engine::document::DtypeError
+pub fn dageist_engine::document::Dtype::from_str(written: &str) -> core::result::Result<Self, Self::Err>
+pub struct dageist_engine::document::DuplicateInput(pub alloc::string::String)
+impl core::error::Error for dageist_engine::document::DuplicateInput
+impl core::fmt::Display for dageist_engine::document::DuplicateInput
+pub fn dageist_engine::document::DuplicateInput::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct dageist_engine::document::EmptyStepId
+impl core::error::Error for dageist_engine::document::EmptyStepId
+impl core::fmt::Display for dageist_engine::document::EmptyStepId
+pub fn dageist_engine::document::EmptyStepId::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct dageist_engine::document::Expression
+impl dageist_engine::document::Expression
+pub fn dageist_engine::document::Expression::links(&self) -> &[dageist_engine::document::Call]
+pub fn dageist_engine::document::Expression::new(start: dageist_engine::document::Start, links: alloc::vec::Vec<dageist_engine::document::Call>) -> core::result::Result<Self, dageist_engine::document::Refusal>
+pub const fn dageist_engine::document::Expression::start(&self) -> &dageist_engine::document::Start
+pub struct dageist_engine::document::ExpressionDtypes
+impl dageist_engine::document::ExpressionDtypes
+pub fn dageist_engine::document::ExpressionDtypes::links(&self) -> &[dageist_engine::document::Resolution]
+pub const fn dageist_engine::document::ExpressionDtypes::place(&self) -> &dageist_engine::document::Place
+pub const fn dageist_engine::document::ExpressionDtypes::start(&self) -> &dageist_engine::document::Resolution
+pub struct dageist_engine::document::Given
+impl dageist_engine::document::Given
+pub fn dageist_engine::document::Given::parameter(&self) -> &str
+pub const fn dageist_engine::document::Given::value(&self) -> &dageist_engine::document::Value
+pub struct dageist_engine::document::Inputs
+impl dageist_engine::document::Inputs
+pub fn dageist_engine::document::Inputs::add_list(&mut self, name: impl core::convert::Into<alloc::string::String>, values: polars_core::series::Series) -> core::result::Result<(), dageist_engine::document::DuplicateInput>
+pub fn dageist_engine::document::Inputs::add_table(&mut self, name: impl core::convert::Into<alloc::string::String>, table: polars_lazy::frame::LazyFrame) -> core::result::Result<(), dageist_engine::document::DuplicateInput>
+pub fn dageist_engine::document::Inputs::add_value(&mut self, name: impl core::convert::Into<alloc::string::String>, value: polars_core::scalar::Scalar) -> core::result::Result<(), dageist_engine::document::DuplicateInput>
+pub fn dageist_engine::document::Inputs::new() -> Self
+impl core::fmt::Debug for dageist_engine::document::Inputs
+pub fn dageist_engine::document::Inputs::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct dageist_engine::document::Place
+impl dageist_engine::document::Place
+pub const fn dageist_engine::document::Place::of_step(index: usize, step: core::option::Option<dageist_engine::document::StepId>) -> Self
+pub fn dageist_engine::document::Place::path(&self) -> &[dageist_engine::document::Segment]
+pub const fn dageist_engine::document::Place::step_id(&self) -> core::option::Option<&dageist_engine::document::StepId>
+pub const fn dageist_engine::document::Place::step_index(&self) -> core::option::Option<usize>
+pub fn dageist_engine::document::Place::then(self, segment: dageist_engine::document::Segment) -> Self
+impl core::fmt::Display for dageist_engine::document::Place
+pub fn dageist_engine::document::Place::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct dageist_engine::document::Refusal(_)
+impl dageist_engine::document::Refusal
+pub fn dageist_engine::document::Refusal::cause(&self) -> &dageist_engine::document::Cause
+pub fn dageist_engine::document::Refusal::place(&self) -> &dageist_engine::document::Place
+impl core::convert::From<dageist_engine::document::Refusal> for dageist_engine::document::ReadError
+pub fn dageist_engine::document::ReadError::from(refusal: dageist_engine::document::Refusal) -> Self
+impl core::error::Error for dageist_engine::document::Refusal
+pub fn dageist_engine::document::Refusal::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Display for dageist_engine::document::Refusal
+pub fn dageist_engine::document::Refusal::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct dageist_engine::document::Report
+impl dageist_engine::document::Report
+pub const fn dageist_engine::document::Report::source(&self) -> &polars_core::schema::SchemaRef
+pub fn dageist_engine::document::Report::steps(&self) -> &[dageist_engine::document::StepReport]
+pub struct dageist_engine::document::Step
+impl dageist_engine::document::Step
+pub const fn dageist_engine::document::Step::call(&self) -> &dageist_engine::document::Call
+pub const fn dageist_engine::document::Step::id(&self) -> &dageist_engine::document::StepId
+pub fn dageist_engine::document::Step::new(id: dageist_engine::document::StepId, call: dageist_engine::document::Call) -> core::result::Result<Self, dageist_engine::document::Refusal>
+pub struct dageist_engine::document::StepId(_)
+impl dageist_engine::document::StepId
+pub fn dageist_engine::document::StepId::as_str(&self) -> &str
+pub fn dageist_engine::document::StepId::new(text: impl core::convert::Into<alloc::string::String>) -> core::result::Result<Self, dageist_engine::document::EmptyStepId>
+impl core::fmt::Display for dageist_engine::document::StepId
+pub fn dageist_engine::document::StepId::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct dageist_engine::document::StepRefusal
+impl dageist_engine::document::StepRefusal
+pub fn dageist_engine::document::StepRefusal::cause(&self) -> &dageist_engine::document::RunCause
+pub const fn dageist_engine::document::StepRefusal::place(&self) -> &dageist_engine::document::Place
+impl core::error::Error for dageist_engine::document::StepRefusal
+pub fn dageist_engine::document::StepRefusal::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Display for dageist_engine::document::StepRefusal
+pub fn dageist_engine::document::StepRefusal::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct dageist_engine::document::StepReport
+impl dageist_engine::document::StepReport
+pub fn dageist_engine::document::StepReport::expressions(&self) -> &[dageist_engine::document::ExpressionDtypes]
+pub const fn dageist_engine::document::StepReport::id(&self) -> &dageist_engine::document::StepId
+pub const fn dageist_engine::document::StepReport::laziness(&self) -> dageist_engine::catalog::Laziness
+pub const fn dageist_engine::document::StepReport::outcome(&self) -> &dageist_engine::document::Outcome
+pub const fn dageist_engine::document::StepReport::schema(&self) -> core::option::Option<&polars_core::schema::SchemaRef>
+pub const dageist_engine::document::VERSION: u32
 pub struct dageist_engine::ColumnInfo
 pub dageist_engine::ColumnInfo::data_type: alloc::string::String
 pub dageist_engine::ColumnInfo::name: alloc::string::String
