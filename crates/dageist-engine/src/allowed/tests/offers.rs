@@ -9,8 +9,8 @@ use std::sync::Arc;
 use crate::allowed::dtype::ResultDtype;
 use crate::allowed::offers::RefusalSource;
 use crate::allowed::{
-    After, Chosen, ConditionState, Context, Nested, Outer, Place, Position, Representative, Rule,
-    Shape, Stage, Verdict, offer, offers, options,
+    After, Chosen, ConditionState, Context, Ending, Nested, Outer, Place, Position, Representative,
+    Rule, Shape, Stage, Unknown, Verdict, offer, offers, options,
 };
 use crate::catalog;
 
@@ -393,6 +393,78 @@ fn the_values_of_a_condition_that_ends_in_otherwise_give_the_dtype_it_is_told() 
     );
     let boolean = giving("Then.otherwise", &ended, Representative::Boolean);
     assert!(boolean.allowance().expect("offered").can_end().is_allowed());
+}
+
+#[test]
+fn a_start_whose_arguments_decide_whether_it_ends_is_not_known_until_its_dtype_is_given() {
+    let ends = |verdict: &Verdict| verdict.allowance().expect("offered").can_end().clone();
+    // A predicate needs a Boolean, which the column's dtype decides.
+    let filter = Place::new(Context::step(Outer::Filter), After::Start);
+    assert_eq!(
+        ends(&verdict("polars.col", &filter, &[])),
+        Ending::NotKnown(Unknown::TheStartsDtype)
+    );
+    // An untyped literal cannot end a join key's condition value, and a typed
+    // one can: the table was measured with an untyped one.
+    let key = Place::new(
+        Context::inside(Outer::JoinLeft, Nested::ConditionValue),
+        After::Start,
+    );
+    assert_eq!(
+        ends(&verdict("polars.lit", &key, &[])),
+        Ending::NotKnown(Unknown::TheStartsDtype)
+    );
+    assert_eq!(
+        ends(&giving("polars.lit", &key, Representative::Int8)),
+        Ending::Allowed
+    );
+    // In a pivot's aggregate, `element` stands for the values of a group.
+    let predicate = Place::new(
+        Context::inside(Outer::PivotAggregate, Nested::ConditionPredicate),
+        After::Start,
+    );
+    assert_eq!(
+        ends(&verdict("polars.element", &predicate, &[])),
+        Ending::NotKnown(Unknown::TheStartsDtype)
+    );
+    assert_eq!(
+        ends(&giving(
+            "polars.element",
+            &predicate,
+            Representative::Boolean
+        )),
+        Ending::Allowed
+    );
+}
+
+#[test]
+fn a_start_that_its_arguments_do_not_decide_ends_without_its_dtype() {
+    // Any column ends a select's item.
+    let select = Place::new(Context::step(Outer::Select), After::Start);
+    let offered = verdict("polars.col", &select, &[]);
+    assert_eq!(
+        offered.allowance().expect("offered").can_end(),
+        &Ending::Allowed
+    );
+}
+
+#[test]
+fn a_method_whose_result_the_arguments_decide_is_not_known_to_end_a_predicate() {
+    // A subtraction gives what its argument decides, so without it nothing says
+    // whether a filter's predicate may end there.
+    let place = Place::new(Context::step(Outer::Filter), after(Representative::Date));
+    let undecided = verdict("Expr.sub", &place, &[]);
+    assert_eq!(result_of(&undecided), None);
+    assert_eq!(
+        undecided.allowance().expect("offered").can_end(),
+        &Ending::NotKnown(Unknown::TheResultsDtype)
+    );
+    // Where no rule needs a Boolean, the result does not matter.
+    let select = verdict("Expr.sub", &select_after(Representative::Date), &[]);
+    assert_eq!(
+        select.allowance().expect("offered").can_end(),
+        &Ending::Allowed
+    );
 }
 
 #[test]
