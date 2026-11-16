@@ -92,3 +92,18 @@ fn a_document_made_in_code_is_written_in_the_format() {
     assert_eq!(document.write(), expected);
     assert_eq!(Document::read(expected).expect("a document"), document);
 }
+
+#[test]
+fn a_float_that_needs_all_seventeen_digits_reads_back_exactly() {
+    // 0.07 * 3.0 is the f64 0.21000000000000002, which is not the f64 0.21.
+    let exact = 0.07_f64 * 3.0;
+    assert_ne!(exact, 0.21);
+    let text = CANONICAL.replacen("2.5", &format!("{exact:?}"), 1);
+    assert!(text.contains("0.21000000000000002"));
+    let document = Document::read(&text).expect("a document");
+    assert_eq!(document.write(), text);
+    assert_eq!(
+        Document::read(&document.write()).expect("the text just written"),
+        document
+    );
+}
