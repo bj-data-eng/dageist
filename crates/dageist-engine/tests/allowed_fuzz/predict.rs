@@ -65,9 +65,6 @@ pub enum Verdict {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Traced {
     pub place: Place,
-    /// How many positions inside an expression hold it, of which the tables
-    /// judge the first.
-    pub nested: usize,
     pub start: Option<Representative>,
     pub links: Vec<Option<Representative>>,
     /// Whether the dtype after the last link is one the tables gave, and not one
@@ -352,11 +349,6 @@ impl Walker<'_> {
         }
         self.traced.push(Traced {
             place,
-            nested: self
-                .slots
-                .iter()
-                .filter(|slot| matches!(slot, Slot::Nested(_)))
-                .count(),
             start: start_class,
             links,
             told: self.told,

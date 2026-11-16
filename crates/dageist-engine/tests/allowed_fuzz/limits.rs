@@ -90,11 +90,6 @@ pub enum Limit {
     /// of another place may not reach it; a combination of what they measured
     /// singly, such as two keys of a window, may reach another.
     APanic,
-    /// A place more than two positions deep is judged by its first two, so a
-    /// predicate inside a value of a condition is judged as a value, which need
-    /// not be a `Boolean`: the tables allow a predicate of a known dtype that is
-    /// no `Boolean`, and refuse a value inside a predicate as a predicate.
-    ADeeperPlace,
     /// A condition with a predicate made of literals alone is decided before it
     /// is run: Polars takes the branch it selects and drops the others, so what
     /// the predicates and values it drops would refuse, it does not. A predicate
@@ -133,7 +128,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 15] = [
         Self::OptionsChangeTheResult,
         Self::ALiteral,
         Self::AnAggregateGivesOneValue,
@@ -144,7 +139,6 @@ impl Limit {
         Self::TheBranchesAreOne,
         Self::APanic,
         Self::ABooleanIsNeededAndTheDtypeUnknown,
-        Self::ADeeperPlace,
         Self::AHiddenSchema,
         Self::AWindowOverAWindow,
         Self::ADecidedCondition,
@@ -165,7 +159,6 @@ impl Limit {
             Self::TheBranchesAreOne => "the-branches-are-one",
             Self::APanic => "a-panic",
             Self::ABooleanIsNeededAndTheDtypeUnknown => "a-boolean-is-needed",
-            Self::ADeeperPlace => "a-deeper-place",
             Self::AHiddenSchema => "a-hidden-schema",
             Self::AWindowOverAWindow => "a-window-over-a-window",
             Self::ADecidedCondition => "a-decided-condition",
@@ -215,9 +208,6 @@ impl Limit {
             }
             Self::AWindowOverAWindow => {
                 "a window over a window is run in an aggregation context, where a key that is not elementwise is refused"
-            }
-            Self::ADeeperPlace => {
-                "a place more than two positions deep is judged by its first two, as the tables hold them"
             }
             Self::ABooleanIsNeededAndTheDtypeUnknown => {
                 "the dtype a column or an argument decides is not asked, where a Boolean is needed"
@@ -482,8 +472,6 @@ struct Locus<'a> {
     inside: Vec<&'a Expression>,
     /// How the place reaches each of them, in the same order.
     reach: Vec<Reach>,
-    /// How many positions inside an expression hold the place.
-    nested: usize,
 }
 
 enum Node<'a> {
@@ -503,7 +491,6 @@ fn locate<'a>(case: &'a Case, place: &Place) -> Locus<'a> {
         in_values: Vec::new(),
         inside: Vec::new(),
         reach: Vec::new(),
-        nested: 0,
     };
     let mut node = Node::Call(case.document.steps()[0].call());
     for segment in place.path() {
@@ -525,14 +512,6 @@ fn locate<'a>(case: &'a Case, place: &Place) -> Locus<'a> {
                     && let Some(chain) = locus.chain
                 {
                     locus.in_values.push(chain);
-                }
-                if matches!(
-                    name.as_str(),
-                    "predicates" | "statement" | "partition_by" | "more_exprs" | "order_by"
-                ) && !matches!(call.entry().id().as_str(), "LazyFrame.filter")
-                    && locus.top.is_some()
-                {
-                    locus.nested += 1;
                 }
                 call.argument(name)
             }
@@ -881,23 +860,6 @@ fn applies(
                 && !refusal.reason.contains("with overflow")
         }
         (Limit::APanic, Disagreement::PolarsAllows(refused)) => is_panic(&refused.reason),
-        (Limit::ADeeperPlace, Disagreement::PolarsRefuses(refusal)) => {
-            // The tables judged a predicate of two positions deep as a value,
-            // which need not be a `Boolean`, and it is a dtype that is not.
-            refusal.reason.contains("Boolean")
-                && prediction.expressions.iter().any(|expression| {
-                    let class = expression.links.last().copied().unwrap_or(expression.start);
-                    expression.nested >= 2
-                        && in_a_predicate_position(&expression.place)
-                        && class.is_some_and(|class| {
-                            class != dageist_engine::allowed::Representative::Boolean
-                        })
-                        && placed(refusal).is_none_or(|place| lies_inside(place, &expression.place))
-                })
-        }
-        (Limit::ADeeperPlace, Disagreement::PolarsAllows(refused)) => {
-            refused.reason.contains("Boolean") && locate(case, &refused.place).nested >= 2
-        }
         (Limit::AJoinKeyDtype, Disagreement::PolarsRefuses(refusal)) => {
             is(step, "LazyFrame.join")
                 && unplaced(refusal)
@@ -1822,77 +1784,8 @@ mod tests {
 
     // ----- Places, schemas, Booleans, pivots
 
-    fn traced(place: Place, nested: usize, class: Option<Representative>) -> Traced {
-        Traced {
-            place,
-            nested,
-            start: None,
-            links: vec![class],
-            told: true,
-        }
-    }
-
     fn predicate_at(item: usize) -> Place {
         at(&[parameter("predicates"), Segment::Item(item)])
-    }
-
-    #[test]
-    fn a_predicate_two_positions_deep_of_a_dtype_that_is_no_boolean_is_judged_as_a_value() {
-        let case = filter(vec![chain(column("a"), &[]), chain(column("b"), &[])]);
-        let reason = "invalid series dtype: expected `Boolean`, got `i8`";
-        let deep = traced(predicate_at(0), 2, Some(Representative::Int8));
-        assert_eq!(
-            polars_refuses(&case, None, Stage::Rows, reason, vec![deep.clone()]),
-            vec![Limit::ADeeperPlace]
-        );
-        // Not so deep, or a Boolean, or another reason.
-        let shallow = traced(predicate_at(0), 1, Some(Representative::Int8));
-        assert_eq!(
-            polars_refuses(&case, None, Stage::Rows, reason, vec![shallow]),
-            vec![]
-        );
-        let boolean = traced(predicate_at(0), 2, Some(Representative::Boolean));
-        assert_eq!(
-            polars_refuses(&case, None, Stage::Rows, reason, vec![boolean]),
-            vec![]
-        );
-        assert_eq!(
-            polars_refuses(&case, None, Stage::Rows, "no", vec![deep.clone()]),
-            vec![]
-        );
-        // A refusal placed outside that predicate.
-        let outside = Some(at(&[
-            parameter("predicates"),
-            Segment::Item(1),
-            Segment::Link(0),
-        ]));
-        assert_eq!(
-            polars_refuses(&case, outside, Stage::Schema, reason, vec![deep]),
-            vec![]
-        );
-    }
-
-    #[test]
-    fn the_tables_refusing_deep_is_excused_for_a_boolean_and_only_where_deep() {
-        let deep = at(&[
-            parameter("exprs"),
-            Segment::Item(0),
-            Segment::Link(0),
-            parameter("statement"),
-            Segment::Start,
-            parameter("predicates"),
-            Segment::Item(0),
-        ]);
-        let case = select(vec![distinct()]);
-        let reason = "it cannot end here: expected `Boolean`";
-        assert_eq!(
-            tables_refuse(&case, deep, Some(TableStage::Schema), reason),
-            vec![Limit::ADeeperPlace]
-        );
-        assert_eq!(
-            tables_refuse(&case, in_the_predicate(), Some(TableStage::Schema), reason),
-            vec![]
-        );
     }
 
     #[test]
@@ -1922,7 +1815,6 @@ mod tests {
         let reason = "filter predicate must be of type `Boolean`, got `Int64`";
         let unknown = Traced {
             place: predicate_at(0),
-            nested: 1,
             start: Some(Representative::Int64),
             links: Vec::new(),
             told: false,

@@ -2,9 +2,11 @@
 //!
 //! A context is a named position that holds an expression: the items a
 //! `select` computes, a `filter`'s predicate, a window's `partition_by`. The
-//! tables record what Polars accepts in each. A place is at most two contexts
-//! deep: a position of a step, and a position inside the expression that
-//! stands there, such as a window's `order_by` inside a `select` item.
+//! tables record what Polars accepts in each. A context is at most two
+//! positions: a position of a step, and a position inside the expression that
+//! stands there, such as a window's `order_by` inside a `select` item. A place
+//! deeper than that is judged by its outer position and the innermost nested
+//! one.
 
 use std::fmt;
 
@@ -204,9 +206,11 @@ impl Context {
     }
 
     /// The context of an expression found by following `positions`, the
-    /// outermost first. Only the first two count: the tables go two levels
-    /// deep, so a place deeper than that is judged by its first two. `None`
-    /// when the way does not start at a position of a step.
+    /// outermost first. The tables go two positions deep, so a place deeper
+    /// than that is judged by its outer position and the innermost nested one:
+    /// an `over` key inside a condition's value is a key, and a predicate
+    /// inside a condition's value is a predicate. `None` when the way does not
+    /// start at a position of a step.
     #[must_use]
     pub fn from_positions(positions: &[Position]) -> Option<Self> {
         let Some(Position::Outer(outer)) = positions.first().copied() else {
@@ -215,6 +219,7 @@ impl Context {
         let nested = positions
             .iter()
             .skip(1)
+            .rev()
             .find_map(|position| match position {
                 Position::Nested(nested) => Some(*nested),
                 Position::Outer(_) => None,

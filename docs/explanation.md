@@ -245,7 +245,8 @@ The contexts are a `select` item, a filter's predicate, a sort key, a join key
 on each side, and a pivot's aggregate, each also with, inside the expression
 that stands there, `over`'s `partition_by` or `order_by` or a condition's
 predicate or value. That is two levels deep, and a place deeper than that is
-judged by its first two.
+judged by its outer position and the innermost nested one: an `over` key inside
+a condition's value is a key, and a predicate inside one is a predicate.
 A join's `right_on` is evaluated against the other table, whose columns are
 named differently from the left table's, so a column of the wrong table is
 found missing. A pivot's aggregate starts from `element()`.
@@ -337,7 +338,7 @@ A disagreement is either a defect of dageist or a combination the tables were no
 measured on. The first found while building the target was `offer` giving a
 `shift` the dtype of what it shifts when a `fill_value` of another dtype was
 chosen; it is corrected, and its case is kept. The second kind is a limit. There are
-sixteen. Each is named in the target, counted when it excuses a case, and has a
+fifteen. Each is named in the target, counted when it excuses a case, and has a
 kept case that the normal tests replay, which only that limit excuses; each has
 a test that the same feature elsewhere in the case excuses nothing.
 
@@ -380,7 +381,6 @@ the tally counts the pivot cases and those the rule refuses apart.
 | A value that runs on no rows | A value of a condition runs on the rows its predicate selects, and a predicate after the first on the rows left to it, which on the sample may be none. The tables refusing, at the stage of running rows, inside such a value or predicate of a condition that is not decided, which Polars allows. What they refused when they built the step is refused whatever the rows. |
 | A panic | One is an internal check that failed on the plan Polars made in `select`; another place, or a combination of what was measured singly, may not reach it, or may reach another. Polars panicking where the tables allow (no place), and the tables recording a panic where Polars allows. |
 | A `Boolean` is needed and the dtype unknown | A predicate needs a `Boolean`. The dtype of a column, one that the arguments decide, and one a condition's values give, is not one `offer` is told, so a predicate that is only a start, or ends in such a call or a condition, is not refused for being no `Boolean`; and a start is judged on the dtype it was measured on. Polars refusing for that, in a predicate whose dtype was not given, and, if the refusal is placed, inside it; and the tables refusing a start in a predicate, which Polars allows. |
-| A deeper place | A place more than two positions deep is judged by its first two, so a predicate inside a value of a condition is judged as a value, and a value inside a predicate as a predicate. Polars refusing a predicate two positions deep whose dtype is known and is no `Boolean`, with a reason about a `Boolean`; and the tables refusing, with such a reason, a place two positions deep, which Polars allows. |
 | A hidden schema | The tables refuse a method whose plan says another dtype than its rows give, as the `cum_sum` of a `UInt128` does; inside an expression that goes on from it or compares it, the rows of the step do not show it. The tables refusing with that reason inside such an expression, which Polars allows. |
 | A window over a window | A window whose receiver holds another window, in its chain before it, or in the arguments of those calls, is run in the aggregation context of the outer one, where a key that is not elementwise is refused; the tables measured one window. Polars refusing the rows with that reason (no place). A window in a key, or two windows apart, is not this. |
 | A join key's dtype | The other table's key is made of the dtype the chain gives on its own, and the join may resolve the chain to another, as the precision of a decimal a null is taken from. Polars refusing the join, with a reason that names a decimal. |
