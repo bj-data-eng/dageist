@@ -355,6 +355,33 @@ fn a_start_that_names_several_columns_has_no_dtype_and_is_not_known_to_end() {
 }
 
 #[test]
+fn element_has_no_dtype_where_a_pivot_takes_values_from_several_columns() {
+    // The group holds `a` and `b`, a whole number and text: `element().sum()` is
+    // refused by Polars for the text, whatever the first column is.
+    let pivot = |values: Vec<&str>| {
+        walk_of(
+            "LazyFrame.pivot",
+            json!({
+                "on": { "columns": ["f"] },
+                "on_columns": { "table": "other" },
+                "values": { "columns": values },
+                "aggregate_function": chain(
+                    call("polars.element", json!({})),
+                    vec![call("Expr.sum", json!({}))],
+                ),
+            }),
+        )
+    };
+    let aggregate = |walk: &Walk| expression_at(walk, &[parameter("aggregate_function")]).places();
+    let several = pivot(vec!["a", "b"]);
+    assert_eq!(aggregate(&several), vec![None, None]);
+    // One column is as before: a group of whole numbers, summed to one.
+    let one = pivot(vec!["a"]);
+    let places = aggregate(&one);
+    assert!(places.iter().all(Option::is_some), "{places:?}");
+}
+
+#[test]
 fn whether_a_literal_of_no_dtype_may_end_a_predicate_is_not_known() {
     // `lit(1)` is whatever the other operand makes it: it may be a Boolean.
     let walk = walk_of(
