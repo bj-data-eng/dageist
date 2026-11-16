@@ -531,6 +531,34 @@ fn a_join_key_that_compares_nothing_of_a_column_with_a_null_is_not_refused() {
 }
 
 #[test]
+fn a_join_key_that_is_wholly_one_value_is_not_refused_for_a_null_it_compares() {
+    // An aggregate is the whole key, whatever is compared inside it.
+    let keys = [
+        chain(
+            call("polars.lit", json!({ "value": { "flag": null } })),
+            vec![compared(
+                "Expr.le",
+                field_then("b", vec![call("Expr.max", json!({}))]),
+            )],
+        ),
+        field_then(
+            "k",
+            vec![
+                compared(
+                    "Expr.gt",
+                    field_then("a", vec![compared("Expr.eq", null())]),
+                ),
+                call("Expr.first", json!({})),
+                compared("Expr.gt", null()),
+            ],
+        ),
+    ];
+    for (at, key) in keys.into_iter().enumerate() {
+        assert_eq!(joined_on(key), None, "key {at}");
+    }
+}
+
+#[test]
 fn the_values_of_a_condition_need_be_boolean_in_a_filter_only_where_it_ends_the_predicate() {
     let condition = |links: Vec<Value>| {
         let mut all = vec![
