@@ -1428,16 +1428,66 @@ mod tests {
     }
 
     #[test]
-    fn a_rule_refusing_an_expression_that_starts_from_a_literal_is_excused_and_a_column_is_not() {
-        let rule = "condition-predicate-is-boolean";
-        let from_a_literal = select(vec![chain(literal(), &["Expr.cum_sum"])]);
+    fn a_rule_refusing_a_whole_key_is_excused_by_no_limit_that_does_not_name_it() {
+        // `true.first() <= (null != true) > b` and the same from a column: the
+        // rule that a join's key is elementwise is refused for what the key holds,
+        // which no literal start, null comparison or aggregate in it explains.
+        let key = |start: Call| {
+            chain_of(
+                start,
+                vec![
+                    call("Expr.first", Vec::new()),
+                    compared_with(
+                        "Expr.le",
+                        chain_of(
+                            null(),
+                            vec![compared_with("Expr.ne", chain(literal(), &[]))],
+                        ),
+                    ),
+                    compared_with("Expr.gt", chain(column("b"), &[])),
+                ],
+            )
+        };
+        let rule = "key-is-elementwise";
+        for start in [literal(), column("f")] {
+            let case = join(key(start), chain(column("rf"), &[]));
+            let place = at(&[parameter("left_on"), Segment::Item(0)]);
+            assert_eq!(rule_refuses(&case, place, rule, "a rule"), vec![]);
+        }
+    }
+
+    #[test]
+    fn a_rule_refusing_an_expression_that_starts_from_a_literal_is_excused_by_no_literal() {
+        // A literal start is no cause of a rule's refusal of the whole item.
         let item = at(&[parameter("exprs"), Segment::Item(0)]);
+        for rule in [
+            "condition-predicate-is-boolean",
+            "filter-predicate-is-boolean",
+        ] {
+            let from_a_literal = select(vec![chain(literal(), &["Expr.cum_sum"])]);
+            assert_eq!(
+                rule_refuses(&from_a_literal, item.clone(), rule, "a rule"),
+                vec![]
+            );
+        }
+        // What a null comparison reaches is a cause of a predicate rule only.
+        let folded = select(vec![chain_of(
+            column("a"),
+            vec![compared_with("Expr.eq", chain(null(), &[]))],
+        )]);
         assert_eq!(
-            rule_refuses(&from_a_literal, item.clone(), rule, "a rule"),
+            rule_refuses(
+                &folded,
+                item.clone(),
+                "condition-predicate-is-boolean",
+                "a rule"
+            ),
             vec![Limit::ALiteral]
         );
-        let from_a_column = select(vec![chain(column("a"), &["Expr.cum_sum"])]);
-        assert_eq!(rule_refuses(&from_a_column, item, rule, "a rule"), vec![]);
+        assert_eq!(
+            rule_refuses(&folded, item, "key-is-elementwise", "a rule"),
+            vec![]
+        );
     }
 
     #[test]
@@ -1813,6 +1863,40 @@ mod tests {
         assert_eq!(
             polars_refuses(&case, Some(step_place()), Stage::Schema, "no", Vec::new()),
             vec![]
+        );
+    }
+
+    #[test]
+    fn a_null_comparison_in_one_key_does_not_excuse_what_another_key_may_have_caused() {
+        let reason = "all join key expressions must be elementwise.";
+        let compared = chain_of(
+            column("f"),
+            vec![compared_with("Expr.gt", chain(null(), &[]))],
+        );
+        // The other key holds a running value, an aggregate or a window, any of
+        // which may be why Polars refuses the join.
+        for other in [
+            chain(column("rb"), &["Expr.cum_max"]),
+            chain(column("rb"), &["Expr.sum"]),
+        ] {
+            let case = case_of(call(
+                "LazyFrame.join",
+                vec![
+                    ("other", Value::Table("other".to_owned())),
+                    ("left_on", many(vec![compared.clone(), other])),
+                    ("right_on", many(vec![chain(column("rk"), &[]); 2])),
+                ],
+            ));
+            assert_eq!(
+                polars_refuses(&case, Some(step_place()), Stage::Schema, reason, Vec::new()),
+                vec![]
+            );
+        }
+        // With the other key plain it is excused.
+        let case = join(compared, chain(column("key"), &[]));
+        assert_eq!(
+            polars_refuses(&case, Some(step_place()), Stage::Schema, reason, Vec::new()),
+            vec![Limit::ANullComparisonInAKey]
         );
     }
 
