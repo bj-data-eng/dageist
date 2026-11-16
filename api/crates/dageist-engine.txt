@@ -131,6 +131,7 @@ pub const fn dageist_engine::allowed::Allowance::result(&self) -> core::option::
 pub const fn dageist_engine::allowed::Allowance::shape(&self) -> dageist_engine::allowed::Shape
 pub struct dageist_engine::allowed::Chosen<'a>
 impl<'a> dageist_engine::allowed::Chosen<'a>
+pub const fn dageist_engine::allowed::Chosen<'a>::giving(self, dtype: dageist_engine::allowed::Representative) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_arguments(self, arguments: &'a [(&'a str, dageist_engine::allowed::Representative)]) -> Self
 pub struct dageist_engine::allowed::Context
 impl dageist_engine::allowed::Context

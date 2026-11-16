@@ -314,6 +314,94 @@ fn a_predicate_inside_the_value_of_a_condition_must_be_boolean() {
     );
 }
 
+/// What is offered at `place` for the entry `id` that gives `dtype`, by what
+/// the call decides.
+fn giving(id: &str, place: &Place, dtype: Representative) -> Verdict {
+    offer(entry(id), place, &Chosen::default().giving(dtype))
+}
+
+#[test]
+fn a_start_given_the_dtype_of_its_column_gives_it() {
+    let start = Place::new(Context::step(Outer::Select), After::Start);
+    let unknown = verdict("polars.col", &start, &[]);
+    assert_eq!(result_of(&unknown), None);
+    for dtype in [Representative::Int64, Representative::Datetime] {
+        let given = giving("polars.col", &start, dtype);
+        assert_eq!(result_of(&given), Some(dtype.name()), "{given:?}");
+        assert_eq!(given.allowance().expect("offered").shape(), Shape::Many);
+    }
+    // A literal is one value.
+    let literal = giving("polars.lit", &start, Representative::Int8);
+    assert_eq!(result_of(&literal), Some("Int8"), "{literal:?}");
+    assert_eq!(literal.allowance().expect("offered").shape(), Shape::One);
+}
+
+#[test]
+fn a_column_that_is_not_boolean_cannot_end_a_filters_predicate() {
+    let start = Place::new(Context::step(Outer::Filter), After::Start);
+    let number = giving("polars.col", &start, Representative::Int64);
+    let refusal = number
+        .allowance()
+        .expect("offered, to be continued")
+        .can_end()
+        .refusal()
+        .expect("a whole number is no predicate");
+    assert_eq!(
+        refusal.source(),
+        RefusalSource::Rule(Rule::FilterPredicateIsBoolean)
+    );
+    let boolean = giving("polars.col", &start, Representative::Boolean);
+    assert!(boolean.allowance().expect("offered").can_end().is_allowed());
+}
+
+#[test]
+fn a_literal_of_text_cannot_end_a_conditions_predicate() {
+    let start = Place::new(
+        Context::inside(Outer::Select, Nested::ConditionPredicate),
+        After::Start,
+    );
+    let text = giving("polars.lit", &start, Representative::String);
+    let refusal = text
+        .allowance()
+        .expect("offered, to be continued")
+        .can_end()
+        .refusal()
+        .expect("text is no condition");
+    assert_eq!(
+        refusal.source(),
+        RefusalSource::Rule(Rule::ConditionPredicateIsBoolean)
+    );
+}
+
+#[test]
+fn the_values_of_a_condition_that_ends_in_otherwise_give_the_dtype_it_is_told() {
+    let ended = Place::new(
+        Context::step(Outer::Filter),
+        After::Condition(ConditionState::Then),
+    );
+    let number = giving("Then.otherwise", &ended, Representative::Int64);
+    assert_eq!(result_of(&number), Some("Int64"), "{number:?}");
+    let refusal = number
+        .allowance()
+        .expect("offered")
+        .can_end()
+        .refusal()
+        .expect("a whole number is no predicate");
+    assert_eq!(
+        refusal.source(),
+        RefusalSource::Rule(Rule::FilterPredicateIsBoolean)
+    );
+    let boolean = giving("Then.otherwise", &ended, Representative::Boolean);
+    assert!(boolean.allowance().expect("offered").can_end().is_allowed());
+}
+
+#[test]
+fn a_method_gives_what_the_tables_say_whatever_it_is_told() {
+    let place = select_after(Representative::Int64);
+    let told = giving("Expr.cum_sum", &place, Representative::String);
+    assert_eq!(result_of(&told), Some("Int64"), "{told:?}");
+}
+
 #[test]
 fn a_condition_predicate_that_is_not_boolean_cannot_end_the_predicate() {
     let predicate = |dtype| {

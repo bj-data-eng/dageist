@@ -65,13 +65,15 @@ impl ConditionState {
 
 /// What has been chosen for a call of an entry, so far as it decides what the
 /// entry gives: the dtypes of the arguments given to its expression
-/// parameters.
+/// parameters, and the dtype of the value an entry makes that the tables
+/// cannot give.
 ///
 /// Nothing chosen is the [`Default`]: an entry that takes an expression it needs is
 /// then judged for any dtype of argument that fits.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Chosen<'a> {
     arguments: &'a [(&'a str, Representative)],
+    gives: Option<Representative>,
 }
 
 impl<'a> Chosen<'a> {
@@ -80,6 +82,16 @@ impl<'a> Chosen<'a> {
     #[must_use]
     pub const fn with_arguments(mut self, arguments: &'a [(&'a str, Representative)]) -> Self {
         self.arguments = arguments;
+        self
+    }
+
+    /// The dtype the entry gives, where the call decides it and the tables
+    /// cannot: the column `polars.col` reads, the literal `polars.lit` makes
+    /// when it is given a dtype, the values of a condition that `otherwise`
+    /// ends. The tables give what a method gives, so a method ignores it.
+    #[must_use]
+    pub const fn giving(mut self, dtype: Representative) -> Self {
+        self.gives = Some(dtype);
         self
     }
 }
@@ -509,6 +521,12 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     if let (After::Value { dtype, .. }, true) = (place.after, is_method(entry)) {
         let fit = on_receiver(entry, dtype, chosen.arguments)?;
         (result, shape) = (fit.result, fit.shape);
+    }
+    // What the call says of what it gives, where the tables do not.
+    if result.is_none() && !is_method(entry) {
+        result = chosen
+            .gives
+            .map(|dtype| ResultDtype::from_name(dtype.name()));
     }
     // What the context table says of the entry where it stands.
     // The entry stands there when the chain may go on from it: what Polars
