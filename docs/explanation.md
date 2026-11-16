@@ -203,9 +203,14 @@ it on an in-memory working window. Polars' own message is the reason when
 Polars refuses. Some mistakes, such as `dt.date` on a String column, are only
 found when rows are read, not from the schema; the editor learns them in
 advance from the [tables of allowed combinations](#which-combinations-polars-allows).
-The runner asks the same tables and rules for the two facts it needs about
-where an expression stands: which table a join's `right_on` is read against,
-and where `element` may start a chain.
+The runner asks the named rules beside those tables, and not the tables, for
+where an expression may start: `element` starts a chain only in a pivot's
+aggregate. A row of the context table was measured with the chain ending at one
+entry, with one argument, such as a bare `element()` or an untyped `lit(1)`, so
+it cannot judge a start that other arguments or more links follow. Polars decides
+the rest as the step is built, and when it refuses a pivot because of a column in
+its aggregate, it refuses the step, not the expression. The context table also
+says which table a join's `right_on` is read against.
 
 ## Which Combinations Polars Allows
 
@@ -230,7 +235,7 @@ for the three rows or `many`.
 | Table | One line for |
 | --- | --- |
 | `dtypes.txt` | A method of an expression on a receiver of each of the representative dtypes, and for each of its expression parameters, with an argument of each of them. Parameters are varied one at a time, the others at a fitting default. |
-| `contexts.txt` | An entry in each context: a position that holds an expression, or such a position inside an expression that stands in one. |
+| `contexts.txt` | An entry in each context: a position that holds an expression, or such a position inside an expression that stands in one. Two lines for each, one for the chain going on from the entry and one for the chain ending at it. |
 | `options.txt` | An entry with each pair of values of its options, the flags and the words of a choice; with one value of its option when it has only one. |
 
 The representative dtypes are every integer and float width, `String`,
@@ -244,6 +249,20 @@ judged by its first two.
 A join's `right_on` is evaluated against the other table, whose columns are
 named differently from the left table's, so a column of the wrong table is
 found missing. A pivot's aggregate starts from `element()`.
+
+Whether an entry may stand at a place is not whether it may end an expression
+there, so the context table measures each entry in each context twice. On the
+line of `continues`, the chain goes on from the entry with a neutral
+continuation that the context needs, and the line says whether the entry may
+stand there at all: `.is_not_null()` where a `Boolean` is required (a filter's
+predicate, what a condition gives in a filter, a condition's predicate), a cast
+to the dtype of the other table's key for the whole expression in a join key,
+and `.first()` for the whole expression in a pivot's aggregate; nothing where
+the context needs nothing. A window in a join key, or in a pivot's aggregate,
+is refused however it goes on. On the line of `ends`, the chain ends at the
+entry as it is, and the line says whether the entry may end an expression
+there: a sum may stand in a filter's predicate, followed by a comparison, though
+it may not end it.
 
 Every call is built through the catalogue's own build functions and run on
 fixed sample tables, by an engine test that checks the committed files are
@@ -261,6 +280,7 @@ and referenced from the lines of the context table they govern:
 | --- | --- |
 | `pivot-aggregate-gives-one-value` | A pivot's aggregate gives one value for each group. Polars lets a running sum stand there. |
 | `condition-predicate-is-boolean` | A condition's predicate is a `Boolean`. Polars finds a whole number there only when rows run. |
+| `filter-predicate-is-boolean` | A filter's predicate is a `Boolean`, and so is what a condition in it gives. Polars refuses a chain that ends in anything else, but a method that is not a `Boolean` may stand partway through one. |
 | `element-only-in-pivot-aggregate` | `polars.element` stands only in a pivot's aggregate. Polars refuses it elsewhere, but as a panic when the table is sorted. |
 
 `dageist_engine::allowed::offers` answers which entries may stand at a place,
@@ -271,9 +291,15 @@ expression parameters, and `options` for a set of options. They read the
 committed files, embedded in the engine, and the rules, and never run Polars.
 Each refusal says who refused it, Polars at a stage or a rule or the shape of
 an expression, and gives the reason. A rule that forbids an entry here
-is applied first, so that its words explain the refusal. A rule about how a
-chain ends does not refuse an entry, which may be continued, but is reported
-by `Allowance::can_end`.
+is applied first, so that its words explain the refusal. An entry may stand at
+a place when the line of `continues` allows it, and a refusal of that line is a
+refusal to stand. A rule about how a chain ends, and the line of `ends`, do not
+refuse an entry, which may be continued, but are reported by
+`Allowance::can_end`: the rule first, so that its words explain the refusal,
+then Polars' reason. An end rule that is about a dtype refuses a dtype known
+not to fit, and does not refuse one that is not known: a start takes the dtype
+of a column, and some methods give a dtype that their argument decides, so the
+result is unknown until it is chosen, and it does not break the rule.
 
 The tables hold what they were measured on. A method's context was measured on
 the receiver that fits it best, so a table cannot say that a predicate must be

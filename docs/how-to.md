@@ -297,13 +297,20 @@ cargo test --offline --locked -p dageist-engine
 Never edit the files by hand. Read the diff and explain each changed line from
 its source: a line that was allowed and is refused, or was refused at the
 schema and now only at the rows, is a change of what the editor may offer; a
-changed reason with the same outcome is Polars rewording. The header of each
-file names the commit of `vendor/polars` it was made with, and the counts of
-allowed and refused combinations by stage. A refresh is reviewed with the
-change that caused it.
+changed reason with the same outcome is Polars rewording. Each context has a
+line for the chain that continues and one for the chain that ends, and a
+refresh shows them apart: a line that continues and is now allowed is an entry
+that may stand where it was refused, and one that ends and is refused is an
+entry that may not end an expression there. The header of each file names the tag
+of the Python Polars release that `vendor/polars` is at, as `git describe`
+gives it there, and its commit, and the counts of allowed and refused
+combinations by stage. A refresh is reviewed with the change that caused it.
 
 A named rule is in `crates/dageist-engine/src/allowed/rules.rs`. Adding one
 changes the `rules` column of the context table, so refresh the tables with it.
+A rule of how a chain ends, which is about a dtype, also says in
+`Rule::forbids_end` what it makes of a result whose dtype is not known: it does
+not refuse it.
 
 ## Check The Build Against The Polars Release
 
