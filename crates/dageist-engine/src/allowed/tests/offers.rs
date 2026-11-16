@@ -486,6 +486,97 @@ fn a_method_is_offered_with_the_options_chosen_and_refused_for_one_it_does_not_h
     assert_eq!(refusal.source(), RefusalSource::Structure);
 }
 
+/// What the method `id` gives after `receiver` at a `select` item, with the
+/// options `chosen` set.
+fn given_options(id: &str, receiver: Representative, chosen: &[(&str, &str)]) -> Option<String> {
+    let verdict = offer(
+        entry(id),
+        &select_after(receiver),
+        &Chosen::default().with_options(chosen),
+    );
+    verdict
+        .allowance()
+        .unwrap_or_else(|| panic!("{id} after {receiver} is offered: {verdict:?}"))
+        .result()
+        .map(|result| result.name().to_owned())
+}
+
+#[test]
+fn a_window_that_joins_gives_a_list_and_the_other_strategies_what_it_follows() {
+    let over = |receiver, strategy| {
+        given_options("Expr.over", receiver, &[("mapping_strategy", strategy)])
+    };
+    assert_eq!(
+        over(Representative::Int64, "join").as_deref(),
+        Some("List(Int64)")
+    );
+    for strategy in ["group_to_rows", "explode"] {
+        assert_eq!(
+            over(Representative::Int64, strategy).as_deref(),
+            Some("Int64"),
+            "{strategy}"
+        );
+    }
+    // The option table was measured on a whole number, and a list of what it
+    // follows is what a window that joins gives after any dtype.
+    assert_eq!(
+        over(Representative::String, "join").as_deref(),
+        Some("List(String)")
+    );
+    assert_eq!(
+        over(Representative::String, "group_to_rows").as_deref(),
+        Some("String")
+    );
+}
+
+#[test]
+fn an_option_set_to_its_default_is_not_a_choice() {
+    let chosen = [
+        ("descending", "false"),
+        ("nulls_last", "false"),
+        ("mapping_strategy", "join"),
+    ];
+    assert_eq!(
+        given_options("Expr.over", Representative::Int64, &chosen).as_deref(),
+        Some("List(Int64)")
+    );
+}
+
+#[test]
+fn options_whose_lines_give_different_results_leave_the_result_unknown() {
+    // Each of the three pairs is measured: the two flags together give what
+    // `over` follows, and each with a window that joins gives a list.
+    let chosen = [
+        ("descending", "true"),
+        ("nulls_last", "true"),
+        ("mapping_strategy", "join"),
+    ];
+    assert_eq!(
+        given_options("Expr.over", Representative::Int64, &chosen),
+        None
+    );
+}
+
+#[test]
+fn a_duration_in_fractional_days_is_a_float() {
+    let days = |fractional| {
+        given_options(
+            "Expr.dt.total_days",
+            Representative::Duration,
+            &[("fractional", fractional)],
+        )
+    };
+    assert_eq!(days("true").as_deref(), Some("Float64"));
+    assert_eq!(days("false").as_deref(), Some("Int64"));
+}
+
+#[test]
+fn an_option_that_does_not_change_the_result_leaves_what_the_method_gives() {
+    let first = |receiver| given_options("Expr.first", receiver, &[("ignore_nulls", "true")]);
+    assert_eq!(first(Representative::Int64).as_deref(), Some("Int64"));
+    assert_eq!(first(Representative::String).as_deref(), Some("String"));
+}
+
 #[test]
 fn a_method_gives_what_the_tables_say_whatever_it_is_told() {
     let place = select_after(Representative::Int64);
