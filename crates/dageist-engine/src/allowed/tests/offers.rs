@@ -558,3 +558,27 @@ fn the_methods_that_may_stand_in_a_filter_predicate_are_offered_in_the_values_of
         assert!(offered.is_allowed(), "{id} after {receiver}: {offered:?}");
     }
 }
+
+#[test]
+fn a_fill_value_decides_what_a_shift_gives() {
+    // Polars, by hand: a column of whole numbers shifted and filled with text
+    // is text, not the whole numbers it was.
+    assert_eq!(
+        selected(
+            Representative::UInt32,
+            Representative::String,
+            col("a").shift_and_fill(lit(1), lit(1).cast(DataType::String)),
+        ),
+        Seen::Ran(DataType::String)
+    );
+    let place = select_after(Representative::UInt32);
+    let filled = verdict(
+        "Expr.shift",
+        &place,
+        &[("fill_value", Representative::String)],
+    );
+    assert_eq!(result_of(&filled), Some("String"), "{filled:?}");
+    // With nothing to fill with, the shift gives what it shifts.
+    let plain = verdict("Expr.shift", &place, &[]);
+    assert_eq!(result_of(&plain), Some("UInt32"), "{plain:?}");
+}
