@@ -727,8 +727,65 @@ fn unplaced(refusal: &Refusal) -> bool {
         .is_none_or(|place| place.path().is_empty())
 }
 
+/// Whether a sort key, or the key of a window, that is wholly one value, holds
+/// the place: Polars drops it, and what the tables refuse in it with it.
+fn dropped_as_one_value(case: &Case, locus: &Locus) -> bool {
+    let step = case.document.steps()[0].call();
+    let keys = keys(case, false);
+    (is(step, "LazyFrame.sort")
+        && locus
+            .top
+            .is_some_and(|top| wholly_single(top, top.links().len(), true)))
+        || locus.inside.iter().any(|holder| {
+            keys.iter().any(|key| std::ptr::eq(*key, *holder))
+                && wholly_single(holder, holder.links().len(), true)
+        })
+}
+
+/// Whether a comparison with a null literal reaches the place: what it follows,
+/// its own arguments, and the calls from it on.
+fn folded_by_a_null(locus: &Locus) -> bool {
+    locus
+        .inside
+        .iter()
+        .zip(&locus.reach)
+        .any(|(holder, reach)| reached_by_a_null(holder, *reach))
+}
+
+/// Whether the limit is why Polars allows what the named rule refuses. A limit
+/// excuses a rule only for a cause it names, and the evidence for each is a
+/// campaign case: a later predicate of a condition runs on the rows left to it,
+/// which Polars finds when it runs rows; a sort key that is one value is dropped;
+/// and what a comparison with a null follows is not evaluated.
+fn applies_to_a_rule(limit: Limit, rule: &str, case: &Case, refused: &Refused) -> bool {
+    let predicate_rule = matches!(
+        rule,
+        "condition-predicate-is-boolean" | "filter-predicate-is-boolean"
+    );
+    let locus = locate(case, &refused.place);
+    match limit {
+        Limit::AValueThatRunsOnNoRows => {
+            rule == "condition-predicate-is-boolean"
+                && locus
+                    .in_values
+                    .iter()
+                    .any(|condition| !is_decided(condition))
+        }
+        Limit::AnAggregateGivesOneValue => predicate_rule && dropped_as_one_value(case, &locus),
+        Limit::ALiteral => predicate_rule && folded_by_a_null(&locus),
+        _ => false,
+    }
+}
+
 /// Whether the limit is why the tables and Polars disagree.
 fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
+    // A rule is refused for a cause of its own, which only the limit that names
+    // it can explain.
+    if let Disagreement::PolarsAllows(refused) = disagreement
+        && let Source::Rule(rule) = refused.source
+    {
+        return applies_to_a_rule(limit, rule, case, refused);
+    }
     let step = case.document.steps()[0].call();
     let pivot = is(step, "LazyFrame.pivot");
     let held = operands(step);
@@ -766,11 +823,7 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
             });
             // A comparison with a null literal is null, and Polars does not
             // evaluate what it follows or what it is given.
-            let folded = locus
-                .inside
-                .iter()
-                .zip(&locus.reach)
-                .any(|(holder, reach)| reached_by_a_null(holder, *reach));
+            let folded = folded_by_a_null(&locus);
             // What a call that follows a literal is given, at any depth, is met by
             // one value, which Polars broadcasts: a comparison of a literal with
             // what the tables refuse when they run rows is not refused.
@@ -794,15 +847,7 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
                     .is_some_and(|at| at > 0 && wholly_single(chain, at, false))
             });
             // A sort key that is one value is dropped, and so is a window's.
-            let keys = keys(case, false);
-            let dropped = (is(step, "LazyFrame.sort")
-                && locus
-                    .top
-                    .is_some_and(|top| wholly_single(top, top.links().len(), true)))
-                || locus.inside.iter().any(|holder| {
-                    keys.iter().any(|key| std::ptr::eq(*key, *holder))
-                        && wholly_single(holder, holder.links().len(), true)
-                });
+            let dropped = dropped_as_one_value(case, &locus);
             // `len` does not read what it counts.
             let counted = locus
                 .inside
@@ -843,9 +888,28 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
             is(step, "LazyFrame.join")
                 && unplaced(refusal)
                 && refusal.reason.contains("elementwise")
-                && keys(case, true)
-                    .iter()
-                    .any(|key| holds_a_null_comparison(key))
+                && {
+                    // Another key may be why Polars refuses the join: one that
+                    // holds a running value, an aggregate or a window.
+                    let keys = keys(case, true);
+                    let other_cause = |key: &Expression| {
+                        any_call(key, &|call| {
+                            is_one_value(call)
+                                || matches!(
+                                    call.entry().id().as_str(),
+                                    "Expr.over"
+                                        | "Expr.cum_sum"
+                                        | "Expr.cum_max"
+                                        | "Expr.cum_count"
+                                )
+                        })
+                    };
+                    keys.iter().any(|key| holds_a_null_comparison(key))
+                        && keys
+                            .iter()
+                            .filter(|key| !holds_a_null_comparison(key))
+                            .all(|key| !other_cause(key))
+                }
         }
         (Limit::ASingleValueInAKey, Disagreement::PolarsAllows(refused)) => {
             // The key the tables refused is wholly one value.
@@ -891,10 +955,7 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
         (Limit::AValueThatRunsOnNoRows, Disagreement::PolarsAllows(refused)) => {
             // Only what the tables refused when it ran rows. A condition that is
             // decided has dropped its other branches, which is its own cause.
-            // A rule that a condition's predicate is a `Boolean` is what Polars
-            // finds when it runs rows.
-            (refused.stage == Some(TableStage::Rows)
-                || refused.source == Source::Rule("condition-predicate-is-boolean"))
+            refused.stage == Some(TableStage::Rows)
                 && locate(case, &refused.place)
                     .in_values
                     .iter()
