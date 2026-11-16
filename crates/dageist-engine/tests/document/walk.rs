@@ -308,7 +308,108 @@ fn whether_a_literal_of_no_dtype_may_end_a_predicate_is_not_known() {
 }
 
 #[test]
-fn a_window_key_that_holds_a_single_value_beside_a_column_is_refused_by_a_rule() {
+fn a_window_key_that_holds_a_single_value_beside_a_column_is_not_refused() {
+    // Polars accepts the key of a window that is not elementwise, where the
+    // window stands in a select, a with_columns or a filter.
+    let mixed = || {
+        field_then(
+            "k",
+            vec![call(
+                "Expr.sub",
+                json!({ "other": field_then("a", vec![call("Expr.sum", json!({}))]) }),
+            )],
+        )
+    };
+    let window = |partition: Value| {
+        field_then(
+            "a",
+            vec![call(
+                "Expr.over",
+                json!({ "partition_by": many(vec![partition]) }),
+            )],
+        )
+    };
+    for (entry, parameter) in [
+        ("LazyFrame.select", "exprs"),
+        ("LazyFrame.with_columns", "exprs"),
+    ] {
+        let walk = walk_of(entry, json!({ parameter: many(vec![window(mixed())]) }));
+        assert_eq!(walk.refusal(), None, "{entry}");
+    }
+    let boolean = field_then(
+        "f",
+        vec![call(
+            "Expr.over",
+            json!({ "partition_by": many(vec![mixed()]) }),
+        )],
+    );
+    let walk = walk_of(
+        "LazyFrame.filter",
+        json!({ "predicates": many(vec![boolean]) }),
+    );
+    assert_eq!(walk.refusal(), None);
+}
+
+#[test]
+fn a_join_key_that_holds_a_null_beside_a_column_is_not_refused() {
+    // Polars allows it: only an aggregate beside a column is not elementwise.
+    let key = field_then(
+        "k",
+        vec![call(
+            "Expr.sub",
+            json!({ "other": chain(
+                call("polars.lit", json!({ "value": { "flag": null } })),
+                vec![],
+            ) }),
+        )],
+    );
+    let walk = walk_of(
+        "LazyFrame.join",
+        json!({
+            "other": { "table": "other" },
+            "left_on": many(vec![key]),
+            "right_on": many(vec![field("rk")]),
+        }),
+    );
+    assert_eq!(walk.refusal(), None);
+}
+
+#[test]
+fn the_values_of_a_condition_need_be_boolean_in_a_filter_only_where_it_ends_the_predicate() {
+    let condition = |links: Vec<Value>| {
+        let mut all = vec![
+            call("When.then", json!({ "statement": field("b") })),
+            call("Then.otherwise", json!({ "statement": field("b") })),
+        ];
+        all.extend(links);
+        chain(
+            call(
+                "polars.when",
+                json!({ "predicates": many(vec![field("f")]) }),
+            ),
+            all,
+        )
+    };
+    // Text is no predicate where the condition is the predicate.
+    let ends = walk_of(
+        "LazyFrame.filter",
+        json!({ "predicates": many(vec![condition(vec![])]) }),
+    );
+    let refusal = ends.refusal().expect("text is no predicate");
+    assert_eq!(
+        refusal.refusal().source(),
+        RefusalSource::Rule(Rule::FilterPredicateIsBoolean)
+    );
+    // A test for a null goes on from it, and gives the Boolean.
+    let goes_on = walk_of(
+        "LazyFrame.filter",
+        json!({ "predicates": many(vec![condition(vec![call("Expr.is_null", json!({}))])]) }),
+    );
+    assert_eq!(goes_on.refusal(), None);
+}
+
+#[test]
+fn a_join_key_that_holds_a_single_value_beside_a_column_is_refused_by_a_rule() {
     let key = field_then(
         "k",
         vec![call(
@@ -317,39 +418,29 @@ fn a_window_key_that_holds_a_single_value_beside_a_column_is_refused_by_a_rule()
         )],
     );
     let walk = walk_of(
-        "LazyFrame.select",
-        json!({ "exprs": many(vec![field_then(
-            "a",
-            vec![call("Expr.over", json!({ "partition_by": many(vec![key]) }))],
-        )]) }),
+        "LazyFrame.join",
+        json!({
+            "other": { "table": "other" },
+            "left_on": many(vec![key]),
+            "right_on": many(vec![field("rk")]),
+        }),
     );
     let refusal = walk.refusal().expect("a key that is not elementwise");
     assert_eq!(
         refusal.refusal().source(),
         RefusalSource::Rule(Rule::KeyIsElementwise)
     );
-    assert_eq!(
-        refusal.place().path(),
-        [
-            parameter("exprs"),
-            Segment::Item(0),
-            Segment::Link(0),
-            parameter("partition_by"),
-            Segment::Item(0),
-        ]
-    );
+    assert_eq!(refusal.place().path(), item("left_on", 0).as_slice());
 
     // A key that is wholly one value is the whole key.
     let whole = field_then("k", vec![call("Expr.sum", json!({}))]);
     let accepted = walk_of(
-        "LazyFrame.select",
-        json!({ "exprs": many(vec![field_then(
-            "a",
-            vec![call(
-                "Expr.over",
-                json!({ "partition_by": many(vec![whole]) }),
-            )],
-        )]) }),
+        "LazyFrame.join",
+        json!({
+            "other": { "table": "other" },
+            "left_on": many(vec![whole]),
+            "right_on": many(vec![field("rk")]),
+        }),
     );
     assert_eq!(accepted.refusal(), None);
 }

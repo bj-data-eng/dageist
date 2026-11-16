@@ -171,12 +171,10 @@ fn a_window_is_refused_as_a_join_key_with_polars_reason() {
 }
 
 #[test]
-fn a_key_with_a_single_value_beside_a_column_is_refused_by_a_rule_where_a_key_stands() {
+fn a_key_with_a_single_value_beside_a_column_is_refused_by_a_rule_only_in_a_joins_own_keys() {
     for context in [
         Context::step(Outer::JoinLeft),
         Context::step(Outer::JoinRight),
-        Context::inside(Outer::Select, Nested::PartitionBy),
-        Context::inside(Outer::Filter, Nested::OrderBy),
     ] {
         let refusal = rule_forbids_mixed_key(context).expect_err("a key");
         assert_eq!(
@@ -185,8 +183,14 @@ fn a_key_with_a_single_value_beside_a_column_is_refused_by_a_rule_where_a_key_st
             "{context}"
         );
     }
-    // Where no key stands, a single value beside a column is nothing to refuse.
+    // Polars accepts a window whose key holds a single value beside a column,
+    // in every position that holds a window, and a sort key.
     for context in [
+        Context::inside(Outer::Select, Nested::PartitionBy),
+        Context::inside(Outer::Select, Nested::OrderBy),
+        Context::inside(Outer::Filter, Nested::PartitionBy),
+        Context::inside(Outer::Filter, Nested::OrderBy),
+        Context::inside(Outer::Sort, Nested::PartitionBy),
         Context::step(Outer::Select),
         Context::step(Outer::Sort),
         Context::inside(Outer::JoinLeft, Nested::ConditionValue),

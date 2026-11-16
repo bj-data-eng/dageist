@@ -17,6 +17,13 @@ use super::observe::{Observed, Seen, observe};
 use super::predict::{Prediction, Source, Verdict, predict};
 use super::reduce::candidates;
 
+/// The named rules that are stricter than Polars by design, each with why. A
+/// rule that refuses what Polars allows and is not here is a disagreement.
+const STRICTER_BY_DESIGN: [(&str, &str); 1] = [(
+    "pivot-aggregate-gives-one-value",
+    "a pivot's aggregate gives one value for each group, though Polars lets a running value stand",
+)];
+
 pub const TARGET: &str = "dageist-engine::allowed-combinations";
 pub const ALLOWANCE: &str = "dageist-engine::tables-predict-allowance";
 pub const DTYPES: &str = "dageist-engine::tables-predict-dtypes";
@@ -348,13 +355,25 @@ impl CaseTarget for AllowedTarget {
                 }
                 (Source::Rule(rule), true) => {
                     // A named rule is dageist's, and may be stricter than
-                    // Polars. It is a result of the target's own, not a
-                    // property of the tables.
+                    // Polars only where it is so by design, which is named.
+                    // Any other rule refusing what Polars allows is a
+                    // disagreement.
+                    let Some((_, why)) = STRICTER_BY_DESIGN.iter().find(|(name, _)| *name == rule)
+                    else {
+                        return failure(
+                            ALLOWANCE,
+                            &format!("rule-refuses-what-polars-allows-{rule}"),
+                            format!(
+                                "the rule {rule} refuses it at {}: {}; Polars allows it",
+                                refused.at, refused.reason
+                            ),
+                        );
+                    };
                     tally(format!("rule stricter than Polars: {rule}"));
                     return CaseOutcome::expected_rejection(
                         checked,
                         format!(
-                            "the rule {rule} refuses what Polars allows: {}",
+                            "the rule {rule} refuses what Polars allows, as {why}: {}",
                             refused.reason
                         ),
                     );
