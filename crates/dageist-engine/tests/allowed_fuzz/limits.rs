@@ -1461,51 +1461,6 @@ mod tests {
     }
 
     #[test]
-    fn a_rule_about_a_later_predicate_of_a_condition_is_excused_and_the_first_is_not() {
-        let condition = chain_of(
-            call(
-                "polars.when",
-                vec![("predicates", many(vec![chain(column("a"), &[])]))],
-            ),
-            vec![
-                call(
-                    "When.then",
-                    vec![("statement", Value::Expression(chain(column("k"), &[])))],
-                ),
-                call(
-                    "Then.when",
-                    vec![("predicates", many(vec![chain(column("b"), &[])]))],
-                ),
-                call(
-                    "ChainedWhen.then",
-                    vec![("statement", Value::Expression(chain(column("f"), &[])))],
-                ),
-            ],
-        );
-        let case = select(vec![condition]);
-        let rule = "condition-predicate-is-boolean";
-        let later = at(&[
-            parameter("exprs"),
-            Segment::Item(0),
-            Segment::Link(1),
-            parameter("predicates"),
-            Segment::Item(0),
-        ]);
-        assert_eq!(
-            rule_refuses(&case, later, rule, "a rule"),
-            vec![Limit::AValueThatRunsOnNoRows]
-        );
-        let first = at(&[
-            parameter("exprs"),
-            Segment::Item(0),
-            Segment::Start,
-            parameter("predicates"),
-            Segment::Item(0),
-        ]);
-        assert_eq!(rule_refuses(&case, first, rule, "a rule"), vec![]);
-    }
-
-    #[test]
     fn the_empty_table_of_a_pivot_is_excused_for_a_null_dtype_however_it_is_quoted() {
         let case = pivot(chain(column("a"), &["Expr.cum_sum"]));
         for reason in [
@@ -1521,6 +1476,269 @@ mod tests {
     }
 
     // ----- Rules that refuse what Polars allows
+
+    /// A bare literal true, false or null, as an expression.
+    fn boolean(value: Option<bool>) -> Expression {
+        chain(call("polars.lit", vec![("value", Value::Flag(value))]), &[])
+    }
+
+    fn when_of(predicates: Vec<Expression>) -> Call {
+        call("polars.when", vec![("predicates", many(predicates))])
+    }
+
+    fn then_of(value: Expression) -> Call {
+        call("When.then", vec![("statement", Value::Expression(value))])
+    }
+
+    fn otherwise_of(value: Expression) -> Call {
+        call(
+            "Then.otherwise",
+            vec![("statement", Value::Expression(value))],
+        )
+    }
+
+    fn also_when(predicates: Vec<Expression>) -> Call {
+        call("Then.when", vec![("predicates", many(predicates))])
+    }
+
+    /// The place of predicate `at` of the start of item 0.
+    fn start_predicate(at: usize) -> Place {
+        self::at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Start,
+            parameter("predicates"),
+            Segment::Item(at),
+        ])
+    }
+
+    /// What `f` is compared with: `f`, or `f.min() > null`, which folds into a
+    /// null.
+    fn operand(folds: bool) -> Expression {
+        if folds {
+            chain_of(
+                column("f"),
+                vec![
+                    call("Expr.min", Vec::new()),
+                    compared_with("Expr.gt", chain(null(), &[])),
+                ],
+            )
+        } else {
+            chain(column("f"), &[])
+        }
+    }
+
+    const BOOLEAN_RULE: &str = "condition-predicate-is-boolean";
+
+    #[test]
+    fn a_fold_that_drops_the_predicate_is_the_cause_and_its_absence_is_not() {
+        // `when(g).then(g).first() == operand`: Polars refuses the text `g`
+        // unless the operand folds into a null, and then never evaluates what the
+        // comparison follows. The same holds with a decided predicate beside `g`,
+        // one-valued branches, and a `len`, none of which is the cause.
+        let g = || chain(column("g"), &[]);
+        let cases: Vec<(Vec<Call>, Vec<Expression>)> = vec![
+            // The condition of the reviewed case: `g` is its only predicate.
+            (
+                vec![then_of(g()), call("Expr.first", Vec::new())],
+                vec![g()],
+            ),
+            // A literal true decides it, and `g` is the second predicate.
+            (
+                vec![then_of(g()), call("Expr.first", Vec::new())],
+                vec![g(), boolean(Some(true))],
+            ),
+            // Branches that are one expression.
+            (
+                vec![
+                    then_of(chain(column("f"), &[])),
+                    otherwise_of(chain(column("f"), &[])),
+                    call("Expr.first", Vec::new()),
+                ],
+                vec![g()],
+            ),
+            // A `len` follows the predicate.
+            (
+                vec![
+                    then_of(chain(column("f"), &[])),
+                    call("Expr.len", Vec::new()),
+                ],
+                vec![g()],
+            ),
+        ];
+        for (at, (links, predicates)) in cases.into_iter().enumerate() {
+            let item = |folds: bool| {
+                let mut all = links.clone();
+                all.push(compared_with("Expr.eq", operand(folds)));
+                select(vec![chain_of(when_of(predicates.clone()), all)])
+            };
+            assert_eq!(
+                rule_refuses(&item(true), start_predicate(0), BOOLEAN_RULE, "a rule"),
+                vec![Limit::ALiteral],
+                "{at}: the fold drops it"
+            );
+            assert_eq!(
+                rule_refuses(&item(false), start_predicate(0), BOOLEAN_RULE, "a rule"),
+                vec![],
+                "{at}: nothing drops it"
+            );
+        }
+    }
+
+    #[test]
+    fn a_decided_condition_and_a_len_together_excuse_a_later_predicate_and_neither_alone_does() {
+        // `when(lit).then(1).when(g).then(2).otherwise(3).len()`: Polars allows
+        // the text `g` only for a decided condition that a `len` follows.
+        let value = |at: i64| chain(literal_of(at), &[]);
+        let item = |decided: Option<bool>, len: bool| {
+            let predicate = match decided {
+                Some(value) => boolean(Some(value)),
+                None => chain(column("k"), &[]),
+            };
+            let mut links = vec![
+                then_of(value(1)),
+                also_when(vec![chain(column("g"), &[])]),
+                call(
+                    "ChainedWhen.then",
+                    vec![("statement", Value::Expression(value(2)))],
+                ),
+                call(
+                    "ChainedThen.otherwise",
+                    vec![("statement", Value::Expression(value(3)))],
+                ),
+            ];
+            if len {
+                links.push(call("Expr.len", Vec::new()));
+            }
+            select(vec![chain_of(when_of(vec![predicate]), links)])
+        };
+        let later = at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Link(1),
+            parameter("predicates"),
+            Segment::Item(0),
+        ]);
+        for decided in [Some(true), Some(false), None] {
+            let case = item(decided, true);
+            let found = rule_refuses(&case, later.clone(), BOOLEAN_RULE, "a rule");
+            if decided.is_some() {
+                assert_eq!(found, vec![Limit::AnAggregateGivesOneValue], "{decided:?}");
+            } else {
+                assert_eq!(found, vec![], "{decided:?}: no decision");
+            }
+        }
+        // Decided and no `len`.
+        assert_eq!(
+            rule_refuses(&item(Some(true), false), later, BOOLEAN_RULE, "a rule"),
+            vec![]
+        );
+    }
+
+    /// A whole number of the dtype of `literal`, as a literal call.
+    fn literal_of(value: i64) -> Call {
+        call("polars.lit", vec![("value", Value::Integer(value))])
+    }
+
+    #[test]
+    fn a_predicate_rule_is_excused_by_neither_a_decided_condition_nor_branches_that_are_one() {
+        // Polars refuses the text `g` as a predicate of a condition that a literal
+        // decides, and of one whose values are one expression, and in a value or a
+        // later predicate that no row reaches.
+        let g = || chain(column("g"), &[]);
+        let one = || chain(literal_of(1), &[]);
+        let two = || chain(literal_of(2), &[]);
+        let decided = select(vec![chain_of(
+            when_of(vec![boolean(Some(true))]),
+            vec![
+                then_of(chain_of(
+                    when_of(vec![g()]),
+                    vec![then_of(one()), otherwise_of(two())],
+                )),
+                otherwise_of(one()),
+            ],
+        )]);
+        let inner_predicate = at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Link(0),
+            parameter("statement"),
+            Segment::Start,
+            parameter("predicates"),
+            Segment::Item(0),
+        ]);
+        assert_eq!(
+            rule_refuses(&decided, inner_predicate.clone(), BOOLEAN_RULE, "a rule"),
+            vec![]
+        );
+        // Values that are one expression.
+        let branches = select(vec![chain_of(
+            when_of(vec![g()]),
+            vec![then_of(one()), otherwise_of(one())],
+        )]);
+        assert_eq!(
+            rule_refuses(&branches, start_predicate(0), BOOLEAN_RULE, "a rule"),
+            vec![]
+        );
+        // A value that a row selected by another predicate reaches, and a later
+        // predicate.
+        let later = select(vec![chain_of(
+            when_of(vec![chain_of(
+                column("k"),
+                vec![compared_with("Expr.gt", chain(literal_of(5), &[]))],
+            )]),
+            vec![
+                then_of(chain_of(
+                    when_of(vec![g()]),
+                    vec![then_of(one()), otherwise_of(two())],
+                )),
+                otherwise_of(one()),
+            ],
+        )]);
+        assert_eq!(
+            rule_refuses(&later, inner_predicate, BOOLEAN_RULE, "a rule"),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_rule_refusing_a_sort_key_that_is_one_value_or_a_literal_start_is_excused_by_nothing() {
+        let rule = "filter-predicate-is-boolean";
+        let key = chain(column("a"), &["Expr.cum_sum", "Expr.sum"]);
+        assert_eq!(
+            rule_refuses(
+                &sort(vec![key]),
+                at(&[parameter("by"), Segment::Item(0)]),
+                rule,
+                "a rule"
+            ),
+            vec![]
+        );
+        let from_a_literal = select(vec![chain(literal(), &["Expr.cum_sum"])]);
+        assert_eq!(
+            rule_refuses(
+                &from_a_literal,
+                at(&[parameter("exprs"), Segment::Item(0)]),
+                BOOLEAN_RULE,
+                "a rule"
+            ),
+            vec![]
+        );
+        // The item that holds a comparison with a null is not what it drops.
+        let folded = select(vec![chain_of(
+            column("a"),
+            vec![compared_with("Expr.eq", chain(null(), &[]))],
+        )]);
+        assert_eq!(
+            rule_refuses(
+                &folded,
+                at(&[parameter("exprs"), Segment::Item(0)]),
+                BOOLEAN_RULE,
+                "a rule"
+            ),
+            vec![]
+        );
+    }
 
     #[test]
     fn a_rule_refusing_a_held_expression_is_not_excused_by_the_link_that_holds_it() {
@@ -1561,133 +1779,6 @@ mod tests {
     }
 
     #[test]
-    fn a_predicate_rule_is_excused_by_a_decided_condition_and_by_branches_that_are_one() {
-        // `when(pred).then(a).otherwise(b)`, and `then(a).otherwise(a)`.
-        let condition = |predicate: Expression, then: &str, otherwise: &str| {
-            chain_of(
-                call("polars.when", vec![("predicates", many(vec![predicate]))]),
-                vec![
-                    call(
-                        "When.then",
-                        vec![("statement", Value::Expression(chain(column(then), &[])))],
-                    ),
-                    call(
-                        "Then.otherwise",
-                        vec![(
-                            "statement",
-                            Value::Expression(chain(column(otherwise), &[])),
-                        )],
-                    ),
-                ],
-            )
-        };
-        let predicate = at(&[
-            parameter("exprs"),
-            Segment::Item(0),
-            Segment::Start,
-            parameter("predicates"),
-            Segment::Item(0),
-        ]);
-        let rule = "condition-predicate-is-boolean";
-        // A predicate made of a literal decides the condition, and the other
-        // branch is dropped.
-        let decided = select(vec![condition(chain(literal(), &[]), "a", "b")]);
-        assert_eq!(
-            rule_refuses(&decided, predicate.clone(), rule, "a rule"),
-            vec![Limit::ADecidedCondition]
-        );
-        // Values that are one expression make the predicate dropped.
-        let one = select(vec![condition(chain(column("g"), &[]), "a", "a")]);
-        assert_eq!(
-            rule_refuses(&one, predicate.clone(), rule, "a rule"),
-            vec![Limit::TheBranchesAreOne]
-        );
-        // Neither, and another rule.
-        let neither = select(vec![condition(chain(column("g"), &[]), "a", "b")]);
-        assert_eq!(
-            rule_refuses(&neither, predicate.clone(), rule, "a rule"),
-            vec![]
-        );
-        assert_eq!(
-            rule_refuses(&decided, predicate, "key-is-elementwise", "a rule"),
-            vec![]
-        );
-    }
-
-    #[test]
-    fn a_rule_about_a_predicate_a_len_follows_is_excused_and_one_it_does_not_follow_is_not() {
-        // `when(null).then(1).when(b).then(k).len()`: `len` does not read what it
-        // counts, so the predicate `b` is not evaluated.
-        let condition = |links: Vec<Call>| {
-            let mut all = vec![
-                call(
-                    "When.then",
-                    vec![("statement", Value::Expression(chain(literal(), &[])))],
-                ),
-                call(
-                    "Then.when",
-                    vec![("predicates", many(vec![chain(column("b"), &[])]))],
-                ),
-                call(
-                    "ChainedWhen.then",
-                    vec![("statement", Value::Expression(chain(column("k"), &[])))],
-                ),
-            ];
-            all.extend(links);
-            chain_of(
-                call(
-                    "polars.when",
-                    vec![("predicates", many(vec![chain(null(), &[])]))],
-                ),
-                all,
-            )
-        };
-        let predicate = at(&[
-            parameter("exprs"),
-            Segment::Item(0),
-            Segment::Link(1),
-            parameter("predicates"),
-            Segment::Item(0),
-        ]);
-        let rule = "condition-predicate-is-boolean";
-        let counted = select(vec![condition(vec![call("Expr.len", Vec::new())])]);
-        // The first predicate is a literal, which decides the condition as well.
-        assert_eq!(
-            rule_refuses(&counted, predicate.clone(), rule, "a rule"),
-            vec![Limit::AnAggregateGivesOneValue, Limit::ADecidedCondition]
-        );
-        let not_counted = select(vec![condition(Vec::new())]);
-        assert_eq!(
-            rule_refuses(&not_counted, predicate, rule, "a rule"),
-            vec![Limit::ADecidedCondition]
-        );
-    }
-
-    #[test]
-    fn a_rule_refusing_a_sort_key_that_is_one_value_is_excused_and_a_select_item_is_not() {
-        let key = chain(column("a"), &["Expr.cum_sum", "Expr.sum"]);
-        let rule = "filter-predicate-is-boolean";
-        assert_eq!(
-            rule_refuses(
-                &sort(vec![key.clone()]),
-                at(&[parameter("by"), Segment::Item(0)]),
-                rule,
-                "a rule"
-            ),
-            vec![Limit::AnAggregateGivesOneValue]
-        );
-        assert_eq!(
-            rule_refuses(
-                &select(vec![key]),
-                at(&[parameter("exprs"), Segment::Item(0)]),
-                rule,
-                "a rule"
-            ),
-            vec![]
-        );
-    }
-
-    #[test]
     fn a_rule_refusing_a_whole_key_is_excused_by_no_limit_that_does_not_name_it() {
         // `true.first() <= (null != true) > b` and the same from a column: the
         // rule that a join's key is elementwise is refused for what the key holds,
@@ -1714,40 +1805,6 @@ mod tests {
             let place = at(&[parameter("left_on"), Segment::Item(0)]);
             assert_eq!(rule_refuses(&case, place, rule, "a rule"), vec![]);
         }
-    }
-
-    #[test]
-    fn a_rule_refusing_an_expression_that_starts_from_a_literal_is_excused_by_no_literal() {
-        // A literal start is no cause of a rule's refusal of the whole item.
-        let item = at(&[parameter("exprs"), Segment::Item(0)]);
-        for rule in [
-            "condition-predicate-is-boolean",
-            "filter-predicate-is-boolean",
-        ] {
-            let from_a_literal = select(vec![chain(literal(), &["Expr.cum_sum"])]);
-            assert_eq!(
-                rule_refuses(&from_a_literal, item.clone(), rule, "a rule"),
-                vec![]
-            );
-        }
-        // What a null comparison reaches is a cause of a predicate rule only.
-        let folded = select(vec![chain_of(
-            column("a"),
-            vec![compared_with("Expr.eq", chain(null(), &[]))],
-        )]);
-        assert_eq!(
-            rule_refuses(
-                &folded,
-                item.clone(),
-                "condition-predicate-is-boolean",
-                "a rule"
-            ),
-            vec![Limit::ALiteral]
-        );
-        assert_eq!(
-            rule_refuses(&folded, item, "key-is-elementwise", "a rule"),
-            vec![]
-        );
     }
 
     #[test]
