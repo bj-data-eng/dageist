@@ -234,7 +234,8 @@ fn replay_a_case() {
 /// `fixed-*.case` was a disagreement the tables or a named rule now settle,
 /// and replays as checked; a file named `uncovered-<limit>.case` is a case the
 /// tables state they do not cover, and replays as excused by that limit, and
-/// every limit has one.
+/// every limit has one. A limit may have others, named
+/// `uncovered-<limit>--<what it shows>.case`.
 #[test]
 fn every_kept_case_replays_as_settled() {
     on_a_large_stack(kept_cases_replay_as_settled);
@@ -273,6 +274,8 @@ fn kept_cases_replay_as_settled() {
         } else if let Some(slug) = name
             .strip_prefix("uncovered-")
             .and_then(|rest| rest.strip_suffix(".case"))
+            // `uncovered-<limit>--<what it shows>.case` is another case of a limit.
+            .map(|rest| rest.split("--").next().unwrap_or(rest))
         {
             let limit = Limit::ALL
                 .into_iter()

@@ -1652,18 +1652,82 @@ mod tests {
     }
 
     #[test]
-    fn a_rule_refusing_a_sort_key_that_is_one_value_or_a_literal_start_is_excused_by_nothing() {
-        let rule = "filter-predicate-is-boolean";
-        let key = chain(column("a"), &["Expr.cum_sum", "Expr.sum"]);
+    fn a_rule_refusing_a_predicate_in_a_sort_key_that_is_one_value_is_excused_and_elsewhere_not() {
+        // `sort(by=[when(b).then(g).min()])`: Polars drops a sort key that is one
+        // value, so the text predicate is not evaluated, and refuses the same key
+        // in `select`, in a window's key, and when the key is not one value.
+        let key = || {
+            chain_of(
+                when_of(vec![chain(column("b"), &[])]),
+                vec![
+                    then_of(chain(column("g"), &[])),
+                    call("Expr.min", Vec::new()),
+                ],
+            )
+        };
+        let predicate = |parameter_name: &str, item: usize| {
+            at(&[
+                parameter(parameter_name),
+                Segment::Item(item),
+                Segment::Start,
+                parameter("predicates"),
+                Segment::Item(0),
+            ])
+        };
         assert_eq!(
             rule_refuses(
-                &sort(vec![key]),
-                at(&[parameter("by"), Segment::Item(0)]),
-                rule,
+                &sort(vec![key()]),
+                predicate("by", 0),
+                BOOLEAN_RULE,
+                "a rule"
+            ),
+            vec![Limit::AnAggregateGivesOneValue]
+        );
+        // Each key is dropped by itself.
+        let beside = sort(vec![chain(column("f"), &[]), key()]);
+        assert_eq!(
+            rule_refuses(&beside, predicate("by", 1), BOOLEAN_RULE, "a rule"),
+            vec![Limit::AnAggregateGivesOneValue]
+        );
+        assert_eq!(
+            rule_refuses(
+                &select(vec![key()]),
+                predicate("exprs", 0),
+                BOOLEAN_RULE,
                 "a rule"
             ),
             vec![]
         );
+        let not_one_value = sort(vec![chain_of(
+            when_of(vec![chain(column("b"), &[])]),
+            vec![then_of(chain(column("g"), &[]))],
+        )]);
+        assert_eq!(
+            rule_refuses(&not_one_value, predicate("by", 0), BOOLEAN_RULE, "a rule"),
+            vec![]
+        );
+        let window = select(vec![chain_of(
+            column("f"),
+            vec![call("Expr.over", vec![("partition_by", many(vec![key()]))])],
+        )]);
+        let in_the_window = at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Link(0),
+            parameter("partition_by"),
+            Segment::Item(0),
+            Segment::Start,
+            parameter("predicates"),
+            Segment::Item(0),
+        ]);
+        assert_eq!(
+            rule_refuses(&window, in_the_window, BOOLEAN_RULE, "a rule"),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_rule_refusing_a_literal_start_or_a_fold_is_excused_by_nothing_else() {
         let from_a_literal = select(vec![chain(literal(), &["Expr.cum_sum"])]);
         assert_eq!(
             rule_refuses(
