@@ -1509,6 +1509,54 @@ mod tests {
     }
 
     #[test]
+    fn a_rule_about_a_predicate_a_len_follows_is_excused_and_one_it_does_not_follow_is_not() {
+        // `when(null).then(1).when(b).then(k).len()`: `len` does not read what it
+        // counts, so the predicate `b` is not evaluated.
+        let condition = |links: Vec<Call>| {
+            let mut all = vec![
+                call(
+                    "When.then",
+                    vec![("statement", Value::Expression(chain(literal(), &[])))],
+                ),
+                call(
+                    "Then.when",
+                    vec![("predicates", many(vec![chain(column("b"), &[])]))],
+                ),
+                call(
+                    "ChainedWhen.then",
+                    vec![("statement", Value::Expression(chain(column("k"), &[])))],
+                ),
+            ];
+            all.extend(links);
+            chain_of(
+                call(
+                    "polars.when",
+                    vec![("predicates", many(vec![chain(null(), &[])]))],
+                ),
+                all,
+            )
+        };
+        let predicate = at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Link(1),
+            parameter("predicates"),
+            Segment::Item(0),
+        ]);
+        let rule = "condition-predicate-is-boolean";
+        let counted = select(vec![condition(vec![call("Expr.len", Vec::new())])]);
+        assert_eq!(
+            rule_refuses(&counted, predicate.clone(), rule, "a rule"),
+            vec![Limit::AnAggregateGivesOneValue]
+        );
+        let not_counted = select(vec![condition(Vec::new())]);
+        assert_eq!(
+            rule_refuses(&not_counted, predicate, rule, "a rule"),
+            vec![]
+        );
+    }
+
+    #[test]
     fn a_rule_refusing_a_sort_key_that_is_one_value_is_excused_and_a_select_item_is_not() {
         let key = chain(column("a"), &["Expr.cum_sum", "Expr.sum"]);
         let rule = "filter-predicate-is-boolean";
