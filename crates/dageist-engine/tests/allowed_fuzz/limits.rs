@@ -62,16 +62,13 @@ pub enum Limit {
     /// refusal is gated by its reason, which has no place; the tables refusing
     /// is placed, in the aggregate, with a reason about a kernel.
     AGroupAggregate,
-    /// A single value in a join's key, which Polars treats as it does not a column.
     /// A key that is wholly a single value, an aggregate or a null, is not one
     /// that has to be elementwise: Polars allows in it what a key may not hold,
-    /// such as a running count under a `last`, and the tables refusing it, with a
-    /// reason about elementwise, placed inside that key, is excused. A comparison
-    /// with a null literal in a join key is a null, a key with no column, which
-    /// Polars refuses as not elementwise where the tables, which measured the
-    /// entry as the whole key, allow it: Polars refusing the step with that
-    /// reason, in a join with such a key. A key that holds an aggregate beside a
-    /// column is refused by a named rule, and is not this.
+    /// such as a running count under a `last`. The tables measured the entry as
+    /// the whole key. The tables refusing it, with a reason about elementwise,
+    /// placed inside that key. A key that holds an aggregate beside a column, or
+    /// a column compared with a null, is refused by a named rule, and is not
+    /// this.
     ASingleValueInAKey,
     /// Whether values of different lengths combine, as the lists of two rows
     /// do not, depends on the rows, which the tables measured on one sample.
@@ -752,15 +749,6 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
                     .any(|words| refused.reason.contains(words))
                         && locate(case, &refused.place).call.is_some())
         }
-        (Limit::ASingleValueInAKey, Disagreement::PolarsRefuses(refusal)) => {
-            // The step is refused for a key that compares with a null.
-            is(step, "LazyFrame.join")
-                && unplaced(refusal)
-                && refusal.reason.contains("elementwise")
-                && keys(case, true)
-                    .iter()
-                    .any(|key| reached_by_a_null(key, Reach::Whole))
-        }
         (Limit::ASingleValueInAKey, Disagreement::PolarsAllows(refused)) => {
             // The key the tables refused is wholly one value.
             refused.reason.contains("elementwise")
@@ -1424,36 +1412,6 @@ mod tests {
         let select = select(vec![chain(column("a"), &[])]);
         assert_eq!(
             polars_refuses(&select, None, Stage::Schema, reason, Vec::new()),
-            vec![]
-        );
-    }
-
-    #[test]
-    fn a_join_key_that_compares_with_a_null_excuses_the_refused_step_and_another_key_does_not() {
-        let reason = "all join key expressions must be elementwise.";
-        let compared = chain_of(
-            column("f"),
-            vec![compared_with("Expr.eq", chain(null(), &[]))],
-        );
-        let plain = chain(column("a"), &["Expr.cum_max"]);
-        let case = join(compared, chain(column("key"), &[]));
-        assert_eq!(
-            polars_refuses(&case, Some(step_place()), Stage::Schema, reason, Vec::new()),
-            vec![Limit::ASingleValueInAKey]
-        );
-        let other = join(plain, chain(column("key"), &[]));
-        assert_eq!(
-            polars_refuses(
-                &other,
-                Some(step_place()),
-                Stage::Schema,
-                reason,
-                Vec::new()
-            ),
-            vec![]
-        );
-        assert_eq!(
-            polars_refuses(&case, Some(step_place()), Stage::Schema, "no", Vec::new()),
             vec![]
         );
     }

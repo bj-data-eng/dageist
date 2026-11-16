@@ -778,11 +778,12 @@ pub fn rule_forbids(entry: &Entry, context: Context) -> Result<(), Refusal> {
     Rule::forbids(entry.id().as_str(), context).map_or(Ok(()), |rule| Err(Refusal::rule(rule)))
 }
 
-/// The refusal of a key that holds an aggregate beside a column, where
-/// `context` holds one of a join's own keys, if the rule refuses it there.
-/// Polars refuses that, and accepts it in the key of a window, and a null
-/// literal beside a column in any key. What a key holds is a matter of the
-/// whole expression, not of one entry, so the caller finds it and asks.
+/// The refusal of a key that holds an aggregate beside a column, or a column
+/// compared with a null, where `context` holds one of a join's own keys, if the
+/// rule refuses it there. Polars accepts an aggregate in the key of a window,
+/// and a null literal beside a column that is not compared. What a key holds is
+/// a matter of the whole expression, not of one entry, so the caller finds it
+/// and asks.
 ///
 /// # Errors
 ///

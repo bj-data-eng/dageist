@@ -43,7 +43,7 @@
 #   condition-predicate-is-boolean: a condition's predicate must be Boolean.
 #   element-only-in-pivot-aggregate: `polars.element` stands only in a pivot's aggregate.
 #   filter-predicate-is-boolean: a filter's predicate must be Boolean.
-#   key-is-elementwise: a join's key must be elementwise: an aggregate may not stand in it beside a column.
+#   key-is-elementwise: a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a column be compared with a null.
 #   pivot-aggregate-gives-one-value: a pivot's aggregate must give one value for each group.
 #
 # An outcome is `allowed <dtype of the result> <one|many>` (`-` for a step), or

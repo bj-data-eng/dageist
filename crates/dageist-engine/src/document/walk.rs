@@ -550,9 +550,10 @@ impl Walker<'_> {
             } else if let Some(Ending::NotKnown(unknown)) = &ending {
                 self.blind(format!("whether it may end is not known: {unknown}"));
             }
-            // A join's key that holds an aggregate beside a column is not
-            // elementwise, which only the whole key shows.
-            if holds_an_aggregate_beside_a_column(expression)
+            // A join's key that holds an aggregate beside a column, or a column
+            // compared with a null, is not elementwise, which only the whole key
+            // shows.
+            if is_not_elementwise(expression)
                 && let Err(refusal) = allowed::rule_forbids_mixed_key(context)
             {
                 self.refuse(&refusal, true);
@@ -859,4 +860,73 @@ fn holds_an_aggregate(expression: &Expression) -> bool {
 /// literal beside a column as elementwise, and an aggregate as not.
 fn holds_an_aggregate_beside_a_column(key: &Expression) -> bool {
     holds_an_aggregate(key) && !wholly_single(key, key.links().len(), true)
+}
+
+/// Whether an expression reads a column: it starts from one, or a call in it is
+/// given an expression that does.
+fn reads_a_column(expression: &Expression) -> bool {
+    let calls = std::iter::once(expression.start())
+        .filter_map(|start| match start {
+            Start::Call(call) => Some(call),
+            Start::Input(_) => None,
+        })
+        .chain(expression.links());
+    matches!(
+        expression.start(),
+        Start::Call(start) if start.entry().id().as_str() == "polars.col"
+    ) || calls
+        .into_iter()
+        .any(|call| operands(call).into_iter().any(reads_a_column))
+}
+
+/// Whether an expression is a null literal and no more.
+fn is_a_null(expression: &Expression) -> bool {
+    expression.links().is_empty()
+        && matches!(
+            expression.start(),
+            Start::Call(start)
+                if start.entry().id().as_str() == "polars.lit"
+                    && matches!(start.argument("value"), Some(Value::Flag(None)))
+        )
+}
+
+/// Whether an expression holds, at any depth, a comparison of a null literal
+/// with what reads a column. Polars folds it into a null, and a key with a null
+/// where a column was is not elementwise.
+fn holds_a_null_comparison(expression: &Expression) -> bool {
+    let start = match expression.start() {
+        Start::Call(call) => Some(call),
+        Start::Input(_) => None,
+    };
+    let mut reads = matches!(
+        start,
+        Some(start) if start.entry().id().as_str() == "polars.col"
+    ) || start.is_some_and(|start| operands(start).into_iter().any(reads_a_column));
+    for (at, link) in expression.links().iter().enumerate() {
+        if COMPARISONS.contains(&link.entry().id().as_str()) {
+            let given = operands(link);
+            let null_given = given.iter().any(|operand| is_a_null(operand));
+            let column_given = given.iter().any(|operand| reads_a_column(operand));
+            let null_start = at == 0
+                && matches!(
+                    expression.start(),
+                    Start::Call(start) if start.entry().id().as_str() == "polars.lit"
+                        && matches!(start.argument("value"), Some(Value::Flag(None)))
+                );
+            if (null_given && reads) || (null_start && column_given) {
+                return true;
+            }
+        }
+        reads |= operands(link).into_iter().any(reads_a_column);
+    }
+    start
+        .into_iter()
+        .chain(expression.links())
+        .any(|call| operands(call).into_iter().any(holds_a_null_comparison))
+}
+
+/// Whether a key is not elementwise, as Polars takes it: it holds an aggregate
+/// beside a column, or a column compared with a null.
+fn is_not_elementwise(key: &Expression) -> bool {
+    holds_an_aggregate_beside_a_column(key) || holds_a_null_comparison(key)
 }
