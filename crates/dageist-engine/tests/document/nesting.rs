@@ -229,3 +229,13 @@ fn a_document_reads_and_is_made_exactly_when_it_nests_within_the_limit() {
     assert_eq!(accepted.iter().max(), Some(&MAX_NESTING));
     assert_eq!(refused.iter().min(), Some(&(MAX_NESTING + 1)));
 }
+
+#[test]
+fn a_step_built_far_deeper_than_the_limit_is_refused_without_exhausting_the_stack() {
+    // Six hundred links is several times the limit, deep enough that building
+    // the step's whole JSON before measuring it overflows a test thread's
+    // stack, while building and dropping the step itself does not.
+    let levels = vec![Level::Link; 600];
+    let refusal = document(&levels).expect_err("far too deep to be a document");
+    assert!(matches!(refusal.cause(), Cause::TooDeep), "{refusal}");
+}
