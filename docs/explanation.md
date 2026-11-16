@@ -209,8 +209,8 @@ aggregate. A row of the context table was measured with the chain ending at one
 entry, with one argument, such as a bare `element()` or an untyped `lit(1)`, so
 it cannot judge a start that other arguments or more links follow. Polars decides
 the rest as the step is built, and when it refuses a pivot because of a column in
-its aggregate, it refuses the step, not the expression. The context table also
-says which table a join's `right_on` is read against.
+its aggregate, it refuses the step, not the expression. The contexts the tables
+are measured in also say which table a join's `right_on` is read against.
 
 ## Which Combinations Polars Allows
 
