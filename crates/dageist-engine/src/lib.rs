@@ -5,10 +5,12 @@
 //! straight from its Parquet files, and handing blocks of either to a host as
 //! Arrow IPC bytes. It also owns the catalogue of Polars operations the step
 //! editor offers, and the step document built from it: its reader, its writer
-//! and running it. It has no dependency on any host.
+//! and running it, and the tables of which combinations of its entries Polars
+//! allows. It has no dependency on any host.
 
 #![forbid(unsafe_code)]
 
+pub mod allowed;
 mod block;
 pub mod catalog;
 pub mod document;

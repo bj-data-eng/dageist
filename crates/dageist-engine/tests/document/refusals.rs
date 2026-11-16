@@ -1,15 +1,17 @@
 //! A step Polars refuses is reported with where in the step it is and Polars'
 //! own reason, and the steps after it are not run.
 
+use dageist_engine::allowed::{RefusalSource, Rule};
 use dageist_engine::catalog::BuildError;
 use dageist_engine::document::{
     Document, Outcome, Report, Resolution, RowsError, RunCause, Segment, StepId, StepRefusal,
 };
 use polars::prelude::*;
 use serde_json::{Value, json};
+use std::sync::Arc;
 
 use crate::claims::{claims, inputs};
-use crate::support::{call, chain, document, field, field_then, many, named, step};
+use crate::support::{call, chain, document, field, field_then, many, named, step, whole};
 
 fn parameter(name: &str) -> Segment {
     Segment::Parameter(name.to_owned())
@@ -405,4 +407,262 @@ fn a_date_part_of_text_passes_schema_resolution_and_fails_when_rows_are_collecte
         .rows(&inputs(), &claims(), &id, 10)
         .expect_err("Polars cannot take the date of text");
     assert!(matches!(error, RowsError::Polars(_)), "{error}");
+}
+
+#[test]
+fn element_outside_a_pivots_aggregate_is_refused_at_its_start_by_the_rule() {
+    let report = run(vec![
+        step(
+            "bad",
+            "LazyFrame.with_columns",
+            json!({ "named_exprs": named(vec![(
+                "x",
+                chain(
+                    call("polars.element", json!({})),
+                    vec![call("Expr.first", json!({}))],
+                ),
+            )]) }),
+        ),
+        step("after", "LazyFrame.select", json!({})),
+    ]);
+    let refusal = refusal_of(&report, "bad");
+    assert_eq!(
+        refusal.place().path(),
+        [parameter("named_exprs"), Segment::Value(0), Segment::Start]
+    );
+    let RunCause::NotAllowed(not_allowed) = refusal.cause() else {
+        panic!("not the rule's reason: {refusal}");
+    };
+    assert_eq!(
+        not_allowed.source(),
+        RefusalSource::Rule(Rule::ElementOnlyInPivotAggregate)
+    );
+    assert!(refusal.to_string().contains("element"), "{refusal}");
+    // Polars itself refuses `element` on a table's columns.
+    assert!(
+        claims()
+            .lazy()
+            .select([element().first()])
+            .collect_schema()
+            .is_err()
+    );
+}
+
+#[test]
+fn a_joins_right_keys_are_read_against_the_other_table_not_the_one_the_step_starts_from() {
+    let join = |left_on: &str, right_on: &str| {
+        run(vec![step(
+            "join",
+            "LazyFrame.join",
+            json!({
+                "other": { "table": "step_sla" },
+                "left_on": many(vec![field(left_on)]),
+                "right_on": many(vec![field(right_on)]),
+            }),
+        )])
+    };
+    // `step` is a column of the other table only, and `step_to` of the claims only.
+    let report = join("step_to", "step");
+    assert!(
+        matches!(report.steps()[0].outcome(), Outcome::Valid { .. }),
+        "{:?}",
+        report.steps()[0].outcome()
+    );
+    let report = join("step_to", "step_to");
+    let refusal = refusal_of(&report, "join");
+    assert_eq!(
+        refusal.place().path(),
+        [parameter("right_on"), Segment::Item(0), Segment::Start]
+    );
+    assert!(matches!(refusal.cause(), RunCause::Polars(_)), "{refusal}");
+    assert!(refusal.to_string().contains("step_to"), "{refusal}");
+    // And `left_on` is read against the claims: the other table's column is not found there.
+    let report = join("step", "step");
+    assert_eq!(
+        refusal_of(&report, "join").place().path(),
+        [parameter("left_on"), Segment::Item(0), Segment::Start]
+    );
+}
+
+/// The step `id` of `report`, valid or not, as the report holds it.
+fn outcome_of<'a>(report: &'a Report, id: &str) -> &'a Outcome {
+    report
+        .steps()
+        .iter()
+        .find(|step| step.id().as_str() == id)
+        .unwrap_or_else(|| panic!("no step {id}"))
+        .outcome()
+}
+
+/// `when(predicates[0]).then(then).otherwise(otherwise)` as an argument.
+fn when_then_otherwise(predicate: Value, then: Value, otherwise: Value, more: Vec<Value>) -> Value {
+    let mut links = vec![
+        call("When.then", json!({ "statement": then })),
+        call("Then.otherwise", json!({ "statement": otherwise })),
+    ];
+    links.extend(more);
+    chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![predicate]) }),
+        ),
+        links,
+    )
+}
+
+#[test]
+fn a_pivot_aggregate_that_is_a_condition_over_element_is_valid_as_polars_accepts_it() {
+    // `when(element().is_not_null()).then(element()).otherwise(lit(0)).sum()`:
+    // the predicate is `element()` tested for a value, a Boolean whatever the
+    // group holds, and the sum is one value for each group.
+    let aggregate = when_then_otherwise(
+        chain(
+            call("polars.element", json!({})),
+            vec![call("Expr.is_not_null", json!({}))],
+        ),
+        chain(call("polars.element", json!({})), vec![]),
+        chain(
+            call("polars.lit", json!({ "value": { "integer": 0 } })),
+            vec![],
+        ),
+        vec![call("Expr.sum", json!({}))],
+    );
+    // Polars, by hand: the same pivot, built on its own API, collects.
+    let step_names =
+        df!("step_to" => ["Intake", "Review", "Pending", "Complete"]).expect("the step names");
+    let pivoted = claims().lazy().pivot(
+        cols(["step_to"]),
+        Arc::new(step_names),
+        cols(["dcn"]),
+        cols(["row_days"]),
+        when(element().is_not_null())
+            .then(element())
+            .otherwise(lit(0))
+            .sum(),
+        false,
+        "_".into(),
+        polars::frame::PivotColumnNaming::Auto,
+    );
+    let collected = pivoted.collect().expect("Polars collects the pivot");
+    assert_eq!(collected.height(), 2);
+
+    let report = run(vec![step(
+        "pivot",
+        "LazyFrame.pivot",
+        json!({
+            "on": { "columns": ["step_to"] },
+            "on_columns": { "table": "step_names" },
+            "index": { "columns": ["dcn"] },
+            "values": { "columns": ["row_days"] },
+            "aggregate_function": aggregate,
+        }),
+    )]);
+    assert!(
+        matches!(outcome_of(&report, "pivot"), Outcome::Valid { .. }),
+        "{:?}",
+        outcome_of(&report, "pivot")
+    );
+}
+
+#[test]
+fn a_join_key_that_is_a_condition_of_typed_literals_is_valid_as_polars_accepts_it() {
+    // `when(row_days > 1).then(lit(1, Int64)).otherwise(lit(2, Int64))` is an
+    // `Int64` key, as `sla_days` is.
+    let typed = |number: i64| {
+        chain(
+            call(
+                "polars.lit",
+                json!({ "value": { "integer": number }, "dtype": { "dtype": "Int64" } }),
+            ),
+            vec![],
+        )
+    };
+    let key = when_then_otherwise(
+        field_then(
+            "row_days",
+            vec![call("Expr.gt", json!({ "other": whole(1) }))],
+        ),
+        typed(1),
+        typed(2),
+        vec![],
+    );
+    // Polars, by hand: the same join, on its own API, collects.
+    let int = |number: i64| lit(Scalar::new(DataType::Int64, AnyValue::Int64(number)));
+    let sla = df!(
+        "step" => ["Intake", "Review", "Pending", "Complete"],
+        "sla_days" => [1_i64, 1, 2, 3],
+    )
+    .expect("the SLA table");
+    let joined = claims()
+        .lazy()
+        .join_builder()
+        .with(sla.lazy())
+        .left_on(vec![
+            when(col("row_days").gt(lit(1)))
+                .then(int(1))
+                .otherwise(int(2)),
+        ])
+        .right_on(vec![col("sla_days")])
+        .finish();
+    let collected = joined
+        .expect("Polars builds the join")
+        .collect()
+        .expect("Polars collects the join");
+    assert!(collected.height() > 0);
+
+    let report = run(vec![step(
+        "join",
+        "LazyFrame.join",
+        json!({
+            "other": { "table": "step_sla" },
+            "left_on": many(vec![key]),
+            "right_on": many(vec![field("sla_days")]),
+        }),
+    )]);
+    assert!(
+        matches!(outcome_of(&report, "join"), Outcome::Valid { .. }),
+        "{:?}",
+        outcome_of(&report, "join")
+    );
+}
+
+#[test]
+fn a_column_in_a_pivot_aggregate_is_refused_with_polars_reason_for_the_step() {
+    // The aggregate of a pivot is built from `element()`, not from a column.
+    // No named rule holds this, so Polars decides as the step is built, and
+    // refuses the pivot as a whole: it does not say which expression.
+    let report = run(vec![step(
+        "pivot",
+        "LazyFrame.pivot",
+        json!({
+            "on": { "columns": ["step_to"] },
+            "on_columns": { "table": "step_names" },
+            "index": { "columns": ["dcn"] },
+            "values": { "columns": ["row_days"] },
+            "aggregate_function": field_then("row_days", vec![call("Expr.sum", json!({}))]),
+        }),
+    )]);
+    let refusal = refusal_of(&report, "pivot");
+    assert_eq!(refusal.place().step_index(), Some(0));
+    assert!(refusal.place().path().is_empty(), "{refusal}");
+    assert!(matches!(refusal.cause(), RunCause::Polars(_)), "{refusal}");
+    assert!(
+        refusal.to_string().contains("column references"),
+        "{refusal}"
+    );
+    // Polars, by hand: its own pivot refuses a column in the aggregate.
+    let step_names =
+        df!("step_to" => ["Intake", "Review", "Pending", "Complete"]).expect("the step names");
+    let mut pivoted = claims().lazy().pivot(
+        cols(["step_to"]),
+        Arc::new(step_names),
+        cols(["dcn"]),
+        cols(["row_days"]),
+        col("row_days").sum(),
+        false,
+        "_".into(),
+        polars::frame::PivotColumnNaming::Auto,
+    );
+    let error = pivoted.collect_schema().expect_err("Polars refuses it");
+    assert!(error.to_string().contains("column references"), "{error}");
 }

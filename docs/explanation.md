@@ -117,7 +117,8 @@ Those build functions are the start of the path from a saved document of steps
 to a Polars plan. The arguments for an entry are checked against its
 parameters, their kinds, shapes and choice words before it is built. Result
 dtypes are not stored, because Polars works them out from a schema without
-reading data.
+reading data; which combinations Polars allows is kept in
+[tables](#which-combinations-polars-allows) beside it.
 
 Every parameter is one of ten kinds, and the view has one way of drawing
 each, so a new operation needs data rather than a new look:
@@ -200,8 +201,112 @@ each link of every expression, all without reading data. Steps after a
 refused one are reported as not run. The rows of any step come from running
 it on an in-memory working window. Polars' own message is the reason when
 Polars refuses. Some mistakes, such as `dt.date` on a String column, are only
-found when rows are read, not from the schema; the editor will learn them in
-advance from tables of allowed combinations, which issue 44 adds next.
+found when rows are read, not from the schema; the editor learns them in
+advance from the [tables of allowed combinations](#which-combinations-polars-allows).
+The runner asks the named rules beside those tables, and not the tables, for
+where an expression may start: `element` starts a chain only in a pivot's
+aggregate. A row of the context table was measured with the chain ending at one
+entry, with one argument, such as a bare `element()` or an untyped `lit(1)`, so
+it cannot judge a start that other arguments or more links follow. Polars decides
+the rest as the step is built, and when it refuses a pivot because of a column in
+its aggregate, it refuses the step, not the expression. The contexts the tables
+are measured in also say which table a join's `right_on` is read against.
+
+## Which Combinations Polars Allows
+
+Polars' schema resolution does not refuse every invalid combination. The
+schema of `dt.date` on a `String` column is a `Date`, and the call fails only
+when rows are read. `cum_sum` on text, `dt.total_days` on something that is
+not a duration, and a comparison of text with a whole number are the same.
+So the step editor cannot learn what it may offer from a schema.
+
+The engine instead runs every combination of the catalogue in Polars, once,
+and keeps what it found as three text artifacts in
+[api/catalogue/](../api/catalogue/dtypes.txt), one combination to a line,
+sorted, so that a Polars upgrade shows as a readable diff. A combination counts
+as allowed only when Polars resolved its schema, ran it on three rows that
+include a null, and ran it on a table with no rows. Where Polars refuses, the
+line records where it did and its own message, cut at the first blank line, with
+no plan, address or timing in it. The stage is `schema`, `rows` (the schema
+resolved and the rows were refused: a mistake only running shows) or `empty`.
+An allowed line records the dtype of the result and whether it is `one` value
+for the three rows or `many`.
+
+| Table | One line for |
+| --- | --- |
+| `dtypes.txt` | A method of an expression on a receiver of each of the representative dtypes, and for each of its expression parameters, with an argument of each of them. Parameters are varied one at a time, the others at a fitting default. |
+| `contexts.txt` | An entry in each context: a position that holds an expression, or such a position inside an expression that stands in one. Two lines for each, one for the chain going on from the entry and one for the chain ending at it. |
+| `options.txt` | An entry with each pair of values of its options, the flags and the words of a choice; with one value of its option when it has only one. |
+
+The representative dtypes are every integer and float width, `String`,
+`Boolean`, `Date`, `Time`, `Datetime` with and without a zone, `Duration`,
+`Null`, `List` of an integer and of `String`, `Struct`, `Array` and `Decimal`.
+The contexts are a `select` item, a filter's predicate, a sort key, a join key
+on each side, and a pivot's aggregate, each also with, inside the expression
+that stands there, `over`'s `partition_by` or `order_by` or a condition's
+predicate or value. That is two levels deep, and a place deeper than that is
+judged by its first two.
+A join's `right_on` is evaluated against the other table, whose columns are
+named differently from the left table's, so a column of the wrong table is
+found missing. A pivot's aggregate starts from `element()`.
+
+Whether an entry may stand at a place is not whether it may end an expression
+there, so the context table measures each entry in each context twice. On the
+line of `continues`, the chain goes on from the entry with a neutral
+continuation that the context needs, and the line says whether the entry may
+stand there at all: `.is_not_null()` where a `Boolean` is required (a filter's
+predicate, what a condition gives in a filter, a condition's predicate), a cast
+to the dtype of the other table's key for the whole expression in a join key,
+and `.first()` for the whole expression in a pivot's aggregate; nothing where
+the context needs nothing. A window in a join key, or in a pivot's aggregate,
+is refused however it goes on. On the line of `ends`, the chain ends at the
+entry as it is, and the line says whether the entry may end an expression
+there: a sum may stand in a filter's predicate, followed by a comparison, though
+it may not end it.
+
+Every call is built through the catalogue's own build functions and run on
+fixed sample tables, by an engine test that checks the committed files are
+current and, with `DAGEIST_REFRESH_TABLES=1`, rewrites them. The test runs
+Polars on one thread in a process of its own, because Polars runs two sides of
+some operations in parallel and reports whichever fails first, which would
+give a different reason from run to run. The
+[refresh procedure](how-to.md#refresh-the-tables-of-allowed-combinations)
+says how to read the diff.
+
+Some rules are not Polars' to hold, and are named in `dageist_engine::allowed::Rule`
+and referenced from the lines of the context table they govern:
+
+| Rule | Says |
+| --- | --- |
+| `pivot-aggregate-gives-one-value` | A pivot's aggregate gives one value for each group. Polars lets a running sum stand there. |
+| `condition-predicate-is-boolean` | A condition's predicate is a `Boolean`. Polars finds a whole number there only when rows run. |
+| `filter-predicate-is-boolean` | A filter's predicate is a `Boolean`, and so is what a condition in it gives. Polars refuses a chain that ends in anything else, but a method that is not a `Boolean` may stand partway through one. |
+| `element-only-in-pivot-aggregate` | `polars.element` stands only in a pivot's aggregate. Polars refuses it elsewhere, but as a panic when the table is sorted. |
+
+`dageist_engine::allowed::offers` answers which entries may stand at a place,
+given the context and what the expression has so far: nothing, a value of a
+representative dtype and a shape, or a condition that is not finished. `offer`
+answers for one entry, with the dtypes of the arguments chosen for its
+expression parameters, and `options` for a set of options. They read the
+committed files, embedded in the engine, and the rules, and never run Polars.
+Each refusal says who refused it, Polars at a stage or a rule or the shape of
+an expression, and gives the reason. A rule that forbids an entry here
+is applied first, so that its words explain the refusal. An entry may stand at
+a place when the line of `continues` allows it, and a refusal of that line is a
+refusal to stand. A rule about how a chain ends, and the line of `ends`, do not
+refuse an entry, which may be continued, but are reported by
+`Allowance::can_end`: the rule first, so that its words explain the refusal,
+then Polars' reason. An end rule that is about a dtype refuses a dtype known
+not to fit, and does not refuse one that is not known: a start takes the dtype
+of a column, and some methods give a dtype that their argument decides, so the
+result is unknown until it is chosen, and it does not break the rule.
+
+The tables hold what they were measured on. A method's context was measured on
+the receiver that fits it best, so a table cannot say that a predicate must be
+`Boolean` for a receiver it was not measured on; the rule does. Arguments are
+varied one parameter at a time, so a method with two expression parameters has
+each judged apart. A `Struct` is two fields, an `Array` of two, and a `Decimal`
+of ten digits: the tables say nothing of other sizes.
 
 ## What The Step Editor Storyboard Has Settled
 

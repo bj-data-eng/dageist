@@ -271,6 +271,47 @@ differs. Run them when the generator's Cargo or rustdoc handling changes:
 env -u CARGO_TARGET_DIR CARGO_NET_OFFLINE=true cargo test --offline --locked --manifest-path api/generator/Cargo.toml --lib -- --ignored
 ```
 
+## Refresh The Tables Of Allowed Combinations
+
+The files `dtypes.txt`, `contexts.txt` and `options.txt` in
+[api/catalogue/](../api/catalogue/dtypes.txt) hold what Polars does with every
+combination of the catalogue, as
+[the explanation](explanation.md#which-combinations-polars-allows) describes.
+An engine test makes them again and compares: it fails, naming the file and
+some of the lines that differ, after a change to the catalogue, to the
+generator under `crates/dageist-engine/src/allowed/tests/`, or to Polars. To
+check them, with the rest of the engine:
+
+```sh
+cargo test --offline --locked -p dageist-engine
+```
+
+To write them again, which takes a few seconds to ten, run the test with the
+variable set, then build and test again so that the engine embeds the new files:
+
+```sh
+DAGEIST_REFRESH_TABLES=1 cargo test --offline --locked -p dageist-engine allowed::tests::artifacts
+cargo test --offline --locked -p dageist-engine
+```
+
+Never edit the files by hand. Read the diff and explain each changed line from
+its source: a line that was allowed and is refused, or was refused at the
+schema and now only at the rows, is a change of what the editor may offer; a
+changed reason with the same outcome is Polars rewording. Each context has a
+line for the chain that continues and one for the chain that ends, and a
+refresh shows them apart: a line that continues and is now allowed is an entry
+that may stand where it was refused, and one that ends and is refused is an
+entry that may not end an expression there. The header of each file names the tag
+of the Python Polars release that `vendor/polars` is at, as `git describe`
+gives it there, and its commit, and the counts of allowed and refused
+combinations by stage. A refresh is reviewed with the change that caused it.
+
+A named rule is in `crates/dageist-engine/src/allowed/rules.rs`. Adding one
+changes the `rules` column of the context table, so refresh the tables with it.
+A rule of how a chain ends, which is about a dtype, also says in
+`Rule::forbids_end` what it makes of a result whose dtype is not known: it does
+not refuse it.
+
 ## Check The Build Against The Polars Release
 
 The engine builds Polars from `vendor/polars` with the same features, crate
@@ -361,6 +402,10 @@ build into line with the new release:
    to the engine's dependency on that crate, unless it only connects Polars to
    Python.
 5. Build and test the engine, and [refresh the Polars audits](#refresh-the-audits-after-a-change).
+6. [Refresh the tables of allowed combinations](#refresh-the-tables-of-allowed-combinations)
+   and review them: Polars decides what each combination does, so a new release
+   can allow what was refused and refuse what was allowed. Explain each changed
+   outcome, and say whether each named rule still holds what Polars does not.
 
 Update the tag and commit in the [reference](reference.md#vendored-sources),
 and name the tag in the commit message.

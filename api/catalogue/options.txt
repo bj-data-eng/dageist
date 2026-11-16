@@ -1,0 +1,471 @@
+# Allowed combinations of options
+#
+# Polars: the release py-2.1.0 at the commit 7f902bd3ffd27ff82d14278a09a295ff2f7aed92 of vendor/polars.
+# Generated from the catalogue and Polars by the engine test
+# `allowed::tests::artifacts::the_committed_tables_are_what_polars_gives`, with Polars on
+# one thread, so that a reason that depends on which of two failures comes first is the
+# same every time. Do not edit.
+# To refresh after a change of the catalogue or of Polars:
+#   DAGEIST_REFRESH_TABLES=1 cargo test --offline --locked -p dageist-engine allowed::tests::artifacts
+# See docs/how-to.md, "Refresh The Tables Of Allowed Combinations".
+#
+# Each line is: entry | receiver | options | outcome.
+#
+# The options are the flags and the choices of an entry. An entry with one option has a
+# line for each value of it; an entry with more has a line for each pair of options and
+# each pair of their values, so options that interact are all covered. A flag is `true`,
+# `false`, or `unset` where Polars decides. A method is run in `select` on a column of
+# the receiver, with the options it needs to mean anything: `over` is given
+# `partition_by` and `order_by`. A step is run on the sample table, with what it needs:
+# a join on `u`, a pivot of `a` by `g`, a rename of `a`, a sort by `a`.
+#
+# An outcome is `allowed <dtype of the result> <one|many>` (`-` for a step), or
+# `refused <stage>: <Polars' reason>`. A combination is allowed only when Polars resolved
+# its schema, ran it on three rows that include a null, and ran it on a table with no rows.
+# The stage is where Polars refused it: `schema`; `rows`, when the schema resolved and
+# the rows were refused; or `empty`, when only the table with no rows was. `one` is a
+# value for the three rows together, `many` any other number. A reason is Polars' message
+# up to its first blank line, on one line.
+#
+# 440 combinations: 408 allowed; 32 refused when Polars resolved the schema, 0 when it ran the rows, 0 when it ran the empty table.
+#
+Expr.cum_count | Int64 | reverse=false | allowed UInt32 many
+Expr.cum_count | Int64 | reverse=true | allowed UInt32 many
+Expr.cum_max | Int64 | reverse=false | allowed Int64 many
+Expr.cum_max | Int64 | reverse=true | allowed Int64 many
+Expr.cum_sum | Int64 | reverse=false | allowed Int64 many
+Expr.cum_sum | Int64 | reverse=true | allowed Int64 many
+Expr.dt.total_days | Duration(us) | fractional=false | allowed Int64 many
+Expr.dt.total_days | Duration(us) | fractional=true | allowed Float64 many
+Expr.first | Int64 | ignore_nulls=false | allowed Int64 one
+Expr.first | Int64 | ignore_nulls=true | allowed Int64 one
+Expr.last | Int64 | ignore_nulls=false | allowed Int64 one
+Expr.last | Int64 | ignore_nulls=true | allowed Int64 one
+Expr.over | Int64 | descending=false, mapping_strategy=explode | allowed Int64 many
+Expr.over | Int64 | descending=false, mapping_strategy=group_to_rows | allowed Int64 many
+Expr.over | Int64 | descending=false, mapping_strategy=join | allowed List(Int64) many
+Expr.over | Int64 | descending=false, nulls_last=false | allowed Int64 many
+Expr.over | Int64 | descending=false, nulls_last=true | allowed Int64 many
+Expr.over | Int64 | descending=true, mapping_strategy=explode | allowed Int64 many
+Expr.over | Int64 | descending=true, mapping_strategy=group_to_rows | allowed Int64 many
+Expr.over | Int64 | descending=true, mapping_strategy=join | allowed List(Int64) many
+Expr.over | Int64 | descending=true, nulls_last=false | allowed Int64 many
+Expr.over | Int64 | descending=true, nulls_last=true | allowed Int64 many
+Expr.over | Int64 | nulls_last=false, mapping_strategy=explode | allowed Int64 many
+Expr.over | Int64 | nulls_last=false, mapping_strategy=group_to_rows | allowed Int64 many
+Expr.over | Int64 | nulls_last=false, mapping_strategy=join | allowed List(Int64) many
+Expr.over | Int64 | nulls_last=true, mapping_strategy=explode | allowed Int64 many
+Expr.over | Int64 | nulls_last=true, mapping_strategy=group_to_rows | allowed Int64 many
+Expr.over | Int64 | nulls_last=true, mapping_strategy=join | allowed List(Int64) many
+LazyFrame.join | - | allow_parallel=false, force_parallel=false | allowed -
+LazyFrame.join | - | allow_parallel=false, force_parallel=true | allowed -
+LazyFrame.join | - | allow_parallel=true, force_parallel=false | allowed -
+LazyFrame.join | - | allow_parallel=true, force_parallel=true | allowed -
+LazyFrame.join | - | build_side=auto, allow_parallel=false | allowed -
+LazyFrame.join | - | build_side=auto, allow_parallel=true | allowed -
+LazyFrame.join | - | build_side=auto, force_parallel=false | allowed -
+LazyFrame.join | - | build_side=auto, force_parallel=true | allowed -
+LazyFrame.join | - | build_side=force_left, allow_parallel=false | allowed -
+LazyFrame.join | - | build_side=force_left, allow_parallel=true | allowed -
+LazyFrame.join | - | build_side=force_left, force_parallel=false | allowed -
+LazyFrame.join | - | build_side=force_left, force_parallel=true | allowed -
+LazyFrame.join | - | build_side=force_right, allow_parallel=false | allowed -
+LazyFrame.join | - | build_side=force_right, allow_parallel=true | allowed -
+LazyFrame.join | - | build_side=force_right, force_parallel=false | allowed -
+LazyFrame.join | - | build_side=force_right, force_parallel=true | allowed -
+LazyFrame.join | - | build_side=prefer_left, allow_parallel=false | allowed -
+LazyFrame.join | - | build_side=prefer_left, allow_parallel=true | allowed -
+LazyFrame.join | - | build_side=prefer_left, force_parallel=false | allowed -
+LazyFrame.join | - | build_side=prefer_left, force_parallel=true | allowed -
+LazyFrame.join | - | build_side=prefer_right, allow_parallel=false | allowed -
+LazyFrame.join | - | build_side=prefer_right, allow_parallel=true | allowed -
+LazyFrame.join | - | build_side=prefer_right, force_parallel=false | allowed -
+LazyFrame.join | - | build_side=prefer_right, force_parallel=true | allowed -
+LazyFrame.join | - | coalesce=false, allow_parallel=false | allowed -
+LazyFrame.join | - | coalesce=false, allow_parallel=true | allowed -
+LazyFrame.join | - | coalesce=false, build_side=auto | allowed -
+LazyFrame.join | - | coalesce=false, build_side=force_left | allowed -
+LazyFrame.join | - | coalesce=false, build_side=force_right | allowed -
+LazyFrame.join | - | coalesce=false, build_side=prefer_left | allowed -
+LazyFrame.join | - | coalesce=false, build_side=prefer_right | allowed -
+LazyFrame.join | - | coalesce=false, force_parallel=false | allowed -
+LazyFrame.join | - | coalesce=false, force_parallel=true | allowed -
+LazyFrame.join | - | coalesce=false, maintain_order=left | allowed -
+LazyFrame.join | - | coalesce=false, maintain_order=left_right | allowed -
+LazyFrame.join | - | coalesce=false, maintain_order=none | allowed -
+LazyFrame.join | - | coalesce=false, maintain_order=right | allowed -
+LazyFrame.join | - | coalesce=false, maintain_order=right_left | allowed -
+LazyFrame.join | - | coalesce=true, allow_parallel=false | allowed -
+LazyFrame.join | - | coalesce=true, allow_parallel=true | allowed -
+LazyFrame.join | - | coalesce=true, build_side=auto | allowed -
+LazyFrame.join | - | coalesce=true, build_side=force_left | allowed -
+LazyFrame.join | - | coalesce=true, build_side=force_right | allowed -
+LazyFrame.join | - | coalesce=true, build_side=prefer_left | allowed -
+LazyFrame.join | - | coalesce=true, build_side=prefer_right | allowed -
+LazyFrame.join | - | coalesce=true, force_parallel=false | allowed -
+LazyFrame.join | - | coalesce=true, force_parallel=true | allowed -
+LazyFrame.join | - | coalesce=true, maintain_order=left | allowed -
+LazyFrame.join | - | coalesce=true, maintain_order=left_right | allowed -
+LazyFrame.join | - | coalesce=true, maintain_order=none | allowed -
+LazyFrame.join | - | coalesce=true, maintain_order=right | allowed -
+LazyFrame.join | - | coalesce=true, maintain_order=right_left | allowed -
+LazyFrame.join | - | coalesce=unset, allow_parallel=false | allowed -
+LazyFrame.join | - | coalesce=unset, allow_parallel=true | allowed -
+LazyFrame.join | - | coalesce=unset, build_side=auto | allowed -
+LazyFrame.join | - | coalesce=unset, build_side=force_left | allowed -
+LazyFrame.join | - | coalesce=unset, build_side=force_right | allowed -
+LazyFrame.join | - | coalesce=unset, build_side=prefer_left | allowed -
+LazyFrame.join | - | coalesce=unset, build_side=prefer_right | allowed -
+LazyFrame.join | - | coalesce=unset, force_parallel=false | allowed -
+LazyFrame.join | - | coalesce=unset, force_parallel=true | allowed -
+LazyFrame.join | - | coalesce=unset, maintain_order=left | allowed -
+LazyFrame.join | - | coalesce=unset, maintain_order=left_right | allowed -
+LazyFrame.join | - | coalesce=unset, maintain_order=none | allowed -
+LazyFrame.join | - | coalesce=unset, maintain_order=right | allowed -
+LazyFrame.join | - | coalesce=unset, maintain_order=right_left | allowed -
+LazyFrame.join | - | how=anti, allow_parallel=false | allowed -
+LazyFrame.join | - | how=anti, allow_parallel=true | allowed -
+LazyFrame.join | - | how=anti, build_side=auto | allowed -
+LazyFrame.join | - | how=anti, build_side=force_left | allowed -
+LazyFrame.join | - | how=anti, build_side=force_right | allowed -
+LazyFrame.join | - | how=anti, build_side=prefer_left | allowed -
+LazyFrame.join | - | how=anti, build_side=prefer_right | allowed -
+LazyFrame.join | - | how=anti, coalesce=false | allowed -
+LazyFrame.join | - | how=anti, coalesce=true | allowed -
+LazyFrame.join | - | how=anti, coalesce=unset | allowed -
+LazyFrame.join | - | how=anti, force_parallel=false | allowed -
+LazyFrame.join | - | how=anti, force_parallel=true | allowed -
+LazyFrame.join | - | how=anti, maintain_order=left | allowed -
+LazyFrame.join | - | how=anti, maintain_order=left_right | allowed -
+LazyFrame.join | - | how=anti, maintain_order=none | allowed -
+LazyFrame.join | - | how=anti, maintain_order=right | allowed -
+LazyFrame.join | - | how=anti, maintain_order=right_left | allowed -
+LazyFrame.join | - | how=anti, nulls_equal=false | allowed -
+LazyFrame.join | - | how=anti, nulls_equal=true | allowed -
+LazyFrame.join | - | how=anti, validate=1:1 | refused schema: 1:1 validation on a ANTI join is not supported
+LazyFrame.join | - | how=anti, validate=1:m | refused schema: 1:m validation on a ANTI join is not supported
+LazyFrame.join | - | how=anti, validate=m:1 | refused schema: m:1 validation on a ANTI join is not supported
+LazyFrame.join | - | how=anti, validate=m:m | allowed -
+LazyFrame.join | - | how=cross, allow_parallel=false | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=cross, allow_parallel=true | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=cross, build_side=auto | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=cross, build_side=force_left | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=cross, build_side=force_right | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=cross, build_side=prefer_left | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=cross, build_side=prefer_right | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=cross, coalesce=false | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=cross, coalesce=true | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=cross, coalesce=unset | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=cross, force_parallel=false | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=cross, force_parallel=true | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=cross, maintain_order=left | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=cross, maintain_order=left_right | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=cross, maintain_order=none | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=cross, maintain_order=right | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=cross, maintain_order=right_left | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=cross, nulls_equal=false | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=cross, nulls_equal=true | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=cross, validate=1:1 | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=cross, validate=1:m | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=cross, validate=m:1 | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=cross, validate=m:m | refused schema: a cross join takes no join keys
+LazyFrame.join | - | how=full, allow_parallel=false | allowed -
+LazyFrame.join | - | how=full, allow_parallel=true | allowed -
+LazyFrame.join | - | how=full, build_side=auto | allowed -
+LazyFrame.join | - | how=full, build_side=force_left | allowed -
+LazyFrame.join | - | how=full, build_side=force_right | allowed -
+LazyFrame.join | - | how=full, build_side=prefer_left | allowed -
+LazyFrame.join | - | how=full, build_side=prefer_right | allowed -
+LazyFrame.join | - | how=full, coalesce=false | allowed -
+LazyFrame.join | - | how=full, coalesce=true | allowed -
+LazyFrame.join | - | how=full, coalesce=unset | allowed -
+LazyFrame.join | - | how=full, force_parallel=false | allowed -
+LazyFrame.join | - | how=full, force_parallel=true | allowed -
+LazyFrame.join | - | how=full, maintain_order=left | allowed -
+LazyFrame.join | - | how=full, maintain_order=left_right | allowed -
+LazyFrame.join | - | how=full, maintain_order=none | allowed -
+LazyFrame.join | - | how=full, maintain_order=right | allowed -
+LazyFrame.join | - | how=full, maintain_order=right_left | allowed -
+LazyFrame.join | - | how=full, nulls_equal=false | allowed -
+LazyFrame.join | - | how=full, nulls_equal=true | allowed -
+LazyFrame.join | - | how=full, validate=1:1 | allowed -
+LazyFrame.join | - | how=full, validate=1:m | allowed -
+LazyFrame.join | - | how=full, validate=m:1 | allowed -
+LazyFrame.join | - | how=full, validate=m:m | allowed -
+LazyFrame.join | - | how=inner, allow_parallel=false | allowed -
+LazyFrame.join | - | how=inner, allow_parallel=true | allowed -
+LazyFrame.join | - | how=inner, build_side=auto | allowed -
+LazyFrame.join | - | how=inner, build_side=force_left | allowed -
+LazyFrame.join | - | how=inner, build_side=force_right | allowed -
+LazyFrame.join | - | how=inner, build_side=prefer_left | allowed -
+LazyFrame.join | - | how=inner, build_side=prefer_right | allowed -
+LazyFrame.join | - | how=inner, coalesce=false | allowed -
+LazyFrame.join | - | how=inner, coalesce=true | allowed -
+LazyFrame.join | - | how=inner, coalesce=unset | allowed -
+LazyFrame.join | - | how=inner, force_parallel=false | allowed -
+LazyFrame.join | - | how=inner, force_parallel=true | allowed -
+LazyFrame.join | - | how=inner, maintain_order=left | allowed -
+LazyFrame.join | - | how=inner, maintain_order=left_right | allowed -
+LazyFrame.join | - | how=inner, maintain_order=none | allowed -
+LazyFrame.join | - | how=inner, maintain_order=right | allowed -
+LazyFrame.join | - | how=inner, maintain_order=right_left | allowed -
+LazyFrame.join | - | how=inner, nulls_equal=false | allowed -
+LazyFrame.join | - | how=inner, nulls_equal=true | allowed -
+LazyFrame.join | - | how=inner, validate=1:1 | allowed -
+LazyFrame.join | - | how=inner, validate=1:m | allowed -
+LazyFrame.join | - | how=inner, validate=m:1 | allowed -
+LazyFrame.join | - | how=inner, validate=m:m | allowed -
+LazyFrame.join | - | how=left, allow_parallel=false | allowed -
+LazyFrame.join | - | how=left, allow_parallel=true | allowed -
+LazyFrame.join | - | how=left, build_side=auto | allowed -
+LazyFrame.join | - | how=left, build_side=force_left | allowed -
+LazyFrame.join | - | how=left, build_side=force_right | allowed -
+LazyFrame.join | - | how=left, build_side=prefer_left | allowed -
+LazyFrame.join | - | how=left, build_side=prefer_right | allowed -
+LazyFrame.join | - | how=left, coalesce=false | allowed -
+LazyFrame.join | - | how=left, coalesce=true | allowed -
+LazyFrame.join | - | how=left, coalesce=unset | allowed -
+LazyFrame.join | - | how=left, force_parallel=false | allowed -
+LazyFrame.join | - | how=left, force_parallel=true | allowed -
+LazyFrame.join | - | how=left, maintain_order=left | allowed -
+LazyFrame.join | - | how=left, maintain_order=left_right | allowed -
+LazyFrame.join | - | how=left, maintain_order=none | allowed -
+LazyFrame.join | - | how=left, maintain_order=right | allowed -
+LazyFrame.join | - | how=left, maintain_order=right_left | allowed -
+LazyFrame.join | - | how=left, nulls_equal=false | allowed -
+LazyFrame.join | - | how=left, nulls_equal=true | allowed -
+LazyFrame.join | - | how=left, validate=1:1 | allowed -
+LazyFrame.join | - | how=left, validate=1:m | allowed -
+LazyFrame.join | - | how=left, validate=m:1 | allowed -
+LazyFrame.join | - | how=left, validate=m:m | allowed -
+LazyFrame.join | - | how=right, allow_parallel=false | allowed -
+LazyFrame.join | - | how=right, allow_parallel=true | allowed -
+LazyFrame.join | - | how=right, build_side=auto | allowed -
+LazyFrame.join | - | how=right, build_side=force_left | allowed -
+LazyFrame.join | - | how=right, build_side=force_right | allowed -
+LazyFrame.join | - | how=right, build_side=prefer_left | allowed -
+LazyFrame.join | - | how=right, build_side=prefer_right | allowed -
+LazyFrame.join | - | how=right, coalesce=false | allowed -
+LazyFrame.join | - | how=right, coalesce=true | allowed -
+LazyFrame.join | - | how=right, coalesce=unset | allowed -
+LazyFrame.join | - | how=right, force_parallel=false | allowed -
+LazyFrame.join | - | how=right, force_parallel=true | allowed -
+LazyFrame.join | - | how=right, maintain_order=left | allowed -
+LazyFrame.join | - | how=right, maintain_order=left_right | allowed -
+LazyFrame.join | - | how=right, maintain_order=none | allowed -
+LazyFrame.join | - | how=right, maintain_order=right | allowed -
+LazyFrame.join | - | how=right, maintain_order=right_left | allowed -
+LazyFrame.join | - | how=right, nulls_equal=false | allowed -
+LazyFrame.join | - | how=right, nulls_equal=true | allowed -
+LazyFrame.join | - | how=right, validate=1:1 | refused schema: 1:1 validation on a RIGHT join is not supported
+LazyFrame.join | - | how=right, validate=1:m | refused schema: 1:m validation on a RIGHT join is not supported
+LazyFrame.join | - | how=right, validate=m:1 | refused schema: m:1 validation on a RIGHT join is not supported
+LazyFrame.join | - | how=right, validate=m:m | allowed -
+LazyFrame.join | - | how=semi, allow_parallel=false | allowed -
+LazyFrame.join | - | how=semi, allow_parallel=true | allowed -
+LazyFrame.join | - | how=semi, build_side=auto | allowed -
+LazyFrame.join | - | how=semi, build_side=force_left | allowed -
+LazyFrame.join | - | how=semi, build_side=force_right | allowed -
+LazyFrame.join | - | how=semi, build_side=prefer_left | allowed -
+LazyFrame.join | - | how=semi, build_side=prefer_right | allowed -
+LazyFrame.join | - | how=semi, coalesce=false | allowed -
+LazyFrame.join | - | how=semi, coalesce=true | allowed -
+LazyFrame.join | - | how=semi, coalesce=unset | allowed -
+LazyFrame.join | - | how=semi, force_parallel=false | allowed -
+LazyFrame.join | - | how=semi, force_parallel=true | allowed -
+LazyFrame.join | - | how=semi, maintain_order=left | allowed -
+LazyFrame.join | - | how=semi, maintain_order=left_right | allowed -
+LazyFrame.join | - | how=semi, maintain_order=none | allowed -
+LazyFrame.join | - | how=semi, maintain_order=right | allowed -
+LazyFrame.join | - | how=semi, maintain_order=right_left | allowed -
+LazyFrame.join | - | how=semi, nulls_equal=false | allowed -
+LazyFrame.join | - | how=semi, nulls_equal=true | allowed -
+LazyFrame.join | - | how=semi, validate=1:1 | refused schema: 1:1 validation on a SEMI join is not supported
+LazyFrame.join | - | how=semi, validate=1:m | refused schema: 1:m validation on a SEMI join is not supported
+LazyFrame.join | - | how=semi, validate=m:1 | refused schema: m:1 validation on a SEMI join is not supported
+LazyFrame.join | - | how=semi, validate=m:m | allowed -
+LazyFrame.join | - | maintain_order=left, allow_parallel=false | allowed -
+LazyFrame.join | - | maintain_order=left, allow_parallel=true | allowed -
+LazyFrame.join | - | maintain_order=left, build_side=auto | allowed -
+LazyFrame.join | - | maintain_order=left, build_side=force_left | allowed -
+LazyFrame.join | - | maintain_order=left, build_side=force_right | allowed -
+LazyFrame.join | - | maintain_order=left, build_side=prefer_left | allowed -
+LazyFrame.join | - | maintain_order=left, build_side=prefer_right | allowed -
+LazyFrame.join | - | maintain_order=left, force_parallel=false | allowed -
+LazyFrame.join | - | maintain_order=left, force_parallel=true | allowed -
+LazyFrame.join | - | maintain_order=left_right, allow_parallel=false | allowed -
+LazyFrame.join | - | maintain_order=left_right, allow_parallel=true | allowed -
+LazyFrame.join | - | maintain_order=left_right, build_side=auto | allowed -
+LazyFrame.join | - | maintain_order=left_right, build_side=force_left | allowed -
+LazyFrame.join | - | maintain_order=left_right, build_side=force_right | allowed -
+LazyFrame.join | - | maintain_order=left_right, build_side=prefer_left | allowed -
+LazyFrame.join | - | maintain_order=left_right, build_side=prefer_right | allowed -
+LazyFrame.join | - | maintain_order=left_right, force_parallel=false | allowed -
+LazyFrame.join | - | maintain_order=left_right, force_parallel=true | allowed -
+LazyFrame.join | - | maintain_order=none, allow_parallel=false | allowed -
+LazyFrame.join | - | maintain_order=none, allow_parallel=true | allowed -
+LazyFrame.join | - | maintain_order=none, build_side=auto | allowed -
+LazyFrame.join | - | maintain_order=none, build_side=force_left | allowed -
+LazyFrame.join | - | maintain_order=none, build_side=force_right | allowed -
+LazyFrame.join | - | maintain_order=none, build_side=prefer_left | allowed -
+LazyFrame.join | - | maintain_order=none, build_side=prefer_right | allowed -
+LazyFrame.join | - | maintain_order=none, force_parallel=false | allowed -
+LazyFrame.join | - | maintain_order=none, force_parallel=true | allowed -
+LazyFrame.join | - | maintain_order=right, allow_parallel=false | allowed -
+LazyFrame.join | - | maintain_order=right, allow_parallel=true | allowed -
+LazyFrame.join | - | maintain_order=right, build_side=auto | allowed -
+LazyFrame.join | - | maintain_order=right, build_side=force_left | allowed -
+LazyFrame.join | - | maintain_order=right, build_side=force_right | allowed -
+LazyFrame.join | - | maintain_order=right, build_side=prefer_left | allowed -
+LazyFrame.join | - | maintain_order=right, build_side=prefer_right | allowed -
+LazyFrame.join | - | maintain_order=right, force_parallel=false | allowed -
+LazyFrame.join | - | maintain_order=right, force_parallel=true | allowed -
+LazyFrame.join | - | maintain_order=right_left, allow_parallel=false | allowed -
+LazyFrame.join | - | maintain_order=right_left, allow_parallel=true | allowed -
+LazyFrame.join | - | maintain_order=right_left, build_side=auto | allowed -
+LazyFrame.join | - | maintain_order=right_left, build_side=force_left | allowed -
+LazyFrame.join | - | maintain_order=right_left, build_side=force_right | allowed -
+LazyFrame.join | - | maintain_order=right_left, build_side=prefer_left | allowed -
+LazyFrame.join | - | maintain_order=right_left, build_side=prefer_right | allowed -
+LazyFrame.join | - | maintain_order=right_left, force_parallel=false | allowed -
+LazyFrame.join | - | maintain_order=right_left, force_parallel=true | allowed -
+LazyFrame.join | - | nulls_equal=false, allow_parallel=false | allowed -
+LazyFrame.join | - | nulls_equal=false, allow_parallel=true | allowed -
+LazyFrame.join | - | nulls_equal=false, build_side=auto | allowed -
+LazyFrame.join | - | nulls_equal=false, build_side=force_left | allowed -
+LazyFrame.join | - | nulls_equal=false, build_side=force_right | allowed -
+LazyFrame.join | - | nulls_equal=false, build_side=prefer_left | allowed -
+LazyFrame.join | - | nulls_equal=false, build_side=prefer_right | allowed -
+LazyFrame.join | - | nulls_equal=false, coalesce=false | allowed -
+LazyFrame.join | - | nulls_equal=false, coalesce=true | allowed -
+LazyFrame.join | - | nulls_equal=false, coalesce=unset | allowed -
+LazyFrame.join | - | nulls_equal=false, force_parallel=false | allowed -
+LazyFrame.join | - | nulls_equal=false, force_parallel=true | allowed -
+LazyFrame.join | - | nulls_equal=false, maintain_order=left | allowed -
+LazyFrame.join | - | nulls_equal=false, maintain_order=left_right | allowed -
+LazyFrame.join | - | nulls_equal=false, maintain_order=none | allowed -
+LazyFrame.join | - | nulls_equal=false, maintain_order=right | allowed -
+LazyFrame.join | - | nulls_equal=false, maintain_order=right_left | allowed -
+LazyFrame.join | - | nulls_equal=true, allow_parallel=false | allowed -
+LazyFrame.join | - | nulls_equal=true, allow_parallel=true | allowed -
+LazyFrame.join | - | nulls_equal=true, build_side=auto | allowed -
+LazyFrame.join | - | nulls_equal=true, build_side=force_left | allowed -
+LazyFrame.join | - | nulls_equal=true, build_side=force_right | allowed -
+LazyFrame.join | - | nulls_equal=true, build_side=prefer_left | allowed -
+LazyFrame.join | - | nulls_equal=true, build_side=prefer_right | allowed -
+LazyFrame.join | - | nulls_equal=true, coalesce=false | allowed -
+LazyFrame.join | - | nulls_equal=true, coalesce=true | allowed -
+LazyFrame.join | - | nulls_equal=true, coalesce=unset | allowed -
+LazyFrame.join | - | nulls_equal=true, force_parallel=false | allowed -
+LazyFrame.join | - | nulls_equal=true, force_parallel=true | allowed -
+LazyFrame.join | - | nulls_equal=true, maintain_order=left | allowed -
+LazyFrame.join | - | nulls_equal=true, maintain_order=left_right | allowed -
+LazyFrame.join | - | nulls_equal=true, maintain_order=none | allowed -
+LazyFrame.join | - | nulls_equal=true, maintain_order=right | allowed -
+LazyFrame.join | - | nulls_equal=true, maintain_order=right_left | allowed -
+LazyFrame.join | - | validate=1:1, allow_parallel=false | allowed -
+LazyFrame.join | - | validate=1:1, allow_parallel=true | allowed -
+LazyFrame.join | - | validate=1:1, build_side=auto | allowed -
+LazyFrame.join | - | validate=1:1, build_side=force_left | allowed -
+LazyFrame.join | - | validate=1:1, build_side=force_right | allowed -
+LazyFrame.join | - | validate=1:1, build_side=prefer_left | allowed -
+LazyFrame.join | - | validate=1:1, build_side=prefer_right | allowed -
+LazyFrame.join | - | validate=1:1, coalesce=false | allowed -
+LazyFrame.join | - | validate=1:1, coalesce=true | allowed -
+LazyFrame.join | - | validate=1:1, coalesce=unset | allowed -
+LazyFrame.join | - | validate=1:1, force_parallel=false | allowed -
+LazyFrame.join | - | validate=1:1, force_parallel=true | allowed -
+LazyFrame.join | - | validate=1:1, maintain_order=left | allowed -
+LazyFrame.join | - | validate=1:1, maintain_order=left_right | allowed -
+LazyFrame.join | - | validate=1:1, maintain_order=none | allowed -
+LazyFrame.join | - | validate=1:1, maintain_order=right | allowed -
+LazyFrame.join | - | validate=1:1, maintain_order=right_left | allowed -
+LazyFrame.join | - | validate=1:1, nulls_equal=false | allowed -
+LazyFrame.join | - | validate=1:1, nulls_equal=true | allowed -
+LazyFrame.join | - | validate=1:m, allow_parallel=false | allowed -
+LazyFrame.join | - | validate=1:m, allow_parallel=true | allowed -
+LazyFrame.join | - | validate=1:m, build_side=auto | allowed -
+LazyFrame.join | - | validate=1:m, build_side=force_left | allowed -
+LazyFrame.join | - | validate=1:m, build_side=force_right | allowed -
+LazyFrame.join | - | validate=1:m, build_side=prefer_left | allowed -
+LazyFrame.join | - | validate=1:m, build_side=prefer_right | allowed -
+LazyFrame.join | - | validate=1:m, coalesce=false | allowed -
+LazyFrame.join | - | validate=1:m, coalesce=true | allowed -
+LazyFrame.join | - | validate=1:m, coalesce=unset | allowed -
+LazyFrame.join | - | validate=1:m, force_parallel=false | allowed -
+LazyFrame.join | - | validate=1:m, force_parallel=true | allowed -
+LazyFrame.join | - | validate=1:m, maintain_order=left | allowed -
+LazyFrame.join | - | validate=1:m, maintain_order=left_right | allowed -
+LazyFrame.join | - | validate=1:m, maintain_order=none | allowed -
+LazyFrame.join | - | validate=1:m, maintain_order=right | allowed -
+LazyFrame.join | - | validate=1:m, maintain_order=right_left | allowed -
+LazyFrame.join | - | validate=1:m, nulls_equal=false | allowed -
+LazyFrame.join | - | validate=1:m, nulls_equal=true | allowed -
+LazyFrame.join | - | validate=m:1, allow_parallel=false | allowed -
+LazyFrame.join | - | validate=m:1, allow_parallel=true | allowed -
+LazyFrame.join | - | validate=m:1, build_side=auto | allowed -
+LazyFrame.join | - | validate=m:1, build_side=force_left | allowed -
+LazyFrame.join | - | validate=m:1, build_side=force_right | allowed -
+LazyFrame.join | - | validate=m:1, build_side=prefer_left | allowed -
+LazyFrame.join | - | validate=m:1, build_side=prefer_right | allowed -
+LazyFrame.join | - | validate=m:1, coalesce=false | allowed -
+LazyFrame.join | - | validate=m:1, coalesce=true | allowed -
+LazyFrame.join | - | validate=m:1, coalesce=unset | allowed -
+LazyFrame.join | - | validate=m:1, force_parallel=false | allowed -
+LazyFrame.join | - | validate=m:1, force_parallel=true | allowed -
+LazyFrame.join | - | validate=m:1, maintain_order=left | allowed -
+LazyFrame.join | - | validate=m:1, maintain_order=left_right | allowed -
+LazyFrame.join | - | validate=m:1, maintain_order=none | allowed -
+LazyFrame.join | - | validate=m:1, maintain_order=right | allowed -
+LazyFrame.join | - | validate=m:1, maintain_order=right_left | allowed -
+LazyFrame.join | - | validate=m:1, nulls_equal=false | allowed -
+LazyFrame.join | - | validate=m:1, nulls_equal=true | allowed -
+LazyFrame.join | - | validate=m:m, allow_parallel=false | allowed -
+LazyFrame.join | - | validate=m:m, allow_parallel=true | allowed -
+LazyFrame.join | - | validate=m:m, build_side=auto | allowed -
+LazyFrame.join | - | validate=m:m, build_side=force_left | allowed -
+LazyFrame.join | - | validate=m:m, build_side=force_right | allowed -
+LazyFrame.join | - | validate=m:m, build_side=prefer_left | allowed -
+LazyFrame.join | - | validate=m:m, build_side=prefer_right | allowed -
+LazyFrame.join | - | validate=m:m, coalesce=false | allowed -
+LazyFrame.join | - | validate=m:m, coalesce=true | allowed -
+LazyFrame.join | - | validate=m:m, coalesce=unset | allowed -
+LazyFrame.join | - | validate=m:m, force_parallel=false | allowed -
+LazyFrame.join | - | validate=m:m, force_parallel=true | allowed -
+LazyFrame.join | - | validate=m:m, maintain_order=left | allowed -
+LazyFrame.join | - | validate=m:m, maintain_order=left_right | allowed -
+LazyFrame.join | - | validate=m:m, maintain_order=none | allowed -
+LazyFrame.join | - | validate=m:m, maintain_order=right | allowed -
+LazyFrame.join | - | validate=m:m, maintain_order=right_left | allowed -
+LazyFrame.join | - | validate=m:m, nulls_equal=false | allowed -
+LazyFrame.join | - | validate=m:m, nulls_equal=true | allowed -
+LazyFrame.pivot | - | maintain_order=false, column_naming=auto | allowed -
+LazyFrame.pivot | - | maintain_order=false, column_naming=combine | allowed -
+LazyFrame.pivot | - | maintain_order=true, column_naming=auto | allowed -
+LazyFrame.pivot | - | maintain_order=true, column_naming=combine | allowed -
+LazyFrame.rename | - | strict=false | allowed -
+LazyFrame.rename | - | strict=true | allowed -
+LazyFrame.sort | - | descending=false, maintain_order=false | allowed -
+LazyFrame.sort | - | descending=false, maintain_order=true | allowed -
+LazyFrame.sort | - | descending=false, multithreaded=false | allowed -
+LazyFrame.sort | - | descending=false, multithreaded=true | allowed -
+LazyFrame.sort | - | descending=false, nulls_last=false | allowed -
+LazyFrame.sort | - | descending=false, nulls_last=true | allowed -
+LazyFrame.sort | - | descending=true, maintain_order=false | allowed -
+LazyFrame.sort | - | descending=true, maintain_order=true | allowed -
+LazyFrame.sort | - | descending=true, multithreaded=false | allowed -
+LazyFrame.sort | - | descending=true, multithreaded=true | allowed -
+LazyFrame.sort | - | descending=true, nulls_last=false | allowed -
+LazyFrame.sort | - | descending=true, nulls_last=true | allowed -
+LazyFrame.sort | - | maintain_order=false, multithreaded=false | allowed -
+LazyFrame.sort | - | maintain_order=false, multithreaded=true | allowed -
+LazyFrame.sort | - | maintain_order=true, multithreaded=false | allowed -
+LazyFrame.sort | - | maintain_order=true, multithreaded=true | allowed -
+LazyFrame.sort | - | nulls_last=false, maintain_order=false | allowed -
+LazyFrame.sort | - | nulls_last=false, maintain_order=true | allowed -
+LazyFrame.sort | - | nulls_last=false, multithreaded=false | allowed -
+LazyFrame.sort | - | nulls_last=false, multithreaded=true | allowed -
+LazyFrame.sort | - | nulls_last=true, maintain_order=false | allowed -
+LazyFrame.sort | - | nulls_last=true, maintain_order=true | allowed -
+LazyFrame.sort | - | nulls_last=true, multithreaded=false | allowed -
+LazyFrame.sort | - | nulls_last=true, multithreaded=true | allowed -
