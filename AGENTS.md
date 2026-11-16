@@ -128,6 +128,7 @@ Source remains authoritative; never hand-edit generated artifacts.
 | `ui/apps/desktop/src/catalogue.json` | the host's catalogue view, written by its snapshot test; [refresh procedure](docs/how-to.md#refresh-the-catalogue-snapshot) |
 | `crates/dageist-tauri/gen/` (ignored) | `tauri-build`, during any build of `dageist-tauri` |
 | `crates/dageist-fuzz/tests/fixtures/subject/Cargo.lock` | Cargo, from the standalone fixture workspace's manifests; refresh it with the fixture's own Cargo command, never through the root workspace |
+| `api/catalogue/*.txt` | The engine test that runs the catalogue in Polars; [refresh procedure](docs/how-to.md#refresh-the-tables-of-allowed-combinations) |
 | `api/public-api.txt`, `api/crates/*.txt`, `api/polars/*.txt` | [api/generator/](api/generator/src/lib.rs); [audit procedures](docs/how-to.md#check-the-public-api-audits) |
 | `api/generator/Cargo.lock` | Cargo, from [api/generator/Cargo.toml](api/generator/Cargo.toml) |
 
