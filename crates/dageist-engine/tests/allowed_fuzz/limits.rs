@@ -655,7 +655,8 @@ fn shift_rows(link: &Call) -> i64 {
 
 /// Whether `links`, taken from the sample, leave only nulls: shifts that move all
 /// its rows, or one value, which an aggregate leaves, shifted away, or the first
-/// row that a shift left null, or a running sum of a comparison with a null,
+/// row that a shift left null, the last row where the sample has a null in it,
+/// or a running sum of a comparison with a null,
 /// which Polars gives as a column of nulls.
 fn leaves_only_nulls(links: &[Call]) -> bool {
     let (mut rows, mut shifted) = (SAMPLE_ROWS, 0);
@@ -679,6 +680,16 @@ fn leaves_only_nulls(links: &[Call]) -> bool {
             && !matches!(link.argument("ignore_nulls"), Some(Value::Flag(Some(true))))
         {
             (rows, shifted) = (1, i64::from(shifted >= 1));
+        } else if is(link, "Expr.last") {
+            // The sample's last row is a value and its null is the middle one, so
+            // the last of what a shift moved is null after one shift, or after
+            // all rows are moved.
+            let null = if rows == 1 {
+                shifted >= 1
+            } else {
+                shifted == 1 || shifted >= rows
+            };
+            (rows, shifted) = (1, i64::from(null));
         } else if is_one_value(link) {
             (rows, shifted) = (1, 0);
         }
@@ -1696,8 +1707,17 @@ mod tests {
             tables_refuse(&plain, at_the_call.clone(), ROWS, "no"),
             vec![]
         );
+        // The last after one shift is the sample's null; after two it is a value.
         let last = given(chain_of(column("k"), shift(&["Expr.shift", "Expr.last"])));
-        assert_eq!(tables_refuse(&last, at_the_call, ROWS, "no"), vec![]);
+        assert_eq!(
+            tables_refuse(&last, at_the_call.clone(), ROWS, "no"),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        let later = given(chain_of(
+            column("k"),
+            shift(&["Expr.shift", "Expr.shift", "Expr.last"]),
+        ));
+        assert_eq!(tables_refuse(&later, at_the_call, ROWS, "no"), vec![]);
     }
 
     /// A whole number as an expression: a literal of it.
