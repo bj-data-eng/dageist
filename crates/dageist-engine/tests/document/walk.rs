@@ -1077,10 +1077,17 @@ fn the_report_gives_each_expression_its_context_and_what_each_link_follows() {
         .iter()
         .find(|expression| expression.place().path() == item("exprs", 0).as_slice())
         .expect("the item");
-    let select = Context::step(Outer::Select);
-    assert_eq!(found.context(), Some(select));
+    // The walk owns the context and the places, and is the one the step gives.
+    let walk = step.walk();
     assert_eq!(
-        found.places(),
+        walk,
+        &document.steps()[0].walk(0, source().schema(), &inputs())
+    );
+    let select = Context::step(Outer::Select);
+    let walked = expression_at(walk, &item("exprs", 0));
+    assert_eq!(walked.context(), Some(select));
+    assert_eq!(
+        walked.places(),
         [
             at(select, after(Representative::Int64, Shape::Many)),
             at(select, after(Representative::Int64, Shape::Many)),
@@ -1088,11 +1095,6 @@ fn the_report_gives_each_expression_its_context_and_what_each_link_follows() {
     );
     // Polars' own answer is beside it.
     assert!(matches!(found.start(), Resolution::Dtype(DataType::Int64)));
-    // The walk is the one the step gives.
-    assert_eq!(
-        step.walk(),
-        &document.steps()[0].walk(0, source().schema(), &inputs())
-    );
 }
 
 #[test]

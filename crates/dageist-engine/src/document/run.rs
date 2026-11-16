@@ -13,7 +13,7 @@ use polars::prelude::{
     DataFrame, DataType, Expr, IdxSize, IntoLazy, LazyFrame, PolarsError, SchemaRef,
 };
 
-use crate::allowed::{self, Context, Place as OfferPlace, Position, Refusal};
+use crate::allowed::{self, Context, Position, Refusal};
 use crate::catalog::{Argument, Arguments, Build, BuildError, Conditional, Laziness};
 
 use super::error::{Place, Segment};
@@ -42,10 +42,8 @@ pub enum Resolution {
 #[derive(Debug, Clone)]
 pub struct ExpressionDtypes {
     place: Place,
-    context: Option<Context>,
     start: Resolution,
     links: Vec<Resolution>,
-    places: Vec<Option<OfferPlace>>,
 }
 
 impl ExpressionDtypes {
@@ -54,23 +52,6 @@ impl ExpressionDtypes {
     #[must_use]
     pub const fn place(&self) -> &Place {
         &self.place
-    }
-
-    /// The context the expression stands in, as the tables of allowed
-    /// combinations have it. `None` when no named position holds it.
-    #[must_use]
-    pub const fn context(&self) -> Option<Context> {
-        self.context
-    }
-
-    /// The places the links stand in, in order, and after them the place a link
-    /// added at the end would stand in, as [`allowed::offers`] is asked at them.
-    /// `None` where what comes before is not known: the dtype the tables say
-    /// the chain has, which is not Polars', is what they follow. See
-    /// [`WalkedExpression::places`](super::WalkedExpression::places).
-    #[must_use]
-    pub fn places(&self) -> &[Option<OfferPlace>] {
-        &self.places
     }
 
     /// What the start alone has.
@@ -414,22 +395,6 @@ fn run_step(
     } else {
         Walk::default()
     };
-    let expressions = |traces: Vec<ExpressionDtypes>| {
-        traces
-            .into_iter()
-            .map(|mut found| {
-                if let Some(walked) = walk
-                    .expressions()
-                    .iter()
-                    .find(|walked| walked.place() == found.place())
-                {
-                    found.context = walked.context();
-                    found.places = walked.places();
-                }
-                found
-            })
-            .collect()
-    };
     let frame = match builder.step(step.call(), input) {
         Ok(frame) => frame,
         Err(stop) => {
@@ -438,7 +403,7 @@ fn run_step(
                     place: stop.place(&base),
                     cause: stop.cause,
                 }),
-                expressions: expressions(builder.traces),
+                expressions: builder.traces,
                 walk,
             };
         }
@@ -448,7 +413,7 @@ fn run_step(
         Err(error) => Err(builder.polars_refusal(error)),
     };
     StepRun {
-        expressions: expressions(builder.traces),
+        expressions: builder.traces,
         walk,
         result,
     }
@@ -693,10 +658,8 @@ impl Builder<'_> {
         if let (Some(start), true) = (start, self.probe.is_some()) {
             self.traces.push(ExpressionDtypes {
                 place,
-                context: None,
                 start,
                 links: links.into_iter().flatten().collect(),
-                places: Vec::new(),
             });
         }
         match state {
