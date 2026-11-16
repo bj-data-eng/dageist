@@ -312,6 +312,73 @@ A rule of how a chain ends, which is about a dtype, also says in
 `Rule::forbids_end` what it makes of a result whose dtype is not known: it does
 not refuse it.
 
+## Check The Tables Against Polars
+
+The tables are measured one combination at a time. A property target in
+`crates/dageist-engine/tests/allowed_fuzz/` makes the combinations they were not
+measured as and checks them against Polars, as
+[the explanation](explanation.md#what-the-tables-are-checked-against) says. It runs
+with the engine's tests, from a fixed seed, on 1000 cases in about eight
+seconds in a debug build:
+
+```sh
+cargo test --offline --locked -p dageist-engine --test allowed_fuzz
+```
+
+It is built on [dageist-fuzz](../crates/dageist-fuzz/README.md)'s `property`
+feature, which is a dev-dependency of the engine. A case is the dtypes of the
+columns `a` and `b` and a step document, written by the document's own writer
+under one line that names the dtypes, so a case is plain text:
+
+```text
+{"a":"UInt32","b":"String","revision":1}
+{"version":1,"steps":[{"id":"s","call":{ … }}]}
+```
+
+To run more, name the seed and the number of cases. A campaign stops at the
+first disagreement, reduces it to the smallest case that disagrees in the same
+way, writes that to `target/tmp/allowed-fuzz/` (or the directory
+`DAGEIST_FUZZ_KEEP` names) and prints it, and prints how many cases ended each
+way. Run it alone, since a case that runs Polars is heavy:
+
+```sh
+DAGEIST_FUZZ_SEED=7 DAGEIST_FUZZ_CASES=20000 cargo test --offline --locked -p dageist-engine \
+  --test allowed_fuzz a_campaign -- --ignored --nocapture --test-threads=1
+```
+
+The case that is about to run is written to `current.case` in that directory
+first, so a case that does not return is found. To run one kept case again, and
+see what the tables predicted and Polars did, name its file:
+
+```sh
+DAGEIST_FUZZ_REPLAY=target/tmp/allowed-fuzz/<file>.case cargo test --offline --locked \
+  -p dageist-engine --test allowed_fuzz replay_a_case -- --ignored --nocapture
+```
+
+A disagreement is a finding to settle, not to silence. Read it, run the case in
+Polars by hand, and decide which it is:
+
+- **A defect of the engine** (the offers, the rules, the generator of the
+  tables): write the test that fails for it in `crates/dageist-engine/src/allowed/tests/`
+  first, then correct it, refreshing the tables as
+  [above](#refresh-the-tables-of-allowed-combinations) if they change. Keep the
+  case as `crates/dageist-engine/tests/allowed_fuzz/regressions/fixed-<what>.case`.
+  The normal run replays it and expects it to check something.
+- **A case the tables say they do not cover**: add or extend a `Limit` in
+  `allowed_fuzz/limits.rs`, with the sentence that says what the tables were not
+  measured on, and say it in
+  [the explanation](explanation.md#what-the-tables-are-checked-against). Keep the
+  case as `regressions/uncovered-<limit>.case`, which the normal run replays and
+  expects the limit to excuse; every limit has one.
+- **A mistake of the generator** (a case that Polars refuses for what no table
+  is about, such as a value that depends on the rows): correct
+  `allowed_fuzz/generate.rs` and say why in a comment there.
+
+`DAGEIST_FUZZ_STRICT=1` makes the limits excuse nothing, which shows what each
+one would otherwise report. The tally printed with `--nocapture` counts the
+cases a limit excused, so a limit that excuses most of what a campaign makes
+shows.
+
 ## Check The Build Against The Polars Release
 
 The engine builds Polars from `vendor/polars` with the same features, crate

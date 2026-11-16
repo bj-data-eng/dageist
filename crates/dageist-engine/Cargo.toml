@@ -179,3 +179,6 @@ toml = { version = "=1.2.1", default-features = false, features = ["parse", "ser
 # resolves for the host and the fuzz framework, so it adds no package; the engine's own
 # JSON reader and writer do not use it.
 serde_json = { version = "=1.0.151", default-features = false, features = ["std"] }
+# The property target in tests/allowed_fuzz generates cases and runs them through this
+# framework's property runner. The fuzz framework depends on no production crate.
+dageist-fuzz = { path = "../dageist-fuzz", features = ["property"] }

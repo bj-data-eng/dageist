@@ -1,0 +1,24 @@
+schema = 1
+fixtures = ["regressions"]
+
+[[targets]]
+id = "dageist-engine::allowed-combinations"
+owner = "dageist-engine"
+binary = "allowed-fuzz"
+properties = [
+    "dageist-engine::tables-predict-allowance",
+    "dageist-engine::tables-predict-dtypes",
+]
+source_references = [
+    "docs/explanation.md#which-combinations-polars-allows",
+    "api/catalogue/dtypes.txt",
+    "api/catalogue/contexts.txt",
+    "api/catalogue/options.txt",
+]
+format = { identity = "dageist-engine::allowed-case", revision = 1 }
+generator_identity = { identity = "dageist-engine::allowed-entropy", revision = 1 }
+encoding = "structured"
+limits = { bytes = 65536, nodes = 0, depth = 0, text_units = 0, operations = 0 }
+requirements = { features = [], capabilities = ["property", "replay", "case-capture", "reduction"] }
+min_evaluated = 1
+max_generation_rejections = 100000
