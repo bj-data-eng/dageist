@@ -115,9 +115,9 @@ David Tolnay, under your choice of either license:
 * License: [MIT License](licenses/serde/LICENSE-MIT)
 * Homepage: [Serde](https://serde.rs)
 
-This product's tests and fuzz framework depend on serde_json 1.0.151, and its
-public API audit generator on serde_json 1.0.150, from the same upstream
-project, under your
+This product depends on serde_json 1.0.151, which its engine uses to read and
+write the step document, and its public API audit generator on serde_json
+1.0.150, from the same upstream project, under your
 choice of either license:
 
 * License: [Apache License 2.0](licenses/serde/LICENSE-APACHE)
