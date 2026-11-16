@@ -24,6 +24,10 @@ const STRICTER_BY_DESIGN: [(&str, &str); 1] = [(
     "a pivot's aggregate gives one value for each group, though Polars lets a running value stand",
 )];
 
+/// What the outcome of a case says where the tables refuse a part that Polars
+/// does not evaluate, and a probe of the part shows the tables right.
+pub const STRICTER_WHERE_UNEVALUATED: &str = "stricter where Polars does not evaluate the part";
+
 pub const TARGET: &str = "dageist-engine::allowed-combinations";
 pub const ALLOWANCE: &str = "dageist-engine::tables-predict-allowance";
 pub const DTYPES: &str = "dageist-engine::tables-predict-dtypes";
