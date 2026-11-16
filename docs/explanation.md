@@ -187,8 +187,11 @@ as Python prints them, such as `Datetime(time_unit='us', time_zone=None)`.
 Reading is strict. A field, entry or argument the catalogue does not know,
 and a call where it cannot stand, such as a method before its start or a
 `then` without its `when`, is refused with its place: the step, the path
-through the parameter's lists and pairs, and the link. Writing a document
-gives back the same text.
+through the parameter's lists and pairs, and the link. A repeated key is a
+syntax error, reported by line and column. Writing a document gives text that
+reads back as the same document, and text the writer produced is written back
+exactly, each float to the bit. Nesting is limited to a fixed depth, which
+reading and constructing a document both enforce.
 
 The engine runs a document on a source table and the graph's inputs. It
 builds each step through the catalogue and reports whether it is valid, with
