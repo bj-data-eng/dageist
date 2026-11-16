@@ -24,7 +24,8 @@
 //! tables embedded in the engine and those rules, whether an entry may stand
 //! at a [`Place`], and give a reason for each refusal, without running Polars.
 //! [`rule_forbids`] answers from the rules alone, and [`rule_forbids_mixed_key`]
-//! for a join's key whose whole expression holds an aggregate beside a column.
+//! for a join's key whose whole expression holds an aggregate beside a column,
+//! or a column compared with a null.
 
 mod context;
 mod dtype;

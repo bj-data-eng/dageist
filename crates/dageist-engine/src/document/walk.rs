@@ -9,7 +9,8 @@
 //! the arguments chosen for its expression parameters, the options it is given,
 //! and, for a start, the dtype of the column or literal it reads. Every
 //! expression that a position holds is asked whether it may end there, and a
-//! join's key whether it holds an aggregate beside a column. The options a step is
+//! join's key whether it holds an aggregate beside a column, or a column compared
+//! with a null. The options a step is
 //! given are asked of [`allowed::options`].
 //!
 //! The tables are measured, so what they cannot say is not guessed: a chain
@@ -868,28 +869,66 @@ const COMPARISONS: [&str; 6] = [
     "Expr.eq", "Expr.ne", "Expr.gt", "Expr.ge", "Expr.lt", "Expr.le",
 ];
 
-/// Whether `call` compares with a null literal.
-fn compares_with_a_null(call: &Call) -> bool {
-    COMPARISONS.contains(&call.entry().id().as_str())
-        && operands(call).into_iter().any(|operand| {
-            operand.links().is_empty()
-                && matches!(
-                    operand.start(),
-                    Start::Call(start)
-                        if start.entry().id().as_str() == "polars.lit"
-                            && matches!(start.argument("value"), Some(Value::Flag(None)))
-                )
-        })
+/// Whether `link` is a comparison.
+fn is_a_comparison(link: &Call) -> bool {
+    COMPARISONS.contains(&link.entry().id().as_str())
 }
 
-/// Whether an expression holds an aggregate. What a comparison with a null
-/// literal follows is dropped, for the comparison is a null, and so is any
+/// The calls of an expression: its start, then its links.
+fn calls_of(expression: &Expression) -> impl Iterator<Item = &Call> {
+    std::iter::once(expression.start())
+        .filter_map(|start| match start {
+            Start::Call(call) => Some(call),
+            Start::Input(_) => None,
+        })
+        .chain(expression.links())
+}
+
+/// Whether an expression holds, at any depth, a comparison with a null literal:
+/// one given it, or one that follows it at the start. Polars folds it into a
+/// null.
+fn folds_a_null(expression: &Expression) -> bool {
+    let from_a_null = starts_from_a_null(expression);
+    expression.links().iter().enumerate().any(|(at, link)| {
+        is_a_comparison(link)
+            && ((from_a_null && at == 0) || operands(link).into_iter().any(is_a_null))
+    }) || calls_of(expression).any(|call| operands(call).into_iter().any(folds_a_null))
+}
+
+/// Whether a null fold is in the first `upto` calls of an expression, or in what
+/// they are given.
+fn folds_a_null_before(expression: &Expression, upto: usize) -> bool {
+    let from_a_null = starts_from_a_null(expression);
+    let links = &expression.links()[..upto];
+    links.iter().enumerate().any(|(at, link)| {
+        is_a_comparison(link)
+            && ((from_a_null && at == 0) || operands(link).into_iter().any(is_a_null))
+    }) || calls_of(expression)
+        .take(upto + 1)
+        .any(|call| operands(call).into_iter().any(folds_a_null))
+}
+
+/// Whether the link `at` of an expression is a comparison that a null reaches:
+/// it is given a null, or a null fold, or follows one. It is a null itself, and
+/// takes with it any aggregate it follows or is given. What Polars folds
+/// depends on dtypes, so any fold that can reach it counts.
+fn is_reached_by_a_null(expression: &Expression, at: usize) -> bool {
+    let link = &expression.links()[at];
+    is_a_comparison(link)
+        && (operands(link)
+            .into_iter()
+            .any(|operand| is_a_null(operand) || folds_a_null(operand))
+            || (starts_from_a_null(expression) && at == 0)
+            || folds_a_null_before(expression, at))
+}
+
+/// Whether an expression holds an aggregate. What a comparison that a null
+/// reaches follows is dropped, for the comparison is a null, and so is any
 /// aggregate in it.
 fn holds_an_aggregate(expression: &Expression) -> bool {
-    let from = expression
-        .links()
-        .iter()
-        .rposition(compares_with_a_null)
+    let from = (0..expression.links().len())
+        .rev()
+        .find(|at| is_reached_by_a_null(expression, *at))
         .map_or(0, |at| at + 1);
     let links = &expression.links()[from..];
     let start = match expression.start() {
