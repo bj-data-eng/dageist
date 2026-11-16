@@ -964,21 +964,13 @@ fn is_reached_by_a_null(expression: &Expression, at: usize) -> bool {
             || folds_a_null_before(expression, at))
 }
 
-/// The last comparison of an expression that a null reaches. Where a join's key
-/// is judged elementwise, Polars drops what such a comparison follows and is
-/// given, when that is one value or literals alone, and does not drop what a
-/// subtraction with a null does: the key `k != f.len() - null` is not
-/// elementwise.
-fn reaching_comparison(expression: &Expression) -> Option<usize> {
-    (0..expression.links().len())
-        .rev()
-        .find(|at| is_reached_by_a_null(expression, *at))
-}
-
 /// Whether an expression holds an aggregate that Polars evaluates. A comparison
-/// that a null reaches is a null, and Polars never evaluates what it follows or
-/// is given where that is one value or literals alone, so an aggregate there is
-/// dropped; a side that is more is evaluated, and its aggregate counts.
+/// that a null reaches is a null. The first of them drops what it follows and is
+/// given where that is one value or literals alone, and the comparisons after it
+/// compare a null, so they drop only what they are given where it is one value or
+/// literals alone. A side that is more is evaluated, and its aggregate counts.
+/// Where a join's key is judged elementwise a subtraction with a null drops
+/// nothing: the key `k != f.len() - null` is not elementwise.
 fn holds_an_aggregate(expression: &Expression) -> bool {
     let evaluated =
         |call: &Call| is_one_value(call) || operands(call).into_iter().any(holds_an_aggregate);
@@ -987,20 +979,25 @@ fn holds_an_aggregate(expression: &Expression) -> bool {
         Start::Input(_) => None,
     };
     let links = expression.links();
-    let Some(reach) = reaching_comparison(expression) else {
+    let Some(first) = (0..links.len()).find(|at| is_reached_by_a_null(expression, *at)) else {
         return start.into_iter().chain(links).any(evaluated);
     };
-    // What the comparison follows is the start and the links before it, dropped as
-    // a whole where they are one value or literals alone.
-    let followed = !wholly_single(expression, reach, true)
-        && start.into_iter().chain(&links[..reach]).any(evaluated);
-    // What it is given is dropped where it is one value or literals alone.
-    let given = operands(&links[reach]).into_iter().any(|operand| {
-        !wholly_single(operand, operand.links().len(), true) && holds_an_aggregate(operand)
+    // What the first comparison follows is the start and the links before it,
+    // dropped as a whole where they are one value or literals alone.
+    let followed = !wholly_single(expression, first, true)
+        && start.into_iter().chain(&links[..first]).any(evaluated);
+    // What a comparison that a null reaches is given is dropped where it is one
+    // value or literals alone, and what is not reached is evaluated.
+    let after = links[first..].iter().enumerate().any(|(at, link)| {
+        if is_reached_by_a_null(expression, first + at) {
+            operands(link).into_iter().any(|operand| {
+                !wholly_single(operand, operand.links().len(), true) && holds_an_aggregate(operand)
+            })
+        } else {
+            evaluated(link)
+        }
     });
-    // What follows the comparison is evaluated.
-    let after = links[reach + 1..].iter().any(evaluated);
-    followed || given || after
+    followed || after
 }
 
 /// Whether an expression reads a column: it starts from one, or a call in it is
