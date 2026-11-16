@@ -223,6 +223,7 @@ pub dageist_engine::document::Cause::Shape
 pub dageist_engine::document::Cause::Shape::expected: &'static str
 pub dageist_engine::document::Cause::Shape::found: &'static str
 pub dageist_engine::document::Cause::Shape::what: &'static str
+pub dageist_engine::document::Cause::TooDeep
 pub dageist_engine::document::Cause::UnfinishedCondition
 pub dageist_engine::document::Cause::UnfinishedCondition::needs: &'static str
 pub dageist_engine::document::Cause::UnknownArgument(alloc::string::String)
@@ -262,7 +263,7 @@ pub dageist_engine::document::Position::Start
 pub dageist_engine::document::Position::Step
 pub enum dageist_engine::document::ReadError
 pub dageist_engine::document::ReadError::Refused(dageist_engine::document::Refusal)
-pub dageist_engine::document::ReadError::Syntax(serde_json::error::Error)
+pub dageist_engine::document::ReadError::Syntax(dageist_engine::document::SyntaxError)
 impl core::convert::From<dageist_engine::document::Refusal> for dageist_engine::document::ReadError
 pub fn dageist_engine::document::ReadError::from(refusal: dageist_engine::document::Refusal) -> Self
 impl core::error::Error for dageist_engine::document::ReadError
@@ -302,6 +303,20 @@ pub dageist_engine::document::Segment::Value(usize)
 pub enum dageist_engine::document::Start
 pub dageist_engine::document::Start::Call(dageist_engine::document::Call)
 pub dageist_engine::document::Start::Input(alloc::string::String)
+pub enum dageist_engine::document::SyntaxProblem
+pub dageist_engine::document::SyntaxProblem::ControlCharacter(char)
+pub dageist_engine::document::SyntaxProblem::DuplicateKey(alloc::string::String)
+pub dageist_engine::document::SyntaxProblem::EndOfText
+pub dageist_engine::document::SyntaxProblem::InvalidEscape(char)
+pub dageist_engine::document::SyntaxProblem::InvalidUnicodeEscape
+pub dageist_engine::document::SyntaxProblem::LeadingZero
+pub dageist_engine::document::SyntaxProblem::LoneSurrogate
+pub dageist_engine::document::SyntaxProblem::NumberOutOfRange
+pub dageist_engine::document::SyntaxProblem::TooDeep
+pub dageist_engine::document::SyntaxProblem::TrailingText(char)
+pub dageist_engine::document::SyntaxProblem::Unexpected(char)
+impl core::fmt::Display for dageist_engine::document::SyntaxProblem
+pub fn dageist_engine::document::SyntaxProblem::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub enum dageist_engine::document::Value
 pub dageist_engine::document::Value::Choice(alloc::string::String)
 pub dageist_engine::document::Value::Columns(alloc::vec::Vec<alloc::string::String>)
@@ -424,6 +439,15 @@ pub const fn dageist_engine::document::StepReport::id(&self) -> &dageist_engine:
 pub const fn dageist_engine::document::StepReport::laziness(&self) -> dageist_engine::catalog::Laziness
 pub const fn dageist_engine::document::StepReport::outcome(&self) -> &dageist_engine::document::Outcome
 pub const fn dageist_engine::document::StepReport::schema(&self) -> core::option::Option<&polars_core::schema::SchemaRef>
+pub struct dageist_engine::document::SyntaxError
+impl dageist_engine::document::SyntaxError
+pub const fn dageist_engine::document::SyntaxError::column(&self) -> usize
+pub const fn dageist_engine::document::SyntaxError::line(&self) -> usize
+pub const fn dageist_engine::document::SyntaxError::problem(&self) -> &dageist_engine::document::SyntaxProblem
+impl core::error::Error for dageist_engine::document::SyntaxError
+impl core::fmt::Display for dageist_engine::document::SyntaxError
+pub fn dageist_engine::document::SyntaxError::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub const dageist_engine::document::MAX_NESTING: usize
 pub const dageist_engine::document::VERSION: u32
 pub struct dageist_engine::ColumnInfo
 pub dageist_engine::ColumnInfo::data_type: alloc::string::String
