@@ -1739,6 +1739,86 @@ mod tests {
     }
 
     #[test]
+    fn a_rule_refusing_a_predicate_in_a_window_order_by_that_is_one_value_is_excused_and_elsewhere_not()
+     {
+        // `f.over(order_by=[when(g).then(k).len()])`: Polars drops an `order_by`
+        // that is one value, so the text predicate is not evaluated; it evaluates
+        // the same key in `partition_by` and in `more_exprs`, and an `order_by`
+        // that is not one value.
+        let single = || {
+            chain_of(
+                when_of(vec![chain(column("g"), &[])]),
+                vec![
+                    then_of(chain(column("k"), &[])),
+                    call("Expr.len", Vec::new()),
+                ],
+            )
+        };
+        let window = |parameter_name: &str, keys: Vec<Expression>| {
+            select(vec![chain_of(
+                column("f"),
+                vec![call("Expr.over", vec![(parameter_name, many(keys))])],
+            )])
+        };
+        let predicate = |parameter_name: &str, item: usize| {
+            at(&[
+                parameter("exprs"),
+                Segment::Item(0),
+                Segment::Link(0),
+                parameter(parameter_name),
+                Segment::Item(item),
+                Segment::Start,
+                parameter("predicates"),
+                Segment::Item(0),
+            ])
+        };
+        assert_eq!(
+            rule_refuses(
+                &window("order_by", vec![single()]),
+                predicate("order_by", 0),
+                BOOLEAN_RULE,
+                "a rule"
+            ),
+            vec![Limit::AnAggregateGivesOneValue]
+        );
+        // Each key is dropped by itself.
+        assert_eq!(
+            rule_refuses(
+                &window("order_by", vec![chain(column("k"), &[]), single()]),
+                predicate("order_by", 1),
+                BOOLEAN_RULE,
+                "a rule"
+            ),
+            vec![Limit::AnAggregateGivesOneValue]
+        );
+        for other in ["partition_by", "more_exprs"] {
+            assert_eq!(
+                rule_refuses(
+                    &window(other, vec![single()]),
+                    predicate(other, 0),
+                    BOOLEAN_RULE,
+                    "a rule"
+                ),
+                vec![],
+                "{other}"
+            );
+        }
+        let not_one_value = chain_of(
+            when_of(vec![chain(column("g"), &[])]),
+            vec![then_of(chain(column("k"), &[]))],
+        );
+        assert_eq!(
+            rule_refuses(
+                &window("order_by", vec![not_one_value]),
+                predicate("order_by", 0),
+                BOOLEAN_RULE,
+                "a rule"
+            ),
+            vec![]
+        );
+    }
+
+    #[test]
     fn a_rule_refusing_a_literal_start_or_a_fold_is_excused_by_nothing_else() {
         let from_a_literal = select(vec![chain(literal(), &["Expr.cum_sum"])]);
         assert_eq!(
