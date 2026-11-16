@@ -57,8 +57,7 @@ pub enum Limit {
     /// in it, which Polars allows. What the tables say of a method's dtype was
     /// measured in `select` on a column. Of the named rules it excuses only the
     /// refusal of a predicate inside a sort key or a window's `order_by` that is
-    /// one value, and of a later predicate of a condition that a literal
-    /// predicate decides, with a `len` after it.
+    /// one value, and inside what a `len` counts in a `select` of one values.
     AnAggregateGivesOneValue,
     /// A pivot's aggregate is run on the values of each group, not on a
     /// column in `select`, and Polars uses other kernels for them: it takes the
@@ -781,6 +780,22 @@ fn leaves_only_nulls(links: &[Call]) -> bool {
     shifted >= rows
 }
 
+/// Whether a `len` is why a place is not evaluated: in a `select` whose every
+/// item is one value, Polars does not read what a `len` counts. `with_columns`,
+/// `filter` and a `select` with an item that is a column evaluate it.
+fn len_is_not_read(case: &Case, locus: &Locus) -> bool {
+    let step = case.document.steps()[0].call();
+    is(step, "LazyFrame.select")
+        && operands(step)
+            .into_iter()
+            .all(|(_, item)| wholly_single(item, item.links().len(), true))
+        && locus
+            .inside
+            .iter()
+            .zip(&locus.reach)
+            .any(|(holder, reach)| reached_by_a_len(holder, *reach))
+}
+
 /// Whether the expression at `place` is what the parameter `name` of a call is
 /// given.
 fn held_by(place: &Place, name: &str) -> bool {
@@ -800,9 +815,8 @@ fn held_by(place: &Place, name: &str) -> bool {
 /// campaign case and a replay of it without the cause: a fold of a null drops
 /// the predicate, which the walk says ([`Walk::evaluation_at`]); a sort key that
 /// is one value, or a window's `order_by` that is, is dropped, and Polars
-/// refuses the same key elsewhere or when it is not one value; and a condition
-/// that a literal predicate decides, with a `len` after it, does not read its
-/// later predicates.
+/// refuses the same key elsewhere or when it is not one value; and a `len` in a
+/// `select` of one values is not given what it counts.
 fn applies_to_a_rule(
     limit: Limit,
     rule: &str,
@@ -833,15 +847,7 @@ fn applies_to_a_rule(
                     && wholly_single(key, key.links().len(), true)
             });
             let dropped = sort_key || order_by;
-            predicate_rule
-                && (dropped
-                    || locus
-                        .inside
-                        .iter()
-                        .zip(&locus.reach)
-                        .any(|(holder, reach)| {
-                            is_decided(holder) && reached_by_a_len(holder, *reach)
-                        }))
+            predicate_rule && (dropped || len_is_not_read(case, &locus))
         }
         _ => false,
     }
@@ -1541,7 +1547,8 @@ mod tests {
                 ],
                 vec![g()],
             ),
-            // A `len` follows the predicate.
+            // A `len` follows the predicate. A `select` of one values does not
+            // read what it counts, so `with_columns` holds it here.
             (
                 vec![
                     then_of(chain(column("f"), &[])),
@@ -1554,7 +1561,12 @@ mod tests {
             let item = |folds: bool| {
                 let mut all = links.clone();
                 all.push(compared_with("Expr.eq", operand(folds)));
-                select(vec![chain_of(when_of(predicates.clone()), all)])
+                let items = vec![chain_of(when_of(predicates.clone()), all)];
+                if at == 3 {
+                    case_of(call("LazyFrame.with_columns", vec![("exprs", many(items))]))
+                } else {
+                    select(items)
+                }
             };
             assert_eq!(
                 rule_refuses(&item(true), start_predicate(0), BOOLEAN_RULE, "a rule"),
