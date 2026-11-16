@@ -423,3 +423,138 @@ fn options_that_polars_refuses_together_are_refused_with_its_reason() {
         .finish();
     assert!(semi.and_then(|mut frame| frame.collect_schema()).is_err());
 }
+
+/// What Polars does with `filter(predicate)` on the sample table whose column
+/// `a` has the dtype `receiver`.
+fn filtered(receiver: Representative, predicate: Expr) -> Seen {
+    let frames = Frames::new(receiver, Representative::Int64, &DataType::Int64);
+    see(&frames.rows, &frames.empty, |frame| {
+        frame.filter(predicate.clone())
+    })
+}
+
+fn filter_after(dtype: Representative) -> Place {
+    Place::new(Context::step(Outer::Filter), after(dtype))
+}
+
+/// Asserts that `id` is offered after `receiver` in a filter's predicate, as a
+/// method to be continued: it gives `shape`, and the chain may not end there,
+/// since a predicate ends `Boolean`.
+fn assert_stands_in_the_middle_of_a_filter_predicate(
+    id: &str,
+    receiver: Representative,
+    shape: Shape,
+) {
+    let offered = verdict(id, &filter_after(receiver), &[]);
+    let allowance = offered
+        .allowance()
+        .unwrap_or_else(|| panic!("{id} after {receiver}: {offered:?}"));
+    assert_eq!(allowance.shape(), shape, "{id} after {receiver}");
+    let refusal = allowance
+        .can_end()
+        .expect_err("a filter's predicate must end Boolean, and this is not one");
+    assert!(
+        matches!(refusal.source(), RefusalSource::Rule(_)),
+        "{id} after {receiver}: {refusal:?}"
+    );
+    assert!(
+        refusal.reason().contains("Boolean"),
+        "{id} after {receiver}: {}",
+        refusal.reason()
+    );
+}
+
+#[test]
+fn dt_date_after_a_datetime_may_stand_in_the_middle_of_a_filter_predicate() {
+    // Polars, by hand: the date of a timestamp, tested for a value, filters.
+    assert!(matches!(
+        filtered(Representative::Datetime, col("a").dt().date().is_not_null()),
+        Seen::Ran(_)
+    ));
+    assert_stands_in_the_middle_of_a_filter_predicate(
+        "Expr.dt.date",
+        Representative::Datetime,
+        Shape::Many,
+    );
+}
+
+#[test]
+fn cum_sum_after_a_whole_number_may_stand_in_the_middle_of_a_filter_predicate() {
+    // Polars, by hand: a running sum compared with a number filters.
+    assert!(matches!(
+        filtered(Representative::Int64, col("a").cum_sum(false).gt(2)),
+        Seen::Ran(_)
+    ));
+    assert_stands_in_the_middle_of_a_filter_predicate(
+        "Expr.cum_sum",
+        Representative::Int64,
+        Shape::Many,
+    );
+}
+
+#[test]
+fn sum_after_a_whole_number_may_stand_in_the_middle_of_a_filter_predicate() {
+    // Polars, by hand: a total compared with a number filters.
+    assert!(matches!(
+        filtered(Representative::Int64, col("a").sum().gt(2)),
+        Seen::Ran(_)
+    ));
+    assert_stands_in_the_middle_of_a_filter_predicate(
+        "Expr.sum",
+        Representative::Int64,
+        Shape::One,
+    );
+}
+
+#[test]
+fn len_after_a_whole_number_may_stand_in_the_middle_of_a_filter_predicate() {
+    // Polars, by hand: a count compared with a number filters.
+    assert!(matches!(
+        filtered(Representative::Int64, col("a").len().gt(0)),
+        Seen::Ran(_)
+    ));
+    assert_stands_in_the_middle_of_a_filter_predicate(
+        "Expr.len",
+        Representative::Int64,
+        Shape::One,
+    );
+}
+
+#[test]
+fn the_methods_that_may_stand_in_a_filter_predicate_are_offered_in_the_values_of_its_conditions() {
+    // `filter(when(f).then(a.cum_sum() > 2).otherwise(true))`: the value of a
+    // condition in a filter is continued to a Boolean as the predicate is.
+    // Polars, by hand.
+    let condition = |predicate: Expr| {
+        polars::prelude::when(col("f"))
+            .then(predicate)
+            .otherwise(lit(true))
+    };
+    for (receiver, predicate) in [
+        (Representative::Datetime, col("a").dt().date().is_not_null()),
+        (Representative::Int64, col("a").cum_sum(false).gt(2)),
+        (Representative::Int64, col("a").sum().gt(2)),
+        (Representative::Int64, col("a").len().gt(0)),
+    ] {
+        assert!(
+            matches!(filtered(receiver, condition(predicate)), Seen::Ran(_)),
+            "{receiver}"
+        );
+    }
+
+    let place = |dtype| {
+        Place::new(
+            Context::inside(Outer::Filter, Nested::ConditionValue),
+            after(dtype),
+        )
+    };
+    for (id, receiver) in [
+        ("Expr.dt.date", Representative::Datetime),
+        ("Expr.cum_sum", Representative::Int64),
+        ("Expr.sum", Representative::Int64),
+        ("Expr.len", Representative::Int64),
+    ] {
+        let offered = verdict(id, &place(receiver), &[]);
+        assert!(offered.is_allowed(), "{id} after {receiver}: {offered:?}");
+    }
+}
