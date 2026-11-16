@@ -2158,6 +2158,60 @@ mod tests {
         );
     }
 
+    #[test]
+    fn what_a_shift_leaves_null_excuses_the_tables_refusing_a_call_it_is_given_to() {
+        // `b.first().shift()` is a null, and `k.shift().first()` is the null
+        // that the shift left first: a comparison with either is met with
+        // nothing, which Polars allows where the tables refuse the dtype.
+        let given = |operand: Expression| {
+            select(vec![chain_of(
+                column("g"),
+                vec![compared_with("Expr.lt", operand)],
+            )])
+        };
+        let shift = |links: &[&str]| {
+            let mut all: Vec<Call> = Vec::new();
+            for id in links {
+                all.push(call(id, Vec::new()));
+            }
+            all
+        };
+        let at_the_call = link_of("exprs", 0, 0);
+        let first_then_shift = given(chain_of(column("b"), shift(&["Expr.first", "Expr.shift"])));
+        assert_eq!(
+            tables_refuse(&first_then_shift, at_the_call.clone(), ROWS, "no"),
+            vec![Limit::AShiftThatEmptiesTheSample]
+        );
+        let shift_then_first = given(chain_of(column("k"), shift(&["Expr.shift", "Expr.first"])));
+        assert_eq!(
+            tables_refuse(&shift_then_first, at_the_call.clone(), ROWS, "no"),
+            vec![Limit::AShiftThatEmptiesTheSample]
+        );
+        // The first that skips nulls, a shift after a first that is not one, and
+        // a first with no shift are not null.
+        let skipping = given(chain_of(
+            column("k"),
+            vec![
+                call("Expr.shift", Vec::new()),
+                call(
+                    "Expr.first",
+                    vec![("ignore_nulls", Value::Flag(Some(true)))],
+                ),
+            ],
+        ));
+        assert_eq!(
+            tables_refuse(&skipping, at_the_call.clone(), ROWS, "no"),
+            vec![]
+        );
+        let plain = given(chain_of(column("k"), shift(&["Expr.first"])));
+        assert_eq!(
+            tables_refuse(&plain, at_the_call.clone(), ROWS, "no"),
+            vec![]
+        );
+        let last = given(chain_of(column("k"), shift(&["Expr.shift", "Expr.last"])));
+        assert_eq!(tables_refuse(&last, at_the_call, ROWS, "no"), vec![]);
+    }
+
     /// A whole number as an expression: a literal of it.
     fn chain_with_integer(rows: i64) -> Expression {
         chain(
