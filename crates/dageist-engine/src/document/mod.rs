@@ -1,0 +1,40 @@
+//! The step document: the steps of a transform, saved as versioned JSON and
+//! built through the catalogue.
+//!
+//! A [`Document`] is a list of steps. Each step is a call of a method of a lazy
+//! frame, such as `LazyFrame.with_columns`, with arguments for its parameters,
+//! and builds on the table the step before it gives. An argument that is an
+//! expression holds a chain: where it starts, then the methods and the links
+//! of a condition that follow.
+//!
+//! [`Document::read`] is strict and names the place of every refusal, down to
+//! the link of an expression; [`Document::write`] gives text that reads back as
+//! the same document. [`Document::run`] builds the steps in Polars without
+//! reading data and reports for each its schema and the dtype after every link
+//! of its expressions, or why Polars refused it. [`Document::rows`] collects the
+//! rows after a step from a table held in memory.
+//!
+//! The version of the format is [`VERSION`]. A document of any other version is
+//! refused; there is no migration before the core API reaches 1.0.
+
+mod dtype;
+mod error;
+mod inputs;
+mod json;
+mod model;
+mod read;
+mod run;
+#[cfg(test)]
+mod tests;
+mod write;
+
+pub use dtype::{Dtype, DtypeError};
+pub use error::{Cause, Place, Position, ReadError, Refusal, Segment};
+pub use inputs::{DuplicateInput, Inputs};
+pub use model::{Call, Document, EmptyStepId, Expression, Given, Start, Step, StepId, Value};
+pub use run::{
+    ExpressionDtypes, Outcome, Report, Resolution, RowsError, RunCause, StepRefusal, StepReport,
+};
+
+/// The version of the document format this engine reads and writes.
+pub const VERSION: u32 = 1;

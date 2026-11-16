@@ -173,3 +173,8 @@ polars-ooc = { path = "../../vendor/polars/crates/polars-ooc", default-features 
 # Reads the language files that give the catalogue its words, into a table; no serde derive.
 # The version Cargo.lock already resolves for the host's build tooling, so it adds no package.
 toml = { version = "=1.2.1", default-features = false, features = ["parse", "serde", "std"] }
+# Reads and writes the step document's JSON. The versions Cargo.lock already resolves for the
+# host (serde) and the fuzz framework (serde_json), so they add no package. The document reader
+# is written by hand against an order-preserving JSON value, so serde's derive is not needed.
+serde = { version = "=1.0.229", default-features = false, features = ["std"] }
+serde_json = { version = "=1.0.151", default-features = false, features = ["std"] }
