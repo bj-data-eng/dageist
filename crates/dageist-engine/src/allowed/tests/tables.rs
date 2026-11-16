@@ -105,7 +105,7 @@ fn every_position_names_the_entry_and_parameter_that_hold_it() {
 }
 
 #[test]
-fn only_the_first_two_positions_of_a_place_count() {
+fn a_place_is_judged_by_its_outer_position_and_its_innermost_nested_one() {
     let positions = [
         Position::Outer(Outer::Select),
         Position::Nested(Nested::OrderBy),
@@ -113,7 +113,16 @@ fn only_the_first_two_positions_of_a_place_count() {
     ];
     assert_eq!(
         Context::from_positions(&positions),
+        Some(Context::inside(Outer::Select, Nested::ConditionPredicate))
+    );
+    // One nested position is the innermost.
+    assert_eq!(
+        Context::from_positions(&positions[..2]),
         Some(Context::inside(Outer::Select, Nested::OrderBy))
+    );
+    assert_eq!(
+        Context::from_positions(&positions[..1]),
+        Some(Context::step(Outer::Select))
     );
     assert_eq!(Context::from_positions(&positions[1..]), None);
     assert_eq!(Context::from_positions(&[]), None);

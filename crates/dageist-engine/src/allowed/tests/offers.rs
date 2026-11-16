@@ -9,8 +9,8 @@ use std::sync::Arc;
 use crate::allowed::dtype::ResultDtype;
 use crate::allowed::offers::RefusalSource;
 use crate::allowed::{
-    After, Chosen, ConditionState, Context, Nested, Outer, Place, Representative, Rule, Shape,
-    Stage, Verdict, offer, offers, options,
+    After, Chosen, ConditionState, Context, Nested, Outer, Place, Position, Representative, Rule,
+    Shape, Stage, Verdict, offer, offers, options,
 };
 use crate::catalog;
 
@@ -260,6 +260,57 @@ fn element_stands_in_a_pivot_aggregate_and_nowhere_else() {
         see(&frames.rows, &frames.empty, |frame| frame
             .select([element()])),
         Seen::Refused(Stage::Schema)
+    );
+}
+
+/// The place of what follows a value of `dtype` in an expression that stands in
+/// `positions`, the outermost first.
+fn deep_place(positions: &[Position], dtype: Representative) -> Place {
+    Place::new(
+        Context::from_positions(positions).expect("a position of a step comes first"),
+        after(dtype),
+    )
+}
+
+#[test]
+fn a_key_of_a_window_inside_the_value_of_a_filters_condition_need_not_be_boolean() {
+    // `filter(when(p).then(x.over(key)))`: the key is judged as a key, not as
+    // the value of the condition that the filter needs to be Boolean.
+    let key = deep_place(
+        &[
+            Position::Outer(Outer::Filter),
+            Position::Nested(Nested::ConditionValue),
+            Position::Nested(Nested::PartitionBy),
+        ],
+        Representative::Int64,
+    );
+    let offered = verdict("Expr.cum_sum", &key, &[]);
+    let ending = offered.allowance().expect("offered").can_end();
+    assert!(ending.is_allowed(), "{ending:?}");
+}
+
+#[test]
+fn a_predicate_inside_the_value_of_a_condition_must_be_boolean() {
+    // `select(when(p).then(when(q).then(..)))`: `q` is a predicate, though the
+    // place it stands in is also inside a value.
+    let predicate = deep_place(
+        &[
+            Position::Outer(Outer::Select),
+            Position::Nested(Nested::ConditionValue),
+            Position::Nested(Nested::ConditionPredicate),
+        ],
+        Representative::Int64,
+    );
+    let offered = verdict("Expr.cum_sum", &predicate, &[]);
+    let refusal = offered
+        .allowance()
+        .expect("offered, to be continued")
+        .can_end()
+        .refusal()
+        .expect("a whole number is no condition");
+    assert_eq!(
+        refusal.source(),
+        RefusalSource::Rule(Rule::ConditionPredicateIsBoolean)
     );
 }
 
