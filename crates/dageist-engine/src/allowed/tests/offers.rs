@@ -582,3 +582,53 @@ fn a_fill_value_decides_what_a_shift_gives() {
     let plain = verdict("Expr.shift", &place, &[]);
     assert_eq!(result_of(&plain), Some("UInt32"), "{plain:?}");
 }
+
+#[test]
+fn two_arguments_that_give_the_same_result_give_it() {
+    // Polars, by hand: a shift by whole numbers of 32 bits and filled with
+    // whole numbers of 64 bits gives the 64 bits of what it shifts.
+    assert_eq!(
+        selected(
+            Representative::Int64,
+            Representative::Int64,
+            col("a").shift_and_fill(lit(1).cast(DataType::Int32), lit(1)),
+        ),
+        Seen::Ran(DataType::Int64)
+    );
+    let place = select_after(Representative::Int64);
+    let given = verdict(
+        "Expr.shift",
+        &place,
+        &[
+            ("n", Representative::Int32),
+            ("fill_value", Representative::Int64),
+        ],
+    );
+    assert_eq!(result_of(&given), Some("Int64"), "{given:?}");
+}
+
+#[test]
+fn two_arguments_that_give_different_results_leave_the_result_unknown() {
+    // The tables measure each parameter with the other at its default, so what
+    // the two give together is not in them: a `n` that leaves the dtype and a
+    // `fill_value` of text that makes it text are not combined by guessing.
+    let place = select_after(Representative::Int64);
+    let given = verdict(
+        "Expr.shift",
+        &place,
+        &[
+            ("n", Representative::Int32),
+            ("fill_value", Representative::String),
+        ],
+    );
+    let allowance = given.allowance().expect("each argument fits alone");
+    assert_eq!(allowance.result(), None, "{given:?}");
+    // Each alone is known.
+    for (parameter, dtype, expected) in [
+        ("n", Representative::Int32, "Int64"),
+        ("fill_value", Representative::String, "String"),
+    ] {
+        let alone = verdict("Expr.shift", &place, &[(parameter, dtype)]);
+        assert_eq!(result_of(&alone), Some(expected), "{parameter}: {alone:?}");
+    }
+}
