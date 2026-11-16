@@ -855,13 +855,6 @@ fn holds_an_aggregate(expression: &Expression) -> bool {
             .any(|call| operands(call).into_iter().any(holds_an_aggregate))
 }
 
-/// Whether a key holds an aggregate beside what is not one value: a key that is
-/// wholly one is the whole key, which the tables measured. Polars takes the null
-/// literal beside a column as elementwise, and an aggregate as not.
-fn holds_an_aggregate_beside_a_column(key: &Expression) -> bool {
-    holds_an_aggregate(key) && !wholly_single(key, key.links().len(), true)
-}
-
 /// Whether an expression reads a column: it starts from one, or a call in it is
 /// given an expression that does.
 fn reads_a_column(expression: &Expression) -> bool {
@@ -926,7 +919,11 @@ fn holds_a_null_comparison(expression: &Expression) -> bool {
 }
 
 /// Whether a key is not elementwise, as Polars takes it: it holds an aggregate
-/// beside a column, or a column compared with a null.
+/// beside what is not one value, or a column compared with a null. A key that is
+/// wholly one value is the whole key, which the tables measured, and Polars
+/// allows it. It takes the null literal beside a column as elementwise, and an
+/// aggregate as not.
 fn is_not_elementwise(key: &Expression) -> bool {
-    holds_an_aggregate_beside_a_column(key) || holds_a_null_comparison(key)
+    !wholly_single(key, key.links().len(), true)
+        && (holds_an_aggregate(key) || holds_a_null_comparison(key))
 }
