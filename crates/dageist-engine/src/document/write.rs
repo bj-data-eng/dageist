@@ -25,9 +25,72 @@ impl Document {
     }
 }
 
-/// How many arrays and objects `step` opens inside each other when written.
-pub(super) fn depth(step: &Step) -> usize {
-    self::step(step).depth()
+/// How many arrays and objects `step` opens inside each other when written,
+/// or `None` when that is more than `limit`. It follows the shape [`step`]
+/// writes without building it, and stops as soon as the limit is passed, so
+/// it never recurses more than `limit` levels however deep the step is.
+pub(super) fn depth_within(step: &Step, limit: usize) -> Option<usize> {
+    nested(limit, |left| call_depth(step.call(), left))
+}
+
+/// The depth of one array or object whose contents are measured by `inner`
+/// with the levels left inside it.
+fn nested(limit: usize, inner: impl FnOnce(usize) -> Option<usize>) -> Option<usize> {
+    let left = limit.checked_sub(1)?;
+    inner(left).map(|depth| depth + 1)
+}
+
+/// The deepest of `items`, each measured by `each` within `limit`.
+fn deepest<T>(
+    items: impl IntoIterator<Item = T>,
+    limit: usize,
+    each: impl Fn(T, usize) -> Option<usize>,
+) -> Option<usize> {
+    let mut most = 0;
+    for item in items {
+        most = most.max(each(item, limit)?);
+    }
+    Some(most)
+}
+
+/// A call's object, holding its entry and the object of its arguments.
+fn call_depth(call: &Call, limit: usize) -> Option<usize> {
+    nested(limit, |left| {
+        nested(left, |left| {
+            deepest(call.arguments(), left, |given, left| {
+                value_depth(given.value(), left)
+            })
+        })
+    })
+}
+
+/// An expression's object, holding its start and the array of its links.
+fn expression_depth(expression: &Expression, limit: usize) -> Option<usize> {
+    nested(limit, |left| {
+        let start = match expression.start() {
+            Start::Call(start) => call_depth(start, left)?,
+            Start::Input(_) => nested(left, |_| Some(0))?,
+        };
+        let links = nested(left, |left| deepest(expression.links(), left, call_depth))?;
+        Some(start.max(links))
+    })
+}
+
+/// A value's object, holding its kind and what it holds.
+fn value_depth(value: &Value, limit: usize) -> Option<usize> {
+    nested(limit, |left| match value {
+        Value::Expression(inner) => expression_depth(inner, left),
+        Value::Columns(_) => nested(left, |_| Some(0)),
+        Value::Pairs(pairs) => nested(left, |left| {
+            deepest(pairs, left, |(key, entry), left| {
+                nested(left, |left| {
+                    Some(value_depth(key, left)?.max(value_depth(entry, left)?))
+                })
+            })
+        }),
+        Value::Many(items) => nested(left, |left| deepest(items, left, value_depth)),
+        _ => Some(0),
+    })
 }
 
 fn entry(name: &str, value: Json) -> (String, Json) {

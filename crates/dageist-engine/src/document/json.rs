@@ -70,21 +70,6 @@ impl Json {
         }
     }
 
-    /// How many arrays and objects are open at the deepest point of the value.
-    pub(super) fn depth(&self) -> usize {
-        match self {
-            Self::Array(items) => 1 + items.iter().map(Self::depth).max().unwrap_or(0),
-            Self::Object(entries) => {
-                1 + entries
-                    .iter()
-                    .map(|(_, value)| value.depth())
-                    .max()
-                    .unwrap_or(0)
-            }
-            _ => 0,
-        }
-    }
-
     /// The value as compact JSON text, which [`Json::parse`] reads back as
     /// the same value.
     pub(super) fn to_text(&self) -> String {

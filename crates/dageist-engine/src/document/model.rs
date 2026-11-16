@@ -535,7 +535,7 @@ impl Document {
     pub fn new(steps: Vec<Step>) -> Result<Self, Refusal> {
         for (at, step) in steps.iter().enumerate() {
             // The document's object and its `steps` array are open around the step.
-            if 2 + write::depth(step) > MAX_NESTING {
+            if write::depth_within(step, MAX_NESTING - 2).is_none() {
                 return Err(Refusal::at(
                     Place::of_step(at, Some(step.id.clone())),
                     Cause::TooDeep,
