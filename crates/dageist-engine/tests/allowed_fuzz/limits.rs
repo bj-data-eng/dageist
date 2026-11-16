@@ -1061,6 +1061,68 @@ mod tests {
     }
 
     #[test]
+    fn what_follows_an_aggregate_compared_with_the_length_of_a_literal_over_a_window_is_excused() {
+        // `a.min() <= 1.len().over(order_by=[true])` then `.total_days()`: Polars
+        // takes the length of a literal over a window for a constant, and does not
+        // evaluate what follows the comparison of a value with it, where the tables
+        // refuse a `Boolean`. It evaluates it for a sum, for a window by a column,
+        // for a column that is not one value, and for no window.
+        let window = |length: &str, order_by: Expression| {
+            chain_of(
+                literal(),
+                vec![
+                    call(length, Vec::new()),
+                    call("Expr.over", vec![("order_by", many(vec![order_by]))]),
+                ],
+            )
+        };
+        let item = |start: Vec<Call>, operand: Expression| {
+            let mut links = start;
+            links.push(compared_with("Expr.le", operand));
+            links.push(call("Expr.dt.total_days", Vec::new()));
+            select(vec![chain_of(column("a"), links)])
+        };
+        let min = || vec![call("Expr.min", Vec::new())];
+        let constant = || chain(literal(), &[]);
+        let at_total_days = |links: usize| link_of("exprs", 0, links);
+        let case = item(min(), window("Expr.len", constant()));
+        assert_eq!(
+            tables_refuse(&case, at_total_days(2), ROWS, "no"),
+            vec![Limit::ALiteral]
+        );
+        // What the tables refused when they built the step, and the comparison.
+        assert_eq!(
+            tables_refuse(&case, at_total_days(2), Some(TableStage::Schema), "no"),
+            vec![]
+        );
+        for (name, other) in [
+            ("a sum", item(min(), window("Expr.sum", constant()))),
+            (
+                "a window by a column",
+                item(min(), window("Expr.len", chain(column("k"), &[]))),
+            ),
+            ("no window", item(min(), chain(literal(), &["Expr.len"]))),
+            (
+                "a column that is not one value",
+                item(Vec::new(), window("Expr.len", constant())),
+            ),
+        ] {
+            let links = if name == "a column that is not one value" {
+                1
+            } else {
+                2
+            };
+            assert_eq!(
+                tables_refuse(&other, at_total_days(links), ROWS, "no"),
+                vec![],
+                "{name}"
+            );
+        }
+        // The calls before the comparison are not what follows it.
+        assert_eq!(tables_refuse(&case, at_total_days(0), ROWS, "no"), vec![]);
+    }
+
+    #[test]
     fn what_a_call_after_a_literal_is_given_is_excused_at_any_depth_when_rows_refuse_it() {
         // `1.cum_sum().le(b.max())`: the tables refuse `max` of a list when they
         // run rows, and Polars meets it with one value.
