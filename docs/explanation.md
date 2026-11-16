@@ -387,7 +387,7 @@ excused a gap of `offer`, and are corrected: a place deeper than two positions
 judged by its first two, a start judged on the dtype it was measured on, the
 options chosen not told, and a single value beside a column in a key offered. Their
 cases are kept, as replays that check. The second kind is a limit. There are
-fifteen. Each is named in the target, counted when it excuses a case, and has a
+sixteen. Each is named in the target, counted when it excuses a case, and has a
 kept case that the normal tests replay, which only that limit excuses; each has
 a test that the same feature elsewhere in the case excuses nothing.
 
@@ -402,6 +402,12 @@ case are what there is, and the limits that can only be gated so (the lengths of
 the rows, an overflow, a panic, a window over a window, an explode, the empty table
 of a pivot) say so below. Two limits may both explain one case, and it is then
 excused by both.
+
+A limit excuses a named rule's refusal only for a cause it names: a later predicate
+of a condition, which runs on the rows left to it, for the rule about a condition's
+predicate; a sort key or a window's key that is one value, which Polars drops, and
+what a comparison with a null folds, for the rules about a predicate. A literal at the
+start of a key, or a null comparison in it, says nothing of why the key rule refused it.
 
 A named rule is dageist's, and may be stricter than Polars only where it is so by design,
 which the target names: `pivot-aggregate-gives-one-value`, since Polars lets a running
@@ -421,6 +427,7 @@ little; the tally counts the pivot cases and those the rule refuses apart.
 | A pivot's aggregate | It is run on the values of each group, with kernels of its own, and on no groups when the table is empty. Polars refusing the empty table, with a reason that an operation is not supported or that a dtype is null, in either quoting (no place); and the tables refusing, with a reason about a dtype an operation does not support, a comparison, an operation, an evaluation, a cast, a struct field or lengths of a window over a group, at a call of the aggregate, which Polars allows |
 | A single value in a key | A key that is wholly a single value, an aggregate or a null, is not one that has to be elementwise in what it holds: Polars allows a running count under a `last` there. The context table measured the entry as the whole key. The tables refusing, with a reason about a key not being elementwise, inside a key that is wholly single, which Polars allows. A key that holds an aggregate beside a column, or a column compared with a null, is refused by the rule above, and is not this. |
 | A null comparison in a key | Polars folds a comparison with a null literal into a null before it asks whether a join's key is elementwise, and what it leaves depends on the dtypes and on what the comparison follows, such as an aggregate. A column compared with a null literal is refused by the rule, and the rest, such as a comparison with what one folded, is found by running. Polars refusing the join as not elementwise, with no place, in a case whose join key holds a comparison with a null literal at any depth. |
+| A shift that empties the sample | Shifts that total the sample's three rows or more, with no value to fill them, leave every row null, and Polars does not meet a call after them with a dtype that the tables refuse when they run rows: it refuses a comparison of a list with a `Boolean` after none, one or two shifts, and allows it after three. The tables refusing, when they run rows, at a call of a chain whose earlier links shift by three rows or more in all. |
 | A join key's dtype | The other table's key is made of the dtype the chain gives on its own, and the join may resolve the chain to another, as the precision of a decimal a null is taken from. Polars refusing the join, with a reason that names a decimal (no place). |
 | The lengths of the rows | Whether lists, or other values, of different lengths combine depends on the rows. Polars refusing the rows with a reason about lengths, in a case with no `explode` (no place). |
 | An overflow | A debug build of Polars panics where a release build wraps. Polars panicking so (no place). |
