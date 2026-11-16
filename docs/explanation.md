@@ -171,6 +171,35 @@ pivot's output columns stay pinned values until the graph supplies tables.
 Previews still run on the storyboard's sample rows, and a set option a preview
 cannot apply is named under the step instead of being ignored.
 
+## The Step Document
+
+A node's steps are saved as a step document, the source of truth that the
+configuration repository will keep, in `dageist_engine::document`. It is JSON
+with a version, and a version the reader does not know is refused: dageist is
+before 1.0, so an older document is not upgraded. A step is a call of a frame
+entry of the catalogue, with its arguments by Python parameter name, and a
+parameter left out takes its default. An expression is a start, a function
+such as `polars.col` or `polars.lit`, `polars.when`, or a connected input,
+followed by a list of calls, one for each method or link of a condition, so
+columns, literals and conditions are written the same way. Dtypes are written
+as Python prints them, such as `Datetime(time_unit='us', time_zone=None)`.
+
+Reading is strict. A field, entry or argument the catalogue does not know,
+and a call where it cannot stand, such as a method before its start or a
+`then` without its `when`, is refused with its place: the step, the path
+through the parameter's lists and pairs, and the link. Writing a document
+gives back the same text.
+
+The engine runs a document on a source table and the graph's inputs. It
+builds each step through the catalogue and reports whether it is valid, with
+the place and reason when it is not, its result schema, and the dtype after
+each link of every expression, all without reading data. Steps after a
+refused one are reported as not run. The rows of any step come from running
+it on an in-memory working window. Polars' own message is the reason when
+Polars refuses. Some mistakes, such as `dt.date` on a String column, are only
+found when rows are read, not from the schema; the editor will learn them in
+advance from tables of allowed combinations, which issue 44 adds next.
+
 ## What The Step Editor Storyboard Has Settled
 
 The step editor is where the design of a transform node is being worked out.
