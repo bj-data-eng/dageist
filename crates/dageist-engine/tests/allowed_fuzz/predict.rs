@@ -110,7 +110,7 @@ fn refused(found: &WalkRefusal) -> Refused {
 
 /// The engine's walk of the case's step: what the tables and the rules say of
 /// it, and what Polars evaluates of it.
-pub fn walk_of(case: &Case) -> Walk {
+fn walk_of(case: &Case) -> Walk {
     let step = &case.document.steps()[0];
     debug_assert_eq!(step.id().as_str(), STEP);
     let frames = Frames::with_key(case.receiver, case.argument, None);

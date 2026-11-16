@@ -12,9 +12,10 @@ use dageist_fuzz::{
 
 use super::case::Case;
 use super::generate::generate;
-use super::limits::excuses;
+use super::limits::{excuses, strict};
 use super::observe::{Observed, Seen, observe};
-use super::predict::{Prediction, Source, Verdict, predict};
+use super::predict::{Prediction, Refused, Source, Verdict, predict};
+use super::probe::{Settled, settle};
 use super::reduce::candidates;
 
 /// The named rules that are stricter than Polars by design, each with why. A
@@ -86,6 +87,10 @@ pub fn take_tally() -> Vec<String> {
         ("agreeing", total("agree:")),
         ("excused by a limit", total("not covered")),
         (
+            "refused where Polars does not evaluate the part",
+            total("stricter where"),
+        ),
+        (
             "refused by a rule that is stricter than Polars",
             total("rule stricter"),
         ),
@@ -135,18 +140,51 @@ pub fn describe(case: &Case) -> String {
             )
         },
     );
+    let probed = match (&prediction.verdict, &observed.refusal) {
+        (Verdict::Refuses(refused), None) => probe_of(case, refused),
+        _ => None,
+    }
+    .map_or_else(String::new, |settled| {
+        format!(
+            "\nprobe: Polars refuses {} for the tables' reason: {}",
+            settled.probe, settled.reason
+        )
+    });
     let limits: Vec<&str> = excuses(case, &prediction, &observed)
         .iter()
         .map(|limit| limit.slug())
         .collect();
     format!(
-        "{predicted}\n{done}\nexcused by: {}",
+        "{predicted}\n{done}{probed}\nexcused by: {}",
         if limits.is_empty() {
             "no limit".to_owned()
         } else {
             limits.join(", ")
         }
     )
+}
+
+/// What a probe of the part the tables refuse shows, unless the limits are held
+/// to everything.
+fn probe_of(case: &Case, refused: &Refused) -> Option<Settled> {
+    if strict() {
+        return None;
+    }
+    settle(case, refused)
+}
+
+/// The outcome of a case where the tables refuse a part Polars does not
+/// evaluate, and the probe of the part shows the tables right.
+fn stricter(case: &Case, refused: &Refused, what: &str) -> Option<Result<CaseOutcome>> {
+    let settled = probe_of(case, refused)?;
+    tally(format!("{STRICTER_WHERE_UNEVALUATED}: {what}"));
+    Some(CaseOutcome::expected_rejection(
+        Vec::new(),
+        format!(
+            "{STRICTER_WHERE_UNEVALUATED}: the probe {} is refused for the tables' reason: {}",
+            settled.probe, settled.reason
+        ),
+    ))
 }
 
 /// The first words of a reason, as a name: the same disagreement is not
@@ -342,8 +380,11 @@ impl CaseTarget for AllowedTarget {
                 checked.push(allowance);
                 tally("agree: allowed");
             }
-            Verdict::Refuses(refused) => match (refused.source, allowed_by_polars) {
+            Verdict::Refuses(refused) => match (refused.source.clone(), allowed_by_polars) {
                 (Source::Polars, true) => {
+                    if let Some(outcome) = stricter(case, &refused, &reason_slug(&refused.reason)) {
+                        return outcome;
+                    }
                     if let Some(outcome) = excused("refused, Polars allows") {
                         return outcome;
                     }
@@ -364,10 +405,9 @@ impl CaseTarget for AllowedTarget {
                     // disagreement.
                     let Some((_, why)) = STRICTER_BY_DESIGN.iter().find(|(name, _)| *name == rule)
                     else {
-                        // Polars does not evaluate everything, as a limit says.
-                        if let Some(outcome) =
-                            excused(&format!("refused by the rule {rule}, Polars allows"))
-                        {
+                        // Polars does not evaluate everything: a probe of the part
+                        // says whether the rule is right where it does.
+                        if let Some(outcome) = stricter(case, &refused, rule) {
                             return outcome;
                         }
                         return failure(

@@ -13,8 +13,14 @@
 //! evaluate the part; when it allows it, or refuses it for another reason, the
 //! disagreement is a finding.
 
-use super::case::Case;
-use super::predict::Refused;
+use dageist_engine::catalog;
+use dageist_engine::document::{
+    Call, Document, Expression, Place, Segment, Start, Step, StepId, Value,
+};
+
+use super::case::{Case, STEP};
+use super::observe::observe;
+use super::predict::{Refused, Source};
 
 /// What a probe found: the document it ran, and why Polars refused it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,11 +29,236 @@ pub struct Settled {
     pub reason: String,
 }
 
+/// The rules that a predicate be a `Boolean`, which Polars holds as it
+/// evaluates the predicate.
+const PREDICATE_RULES: [&str; 2] = [
+    "condition-predicate-is-boolean",
+    "filter-predicate-is-boolean",
+];
+
+/// The innermost expression that holds the place, and what of the place is
+/// left under it.
+struct Found<'a> {
+    expression: &'a Expression,
+    rest: &'a [Segment],
+    /// Whether the place is in a pivot's aggregate, where `element` stands.
+    in_the_aggregate: bool,
+}
+
+enum Node<'a> {
+    Call(&'a Call),
+    Value(&'a Value),
+    Expression(&'a Expression),
+}
+
+fn enter(value: &Value) -> Node<'_> {
+    match value {
+        Value::Expression(expression) => Node::Expression(expression),
+        other => Node::Value(other),
+    }
+}
+
+fn find<'a>(case: &'a Case, place: &'a Place) -> Option<Found<'a>> {
+    let path = place.path();
+    let step = case.document.steps()[0].call();
+    let mut node = Node::Call(step);
+    let mut held: Option<(&Expression, usize)> = None;
+    for (at, segment) in path.iter().enumerate() {
+        node = match (node, segment) {
+            (Node::Call(call), Segment::Parameter(name)) => enter(call.argument(name)?),
+            (Node::Value(Value::Many(items)), Segment::Item(item)) => enter(items.get(*item)?),
+            (Node::Value(Value::Pairs(pairs)), Segment::Key(item)) => enter(&pairs.get(*item)?.0),
+            (Node::Value(Value::Pairs(pairs)), Segment::Value(item)) => enter(&pairs.get(*item)?.1),
+            (Node::Expression(expression), Segment::Start) => match expression.start() {
+                Start::Call(call) => Node::Call(call),
+                Start::Input(_) => return None,
+            },
+            (Node::Expression(expression), Segment::Link(link)) => {
+                Node::Call(expression.links().get(*link)?)
+            }
+            _ => return None,
+        };
+        if let Node::Expression(expression) = &node {
+            held = Some((expression, at + 1));
+        }
+    }
+    let (expression, consumed) = held?;
+    Some(Found {
+        expression,
+        rest: &path[consumed..],
+        in_the_aggregate: matches!(
+            path.first(),
+            Some(Segment::Parameter(name)) if name == "aggregate_function"
+        ) && step.entry().id().as_str() == "LazyFrame.pivot",
+    })
+}
+
+fn call(id: &str, given: Vec<(&str, Value)>) -> Option<Call> {
+    Call::new(catalog::entry(id)?, given).ok()
+}
+
+fn literal(whole: i64) -> Option<Expression> {
+    let lit = call("polars.lit", vec![("value", Value::Integer(whole))])?;
+    Expression::new(Start::Call(lit), Vec::new()).ok()
+}
+
+/// The chain through the refused call: the start, or the links up to the one.
+fn chain_through(found: &Found) -> Option<Expression> {
+    let expression = found.expression;
+    match found.rest.first() {
+        None => Some(expression.clone()),
+        Some(Segment::Start) => Expression::new(expression.start().clone(), Vec::new()).ok(),
+        Some(Segment::Link(link)) => Expression::new(
+            expression.start().clone(),
+            expression.links().get(..=*link)?.to_vec(),
+        )
+        .ok(),
+        Some(_) => None,
+    }
+}
+
+/// A condition with `predicate` and literal values: nothing in it but the
+/// predicate can be refused.
+fn condition_of(predicate: Expression) -> Option<Expression> {
+    let when = call(
+        "polars.when",
+        vec![(
+            "predicates",
+            Value::Many(vec![Value::Expression(predicate)]),
+        )],
+    )?;
+    let then = call(
+        "When.then",
+        vec![("statement", Value::Expression(literal(1)?))],
+    )?;
+    let otherwise = call(
+        "Then.otherwise",
+        vec![("statement", Value::Expression(literal(2)?))],
+    )?;
+    Expression::new(Start::Call(when), vec![then, otherwise]).ok()
+}
+
+/// The document that evaluates `part` where Polars must: in a pivot's own
+/// aggregate when the part is one, a filter's predicate for the rule about it,
+/// and a plain `select` otherwise.
+fn document_of(case: &Case, found: &Found, part: Expression, filter: bool) -> Option<Document> {
+    let original = case.document.steps()[0].call();
+    let step = if found.in_the_aggregate {
+        let given: Vec<(&str, Value)> = original
+            .arguments()
+            .iter()
+            .map(|given| {
+                let value = if given.parameter() == "aggregate_function" {
+                    Value::Expression(part.clone())
+                } else {
+                    given.value().clone()
+                };
+                (given.parameter(), value)
+            })
+            .collect();
+        call("LazyFrame.pivot", given)?
+    } else if filter {
+        call(
+            "LazyFrame.filter",
+            vec![("predicates", Value::Many(vec![Value::Expression(part)]))],
+        )?
+    } else {
+        call(
+            "LazyFrame.select",
+            vec![("exprs", Value::Many(vec![Value::Expression(part)]))],
+        )?
+    };
+    Document::new(vec![Step::new(StepId::new(STEP).ok()?, step).ok()?]).ok()
+}
+
+/// The words of a reason that say what Polars objected to: what is quoted, in
+/// parentheses or a dtype is the part's, not the objection's.
+fn objection(reason: &str) -> String {
+    const DTYPES: [&str; 20] = [
+        "str",
+        "string",
+        "bool",
+        "boolean",
+        "date",
+        "datetime",
+        "time",
+        "duration",
+        "list",
+        "struct",
+        "array",
+        "decimal",
+        "null",
+        "binary",
+        "categorical",
+        "enum",
+        "object",
+        "unknown",
+        "int",
+        "float",
+    ];
+    let mut kept = String::new();
+    let mut depth = 0_u32;
+    let mut quoted = false;
+    for character in reason.chars() {
+        match character {
+            '`' => quoted = !quoted,
+            '(' | '[' => depth += 1,
+            ')' | ']' => depth = depth.saturating_sub(1),
+            _ if quoted || depth > 0 => {}
+            _ => kept.push(character),
+        }
+    }
+    kept.to_ascii_lowercase()
+        .split(|character: char| !character.is_ascii_alphabetic())
+        .filter(|word| word.len() > 1 && !DTYPES.contains(word))
+        .take(8)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Whether `probe` is refused as the tables refused the part: for Polars' own
+/// reason the same objection, and for a rule that a predicate be a `Boolean`
+/// Polars' words for it.
+fn same_reason(source: &Source, tables: &str, probe: &str) -> bool {
+    match source {
+        Source::Polars => !objection(tables).is_empty() && objection(tables) == objection(probe),
+        Source::Rule(rule) if PREDICATE_RULES.contains(rule) => {
+            let probe = probe.to_ascii_lowercase();
+            probe.contains("boolean") && (probe.contains("expected") || probe.contains("must be"))
+        }
+        _ => false,
+    }
+}
+
 /// Asks Polars about the part the tables refused at `refused`, alone. `None`
 /// when there is nothing to ask, Polars allows the probe, or it refuses it for
 /// another reason than the tables did.
-pub fn settle(_case: &Case, _refused: &Refused) -> Option<Settled> {
-    None
+pub fn settle(case: &Case, refused: &Refused) -> Option<Settled> {
+    let found = find(case, &refused.place)?;
+    let (part, filter) = match &refused.source {
+        Source::Polars => (chain_through(&found)?, false),
+        Source::Rule("condition-predicate-is-boolean") => {
+            (condition_of(found_predicate(&found)?)?, false)
+        }
+        Source::Rule("filter-predicate-is-boolean") => (found_predicate(&found)?, true),
+        _ => return None,
+    };
+    let document = document_of(case, &found, part, filter)?;
+    let probe = Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        document,
+    };
+    let reason = observe(&probe).refusal?.reason;
+    same_reason(&refused.source, &refused.reason, &reason).then(|| Settled {
+        probe: probe.document.write(),
+        reason,
+    })
+}
+
+/// The predicate a rule refused: the whole expression at its place.
+fn found_predicate(found: &Found) -> Option<Expression> {
+    found.rest.is_empty().then(|| found.expression.clone())
 }
 
 #[cfg(test)]
