@@ -361,13 +361,13 @@ deep that start from a column of any representative dtype or from a typed
 literal, in each position that holds an expression (a select item, a filter's
 predicate, a sort key, either side of a join key, a pivot's aggregate), with
 conditions nested two deep and `over`'s keys inside them, and sets of the
-options of each call. For each it takes the engine's [walk](#which-combinations-polars-allows) of the
-case, which asks `offer` at the place each call stands in whether the call may
-stand and what it gives, whether each expression a position holds may end there,
-and `options` of the options a step is given. From that it predicts whether
-Polars allows the case and the dtype after each link. A case whose answer is not
-known, as whether a start may end where it was not told its dtype, is not
-predicted past that point.
+options of each call. For each it takes the engine's
+[walk](#which-combinations-polars-allows) of the case, which asks `offer` at the
+place each call stands in whether the call may stand and what it gives, whether
+each expression a position holds may end there, and `options` of the options a
+step is given. From that it predicts whether Polars allows the case and the dtype
+after each link. A case whose answer is not known, as whether a start may end
+where it was not told its dtype, is not predicted past that point.
 It then runs the case through the step document, as the editor does, on three rows
 with a null and on a table with no rows, and compares: a case is allowed only
 when the schema and both runs succeed, as the tables count it, and the dtype
@@ -379,7 +379,11 @@ and to replay a case.
 A disagreement is either a defect of dageist or a combination the tables were not
 measured on. The first found while building the target was `offer` giving a
 `shift` the dtype of what it shifts when a `fill_value` of another dtype was
-chosen; it is corrected, and its case is kept. The second kind is a limit. There are
+chosen; it is corrected, and its case is kept. Others were found where a limit had
+excused a gap of `offer`, and are corrected: a place deeper than two positions
+judged by its first two, a start judged on the dtype it was measured on, the
+options chosen not told, and a single value beside a column in a key offered. Their
+cases are kept, as replays that check. The second kind is a limit. There are
 thirteen. Each is named in the target, counted when it excuses a case, and has a
 kept case that the normal tests replay, which only that limit excuses; each has
 a test that the same feature elsewhere in the case excuses nothing.
@@ -399,7 +403,7 @@ excused by both.
 One thing the target does not do: it compares nothing more of a case that a named rule
 refuses and Polars allows. The dtypes before the refusal are compared, but whether Polars
 allows the rest is not. The rule `pivot-aggregate-gives-one-value` is stricter than Polars
-wherever it refuses, which is about a third of the pivot cases (55 of the 153 of the fixed
+wherever it refuses, which is about a third of the pivot cases (54 of the 151 of the fixed
 seed, and the same share in longer campaigns), so those pivot aggregates are checked little;
 the tally counts the pivot cases and those the rule refuses apart.
 
