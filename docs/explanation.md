@@ -305,8 +305,91 @@ The tables hold what they were measured on. A method's context was measured on
 the receiver that fits it best, so a table cannot say that a predicate must be
 `Boolean` for a receiver it was not measured on; the rule does. Arguments are
 varied one parameter at a time, so a method with two expression parameters has
-each judged apart. A `Struct` is two fields, an `Array` of two, and a `Decimal`
-of ten digits: the tables say nothing of other sizes.
+each judged apart, and what the arguments given decide is what the method gives:
+a `fill_value` of text makes a `shift` give text, and where two arguments give
+different results the result is not known. A `Struct` is two fields, an `Array`
+of two, and a `Decimal` of ten digits: the tables say nothing of other sizes.
+
+### What The Tables Are Checked Against
+
+The tables are measured one combination at a time, so whether they predict what
+Polars does with the combinations they were not measured as is itself checked.
+A property target built on [dageist-fuzz](../crates/dageist-fuzz/README.md) makes
+random step documents of one step from the catalogue: chains up to six links
+deep that start from a column of any representative dtype or from a typed
+literal, in each position that holds an expression (a select item, a filter's
+predicate, a sort key, either side of a join key, a pivot's aggregate), with
+conditions nested two deep and `over`'s keys inside them, and sets of the
+options of each call. For each it asks [`offer`](#which-combinations-polars-allows),
+at the place each call stands in, with the dtypes of the arguments the case chose,
+whether the call may stand and what it gives; asks whether each expression a
+position holds may end there; and asks `options` of the options set. From
+those it predicts whether Polars allows the case and the dtype after each link.
+It then runs the case through the step document, as the editor does, on three rows
+with a null and on a table with no rows, and compares: a case is allowed only
+when the schema and both runs succeed, as the tables count it, and the dtype
+after every link that the tables gave is the class Polars gives. The case is the
+document's own text, so a kept case replays exactly. The
+[how-to](how-to.md#check-the-tables-against-polars) says how to run it for longer
+and to replay a case.
+
+A disagreement is either a defect of dageist or a combination the tables were not
+measured on. The first found while building the target was `offer` giving a
+`shift` the dtype of what it shifts when a `fill_value` of another dtype was
+chosen; it is corrected, and its case is kept. The second kind is a limit. There are
+sixteen. Each is named in the target, counted when it excuses a case, and has a
+kept case that the normal tests replay, which only that limit excuses; each has
+a test that the same feature elsewhere in the case excuses nothing.
+
+A limit excuses a disagreement only when it is the cause of it. The tables always
+say where they refused, and that place must lie in the expression that holds what
+the limit is about. Polars says where only when it refused while it built the
+step and worked out its schema, and then a refusal of the whole step, as a join's
+keys are refused, has the step for its place, so the key that holds the cause is
+found by what each key holds. A refusal when Polars collected rows, the empty
+table's too, and a panic, have no place. For those the reason and the feature in the
+case are what there is, and the limits that can only be gated so (the lengths of
+the rows, an overflow, a panic, a window over a window, an explode, the empty table
+of a pivot) say so below. Two limits may both explain one case, and it is then
+excused by both.
+
+Two things the target does not do. It stops predicting after a call given an option
+that changes what the method gives, which `offer` is not told: `over`'s
+`mapping_strategy` as `join` gives a `List`, and `dt.total_days`'s `fractional` as
+true a `Float64`. `options.txt` records them. The dtype after such a call, and so
+what follows it that needs one, is not asked of the tables, and the tally counts
+the cases that stopped so; it is not a limit, which excuses a disagreement. And it
+compares nothing more of a case that a named rule refuses and Polars allows: the
+dtypes before the refusal are compared, but whether Polars allows the rest is not.
+The rule `pivot-aggregate-gives-one-value` is stricter than Polars wherever it
+refuses, which is about a third of the pivot cases (55 of the 153 of the fixed seed,
+and the same share in longer campaigns), so those pivot aggregates are checked little;
+the tally counts the pivot cases and those the rule refuses apart.
+
+| Limit | Excuses |
+| --- | --- |
+| An option changes what a method gives | `Expr.over`'s `mapping_strategy` as `explode` gives other lengths, which meet those of what follows it. Polars refusing the rows, with a reason about lengths, in a case with an `explode` (no place: the reason and the `explode` gate it); and the tables refusing, with a reason about lengths, at the window or at a call after it, or in the arguments of a link after it, in the same chain, which Polars allows; not before the window, not in its own arguments, and not an `explode` in another operand or item. |
+| A literal | An argument or a start is measured as a column of the dtype, except the values of `shift` and the arguments of a pivot's group. A literal, or a condition of literals, is one value, which Polars casts and broadcasts as it does not a column. A comparison or a subtraction with a null literal is null, so that Polars does not evaluate what it follows or what it is given, and does evaluate the arguments of the calls after it. The tables refusing at a call that follows a literal or is given one, or at what a null comparison follows, is given, or at the calls from it on, which Polars allows. |
+| A single value | Polars does not evaluate what it does not need for one value. The tables refusing at a call whose receiver in its chain is one value (an aggregate with only single values after it), or inside a sort key or a window's key that is one value (a literal is one), which is dropped, or in what a `len` follows, or in the arguments of the links before it, which it does not count; Polars allows it. A `len` before an unrelated later argument excuses nothing there. |
+| A pivot's aggregate | It is run on the values of each group, with kernels of its own, and on no groups when the table is empty. Polars refusing the empty table, with a reason that an operation is not supported or that a dtype is null (no place); and the tables refusing, with a reason about a dtype an operation does not support, a comparison, an operation, an evaluation, a cast, a struct field or lengths of a window over a group, at a call of the aggregate, which Polars allows. |
+| A single value in a key | A join's or a window's key that holds a single value, an aggregate or a null literal, beside what is not one is not elementwise; the context table measured the entry as the whole key, and a key that is wholly single is that. Polars refusing with that reason, when a key of the case holds one beside a column, and, if the refusal has a place inside the step, inside that key; and the tables refusing, with that reason, a key that holds the single value, which Polars allows. A refusal of the rows of a window has no place. |
+| The lengths of the rows | Whether lists, or other values, of different lengths combine depends on the rows. Polars refusing the rows with a reason about lengths, in a case with no `explode` (no place). |
+| An overflow | A debug build of Polars panics where a release build wraps. Polars panicking so (no place). |
+| Branches that are one | A condition whose values are one expression is simplified to it, and its predicates are dropped. The tables refusing inside a predicate of such a condition, which Polars allows. |
+| A decided condition | A condition with a predicate made of literals alone is decided before it is run, and the other branches are dropped; a predicate that only starts from a literal and goes on to a column is not. The tables refusing inside such a condition, which Polars allows. |
+| A value that runs on no rows | A value of a condition runs on the rows its predicate selects, and a predicate after the first on the rows left to it, which on the sample may be none. The tables refusing, at the stage of running rows, inside such a value or predicate of a condition that is not decided, which Polars allows. What they refused when they built the step is refused whatever the rows. |
+| A panic | One is an internal check that failed on the plan Polars made in `select`; another place, or a combination of what was measured singly, may not reach it, or may reach another. Polars panicking where the tables allow (no place), and the tables recording a panic where Polars allows. |
+| A `Boolean` is needed and the dtype unknown | A predicate needs a `Boolean`. The dtype of a column, one that the arguments decide, and one a condition's values give, is not one `offer` is told, so a predicate that is only a start, or ends in such a call or a condition, is not refused for being no `Boolean`; and a start is judged on the dtype it was measured on. Polars refusing for that, in a predicate whose dtype was not given, and, if the refusal is placed, inside it; and the tables refusing a start in a predicate, which Polars allows. |
+| A deeper place | A place more than two positions deep is judged by its first two, so a predicate inside a value of a condition is judged as a value, and a value inside a predicate as a predicate. Polars refusing a predicate two positions deep whose dtype is known and is no `Boolean`, with a reason about a `Boolean`; and the tables refusing, with such a reason, a place two positions deep, which Polars allows. |
+| A hidden schema | The tables refuse a method whose plan says another dtype than its rows give, as the `cum_sum` of a `UInt128` does; inside an expression that goes on from it or compares it, the rows of the step do not show it. The tables refusing with that reason inside such an expression, which Polars allows. |
+| A window over a window | A window whose receiver holds another window, in its chain before it, or in the arguments of those calls, is run in the aggregation context of the outer one, where a key that is not elementwise is refused; the tables measured one window. Polars refusing the rows with that reason (no place). A window in a key, or two windows apart, is not this. |
+| A join key's dtype | The other table's key is made of the dtype the chain gives on its own, and the join may resolve the chain to another, as the precision of a decimal a null is taken from. Polars refusing the join, with a reason that names a decimal. |
+
+A case that the tables cannot be asked about, because the dtype of an argument or
+before a method is not known, is not predicted past that point and is counted. The
+generator keeps to what the tables measured where a value, not a dtype, decides: a
+`shift` by the number 1 of a dtype, durations that are text of `b`, two values of
+a condition of one dtype, a join without `validate`.
 
 ## What The Step Editor Storyboard Has Settled
 

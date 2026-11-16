@@ -1017,6 +1017,7 @@ version = "0.1.0"
 name = "dageist-engine"
 version = "0.1.0"
 dependencies = [
+ "dageist-fuzz",
  "polars",
  "polars-lazy",
  "polars-ooc",
