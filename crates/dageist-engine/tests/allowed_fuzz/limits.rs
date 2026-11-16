@@ -117,18 +117,11 @@ pub enum Limit {
     /// before the outer `over` in its chain, with the arguments of those calls.
     /// Polars refuses the rows, so there is no place and the reason gates it.
     AWindowOverAWindow,
-    /// The tables are asked what a chain gives so that a predicate, which needs
-    /// a `Boolean`, can be checked, and a start, or a method that gives what its
-    /// arguments decide, gives nothing to check: the dtype of a column is the
-    /// caller's to say, and [`offer`](dageist_engine::allowed::offer) is not told
-    /// it. Only an expression in a predicate position is meant. The tables
-    /// refusing a start there is judged on the dtype it was measured on.
-    ABooleanIsNeededAndTheDtypeUnknown,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 14] = [
         Self::OptionsChangeTheResult,
         Self::ALiteral,
         Self::AnAggregateGivesOneValue,
@@ -138,7 +131,6 @@ impl Limit {
         Self::AnOverflow,
         Self::TheBranchesAreOne,
         Self::APanic,
-        Self::ABooleanIsNeededAndTheDtypeUnknown,
         Self::AHiddenSchema,
         Self::AWindowOverAWindow,
         Self::ADecidedCondition,
@@ -158,7 +150,6 @@ impl Limit {
             Self::AnOverflow => "an-overflow",
             Self::TheBranchesAreOne => "the-branches-are-one",
             Self::APanic => "a-panic",
-            Self::ABooleanIsNeededAndTheDtypeUnknown => "a-boolean-is-needed",
             Self::AHiddenSchema => "a-hidden-schema",
             Self::AWindowOverAWindow => "a-window-over-a-window",
             Self::ADecidedCondition => "a-decided-condition",
@@ -208,9 +199,6 @@ impl Limit {
             }
             Self::AWindowOverAWindow => {
                 "a window over a window is run in an aggregation context, where a key that is not elementwise is refused"
-            }
-            Self::ABooleanIsNeededAndTheDtypeUnknown => {
-                "the dtype a column or an argument decides is not asked, where a Boolean is needed"
             }
         }
     }
@@ -589,35 +577,6 @@ fn is_panic(reason: &str) -> bool {
     reason.starts_with("Polars panicked")
 }
 
-/// Whether an expression is in a predicate position, which needs a `Boolean`:
-/// the last parameter on the way to it is `predicates`.
-fn in_a_predicate_position(place: &Place) -> bool {
-    place.path().iter().rev().find_map(|segment| match segment {
-        Segment::Parameter(name) => Some(name.as_str()),
-        _ => None,
-    }) == Some("predicates")
-}
-
-/// The predicates the tables were asked of that gave nothing to check against a
-/// `Boolean`: no link, or a last link whose dtype they did not give.
-fn predicates_of_unknown_dtype(prediction: &Prediction) -> Vec<&Place> {
-    prediction
-        .expressions
-        .iter()
-        .filter(|expression| {
-            in_a_predicate_position(&expression.place)
-                && (!expression.told || expression.links.last().is_none_or(Option::is_none))
-        })
-        .map(|expression| &expression.place)
-        .collect()
-}
-
-/// Whether `place` lies inside `inside`, as the way to it begins with the way
-/// to `inside`.
-fn lies_inside(place: &Place, inside: &Place) -> bool {
-    place.path().starts_with(inside.path())
-}
-
 /// The keys of the step: a join's, if `joins`, and the keys of every window in it.
 fn keys(case: &Case, joins: bool) -> Vec<&Expression> {
     let step = case.document.steps()[0].call();
@@ -709,12 +668,7 @@ fn unplaced(refusal: &Refusal) -> bool {
 }
 
 /// Whether the limit is why the tables and Polars disagree.
-fn applies(
-    limit: Limit,
-    case: &Case,
-    prediction: &Prediction,
-    disagreement: &Disagreement,
-) -> bool {
+fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
     let step = case.document.steps()[0].call();
     let pivot = is(step, "LazyFrame.pivot");
     let held = operands(step);
@@ -892,24 +846,6 @@ fn applies(
                 && refusal.reason.contains("aggregation context")
                 && held.iter().any(|(_, held)| window_over_a_window(held))
         }
-        (Limit::ABooleanIsNeededAndTheDtypeUnknown, Disagreement::PolarsAllows(refused)) => {
-            // The tables judged a start where a `Boolean` is needed on the dtype
-            // they were measured on, which is not the dtype of this case.
-            let locus = locate(case, &refused.place);
-            refused.reason.contains("Boolean")
-                && in_a_predicate_position(&refused.place)
-                && locus.chain.is_some_and(|chain| {
-                    chain.links().is_empty() || (locus.call.is_some() && locus.index.is_none())
-                })
-        }
-        (Limit::ABooleanIsNeededAndTheDtypeUnknown, Disagreement::PolarsRefuses(refusal)) => {
-            refusal.reason.contains("Boolean")
-                && predicates_of_unknown_dtype(prediction)
-                    .into_iter()
-                    .any(|predicate| {
-                        placed(refusal).is_none_or(|place| lies_inside(place, predicate))
-                    })
-        }
         _ => false,
     }
 }
@@ -932,7 +868,7 @@ pub fn excuses(case: &Case, prediction: &Prediction, observed: &Observed) -> Vec
     };
     Limit::ALL
         .into_iter()
-        .filter(|limit| applies(*limit, case, prediction, &disagreement))
+        .filter(|limit| applies(*limit, case, &disagreement))
         .collect()
 }
 
@@ -1032,10 +968,6 @@ mod tests {
 
     fn sort(items: Vec<Expression>) -> Case {
         case_of(call("LazyFrame.sort", vec![("by", many(items))]))
-    }
-
-    fn filter(items: Vec<Expression>) -> Case {
-        case_of(call("LazyFrame.filter", vec![("predicates", many(items))]))
     }
 
     fn join(left: Expression, right: Expression) -> Case {
@@ -1784,10 +1716,6 @@ mod tests {
 
     // ----- Places, schemas, Booleans, pivots
 
-    fn predicate_at(item: usize) -> Place {
-        at(&[parameter("predicates"), Segment::Item(item)])
-    }
-
     #[test]
     fn a_hidden_schema_is_excused_inside_an_expression_and_not_at_its_end() {
         let reason = "the schema says Int64 and the rows give UInt128";
@@ -1806,127 +1734,6 @@ mod tests {
         assert_eq!(
             tables_refuse(&case, link_of("exprs", 0, 0), ROWS, "no"),
             vec![]
-        );
-    }
-
-    #[test]
-    fn a_boolean_is_needed_only_of_a_predicate_whose_dtype_was_not_given() {
-        let case = filter(vec![chain(column("a"), &[]), chain(column("b"), &[])]);
-        let reason = "filter predicate must be of type `Boolean`, got `Int64`";
-        let unknown = Traced {
-            place: predicate_at(0),
-            start: Some(Representative::Int64),
-            links: Vec::new(),
-            told: false,
-        };
-        assert_eq!(
-            polars_refuses(
-                &case,
-                Some(step_place()),
-                Stage::Schema,
-                reason,
-                vec![unknown.clone()]
-            ),
-            vec![Limit::ABooleanIsNeededAndTheDtypeUnknown]
-        );
-        // A predicate with a last link whose dtype the walk worked out, as a
-        // condition's, is as unknown to `offer`; one the tables gave is not.
-        let worked_out = Traced {
-            links: vec![Some(Representative::String)],
-            ..unknown.clone()
-        };
-        assert_eq!(
-            polars_refuses(
-                &case,
-                Some(step_place()),
-                Stage::Schema,
-                reason,
-                vec![worked_out.clone()]
-            ),
-            vec![Limit::ABooleanIsNeededAndTheDtypeUnknown]
-        );
-        let told = Traced {
-            told: true,
-            ..worked_out
-        };
-        assert_eq!(
-            polars_refuses(&case, Some(step_place()), Stage::Schema, reason, vec![told]),
-            vec![]
-        );
-        // A refusal placed in another predicate, and a value that is no predicate.
-        let elsewhere = Some(at(&[
-            parameter("predicates"),
-            Segment::Item(1),
-            Segment::Link(0),
-        ]));
-        assert_eq!(
-            polars_refuses(
-                &case,
-                elsewhere,
-                Stage::Schema,
-                reason,
-                vec![unknown.clone()]
-            ),
-            vec![]
-        );
-        let value = Traced {
-            place: at(&[
-                parameter("predicates"),
-                Segment::Item(0),
-                Segment::Link(0),
-                parameter("statement"),
-            ]),
-            ..unknown
-        };
-        assert_eq!(
-            polars_refuses(
-                &case,
-                Some(step_place()),
-                Stage::Schema,
-                reason,
-                vec![value]
-            ),
-            vec![]
-        );
-    }
-
-    #[test]
-    fn the_tables_refusing_a_start_where_a_boolean_is_needed_is_excused_for_a_predicate() {
-        let reason = "it cannot end here: invalid series dtype: expected `Boolean`, got `i64`";
-        let case = pivot(chain_of(
-            call(
-                "polars.when",
-                vec![("predicates", many(vec![chain(column("a"), &[])]))],
-            ),
-            vec![
-                call(
-                    "When.then",
-                    vec![("statement", Value::Expression(chain(column("a"), &[])))],
-                ),
-                call(
-                    "Then.otherwise",
-                    vec![("statement", Value::Expression(chain(column("b"), &[])))],
-                ),
-            ],
-        ));
-        let predicate = at(&[
-            parameter("aggregate_function"),
-            Segment::Start,
-            parameter("predicates"),
-            Segment::Item(0),
-        ]);
-        assert_eq!(
-            tables_refuse(&case, predicate, Some(TableStage::Rows), reason),
-            vec![Limit::ABooleanIsNeededAndTheDtypeUnknown]
-        );
-        let value = at(&[
-            parameter("aggregate_function"),
-            Segment::Link(0),
-            parameter("statement"),
-        ]);
-        assert_eq!(
-            tables_refuse(&case, value, Some(TableStage::Rows), reason),
-            vec![Limit::AValueThatRunsOnNoRows]
         );
     }
 

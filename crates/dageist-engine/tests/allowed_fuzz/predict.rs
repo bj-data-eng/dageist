@@ -15,8 +15,8 @@
 //! predicted before that.
 
 use dageist_engine::allowed::{
-    self, After, Chosen, ConditionState, Context, Place as OfferPlace, Position as Slot,
-    RefusalSource, Representative, Shape, Verdict as OfferVerdict,
+    self, After, Chosen, ConditionState, Context, Ending, Place as OfferPlace, Position as Slot,
+    RefusalSource, Representative, Shape, Unknown, Verdict as OfferVerdict,
 };
 use dageist_engine::catalog::{Applies, Entry, Kind};
 use dageist_engine::document::{Call, Expression, Place, Segment, Start, Value};
@@ -67,10 +67,6 @@ pub struct Traced {
     pub place: Place,
     pub start: Option<Representative>,
     pub links: Vec<Option<Representative>>,
-    /// Whether the dtype after the last link is one the tables gave, and not one
-    /// the walk worked out: a start has the dtype of its column, and a condition
-    /// the dtype of its values, which [`allowed::offer`] is not told.
-    pub told: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -107,8 +103,6 @@ struct Walker<'a> {
     refusal: Option<Refused>,
     undetermined: Option<String>,
     stopped_by_options: bool,
-    /// Whether the last call walked gave its dtype from the tables.
-    told: bool,
 }
 
 pub fn predict(case: &Case) -> Prediction {
@@ -122,7 +116,6 @@ pub fn predict(case: &Case) -> Prediction {
         refusal: None,
         undetermined: None,
         stopped_by_options: false,
-        told: false,
     };
     walker.arguments(step.call());
     walker.options(step.call());
@@ -281,7 +274,7 @@ impl Walker<'_> {
         let place = self.here();
         let context = Context::from_positions(&self.slots);
         let mut start_class = None;
-        let mut last_end: Option<allowed::Refusal> = None;
+        let mut last_end: Option<Ending> = None;
         let mut cur = Cur::Dead;
         let Start::Call(start) = expression.start() else {
             self.blind("a connected input starts the chain");
@@ -296,39 +289,40 @@ impl Walker<'_> {
             return None;
         };
         self.path.push(Segment::Start);
+        let start_dtype = match start.entry().id().as_str() {
+            "polars.col" => self.column_of(start),
+            "polars.lit" => Self::literal_class(start),
+            "polars.element" => Some(self.case.receiver),
+            _ => None,
+        };
+        let chosen = Chosen::default();
+        let chosen = match start_dtype {
+            Some(dtype) => chosen.giving(dtype),
+            None => chosen,
+        };
         match allowed::offer(
             start.entry(),
             &OfferPlace::new(context, After::Start),
-            &Chosen::default(),
+            &chosen,
         ) {
             OfferVerdict::Refused(refusal) => self.refused(&refusal),
             OfferVerdict::Allowed(allowance) => {
-                last_end = allowance.can_end().refusal().cloned();
-                match start.entry().id().as_str() {
-                    "polars.when" => {
-                        cur = Cur::Condition {
-                            state: ConditionState::When,
-                            values: Vec::new(),
-                        };
-                    }
-                    id => {
-                        let dtype = match id {
-                            "polars.col" => self.column_of(start),
-                            "polars.lit" => Self::literal_class(start),
-                            "polars.element" => Some(self.case.receiver),
-                            _ => None,
-                        };
-                        start_class = dtype;
-                        cur = Cur::Value {
-                            dtype,
-                            shape: allowance.shape(),
-                        };
-                    }
+                last_end = Some(allowance.can_end().clone());
+                if start.entry().id().as_str() == "polars.when" {
+                    cur = Cur::Condition {
+                        state: ConditionState::When,
+                        values: Vec::new(),
+                    };
+                } else {
+                    start_class = start_dtype;
+                    cur = Cur::Value {
+                        dtype: start_dtype,
+                        shape: allowance.shape(),
+                    };
                 }
             }
         }
         self.path.pop();
-        self.told = false;
         let mut links: Vec<Option<Representative>> = Vec::new();
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
@@ -341,17 +335,19 @@ impl Walker<'_> {
                 _ => None,
             });
         }
-        if held
-            && !matches!(cur, Cur::Dead)
-            && let Some(refusal) = last_end
-        {
-            self.refuse_by_end(&refusal);
+        if held && !matches!(cur, Cur::Dead) {
+            match last_end {
+                Some(Ending::Refused(refusal)) => self.refuse_by_end(&refusal),
+                Some(Ending::NotKnown(unknown)) => {
+                    self.blind(format!("whether it may end is not known: {unknown}"));
+                }
+                Some(Ending::Allowed) | None => {}
+            }
         }
         self.traced.push(Traced {
             place,
             start: start_class,
             links,
-            told: self.told,
         });
         match cur {
             Cur::Value { dtype, .. } => dtype,
@@ -390,7 +386,7 @@ impl Walker<'_> {
         arguments: Vec<(String, Option<Representative>)>,
         context: Context,
         cur: Cur,
-        last_end: &mut Option<allowed::Refusal>,
+        last_end: &mut Option<Ending>,
     ) -> Cur {
         let entry: &'static Entry = link.entry();
         let after = match &cur {
@@ -441,22 +437,33 @@ impl Walker<'_> {
                 shape: Shape::Many,
             };
         }
-        let allowance = match allowed::offer(
-            entry,
-            &OfferPlace::new(context, after),
-            &Chosen::default().with_arguments(&given),
-        ) {
+        let statement = arguments
+            .iter()
+            .find(|(name, _)| name == "statement")
+            .and_then(|(_, dtype)| *dtype);
+        // A condition that ends gives the dtype its values have, when they have
+        // one.
+        let gives = match (&cur, entry.id().as_str()) {
+            (Cur::Condition { values, .. }, "Then.otherwise" | "ChainedThen.otherwise") => {
+                let mut all = values.clone();
+                all.push(statement);
+                unify(&all)
+            }
+            _ => None,
+        };
+        let chosen = Chosen::default().with_arguments(&given);
+        let chosen = match gives {
+            Some(dtype) => chosen.giving(dtype),
+            None => chosen,
+        };
+        let allowance = match allowed::offer(entry, &OfferPlace::new(context, after), &chosen) {
             OfferVerdict::Refused(refusal) => {
                 self.refused(&refusal);
                 return Cur::Dead;
             }
             OfferVerdict::Allowed(allowance) => allowance,
         };
-        *last_end = allowance.can_end().refusal().cloned();
-        let statement = arguments
-            .iter()
-            .find(|(name, _)| name == "statement")
-            .and_then(|(_, dtype)| *dtype);
+        *last_end = Some(allowance.can_end().clone());
         match (entry.applies(), cur) {
             (Applies::Expression, _) => {
                 // Documented limit ([`super::limits::Limit::OptionsChangeTheResult`]):
@@ -471,7 +478,11 @@ impl Walker<'_> {
                         Some(Value::Choice(word)) if word == "join"
                     ) || matches!(link.argument("fractional"), Some(Value::Flag(Some(true))));
                 self.stopped_by_options |= changed;
-                self.told = allowance.result().is_some() && !changed;
+                // What `offer` says of how the chain ends was worked out for
+                // the dtype the method gives at its defaults.
+                if changed {
+                    *last_end = Some(Ending::NotKnown(Unknown::TheResultsDtype));
+                }
                 let dtype = allowance
                     .result()
                     .and_then(allowed::ResultDtype::class)
@@ -482,7 +493,6 @@ impl Walker<'_> {
                 }
             }
             (Applies::Condition, Cur::Condition { mut values, .. }) => {
-                self.told = false;
                 let next = match entry.id().as_str() {
                     "When.then" => {
                         values.push(statement);

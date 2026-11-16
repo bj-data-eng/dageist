@@ -132,6 +132,13 @@ impl Rule {
         }
     }
 
+    /// Whether some rule says a chain must end `Boolean` in `context`.
+    pub(super) fn boolean_needed(context: Context) -> bool {
+        Self::ALL
+            .into_iter()
+            .any(|rule| rule.needs_boolean_end(context))
+    }
+
     /// Whether the rule says a chain must end `Boolean` in `context`. At most
     /// one rule does, for no two of them govern the same context.
     pub(super) fn needs_boolean_end(self, context: Context) -> bool {

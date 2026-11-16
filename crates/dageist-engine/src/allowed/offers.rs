@@ -190,7 +190,8 @@ impl std::error::Error for Refusal {}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Unknown {
     /// A start takes the dtype of a column or of a literal, which its arguments
-    /// decide, and the table measured it with one argument.
+    /// decide, and the table measured it with one argument. The dtype of what
+    /// it gives was not told to [`offer`].
     TheStartsDtype,
     /// A dtype that is needed is not known: the argument that decides what a
     /// method gives is not chosen.
@@ -452,7 +453,10 @@ fn on_receiver(
 /// at the entry is worked out: the rules of how a chain ends are applied to
 /// what it gives, and what the table says of an entry that ends there. A chain
 /// that may not end does not refuse the entry, which may be continued; that is
-/// what [`Allowance::can_end`] reports.
+/// what [`Allowance::can_end`] reports. Where what decides it is not known, it
+/// says so: a start whose arguments decide, and was not told the dtype it gives
+/// (see [`Chosen::giving`]), or a method whose result an argument decides in a
+/// place that needs a `Boolean`.
 ///
 /// The context table was measured at the receiver that best fits each entry,
 /// so where the context cares about the receiver, as a predicate cares that it
@@ -553,12 +557,29 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     }
     // Whether it may also end the chain there: a rule first, so that its words
     // explain the refusal, then what Polars said of an entry that ends.
-    let ending = match Rule::forbids_end(place.context, result.as_ref(), shape) {
-        Some(rule) => Ending::Refused(Refusal::rule(rule)),
-        None => match &ends {
+    let boolean_needed = Rule::boolean_needed(place.context);
+    let ending = if let Some(rule) = Rule::forbids_end(place.context, result.as_ref(), shape) {
+        Ending::Refused(Refusal::rule(rule))
+    } else if entry.applies() == Applies::Function {
+        // The table measured a start with one argument, and what its arguments
+        // decide is the dtype of the value: a column's own, a literal's. Told
+        // it, the rules above have judged it; not told, the table speaks only
+        // where the dtype does not matter, and a refusal it recorded may be one
+        // that another argument does not meet.
+        if chosen.gives.is_some() {
+            Ending::Allowed
+        } else if boolean_needed || matches!(ends, Outcome::Refused(_)) {
+            Ending::NotKnown(Unknown::TheStartsDtype)
+        } else {
+            Ending::Allowed
+        }
+    } else if result.is_none() && boolean_needed {
+        Ending::NotKnown(Unknown::TheResultsDtype)
+    } else {
+        match &ends {
             Outcome::Refused(reason) => Ending::Refused(Refusal::polars(reason)),
             Outcome::Allowed(_) => Ending::Allowed,
-        },
+        }
     };
     Ok(Allowance {
         result,
