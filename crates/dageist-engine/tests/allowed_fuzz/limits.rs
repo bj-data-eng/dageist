@@ -101,7 +101,10 @@ pub enum Limit {
     /// release build, on keys the tables did not measure.
     AnOverflow,
     /// A condition whose values are one expression is simplified to it, and
-    /// its predicates are dropped, so what Polars refuses in them it does not.
+    /// its predicates are dropped, so what Polars refuses in them it does not. Of
+    /// the named rules it excuses only the refusal of what is inside a predicate,
+    /// not of the predicate itself, which Polars simplifies away only when it is a
+    /// comparison and refuses when it is a column.
     TheBranchesAreOne,
     /// Polars panicking has no place, and is gated by its reason. A panic of
     /// Polars is an internal check that failed. The tables record
@@ -467,6 +470,8 @@ struct Locus<'a> {
     inside: Vec<&'a Expression>,
     /// How the place reaches each of them, in the same order.
     reach: Vec<Reach>,
+    /// How many segments of the place it took to enter each of them.
+    depths: Vec<usize>,
 }
 
 enum Node<'a> {
@@ -486,9 +491,10 @@ fn locate<'a>(case: &'a Case, place: &Place) -> Locus<'a> {
         in_values: Vec::new(),
         inside: Vec::new(),
         reach: Vec::new(),
+        depths: Vec::new(),
     };
     let mut node = Node::Call(case.document.steps()[0].call());
-    for segment in place.path() {
+    for (taken, segment) in place.path().iter().enumerate() {
         let value = match (&node, segment) {
             (Node::Call(call), Segment::Parameter(name)) => {
                 if matches!(
@@ -548,6 +554,7 @@ fn locate<'a>(case: &'a Case, place: &Place) -> Locus<'a> {
                 locus.top.get_or_insert(expression);
                 locus.inside.push(expression);
                 locus.reach.push(Reach::Whole);
+                locus.depths.push(taken + 1);
                 // Which call of this expression the place is at is not known
                 // until the way says; it is not the link of the chain that holds
                 // this one.
@@ -870,8 +877,9 @@ fn held_by(place: &Place, name: &str) -> bool {
 /// is one value, or a window's `order_by` that is, is dropped, and Polars
 /// refuses the same key elsewhere or when it is not one value; a `len` in a
 /// `select` of one values is not given what it counts; and a condition that a
-/// literal true decides drops what follows its first value; and a later
-/// predicate in a window's `order_by` is not evaluated where no row reaches it.
+/// literal true decides drops what follows its first value; a later predicate
+/// in a window's `order_by` is not evaluated where no row reaches it; and what
+/// is inside the predicate of branches that are one is not evaluated.
 fn applies_to_a_rule(
     limit: Limit,
     rule: &str,
@@ -889,6 +897,23 @@ fn applies_to_a_rule(
         }
         Limit::AValueThatRunsOnNoRows => {
             predicate_rule && in_a_later_predicate_of_an_order_by(case, &refused.place)
+        }
+        Limit::TheBranchesAreOne => {
+            let locus = locate(case, &refused.place);
+            // Polars never evaluates the predicate of such a condition, so what is
+            // inside it is not refused; the predicate itself is.
+            predicate_rule
+                && locus.inside.iter().enumerate().any(|(at, holder)| {
+                    locus
+                        .in_predicates
+                        .iter()
+                        .any(|condition| std::ptr::eq(*condition, *holder))
+                        && branches_are_one(holder)
+                        && locus
+                            .depths
+                            .get(at + 1)
+                            .is_some_and(|entered| refused.place.path().len() > *entered)
+                })
         }
         Limit::ADecidedCondition => {
             let locus = locate(case, &refused.place);

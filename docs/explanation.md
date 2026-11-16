@@ -415,7 +415,7 @@ the rows, an overflow, a panic, a window over a window, an explode, the empty ta
 of a pivot) say so below. Two limits may both explain one case, and it is then
 excused by both.
 
-A limit excuses a named rule's refusal only for a cause it names, and there are five, each
+A limit excuses a named rule's refusal only for a cause it names, and there are six, each
 shown by a campaign case and by a replay of it without the cause. The first is a fold of a
 null that drops the predicate the rule refused, which the walk says Polars never evaluates;
 the literal limit holds it. The second is a sort key that is one value, or a window's
@@ -432,10 +432,14 @@ predicates or values, while a first value that is a literal, a condition decided
 holds it. The fifth is a later predicate in a window's `order_by`, which Polars evaluates on
 groups and does not evaluate where no row reaches it, as the rows of the sample decide; the
 same condition in `select`, in `sort`, and in a window's `partition_by` or `more_exprs` is
-evaluated, and the first predicate always is. The limit for a value that runs on no rows
-holds it. No other cause excuses a rule: not a decided condition or a `len` outside those,
-not values that are one expression, and not a start that is a literal. A literal at the
-start of a key, or a null comparison in it, says nothing of why the key rule refused it.
+evaluated, and the first predicate always is; the limit for a value that runs on no rows
+holds it. The sixth is what is inside the predicate of a condition whose values are one
+expression, which Polars simplifies to that expression without evaluating the predicate when
+the predicate is a comparison, while it refuses a predicate that is a column, values that
+differ, and a condition with one value; the limit for branches that are one holds it. No
+other cause excuses a rule: not a decided condition or a `len` outside those, and not a
+start that is a literal. A literal at the start of a key, or a null comparison in it, says
+nothing of why the key rule refused it.
 
 A named rule is dageist's, and may be stricter than Polars only where it is so by design,
 which the target names: `pivot-aggregate-gives-one-value`, since Polars lets a running
@@ -459,7 +463,7 @@ little; the tally counts the pivot cases and those the rule refuses apart.
 | A join key's dtype | The other table's key is made of the dtype the chain gives on its own, and the join may resolve the chain to another, as the precision of a decimal a null is taken from. Polars refusing the join, with a reason that names a decimal (no place). |
 | The lengths of the rows | Whether lists, or other values, of different lengths combine depends on the rows. Polars refusing the rows with a reason about lengths, in a case with no `explode` (no place). |
 | An overflow | A debug build of Polars panics where a release build wraps. Polars panicking so (no place). |
-| Branches that are one | A condition whose values are one expression is simplified to it, and its predicates are dropped. The tables refusing inside a predicate of such a condition, which Polars allows. The rule that a predicate is a `Boolean` is not excused by it. |
+| Branches that are one | A condition whose values are one expression is simplified to it, and its predicates are dropped. The tables refusing inside a predicate of such a condition, which Polars allows. Of the rules it excuses only that a predicate inside a predicate be a `Boolean`, not the predicate itself, which Polars refuses when it is a column. |
 | A decided condition | A condition with a predicate made of literals alone is decided before it is run, and the other branches are dropped; a predicate that only starts from a literal and goes on to a column is not. The tables refusing inside such a condition, which Polars allows. Of the rules it excuses only that a later predicate be a `Boolean`, after the first value of a condition that a lone literal `true` decides, when that value reads a column or the whole condition is literals. |
 | A value that runs on no rows | A value of a condition runs on the rows its predicate selects, and a predicate after the first on the rows left to it, which on the sample may be none. The tables refusing, at the stage of running rows, inside such a value or predicate of a condition that is not decided, which Polars allows. What they refused when they built the step is refused whatever the rows. Of the rules it excuses only that a later predicate in a window's `order_by` be a `Boolean`. |
 | A panic | One is an internal check that failed on the plan Polars made in `select`; another place, or a combination of what was measured singly, may not reach it, or may reach another. Polars panicking where the tables allow (no place), and the tables recording a panic where Polars allows. |
