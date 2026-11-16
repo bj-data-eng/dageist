@@ -558,6 +558,105 @@ fn a_join_key_that_is_wholly_one_value_is_not_refused_for_a_null_it_compares() {
     }
 }
 
+/// `lit(true) != null`, which Polars folds into a null.
+fn folded() -> Value {
+    chain(
+        call("polars.lit", json!({ "value": { "flag": true } })),
+        vec![compared("Expr.ne", null())],
+    )
+}
+
+#[test]
+fn a_comparison_that_folds_into_a_null_is_a_null_in_the_next_comparison() {
+    let refused = Some(RefusalSource::Rule(Rule::KeyIsElementwise));
+    // The folded null on either side of a comparison with a column.
+    let keys = [
+        chain(
+            call("polars.lit", json!({ "value": { "flag": true } })),
+            vec![compared("Expr.ne", null()), compared("Expr.eq", field("f"))],
+        ),
+        field_then("f", vec![compared("Expr.eq", folded())]),
+    ];
+    for (at, key) in keys.into_iter().enumerate() {
+        assert_eq!(joined_on(key), refused, "key {at}");
+    }
+    // A fold alone has no column to lose, and an aggregate is one value.
+    assert_eq!(joined_on(folded()), None);
+    assert_eq!(
+        joined_on(chain(
+            call("polars.lit", json!({ "value": { "flag": true } })),
+            vec![
+                compared("Expr.ne", null()),
+                compared(
+                    "Expr.eq",
+                    field_then("f", vec![call("Expr.first", json!({}))])
+                ),
+            ],
+        )),
+        None
+    );
+}
+
+#[test]
+fn a_comparison_of_an_aggregate_with_a_null_is_no_comparison_of_a_column() {
+    // `f.first() == null` is one value, and what is compared with it is a column
+    // compared with a value that is not null.
+    let key = field_then(
+        "b",
+        vec![compared(
+            "Expr.le",
+            field_then(
+                "a",
+                vec![
+                    call("Expr.first", json!({})),
+                    compared("Expr.eq", null()),
+                    compared("Expr.gt", field("f")),
+                ],
+            ),
+        )],
+    );
+    assert_eq!(joined_on(key), None);
+}
+
+#[test]
+fn a_condition_with_a_refused_predicate_gives_a_place_that_is_not_known() {
+    // The shape of a condition is that of its parts, and a predicate that is
+    // refused has none, so a window that joins after it is not known to give a
+    // list.
+    let condition = chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![chain(
+                call("polars.lit", json!({ "value": { "string": "1d" } })),
+                vec![call("Expr.dt.month_start", json!({}))],
+            )]) }),
+        ),
+        vec![
+            call(
+                "When.then",
+                json!({ "statement": field_then("f", vec![call("Expr.len", json!({}))]) }),
+            ),
+            call(
+                "Then.otherwise",
+                json!({ "statement": field_then("b", vec![call("Expr.len", json!({}))]) }),
+            ),
+            call(
+                "Expr.over",
+                json!({
+                    "partition_by": many(vec![field("k")]),
+                    "mapping_strategy": { "choice": "join" },
+                }),
+            ),
+        ],
+    );
+    let walk = walk_of(
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![condition]) }),
+    );
+    let item = expression_at(&walk, &item("exprs", 0));
+    assert_eq!(item.places().last(), Some(&None));
+}
+
 #[test]
 fn the_values_of_a_condition_need_be_boolean_in_a_filter_only_where_it_ends_the_predicate() {
     let condition = |links: Vec<Value>| {
