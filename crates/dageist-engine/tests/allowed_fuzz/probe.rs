@@ -314,6 +314,32 @@ mod tests {
         assert!(found.probe.contains("Expr.max"), "{}", found.probe);
     }
 
+    #[test]
+    fn a_reason_is_matched_by_what_polars_objected_to_and_not_by_the_names_it_quotes() {
+        let tables = "could not evaluate '<' comparison between series 'a' of dtype: Boolean and series 'b' of dtype: Date";
+        let probe = "could not evaluate '<' comparison between series '_POLARS_TMP_PHYS_2' of dtype: Boolean and series '_POLARS_TMP_PHYS_3' of dtype: Date";
+        assert!(same_reason(&Source::Polars, tables, probe));
+        assert!(!same_reason(
+            &Source::Polars,
+            tables,
+            "cannot compare string with numeric type (i8)"
+        ));
+    }
+
+    #[test]
+    fn a_comparison_in_a_sort_key_of_one_value_is_refused_alone_for_the_same_reason() {
+        let found = settled("stricter-a-comparison-in-a-sort-key-of-one-value.case");
+        assert!(found.reason.contains("comparison"), "{}", found.reason);
+    }
+
+    #[test]
+    fn a_part_of_a_right_key_is_probed_against_the_other_table() {
+        // The part reads `rh` and `rb`, which only the other table has: selected
+        // from the left table the probe would be refused for no column.
+        let found = settled("stricter-a-comparison-in-a-right-key-of-branches-that-are-one.case");
+        assert!(found.reason.contains("compare"), "{}", found.reason);
+    }
+
     /// A case that selects the one chain `a.cum_sum()` on columns of `receiver`.
     fn cum_sum_of(receiver: &str) -> Case {
         let text = format!(
