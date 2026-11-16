@@ -21,13 +21,13 @@
 //! depend on the order the limits are asked in, and a case that two apply to is
 //! excused by both.
 
-use dageist_engine::document::{Call, Expression, Place, Segment, Start, Value};
+use dageist_engine::document::{Call, Evaluation, Expression, Place, Segment, Start, Value, Walk};
 
 use super::case::Case;
 use dageist_engine::allowed::Stage as TableStage;
 
 use super::observe::{Observed, Refusal, Stage};
-use super::predict::{Prediction, Refused, Source, Verdict};
+use super::predict::{Prediction, Refused, Source, Verdict, walk_of};
 
 /// A limit of the tables, and what it says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,11 +40,14 @@ pub enum Limit {
     /// expression that holds an `explode`.
     AnExplodeChangesTheLengths,
     /// A comparison or a subtraction with a null literal is null, and Polars does not evaluate
-    /// the other side of it, wherever in the expression that comparison is. A
-    /// literal is one value, which Polars broadcasts and casts as it does not
-    /// a column: it accepts a text compared with a typed number, or a window
-    /// over a constant, where a column of the dtype is refused, and joins it
-    /// with a column of other length. The tables measure an argument as a
+    /// the other side of it, wherever in the expression that comparison is; the
+    /// engine's walk says what it folds and what it never evaluates
+    /// ([`Walk::evaluation_at`]), and this limit reads that and has no model of
+    /// its own. A named rule's refusal of a predicate that a fold drops is this
+    /// too. A literal is one value, which Polars broadcasts and casts as it
+    /// does not a column: it accepts a text compared with a typed number, or a
+    /// window over a constant, where a column of the dtype is refused, and joins
+    /// it with a column of other length. The tables measure an argument as a
     /// column of the dtype, except the values of `shift` and a pivot's group.
     ALiteral,
     /// Polars does not evaluate what it does not need for one value: a sort key
@@ -52,7 +55,9 @@ pub enum Limit {
     /// tables refusing at a call that follows an aggregate in its own chain, or
     /// inside a sort key that is one value, or inside an expression with a `len`
     /// in it, which Polars allows. What the tables say of a method's dtype was
-    /// measured in `select` on a column.
+    /// measured in `select` on a column. Of the named rules it excuses only the
+    /// refusal of a later predicate of a condition that a literal predicate
+    /// decides, with a `len` after it.
     AnAggregateGivesOneValue,
     /// A pivot's aggregate is run on the values of each group, not on a
     /// column in `select`, and Polars uses other kernels for them: it takes the
@@ -337,11 +342,6 @@ fn measured_literal(owner: &Call, parameter: &str, pivot: bool) -> bool {
     pivot || (is(owner, "Expr.shift") && matches!(parameter, "n" | "fill_value"))
 }
 
-/// Whether `call` is a null literal on its own.
-fn is_a_null(call: &Call) -> bool {
-    is(call, "polars.lit") && matches!(call.argument("value"), Some(Value::Flag(None)))
-}
-
 /// The indexes of the links of `expression` that `found` says yes to.
 fn links_where(expression: &Expression, found: &dyn Fn(&Call) -> bool) -> Vec<usize> {
     expression
@@ -351,52 +351,6 @@ fn links_where(expression: &Expression, found: &dyn Fn(&Call) -> bool) -> Vec<us
         .filter(|(_, link)| found(link))
         .map(|(at, _)| at)
         .collect()
-}
-
-/// Whether a place reached `holder` where a comparison with a null literal
-/// reaches: what the comparison follows, its own arguments, and the calls from
-/// it on, and not the arguments of the links after it.
-fn reached_by_a_null(holder: &Expression, reach: Reach) -> bool {
-    let comparisons = [
-        "Expr.eq", "Expr.ne", "Expr.gt", "Expr.ge", "Expr.lt", "Expr.le", "Expr.sub",
-    ];
-    let compares = |link: &Call| comparisons.contains(&link.entry().id().as_str());
-    let with_a_null = |link: &Call| {
-        compares(link)
-            && operands(link).into_iter().any(|(_, operand)| {
-                operand.links().is_empty()
-                    && matches!(operand.start(), Start::Call(start) if is_a_null(start))
-            })
-    };
-    // What a comparison with a null gives is a null, which the comparison that
-    // follows it compares.
-    fn null_before(
-        holder: &Expression,
-        at: usize,
-        with_a_null: &dyn Fn(&Call) -> bool,
-        compares: &dyn Fn(&Call) -> bool,
-    ) -> bool {
-        match at.checked_sub(1) {
-            None => matches!(holder.start(), Start::Call(start) if is_a_null(start)),
-            Some(before) => {
-                let link = &holder.links()[before];
-                compares(link)
-                    && (with_a_null(link) || null_before(holder, before, with_a_null, compares))
-            }
-        }
-    }
-    holder.links().iter().enumerate().any(|(at, link)| {
-        compares(link)
-            && (with_a_null(link)
-                // A comparison folds what an earlier one folded, and a subtraction
-                // after it evaluates its argument.
-                || (link.entry().id().as_str() != "Expr.sub"
-                    && null_before(holder, at, &with_a_null, &compares)))
-            && match reach {
-                Reach::Whole | Reach::Start | Reach::At(_) => true,
-                Reach::Operand(j) => j <= at,
-            }
-    })
 }
 
 /// Whether a place reached `holder` where a `len` does not read what it counts:
@@ -629,82 +583,95 @@ fn is_panic(reason: &str) -> bool {
     reason.starts_with("Polars panicked")
 }
 
-/// The keys of the step: a join's, if `joins`, and the keys of every window in it.
-fn keys(case: &Case, joins: bool) -> Vec<&Expression> {
-    let step = case.document.steps()[0].call();
-    let mut found: Vec<&Expression> = Vec::new();
-    if joins && is(step, "LazyFrame.join") {
-        found.extend(
-            operands(step)
-                .into_iter()
-                .filter(|(parameter, _)| ["on", "left_on", "right_on"].contains(parameter))
-                .map(|(_, key)| key),
-        );
-    }
-    fn windows<'a>(expression: &'a Expression, found: &mut Vec<&'a Expression>) {
-        let calls = std::iter::once(expression.start())
-            .filter_map(|start| match start {
-                Start::Call(call) => Some(call),
-                Start::Input(_) => None,
-            })
-            .chain(expression.links());
-        for call in calls {
-            if is(call, "Expr.over") {
-                found.extend(
-                    operands(call)
-                        .into_iter()
-                        .filter(|(parameter, _)| {
-                            ["partition_by", "more_exprs", "order_by"].contains(parameter)
-                        })
-                        .map(|(_, key)| key),
+/// The expressions a call is given, by parameter, and the place of each: the
+/// call is at `call`.
+fn placed_operands<'a>(call: &'a Call, at: &Place) -> Vec<(&'a str, Place, &'a Expression)> {
+    fn collect<'a>(
+        parameter: &'a str,
+        value: &'a Value,
+        place: Place,
+        found: &mut Vec<(&'a str, Place, &'a Expression)>,
+    ) {
+        match value {
+            Value::Expression(expression) => found.push((parameter, place, expression)),
+            Value::Many(items) => items.iter().enumerate().for_each(|(item, inside)| {
+                collect(
+                    parameter,
+                    inside,
+                    place.clone().then(Segment::Item(item)),
+                    found,
                 );
-            }
-            for (_, inside) in operands(call) {
-                windows(inside, found);
-            }
+            }),
+            Value::Pairs(pairs) => pairs.iter().enumerate().for_each(|(at, (key, entry))| {
+                collect(parameter, key, place.clone().then(Segment::Key(at)), found);
+                collect(
+                    parameter,
+                    entry,
+                    place.clone().then(Segment::Value(at)),
+                    found,
+                );
+            }),
+            _ => {}
         }
     }
-    for (_, held) in operands(step) {
-        windows(held, &mut found);
+    let mut found = Vec::new();
+    for given in call.arguments() {
+        let place = at
+            .clone()
+            .then(Segment::Parameter(given.parameter().to_owned()));
+        collect(given.parameter(), given.value(), place, &mut found);
     }
     found
 }
 
-/// Whether a key holds, at any depth, a comparison with a null literal: one
-/// that is given it, or one that follows it.
-fn holds_a_null_comparison(key: &Expression) -> bool {
-    let comparisons = [
-        "Expr.eq", "Expr.ne", "Expr.gt", "Expr.ge", "Expr.lt", "Expr.le",
-    ];
-    let is_null = |expression: &Expression| {
-        expression.links().is_empty()
-            && matches!(expression.start(), Start::Call(start) if is_a_null(start))
-    };
-    let compares = |expression: &Expression| {
-        let null_start = matches!(expression.start(), Start::Call(start) if is_a_null(start));
-        expression.links().iter().enumerate().any(|(at, link)| {
-            comparisons.contains(&link.entry().id().as_str())
-                && ((null_start && at == 0)
-                    || operands(link)
-                        .into_iter()
-                        .any(|(_, operand)| is_null(operand)))
-        })
-    };
-    fn walk(expression: &Expression, compares: &dyn Fn(&Expression) -> bool) -> bool {
-        let calls = std::iter::once(expression.start())
-            .filter_map(|start| match start {
-                Start::Call(call) => Some(call),
-                Start::Input(_) => None,
-            })
-            .chain(expression.links());
-        compares(expression)
-            || calls.into_iter().any(|call| {
-                operands(call)
-                    .into_iter()
-                    .any(|(_, inside)| walk(inside, compares))
-            })
+/// The keys of the step, each with its place: a join's, if `joins`, and the keys
+/// of every window in it.
+fn keys(case: &Case, joins: bool) -> Vec<(Place, &Expression)> {
+    let step = &case.document.steps()[0];
+    let origin = Place::of_step(0, Some(step.id().clone()));
+    let mut found: Vec<(Place, &Expression)> = Vec::new();
+    if joins && is(step.call(), "LazyFrame.join") {
+        found.extend(
+            placed_operands(step.call(), &origin)
+                .into_iter()
+                .filter(|(parameter, _, _)| ["on", "left_on", "right_on"].contains(parameter))
+                .map(|(_, place, key)| (place, key)),
+        );
     }
-    walk(key, &compares)
+    fn windows<'a>(
+        expression: &'a Expression,
+        place: &Place,
+        found: &mut Vec<(Place, &'a Expression)>,
+    ) {
+        let starts = match expression.start() {
+            Start::Call(call) => Some((call, place.clone().then(Segment::Start))),
+            Start::Input(_) => None,
+        };
+        let links = expression
+            .links()
+            .iter()
+            .enumerate()
+            .map(|(at, link)| (link, place.clone().then(Segment::Link(at))));
+        for (call, at) in starts.into_iter().chain(links) {
+            let held = placed_operands(call, &at);
+            if is(call, "Expr.over") {
+                found.extend(
+                    held.iter()
+                        .filter(|(parameter, _, _)| {
+                            ["partition_by", "more_exprs", "order_by"].contains(parameter)
+                        })
+                        .map(|(_, key_at, key)| (key_at.clone(), *key)),
+                );
+            }
+            for (_, inside_at, inside) in held {
+                windows(inside, &inside_at, found);
+            }
+        }
+    }
+    for (_, held_at, held) in placed_operands(step.call(), &origin) {
+        windows(held, &held_at, &mut found);
+    }
+    found
 }
 
 /// Whether an `over` has, before it in its chain, another window.
@@ -766,19 +733,9 @@ fn dropped_as_one_value(case: &Case, locus: &Locus) -> bool {
             .top
             .is_some_and(|top| wholly_single(top, top.links().len(), true)))
         || locus.inside.iter().any(|holder| {
-            keys.iter().any(|key| std::ptr::eq(*key, *holder))
+            keys.iter().any(|(_, key)| std::ptr::eq(*key, *holder))
                 && wholly_single(holder, holder.links().len(), true)
         })
-}
-
-/// Whether a comparison with a null literal reaches the place: what it follows,
-/// its own arguments, and the calls from it on.
-fn folded_by_a_null(locus: &Locus) -> bool {
-    locus
-        .inside
-        .iter()
-        .zip(&locus.reach)
-        .any(|(holder, reach)| reached_by_a_null(holder, *reach))
 }
 
 /// The rows of the sample tables the tables were measured on and the target
@@ -825,61 +782,45 @@ fn leaves_only_nulls(links: &[Call]) -> bool {
 
 /// Whether the limit is why Polars allows what the named rule refuses. A limit
 /// excuses a rule only for a cause it names, and the evidence for each is a
-/// campaign case: a later predicate of a condition runs on the rows left to it,
-/// which Polars finds when it runs rows; a sort key that is one value is dropped, and
-/// what a `len` follows is not evaluated; what a comparison with a null follows
-/// is not evaluated; and a condition that a literal predicate decides, or whose
-/// values are one expression, has dropped its predicates.
-fn applies_to_a_rule(limit: Limit, rule: &str, case: &Case, refused: &Refused) -> bool {
+/// campaign case: a fold of a null drops the predicate, which the walk says
+/// ([`Walk::evaluation_at`]); and a condition that a literal predicate decides,
+/// with a `len` after it, does not read its later predicates.
+fn applies_to_a_rule(
+    limit: Limit,
+    rule: &str,
+    case: &Case,
+    walk: &Walk,
+    refused: &Refused,
+) -> bool {
     let predicate_rule = matches!(
         rule,
         "condition-predicate-is-boolean" | "filter-predicate-is-boolean"
     );
-    let locus = locate(case, &refused.place);
     match limit {
-        Limit::AValueThatRunsOnNoRows => {
-            rule == "condition-predicate-is-boolean"
-                && locus
-                    .in_values
-                    .iter()
-                    .any(|condition| !is_decided(condition))
+        Limit::ALiteral => {
+            predicate_rule && walk.evaluation_at(&refused.place) == Evaluation::Dropped
         }
-        // A sort key that is one value is dropped, and `len` does not read what it
-        // counts.
         Limit::AnAggregateGivesOneValue => {
-            predicate_rule
-                && (dropped_as_one_value(case, &locus)
-                    || locus
-                        .inside
-                        .iter()
-                        .zip(&locus.reach)
-                        .any(|(holder, reach)| reached_by_a_len(holder, *reach)))
-        }
-        Limit::ALiteral => predicate_rule && folded_by_a_null(&locus),
-        // A condition that a literal predicate decides, or whose values are one
-        // expression, has dropped the predicates that Polars would refuse.
-        Limit::ADecidedCondition => {
-            predicate_rule && locus.inside.iter().any(|holder| is_decided(holder))
-        }
-        Limit::TheBranchesAreOne => {
+            let locus = locate(case, &refused.place);
             predicate_rule
                 && locus
-                    .in_predicates
+                    .inside
                     .iter()
-                    .any(|condition| branches_are_one(condition))
+                    .zip(&locus.reach)
+                    .any(|(holder, reach)| is_decided(holder) && reached_by_a_len(holder, *reach))
         }
         _ => false,
     }
 }
 
 /// Whether the limit is why the tables and Polars disagree.
-fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
+fn applies(limit: Limit, case: &Case, walk: &Walk, disagreement: &Disagreement) -> bool {
     // A rule is refused for a cause of its own, which only the limit that names
     // it can explain.
     if let Disagreement::PolarsAllows(refused) = disagreement
         && let Source::Rule(rule) = refused.source
     {
-        return applies_to_a_rule(limit, rule, case, refused);
+        return applies_to_a_rule(limit, rule, case, walk, refused);
     }
     let step = case.document.steps()[0].call();
     let pivot = is(step, "LazyFrame.pivot");
@@ -917,8 +858,8 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
                 })
             });
             // A comparison with a null literal is null, and Polars does not
-            // evaluate what it follows or what it is given.
-            let folded = folded_by_a_null(&locus);
+            // evaluate what it follows or what it is given: the walk says where.
+            let folded = walk.evaluation_at(&refused.place) != Evaluation::Evaluated;
             // What a call that follows a literal is given, at any depth, is met by
             // one value, which Polars broadcasts: a comparison of a literal with
             // what the tables refuse when they run rows is not refused.
@@ -999,11 +940,17 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
                                 )
                         })
                     };
-                    keys.iter().any(|key| holds_a_null_comparison(key))
+                    // Whether the walk says a comparison with a null folds in it.
+                    let folds = |place: &Place| {
+                        walk.expressions()
+                            .iter()
+                            .any(|walked| walked.place() == place && walked.folds_a_null())
+                    };
+                    keys.iter().any(|(place, _)| folds(place))
                         && keys
                             .iter()
-                            .filter(|key| !holds_a_null_comparison(key))
-                            .all(|key| !other_cause(key))
+                            .filter(|(place, _)| !folds(place))
+                            .all(|(_, key)| !other_cause(key))
                 }
         }
         (Limit::AShiftThatLeavesNulls, Disagreement::PolarsAllows(refused)) => {
@@ -1022,7 +969,9 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
             // The key the tables refused is wholly one value.
             refused.reason.contains("elementwise")
                 && locate(case, &refused.place).top.is_some_and(|top| {
-                    keys(case, true).iter().any(|key| std::ptr::eq(*key, top))
+                    keys(case, true)
+                        .iter()
+                        .any(|(_, key)| std::ptr::eq(*key, top))
                         && any_call(top, &is_a_single_value)
                         && wholly_single(top, top.links().len(), true)
                 })
@@ -1096,9 +1045,10 @@ pub fn excuses(case: &Case, prediction: &Prediction, observed: &Observed) -> Vec
         }
         _ => return Vec::new(),
     };
+    let walk = walk_of(case);
     Limit::ALL
         .into_iter()
-        .filter(|limit| applies(*limit, case, &disagreement))
+        .filter(|limit| applies(*limit, case, &walk, &disagreement))
         .collect()
 }
 

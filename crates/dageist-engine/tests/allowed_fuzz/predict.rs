@@ -108,11 +108,17 @@ fn refused(found: &WalkRefusal) -> Refused {
     }
 }
 
-pub fn predict(case: &Case) -> Prediction {
+/// The engine's walk of the case's step: what the tables and the rules say of
+/// it, and what Polars evaluates of it.
+pub fn walk_of(case: &Case) -> Walk {
     let step = &case.document.steps()[0];
     debug_assert_eq!(step.id().as_str(), STEP);
     let frames = Frames::with_key(case.receiver, case.argument, None);
-    let walk: Walk = step.walk(0, frames.rows.schema(), &frames.inputs(false));
+    step.walk(0, frames.rows.schema(), &frames.inputs(false))
+}
+
+pub fn predict(case: &Case) -> Prediction {
+    let walk = walk_of(case);
     let verdict = match (walk.refusal(), walk.not_known()) {
         (Some(found), _) => Verdict::Refuses(refused(found)),
         (None, Some(reason)) => Verdict::Undetermined(reason.to_owned()),
