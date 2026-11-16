@@ -28,14 +28,18 @@ pub enum Rule {
     FilterPredicateIsBoolean,
     /// `polars.element` stands only in a pivot's aggregate.
     ElementOnlyInPivotAggregate,
+    /// A join's or a window's key is elementwise: it holds no single value, an
+    /// aggregate or a null literal, beside what is not one.
+    KeyIsElementwise,
 }
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
         Self::ConditionPredicateIsBoolean,
         Self::ElementOnlyInPivotAggregate,
         Self::FilterPredicateIsBoolean,
+        Self::KeyIsElementwise,
         Self::PivotAggregateGivesOneValue,
     ];
 
@@ -47,6 +51,7 @@ impl Rule {
             Self::ConditionPredicateIsBoolean => "condition-predicate-is-boolean",
             Self::ElementOnlyInPivotAggregate => "element-only-in-pivot-aggregate",
             Self::FilterPredicateIsBoolean => "filter-predicate-is-boolean",
+            Self::KeyIsElementwise => "key-is-elementwise",
         }
     }
 
@@ -68,6 +73,9 @@ impl Rule {
                 "`polars.element` stands only in a pivot's aggregate"
             }
             Self::FilterPredicateIsBoolean => "a filter's predicate must be Boolean",
+            Self::KeyIsElementwise => {
+                "a key must be elementwise: a single value, an aggregate or a null, may not stand in it beside a column"
+            }
         }
     }
 
@@ -80,6 +88,7 @@ impl Rule {
         match self {
             Self::ElementOnlyInPivotAggregate => entry == "polars.element",
             Self::PivotAggregateGivesOneValue => context == Context::step(Outer::PivotAggregate),
+            Self::KeyIsElementwise => context.is_key(),
             Self::ConditionPredicateIsBoolean | Self::FilterPredicateIsBoolean => {
                 self.needs_boolean_end(context)
             }
@@ -102,6 +111,14 @@ impl Rule {
     pub(super) fn forbids(entry: &str, context: Context) -> Option<Self> {
         (entry == "polars.element" && context.outer() != Outer::PivotAggregate)
             .then_some(Self::ElementOnlyInPivotAggregate)
+    }
+
+    /// The rule that forbids a key that holds a single value beside a column,
+    /// where `context` is a key, if it does. Whether the key holds one is a
+    /// matter of the whole expression, which the caller found.
+    #[must_use]
+    pub(super) fn forbids_mixed_key(context: Context) -> Option<Self> {
+        context.is_key().then_some(Self::KeyIsElementwise)
     }
 
     /// The rule that forbids a chain to end in `context` with a value of the
@@ -150,7 +167,9 @@ impl Rule {
                 context.outer() == Outer::Filter
                     && matches!(context.nested(), None | Some(Nested::ConditionValue))
             }
-            Self::PivotAggregateGivesOneValue | Self::ElementOnlyInPivotAggregate => false,
+            Self::PivotAggregateGivesOneValue
+            | Self::ElementOnlyInPivotAggregate
+            | Self::KeyIsElementwise => false,
         }
     }
 }

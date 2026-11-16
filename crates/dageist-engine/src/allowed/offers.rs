@@ -778,6 +778,18 @@ pub fn rule_forbids(entry: &Entry, context: Context) -> Result<(), Refusal> {
     Rule::forbids(entry.id().as_str(), context).map_or(Ok(()), |rule| Err(Refusal::rule(rule)))
 }
 
+/// The refusal of a key that holds a single value, an aggregate or a null
+/// literal, beside a column, where `context` holds a key of a join or of a
+/// window, if the rule refuses it there. What a key holds is a matter of the
+/// whole expression, not of one entry, so the caller finds it and asks.
+///
+/// # Errors
+///
+/// The rule, as a refusal that says it in its words.
+pub fn rule_forbids_mixed_key(context: Context) -> Result<(), Refusal> {
+    Rule::forbids_mixed_key(context).map_or(Ok(()), |rule| Err(Refusal::rule(rule)))
+}
+
 /// Every entry that stands in an expression, offered or refused at `place`.
 /// A step is not offered: steps stand in a list.
 ///

@@ -129,6 +129,23 @@ fn a_place_is_judged_by_its_outer_position_and_its_innermost_nested_one() {
 }
 
 #[test]
+fn a_context_holds_a_key_where_a_join_or_a_window_has_one() {
+    let keys: Vec<Context> = Context::all().into_iter().filter(Context::is_key).collect();
+    let mut expected = vec![
+        Context::step(Outer::JoinLeft),
+        Context::step(Outer::JoinRight),
+    ];
+    for outer in Outer::ALL {
+        expected.push(Context::inside(outer, Nested::PartitionBy));
+        expected.push(Context::inside(outer, Nested::OrderBy));
+    }
+    for context in &keys {
+        assert!(expected.contains(context), "{context}");
+    }
+    assert_eq!(keys.len(), expected.len());
+}
+
+#[test]
 fn the_dtype_table_has_a_line_for_every_method_receiver_and_argument() {
     let mut expected = 0;
     for entry in catalog::entries()

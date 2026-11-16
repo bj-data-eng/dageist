@@ -95,9 +95,10 @@ pub enum dageist_engine::allowed::Rule
 pub dageist_engine::allowed::Rule::ConditionPredicateIsBoolean
 pub dageist_engine::allowed::Rule::ElementOnlyInPivotAggregate
 pub dageist_engine::allowed::Rule::FilterPredicateIsBoolean
+pub dageist_engine::allowed::Rule::KeyIsElementwise
 pub dageist_engine::allowed::Rule::PivotAggregateGivesOneValue
 impl dageist_engine::allowed::Rule
-pub const dageist_engine::allowed::Rule::ALL: [Self; 4]
+pub const dageist_engine::allowed::Rule::ALL: [Self; 5]
 pub fn dageist_engine::allowed::Rule::from_name(name: &str) -> core::option::Option<Self>
 pub const fn dageist_engine::allowed::Rule::name(self) -> &'static str
 pub const fn dageist_engine::allowed::Rule::statement(self) -> &'static str
@@ -140,6 +141,7 @@ pub fn dageist_engine::allowed::Context::all() -> alloc::vec::Vec<Self>
 pub fn dageist_engine::allowed::Context::from_name(name: &str) -> core::option::Option<Self>
 pub fn dageist_engine::allowed::Context::from_positions(positions: &[dageist_engine::allowed::Position]) -> core::option::Option<Self>
 pub const fn dageist_engine::allowed::Context::inside(outer: dageist_engine::allowed::Outer, nested: dageist_engine::allowed::Nested) -> Self
+pub const fn dageist_engine::allowed::Context::is_key(&self) -> bool
 pub fn dageist_engine::allowed::Context::name(&self) -> alloc::string::String
 pub const fn dageist_engine::allowed::Context::nested(&self) -> core::option::Option<dageist_engine::allowed::Nested>
 pub const fn dageist_engine::allowed::Context::outer(&self) -> dageist_engine::allowed::Outer
@@ -180,6 +182,7 @@ pub fn dageist_engine::allowed::offer(entry: &'static dageist_engine::catalog::E
 pub fn dageist_engine::allowed::offers(place: &dageist_engine::allowed::Place) -> alloc::vec::Vec<dageist_engine::allowed::Offer>
 pub fn dageist_engine::allowed::options(entry: &dageist_engine::catalog::Entry, chosen: &[(&str, &str)]) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids(entry: &dageist_engine::catalog::Entry, context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
+pub fn dageist_engine::allowed::rule_forbids_mixed_key(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub mod dageist_engine::catalog
 pub enum dageist_engine::catalog::Applies
 pub dageist_engine::catalog::Applies::Condition

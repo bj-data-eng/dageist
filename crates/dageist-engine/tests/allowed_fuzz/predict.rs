@@ -23,6 +23,7 @@ use dageist_engine::document::{Call, Expression, Place, Segment, Start, Value};
 
 use super::case::{Case, STEP};
 use super::frames::column_class;
+use super::limits::holds_a_single_value_beside_a_column;
 
 /// Who refused a case.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -357,6 +358,13 @@ impl Walker<'_> {
                     self.blind(format!("whether it may end is not known: {unknown}"));
                 }
                 Some(Ending::Allowed) | None => {}
+            }
+            // A key that holds a single value beside a column is not
+            // elementwise, which only the whole key shows.
+            if holds_a_single_value_beside_a_column(expression)
+                && let Err(refusal) = allowed::rule_forbids_mixed_key(context)
+            {
+                self.refuse_by_end(&refusal);
             }
         }
         self.traced.push(Traced {

@@ -10,7 +10,7 @@ use crate::allowed::dtype::ResultDtype;
 use crate::allowed::offers::RefusalSource;
 use crate::allowed::{
     After, Chosen, ConditionState, Context, Ending, Nested, Outer, Place, Position, Representative,
-    Rule, Shape, Stage, Unknown, Verdict, offer, offers, options,
+    Rule, Shape, Stage, Unknown, Verdict, offer, offers, options, rule_forbids_mixed_key,
 };
 use crate::catalog;
 
@@ -168,6 +168,57 @@ fn a_window_is_refused_as_a_join_key_with_polars_reason() {
         .right_on(vec![col("rk")])
         .finish();
     assert!(joined.and_then(|mut frame| frame.collect_schema()).is_err());
+}
+
+#[test]
+fn a_key_with_a_single_value_beside_a_column_is_refused_by_a_rule_where_a_key_stands() {
+    for context in [
+        Context::step(Outer::JoinLeft),
+        Context::step(Outer::JoinRight),
+        Context::inside(Outer::Select, Nested::PartitionBy),
+        Context::inside(Outer::Filter, Nested::OrderBy),
+    ] {
+        let refusal = rule_forbids_mixed_key(context).expect_err("a key");
+        assert_eq!(
+            refusal.source(),
+            RefusalSource::Rule(Rule::KeyIsElementwise),
+            "{context}"
+        );
+    }
+    // Where no key stands, a single value beside a column is nothing to refuse.
+    for context in [
+        Context::step(Outer::Select),
+        Context::step(Outer::Sort),
+        Context::inside(Outer::JoinLeft, Nested::ConditionValue),
+        Context::inside(Outer::Select, Nested::ConditionPredicate),
+    ] {
+        assert!(rule_forbids_mixed_key(context).is_ok(), "{context}");
+    }
+
+    // Polars, by hand: a key that adds an aggregate to a column is
+    // refused when the join is planned, and one that adds another column to it
+    // is not.
+    let frames = Frames::new(
+        Representative::Int64,
+        Representative::Int64,
+        &DataType::Int64,
+    );
+    let planned = |key: Expr| {
+        frames
+            .rows
+            .clone()
+            .lazy()
+            .join_builder()
+            .with(frames.other_rows.clone().lazy())
+            .left_on(vec![key])
+            .right_on(vec![col("rk")])
+            .finish()
+            .and_then(|mut frame| frame.collect_schema())
+    };
+    let mixed = col("k") + col("u").max();
+    let reason = planned(mixed).expect_err("not elementwise").to_string();
+    assert!(reason.contains("elementwise"), "{reason}");
+    assert!(planned(col("k") + col("u")).is_ok());
 }
 
 #[test]

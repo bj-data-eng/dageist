@@ -62,14 +62,12 @@ pub enum Limit {
     /// refusal is gated by its reason, which has no place; the tables refusing
     /// is placed, in the aggregate, with a reason about a kernel.
     AGroupAggregate,
-    /// A single value in a key, a join's or a window's, beside a column is not
-    /// elementwise, and Polars refuses it: an aggregate, or a null literal. The
-    /// context table measured the entry as the whole key. A key that is wholly a
-    /// single value is the whole key, and is not this. Polars refusing the step
-    /// has the step for its place, so the key itself is found by what it holds;
-    /// a refusal of the rows of a window has none and is gated by its reason.
-    /// The tables refusing a key that is wholly single, which Polars allows, is
-    /// placed in that key.
+    /// A key that is wholly a single value, an aggregate or a null, is not one
+    /// that has to be elementwise: Polars allows in it what a key may not hold,
+    /// such as a running count under a `last`. The tables measured the entry as
+    /// the whole key. They refuse a key that holds a single value beside a
+    /// column by a named rule, which is not this. Polars allowing, the tables
+    /// refusing with a reason about elementwise, placed inside that key.
     ASingleValueInAKey,
     /// Whether values of different lengths combine, as the lists of two rows
     /// do not, depends on the rows, which the tables measured on one sample.
@@ -97,11 +95,6 @@ pub enum Limit {
     /// what the tables refused when it ran rows is excused; what they refused
     /// when it built the step is refused whatever the rows.
     AValueThatRunsOnNoRows,
-    /// The other table's key is made of the dtype its chain gives on its own,
-    /// and the join may resolve the chain to another, as the precision of a
-    /// decimal that a null is taken from. Polars' message names the decimal, and
-    /// the refusal is of the step.
-    AJoinKeyDtype,
     /// The tables hold the schema of a method and what its rows give as one
     /// thing, and refuse a method whose plan says another dtype than its rows
     /// give. Inside an expression that goes on from it or compares it, the rows
@@ -117,7 +110,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 14] = [
+    pub const ALL: [Self; 13] = [
         Self::OptionsChangeTheResult,
         Self::ALiteral,
         Self::AnAggregateGivesOneValue,
@@ -131,7 +124,6 @@ impl Limit {
         Self::AWindowOverAWindow,
         Self::ADecidedCondition,
         Self::AValueThatRunsOnNoRows,
-        Self::AJoinKeyDtype,
     ];
 
     /// The name a kept case is filed under.
@@ -149,7 +141,6 @@ impl Limit {
             Self::AHiddenSchema => "a-hidden-schema",
             Self::AWindowOverAWindow => "a-window-over-a-window",
             Self::ADecidedCondition => "a-decided-condition",
-            Self::AJoinKeyDtype => "a-join-key-dtype",
             Self::AValueThatRunsOnNoRows => "a-value-that-runs-on-no-rows",
         }
     }
@@ -179,10 +170,7 @@ impl Limit {
                 "a pivot's aggregate is run on groups, with kernels of its own, not on a column in select"
             }
             Self::ASingleValueInAKey => {
-                "a single value, an aggregate or a null, in a key beside a column is not elementwise"
-            }
-            Self::AJoinKeyDtype => {
-                "the join resolves a key to a dtype other than the one its chain gives on its own"
+                "a key that is wholly a single value, an aggregate or a null, need not be elementwise in what it holds"
             }
             Self::AValueThatRunsOnNoRows => {
                 "a value of a condition, or a predicate after the first, runs on the rows left to it, which may be none"
@@ -617,7 +605,7 @@ fn keys(case: &Case, joins: bool) -> Vec<&Expression> {
 /// Whether a key holds a single value that is no column, an aggregate or a null
 /// literal, beside what is not one: a key that is wholly one is the whole key,
 /// which the tables measured.
-fn holds_a_single_value_beside_a_column(key: &Expression) -> bool {
+pub(super) fn holds_a_single_value_beside_a_column(key: &Expression) -> bool {
     any_call(key, &is_a_single_value) && !wholly_single(key, key.links().len(), true)
 }
 
@@ -644,14 +632,6 @@ fn window_over_a_window(expression: &Expression) -> bool {
             .into_iter()
             .any(|(_, inside)| window_over_a_window(inside))
     })
-}
-
-/// The place Polars refused at, inside the step, if it said.
-fn placed(refusal: &Refusal) -> Option<&Place> {
-    refusal
-        .place
-        .as_ref()
-        .filter(|place| !place.path().is_empty())
 }
 
 /// Whether a refusal by Polars has no place inside the step: it refused the
@@ -763,25 +743,13 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
                 .any(|words| refused.reason.contains(words))
                 && locate(case, &refused.place).call.is_some()
         }
-        (Limit::ASingleValueInAKey, Disagreement::PolarsRefuses(refusal)) => {
-            let keys = keys(case, true);
-            let mixed = |key: &Expression| holds_a_single_value_beside_a_column(key);
-            refusal.reason.contains("elementwise")
-                && match placed(refusal) {
-                    // The refusal is inside a key, and that key holds it.
-                    Some(place) => locate(case, place).inside.iter().any(|inside| {
-                        keys.iter().any(|key| std::ptr::eq(*key, *inside)) && mixed(inside)
-                    }),
-                    // Of the step, or of the rows of a window: some key does.
-                    None => keys.iter().any(|key| mixed(key)),
-                }
-        }
         (Limit::ASingleValueInAKey, Disagreement::PolarsAllows(refused)) => {
-            // The key the tables refused is the one that holds the single value.
+            // The key the tables refused is wholly one value.
             refused.reason.contains("elementwise")
                 && locate(case, &refused.place).top.is_some_and(|top| {
                     keys(case, true).iter().any(|key| std::ptr::eq(*key, top))
                         && any_call(top, &is_a_single_value)
+                        && wholly_single(top, top.links().len(), true)
                 })
         }
         (Limit::AnOverflow, Disagreement::PolarsRefuses(refusal)) => {
@@ -810,12 +778,6 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
                 && !refusal.reason.contains("with overflow")
         }
         (Limit::APanic, Disagreement::PolarsAllows(refused)) => is_panic(&refused.reason),
-        (Limit::AJoinKeyDtype, Disagreement::PolarsRefuses(refusal)) => {
-            is(step, "LazyFrame.join")
-                && unplaced(refusal)
-                && refusal.reason.contains("datatypes of join keys")
-                && refusal.reason.contains("decimal")
-        }
         (Limit::AValueThatRunsOnNoRows, Disagreement::PolarsAllows(refused)) => {
             // Only what the tables refused when it ran rows. A condition that is
             // decided has dropped its other branches, which is its own cause.
@@ -1415,64 +1377,41 @@ mod tests {
     // ----- Keys
 
     #[test]
-    fn a_key_that_holds_a_single_value_beside_a_column_excuses_the_refused_step() {
-        let mixed = chain_of(
-            column("f"),
-            vec![compared_with("Expr.le", chain(null(), &[]))],
-        );
+    fn the_tables_refusing_inside_a_key_that_is_wholly_one_value_are_excused() {
         let reason = "all join key expressions must be elementwise.";
-        let case = join(mixed, chain(column("key"), &[]));
+        let whole = chain(column("a"), &["Expr.cum_max", "Expr.max"]);
+        let plain = chain(column("a"), &["Expr.cum_max"]);
+        let case = join(whole.clone(), plain.clone());
+        let refuse = |case: &Case, parameter: &str, reason: &str| {
+            tables_refuse(
+                case,
+                link_of(parameter, 0, 0),
+                Some(TableStage::Schema),
+                reason,
+            )
+        };
         assert_eq!(
-            polars_refuses(&case, Some(step_place()), Stage::Schema, reason, Vec::new()),
+            refuse(&case, "left_on", reason),
             vec![Limit::ASingleValueInAKey]
         );
+        // The other key is not one value, so what is refused in it is refused.
+        assert_eq!(refuse(&join(plain, whole), "left_on", reason), vec![]);
+        // Another reason.
+        assert_eq!(refuse(&case, "left_on", "no"), vec![]);
     }
 
     #[test]
-    fn a_single_value_in_the_other_key_does_not_excuse_a_bad_key() {
-        let bad = chain(column("a"), &["Expr.cum_max"]);
-        let whole = chain(column("x"), &["Expr.first"]);
+    fn a_key_that_holds_a_single_value_beside_a_column_is_not_excused() {
+        // That key is refused by a rule, and Polars refuses it too.
         let reason = "all join key expressions must be elementwise.";
-        let case = join(bad, whole);
-        assert_eq!(
-            polars_refuses(&case, Some(step_place()), Stage::Schema, reason, Vec::new()),
-            vec![]
-        );
-    }
-
-    #[test]
-    fn a_refusal_inside_a_key_is_excused_by_that_key_and_not_by_the_other() {
-        let bad = chain(column("a"), &["Expr.cum_max"]);
         let mixed = chain_of(
-            column("f"),
-            vec![compared_with("Expr.le", chain(null(), &[]))],
-        );
-        let reason = "all join key expressions must be elementwise.";
-        let case = join(bad, mixed);
-        let in_left = link_of("left_on", 0, 0);
-        let in_right = link_of("right_on", 0, 0);
-        assert_eq!(
-            polars_refuses(&case, Some(in_left), Stage::Schema, reason, Vec::new()),
-            vec![]
-        );
-        assert_eq!(
-            polars_refuses(&case, Some(in_right), Stage::Schema, reason, Vec::new()),
-            vec![Limit::ASingleValueInAKey]
-        );
-    }
-
-    #[test]
-    fn the_tables_refusing_a_key_are_excused_when_that_key_holds_the_single_value() {
-        let reason = "all join key expressions must be elementwise.";
-        let single = chain_of(
             column("f"),
             vec![
                 call("Expr.cum_max", Vec::new()),
                 compared_with("Expr.le", chain(column("x"), &["Expr.max"])),
             ],
         );
-        let plain = chain(column("a"), &["Expr.cum_max"]);
-        let case = join(single.clone(), plain.clone());
+        let case = join(mixed, chain(column("key"), &[]));
         assert_eq!(
             tables_refuse(
                 &case,
@@ -1480,42 +1419,6 @@ mod tests {
                 Some(TableStage::Schema),
                 reason
             ),
-            vec![Limit::ASingleValueInAKey]
-        );
-        let other = join(plain, single);
-        assert_eq!(
-            tables_refuse(
-                &other,
-                link_of("left_on", 0, 0),
-                Some(TableStage::Schema),
-                reason
-            ),
-            vec![]
-        );
-    }
-
-    #[test]
-    fn a_join_key_dtype_is_the_refusal_of_a_join_that_names_a_decimal() {
-        let reason = "datatypes of join keys don't match - `a`: decimal[38,2] on left does not match `key`: decimal[10,2] on right";
-        let case = join(chain(column("a"), &[]), chain(column("key"), &[]));
-        assert_eq!(
-            polars_refuses(&case, Some(step_place()), Stage::Schema, reason, Vec::new()),
-            vec![Limit::AJoinKeyDtype]
-        );
-        let not_decimal = "datatypes of join keys don't match - `a`: i64 on left";
-        assert_eq!(
-            polars_refuses(
-                &case,
-                Some(step_place()),
-                Stage::Schema,
-                not_decimal,
-                Vec::new()
-            ),
-            vec![]
-        );
-        let select = select(vec![chain(column("a"), &[])]);
-        assert_eq!(
-            polars_refuses(&select, None, Stage::Schema, reason, Vec::new()),
             vec![]
         );
     }
