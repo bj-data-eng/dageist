@@ -13,7 +13,7 @@ use polars::prelude::{
     DataFrame, DataType, Expr, IdxSize, IntoLazy, LazyFrame, PolarsError, SchemaRef,
 };
 
-use crate::allowed::{self, After, Context, Place as Standing, Position, Refusal, Verdict};
+use crate::allowed::{self, Context, Position, Refusal};
 use crate::catalog::{Argument, Arguments, Build, BuildError, Conditional, Laziness};
 
 use super::error::{Place, Segment};
@@ -77,9 +77,9 @@ pub enum RunCause {
     /// The catalogue could not build the call: an argument is missing, or
     /// Polars refused it.
     Build(BuildError),
-    /// An entry stands where the tables of allowed combinations, or a named
-    /// rule beside them, do not let it, such as `element` outside a pivot's
-    /// aggregate.
+    /// A named rule does not let an entry stand where it does, such as
+    /// `element` outside a pivot's aggregate. Polars decides the rest, as it
+    /// builds.
     NotAllowed(Refusal),
     /// Polars refused the step when it worked out its schema.
     Polars(PolarsError),
@@ -466,17 +466,21 @@ impl Builder<'_> {
     }
 
     /// Whether the function that starts an expression may stand in the named
-    /// positions that hold the expression, as the tables of allowed
-    /// combinations and the rules beside them say: `element` stands only in a
-    /// pivot's aggregate. Where no named position holds the expression, there
-    /// is nothing to ask and Polars decides.
+    /// positions that hold the expression, as the named rules beside the
+    /// tables of allowed combinations say: `element` stands only in a pivot's
+    /// aggregate. Nothing else is asked of the tables here. A row of the
+    /// context table was measured with the chain ending at one entry, with one
+    /// argument, such as a bare `element()` or an untyped `lit(1)`, so it
+    /// cannot judge a start that other arguments or more links follow. Where
+    /// no named position holds the expression, there is nothing to ask. Polars
+    /// decides the rest when the step is built.
     fn stands_here(&self, call: &Call) -> Result<(), Stop> {
         let Some(context) = Context::from_positions(&self.positions) else {
             return Ok(());
         };
-        match allowed::offer(call.entry(), &Standing::new(context, After::Start), &[]) {
-            Verdict::Allowed(_) => Ok(()),
-            Verdict::Refused(refusal) => self.stop(RunCause::NotAllowed(refusal)),
+        match allowed::rule_forbids(call.entry(), context) {
+            Ok(()) => Ok(()),
+            Err(refusal) => self.stop(RunCause::NotAllowed(refusal)),
         }
     }
 

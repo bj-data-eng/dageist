@@ -4,6 +4,7 @@
 use std::collections::BTreeSet;
 
 use crate::allowed::context::{Context, Nested, Outer, Position};
+use crate::allowed::dtype::ResultDtype;
 use crate::allowed::dtype::{Representative, dtype_name};
 use crate::allowed::rules::Rule;
 use crate::allowed::table::{
@@ -272,4 +273,85 @@ fn the_named_rules_have_names_that_read_back() {
         assert!(!rule.statement().is_empty());
     }
     assert!(lines(table::OPTIONS, |_| Ok(())).is_ok());
+}
+
+#[test]
+fn an_entry_may_stand_in_a_context_where_it_may_not_end_a_chain() {
+    let tables = Tables::committed();
+    let cell = |entry: &'static str, context| {
+        tables
+            .contexts
+            .get(&(entry, context))
+            .unwrap_or_else(|| panic!("{entry} in {context}"))
+    };
+    // A sum is no `Boolean`, so it does not end a filter's predicate, and
+    // a test for a value that follows it does.
+    let sum = cell("Expr.sum", Context::step(Outer::Filter));
+    assert!(matches!(sum.continues, Outcome::Allowed(_)), "{sum:?}");
+    assert!(matches!(sum.ends, Outcome::Refused(_)), "{sum:?}");
+    // A window is refused as a join key whatever follows it.
+    let window = cell("Expr.over", Context::step(Outer::JoinLeft));
+    assert!(
+        matches!(window.continues, Outcome::Refused(_)),
+        "{window:?}"
+    );
+    assert!(matches!(window.ends, Outcome::Refused(_)), "{window:?}");
+    // And in a pivot's aggregate, where a group's values are one value.
+    let window = cell("Expr.over", Context::step(Outer::PivotAggregate));
+    assert!(
+        matches!(window.continues, Outcome::Refused(_)),
+        "{window:?}"
+    );
+}
+
+#[test]
+fn a_table_that_lacks_one_of_the_two_lines_of_a_cell_does_not_read() {
+    let lone = "polars.col | select | continues | - | - | - | allowed Int64 many\n";
+    let error = Tables::read(table::DTYPES, lone, table::OPTIONS)
+        .expect_err("the line that ends is missing");
+    assert_eq!(error.0, "contexts.txt");
+    assert!(error.1.to_string().contains("lacks"), "{}", error.1);
+}
+
+#[test]
+fn an_end_rule_about_a_dtype_does_not_refuse_what_it_does_not_know() {
+    let predicate = Context::inside(Outer::Select, Nested::ConditionPredicate);
+    let boolean = ResultDtype::from_name("Boolean");
+    let number = ResultDtype::from_name("Int64");
+    // A dtype that is known to be something else breaks the rule, even one
+    // that has no representative class.
+    let list = ResultDtype::from_name("List(Float64)");
+    assert_eq!(list.class(), None);
+    for context in [
+        predicate,
+        Context::step(Outer::Filter),
+        Context::inside(Outer::Filter, Nested::ConditionValue),
+    ] {
+        let rule = Rule::ALL
+            .into_iter()
+            .find(|rule| rule.needs_boolean_end(context))
+            .expect("a rule about the Boolean");
+        assert_eq!(
+            Rule::forbids_end(context, Some(&number), Shape::Many),
+            Some(rule)
+        );
+        assert_eq!(
+            Rule::forbids_end(context, Some(&list), Shape::Many),
+            Some(rule)
+        );
+        assert_eq!(
+            Rule::forbids_end(context, Some(&boolean), Shape::Many),
+            None
+        );
+        // Not known: a start takes the dtype of a column, and an argument
+        // decides what some methods give.
+        assert_eq!(Rule::forbids_end(context, None, Shape::Many), None);
+    }
+    // The rule about how many values is not about a dtype.
+    let aggregate = Context::step(Outer::PivotAggregate);
+    assert_eq!(
+        Rule::forbids_end(aggregate, None, Shape::Many),
+        Some(Rule::PivotAggregateGivesOneValue)
+    );
+    assert_eq!(Rule::forbids_end(aggregate, None, Shape::One), None);
 }

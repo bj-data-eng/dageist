@@ -20,19 +20,41 @@ fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
-/// The commit of `vendor/polars`.
-fn release() -> String {
+/// The release `vendor/polars` is pinned to.
+pub(super) struct Release {
+    /// The tag of the Python Polars release, such as `py-2.1.0`.
+    tag: String,
+    /// The commit the tag names.
+    commit: String,
+}
+
+/// What `git` prints for `arguments` in `vendor/polars`.
+fn polars_git(arguments: &[&str]) -> String {
     let output = Command::new("git")
         .arg("-C")
         .arg(root().join("vendor/polars"))
-        .args(["rev-parse", "HEAD"])
+        .args(arguments)
         .output()
         .expect("git runs");
-    assert!(output.status.success(), "vendor/polars is a Git checkout");
+    assert!(
+        output.status.success(),
+        "`git {}` runs in vendor/polars, which is pinned to a release tag",
+        arguments.join(" ")
+    );
     String::from_utf8(output.stdout)
-        .expect("a commit is text")
+        .expect("git prints text")
         .trim()
         .to_owned()
+}
+
+/// The tag and the commit of `vendor/polars`. The checkout is at the tag
+/// exactly, as it is pinned to a release, so the tag does not change from run
+/// to run.
+fn release() -> Release {
+    Release {
+        tag: polars_git(&["describe", "--tags", "--exact-match"]),
+        commit: polars_git(&["rev-parse", "HEAD"]),
+    }
 }
 
 /// How many combinations were allowed, and how many Polars refused at each
@@ -74,11 +96,14 @@ impl Counts {
     }
 }
 
-fn header(title: &str, release: &str, counts: &Counts, format: &[String]) -> String {
+fn header(title: &str, release: &Release, counts: &Counts, format: &[String]) -> String {
     let mut lines = vec![
         format!("# {title}"),
         "#".to_owned(),
-        format!("# Polars: the commit {release} of vendor/polars."),
+        format!(
+            "# Polars: the release {} at the commit {} of vendor/polars.",
+            release.tag, release.commit
+        ),
         "# Generated from the catalogue and Polars by the engine test".to_owned(),
         "# `allowed::tests::artifacts::the_committed_tables_are_what_polars_gives`, with Polars on"
             .to_owned(),
@@ -125,7 +150,7 @@ fn file(header: &str, mut lines: Vec<String>) -> String {
 }
 
 /// The three files, by name.
-pub(super) fn files(generated: &Generated, release: &str) -> [(&'static str, String); 3] {
+pub(super) fn files(generated: &Generated, release: &Release) -> [(&'static str, String); 3] {
     let text =
         |lines: &[&str]| -> Vec<String> { lines.iter().map(|line| (*line).to_owned()).collect() };
     let dtypes = header(
@@ -145,19 +170,34 @@ pub(super) fn files(generated: &Generated, release: &str) -> [(&'static str, Str
         ]),
     );
     let mut contexts_format = text(&[
-        "Each line is: entry | context | receiver | argument | rules | outcome.",
+        "Each line is: entry | context | chain | receiver | argument | rules | outcome.",
         "",
         "An entry that is not a step stands in a context: a position of a step that holds an",
         "expression, such as `select`, or such a position inside another expression, such as",
-        "`select > over.order_by`. A method is measured on the receiver and argument dtypes",
-        "that fit it best, the first that runs in the dtype table (`Int64` first), and in",
-        "contexts that need a `Boolean`, one that gives a `Boolean` if there is one. The",
-        "result of an allowed method is what it gives on its own. `col` and `lit` are measured on a",
-        "`Boolean` column and literal where a `Boolean` is needed, and on a column of whole numbers",
-        "and the literal `1` elsewhere. `join_right` is evaluated",
-        "against the other table, whose columns are named differently from the left table's;",
-        "`pivot_aggregate` starts from `element()`, and a method's arguments there are nulls of",
-        "their dtype.",
+        "`select > over.order_by`. Each entry in each context has two lines, one for each chain:",
+        "",
+        "  continues: the chain goes on from the entry, with the neutral continuation the context",
+        "    needs, and the line says whether the entry may stand there at all. The continuation",
+        "    is `.is_not_null()` where a `Boolean` is required (a filter's predicate, what a",
+        "    condition gives in a filter, a condition's predicate), a cast to the dtype of the",
+        "    other table's key (`Int64`) for the whole expression in a join key, and `.first()`",
+        "    for the whole expression in a pivot's aggregate. Where the context needs nothing,",
+        "    nothing follows. Polars refusing the entry however it goes on, as it refuses a window",
+        "    in a join key, makes the entry unable to stand.",
+        "  ends: the chain ends at the entry as it is, and the line says whether the entry may end",
+        "    an expression there. A `Boolean` is required of a chain that ends in a filter, so an",
+        "    entry that gives something else may stand there, followed by what makes a `Boolean`,",
+        "    though it may not end the chain.",
+        "",
+        "A method is measured on the receiver and argument dtypes that fit it best, the first",
+        "that runs in the dtype table (`Int64` first), and, where the chain ends in a context that",
+        "needs a `Boolean`, one that gives a `Boolean` if there is one. The result of an allowed",
+        "method is what it gives on its own. `col` and `lit` are measured, where the chain ends and",
+        "a `Boolean` is needed, on a `Boolean` column and literal, and on a column of whole numbers",
+        "and the literal `1` otherwise. Where the chain ends in a join key, the other table's key",
+        "has the dtype the key has. `join_right` is evaluated against the other table, whose",
+        "columns are named differently from the left table's; `pivot_aggregate` starts from",
+        "`element()`, and a method's arguments there are nulls of their dtype.",
         "",
         "The rules column names the rules that govern the line, which dageist holds and Polars",
         "does not. The outcome is Polars' alone, whatever the rules say. The rules are:",

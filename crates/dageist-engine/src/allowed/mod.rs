@@ -12,7 +12,10 @@
 //!   [representative dtype](Representative), and, for each expression
 //!   parameter, with an argument of each of them;
 //! - the **context table**: each entry in each [context](Context), a place
-//!   that holds an expression, up to two levels deep;
+//!   that holds an expression, up to two levels deep, twice: with the chain
+//!   going on from the entry, which says whether it may stand there, and with
+//!   the chain ending at it, which says whether it may end an expression
+//!   there;
 //! - the **option table**: each entry with each pair of its options, the flags
 //!   and the words of a choice.
 //!
@@ -20,6 +23,7 @@
 //! beside the tables. [`offers`] and [`offer`] answer, from the committed
 //! tables embedded in the engine and those rules, whether an entry may stand
 //! at a [`Place`], and give a reason for each refusal, without running Polars.
+//! [`rule_forbids`] answers from the rules alone.
 
 mod context;
 mod dtype;
@@ -33,7 +37,7 @@ pub use context::{Context, Nested, Outer, Position};
 pub use dtype::{Representative, ResultDtype, dtype_name};
 pub use offers::{
     After, Allowance, ConditionState, Offer, Place, Refusal, RefusalSource, Verdict,
-    argument_dtypes, offer, offers, options,
+    argument_dtypes, offer, offers, options, rule_forbids,
 };
 pub use rules::Rule;
 pub use table::{Outcome, Produces, Reason, Shape, Stage};

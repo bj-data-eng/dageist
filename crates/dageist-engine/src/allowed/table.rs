@@ -234,12 +234,47 @@ impl DtypeLine {
     }
 }
 
-/// One line of the context table: an entry standing in a context, on the
-/// receiver and with the arguments it was measured with.
+/// What a line of the context table measured of an entry in a context.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(super) enum Chain {
+    /// The chain goes on from the entry, with the neutral continuation the
+    /// context needs: a test for a value where a `Boolean` is required, a
+    /// cast to the key's dtype in a join key, the first value of a group in a
+    /// pivot's aggregate. Whether the entry may stand there at all.
+    Continues,
+    /// The chain ends at the entry, as it is. Whether the entry may end an
+    /// expression there.
+    Ends,
+}
+
+impl Chain {
+    /// Both measurements, in the order the tables list them.
+    pub(super) const ALL: [Self; 2] = [Self::Continues, Self::Ends];
+
+    /// The word the tables use.
+    pub(super) const fn name(self) -> &'static str {
+        match self {
+            Self::Continues => "continues",
+            Self::Ends => "ends",
+        }
+    }
+
+    fn from_name(name: &str) -> Result<Self, String> {
+        Self::ALL
+            .into_iter()
+            .find(|chain| chain.name() == name)
+            .ok_or_else(|| format!("{name:?} is neither continues nor ends"))
+    }
+}
+
+/// One line of the context table: an entry standing in a context, with the
+/// chain continued or ended there, on the receiver and with the arguments it
+/// was measured with.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct ContextLine {
     pub entry: &'static str,
     pub context: Context,
+    pub chain: Chain,
     pub receiver: Option<Representative>,
     pub argument: Option<Representative>,
     pub rules: Vec<Rule>,
@@ -259,9 +294,10 @@ impl ContextLine {
                 .join(",")
         };
         format!(
-            "{} | {} | {} | {} | {} | {}",
+            "{} | {} | {} | {} | {} | {} | {}",
             self.entry,
             self.context,
+            self.chain.name(),
             self.receiver
                 .map_or_else(|| "-".to_owned(), |dtype| dtype.to_string()),
             self.argument
@@ -272,11 +308,11 @@ impl ContextLine {
     }
 
     pub(super) fn parse(line: &str) -> Result<Self, String> {
-        let fields = fields(line, 6)?;
-        let rules = if fields[4] == "-" {
+        let fields = fields(line, 7)?;
+        let rules = if fields[5] == "-" {
             Vec::new()
         } else {
-            fields[4]
+            fields[5]
                 .split(',')
                 .map(|name| Rule::from_name(name).ok_or_else(|| format!("{name:?} is not a rule")))
                 .collect::<Result<_, _>>()?
@@ -285,10 +321,11 @@ impl ContextLine {
             entry: entry_named(fields[0])?.id().as_str(),
             context: Context::from_name(fields[1])
                 .ok_or_else(|| format!("{:?} is not a context", fields[1]))?,
-            receiver: optional(fields[2], dtype_named)?,
-            argument: optional(fields[3], dtype_named)?,
+            chain: Chain::from_name(fields[2])?,
+            receiver: optional(fields[3], dtype_named)?,
+            argument: optional(fields[4], dtype_named)?,
             rules,
-            outcome: Outcome::parse(fields[5])?,
+            outcome: Outcome::parse(fields[6])?,
         })
     }
 }
@@ -344,21 +381,32 @@ impl OptionLine {
     }
 }
 
+/// The lines of a committed table, header and blank lines left out, each with
+/// its number in the file.
+fn numbered<T>(
+    text: &'static str,
+    parse: impl Fn(&str) -> Result<T, String>,
+) -> Result<Vec<(usize, T)>, TableError> {
+    text.lines()
+        .enumerate()
+        .filter(|(_, line)| !line.is_empty() && !line.starts_with('#'))
+        .map(|(at, line)| {
+            parse(line)
+                .map(|parsed| (at + 1, parsed))
+                .map_err(|problem| TableError {
+                    line: at + 1,
+                    problem,
+                })
+        })
+        .collect()
+}
+
 /// The lines of a committed table, header and blank lines left out.
 pub(super) fn lines<T>(
     text: &'static str,
     parse: impl Fn(&str) -> Result<T, String>,
 ) -> Result<Vec<T>, TableError> {
-    text.lines()
-        .enumerate()
-        .filter(|(_, line)| !line.is_empty() && !line.starts_with('#'))
-        .map(|(at, line)| {
-            parse(line).map_err(|problem| TableError {
-                line: at + 1,
-                problem,
-            })
-        })
-        .collect()
+    numbered(text, parse).map(|numbered| numbered.into_iter().map(|(_, line)| line).collect())
 }
 
 /// A committed table that does not read.
@@ -384,11 +432,79 @@ pub(super) type DtypeKey = (
     Option<Representative>,
 );
 
-/// What the context table says of an entry in a context.
+/// What the context table says of an entry in a context: whether the chain
+/// may go on from it, and whether it may end there.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct ContextCell {
-    pub outcome: Outcome,
+    pub continues: Outcome,
+    pub ends: Outcome,
     pub rules: Vec<Rule>,
+}
+
+/// The two lines of the context table for an entry in a context, as far as
+/// they have been read.
+#[derive(Default)]
+struct HalfCell {
+    continues: Option<Outcome>,
+    ends: Option<Outcome>,
+    rules: Vec<Rule>,
+}
+
+/// The cells of the lines of the context table: each entry in each context
+/// has a line for each [`Chain`], and the rules that govern the two agree.
+fn cells(
+    lines: Vec<(usize, ContextLine)>,
+) -> Result<HashMap<(&'static str, Context), ContextCell>, TableError> {
+    let mut halves: HashMap<(&'static str, Context), (usize, HalfCell)> = HashMap::new();
+    for (at, line) in lines {
+        let (first, half) = halves.entry((line.entry, line.context)).or_insert_with(|| {
+            (
+                at,
+                HalfCell {
+                    rules: line.rules.clone(),
+                    ..HalfCell::default()
+                },
+            )
+        });
+        let slot = match line.chain {
+            Chain::Continues => &mut half.continues,
+            Chain::Ends => &mut half.ends,
+        };
+        let problem = |problem: String| TableError { line: at, problem };
+        if slot.replace(line.outcome).is_some() {
+            return Err(problem(format!(
+                "{} in {} has two lines that {}",
+                line.entry,
+                line.context,
+                line.chain.name()
+            )));
+        }
+        if half.rules != line.rules {
+            return Err(problem(format!(
+                "{} in {} names other rules than its line at {first}",
+                line.entry, line.context
+            )));
+        }
+    }
+    halves
+        .into_iter()
+        .map(
+            |((entry, context), (at, half))| match (half.continues, half.ends) {
+                (Some(continues), Some(ends)) => Ok((
+                    (entry, context),
+                    ContextCell {
+                        continues,
+                        ends,
+                        rules: half.rules,
+                    },
+                )),
+                _ => Err(TableError {
+                    line: at,
+                    problem: format!("{entry} in {context} lacks a line that continues or ends"),
+                }),
+            },
+        )
+        .collect()
 }
 
 /// The committed tables, read.
@@ -416,19 +532,9 @@ impl Tables {
                 )
             })
             .collect();
-        let contexts = lines(contexts, ContextLine::parse)
-            .map_err(named("contexts.txt"))?
-            .into_iter()
-            .map(|line| {
-                (
-                    (line.entry, line.context),
-                    ContextCell {
-                        outcome: line.outcome,
-                        rules: line.rules,
-                    },
-                )
-            })
-            .collect();
+        let contexts = numbered(contexts, ContextLine::parse)
+            .and_then(cells)
+            .map_err(named("contexts.txt"))?;
         let options = lines(options, OptionLine::parse)
             .map_err(named("options.txt"))?
             .into_iter()

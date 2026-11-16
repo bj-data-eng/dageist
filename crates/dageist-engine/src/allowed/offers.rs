@@ -178,11 +178,14 @@ impl Allowance {
 
     /// Whether the expression may end after the entry, in the context it
     /// stands in. A chain that is only to be continued is fine, and an entry
-    /// that cannot end it may be followed by one that can.
+    /// that cannot end it may be followed by one that can: an entry that may
+    /// not end a chain may still stand.
     ///
     /// # Errors
     ///
-    /// The rule that the expression, ended here, would break.
+    /// The rule that the expression, ended here, would break, or else the
+    /// reason Polars refused the entry ending a chain in this context, as the
+    /// table of contexts recorded it.
     pub fn can_end(&self) -> Result<(), &Refusal> {
         self.cannot_end.as_ref().map_or(Ok(()), Err)
     }
@@ -344,16 +347,21 @@ fn on_receiver(
 /// A rule that forbids the entry where it stands is applied first, so that its
 /// words explain the refusal. A method is then judged by the dtype table for
 /// the receiver it follows and for each argument given, one parameter at a
-/// time, and by the context table for where it stands. When it takes an
-/// expression it needs and none is given, it may stand if some dtype fits, and
-/// gives a dtype when every dtype that fits gives the same. Last, the rules of
-/// how a chain ends are applied to what it gives: they do not refuse the
-/// entry, which may be continued, but say whether the chain may end here, as
-/// [`Allowance::can_end`] reports.
+/// time, and by the context table for where it stands: the entry may stand
+/// where the chain may go on from it, which the table measured with the
+/// neutral continuation the context needs. When it takes an expression it
+/// needs and none is given, it may stand if some dtype fits, and gives a dtype
+/// when every dtype that fits gives the same. Last, whether the chain may end
+/// at the entry is worked out: the rules of how a chain ends are applied to
+/// what it gives, and what the table says of an entry that ends there. A chain
+/// that may not end does not refuse the entry, which may be continued; that is
+/// what [`Allowance::can_end`] reports.
 ///
 /// The context table was measured at the receiver that best fits each entry,
 /// so where the context cares about the receiver, as a predicate cares that it
-/// is `Boolean`, the rules of how a chain ends carry what the table cannot.
+/// is `Boolean`, the rules of how a chain ends carry what the table cannot. A
+/// result whose dtype is not known, which the argument will decide, does not
+/// break a rule that is about a dtype: it is not refused for what is not known.
 #[must_use]
 pub fn offer(
     entry: &'static Entry,
@@ -426,8 +434,11 @@ fn judge(
         (result, shape) = (fit.result, fit.shape);
     }
     // What the context table says of the entry where it stands.
+    // The entry stands there when the chain may go on from it: what Polars
+    // refuses of an entry that is continued is refused whatever follows.
+    let mut ends = Outcome::Allowed(None);
     if let Some(cell) = tables.contexts.get(&(id, place.context)) {
-        match &cell.outcome {
+        match &cell.continues {
             Outcome::Refused(reason) => return Err(Refusal::polars(reason)),
             Outcome::Allowed(produces) => {
                 if !is_method(entry)
@@ -437,6 +448,7 @@ fn judge(
                 }
             }
         }
+        ends = cell.ends.clone();
     }
     if let After::Value {
         shape: Shape::One, ..
@@ -444,17 +456,31 @@ fn judge(
     {
         shape = Shape::One;
     }
-    let cannot_end = Rule::forbids_end(
-        place.context,
-        result.as_ref().and_then(ResultDtype::class),
-        shape,
-    )
-    .map(Refusal::rule);
+    // Whether it may also end the chain there: a rule first, so that its words
+    // explain the refusal, then what Polars said of an entry that ends.
+    let cannot_end = match Rule::forbids_end(place.context, result.as_ref(), shape) {
+        Some(rule) => Some(Refusal::rule(rule)),
+        None => match &ends {
+            Outcome::Refused(reason) => Some(Refusal::polars(reason)),
+            Outcome::Allowed(_) => None,
+        },
+    };
     Ok(Allowance {
         result,
         shape,
         cannot_end,
     })
+}
+
+/// The refusal of a rule that forbids `entry` to start or continue a chain in
+/// `context`, if one does, without the tables: the rules alone. Polars is left
+/// to decide the rest, as it builds.
+///
+/// # Errors
+///
+/// The rule, as a refusal that says it in its words.
+pub fn rule_forbids(entry: &Entry, context: Context) -> Result<(), Refusal> {
+    Rule::forbids(entry.id().as_str(), context).map_or(Ok(()), |rule| Err(Refusal::rule(rule)))
 }
 
 /// Every entry that stands in an expression, offered or refused at `place`.

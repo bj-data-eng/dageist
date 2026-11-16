@@ -6,12 +6,14 @@
 //! the context table says which rules govern it. [`offer`](super::offer)
 //! applies a rule that forbids an entry before it reads the tables, so that the
 //! rule's words explain the refusal, and the rules of how a chain ends to what
-//! the tables say the chain gives.
+//! the tables say the chain gives. An end rule never stops an entry from
+//! standing, since more links may follow it; it only says whether the chain
+//! may end there.
 
 use std::fmt;
 
 use super::context::{Context, Nested, Outer};
-use super::dtype::Representative;
+use super::dtype::{Representative, ResultDtype};
 use super::table::Shape;
 
 /// A rule that holds wherever it applies, whatever Polars does.
@@ -21,15 +23,19 @@ pub enum Rule {
     PivotAggregateGivesOneValue,
     /// The predicate of a condition is a `Boolean`.
     ConditionPredicateIsBoolean,
+    /// The predicate of a `filter` is a `Boolean`, and so is what a condition
+    /// in it gives.
+    FilterPredicateIsBoolean,
     /// `polars.element` stands only in a pivot's aggregate.
     ElementOnlyInPivotAggregate,
 }
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 3] = [
+    pub const ALL: [Self; 4] = [
         Self::ConditionPredicateIsBoolean,
         Self::ElementOnlyInPivotAggregate,
+        Self::FilterPredicateIsBoolean,
         Self::PivotAggregateGivesOneValue,
     ];
 
@@ -40,6 +46,7 @@ impl Rule {
             Self::PivotAggregateGivesOneValue => "pivot-aggregate-gives-one-value",
             Self::ConditionPredicateIsBoolean => "condition-predicate-is-boolean",
             Self::ElementOnlyInPivotAggregate => "element-only-in-pivot-aggregate",
+            Self::FilterPredicateIsBoolean => "filter-predicate-is-boolean",
         }
     }
 
@@ -60,6 +67,7 @@ impl Rule {
             Self::ElementOnlyInPivotAggregate => {
                 "`polars.element` stands only in a pivot's aggregate"
             }
+            Self::FilterPredicateIsBoolean => "a filter's predicate must be Boolean",
         }
     }
 
@@ -72,8 +80,8 @@ impl Rule {
         match self {
             Self::ElementOnlyInPivotAggregate => entry == "polars.element",
             Self::PivotAggregateGivesOneValue => context == Context::step(Outer::PivotAggregate),
-            Self::ConditionPredicateIsBoolean => {
-                context.nested() == Some(Nested::ConditionPredicate)
+            Self::ConditionPredicateIsBoolean | Self::FilterPredicateIsBoolean => {
+                self.needs_boolean_end(context)
             }
         }
     }
@@ -97,22 +105,46 @@ impl Rule {
     }
 
     /// The rule that forbids a chain to end in `context` with a value of the
-    /// dtype `dtype` and the shape `shape`, if one does.
+    /// dtype `result` and the shape `shape`, if one does.
+    ///
+    /// `result` is `None` where the dtype is not known: a start takes the
+    /// dtype of a column, and a method that takes an argument gives a dtype
+    /// the argument decides. An end rule that is about a dtype does not refuse
+    /// what it does not know; the dtype is known to break it, or the rule is
+    /// silent.
     #[must_use]
     pub(super) fn forbids_end(
         context: Context,
-        dtype: Option<Representative>,
+        result: Option<&ResultDtype>,
         shape: Shape,
     ) -> Option<Self> {
+        let known_not_boolean =
+            result.is_some_and(|result| result.class() != Some(Representative::Boolean));
         if context == Context::step(Outer::PivotAggregate) && shape != Shape::One {
             return Some(Self::PivotAggregateGivesOneValue);
         }
-        if context.nested() == Some(Nested::ConditionPredicate)
-            && dtype != Some(Representative::Boolean)
-        {
-            return Some(Self::ConditionPredicateIsBoolean);
+        if known_not_boolean {
+            Self::ALL
+                .into_iter()
+                .find(|rule| rule.needs_boolean_end(context))
+        } else {
+            None
         }
-        None
+    }
+
+    /// Whether the rule says a chain must end `Boolean` in `context`. At most
+    /// one rule does, for no two of them govern the same context.
+    pub(super) fn needs_boolean_end(self, context: Context) -> bool {
+        match self {
+            Self::ConditionPredicateIsBoolean => {
+                context.nested() == Some(Nested::ConditionPredicate)
+            }
+            Self::FilterPredicateIsBoolean => {
+                context.outer() == Outer::Filter
+                    && matches!(context.nested(), None | Some(Nested::ConditionValue))
+            }
+            Self::PivotAggregateGivesOneValue | Self::ElementOnlyInPivotAggregate => false,
+        }
     }
 }
 

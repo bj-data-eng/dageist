@@ -13,7 +13,8 @@ use crate::allowed::context::{Context, Nested, Outer};
 use crate::allowed::dtype::Representative;
 use crate::allowed::rules::Rule;
 use crate::allowed::table::{
-    ContextLine, DtypeKey, DtypeLine, OptionLine, OptionValue, Outcome, Produces, Reason, Stage,
+    Chain, ContextLine, DtypeKey, DtypeLine, OptionLine, OptionValue, Outcome, Produces, Reason,
+    Stage,
 };
 use crate::catalog::{
     self, Applies, Argument, BuildError, Entry, Kind, Parameter, ParameterDefault,
@@ -381,12 +382,39 @@ fn method_on(
     method(entry, scope.start(), given)
 }
 
-/// Whether the expression under test must be `Boolean` where it stands.
+/// Whether the expression under test must be `Boolean` where it stands, as
+/// the rules say.
 fn needs_boolean(context: Context) -> bool {
-    match context.nested() {
-        Some(Nested::ConditionPredicate) => true,
-        Some(Nested::ConditionValue) | None => context.outer() == Outer::Filter,
-        Some(_) => false,
+    Rule::ALL
+        .into_iter()
+        .any(|rule| rule.needs_boolean_end(context))
+}
+
+/// The dtype a join key is cast to, where the chain goes on from an entry in
+/// a join key: the dtype of the other table's key, which the sample tables
+/// give as `key`.
+const KEY: DataType = DataType::Int64;
+
+/// What follows the expression under test where the chain goes on from it,
+/// so that the context does not refuse it for how it ends: a test for a value
+/// where a `Boolean` is required, which any dtype can be given.
+fn continued_subject(context: Context, subject: Expr) -> Result<Expr, BuildError> {
+    if needs_boolean(context) {
+        method(entry("Expr.is_not_null"), subject, Vec::new())
+    } else {
+        Ok(subject)
+    }
+}
+
+/// What follows the whole expression that stands at a position of a step,
+/// where the chain goes on from the entry under test: a cast to the key's
+/// dtype in a join key, which the catalogue has no entry for yet, and the
+/// first value of a group in a pivot's aggregate.
+fn continued_held(outer: Outer, held: Expr) -> Result<Expr, BuildError> {
+    match outer {
+        Outer::JoinLeft | Outer::JoinRight => Ok(held.cast(KEY)),
+        Outer::PivotAggregate => method(entry("Expr.first"), held, Vec::new()),
+        Outer::Select | Outer::Filter | Outer::Sort => Ok(held),
     }
 }
 
@@ -512,17 +540,25 @@ type Maker = Box<dyn Fn(Scope) -> Result<Expr, BuildError> + Sync>;
 /// Builds the expression under test in a scope.
 type Subject<'a> = &'a (dyn Fn(Scope) -> Result<Expr, BuildError> + Sync);
 
-/// The plan of the expression `subject` standing in `context`.
+/// The plan of the expression `subject` standing in `context`, with the chain
+/// ending at it, or going on from it.
 fn context_plan(
     context: Context,
+    chain: Chain,
     subject: Subject<'_>,
     frames: &Frames,
     empty: bool,
 ) -> Result<LazyFrame, BuildError> {
     let scope = scope_of(context.outer());
     let mut held = subject(scope)?;
+    if chain == Chain::Continues {
+        held = continued_subject(context, held)?;
+    }
     if let Some(nested) = context.nested() {
         held = wrap(nested, held, scope)?;
+    }
+    if chain == Chain::Continues {
+        held = continued_held(context.outer(), held)?;
     }
     host(context.outer(), held, frames, empty)
 }
@@ -562,7 +598,9 @@ fn context_lines(index: &DtypeIndex) -> Vec<ContextLine> {
         .filter(|entry| entry.applies() != Applies::Frame)
     {
         for context in Context::all() {
-            jobs.push((entry, context));
+            for chain in Chain::ALL {
+                jobs.push((entry, context, chain));
+            }
         }
     }
     let candidates: HashMap<&'static str, Vec<Candidate>> = catalog::entries()
@@ -570,14 +608,15 @@ fn context_lines(index: &DtypeIndex) -> Vec<ContextLine> {
         .filter(|entry| entry.applies() == Applies::Expression)
         .map(|entry| (entry.id().as_str(), index.candidates(entry)))
         .collect();
-    in_parallel(&jobs, |(entry, context)| {
-        context_line(entry, *context, &candidates)
+    in_parallel(&jobs, |(entry, context, chain)| {
+        context_line(entry, *context, *chain, &candidates)
     })
 }
 
 fn context_line(
     entry: &'static Entry,
     context: Context,
+    chain: Chain,
     candidates: &HashMap<&'static str, Vec<Candidate>>,
 ) -> ContextLine {
     let id = entry.id().as_str();
@@ -585,7 +624,10 @@ fn context_line(
     let (candidate, subject): (Option<Candidate>, Maker) = match entry.applies() {
         Applies::Expression => {
             let all = &candidates[id];
-            let chosen = if needs_boolean(context) {
+            // Where the chain ends, a context that needs a `Boolean` is given
+            // a method that gives one. Where it goes on, a test for a value
+            // follows, so the method that fits best is measured.
+            let chosen = if chain == Chain::Ends && needs_boolean(context) {
                 all.iter()
                     .find(|candidate| {
                         candidate.produces.as_ref().is_some_and(|produces| {
@@ -600,6 +642,7 @@ fn context_line(
                 return ContextLine {
                     entry: id,
                     context,
+                    chain,
                     receiver: None,
                     argument: None,
                     rules,
@@ -618,9 +661,11 @@ fn context_line(
         Applies::Function => (
             None,
             Box::new(move |scope| match id {
-                "polars.col" if needs_boolean(context) => Ok(column(scope.boolean)),
+                "polars.col" if chain == Chain::Ends && needs_boolean(context) => {
+                    Ok(column(scope.boolean))
+                }
                 "polars.col" => Ok(column(scope.receiver)),
-                "polars.lit" if needs_boolean(context) => Ok(flag(true)),
+                "polars.lit" if chain == Chain::Ends && needs_boolean(context) => Ok(flag(true)),
                 "polars.lit" => Ok(integer(1)),
                 "polars.element" => Ok(element()),
                 other => panic!("the generator does not know the function {other}"),
@@ -638,13 +683,17 @@ fn context_line(
         argument.unwrap_or_else(|| receiver.unwrap_or(Representative::Int64)),
     );
     let probe = Frames::new(receiver_dtype, argument_dtype, &DataType::Int64);
-    let key = if matches!(context.outer(), Outer::JoinLeft | Outer::JoinRight) {
-        held_dtype(context, &*subject, &probe)
-    } else {
-        DataType::Int64
-    };
+    // Where the chain ends in a join key, the other table's key has the dtype
+    // the key has. Where it goes on, the key is cast to the dtype of the other.
+    let key =
+        if chain == Chain::Ends && matches!(context.outer(), Outer::JoinLeft | Outer::JoinRight) {
+            held_dtype(context, &*subject, &probe)
+        } else {
+            KEY
+        };
     let frames = Frames::new(receiver_dtype, argument_dtype, &key);
-    let plan = |frames: &Frames, empty: bool| context_plan(context, &*subject, frames, empty);
+    let plan =
+        |frames: &Frames, empty: bool| context_plan(context, chain, &*subject, frames, empty);
     let measured = measure(&plan, &frames);
     let outcome = match measured {
         Err(reason) => Outcome::Refused(reason),
@@ -657,6 +706,7 @@ fn context_line(
     ContextLine {
         entry: id,
         context,
+        chain,
         receiver,
         argument,
         rules,

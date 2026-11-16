@@ -625,3 +625,44 @@ fn a_join_key_that_is_a_condition_of_typed_literals_is_valid_as_polars_accepts_i
         outcome_of(&report, "join")
     );
 }
+
+#[test]
+fn a_column_in_a_pivot_aggregate_is_refused_with_polars_reason_for_the_step() {
+    // The aggregate of a pivot is built from `element()`, not from a column.
+    // No named rule holds this, so Polars decides as the step is built, and
+    // refuses the pivot as a whole: it does not say which expression.
+    let report = run(vec![step(
+        "pivot",
+        "LazyFrame.pivot",
+        json!({
+            "on": { "columns": ["step_to"] },
+            "on_columns": { "table": "step_names" },
+            "index": { "columns": ["dcn"] },
+            "values": { "columns": ["row_days"] },
+            "aggregate_function": field_then("row_days", vec![call("Expr.sum", json!({}))]),
+        }),
+    )]);
+    let refusal = refusal_of(&report, "pivot");
+    assert_eq!(refusal.place().step_index(), Some(0));
+    assert!(refusal.place().path().is_empty(), "{refusal}");
+    assert!(matches!(refusal.cause(), RunCause::Polars(_)), "{refusal}");
+    assert!(
+        refusal.to_string().contains("column references"),
+        "{refusal}"
+    );
+    // Polars, by hand: its own pivot refuses a column in the aggregate.
+    let step_names =
+        df!("step_to" => ["Intake", "Review", "Pending", "Complete"]).expect("the step names");
+    let mut pivoted = claims().lazy().pivot(
+        cols(["step_to"]),
+        Arc::new(step_names),
+        cols(["dcn"]),
+        cols(["row_days"]),
+        col("row_days").sum(),
+        false,
+        "_".into(),
+        polars::frame::PivotColumnNaming::Auto,
+    );
+    let error = pivoted.collect_schema().expect_err("Polars refuses it");
+    assert!(error.to_string().contains("column references"), "{error}");
+}
