@@ -289,6 +289,72 @@ fn a_column_that_is_not_boolean_is_refused_as_a_filters_predicate_by_a_rule() {
 }
 
 #[test]
+fn a_start_that_names_several_columns_has_no_dtype_and_is_not_known_to_end() {
+    // `col("f", "a")` expands to one expression for each column, whatever the
+    // first is: Polars refuses it as a predicate though `f` is a Boolean.
+    let several = |first: &str, more: Vec<&str>| {
+        chain(
+            call(
+                "polars.col",
+                json!({
+                    "name": { "columns": [first] },
+                    "more_names": { "many": more.iter().map(|name| json!({ "columns": [name] })).collect::<Vec<_>>() },
+                }),
+            ),
+            vec![],
+        )
+    };
+    let walk = walk_of(
+        "LazyFrame.filter",
+        json!({ "predicates": many(vec![several("f", vec!["a"])]) }),
+    );
+    assert_eq!(walk.refusal(), None);
+    let predicate = expression_at(&walk, &item("predicates", 0));
+    assert_eq!(
+        predicate.ending(),
+        Some(&Ending::NotKnown(Unknown::TheStartsDtype))
+    );
+    assert_eq!(predicate.places(), vec![None]);
+    // Names given as a list of the first argument are the same.
+    let listed = chain(
+        call("polars.col", json!({ "name": { "columns": ["f", "a"] } })),
+        vec![],
+    );
+    let walk = walk_of(
+        "LazyFrame.filter",
+        json!({ "predicates": many(vec![listed]) }),
+    );
+    assert_eq!(
+        expression_at(&walk, &item("predicates", 0)).ending(),
+        Some(&Ending::NotKnown(Unknown::TheStartsDtype))
+    );
+    // Where no Boolean is needed it is still not known: the dtypes may differ.
+    let walk = walk_of(
+        "LazyFrame.join",
+        json!({
+            "other": { "table": "other" },
+            "left_on": many(vec![several("k", vec!["a"])]),
+            "right_on": many(vec![field("rk")]),
+        }),
+    );
+    let key = expression_at(&walk, &item("left_on", 0));
+    assert_eq!(
+        key.ending(),
+        Some(&Ending::NotKnown(Unknown::TheStartsDtype))
+    );
+    assert_eq!(key.places(), vec![None]);
+    // One name is as before.
+    let one = walk_of(
+        "LazyFrame.filter",
+        json!({ "predicates": many(vec![several("f", vec![])]) }),
+    );
+    assert_eq!(
+        expression_at(&one, &item("predicates", 0)).ending(),
+        Some(&Ending::Allowed)
+    );
+}
+
+#[test]
 fn whether_a_literal_of_no_dtype_may_end_a_predicate_is_not_known() {
     // `lit(1)` is whatever the other operand makes it: it may be a Boolean.
     let walk = walk_of(
