@@ -792,8 +792,9 @@ fn shifted_by(links: &[Call]) -> i64 {
 /// Whether the limit is why Polars allows what the named rule refuses. A limit
 /// excuses a rule only for a cause it names, and the evidence for each is a
 /// campaign case: a later predicate of a condition runs on the rows left to it,
-/// which Polars finds when it runs rows; a sort key that is one value is dropped;
-/// and what a comparison with a null follows is not evaluated.
+/// which Polars finds when it runs rows; a sort key that is one value is dropped, and
+/// what a `len` follows is not evaluated; and what a comparison with a null
+/// follows is not evaluated.
 fn applies_to_a_rule(limit: Limit, rule: &str, case: &Case, refused: &Refused) -> bool {
     let predicate_rule = matches!(
         rule,
@@ -808,7 +809,17 @@ fn applies_to_a_rule(limit: Limit, rule: &str, case: &Case, refused: &Refused) -
                     .iter()
                     .any(|condition| !is_decided(condition))
         }
-        Limit::AnAggregateGivesOneValue => predicate_rule && dropped_as_one_value(case, &locus),
+        // A sort key that is one value is dropped, and `len` does not read what it
+        // counts.
+        Limit::AnAggregateGivesOneValue => {
+            predicate_rule
+                && (dropped_as_one_value(case, &locus)
+                    || locus
+                        .inside
+                        .iter()
+                        .zip(&locus.reach)
+                        .any(|(holder, reach)| reached_by_a_len(holder, *reach)))
+        }
         Limit::ALiteral => predicate_rule && folded_by_a_null(&locus),
         _ => false,
     }

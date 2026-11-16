@@ -405,8 +405,8 @@ excused by both.
 
 A limit excuses a named rule's refusal only for a cause it names: a later predicate
 of a condition, which runs on the rows left to it, for the rule about a condition's
-predicate; a sort key or a window's key that is one value, which Polars drops, and
-what a comparison with a null folds, for the rules about a predicate. A literal at the
+predicate; a sort key or a window's key that is one value, which Polars drops, what a `len`
+follows, and what a comparison with a null folds, for the rules about a predicate. A literal at the
 start of a key, or a null comparison in it, says nothing of why the key rule refused it.
 
 A named rule is dageist's, and may be stricter than Polars only where it is so by design,
