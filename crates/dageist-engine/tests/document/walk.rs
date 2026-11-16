@@ -659,6 +659,84 @@ fn a_comparison_with_what_an_earlier_one_folded_is_left_to_a_limit() {
 }
 
 #[test]
+fn an_aggregate_that_a_comparison_folded_by_a_null_reaches_is_not_a_cause() {
+    // A comparison with what an earlier one folded is itself a null, and takes
+    // the aggregate it follows or is given with it: Polars allows these keys.
+    let keys = [
+        // `f.first() <= (null != true) > b`
+        field_then(
+            "f",
+            vec![
+                call("Expr.first", json!({})),
+                compared(
+                    "Expr.le",
+                    chain(
+                        call(
+                            "polars.lit",
+                            json!({ "value": { "flag": null }, "dtype": { "dtype": "Float32" } }),
+                        ),
+                        vec![compared(
+                            "Expr.ne",
+                            chain(
+                                call("polars.lit", json!({ "value": { "flag": true } })),
+                                vec![],
+                            ),
+                        )],
+                    ),
+                ),
+                compared("Expr.gt", field("b")),
+            ],
+        ),
+        // `when(k > k).then((1 == null) >= true.first()).otherwise(f)`
+        chain(
+            call(
+                "polars.when",
+                json!({ "predicates": many(vec![field_then("k", vec![compared("Expr.gt", field("k"))])]) }),
+            ),
+            vec![
+                call(
+                    "When.then",
+                    json!({ "statement": chain(
+                        call("polars.lit", json!({ "value": { "integer": 1 } })),
+                        vec![
+                            compared("Expr.eq", null()),
+                            compared(
+                                "Expr.ge",
+                                chain(
+                                    call("polars.lit", json!({ "value": { "flag": true } })),
+                                    vec![call("Expr.first", json!({}))],
+                                ),
+                            ),
+                        ],
+                    ) }),
+                ),
+                call("Then.otherwise", json!({ "statement": field("f") })),
+            ],
+        ),
+    ];
+    for (at, key) in keys.into_iter().enumerate() {
+        assert_eq!(joined_on(key), None, "key {at}");
+    }
+    // A column compared with a null is refused still, and an aggregate beside a
+    // column where no null reaches it.
+    let rule = Some(RefusalSource::Rule(Rule::KeyIsElementwise));
+    assert_eq!(
+        joined_on(field_then("f", vec![compared("Expr.eq", null())])),
+        rule
+    );
+    assert_eq!(
+        joined_on(field_then(
+            "k",
+            vec![compared(
+                "Expr.sub",
+                field_then("a", vec![call("Expr.sum", json!({}))])
+            )]
+        )),
+        rule
+    );
+}
+
+#[test]
 fn a_comparison_of_an_aggregate_with_a_null_is_no_comparison_of_a_column() {
     // `f.first() == null` is one value, and what is compared with it is a column
     // compared with a value that is not null.
