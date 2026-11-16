@@ -407,6 +407,129 @@ fn a_join_key_whose_aggregate_is_compared_with_a_null_is_not_refused() {
     assert_eq!(walk.refusal(), None);
 }
 
+/// The literal null, which a comparison with it folds to a null.
+fn null() -> Value {
+    chain(
+        call("polars.lit", json!({ "value": { "flag": null } })),
+        vec![],
+    )
+}
+
+fn compared(id: &str, other: Value) -> Value {
+    call(id, json!({ "other": other }))
+}
+
+/// What the walk refuses of a join whose left key is `key`.
+fn joined_on(key: Value) -> Option<RefusalSource> {
+    let walk = walk_of(
+        "LazyFrame.join",
+        json!({
+            "other": { "table": "other" },
+            "left_on": many(vec![key]),
+            "right_on": many(vec![field("rk")]),
+        }),
+    );
+    walk.refusal().map(|refusal| refusal.refusal().source())
+}
+
+#[test]
+fn a_join_key_with_a_comparison_of_a_column_with_a_null_at_any_depth_is_refused() {
+    // Polars folds the comparison into a null, and what has no column is not
+    // elementwise: one level down, in an operand, before a method, after a
+    // null, and in the predicate of a condition.
+    let rule = Some(RefusalSource::Rule(Rule::KeyIsElementwise));
+    let keys = [
+        field_then("k", vec![compared("Expr.gt", null())]),
+        field_then(
+            "k",
+            vec![compared(
+                "Expr.le",
+                field_then("a", vec![compared("Expr.gt", null())]),
+            )],
+        ),
+        field_then(
+            "a",
+            vec![
+                compared("Expr.gt", null()),
+                compared("Expr.sub", field("k")),
+            ],
+        ),
+        chain(
+            call("polars.lit", json!({ "value": { "string": "1d" } })),
+            vec![compared(
+                "Expr.le",
+                chain(
+                    call("polars.lit", json!({ "value": { "flag": null } })),
+                    vec![compared("Expr.eq", field("f"))],
+                ),
+            )],
+        ),
+        chain(
+            call(
+                "polars.when",
+                json!({ "predicates": many(vec![chain(
+                    call("polars.lit", json!({ "value": { "flag": null } })),
+                    vec![compared("Expr.lt", field("f"))],
+                )]) }),
+            ),
+            vec![call("When.then", json!({ "statement": field("a") }))],
+        ),
+    ];
+    for (at, key) in keys.into_iter().enumerate() {
+        assert_eq!(joined_on(key), rule, "key {at}");
+    }
+}
+
+#[test]
+fn a_join_key_that_compares_nothing_of_a_column_with_a_null_is_not_refused() {
+    let keys = [
+        // A null, a comparison of two literals, a column with a whole number.
+        null(),
+        chain(
+            call("polars.lit", json!({ "value": { "integer": 1 } })),
+            vec![compared(
+                "Expr.gt",
+                chain(
+                    call("polars.lit", json!({ "value": { "integer": 2 } })),
+                    vec![],
+                ),
+            )],
+        ),
+        field_then(
+            "a",
+            vec![compared(
+                "Expr.gt",
+                chain(
+                    call("polars.lit", json!({ "value": { "integer": 1 } })),
+                    vec![],
+                ),
+            )],
+        ),
+        // A null compared with a null, then taken from a column.
+        chain(
+            call("polars.lit", json!({ "value": { "flag": null } })),
+            vec![
+                compared("Expr.eq", null()),
+                compared("Expr.sub", field("k")),
+            ],
+        ),
+        // A test for null of a null.
+        chain(
+            call(
+                "polars.when",
+                json!({ "predicates": many(vec![chain(
+                    call("polars.lit", json!({ "value": { "flag": null } })),
+                    vec![call("Expr.is_not_null", json!({}))],
+                )]) }),
+            ),
+            vec![call("When.then", json!({ "statement": field("b") }))],
+        ),
+    ];
+    for (at, key) in keys.into_iter().enumerate() {
+        assert_eq!(joined_on(key), None, "key {at}");
+    }
+}
+
 #[test]
 fn the_values_of_a_condition_need_be_boolean_in_a_filter_only_where_it_ends_the_predicate() {
     let condition = |links: Vec<Value>| {
