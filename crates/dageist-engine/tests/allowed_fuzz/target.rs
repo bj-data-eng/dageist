@@ -361,7 +361,9 @@ impl CaseTarget for AllowedTarget {
                     let Some((_, why)) = STRICTER_BY_DESIGN.iter().find(|(name, _)| *name == rule)
                     else {
                         // Polars does not evaluate everything, as a limit says.
-                        if let Some(outcome) = excused("refused by a rule, Polars allows") {
+                        if let Some(outcome) =
+                            excused(&format!("refused by the rule {rule}, Polars allows"))
+                        {
                             return outcome;
                         }
                         return failure(

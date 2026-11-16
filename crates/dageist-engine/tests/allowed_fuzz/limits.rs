@@ -536,6 +536,10 @@ fn locate<'a>(case: &'a Case, place: &Place) -> Locus<'a> {
                 locus.top.get_or_insert(expression);
                 locus.inside.push(expression);
                 locus.reach.push(Reach::Whole);
+                // Which call of this expression the place is at is not known
+                // until the way says; it is not the link of the chain that holds
+                // this one.
+                locus.index = None;
                 Node::Expression(expression)
             }
             Some(other) => Node::Value(other),
@@ -731,23 +735,21 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
         (Limit::AGroupAggregate, Disagreement::PolarsAllows(refused)) => {
             // The kernels that take the values of a group accept what the ones of
             // `select` refuse: a dtype of an aggregate, a comparison, a cast, a
-            // struct, or a window over a group. They also take a group's values as a
-            // condition's predicate where the named rule asks for a `Boolean`.
+            // struct, or a window over a group.
             pivot
-                && (refused.source == Source::Rule("condition-predicate-is-boolean")
-                    || [
-                        "not supported for dtype",
-                        "cannot compare",
-                        "cannot perform",
-                        "could not evaluate",
-                        "casting from",
-                        "lengths don't match",
-                        "must specify one field",
-                        "cannot cast",
-                    ]
-                    .iter()
-                    .any(|words| refused.reason.contains(words))
-                        && locate(case, &refused.place).call.is_some())
+                && [
+                    "not supported for dtype",
+                    "cannot compare",
+                    "cannot perform",
+                    "could not evaluate",
+                    "casting from",
+                    "lengths don't match",
+                    "must specify one field",
+                    "cannot cast",
+                ]
+                .iter()
+                .any(|words| refused.reason.contains(words))
+                && locate(case, &refused.place).call.is_some()
         }
         (Limit::ASingleValueInAKey, Disagreement::PolarsAllows(refused)) => {
             // The key the tables refused is wholly one value.
@@ -1006,6 +1008,18 @@ mod tests {
         excuses(case, &prediction(verdict, Vec::new()), &Observed::default())
     }
 
+    /// A named rule refuses the case at `place`, and Polars allows it.
+    fn rule_refuses(case: &Case, place: Place, rule: &'static str, reason: &str) -> Vec<Limit> {
+        let verdict = Verdict::Refuses(Refused {
+            source: Source::Rule(rule),
+            at: place.to_string(),
+            place,
+            stage: None,
+            reason: reason.to_owned(),
+        });
+        excuses(case, &prediction(verdict, Vec::new()), &Observed::default())
+    }
+
     /// The tables allow the case and Polars refuses it, at `place` if it said.
     fn polars_refuses(
         case: &Case,
@@ -1095,6 +1109,83 @@ mod tests {
             tables_refuse(&case, link_of("exprs", 0, 0), ROWS, "no"),
             vec![]
         );
+    }
+
+    // ----- Rules that refuse what Polars allows
+
+    #[test]
+    fn a_rule_refusing_a_held_expression_is_not_excused_by_the_link_that_holds_it() {
+        // The predicate `k.sum()` is one value, but it is held by a condition
+        // that is the operand of link 1 of the item, and the place is the
+        // predicate itself, not a call that follows one value.
+        let condition = chain_of(
+            call(
+                "polars.when",
+                vec![("predicates", many(vec![chain(column("k"), &["Expr.sum"])]))],
+            ),
+            vec![call(
+                "When.then",
+                vec![("statement", Value::Expression(chain(column("a"), &[])))],
+            )],
+        );
+        let item = chain_of(
+            column("a"),
+            vec![
+                call("Expr.cum_sum", Vec::new()),
+                compared_with("Expr.eq", condition),
+            ],
+        );
+        let case = select(vec![item]);
+        let predicate = at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Link(1),
+            parameter("other"),
+            Segment::Start,
+            parameter("predicates"),
+            Segment::Item(0),
+        ]);
+        assert_eq!(
+            rule_refuses(&case, predicate, "condition-predicate-is-boolean", "a rule"),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_rule_refusing_a_sort_key_that_is_one_value_is_excused_and_a_select_item_is_not() {
+        let key = chain(column("a"), &["Expr.cum_sum", "Expr.sum"]);
+        let rule = "filter-predicate-is-boolean";
+        assert_eq!(
+            rule_refuses(
+                &sort(vec![key.clone()]),
+                at(&[parameter("by"), Segment::Item(0)]),
+                rule,
+                "a rule"
+            ),
+            vec![Limit::AnAggregateGivesOneValue]
+        );
+        assert_eq!(
+            rule_refuses(
+                &select(vec![key]),
+                at(&[parameter("exprs"), Segment::Item(0)]),
+                rule,
+                "a rule"
+            ),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_rule_refusing_an_expression_that_starts_from_a_literal_is_excused_and_a_column_is_not() {
+        let rule = "condition-predicate-is-boolean";
+        let from_a_literal = select(vec![chain(literal(), &["Expr.cum_sum"])]);
+        let item = at(&[parameter("exprs"), Segment::Item(0)]);
+        assert_eq!(
+            rule_refuses(&from_a_literal, item.clone(), rule, "a rule"),
+            vec![Limit::ALiteral]
+        );
+        let from_a_column = select(vec![chain(column("a"), &["Expr.cum_sum"])]);
+        assert_eq!(rule_refuses(&from_a_column, item, rule, "a rule"), vec![]);
     }
 
     #[test]
