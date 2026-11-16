@@ -235,6 +235,9 @@ enum Cur {
         /// Whether every predicate and value so far gives one value, which a
         /// condition of them gives too.
         single: bool,
+        /// Whether every value so far gives one value: what the condition is
+        /// where its values are one expression, and the predicates are dropped.
+        values_single: bool,
         /// Whether every predicate and value so far was walked to its end: a
         /// refused one has no shape, so the condition has none.
         known: bool,
@@ -538,6 +541,7 @@ impl Walker<'_> {
                                 single: start_arguments
                                     .iter()
                                     .all(|(_, operand)| operand.shape == Shape::One),
+                                values_single: true,
                                 known: start_arguments.iter().all(|(_, operand)| operand.known),
                             }
                         } else {
@@ -562,10 +566,29 @@ impl Walker<'_> {
                 };
             }
         }
+        // Values that are one expression make the condition that expression, and
+        // its predicates are dropped.
+        let statements: Vec<&Expression> = expression
+            .links()
+            .iter()
+            .filter_map(|link| match link.argument("statement") {
+                Some(Value::Expression(statement)) => Some(statement),
+                _ => None,
+            })
+            .collect();
+        let branches_are_one =
+            statements.len() > 1 && statements.windows(2).all(|pair| pair[0] == pair[1]);
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
             let arguments = self.arguments(link, values_end);
-            let (next, standing) = self.link(link, &arguments, context, cur, &mut last_end);
+            let (next, standing) = self.link(
+                link,
+                &arguments,
+                context,
+                cur,
+                &mut last_end,
+                branches_are_one,
+            );
             cur = next;
             calls.push(standing);
             self.path.pop();
@@ -637,6 +660,7 @@ impl Walker<'_> {
         context: Context,
         cur: Cur,
         last_end: &mut Option<Ending>,
+        branches_are_one: bool,
     ) -> (Cur, Standing) {
         let entry = link.entry();
         let after = match &cur {
@@ -719,6 +743,10 @@ impl Walker<'_> {
             .iter()
             .filter(|(name, _)| matches!(name.as_str(), "predicates" | "statement"))
             .all(|(_, operand)| operand.known);
+        let given_values_single = arguments
+            .iter()
+            .filter(|(name, _)| name == "statement")
+            .all(|(_, operand)| operand.shape == Shape::One);
         let given_single = arguments
             .iter()
             .filter(|(name, _)| matches!(name.as_str(), "predicates" | "statement"))
@@ -763,11 +791,13 @@ impl Walker<'_> {
                 Cur::Condition {
                     mut values,
                     single,
+                    values_single,
                     known,
                     ..
                 },
             ) => {
                 let single = single && given_single;
+                let values_single = values_single && given_values_single;
                 let known = known && given_known;
                 let state = match entry.id().as_str() {
                     "When.then" => {
@@ -784,7 +814,15 @@ impl Walker<'_> {
                         return (
                             Cur::Value {
                                 dtype: if known { unify(&values) } else { None },
-                                shape: if single { Shape::One } else { Shape::Many },
+                                // Where the values are one expression the predicates
+                                // are dropped, and the values give the shape.
+                                shape: if (branches_are_one && values_single)
+                                    || (!branches_are_one && single)
+                                {
+                                    Shape::One
+                                } else {
+                                    Shape::Many
+                                },
                             },
                             standing,
                         );
@@ -794,6 +832,7 @@ impl Walker<'_> {
                     state,
                     values,
                     single,
+                    values_single,
                     known,
                 }
             }

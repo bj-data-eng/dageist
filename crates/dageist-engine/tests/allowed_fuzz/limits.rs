@@ -739,6 +739,21 @@ fn unplaced(refusal: &Refusal) -> bool {
         .is_none_or(|place| place.path().is_empty())
 }
 
+/// Whether the values of a condition are one expression, so that Polars takes it
+/// for that expression and drops its predicates.
+fn branches_are_one(condition: &Expression) -> bool {
+    let values: Vec<&Expression> = condition
+        .links()
+        .iter()
+        .filter(|link| is_a_value_link(link))
+        .filter_map(|link| match link.argument("statement") {
+            Some(Value::Expression(value)) => Some(value),
+            _ => None,
+        })
+        .collect();
+    values.len() > 1 && values.windows(2).all(|pair| pair[0] == pair[1])
+}
+
 /// Whether a sort key, or the key of a window, that is wholly one value, holds
 /// the place: Polars drops it, and what the tables refuse in it with it.
 fn dropped_as_one_value(case: &Case, locus: &Locus) -> bool {
@@ -793,8 +808,9 @@ fn shifted_by(links: &[Call]) -> i64 {
 /// excuses a rule only for a cause it names, and the evidence for each is a
 /// campaign case: a later predicate of a condition runs on the rows left to it,
 /// which Polars finds when it runs rows; a sort key that is one value is dropped, and
-/// what a `len` follows is not evaluated; and what a comparison with a null
-/// follows is not evaluated.
+/// what a `len` follows is not evaluated; what a comparison with a null follows
+/// is not evaluated; and a condition that a literal predicate decides, or whose
+/// values are one expression, has dropped its predicates.
 fn applies_to_a_rule(limit: Limit, rule: &str, case: &Case, refused: &Refused) -> bool {
     let predicate_rule = matches!(
         rule,
@@ -821,6 +837,18 @@ fn applies_to_a_rule(limit: Limit, rule: &str, case: &Case, refused: &Refused) -
                         .any(|(holder, reach)| reached_by_a_len(holder, *reach)))
         }
         Limit::ALiteral => predicate_rule && folded_by_a_null(&locus),
+        // A condition that a literal predicate decides, or whose values are one
+        // expression, has dropped the predicates that Polars would refuse.
+        Limit::ADecidedCondition => {
+            predicate_rule && locus.inside.iter().any(|holder| is_decided(holder))
+        }
+        Limit::TheBranchesAreOne => {
+            predicate_rule
+                && locus
+                    .in_predicates
+                    .iter()
+                    .any(|condition| branches_are_one(condition))
+        }
         _ => false,
     }
 }
@@ -982,18 +1010,7 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
             locate(case, &refused.place)
                 .in_predicates
                 .iter()
-                .any(|condition| {
-                    let values: Vec<&Expression> = condition
-                        .links()
-                        .iter()
-                        .filter(|link| is_a_value_link(link))
-                        .filter_map(|link| match link.argument("statement") {
-                            Some(Value::Expression(value)) => Some(value),
-                            _ => None,
-                        })
-                        .collect();
-                    values.len() > 1 && values.windows(2).all(|pair| pair[0] == pair[1])
-                })
+                .any(|condition| branches_are_one(condition))
         }
         (Limit::APanic, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
@@ -1610,14 +1627,15 @@ mod tests {
         ]);
         let rule = "condition-predicate-is-boolean";
         let counted = select(vec![condition(vec![call("Expr.len", Vec::new())])]);
+        // The first predicate is a literal, which decides the condition as well.
         assert_eq!(
             rule_refuses(&counted, predicate.clone(), rule, "a rule"),
-            vec![Limit::AnAggregateGivesOneValue]
+            vec![Limit::AnAggregateGivesOneValue, Limit::ADecidedCondition]
         );
         let not_counted = select(vec![condition(Vec::new())]);
         assert_eq!(
             rule_refuses(&not_counted, predicate, rule, "a rule"),
-            vec![]
+            vec![Limit::ADecidedCondition]
         );
     }
 
