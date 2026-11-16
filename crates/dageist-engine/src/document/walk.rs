@@ -1106,21 +1106,32 @@ fn reaching_comparison(expression: &Expression) -> Option<usize> {
     })
 }
 
-/// Whether an expression holds an aggregate. What a comparison that a null
-/// reaches follows is dropped, for the comparison is a null, and so is any
-/// aggregate in it.
+/// Whether an expression holds an aggregate that Polars evaluates. A comparison
+/// that a null reaches is a null, and Polars never evaluates what it follows or
+/// is given where that is one value or literals alone, so an aggregate there is
+/// dropped; a side that is more is evaluated, and its aggregate counts.
 fn holds_an_aggregate(expression: &Expression) -> bool {
-    let from = reaching_comparison(expression).map_or(0, |at| at + 1);
-    let links = &expression.links()[from..];
+    let evaluated =
+        |call: &Call| is_one_value(call) || operands(call).into_iter().any(holds_an_aggregate);
     let start = match expression.start() {
-        Start::Call(call) if from == 0 => Some(call),
-        _ => None,
+        Start::Call(call) => Some(call),
+        Start::Input(_) => None,
     };
-    links.iter().any(is_one_value)
-        || start
-            .into_iter()
-            .chain(links)
-            .any(|call| operands(call).into_iter().any(holds_an_aggregate))
+    let links = expression.links();
+    let Some(reach) = reaching_comparison(expression) else {
+        return start.into_iter().chain(links).any(evaluated);
+    };
+    // What the comparison follows is the start and the links before it, dropped as
+    // a whole where they are one value or literals alone.
+    let followed = !wholly_single(expression, reach, true)
+        && start.into_iter().chain(&links[..reach]).any(evaluated);
+    // What it is given is dropped where it is one value or literals alone.
+    let given = operands(&links[reach]).into_iter().any(|operand| {
+        !wholly_single(operand, operand.links().len(), true) && holds_an_aggregate(operand)
+    });
+    // What follows the comparison is evaluated.
+    let after = links[reach + 1..].iter().any(evaluated);
+    followed || given || after
 }
 
 /// Whether an expression reads a column: it starts from one, or a call in it is
