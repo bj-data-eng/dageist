@@ -117,6 +117,9 @@ impl dageist_engine::allowed::Allowance
 pub fn dageist_engine::allowed::Allowance::can_end(&self) -> core::result::Result<(), &dageist_engine::allowed::Refusal>
 pub const fn dageist_engine::allowed::Allowance::result(&self) -> core::option::Option<&dageist_engine::allowed::ResultDtype>
 pub const fn dageist_engine::allowed::Allowance::shape(&self) -> dageist_engine::allowed::Shape
+pub struct dageist_engine::allowed::Chosen<'a>
+impl<'a> dageist_engine::allowed::Chosen<'a>
+pub const fn dageist_engine::allowed::Chosen<'a>::with_arguments(self, arguments: &'a [(&'a str, dageist_engine::allowed::Representative)]) -> Self
 pub struct dageist_engine::allowed::Context
 impl dageist_engine::allowed::Context
 pub fn dageist_engine::allowed::Context::all() -> alloc::vec::Vec<Self>
@@ -159,7 +162,7 @@ impl core::fmt::Display for dageist_engine::allowed::ResultDtype
 pub fn dageist_engine::allowed::ResultDtype::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn dageist_engine::allowed::argument_dtypes(entry: &dageist_engine::catalog::Entry, parameter: &str, receiver: dageist_engine::allowed::Representative) -> alloc::vec::Vec<(dageist_engine::allowed::Representative, dageist_engine::allowed::Outcome)>
 pub fn dageist_engine::allowed::dtype_name(dtype: &polars_core::datatypes::dtype::DataType) -> alloc::string::String
-pub fn dageist_engine::allowed::offer(entry: &'static dageist_engine::catalog::Entry, place: &dageist_engine::allowed::Place, arguments: &[(&str, dageist_engine::allowed::Representative)]) -> dageist_engine::allowed::Verdict
+pub fn dageist_engine::allowed::offer(entry: &'static dageist_engine::catalog::Entry, place: &dageist_engine::allowed::Place, chosen: &dageist_engine::allowed::Chosen<'_>) -> dageist_engine::allowed::Verdict
 pub fn dageist_engine::allowed::offers(place: &dageist_engine::allowed::Place) -> alloc::vec::Vec<dageist_engine::allowed::Offer>
 pub fn dageist_engine::allowed::options(entry: &dageist_engine::catalog::Entry, chosen: &[(&str, &str)]) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids(entry: &dageist_engine::catalog::Entry, context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>

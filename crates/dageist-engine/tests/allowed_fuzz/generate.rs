@@ -14,8 +14,8 @@
 //! is [`super::predict`]'s, and Polars' is [`super::observe`]'s.
 
 use dageist_engine::allowed::{
-    self, After, ConditionState, Context, Place as OfferPlace, Position as Slot, Representative,
-    Shape, Verdict as OfferVerdict,
+    self, After, Chosen, ConditionState, Context, Place as OfferPlace, Position as Slot,
+    Representative, Shape, Verdict as OfferVerdict,
 };
 use dageist_engine::catalog::{self, Applies, Entry, Kind, ParameterDefault, Shape as ParamShape};
 use dageist_engine::document::{Call, Document, Dtype, Expression, Start, Step, StepId, Value};
@@ -524,7 +524,11 @@ impl Gen<'_> {
             links = condition;
             cur_class = unify(&values);
         } else {
-            match allowed::offer(start.entry(), &OfferPlace::new(context, After::Start), &[]) {
+            match allowed::offer(
+                start.entry(),
+                &OfferPlace::new(context, After::Start),
+                &Chosen::default(),
+            ) {
                 OfferVerdict::Allowed(allowance) => shape = allowance.shape(),
                 OfferVerdict::Refused(_) => alive = false,
             }
@@ -684,7 +688,7 @@ impl Gen<'_> {
                         shape,
                     },
                 ),
-                &given,
+                &Chosen::default().with_arguments(&given),
             );
             match verdict {
                 OfferVerdict::Allowed(allowance) => {
@@ -735,7 +739,7 @@ impl Gen<'_> {
                     shape,
                 },
             ),
-            &given,
+            &Chosen::default().with_arguments(&given),
         ) {
             OfferVerdict::Allowed(allowance) => Some((
                 call,

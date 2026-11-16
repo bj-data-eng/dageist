@@ -15,8 +15,8 @@
 //! predicted before that.
 
 use dageist_engine::allowed::{
-    self, After, ConditionState, Context, Place as OfferPlace, Position as Slot, RefusalSource,
-    Representative, Shape, Verdict as OfferVerdict,
+    self, After, Chosen, ConditionState, Context, Place as OfferPlace, Position as Slot,
+    RefusalSource, Representative, Shape, Verdict as OfferVerdict,
 };
 use dageist_engine::catalog::{Applies, Entry, Kind};
 use dageist_engine::document::{Call, Expression, Place, Segment, Start, Value};
@@ -299,7 +299,11 @@ impl Walker<'_> {
             return None;
         };
         self.path.push(Segment::Start);
-        match allowed::offer(start.entry(), &OfferPlace::new(context, After::Start), &[]) {
+        match allowed::offer(
+            start.entry(),
+            &OfferPlace::new(context, After::Start),
+            &Chosen::default(),
+        ) {
             OfferVerdict::Refused(refusal) => self.refused(&refusal),
             OfferVerdict::Allowed(allowance) => {
                 last_end = allowance.can_end().err().cloned();
@@ -432,9 +436,11 @@ impl Walker<'_> {
             ));
             // The call is still offered, for a refusal is a refusal whatever
             // the argument, but nothing is said of what it gives.
-            if let OfferVerdict::Refused(refusal) =
-                allowed::offer(entry, &OfferPlace::new(context, after), &given)
-            {
+            if let OfferVerdict::Refused(refusal) = allowed::offer(
+                entry,
+                &OfferPlace::new(context, after),
+                &Chosen::default().with_arguments(&given),
+            ) {
                 self.refused(&refusal);
                 return Cur::Dead;
             }
@@ -443,7 +449,11 @@ impl Walker<'_> {
                 shape: Shape::Many,
             };
         }
-        let allowance = match allowed::offer(entry, &OfferPlace::new(context, after), &given) {
+        let allowance = match allowed::offer(
+            entry,
+            &OfferPlace::new(context, after),
+            &Chosen::default().with_arguments(&given),
+        ) {
             OfferVerdict::Refused(refusal) => {
                 self.refused(&refusal);
                 return Cur::Dead;

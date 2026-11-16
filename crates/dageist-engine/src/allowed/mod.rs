@@ -36,7 +36,7 @@ mod tests;
 pub use context::{Context, Nested, Outer, Position};
 pub use dtype::{Representative, ResultDtype, dtype_name};
 pub use offers::{
-    After, Allowance, ConditionState, Offer, Place, Refusal, RefusalSource, Verdict,
+    After, Allowance, Chosen, ConditionState, Offer, Place, Refusal, RefusalSource, Verdict,
     argument_dtypes, offer, offers, options, rule_forbids,
 };
 pub use rules::Rule;

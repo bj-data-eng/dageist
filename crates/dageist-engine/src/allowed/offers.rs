@@ -63,6 +63,27 @@ impl ConditionState {
     }
 }
 
+/// What has been chosen for a call of an entry, so far as it decides what the
+/// entry gives: the dtypes of the arguments given to its expression
+/// parameters.
+///
+/// Nothing chosen is the [`Default`]: an entry that takes an expression it needs is
+/// then judged for any dtype of argument that fits.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Chosen<'a> {
+    arguments: &'a [(&'a str, Representative)],
+}
+
+impl<'a> Chosen<'a> {
+    /// The dtypes of the arguments given to expression parameters, each by the
+    /// parameter's name.
+    #[must_use]
+    pub const fn with_arguments(mut self, arguments: &'a [(&'a str, Representative)]) -> Self {
+        self.arguments = arguments;
+        self
+    }
+}
+
 /// Where an entry would stand: in which context, and after what.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Place {
@@ -357,8 +378,9 @@ fn on_receiver(
     fit.ok_or_else(missing)
 }
 
-/// Whether the entry `entry` may stand at `place`, given the dtypes of the
-/// arguments that have been chosen for its expression parameters.
+/// Whether the entry `entry` may stand at `place`, given what has been
+/// [chosen](Chosen) for it, the dtypes of the arguments for its expression
+/// parameters.
 ///
 /// A rule that forbids the entry where it stands is applied first, so that its
 /// words explain the refusal. A method is then judged by the dtype table for
@@ -379,22 +401,14 @@ fn on_receiver(
 /// result whose dtype is not known, which the argument will decide, does not
 /// break a rule that is about a dtype: it is not refused for what is not known.
 #[must_use]
-pub fn offer(
-    entry: &'static Entry,
-    place: &Place,
-    arguments: &[(&str, Representative)],
-) -> Verdict {
-    match judge(entry, place, arguments) {
+pub fn offer(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Verdict {
+    match judge(entry, place, chosen) {
         Ok(allowance) => Verdict::Allowed(allowance),
         Err(refusal) => Verdict::Refused(refusal),
     }
 }
 
-fn judge(
-    entry: &'static Entry,
-    place: &Place,
-    arguments: &[(&str, Representative)],
-) -> Result<Allowance, Refusal> {
+fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Allowance, Refusal> {
     let id = entry.id().as_str();
     let tables = Tables::committed();
     // Whether the entry can follow what the expression has.
@@ -446,7 +460,7 @@ fn judge(
     // What the dtype table says of a method on the value it follows.
     let (mut result, mut shape) = (None, Shape::Many);
     if let (After::Value { dtype, .. }, true) = (place.after, is_method(entry)) {
-        let fit = on_receiver(entry, dtype, arguments)?;
+        let fit = on_receiver(entry, dtype, chosen.arguments)?;
         (result, shape) = (fit.result, fit.shape);
     }
     // What the context table says of the entry where it stands.
@@ -511,7 +525,7 @@ pub fn offers(place: &Place) -> Vec<Offer> {
         .filter(|entry| entry.applies() != Applies::Frame)
         .map(|entry| Offer {
             entry,
-            verdict: offer(entry, place, &[]),
+            verdict: offer(entry, place, &Chosen::default()),
         })
         .collect()
 }

@@ -9,8 +9,8 @@ use std::sync::Arc;
 use crate::allowed::dtype::ResultDtype;
 use crate::allowed::offers::RefusalSource;
 use crate::allowed::{
-    After, ConditionState, Context, Nested, Outer, Place, Representative, Rule, Shape, Stage,
-    Verdict, offer, offers, options,
+    After, Chosen, ConditionState, Context, Nested, Outer, Place, Representative, Rule, Shape,
+    Stage, Verdict, offer, offers, options,
 };
 use crate::catalog;
 
@@ -33,7 +33,11 @@ fn select_after(dtype: Representative) -> Place {
 }
 
 fn verdict(id: &str, place: &Place, arguments: &[(&str, Representative)]) -> Verdict {
-    offer(entry(id), place, arguments)
+    offer(
+        entry(id),
+        place,
+        &Chosen::default().with_arguments(arguments),
+    )
 }
 
 fn result_of(verdict: &Verdict) -> Option<&str> {
