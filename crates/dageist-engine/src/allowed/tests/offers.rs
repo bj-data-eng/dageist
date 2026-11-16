@@ -185,20 +185,23 @@ fn a_pivot_aggregate_must_give_one_value_although_polars_lets_it_give_more() {
     let sum = verdict("Expr.sum", &pivot(Shape::Many), &[]);
     let sum = sum.allowance().expect("a sum is offered");
     assert_eq!(sum.shape(), Shape::One);
-    assert!(sum.can_end().is_ok());
+    assert!(sum.can_end().is_allowed());
     let running = verdict("Expr.cum_sum", &pivot(Shape::Many), &[]);
     let running = running
         .allowance()
         .expect("a running sum is offered to be continued");
     assert_eq!(running.shape(), Shape::Many);
-    let refusal = running.can_end().expect_err("it cannot end the aggregate");
+    let refusal = running
+        .can_end()
+        .refusal()
+        .expect("it cannot end the aggregate");
     assert_eq!(
         refusal.source(),
         RefusalSource::Rule(Rule::PivotAggregateGivesOneValue)
     );
     // A chain that has given one value keeps giving one.
     let one = verdict("Expr.cum_sum", &pivot(Shape::One), &[]);
-    assert!(one.allowance().expect("offered").can_end().is_ok());
+    assert!(one.allowance().expect("offered").can_end().is_allowed());
 
     // Polars, by hand: the first group holds two values, and a running sum
     // over them is not refused: the rule is dageist's, not Polars'.
@@ -274,13 +277,14 @@ fn a_condition_predicate_that_is_not_boolean_cannot_end_the_predicate() {
         .allowance()
         .expect("offered, to be continued")
         .can_end()
-        .expect_err("a whole number is no condition");
+        .refusal()
+        .expect("a whole number is no condition");
     assert_eq!(
         refusal.source(),
         RefusalSource::Rule(Rule::ConditionPredicateIsBoolean)
     );
     let boolean = verdict("Expr.first", &predicate(Representative::Boolean), &[]);
-    assert!(boolean.allowance().expect("offered").can_end().is_ok());
+    assert!(boolean.allowance().expect("offered").can_end().is_allowed());
     // A comparison gives a Boolean whatever it compares.
     let comparison = verdict(
         "Expr.gt",
@@ -288,7 +292,13 @@ fn a_condition_predicate_that_is_not_boolean_cannot_end_the_predicate() {
         &[("other", Representative::Int64)],
     );
     assert_eq!(result_of(&comparison), Some("Boolean"));
-    assert!(comparison.allowance().expect("offered").can_end().is_ok());
+    assert!(
+        comparison
+            .allowance()
+            .expect("offered")
+            .can_end()
+            .is_allowed()
+    );
 
     // Polars, by hand: a whole number as the predicate of a condition resolves
     // a schema, and its rows are refused.
@@ -456,7 +466,8 @@ fn assert_stands_in_the_middle_of_a_filter_predicate(
     assert_eq!(allowance.shape(), shape, "{id} after {receiver}");
     let refusal = allowance
         .can_end()
-        .expect_err("a filter's predicate must end Boolean, and this is not one");
+        .refusal()
+        .expect("a filter's predicate must end Boolean, and this is not one");
     assert!(
         matches!(refusal.source(), RefusalSource::Rule(_)),
         "{id} after {receiver}: {refusal:?}"

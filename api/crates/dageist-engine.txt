@@ -14,6 +14,13 @@ pub dageist_engine::allowed::ConditionState::ChainedThen
 pub dageist_engine::allowed::ConditionState::ChainedWhen
 pub dageist_engine::allowed::ConditionState::Then
 pub dageist_engine::allowed::ConditionState::When
+pub enum dageist_engine::allowed::Ending
+pub dageist_engine::allowed::Ending::Allowed
+pub dageist_engine::allowed::Ending::NotKnown(dageist_engine::allowed::Unknown)
+pub dageist_engine::allowed::Ending::Refused(dageist_engine::allowed::Refusal)
+impl dageist_engine::allowed::Ending
+pub const fn dageist_engine::allowed::Ending::is_allowed(&self) -> bool
+pub const fn dageist_engine::allowed::Ending::refusal(&self) -> core::option::Option<&dageist_engine::allowed::Refusal>
 pub enum dageist_engine::allowed::Nested
 pub dageist_engine::allowed::Nested::ConditionPredicate
 pub dageist_engine::allowed::Nested::ConditionValue
@@ -105,6 +112,11 @@ pub dageist_engine::allowed::Stage::Rows
 pub dageist_engine::allowed::Stage::Schema
 impl dageist_engine::allowed::Stage
 pub const fn dageist_engine::allowed::Stage::name(self) -> &'static str
+pub enum dageist_engine::allowed::Unknown
+pub dageist_engine::allowed::Unknown::TheResultsDtype
+pub dageist_engine::allowed::Unknown::TheStartsDtype
+impl core::fmt::Display for dageist_engine::allowed::Unknown
+pub fn dageist_engine::allowed::Unknown::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub enum dageist_engine::allowed::Verdict
 pub dageist_engine::allowed::Verdict::Allowed(dageist_engine::allowed::Allowance)
 pub dageist_engine::allowed::Verdict::Refused(dageist_engine::allowed::Refusal)
@@ -114,7 +126,7 @@ pub const fn dageist_engine::allowed::Verdict::is_allowed(&self) -> bool
 pub const fn dageist_engine::allowed::Verdict::refusal(&self) -> core::option::Option<&dageist_engine::allowed::Refusal>
 pub struct dageist_engine::allowed::Allowance
 impl dageist_engine::allowed::Allowance
-pub fn dageist_engine::allowed::Allowance::can_end(&self) -> core::result::Result<(), &dageist_engine::allowed::Refusal>
+pub const fn dageist_engine::allowed::Allowance::can_end(&self) -> &dageist_engine::allowed::Ending
 pub const fn dageist_engine::allowed::Allowance::result(&self) -> core::option::Option<&dageist_engine::allowed::ResultDtype>
 pub const fn dageist_engine::allowed::Allowance::shape(&self) -> dageist_engine::allowed::Shape
 pub struct dageist_engine::allowed::Chosen<'a>

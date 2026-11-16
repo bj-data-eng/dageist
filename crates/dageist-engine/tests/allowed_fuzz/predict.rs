@@ -306,7 +306,7 @@ impl Walker<'_> {
         ) {
             OfferVerdict::Refused(refusal) => self.refused(&refusal),
             OfferVerdict::Allowed(allowance) => {
-                last_end = allowance.can_end().err().cloned();
+                last_end = allowance.can_end().refusal().cloned();
                 match start.entry().id().as_str() {
                     "polars.when" => {
                         cur = Cur::Condition {
@@ -460,7 +460,7 @@ impl Walker<'_> {
             }
             OfferVerdict::Allowed(allowance) => allowance,
         };
-        *last_end = allowance.can_end().err().cloned();
+        *last_end = allowance.can_end().refusal().cloned();
         let statement = arguments
             .iter()
             .find(|(name, _)| name == "statement")

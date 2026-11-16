@@ -174,12 +174,60 @@ impl fmt::Display for Refusal {
 
 impl std::error::Error for Refusal {}
 
+/// Why whether an expression may end is not known.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Unknown {
+    /// A start takes the dtype of a column or of a literal, which its arguments
+    /// decide, and the table measured it with one argument.
+    TheStartsDtype,
+    /// A dtype that is needed is not known: the argument that decides what a
+    /// method gives is not chosen.
+    TheResultsDtype,
+}
+
+impl fmt::Display for Unknown {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::TheStartsDtype => "the dtype of the start is not given",
+            Self::TheResultsDtype => "the dtype that the arguments decide is not known",
+        })
+    }
+}
+
+/// Whether an expression may end after an entry, in the context it stands in.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Ending {
+    /// It may.
+    Allowed,
+    /// It may not, for this reason.
+    Refused(Refusal),
+    /// What the tables and the rules hold does not say.
+    NotKnown(Unknown),
+}
+
+impl Ending {
+    /// Whether it may end there.
+    #[must_use]
+    pub const fn is_allowed(&self) -> bool {
+        matches!(self, Self::Allowed)
+    }
+
+    /// The refusal, when it may not.
+    #[must_use]
+    pub const fn refusal(&self) -> Option<&Refusal> {
+        match self {
+            Self::Refused(refusal) => Some(refusal),
+            _ => None,
+        }
+    }
+}
+
 /// What an entry that may stand at a place gives.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Allowance {
     result: Option<ResultDtype>,
     shape: Shape,
-    cannot_end: Option<Refusal>,
+    ending: Ending,
 }
 
 impl Allowance {
@@ -202,13 +250,12 @@ impl Allowance {
     /// that cannot end it may be followed by one that can: an entry that may
     /// not end a chain may still stand.
     ///
-    /// # Errors
-    ///
-    /// The rule that the expression, ended here, would break, or else the
-    /// reason Polars refused the entry ending a chain in this context, as the
-    /// table of contexts recorded it.
-    pub fn can_end(&self) -> Result<(), &Refusal> {
-        self.cannot_end.as_ref().map_or(Ok(()), Err)
+    /// A refusal is the rule that the expression, ended here, would break, or
+    /// else the reason Polars refused the entry ending a chain in this context,
+    /// as the table of contexts recorded it.
+    #[must_use]
+    pub const fn can_end(&self) -> &Ending {
+        &self.ending
     }
 }
 
@@ -488,17 +535,17 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     }
     // Whether it may also end the chain there: a rule first, so that its words
     // explain the refusal, then what Polars said of an entry that ends.
-    let cannot_end = match Rule::forbids_end(place.context, result.as_ref(), shape) {
-        Some(rule) => Some(Refusal::rule(rule)),
+    let ending = match Rule::forbids_end(place.context, result.as_ref(), shape) {
+        Some(rule) => Ending::Refused(Refusal::rule(rule)),
         None => match &ends {
-            Outcome::Refused(reason) => Some(Refusal::polars(reason)),
-            Outcome::Allowed(_) => None,
+            Outcome::Refused(reason) => Ending::Refused(Refusal::polars(reason)),
+            Outcome::Allowed(_) => Ending::Allowed,
         },
     };
     Ok(Allowance {
         result,
         shape,
-        cannot_end,
+        ending,
     })
 }
 
