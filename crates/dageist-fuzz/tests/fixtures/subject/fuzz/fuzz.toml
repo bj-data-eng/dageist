@@ -1,0 +1,44 @@
+schema = 1
+fixtures = ["seeds", "regressions"]
+
+[[targets]]
+id = "dageist-fixture::bytes"
+owner = "dageist-fixture"
+binary = "fixture-worker"
+properties = ["dageist-fixture::byte-count"]
+source_references = ["src/lib.rs#reported_bytes"]
+format = { identity = "dageist-fixture::bytes", revision = 1 }
+generator_identity = { identity = "dageist-fixture::bytes", revision = 1 }
+encoding = "raw-bytes"
+limits = { bytes = 4096, nodes = 0, depth = 0, text_units = 0, operations = 0 }
+requirements = { features = [], capabilities = ["replay", "case-capture"] }
+min_evaluated = 1
+max_generation_rejections = 0
+
+[[targets]]
+id = "dageist-fixture::streaming"
+owner = "dageist-fixture"
+binary = "fixture-streaming-worker"
+properties = ["dageist-fixture::streaming-byte-count"]
+source_references = ["src/lib.rs#reported_bytes"]
+format = { identity = "dageist-fixture::streaming", revision = 1 }
+generator_identity = { identity = "dageist-fixture::streaming", revision = 1 }
+encoding = "structured"
+limits = { bytes = 4096, nodes = 0, depth = 0, text_units = 0, operations = 0 }
+requirements = { features = [], capabilities = ["replay", "case-capture"] }
+min_evaluated = 1
+max_generation_rejections = 0
+
+[[targets]]
+id = "dageist-fixture::structured"
+owner = "dageist-fixture"
+binary = "fixture-structured-worker"
+properties = ["dageist-fixture::unit-count", "dageist-fixture::rejection-atomicity"]
+source_references = ["src/lib.rs#reported_units", "src/lib.rs#use_node"]
+format = { identity = "dageist-fixture::structured", revision = 1 }
+generator_identity = { identity = "dageist-fixture::structured", revision = 1 }
+encoding = "structured"
+limits = { bytes = 4096, nodes = 8, depth = 8, text_units = 8, operations = 8 }
+requirements = { features = [], capabilities = ["replay", "case-capture"] }
+min_evaluated = 1
+max_generation_rejections = 0

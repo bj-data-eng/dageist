@@ -28,6 +28,7 @@ resolver = "3"
 default-members = ["."]
 members = [
     "crates/dageist-engine",
+    "crates/dageist-fuzz",
     "crates/dageist-tauri",
 ]
 # Vendored sources keep their own workspaces; Polars' crates inherit from Polars' root manifest.
