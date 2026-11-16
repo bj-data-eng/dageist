@@ -1553,6 +1553,55 @@ mod tests {
     }
 
     #[test]
+    fn a_running_sum_of_a_comparison_with_a_null_leaves_only_nulls() {
+        // `f > null` then `cum_sum` then `== b`: Polars meets the call with a
+        // column of nulls and does not refuse the dtype the tables refuse when
+        // they run rows. Another running value, a comparison with no running sum,
+        // a running sum of what is not a comparison with a null, and a refusal of
+        // the schema, are refused.
+        let item = |links: Vec<Call>| {
+            let mut all = links;
+            all.push(compared_with("Expr.eq", chain(column("b"), &[])));
+            select(vec![chain_of(column("f"), all)])
+        };
+        let null_comparison = || compared_with("Expr.gt", chain(null(), &[]));
+        let sum = || call("Expr.cum_sum", Vec::new());
+        let case = item(vec![null_comparison(), sum()]);
+        assert_eq!(
+            tables_refuse(&case, link_of("exprs", 0, 2), ROWS, "no"),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        assert_eq!(
+            tables_refuse(
+                &case,
+                link_of("exprs", 0, 2),
+                Some(TableStage::Schema),
+                "no"
+            ),
+            vec![]
+        );
+        for (name, links) in [
+            (
+                "another running value",
+                vec![null_comparison(), call("Expr.cum_max", Vec::new())],
+            ),
+            ("no running sum", vec![null_comparison()]),
+            (
+                "a comparison with a value",
+                vec![compared_with("Expr.gt", chain(literal(), &[])), sum()],
+            ),
+            ("a running sum alone", vec![sum()]),
+        ] {
+            let at = links.len();
+            assert_eq!(
+                tables_refuse(&item(links), link_of("exprs", 0, at), ROWS, "no"),
+                vec![],
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
     fn what_a_shift_leaves_null_excuses_the_tables_refusing_a_call_it_is_given_to() {
         // `b.first().shift()` is a null, and `k.shift().first()` is the null
         // that the shift left first: a comparison with either is met with
