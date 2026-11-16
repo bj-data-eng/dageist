@@ -10,7 +10,8 @@ use crate::allowed::dtype::ResultDtype;
 use crate::allowed::offers::RefusalSource;
 use crate::allowed::{
     After, Chosen, ConditionState, Context, Ending, Nested, Outer, Place, Position, Representative,
-    Rule, Shape, Stage, Unknown, Verdict, offer, offers, options, rule_forbids_mixed_key,
+    Rule, Shape, Stage, Unknown, Verdict, offer, offers, options,
+    rule_forbids_a_key_known_not_elementwise,
 };
 use crate::catalog;
 
@@ -176,7 +177,7 @@ fn a_key_with_a_single_value_beside_a_column_is_refused_by_a_rule_only_in_a_join
         Context::step(Outer::JoinLeft),
         Context::step(Outer::JoinRight),
     ] {
-        let refusal = rule_forbids_mixed_key(context).expect_err("a key");
+        let refusal = rule_forbids_a_key_known_not_elementwise(context).expect_err("a key");
         assert_eq!(
             refusal.source(),
             RefusalSource::Rule(Rule::KeyIsElementwise),
@@ -196,7 +197,10 @@ fn a_key_with_a_single_value_beside_a_column_is_refused_by_a_rule_only_in_a_join
         Context::inside(Outer::JoinLeft, Nested::ConditionValue),
         Context::inside(Outer::Select, Nested::ConditionPredicate),
     ] {
-        assert!(rule_forbids_mixed_key(context).is_ok(), "{context}");
+        assert!(
+            rule_forbids_a_key_known_not_elementwise(context).is_ok(),
+            "{context}"
+        );
     }
 
     // Polars, by hand: a key that adds an aggregate to a column is

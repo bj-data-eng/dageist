@@ -118,7 +118,7 @@ impl Rule {
     /// does. Whether the key holds one is a
     /// matter of the whole expression, which the caller found.
     #[must_use]
-    pub(super) fn forbids_mixed_key(context: Context) -> Option<Self> {
+    pub(super) fn forbids_non_elementwise_key(context: Context) -> Option<Self> {
         context.is_join_key().then_some(Self::KeyIsElementwise)
     }
 

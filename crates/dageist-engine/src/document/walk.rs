@@ -29,30 +29,11 @@ use super::error::{Place, Segment};
 use super::inputs::Inputs;
 use super::model::{Call, Expression, Start, Step, Value};
 
-/// Whether Polars evaluates a part of an expression, as far as a null decides
-/// it. Polars folds a comparison with a null literal into a null, and never
-/// evaluates what the fold follows or is given, so what it refuses of such a part
-/// it does not refuse, and the editor can say that the part is never evaluated.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Evaluation {
-    /// Polars evaluates it, as far as a null is concerned.
-    Evaluated,
-    /// It is a comparison that Polars folds into a null: with a null literal,
-    /// with a null that an expression folds to, or following one.
-    Folded,
-    /// Polars never evaluates it, because a fold reaches it: what a folded
-    /// comparison follows, or is given.
-    Dropped,
-    /// It follows a fold, so it is met with a null.
-    OnANull,
-}
-
 /// A call of an expression: what it follows, and whether it may stand there.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Standing {
     follows: Option<After>,
     verdict: Option<Verdict>,
-    evaluation: Evaluation,
 }
 
 impl Standing {
@@ -60,14 +41,7 @@ impl Standing {
         Self {
             follows: None,
             verdict: None,
-            evaluation: Evaluation::Evaluated,
         }
-    }
-
-    /// Whether Polars evaluates the call, as far as a null decides it.
-    #[must_use]
-    pub const fn evaluation(&self) -> Evaluation {
-        self.evaluation
     }
 
     /// What the call follows: nothing for a start, otherwise the value or the
@@ -96,8 +70,6 @@ pub struct WalkedExpression {
     calls: Vec<Standing>,
     next: Option<After>,
     ending: Option<Ending>,
-    evaluation: Evaluation,
-    folds_a_null: bool,
 }
 
 impl WalkedExpression {
@@ -135,22 +107,6 @@ impl WalkedExpression {
         follows
             .map(|after| Some(OfferPlace::new(self.context?, after?)))
             .collect()
-    }
-
-    /// Whether Polars evaluates the expression as a whole: it never does where
-    /// a fold reaches an expression that holds it ([`Evaluation::Dropped`]), and
-    /// it folds it into a null where its last call is folded
-    /// ([`Evaluation::Folded`]).
-    #[must_use]
-    pub const fn evaluation(&self) -> Evaluation {
-        self.evaluation
-    }
-
-    /// Whether the expression holds, at any depth, a comparison with a null
-    /// literal, which Polars folds into a null.
-    #[must_use]
-    pub const fn folds_a_null(&self) -> bool {
-        self.folds_a_null
     }
 
     /// Whether the expression may end where it does, when a position holds it
@@ -218,32 +174,6 @@ impl Walk {
     pub fn not_known(&self) -> Option<&str> {
         self.not_known.as_deref()
     }
-
-    /// How Polars treats the part of the step at `place`, as far as a null
-    /// decides it: the call there, or the expression, or the innermost
-    /// expression that holds it. A part that no fold reaches is evaluated.
-    #[must_use]
-    pub fn evaluation_at(&self, place: &Place) -> Evaluation {
-        let path = place.path();
-        let Some(holder) = self
-            .expressions
-            .iter()
-            .filter(|walked| path.starts_with(walked.place().path()))
-            .max_by_key(|walked| walked.place().path().len())
-        else {
-            return Evaluation::Evaluated;
-        };
-        if holder.evaluation == Evaluation::Dropped {
-            return Evaluation::Dropped;
-        }
-        let call = |at: usize| holder.calls.get(at).map(Standing::evaluation);
-        match path.get(holder.place().path().len()) {
-            Some(Segment::Start) => call(0),
-            Some(Segment::Link(at)) => call(at + 1),
-            _ => None,
-        }
-        .unwrap_or(holder.evaluation)
-    }
 }
 
 impl Step {
@@ -271,7 +201,7 @@ impl Step {
             refusal: None,
             not_known: None,
         };
-        walker.arguments(self.call(), false, false);
+        walker.arguments(self.call(), false);
         walker.step_options(self.call());
         Walk {
             expressions: walker.walked,
@@ -423,12 +353,7 @@ impl Walker<'_> {
     /// has, by the parameter that holds it. `values_end` says whether the values
     /// of a condition that `call` is a link of end the predicate: the condition
     /// is all the expression is.
-    fn arguments(
-        &mut self,
-        call: &Call,
-        values_end: bool,
-        dropped: bool,
-    ) -> Vec<(String, Operand)> {
+    fn arguments(&mut self, call: &Call, values_end: bool) -> Vec<(String, Operand)> {
         let entry = call.entry().id().as_str();
         let mut found = Vec::new();
         for given in call.arguments() {
@@ -447,7 +372,6 @@ impl Walker<'_> {
                 given.value(),
                 given.parameter(),
                 slot.is_some().then_some(ends),
-                dropped,
                 &mut found,
             );
             if slot.is_some() {
@@ -463,28 +387,27 @@ impl Walker<'_> {
         value: &Value,
         parameter: &str,
         held: Option<bool>,
-        dropped: bool,
         found: &mut Vec<(String, Operand)>,
     ) {
         match value {
             Value::Expression(expression) => {
-                let operand = self.expression(expression, held, dropped);
+                let operand = self.expression(expression, held);
                 found.push((parameter.to_owned(), operand));
             }
             Value::Many(items) => {
                 for (at, item) in items.iter().enumerate() {
                     self.path.push(Segment::Item(at));
-                    self.value(item, parameter, held, dropped, found);
+                    self.value(item, parameter, held, found);
                     self.path.pop();
                 }
             }
             Value::Pairs(pairs) => {
                 for (at, (key, entry)) in pairs.iter().enumerate() {
                     self.path.push(Segment::Key(at));
-                    self.value(key, parameter, held, dropped, found);
+                    self.value(key, parameter, held, found);
                     self.path.pop();
                     self.path.push(Segment::Value(at));
-                    self.value(entry, parameter, held, dropped, found);
+                    self.value(entry, parameter, held, found);
                     self.path.pop();
                 }
             }
@@ -553,31 +476,7 @@ impl Walker<'_> {
 
     /// Walks `expression`, which a position holds when `held` says whether it ends
     /// the predicate there, and which is an argument of a call otherwise.
-    fn expression(
-        &mut self,
-        expression: &Expression,
-        held: Option<bool>,
-        dropped: bool,
-    ) -> Operand {
-        // The last call that a fold reaches: it and what it follows, with what
-        // they are given, are never evaluated.
-        let reach = reaching_link(expression);
-        let folds = folds_a_null(expression);
-        let evaluation = if dropped {
-            Evaluation::Dropped
-        } else if reach.is_some_and(|at| at + 1 == expression.links().len()) {
-            Evaluation::Folded
-        } else {
-            Evaluation::Evaluated
-        };
-        // How the call `at` (the start is 0) is evaluated.
-        let call_evaluation = |at: usize| match (dropped, reach) {
-            (true, _) => Evaluation::Dropped,
-            (false, None) => Evaluation::Evaluated,
-            (false, Some(last)) if at <= last => Evaluation::Dropped,
-            (false, Some(last)) if at == last + 1 => Evaluation::Folded,
-            (false, Some(_)) => Evaluation::OnANull,
-        };
+    fn expression(&mut self, expression: &Expression, held: Option<bool>) -> Operand {
         // The values of a condition end the predicate where the condition is
         // all the expression is: a method that goes on from it is what ends it.
         let values_end = held == Some(true)
@@ -600,7 +499,7 @@ impl Walker<'_> {
         match expression.start() {
             Start::Call(start) => {
                 self.path.push(Segment::Start);
-                start_arguments = self.arguments(start, values_end, dropped || reach.is_some());
+                start_arguments = self.arguments(start, values_end);
                 self.path.pop();
             }
             Start::Input(_) => self.blind("a connected input starts the chain"),
@@ -613,8 +512,6 @@ impl Walker<'_> {
                 calls,
                 next: None,
                 ending: None,
-                evaluation,
-                folds_a_null: folds,
             });
             return unsaid;
         };
@@ -662,15 +559,11 @@ impl Walker<'_> {
                 calls.push(Standing {
                     follows: Some(After::Start),
                     verdict: Some(verdict),
-                    evaluation: call_evaluation(0),
                 });
                 self.path.pop();
             }
             Start::Input(_) => {
-                calls.push(Standing {
-                    evaluation: call_evaluation(0),
-                    ..Standing::not_asked()
-                });
+                calls.push(Standing::not_asked());
                 cur = Cur::Value {
                     dtype: None,
                     shape: Shape::Many,
@@ -691,11 +584,7 @@ impl Walker<'_> {
             statements.len() > 1 && statements.windows(2).all(|pair| pair[0] == pair[1]);
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
-            let arguments = self.arguments(
-                link,
-                values_end,
-                dropped || reach.is_some_and(|last| at <= last),
-            );
+            let arguments = self.arguments(link, values_end);
             let (next, standing) = self.link(
                 link,
                 &arguments,
@@ -705,10 +594,7 @@ impl Walker<'_> {
                 branches_are_one,
             );
             cur = next;
-            calls.push(Standing {
-                evaluation: call_evaluation(at + 1),
-                ..standing
-            });
+            calls.push(standing);
             self.path.pop();
         }
         let mut ending = None;
@@ -729,7 +615,7 @@ impl Walker<'_> {
             // compared with a null, is not elementwise, which only the whole key
             // shows.
             if is_not_elementwise(expression)
-                && let Err(refusal) = allowed::rule_forbids_mixed_key(context)
+                && let Err(refusal) = allowed::rule_forbids_a_key_known_not_elementwise(context)
             {
                 self.refuse(&refusal, true);
                 ending = Some(Ending::Refused(refusal));
@@ -752,8 +638,6 @@ impl Walker<'_> {
             calls,
             next,
             ending,
-            evaluation,
-            folds_a_null: folds,
         });
         match cur {
             Cur::Value { dtype, shape } => Operand {
@@ -839,7 +723,6 @@ impl Walker<'_> {
             let standing = Standing {
                 follows: Some(after),
                 verdict: Some(verdict.clone()),
-                evaluation: Evaluation::Evaluated,
             };
             if let Verdict::Refused(refusal) = &verdict {
                 self.refuse(refusal, false);
@@ -893,7 +776,6 @@ impl Walker<'_> {
         let standing = Standing {
             follows: Some(after),
             verdict: Some(verdict.clone()),
-            evaluation: Evaluation::Evaluated,
         };
         let allowance = match &verdict {
             Verdict::Refused(refusal) => {
@@ -1069,41 +951,28 @@ fn folds_a_null_before(expression: &Expression, upto: usize) -> bool {
         .any(|call| operands(call).into_iter().any(folds_a_null))
 }
 
-/// Whether the link `at` of an expression is one that a null reaches: Polars
-/// folds it into a null, and takes with it what it follows and is given. A
-/// comparison is reached where it is given a null or what folds into one, follows
-/// a fold, or starts from a null. A subtraction only where it is given a null
-/// literal, for what follows a fold evaluates the argument of a subtraction. What
-/// Polars folds depends on dtypes, so any fold that can reach a comparison counts.
+/// Whether the comparison `at` of an expression is one that a null reaches:
+/// Polars folds it into a null. It is reached where it is given a null or what
+/// folds into one, follows a fold, or starts from a null. What Polars folds
+/// depends on dtypes, so any fold that can reach a comparison counts.
 fn is_reached_by_a_null(expression: &Expression, at: usize) -> bool {
-    let link = &expression.links()[at];
-    if link.entry().id().as_str() == "Expr.sub" {
-        return operands(link).into_iter().any(is_a_null);
-    }
-    is_a_comparison(link)
-        && (operands(link)
+    is_a_comparison(&expression.links()[at])
+        && (operands(&expression.links()[at])
             .into_iter()
             .any(|operand| is_a_null(operand) || folds_a_null(operand))
             || (starts_from_a_null(expression) && at == 0)
             || folds_a_null_before(expression, at))
 }
 
-/// The last link of an expression that a null reaches: it, what it follows and
-/// what they are given are never evaluated.
-fn reaching_link(expression: &Expression) -> Option<usize> {
+/// The last comparison of an expression that a null reaches. Where a join's key
+/// is judged elementwise, Polars drops what such a comparison follows and is
+/// given, when that is one value or literals alone, and does not drop what a
+/// subtraction with a null does: the key `k != f.len() - null` is not
+/// elementwise.
+fn reaching_comparison(expression: &Expression) -> Option<usize> {
     (0..expression.links().len())
         .rev()
         .find(|at| is_reached_by_a_null(expression, *at))
-}
-
-/// The last comparison of an expression that a null reaches. Where a join's key
-/// is judged elementwise, Polars drops what a comparison with a null follows and
-/// is given, and does not drop what a subtraction with a null does: the key
-/// `k != f.len() - null` is not elementwise.
-fn reaching_comparison(expression: &Expression) -> Option<usize> {
-    (0..expression.links().len()).rev().find(|at| {
-        is_a_comparison(&expression.links()[*at]) && is_reached_by_a_null(expression, *at)
-    })
 }
 
 /// Whether an expression holds an aggregate that Polars evaluates. A comparison

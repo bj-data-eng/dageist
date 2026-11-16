@@ -778,18 +778,18 @@ pub fn rule_forbids(entry: &Entry, context: Context) -> Result<(), Refusal> {
     Rule::forbids(entry.id().as_str(), context).map_or(Ok(()), |rule| Err(Refusal::rule(rule)))
 }
 
-/// The refusal of a key that holds an aggregate beside a column, or a column
-/// compared with a null, where `context` holds one of a join's own keys, if the
-/// rule refuses it there. Polars accepts an aggregate in the key of a window,
-/// and a null literal beside a column that is not compared. What a key holds is
-/// a matter of the whole expression, not of one entry, so the caller finds it
-/// and asks.
+/// The refusal of a key that the caller has already found is not elementwise, as
+/// it holds an aggregate beside a column, or a column compared with a null,
+/// where `context` holds one of a join's own keys, if the rule refuses it there.
+/// Polars accepts such a key in a window, so the rule is silent there. What a
+/// key holds is a matter of the whole expression, not of one entry, so the
+/// caller finds it, and this does not.
 ///
 /// # Errors
 ///
 /// The rule, as a refusal that says it in its words.
-pub fn rule_forbids_mixed_key(context: Context) -> Result<(), Refusal> {
-    Rule::forbids_mixed_key(context).map_or(Ok(()), |rule| Err(Refusal::rule(rule)))
+pub fn rule_forbids_a_key_known_not_elementwise(context: Context) -> Result<(), Refusal> {
+    Rule::forbids_non_elementwise_key(context).map_or(Ok(()), |rule| Err(Refusal::rule(rule)))
 }
 
 /// Every entry that stands in an expression, offered or refused at `place`.
