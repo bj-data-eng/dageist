@@ -851,6 +851,24 @@ fn a_fold_drops_an_aggregate_only_from_a_side_that_is_one_value_or_literals() {
 }
 
 #[test]
+fn an_aggregate_that_the_first_fold_drops_stays_dropped_for_the_comparisons_after_it() {
+    // `a.len() <= null == h <= h`: the first comparison folds into a null and
+    // drops the aggregate it follows, which is one value, and the comparisons
+    // that follow compare a null, so the key is no more refused for the aggregate
+    // than `a.len() <= null` is.
+    let key = field_then(
+        "a",
+        vec![
+            call("Expr.len", json!({})),
+            compared("Expr.le", null()),
+            compared("Expr.eq", field("h")),
+            compared("Expr.le", field("h")),
+        ],
+    );
+    assert_eq!(joined_on(key), None);
+}
+
+#[test]
 fn a_comparison_of_an_aggregate_with_a_null_is_no_comparison_of_a_column() {
     // `f.first() == null` is one value, and what is compared with it is a column
     // compared with a value that is not null.
