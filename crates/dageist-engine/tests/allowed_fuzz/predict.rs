@@ -44,6 +44,9 @@ pub struct Refused {
     pub at: String,
     /// Where, in the document.
     pub place: Place,
+    /// The stage at which Polars refused it, as the tables recorded it, when
+    /// Polars did.
+    pub stage: Option<allowed::Stage>,
     pub reason: String,
 }
 
@@ -67,12 +70,20 @@ pub struct Traced {
     pub nested: usize,
     pub start: Option<Representative>,
     pub links: Vec<Option<Representative>>,
+    /// Whether the dtype after the last link is one the tables gave, and not one
+    /// the walk worked out: a start has the dtype of its column, and a condition
+    /// the dtype of its values, which [`allowed::offer`] is not told.
+    pub told: bool,
 }
 
 #[derive(Debug, Clone)]
 pub struct Prediction {
     pub verdict: Verdict,
     pub expressions: Vec<Traced>,
+    /// Whether a call was given an option that changes what a method gives, so
+    /// that the dtype after it is not predicted (`over`'s `mapping_strategy` as
+    /// `join`, `dt.total_days`'s `fractional`, which `offer` is not told).
+    pub stopped_by_options: bool,
 }
 
 /// What a chain has so far.
@@ -98,6 +109,9 @@ struct Walker<'a> {
     traced: Vec<Traced>,
     refusal: Option<Refused>,
     undetermined: Option<String>,
+    stopped_by_options: bool,
+    /// Whether the last call walked gave its dtype from the tables.
+    told: bool,
 }
 
 pub fn predict(case: &Case) -> Prediction {
@@ -110,6 +124,8 @@ pub fn predict(case: &Case) -> Prediction {
         traced: Vec::new(),
         refusal: None,
         undetermined: None,
+        stopped_by_options: false,
+        told: false,
     };
     walker.arguments(step.call());
     walker.options(step.call());
@@ -122,6 +138,7 @@ pub fn predict(case: &Case) -> Prediction {
     Prediction {
         verdict,
         expressions: walker.traced,
+        stopped_by_options: walker.stopped_by_options,
     }
 }
 
@@ -144,12 +161,13 @@ impl Walker<'_> {
             .fold(self.base.clone(), Place::then)
     }
 
-    fn refuse(&mut self, source: Source, reason: String) {
+    fn refuse(&mut self, source: Source, stage: Option<allowed::Stage>, reason: String) {
         if self.refusal.is_none() {
             self.refusal = Some(Refused {
                 source,
                 at: self.here().to_string(),
                 place: self.here(),
+                stage,
                 reason,
             });
         }
@@ -182,12 +200,7 @@ impl Walker<'_> {
             .map(|(name, word)| (*name, word.as_str()))
             .collect();
         if let Err(refusal) = allowed::options(entry, &chosen) {
-            let source = match refusal.source() {
-                RefusalSource::Polars(_) => Source::Polars,
-                RefusalSource::Rule(rule) => Source::Rule(rule.name()),
-                RefusalSource::Structure => Source::Silent,
-            };
-            self.refuse(source, refusal.reason().to_owned());
+            self.refused(&refusal);
         }
     }
 
@@ -271,7 +284,7 @@ impl Walker<'_> {
         let place = self.here();
         let context = Context::from_positions(&self.slots);
         let mut start_class = None;
-        let mut last_end: Option<String> = None;
+        let mut last_end: Option<allowed::Refusal> = None;
         let mut cur = Cur::Dead;
         let Start::Call(start) = expression.start() else {
             self.blind("a connected input starts the chain");
@@ -289,7 +302,7 @@ impl Walker<'_> {
         match allowed::offer(start.entry(), &OfferPlace::new(context, After::Start), &[]) {
             OfferVerdict::Refused(refusal) => self.refused(&refusal),
             OfferVerdict::Allowed(allowance) => {
-                last_end = allowance.can_end().err().map(|refusal| refusal.to_string());
+                last_end = allowance.can_end().err().cloned();
                 match start.entry().id().as_str() {
                     "polars.when" => {
                         cur = Cur::Condition {
@@ -314,6 +327,7 @@ impl Walker<'_> {
             }
         }
         self.path.pop();
+        self.told = false;
         let mut links: Vec<Option<Representative>> = Vec::new();
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
@@ -328,9 +342,9 @@ impl Walker<'_> {
         }
         if held
             && !matches!(cur, Cur::Dead)
-            && let Some(reason) = last_end
+            && let Some(refusal) = last_end
         {
-            self.refuse_by_end(&reason);
+            self.refuse_by_end(&refusal);
         }
         self.traced.push(Traced {
             place,
@@ -341,6 +355,7 @@ impl Walker<'_> {
                 .count(),
             start: start_class,
             links,
+            told: self.told,
         });
         match cur {
             Cur::Value { dtype, .. } => dtype,
@@ -350,22 +365,27 @@ impl Walker<'_> {
     }
 
     fn refused(&mut self, refusal: &allowed::Refusal) {
-        let source = match refusal.source() {
-            RefusalSource::Polars(_) => Source::Polars,
-            RefusalSource::Rule(rule) => Source::Rule(rule.name()),
-            RefusalSource::Structure => Source::Silent,
+        let (source, stage) = match refusal.source() {
+            RefusalSource::Polars(stage) => (Source::Polars, Some(stage)),
+            RefusalSource::Rule(rule) => (Source::Rule(rule.name()), None),
+            RefusalSource::Structure => (Source::Silent, None),
         };
-        self.refuse(source, refusal.reason().to_owned());
+        self.refuse(source, stage, refusal.reason().to_owned());
     }
 
-    fn refuse_by_end(&mut self, reason: &str) {
-        // The reason says whether it is a rule's words or Polars': a rule's
-        // statement is one of the named rules'.
-        let source = allowed::Rule::ALL
-            .into_iter()
-            .find(|rule| rule.statement() == reason)
-            .map_or(Source::Polars, |rule| Source::Rule(rule.name()));
-        self.refuse(source, format!("it cannot end here: {reason}"));
+    /// The expression may not end where it does: a rule's words, or Polars' as
+    /// the table of contexts recorded it for a chain that ends.
+    fn refuse_by_end(&mut self, refusal: &allowed::Refusal) {
+        let (source, stage) = match refusal.source() {
+            RefusalSource::Polars(stage) => (Source::Polars, Some(stage)),
+            RefusalSource::Rule(rule) => (Source::Rule(rule.name()), None),
+            RefusalSource::Structure => (Source::Silent, None),
+        };
+        self.refuse(
+            source,
+            stage,
+            format!("it cannot end here: {}", refusal.reason()),
+        );
     }
 
     fn link(
@@ -374,7 +394,7 @@ impl Walker<'_> {
         arguments: Vec<(String, Option<Representative>)>,
         context: Context,
         cur: Cur,
-        last_end: &mut Option<String>,
+        last_end: &mut Option<allowed::Refusal>,
     ) -> Cur {
         let entry: &'static Entry = link.entry();
         let after = match &cur {
@@ -430,7 +450,7 @@ impl Walker<'_> {
             }
             OfferVerdict::Allowed(allowance) => allowance,
         };
-        *last_end = allowance.can_end().err().map(|refusal| refusal.to_string());
+        *last_end = allowance.can_end().err().cloned();
         let statement = arguments
             .iter()
             .find(|(name, _)| name == "statement")
@@ -448,6 +468,8 @@ impl Walker<'_> {
                         link.argument("mapping_strategy"),
                         Some(Value::Choice(word)) if word == "join"
                     ) || matches!(link.argument("fractional"), Some(Value::Flag(Some(true))));
+                self.stopped_by_options |= changed;
+                self.told = allowance.result().is_some() && !changed;
                 let dtype = allowance
                     .result()
                     .and_then(allowed::ResultDtype::class)
@@ -458,6 +480,7 @@ impl Walker<'_> {
                 }
             }
             (Applies::Condition, Cur::Condition { mut values, .. }) => {
+                self.told = false;
                 let next = match entry.id().as_str() {
                     "When.then" => {
                         values.push(statement);
