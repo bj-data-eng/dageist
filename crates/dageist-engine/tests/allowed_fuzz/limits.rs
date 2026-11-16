@@ -56,9 +56,9 @@ pub enum Limit {
     /// inside a sort key that is one value, or inside an expression with a `len`
     /// in it, which Polars allows. What the tables say of a method's dtype was
     /// measured in `select` on a column. Of the named rules it excuses only the
-    /// refusal of a predicate inside a sort key that is one value, and of a later
-    /// predicate of a condition that a literal predicate decides, with a `len`
-    /// after it.
+    /// refusal of a predicate inside a sort key or a window's `order_by` that is
+    /// one value, and of a later predicate of a condition that a literal
+    /// predicate decides, with a `len` after it.
     AnAggregateGivesOneValue,
     /// A pivot's aggregate is run on the values of each group, not on a
     /// column in `select`, and Polars uses other kernels for them: it takes the
@@ -781,13 +781,28 @@ fn leaves_only_nulls(links: &[Call]) -> bool {
     shifted >= rows
 }
 
+/// Whether the expression at `place` is what the parameter `name` of a call is
+/// given.
+fn held_by(place: &Place, name: &str) -> bool {
+    place
+        .path()
+        .iter()
+        .rev()
+        .find_map(|segment| match segment {
+            Segment::Parameter(held) => Some(held == name),
+            _ => None,
+        })
+        .unwrap_or(false)
+}
+
 /// Whether the limit is why Polars allows what the named rule refuses. A limit
 /// excuses a rule only for a cause it names, and the evidence for each is a
 /// campaign case and a replay of it without the cause: a fold of a null drops
 /// the predicate, which the walk says ([`Walk::evaluation_at`]); a sort key that
-/// is one value is dropped, and Polars refuses the same key in `select`; and a
-/// condition that a literal predicate decides, with a `len` after it, does not
-/// read its later predicates.
+/// is one value, or a window's `order_by` that is, is dropped, and Polars
+/// refuses the same key elsewhere or when it is not one value; and a condition
+/// that a literal predicate decides, with a `len` after it, does not read its
+/// later predicates.
 fn applies_to_a_rule(
     limit: Limit,
     rule: &str,
@@ -805,12 +820,19 @@ fn applies_to_a_rule(
         }
         Limit::AnAggregateGivesOneValue => {
             let locus = locate(case, &refused.place);
-            // A sort key that is one value is dropped, so no predicate in it is
-            // evaluated; a window's key is evaluated, and is not this.
-            let dropped = is(case.document.steps()[0].call(), "LazyFrame.sort")
+            // A sort key that is one value is dropped, and so is a window's
+            // `order_by` that is one value, so no predicate in it is evaluated;
+            // the `partition_by` and `more_exprs` of a window are evaluated.
+            let sort_key = is(case.document.steps()[0].call(), "LazyFrame.sort")
                 && locus
                     .top
                     .is_some_and(|top| wholly_single(top, top.links().len(), true));
+            let order_by = keys(case, false).iter().any(|(place, key)| {
+                refused.place.path().starts_with(place.path())
+                    && held_by(place, "order_by")
+                    && wholly_single(key, key.links().len(), true)
+            });
+            let dropped = sort_key || order_by;
             predicate_rule
                 && (dropped
                     || locus
