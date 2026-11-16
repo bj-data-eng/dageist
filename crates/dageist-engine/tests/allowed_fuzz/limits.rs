@@ -1520,6 +1520,60 @@ mod tests {
     }
 
     #[test]
+    fn a_predicate_rule_is_excused_by_a_decided_condition_and_by_branches_that_are_one() {
+        // `when(pred).then(a).otherwise(b)`, and `then(a).otherwise(a)`.
+        let condition = |predicate: Expression, then: &str, otherwise: &str| {
+            chain_of(
+                call("polars.when", vec![("predicates", many(vec![predicate]))]),
+                vec![
+                    call(
+                        "When.then",
+                        vec![("statement", Value::Expression(chain(column(then), &[])))],
+                    ),
+                    call(
+                        "Then.otherwise",
+                        vec![(
+                            "statement",
+                            Value::Expression(chain(column(otherwise), &[])),
+                        )],
+                    ),
+                ],
+            )
+        };
+        let predicate = at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Start,
+            parameter("predicates"),
+            Segment::Item(0),
+        ]);
+        let rule = "condition-predicate-is-boolean";
+        // A predicate made of a literal decides the condition, and the other
+        // branch is dropped.
+        let decided = select(vec![condition(chain(literal(), &[]), "a", "b")]);
+        assert_eq!(
+            rule_refuses(&decided, predicate.clone(), rule, "a rule"),
+            vec![Limit::ADecidedCondition]
+        );
+        // Values that are one expression make the predicate dropped.
+        let one = select(vec![condition(chain(column("g"), &[]), "a", "a")]);
+        assert_eq!(
+            rule_refuses(&one, predicate.clone(), rule, "a rule"),
+            vec![Limit::TheBranchesAreOne]
+        );
+        // Neither, and another rule.
+        let neither = select(vec![condition(chain(column("g"), &[]), "a", "b")]);
+        assert_eq!(
+            rule_refuses(&neither, predicate.clone(), rule, "a rule"),
+            vec![]
+        );
+        assert_eq!(
+            rule_refuses(&decided, predicate, "key-is-elementwise", "a rule"),
+            vec![]
+        );
+    }
+
+    #[test]
     fn a_rule_about_a_predicate_a_len_follows_is_excused_and_one_it_does_not_follow_is_not() {
         // `when(null).then(1).when(b).then(k).len()`: `len` does not read what it
         // counts, so the predicate `b` is not evaluated.

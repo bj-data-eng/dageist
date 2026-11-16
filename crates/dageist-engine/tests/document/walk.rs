@@ -758,6 +758,60 @@ fn a_comparison_of_an_aggregate_with_a_null_is_no_comparison_of_a_column() {
 }
 
 #[test]
+fn a_condition_whose_values_are_one_expression_has_the_shape_of_that_expression() {
+    // Polars simplifies `when(p).then(1).otherwise(1)` to `1`, and drops the
+    // predicate, whatever it gives: the condition is one value, so a window that
+    // joins after it is not known to give a list.
+    let literal = || {
+        chain(
+            call(
+                "polars.lit",
+                json!({ "value": { "integer": 1 }, "dtype": { "dtype": "UInt64" } }),
+            ),
+            vec![],
+        )
+    };
+    let condition = |otherwise: Value| {
+        chain(
+            call(
+                "polars.when",
+                json!({ "predicates": many(vec![field("f")]) }),
+            ),
+            vec![
+                call("When.then", json!({ "statement": literal() })),
+                call("Then.otherwise", json!({ "statement": otherwise })),
+                call(
+                    "Expr.over",
+                    json!({
+                        "partition_by": many(vec![field("k")]),
+                        "mapping_strategy": { "choice": "join" },
+                    }),
+                ),
+            ],
+        )
+    };
+    let places = |otherwise: Value| {
+        let walk = walk_of(
+            "LazyFrame.select",
+            json!({ "exprs": many(vec![condition(otherwise)]) }),
+        );
+        expression_at(&walk, &item("exprs", 0)).places()
+    };
+    // One expression twice: one value.
+    assert_eq!(places(literal()).last(), Some(&None));
+    // Two values: a value for each row, as the predicate is, and a list.
+    let other = chain(
+        call(
+            "polars.lit",
+            json!({ "value": { "integer": 2 }, "dtype": { "dtype": "UInt64" } }),
+        ),
+        vec![],
+    );
+    let many_values = places(other);
+    assert!(matches!(many_values.last(), Some(Some(_))));
+}
+
+#[test]
 fn a_condition_with_a_refused_predicate_gives_a_place_that_is_not_known() {
     // The shape of a condition is that of its parts, and a predicate that is
     // refused has none, so a window that joins after it is not known to give a
