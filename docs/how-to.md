@@ -351,9 +351,13 @@ first, so a case that does not return is found. To run one kept case again, and
 see what the tables predicted and Polars did, name its file:
 
 ```sh
-DAGEIST_FUZZ_REPLAY=target/tmp/allowed-fuzz/<file>.case cargo test --offline --locked \
+DAGEIST_FUZZ_REPLAY=$PWD/target/tmp/allowed-fuzz/<file>.case cargo test --offline --locked \
   -p dageist-engine --test allowed_fuzz replay_a_case -- --ignored --nocapture
 ```
+
+It prints the case, what the tables predicted of it and where, what Polars did and
+where, which limits excuse the difference if there is one, and the outcome. Name the
+file by its whole path, since the test runs from the crate's directory.
 
 A disagreement is a finding to settle, not to silence. Read it, run the case in
 Polars by hand, and decide which it is:
@@ -376,7 +380,8 @@ Polars by hand, and decide which it is:
 
 `DAGEIST_FUZZ_STRICT=1` makes the limits excuse nothing, which shows what each
 one would otherwise report. The tally printed with `--nocapture` counts the
-cases a limit excused, so a limit that excuses most of what a campaign makes
+cases a limit excused, and ends with the totals of the cases that agreed, that a limit excused, that a stricter
+rule refused and that disagreed, so a limit that excuses most of what a campaign makes
 shows.
 
 ## Check The Build Against The Polars Release

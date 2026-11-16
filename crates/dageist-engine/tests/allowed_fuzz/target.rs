@@ -59,13 +59,83 @@ fn tally(what: impl Into<String>) {
     TALLY.with(|tally| *tally.borrow_mut().entry(what.into()).or_default() += 1);
 }
 
-/// What was tallied on this thread since the last call, one line each.
+/// What was tallied on this thread since the last call, one line each, and the
+/// totals of cases that agreed, that a limit excused, that a named rule was
+/// stricter in, and that were disagreements.
 pub fn take_tally() -> Vec<String> {
-    TALLY
-        .with(|tally| std::mem::take(&mut *tally.borrow_mut()))
-        .into_iter()
+    let tallied = TALLY.with(|tally| std::mem::take(&mut *tally.borrow_mut()));
+    let total = |prefix: &str| -> u64 {
+        tallied
+            .iter()
+            .filter(|(what, _)| what.starts_with(prefix))
+            .map(|(_, count)| count)
+            .sum()
+    };
+    let totals = [
+        ("agreeing", total("agree:")),
+        ("excused by a limit", total("not covered")),
+        (
+            "refused by a rule that is stricter than Polars",
+            total("rule stricter"),
+        ),
+        ("disagreeing", total("disagreement:")),
+    ];
+    let mut lines: Vec<String> = tallied
+        .iter()
         .map(|(what, count)| format!("{count:>6}  {what}"))
-        .collect()
+        .collect();
+    lines.push("total:".to_owned());
+    lines.extend(
+        totals
+            .iter()
+            .map(|(what, count)| format!("{count:>6}  cases {what}")),
+    );
+    lines
+}
+
+/// What the tables predicted of the case, what Polars did, and which limits
+/// excuse the difference, in words.
+pub fn describe(case: &Case) -> String {
+    let prediction = predict(case);
+    let observed = observe(case);
+    let predicted = match &prediction.verdict {
+        Verdict::Allows => "the tables allow it".to_owned(),
+        Verdict::Refuses(refused) => format!(
+            "the tables refuse it at {} ({}): {}",
+            refused.at,
+            match (&refused.source, refused.stage) {
+                (Source::Polars, Some(stage)) => format!("Polars, {stage:?}"),
+                (Source::Polars, None) => "Polars".to_owned(),
+                (Source::Rule(rule), _) => format!("the rule {rule}"),
+                (Source::Silent, _) => "the tables are silent".to_owned(),
+            },
+            refused.reason
+        ),
+        Verdict::Undetermined(why) => format!("the tables cannot say: {why}"),
+    };
+    let done = observed.refusal.as_ref().map_or_else(
+        || "Polars allows it".to_owned(),
+        |refusal| {
+            format!(
+                "Polars refuses it at {} ({}): {}",
+                refusal.at,
+                refusal.stage.name(),
+                refusal.reason
+            )
+        },
+    );
+    let limits: Vec<&str> = excuses(case, &prediction, &observed)
+        .iter()
+        .map(|limit| limit.slug())
+        .collect();
+    format!(
+        "{predicted}\n{done}\nexcused by: {}",
+        if limits.is_empty() {
+            "no limit".to_owned()
+        } else {
+            limits.join(", ")
+        }
+    )
 }
 
 /// The first words of a reason, as a name: the same disagreement is not

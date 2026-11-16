@@ -340,20 +340,63 @@ fn is_a_null(call: &Call) -> bool {
     is(call, "polars.lit") && matches!(call.argument("value"), Some(Value::Flag(None)))
 }
 
-/// Whether a call of `expression` compares or subtracts a null literal, as what it is given
-/// or as what it follows.
-fn compared_with_a_null(expression: &Expression) -> bool {
+/// The indexes of the links of `expression` that `found` says yes to.
+fn links_where(expression: &Expression, found: &dyn Fn(&Call) -> bool) -> Vec<usize> {
+    expression
+        .links()
+        .iter()
+        .enumerate()
+        .filter(|(_, link)| found(link))
+        .map(|(at, _)| at)
+        .collect()
+}
+
+/// Whether a place reached `holder` where a comparison with a null literal
+/// reaches: what the comparison follows, its own arguments, and the calls from
+/// it on, and not the arguments of the links after it.
+fn reached_by_a_null(holder: &Expression, reach: Reach) -> bool {
     let comparisons = [
         "Expr.eq", "Expr.ne", "Expr.gt", "Expr.ge", "Expr.lt", "Expr.le", "Expr.sub",
     ];
-    expression.links().iter().enumerate().any(|(at, link)| {
+    let null_start = matches!(holder.start(), Start::Call(start) if is_a_null(start));
+    holder.links().iter().enumerate().any(|(at, link)| {
+        let null_operand = operands(link).into_iter().any(|(_, operand)| {
+            operand.links().is_empty()
+                && matches!(operand.start(), Start::Call(start) if is_a_null(start))
+        });
         comparisons.contains(&link.entry().id().as_str())
-            && (operands(link).into_iter().any(|(_, operand)| {
-                operand.links().is_empty()
-                    && matches!(operand.start(), Start::Call(start) if is_a_null(start))
-            }) || (at == 0
-                && matches!(expression.start(), Start::Call(start) if is_a_null(start))))
+            && (null_operand || (at == 0 && null_start))
+            && match reach {
+                Reach::Whole | Reach::Start | Reach::At(_) => true,
+                Reach::Operand(j) => j <= at,
+            }
     })
+}
+
+/// Whether a place reached `holder` where a `len` does not read what it counts:
+/// what the `len` follows, and the arguments of the links before it.
+fn reached_by_a_len(holder: &Expression, reach: Reach) -> bool {
+    links_where(holder, &|call| is(call, "Expr.len"))
+        .into_iter()
+        .any(|at| match reach {
+            Reach::Whole => at + 1 == holder.links().len(),
+            Reach::Start => true,
+            Reach::Operand(j) => j < at,
+            Reach::At(k) => k <= at,
+        })
+}
+
+/// Whether a place reached `holder` where an `explode` changes the rows it
+/// meets: at the window or after it, and in the arguments of the links after.
+fn reached_by_an_explode(holder: &Expression, reach: Reach) -> bool {
+    links_where(holder, &has_explode)
+        .into_iter()
+        .any(|at| match reach {
+            Reach::Whole => true,
+            Reach::Start => false,
+            Reach::Operand(j) => j > at,
+            Reach::At(k) => k >= at,
+        })
 }
 
 /// Whether `expression` is made of literals alone: nothing in it, at its start
@@ -407,6 +450,19 @@ fn wholly_single(expression: &Expression, upto: usize, literals: bool) -> bool {
     }
 }
 
+/// Where a place is in an expression that holds it: in what the chain starts
+/// from, in the arguments of one of its links, at one of its calls, or at the
+/// expression as a whole.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Reach {
+    Whole,
+    Start,
+    /// Inside the arguments of the link.
+    Operand(usize),
+    /// At the call of the link itself.
+    At(usize),
+}
+
 /// Where a place is in the document: the expression a position of the step
 /// holds that it is inside, the chain and the call it is at, and the
 /// conditions whose predicates it is inside.
@@ -424,6 +480,8 @@ struct Locus<'a> {
     in_values: Vec<&'a Expression>,
     /// Every expression the place is inside, outermost first.
     inside: Vec<&'a Expression>,
+    /// How the place reaches each of them, in the same order.
+    reach: Vec<Reach>,
     /// How many positions inside an expression hold the place.
     nested: usize,
 }
@@ -444,6 +502,7 @@ fn locate<'a>(case: &'a Case, place: &Place) -> Locus<'a> {
         in_predicates: Vec::new(),
         in_values: Vec::new(),
         inside: Vec::new(),
+        reach: Vec::new(),
         nested: 0,
     };
     let mut node = Node::Call(case.document.steps()[0].call());
@@ -487,6 +546,9 @@ fn locate<'a>(case: &'a Case, place: &Place) -> Locus<'a> {
             (Node::Expression(expression), Segment::Start) => {
                 locus.chain = Some(expression);
                 locus.index = None;
+                if let Some(last) = locus.reach.last_mut() {
+                    *last = Reach::Start;
+                }
                 node = match expression.start() {
                     Start::Call(call) => Node::Call(call),
                     Start::Input(_) => return locus,
@@ -496,6 +558,9 @@ fn locate<'a>(case: &'a Case, place: &Place) -> Locus<'a> {
             (Node::Expression(expression), Segment::Link(at)) => {
                 locus.chain = Some(expression);
                 locus.index = Some(*at);
+                if let Some(last) = locus.reach.last_mut() {
+                    *last = Reach::Operand(*at);
+                }
                 node = match expression.links().get(*at) {
                     Some(call) => Node::Call(call),
                     None => return locus,
@@ -508,11 +573,18 @@ fn locate<'a>(case: &'a Case, place: &Place) -> Locus<'a> {
             Some(Value::Expression(expression)) => {
                 locus.top.get_or_insert(expression);
                 locus.inside.push(expression);
+                locus.reach.push(Reach::Whole);
                 Node::Expression(expression)
             }
             Some(other) => Node::Value(other),
             None => return locus,
         };
+    }
+    // The path ends at a call: the innermost expression is reached at it.
+    if let (Node::Call(_), Some(Reach::Operand(at)), Some(last)) =
+        (&node, locus.reach.last().copied(), locus.reach.last_mut())
+    {
+        *last = Reach::At(at);
     }
     match node {
         Node::Call(call) => locus.call = Some(call),
@@ -675,7 +747,16 @@ fn applies(
                 && held.iter().any(|(_, held)| explodes_in(held))
         }
         (Limit::OptionsChangeTheResult, Disagreement::PolarsAllows(refused)) => {
-            locate(case, &refused.place).top.is_some_and(&explodes_in)
+            // An `explode` changes the rows that what follows it meets, which
+            // Polars refuses with a reason about lengths.
+            is_lengths(&refused.reason) && {
+                let locus = locate(case, &refused.place);
+                locus
+                    .inside
+                    .iter()
+                    .zip(&locus.reach)
+                    .any(|(holder, reach)| reached_by_an_explode(holder, *reach))
+            }
         }
         (Limit::TheLengthsOfTheRows, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
@@ -691,11 +772,12 @@ fn applies(
                 })
             });
             // A comparison with a null literal is null, and Polars does not
-            // evaluate the other side of it, wherever in the expression it is.
+            // evaluate what it follows or what it is given.
             let folded = locus
                 .inside
                 .iter()
-                .any(|holder| compared_with_a_null(holder));
+                .zip(&locus.reach)
+                .any(|(holder, reach)| reached_by_a_null(holder, *reach));
             chain_starts || operand || folded
         }
         (Limit::AnAggregateGivesOneValue, Disagreement::PolarsAllows(refused)) => {
@@ -721,13 +803,17 @@ fn applies(
             let counted = locus
                 .inside
                 .iter()
-                .any(|holder| holder.links().iter().any(|link| is(link, "Expr.len")));
+                .zip(&locus.reach)
+                .any(|(holder, reach)| reached_by_a_len(holder, *reach));
             receiver || dropped || counted
         }
         (Limit::AGroupAggregate, Disagreement::PolarsRefuses(refusal)) => {
             // A table with no rows has no groups, and the values of an
             // aggregate over none have no dtype.
-            pivot && refusal.stage == Stage::Empty && refusal.reason.contains("not supported")
+            pivot
+                && refusal.stage == Stage::Empty
+                && (refusal.reason.contains("not supported")
+                    || refusal.reason.contains("got `null`"))
         }
         (Limit::AGroupAggregate, Disagreement::PolarsAllows(refused)) => {
             // The kernels that take the values of a group accept what the ones of
@@ -1187,6 +1273,97 @@ mod tests {
             tables_refuse(&summed, link_of("exprs", 0, 0), ROWS, "no"),
             vec![]
         );
+        // What the links before the `len` are given, it does not count either.
+        let given = select(vec![chain_of(
+            column("a"),
+            vec![
+                compared_with("Expr.eq", chain(column("b"), &["Expr.cum_sum"])),
+                call("Expr.len", Vec::new()),
+            ],
+        )]);
+        assert_eq!(
+            tables_refuse(&given, in_operand(0, "other", 0), ROWS, "no"),
+            vec![Limit::AnAggregateGivesOneValue]
+        );
+    }
+
+    #[test]
+    fn a_len_before_an_unrelated_later_operand_excuses_nothing() {
+        let case = select(vec![chain_of(
+            column("a"),
+            vec![
+                call("Expr.len", Vec::new()),
+                compared_with("Expr.sub", chain(column("b"), &["Expr.cum_sum"])),
+            ],
+        )]);
+        assert_eq!(
+            tables_refuse(&case, in_operand(1, "other", 0), ROWS, "no"),
+            vec![]
+        );
+        // The `len` itself, and what it follows, are excused.
+        assert_eq!(
+            tables_refuse(&case, link_of("exprs", 0, 0), ROWS, "no"),
+            vec![Limit::AnAggregateGivesOneValue]
+        );
+    }
+
+    // ----- A null literal folds a comparison
+
+    #[test]
+    fn a_comparison_with_a_null_excuses_what_it_follows_and_is_given_and_not_later_operands() {
+        // `a.cum_sum().eq(null).sub(b.cum_sum())`
+        let case = select(vec![chain_of(
+            column("a"),
+            vec![
+                call("Expr.cum_sum", Vec::new()),
+                compared_with("Expr.eq", chain(null(), &[])),
+                compared_with("Expr.sub", chain(column("b"), &["Expr.cum_sum"])),
+            ],
+        )]);
+        assert_eq!(
+            tables_refuse(&case, link_of("exprs", 0, 0), ROWS, "no"),
+            vec![Limit::ALiteral]
+        );
+        assert_eq!(
+            tables_refuse(&case, link_of("exprs", 0, 2), ROWS, "no"),
+            vec![Limit::ALiteral]
+        );
+        // The argument of the subtraction after it is evaluated.
+        assert_eq!(
+            tables_refuse(&case, in_operand(2, "other", 0), ROWS, "no"),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_comparison_given_a_column_that_a_null_follows_excuses_that_column() {
+        // `null.eq(b.cum_sum())`: the null is what the comparison follows.
+        let case = select(vec![chain_of(
+            null(),
+            vec![compared_with(
+                "Expr.eq",
+                chain(column("b"), &["Expr.cum_sum"]),
+            )],
+        )]);
+        assert_eq!(
+            tables_refuse(&case, in_operand(0, "other", 0), ROWS, "no"),
+            vec![Limit::ALiteral]
+        );
+    }
+
+    #[test]
+    fn a_null_comparison_in_another_item_excuses_nothing() {
+        let case = select(vec![
+            chain(column("a"), &["Expr.cum_sum"]),
+            chain_of(
+                column("b"),
+                vec![compared_with("Expr.eq", chain(null(), &[]))],
+            ),
+        ]);
+        assert_eq!(
+            tables_refuse(&case, link_of("exprs", 0, 0), ROWS, "no"),
+            vec![]
+        );
     }
 
     #[test]
@@ -1204,22 +1381,75 @@ mod tests {
         over("k", Some("explode"))
     }
 
+    /// The place of link `inner` of the argument `name` of link `link` of item 0
+    /// of `exprs`.
+    fn in_operand(link: usize, name: &str, inner: usize) -> Place {
+        at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Link(link),
+            parameter(name),
+            Segment::Link(inner),
+        ])
+    }
+
+    const LENGTHS: &str = "lengths don't match: zip node received non-equal length inputs";
+
     #[test]
-    fn an_explode_excuses_the_tables_refusing_inside_its_expression_only() {
-        let with = select(vec![chain_of(
+    fn an_explode_excuses_what_the_window_and_what_follows_it_meet_and_not_what_is_before() {
+        // Window at link 1: the call after it, and the arguments of the links
+        // after it, meet its rows.
+        let case = select(vec![chain_of(
             column("a"),
-            vec![call("Expr.cum_sum", Vec::new()), explode()],
+            vec![
+                call("Expr.cum_sum", Vec::new()),
+                explode(),
+                compared_with("Expr.eq", chain(column("b"), &["Expr.cum_sum"])),
+            ],
         )]);
         assert_eq!(
-            tables_refuse(&with, link_of("exprs", 0, 0), ROWS, "no"),
+            tables_refuse(&case, link_of("exprs", 0, 2), ROWS, LENGTHS),
             vec![Limit::OptionsChangeTheResult]
+        );
+        assert_eq!(
+            tables_refuse(&case, in_operand(2, "other", 0), ROWS, LENGTHS),
+            vec![Limit::OptionsChangeTheResult]
+        );
+        // Before the window, or in its own arguments, they are not.
+        assert_eq!(
+            tables_refuse(&case, link_of("exprs", 0, 0), ROWS, LENGTHS),
+            vec![]
+        );
+        assert_eq!(
+            tables_refuse(&case, in_operand(1, "partition_by", 0), ROWS, LENGTHS),
+            vec![]
+        );
+        // Another reason is not about the rows an explode changes.
+        assert_eq!(
+            tables_refuse(&case, link_of("exprs", 0, 2), ROWS, "no"),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn an_explode_in_an_unrelated_later_operand_or_item_excuses_nothing() {
+        let later = select(vec![chain_of(
+            column("a"),
+            vec![
+                call("Expr.cum_sum", Vec::new()),
+                compared_with("Expr.eq", chain_of(column("b"), vec![explode()])),
+            ],
+        )]);
+        assert_eq!(
+            tables_refuse(&later, link_of("exprs", 0, 0), ROWS, LENGTHS),
+            vec![]
         );
         let elsewhere = select(vec![
             chain(column("a"), &["Expr.cum_sum"]),
             chain_of(column("b"), vec![explode()]),
         ]);
         assert_eq!(
-            tables_refuse(&elsewhere, link_of("exprs", 0, 0), ROWS, "no"),
+            tables_refuse(&elsewhere, link_of("exprs", 0, 0), ROWS, LENGTHS),
             vec![]
         );
     }
@@ -1831,6 +2061,16 @@ mod tests {
                 None,
                 Stage::Empty,
                 "`cum_max` operation not supported for dtype `null`",
+                Vec::new()
+            ),
+            vec![Limit::AGroupAggregate]
+        );
+        assert_eq!(
+            polars_refuses(
+                &case,
+                None,
+                Stage::Empty,
+                "invalid series dtype: expected `Duration`, got `null` for series with name `a`",
                 Vec::new()
             ),
             vec![Limit::AGroupAggregate]

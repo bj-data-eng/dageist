@@ -218,7 +218,9 @@ fn replay_a_case() {
     let bytes = std::fs::read(&path).expect("the file of the case is read");
     let evaluation = replay(&AllowedTarget::new(), &bytes, &mut |_| Ok(()))
         .unwrap_or_else(|error| panic!("the case could not be replayed: {error:?}"));
+    let case = Case::decode(&evaluation.canonical).expect("a replayed case is a case");
     println!("{}", String::from_utf8_lossy(&evaluation.canonical));
+    println!("{}", on_a_large_stack(|| target::describe(&case)));
     println!("{:?}", evaluation.outcome);
     assert_ne!(
         evaluation.outcome.kind(),
