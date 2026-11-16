@@ -52,7 +52,9 @@ impl Standing {
     }
 
     /// Whether the call may stand there and what it gives, as [`allowed::offer`]
-    /// answered. `None` where it was not asked.
+    /// answered. `None` where it was not asked. Where the dtype of an argument
+    /// was not known it was asked with the arguments that were, so what it says
+    /// the call gives is not what the chain has; the places say that.
     #[must_use]
     pub const fn verdict(&self) -> Option<&Verdict> {
         self.verdict.as_ref()
@@ -590,7 +592,8 @@ impl Walker<'_> {
             Cur::Value { dtype, shape } => Operand {
                 dtype,
                 shape,
-                known: true,
+                // What was not asked has no shape that can be counted on.
+                known: dtype.is_some(),
             },
             Cur::Condition { values, .. } => Operand {
                 dtype: unify(&values),
@@ -894,48 +897,26 @@ fn reads_a_column(expression: &Expression) -> bool {
         .any(|call| operands(call).into_iter().any(reads_a_column))
 }
 
-/// Whether the first `upto` calls of `expression` read a column.
-fn prefix_reads_a_column(expression: &Expression, upto: usize) -> bool {
-    let start = match expression.start() {
-        Start::Call(call) => Some(call),
-        Start::Input(_) => None,
-    };
-    matches!(start, Some(start) if start.entry().id().as_str() == "polars.col")
-        || start
-            .into_iter()
-            .chain(&expression.links()[..upto])
-            .any(|call| operands(call).into_iter().any(reads_a_column))
+/// Whether an expression is a null literal and no more.
+fn is_a_null(expression: &Expression) -> bool {
+    expression.links().is_empty() && starts_from_a_null(expression)
 }
 
-/// Whether the first `upto` calls of `expression` give a null that no column is
-/// left in: it starts from a null literal, or the last of them is a comparison,
-/// which with a null on either side is a null, and nothing in them reads a
-/// column.
-fn prefix_is_null(expression: &Expression, upto: usize) -> bool {
-    let Some(last) = upto.checked_sub(1) else {
-        return matches!(
-            expression.start(),
-            Start::Call(start)
-                if start.entry().id().as_str() == "polars.lit"
-                    && matches!(start.argument("value"), Some(Value::Flag(None)))
-        );
-    };
-    let link = &expression.links()[last];
-    COMPARISONS.contains(&link.entry().id().as_str())
-        && !prefix_reads_a_column(expression, upto)
-        && (operands(link).into_iter().any(folds_to_null) || prefix_is_null(expression, last))
+/// Whether an expression starts from a null literal.
+fn starts_from_a_null(expression: &Expression) -> bool {
+    matches!(
+        expression.start(),
+        Start::Call(start)
+            if start.entry().id().as_str() == "polars.lit"
+                && matches!(start.argument("value"), Some(Value::Flag(None)))
+    )
 }
 
-/// Whether an expression is a null, as Polars folds it, that no column is left
-/// in: a null literal, or a comparison with one that reads no column.
-fn folds_to_null(expression: &Expression) -> bool {
-    prefix_is_null(expression, expression.links().len())
-}
-
-/// Whether an expression holds, at any depth, a comparison of a null, as Polars
-/// folds it, with what reads a column and is not one value. Polars folds the
-/// comparison into a null, and a key with a null where a column was is not
-/// elementwise.
+/// Whether an expression holds, at any depth, a comparison of a null literal
+/// with what reads a column and is not one value. Polars folds the comparison
+/// into a null, and a key with a null where a column was is not elementwise. A
+/// comparison with what an earlier one folded is left to a limit: what Polars
+/// does with it depends on dtypes that the document does not decide.
 fn holds_a_null_comparison(expression: &Expression) -> bool {
     let start = match expression.start() {
         Start::Call(call) => Some(call),
@@ -948,12 +929,13 @@ fn holds_a_null_comparison(expression: &Expression) -> bool {
     for (at, link) in expression.links().iter().enumerate() {
         if COMPARISONS.contains(&link.entry().id().as_str()) {
             let given = operands(link);
-            let null_given = given.iter().any(|operand| folds_to_null(operand));
+            let null_given = given.iter().any(|operand| is_a_null(operand));
             let column_given = given.iter().any(|operand| {
                 reads_a_column(operand) && !wholly_single(operand, operand.links().len(), true)
             });
             let column_before = reads && !wholly_single(expression, at, true);
-            if (null_given && column_before) || (prefix_is_null(expression, at) && column_given) {
+            let null_start = at == 0 && starts_from_a_null(expression);
+            if (null_given && column_before) || (null_start && column_given) {
                 return true;
             }
         }

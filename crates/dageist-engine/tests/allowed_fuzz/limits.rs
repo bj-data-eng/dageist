@@ -771,7 +771,18 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
                 .iter()
                 .zip(&locus.reach)
                 .any(|(holder, reach)| reached_by_a_null(holder, *reach));
-            chain_starts || operand || folded
+            // What a call that follows a literal is given, at any depth, is met by
+            // one value, which Polars broadcasts: a comparison of a literal with
+            // what the tables refuse when they run rows is not refused.
+            let given_to_a_literal = refused.stage == Some(TableStage::Rows)
+                && locus
+                    .inside
+                    .iter()
+                    .zip(&locus.reach)
+                    .any(|(holder, reach)| {
+                        matches!(reach, Reach::Operand(_)) && starts_from_a_literal(holder)
+                    });
+            chain_starts || operand || folded || given_to_a_literal
         }
         (Limit::AnAggregateGivesOneValue, Disagreement::PolarsAllows(refused)) => {
             let locus = locate(case, &refused.place);
@@ -1195,6 +1206,55 @@ mod tests {
         ]);
         assert_eq!(
             tables_refuse(&case, link_of("exprs", 0, 0), ROWS, "no"),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn what_a_call_after_a_literal_is_given_is_excused_at_any_depth_when_rows_refuse_it() {
+        // `1.cum_sum().le(b.max())`: the tables refuse `max` of a list when they
+        // run rows, and Polars meets it with one value.
+        let item = chain_of(
+            literal(),
+            vec![
+                call("Expr.cum_sum", Vec::new()),
+                compared_with("Expr.le", chain(column("b"), &["Expr.max"])),
+            ],
+        );
+        let case = select(vec![item]);
+        let inside = at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Link(1),
+            parameter("other"),
+            Segment::Link(0),
+        ]);
+        assert_eq!(
+            tables_refuse(&case, inside.clone(), ROWS, "no"),
+            vec![Limit::ALiteral]
+        );
+        // What the tables refuse when they built the step is refused.
+        assert_eq!(
+            tables_refuse(&case, inside, Some(TableStage::Schema), "no"),
+            vec![]
+        );
+        // Nothing starts from a literal.
+        let plain = chain_of(
+            column("a"),
+            vec![
+                call("Expr.cum_sum", Vec::new()),
+                compared_with("Expr.le", chain(column("b"), &["Expr.max"])),
+            ],
+        );
+        let inside = at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Link(1),
+            parameter("other"),
+            Segment::Link(0),
+        ]);
+        assert_eq!(
+            tables_refuse(&select(vec![plain]), inside, ROWS, "no"),
             vec![]
         );
     }

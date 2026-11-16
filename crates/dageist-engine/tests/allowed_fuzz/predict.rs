@@ -12,7 +12,7 @@
 //! predicted before that.
 
 use dageist_engine::allowed::{self, RefusalSource, Representative};
-use dageist_engine::document::{Place, Standing, Walk, WalkRefusal, WalkedExpression};
+use dageist_engine::document::{Place, Walk, WalkRefusal, WalkedExpression};
 
 use super::case::{Case, STEP};
 use super::frames::Frames;
@@ -68,21 +68,23 @@ pub struct Prediction {
     pub expressions: Vec<Traced>,
 }
 
-/// The class a call gives, as the tables say, when they say.
-fn class(standing: &Standing) -> Option<Representative> {
-    standing
-        .verdict()?
-        .allowance()?
-        .result()
-        .and_then(allowed::ResultDtype::class)
+/// The class of what a place follows, when it follows a value of one.
+fn class(place: Option<allowed::Place>) -> Option<Representative> {
+    match place?.after() {
+        allowed::After::Value { dtype, .. } => Some(dtype),
+        _ => None,
+    }
 }
 
+/// What the walk found the expression to have after its start and each link:
+/// what the next call follows, which is not what a call offered without an
+/// argument's dtype says it gives.
 fn traced(expression: &WalkedExpression) -> Traced {
-    let mut classes = expression.calls().iter().map(class);
+    let places = expression.places();
     Traced {
         place: expression.place().clone(),
-        start: classes.next().flatten(),
-        links: classes.collect(),
+        start: places.first().copied().and_then(class),
+        links: places.iter().skip(1).copied().map(class).collect(),
     }
 }
 

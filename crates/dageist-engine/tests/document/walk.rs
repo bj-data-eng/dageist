@@ -567,34 +567,29 @@ fn folded() -> Value {
 }
 
 #[test]
-fn a_comparison_that_folds_into_a_null_is_a_null_in_the_next_comparison() {
-    let refused = Some(RefusalSource::Rule(Rule::KeyIsElementwise));
-    // The folded null on either side of a comparison with a column.
+fn a_comparison_with_what_an_earlier_one_folded_is_left_to_a_limit() {
+    // Polars refuses `null == f` and `f == (true != null)`, and allows
+    // `ra.is_not_null() == ((1 == null) != 1)`: what it folds depends on dtypes
+    // that the document does not decide, so the rule refuses only a column
+    // compared with a null literal itself.
     let keys = [
         chain(
             call("polars.lit", json!({ "value": { "flag": true } })),
             vec![compared("Expr.ne", null()), compared("Expr.eq", field("f"))],
         ),
         field_then("f", vec![compared("Expr.eq", folded())]),
+        field_then(
+            "b",
+            vec![
+                call("Expr.is_not_null", json!({})),
+                compared("Expr.eq", folded()),
+            ],
+        ),
     ];
     for (at, key) in keys.into_iter().enumerate() {
-        assert_eq!(joined_on(key), refused, "key {at}");
+        assert_eq!(joined_on(key), None, "key {at}");
     }
-    // A fold alone has no column to lose, and an aggregate is one value.
     assert_eq!(joined_on(folded()), None);
-    assert_eq!(
-        joined_on(chain(
-            call("polars.lit", json!({ "value": { "flag": true } })),
-            vec![
-                compared("Expr.ne", null()),
-                compared(
-                    "Expr.eq",
-                    field_then("f", vec![call("Expr.first", json!({}))])
-                ),
-            ],
-        )),
-        None
-    );
 }
 
 #[test]
