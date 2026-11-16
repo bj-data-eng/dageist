@@ -1569,6 +1569,35 @@ mod tests {
     }
 
     #[test]
+    fn the_last_of_a_shift_is_null_where_the_sample_has_a_null_there() {
+        // The sample's columns are a value, a null and a value. One shift puts the
+        // null last, so `b.shift().last()` is null, and three shifts leave only
+        // nulls; two shifts put a value last, and no shift leaves the value.
+        let shift = || call("Expr.shift", Vec::new());
+        let last = || call("Expr.last", Vec::new());
+        let item = |links: Vec<Call>| {
+            let mut all = links;
+            all.push(compared_with("Expr.lt", chain(column("g"), &[])));
+            select(vec![chain_of(column("b"), all)])
+        };
+        let excused = |links: Vec<Call>| {
+            let at = links.len();
+            tables_refuse(&item(links), link_of("exprs", 0, at), ROWS, "no")
+        };
+        assert_eq!(
+            excused(vec![shift(), last()]),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        assert_eq!(
+            excused(vec![shift(), shift(), shift(), last()]),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        assert_eq!(excused(vec![shift(), shift(), last()]), vec![]);
+        assert_eq!(excused(vec![last()]), vec![]);
+        assert_eq!(excused(vec![shift(), call("Expr.max", Vec::new())]), vec![]);
+    }
+
+    #[test]
     fn a_running_sum_of_a_comparison_with_a_null_leaves_only_nulls() {
         // `f > null` then `cum_sum` then `== b`: Polars meets the call with a
         // column of nulls and does not refuse the dtype the tables refuse when
