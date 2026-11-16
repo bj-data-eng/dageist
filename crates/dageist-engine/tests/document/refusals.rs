@@ -1,0 +1,408 @@
+//! A step Polars refuses is reported with where in the step it is and Polars'
+//! own reason, and the steps after it are not run.
+
+use dageist_engine::catalog::BuildError;
+use dageist_engine::document::{
+    Document, Outcome, Report, Resolution, RowsError, RunCause, Segment, StepId, StepRefusal,
+};
+use polars::prelude::*;
+use serde_json::{Value, json};
+
+use crate::claims::{claims, inputs};
+use crate::support::{call, chain, document, field, field_then, many, named, step};
+
+fn parameter(name: &str) -> Segment {
+    Segment::Parameter(name.to_owned())
+}
+
+fn run(steps: Vec<Value>) -> Report {
+    Document::read(&document(steps))
+        .expect("a document")
+        .run(&inputs(), claims().lazy())
+        .expect("the claims have a schema")
+}
+
+fn refusal_of<'a>(report: &'a Report, id: &str) -> &'a StepRefusal {
+    let step = report
+        .steps()
+        .iter()
+        .find(|step| step.id().as_str() == id)
+        .unwrap_or_else(|| panic!("no step {id}"));
+    match step.outcome() {
+        Outcome::Refused(refusal) => refusal,
+        other => panic!("step {id} is {other:?}"),
+    }
+}
+
+/// Polars' own words for the plan the step builds: what `collect_schema` says
+/// of `select` of `expressions` on the claims.
+fn polars_says(expressions: Vec<Expr>) -> String {
+    claims()
+        .lazy()
+        .select(expressions)
+        .collect_schema()
+        .expect_err("Polars refuses it")
+        .to_string()
+}
+
+#[test]
+fn a_sum_of_text_is_refused_at_its_link_with_polars_reason() {
+    // `dcn` is text, which Polars cannot add up.
+    let report = run(vec![
+        step(
+            "bad",
+            "LazyFrame.with_columns",
+            json!({ "named_exprs": named(vec![(
+                "total",
+                field_then("dcn", vec![call("Expr.sum", json!({}))]),
+            )]) }),
+        ),
+        step("after", "LazyFrame.select", json!({})),
+    ]);
+    let refusal = refusal_of(&report, "bad");
+    assert_eq!(refusal.place().step_id().map(StepId::as_str), Some("bad"));
+    assert_eq!(refusal.place().step_index(), Some(0));
+    assert_eq!(
+        refusal.place().path(),
+        [
+            parameter("named_exprs"),
+            Segment::Value(0),
+            Segment::Link(0)
+        ]
+    );
+    let RunCause::Polars(reason) = refusal.cause() else {
+        panic!("not Polars' reason: {refusal}");
+    };
+    assert_eq!(reason.to_string(), polars_says(vec![col("dcn").sum()]));
+    assert!(reason.to_string().contains("sum"), "{reason}");
+    assert!(reason.to_string().contains("str"), "{reason}");
+}
+
+#[test]
+fn taking_text_from_a_timestamp_is_refused_at_its_link_with_polars_reason() {
+    let report = run(vec![step(
+        "bad",
+        "LazyFrame.with_columns",
+        json!({ "named_exprs": named(vec![(
+            "gap",
+            field_then("timestamp", vec![call("Expr.sub", json!({ "other": field("dcn") }))]),
+        )]) }),
+    )]);
+    let refusal = refusal_of(&report, "bad");
+    assert_eq!(
+        refusal.place().path(),
+        [
+            parameter("named_exprs"),
+            Segment::Value(0),
+            Segment::Link(0)
+        ]
+    );
+    let RunCause::Polars(reason) = refusal.cause() else {
+        panic!("not Polars' reason: {refusal}");
+    };
+    assert_eq!(
+        reason.to_string(),
+        polars_says(vec![binary_expr(
+            col("timestamp"),
+            Operator::Minus,
+            col("dcn")
+        )])
+    );
+}
+
+#[test]
+fn the_dtypes_before_a_refused_link_are_still_reported() {
+    let report = run(vec![step(
+        "bad",
+        "LazyFrame.with_columns",
+        json!({ "named_exprs": named(vec![(
+            "total",
+            field_then("dcn", vec![call("Expr.first", json!({})), call("Expr.sum", json!({}))]),
+        )]) }),
+    )]);
+    let trace = report.steps()[0]
+        .expressions()
+        .iter()
+        .find(|trace| trace.place().path() == [parameter("named_exprs"), Segment::Value(0)])
+        .expect("the expression");
+    assert!(matches!(trace.start(), Resolution::Dtype(DataType::String)));
+    assert!(matches!(
+        &trace.links()[0],
+        Resolution::Dtype(DataType::String)
+    ));
+    assert!(matches!(&trace.links()[1], Resolution::Refused(_)));
+    let refusal = refusal_of(&report, "bad");
+    assert_eq!(
+        refusal.place().path(),
+        [
+            parameter("named_exprs"),
+            Segment::Value(0),
+            Segment::Link(1)
+        ]
+    );
+}
+
+#[test]
+fn a_step_after_a_refused_step_is_not_run() {
+    let report = run(vec![
+        step(
+            "fine",
+            "LazyFrame.select",
+            json!({ "exprs": many(vec![field("dcn")]) }),
+        ),
+        step(
+            "bad",
+            "LazyFrame.select",
+            json!({ "exprs": many(vec![field("nope")]) }),
+        ),
+        step(
+            "later",
+            "LazyFrame.select",
+            json!({ "exprs": many(vec![field("dcn")]) }),
+        ),
+        step(
+            "last",
+            "LazyFrame.select",
+            json!({ "exprs": many(vec![field("dcn")]) }),
+        ),
+    ]);
+    assert!(matches!(report.steps()[0].outcome(), Outcome::Valid { .. }));
+    assert!(matches!(report.steps()[1].outcome(), Outcome::Refused(_)));
+    for step in &report.steps()[2..] {
+        assert!(
+            matches!(step.outcome(), Outcome::NotRun { blocked_by } if blocked_by.as_str() == "bad"),
+            "{}: {:?}",
+            step.id(),
+            step.outcome()
+        );
+        assert!(step.expressions().is_empty());
+        assert!(step.schema().is_none());
+    }
+}
+
+#[test]
+fn a_missing_column_is_refused_at_its_start_with_polars_reason() {
+    let report = run(vec![step(
+        "bad",
+        "LazyFrame.sort",
+        json!({ "by": many(vec![field("dcn"), field("nope")]) }),
+    )]);
+    let refusal = refusal_of(&report, "bad");
+    assert_eq!(
+        refusal.place().path(),
+        [parameter("by"), Segment::Item(1), Segment::Start]
+    );
+    let RunCause::Polars(reason) = refusal.cause() else {
+        panic!("not Polars' reason: {refusal}");
+    };
+    assert_eq!(reason.to_string(), polars_says(vec![col("nope")]));
+    assert!(reason.to_string().contains("nope"), "{reason}");
+    assert!(reason.to_string().contains("valid columns"), "{reason}");
+}
+
+#[test]
+fn a_column_a_later_step_adds_is_missing_before_that_step() {
+    // `later` is made by the second step, so the first cannot use it.
+    let report = run(vec![
+        step(
+            "early",
+            "LazyFrame.select",
+            json!({ "exprs": many(vec![field("later")]) }),
+        ),
+        step(
+            "second",
+            "LazyFrame.with_columns",
+            json!({ "named_exprs": named(vec![("later", field("dcn"))]) }),
+        ),
+    ]);
+    let refusal = refusal_of(&report, "early");
+    assert!(matches!(refusal.cause(), RunCause::Polars(_)), "{refusal}");
+    assert!(refusal.to_string().contains("later"), "{refusal}");
+}
+
+#[test]
+fn a_missing_column_inside_a_nested_expression_is_found_through_its_links() {
+    // `dcn.shift(n).over(nope)`: the missing column is the partition.
+    let report = run(vec![step(
+        "bad",
+        "LazyFrame.with_columns",
+        json!({ "named_exprs": named(vec![(
+            "x",
+            field_then(
+                "dcn",
+                vec![call("Expr.over", json!({ "partition_by": many(vec![field("nope")]) }))],
+            ),
+        )]) }),
+    )]);
+    let refusal = refusal_of(&report, "bad");
+    assert_eq!(
+        refusal.place().path(),
+        [
+            parameter("named_exprs"),
+            Segment::Value(0),
+            Segment::Link(0),
+            parameter("partition_by"),
+            Segment::Item(0),
+            Segment::Start,
+        ]
+    );
+    assert!(refusal.to_string().contains("nope"), "{refusal}");
+}
+
+#[test]
+fn a_join_on_keys_of_different_dtypes_is_refused_at_the_step() {
+    // Text against whole numbers: each key is fine alone, so the refusal is the
+    // step's, with Polars' reason for it.
+    let report = run(vec![step(
+        "join",
+        "LazyFrame.join",
+        json!({
+            "other": { "table": "step_sla" },
+            "left_on": many(vec![field("dcn")]),
+            "right_on": many(vec![field("sla_days")]),
+        }),
+    )]);
+    let refusal = refusal_of(&report, "join");
+    assert!(refusal.place().path().is_empty(), "{refusal}");
+    assert!(matches!(refusal.cause(), RunCause::Polars(_)), "{refusal}");
+}
+
+#[test]
+fn a_table_that_is_not_connected_is_refused_at_its_argument() {
+    let report = run(vec![step(
+        "join",
+        "LazyFrame.join",
+        json!({
+            "other": { "table": "nowhere" },
+            "on": many(vec![field("dcn")]),
+        }),
+    )]);
+    let refusal = refusal_of(&report, "join");
+    assert_eq!(refusal.place().path(), [parameter("other")]);
+    assert!(matches!(refusal.cause(), RunCause::UnknownTable(name) if name == "nowhere"));
+}
+
+#[test]
+fn an_input_that_is_not_connected_is_refused_at_the_start_of_its_expression() {
+    // `sla_cutoff` is a value, not a table, and `step_sla` a table, not a value.
+    for (name, how) in [("missing", "no input"), ("step_sla", "a table")] {
+        let report = run(vec![step(
+            "bad",
+            "LazyFrame.with_columns",
+            json!({ "named_exprs": named(vec![(
+                "x",
+                chain(json!({ "input": name }), vec![]),
+            )]) }),
+        )]);
+        let refusal = refusal_of(&report, "bad");
+        assert_eq!(
+            refusal.place().path(),
+            [parameter("named_exprs"), Segment::Value(0), Segment::Start],
+            "{how}"
+        );
+        assert!(matches!(refusal.cause(), RunCause::UnknownInput(found) if found == name));
+    }
+}
+
+#[test]
+fn a_missing_argument_is_refused_at_its_parameter() {
+    let report = run(vec![
+        step("no_keys", "LazyFrame.sort", json!({})),
+        step("after", "LazyFrame.select", json!({})),
+    ]);
+    let refusal = refusal_of(&report, "no_keys");
+    assert_eq!(refusal.place().path(), [parameter("by")]);
+    assert!(matches!(
+        refusal.cause(),
+        RunCause::Build(BuildError::Missing { parameter: "by" })
+    ));
+}
+
+#[test]
+fn a_missing_argument_of_a_link_is_refused_at_the_link_and_its_parameter() {
+    // `sub` needs the value to take away.
+    let report = run(vec![step(
+        "bad",
+        "LazyFrame.with_columns",
+        json!({ "named_exprs": named(vec![(
+            "x",
+            field_then("timestamp", vec![call("Expr.is_null", json!({})), call("Expr.sub", json!({}))]),
+        )]) }),
+    )]);
+    let refusal = refusal_of(&report, "bad");
+    assert_eq!(
+        refusal.place().path(),
+        [
+            parameter("named_exprs"),
+            Segment::Value(0),
+            Segment::Link(1),
+            parameter("other"),
+        ]
+    );
+    assert!(matches!(
+        refusal.cause(),
+        RunCause::Build(BuildError::Missing { parameter: "other" })
+    ));
+}
+
+#[test]
+fn rows_of_a_refused_step_or_an_unknown_step_are_errors() {
+    let document = Document::read(&document(vec![
+        step(
+            "fine",
+            "LazyFrame.select",
+            json!({ "exprs": many(vec![field("dcn")]) }),
+        ),
+        step(
+            "bad",
+            "LazyFrame.select",
+            json!({ "exprs": many(vec![field("nope")]) }),
+        ),
+    ]))
+    .expect("a document");
+    let working = claims();
+    let id = |text: &str| StepId::new(text).expect("an id");
+
+    let rows = document
+        .rows(&inputs(), &working, &id("fine"), 10)
+        .expect("rows");
+    assert_eq!((rows.height(), rows.width()), (7, 1));
+
+    let error = document
+        .rows(&inputs(), &working, &id("bad"), 10)
+        .expect_err("refused");
+    let RowsError::Refused(refusal) = error else {
+        panic!("not refused: {error:?}");
+    };
+    assert_eq!(refusal.place().step_id().map(StepId::as_str), Some("bad"));
+
+    let error = document
+        .rows(&inputs(), &working, &id("absent"), 10)
+        .expect_err("no step");
+    assert!(matches!(error, RowsError::NoSuchStep(missing) if missing.as_str() == "absent"));
+}
+
+#[test]
+fn a_date_part_of_text_passes_schema_resolution_and_fails_when_rows_are_collected() {
+    // Characterization of Polars: `dt.date` is known to give a `Date` whatever it
+    // is applied to, so `collect_schema` accepts it on text and the dtype
+    // mismatch is only found when the rows are collected.
+    let steps = vec![step(
+        "day",
+        "LazyFrame.with_columns",
+        json!({ "named_exprs": named(vec![(
+            "day",
+            field_then("dcn", vec![call("Expr.dt.date", json!({}))]),
+        )]) }),
+    )];
+    let report = run(steps.clone());
+    let schema = report.steps()[0].schema().expect("valid");
+    assert_eq!(schema.get("day"), Some(&DataType::Date));
+
+    let document = Document::read(&document(steps)).expect("a document");
+    let id = StepId::new("day").expect("an id");
+    let error = document
+        .rows(&inputs(), &claims(), &id, 10)
+        .expect_err("Polars cannot take the date of text");
+    assert!(matches!(error, RowsError::Polars(_)), "{error}");
+}

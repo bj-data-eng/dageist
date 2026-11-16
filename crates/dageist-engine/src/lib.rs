@@ -3,12 +3,15 @@
 //! This crate owns everything that touches Polars: generating sample data,
 //! loading a working window of whole keys into memory, reading a stored table
 //! straight from its Parquet files, and handing blocks of either to a host as
-//! Arrow IPC bytes. It has no dependency on any host.
+//! Arrow IPC bytes. It also owns the catalogue of Polars operations the step
+//! editor offers, and the step document built from it: its reader, its writer
+//! and running it. It has no dependency on any host.
 
 #![forbid(unsafe_code)]
 
 mod block;
 pub mod catalog;
+pub mod document;
 mod error;
 mod sample;
 mod stored;
