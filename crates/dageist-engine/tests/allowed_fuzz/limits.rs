@@ -1963,6 +1963,71 @@ mod tests {
         assert_eq!(rule_refuses(&sorted, later, BOOLEAN_RULE, "a rule"), vec![]);
     }
 
+    #[test]
+    fn a_predicate_inside_the_predicate_of_branches_that_are_one_is_excused_for_a_rule() {
+        // `when(when(b).then(null) <= 1).then(h).otherwise(h)`: Polars simplifies
+        // a condition whose values are one expression to it, when its predicate
+        // is a comparison, and never evaluates the predicate, so what is inside it
+        // is not refused. The predicate itself, a column, is refused still, and
+        // so is the same condition with values that differ or one value only.
+        let inner = || {
+            chain_of(
+                when_of(vec![chain(column("b"), &[])]),
+                vec![
+                    then_of(chain(null(), &[])),
+                    compared_with("Expr.le", chain(literal_of(1), &[])),
+                ],
+            )
+        };
+        let outer = |first: Expression, last: Option<Expression>| {
+            let mut links = vec![then_of(chain(column("h"), &[]))];
+            links.extend(last.map(otherwise_of));
+            select(vec![chain_of(when_of(vec![first]), links)])
+        };
+        let h = || chain(column("h"), &[]);
+        let in_the_inner_predicate = at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Start,
+            parameter("predicates"),
+            Segment::Item(0),
+            Segment::Start,
+            parameter("predicates"),
+            Segment::Item(0),
+        ]);
+        assert_eq!(
+            rule_refuses(
+                &outer(inner(), Some(h())),
+                in_the_inner_predicate.clone(),
+                BOOLEAN_RULE,
+                "a rule"
+            ),
+            vec![Limit::TheBranchesAreOne]
+        );
+        // Values that differ, and a condition with one value.
+        for last in [Some(chain(column("f"), &[])), None] {
+            assert_eq!(
+                rule_refuses(
+                    &outer(inner(), last),
+                    in_the_inner_predicate.clone(),
+                    BOOLEAN_RULE,
+                    "a rule"
+                ),
+                vec![]
+            );
+        }
+        // The predicate itself.
+        assert_eq!(
+            rule_refuses(
+                &outer(chain(column("b"), &[]), Some(h())),
+                start_predicate(0),
+                BOOLEAN_RULE,
+                "a rule"
+            ),
+            vec![]
+        );
+    }
+
     /// A whole number of the dtype of `literal`, as a literal call.
     fn literal_of(value: i64) -> Call {
         call("polars.lit", vec![("value", Value::Integer(value))])
