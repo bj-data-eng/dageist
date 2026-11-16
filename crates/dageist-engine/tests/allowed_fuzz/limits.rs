@@ -83,10 +83,11 @@ pub enum Limit {
     /// with a dtype that the tables refuse when they run rows where what it
     /// follows or is given is only nulls: shifts that total the sample's three
     /// rows or more, an aggregate that leaves one value which a shift moves away,
-    /// the first of what a shift moved. A comparison of a list with a `Boolean`
-    /// is refused after none, one or two shifts and allowed after three. The
-    /// tables refusing, when they run rows, at a call that follows such a chain
-    /// or is given one.
+    /// the first of what a shift moved, and a running sum of a comparison with a
+    /// null, which Polars gives as a column of nulls. A comparison of a list with
+    /// a `Boolean` is refused after none, one or two shifts and allowed after
+    /// three. The tables refusing, when they run rows, at a call that follows such
+    /// a chain or is given one.
     AShiftThatLeavesNulls,
     /// Whether values of different lengths combine, as the lists of two rows
     /// do not, depends on the rows, which the tables measured on one sample.
@@ -654,10 +655,25 @@ fn shift_rows(link: &Call) -> i64 {
 
 /// Whether `links`, taken from the sample, leave only nulls: shifts that move all
 /// its rows, or one value, which an aggregate leaves, shifted away, or the first
-/// row that a shift left null.
+/// row that a shift left null, or a running sum of a comparison with a null,
+/// which Polars gives as a column of nulls.
 fn leaves_only_nulls(links: &[Call]) -> bool {
     let (mut rows, mut shifted) = (SAMPLE_ROWS, 0);
+    let mut compared_with_a_null = false;
     for link in links {
+        compared_with_a_null |= [
+            "Expr.eq", "Expr.ne", "Expr.gt", "Expr.ge", "Expr.lt", "Expr.le",
+        ]
+        .contains(&link.entry().id().as_str())
+            && operands(link).into_iter().any(|(_, operand)| {
+                operand.links().is_empty()
+                    && matches!(operand.start(), Start::Call(start)
+                        if is(start, "polars.lit")
+                            && matches!(start.argument("value"), Some(Value::Flag(None))))
+            });
+        if is(link, "Expr.cum_sum") && compared_with_a_null {
+            shifted = rows;
+        }
         shifted += shift_rows(link);
         if is(link, "Expr.first")
             && !matches!(link.argument("ignore_nulls"), Some(Value::Flag(Some(true))))
