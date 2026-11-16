@@ -121,7 +121,9 @@ pub enum Limit {
     /// predicate after the first on the rows left to it. On the rows of the
     /// sample that may be none, and what would be refused is not raised. Only
     /// what the tables refused when it ran rows is excused; what they refused
-    /// when it built the step is refused whatever the rows.
+    /// when it built the step is refused whatever the rows. Of the named rules it
+    /// excuses only the refusal of a later predicate in the `order_by` of a
+    /// window, which Polars evaluates on groups and skips where no row reaches it.
     AValueThatRunsOnNoRows,
     /// The other table's key is made of the dtype its chain gives on its own,
     /// and the join may resolve the chain to another, as the precision of a
@@ -783,6 +785,20 @@ fn leaves_only_nulls(links: &[Call]) -> bool {
     shifted >= rows
 }
 
+/// Whether a place is inside a later predicate of a condition, in the `order_by`
+/// of a window. A window's `order_by` is evaluated on groups, where Polars does
+/// not evaluate a predicate that no row reaches, as the rows of the sample
+/// decide; `select`, `sort`, `partition_by` and `more_exprs` evaluate it.
+fn in_a_later_predicate_of_an_order_by(case: &Case, place: &Place) -> bool {
+    keys(case, false).iter().any(|(key, _)| {
+        place.path().starts_with(key.path())
+            && held_by(key, "order_by")
+            && place.path()[key.path().len()..].windows(2).any(|pair| {
+                matches!(pair, [Segment::Link(_), Segment::Parameter(name)] if name == "predicates")
+            })
+    })
+}
+
 /// Whether a condition is decided true by a literal that is its only first
 /// predicate, and its first value reads a column, or the whole condition is
 /// literals: Polars evaluates that value and not what follows it. A first value
@@ -854,7 +870,8 @@ fn held_by(place: &Place, name: &str) -> bool {
 /// is one value, or a window's `order_by` that is, is dropped, and Polars
 /// refuses the same key elsewhere or when it is not one value; a `len` in a
 /// `select` of one values is not given what it counts; and a condition that a
-/// literal true decides drops what follows its first value.
+/// literal true decides drops what follows its first value; and a later
+/// predicate in a window's `order_by` is not evaluated where no row reaches it.
 fn applies_to_a_rule(
     limit: Limit,
     rule: &str,
@@ -869,6 +886,9 @@ fn applies_to_a_rule(
     match limit {
         Limit::ALiteral => {
             predicate_rule && walk.evaluation_at(&refused.place) == Evaluation::Dropped
+        }
+        Limit::AValueThatRunsOnNoRows => {
+            predicate_rule && in_a_later_predicate_of_an_order_by(case, &refused.place)
         }
         Limit::ADecidedCondition => {
             let locus = locate(case, &refused.place);
