@@ -3,8 +3,11 @@
 
 mod claims;
 mod dtypes;
+mod floats;
 mod inputs;
+mod nesting;
 mod reading;
 mod refusals;
 mod support;
+mod syntax;
 mod writing;

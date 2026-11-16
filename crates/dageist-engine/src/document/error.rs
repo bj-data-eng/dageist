@@ -5,6 +5,7 @@ use std::fmt;
 use crate::catalog::{Applies, BuildError};
 
 use super::dtype::DtypeError;
+use super::json::SyntaxError;
 use super::model::StepId;
 
 /// One step of the way from a step to the thing inside it.
@@ -200,6 +201,9 @@ pub enum Cause {
     EmptyStepId,
     /// A step identifier used twice.
     DuplicateStep(StepId),
+    /// A step whose JSON would nest arrays and objects deeper than
+    /// [`MAX_NESTING`](super::MAX_NESTING) allows.
+    TooDeep,
 }
 
 impl fmt::Display for Cause {
@@ -247,6 +251,11 @@ impl fmt::Display for Cause {
                 write!(formatter, "the condition still needs its {needs}")
             }
             Self::EmptyStepId => formatter.write_str("a step needs an identifier"),
+            Self::TooDeep => write!(
+                formatter,
+                "the step nests arrays and objects deeper than {} levels",
+                super::MAX_NESTING
+            ),
             Self::DuplicateStep(id) => {
                 write!(
                     formatter,
@@ -330,8 +339,9 @@ impl std::error::Error for Refusal {
 /// Why text could not be read as a document.
 #[derive(Debug)]
 pub enum ReadError {
-    /// The text is not JSON, or repeats a field.
-    Syntax(serde_json::Error),
+    /// The text is not JSON by RFC 8259, repeats a key, or nests arrays and
+    /// objects deeper than [`MAX_NESTING`](super::MAX_NESTING).
+    Syntax(SyntaxError),
     /// The JSON is not a document the engine reads.
     Refused(Refusal),
 }

@@ -3,7 +3,7 @@
 
 use dageist_engine::catalog::{Applies, BuildError, entry};
 use dageist_engine::document::{
-    Call, Cause, Document, DtypeError, ReadError, Refusal, Segment, Value,
+    Call, Cause, Document, DtypeError, ReadError, Refusal, Segment, SyntaxProblem, Value,
 };
 use serde_json::{Value as Json, json};
 
@@ -60,10 +60,12 @@ fn a_repeated_field_is_a_syntax_error_not_a_last_one_wins() {
     let ReadError::Syntax(error) = error else {
         panic!("not a syntax error: {error:?}");
     };
-    assert!(
-        error.to_string().contains("duplicate field `version`"),
-        "{error}"
+    assert_eq!(
+        error.problem(),
+        &SyntaxProblem::DuplicateKey("version".to_owned())
     );
+    // The place is the second `"version"`, which opens at column 14.
+    assert_eq!((error.line(), error.column()), (1, 14));
 
     let twice = r#"{"id":"s","call":{"entry":"LazyFrame.select","arguments":{"exprs":{"many":[]},"exprs":{"many":[]}}}}"#;
     assert!(matches!(

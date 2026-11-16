@@ -132,3 +132,44 @@ fn a_dtype_the_document_cannot_hold_is_refused() {
         );
     }
 }
+
+fn nested_lists(depth: usize, inner: &str) -> String {
+    format!("{}{inner}{}", "List(".repeat(depth), ")".repeat(depth))
+}
+
+#[test]
+fn lists_nest_up_to_thirty_two_deep_and_no_deeper() {
+    let allowed = nested_lists(32, "Int64");
+    let dtype: Dtype = allowed.parse().expect("thirty-two lists");
+    assert_eq!(dtype.to_string(), allowed);
+
+    let beyond = nested_lists(33, "Int64");
+    assert!(matches!(
+        beyond.parse::<Dtype>(),
+        Err(DtypeError::Unknown(_))
+    ));
+}
+
+#[test]
+fn a_hostile_dtype_text_is_refused_without_exhausting_the_stack() {
+    let hostile = nested_lists(200_000, "Int64");
+    assert!(matches!(
+        hostile.parse::<Dtype>(),
+        Err(DtypeError::Unknown(_))
+    ));
+}
+
+#[test]
+fn a_polars_dtype_of_lists_nests_up_to_the_same_limit() {
+    let wrap =
+        |depth: usize| (0..depth).fold(DataType::Int64, |inner, _| DataType::List(Box::new(inner)));
+    let allowed = Dtype::new(wrap(32)).expect("thirty-two lists");
+    assert_eq!(
+        allowed.to_string().parse::<Dtype>().expect("reads back"),
+        allowed
+    );
+    assert!(matches!(
+        Dtype::new(wrap(33)),
+        Err(DtypeError::Unsupported(_))
+    ));
+}

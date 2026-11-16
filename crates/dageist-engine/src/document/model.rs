@@ -14,6 +14,7 @@ use crate::catalog::{Argument, Build, Entry, Kind, Parameter, Shape, ValueType};
 
 use super::dtype::Dtype;
 use super::error::{Cause, Place, Position, Refusal, Segment};
+use super::{MAX_NESTING, write};
 
 /// The identifier of a step: its name in the document, which no other step
 /// has.
@@ -528,9 +529,18 @@ impl Document {
     ///
     /// # Errors
     ///
-    /// When two steps have the same identifier. The place is the later one.
+    /// When two steps have the same identifier, or a step would be written
+    /// with arrays and objects nested deeper than [`MAX_NESTING`] allows
+    /// inside the document. The place is the later step, or the deep one.
     pub fn new(steps: Vec<Step>) -> Result<Self, Refusal> {
         for (at, step) in steps.iter().enumerate() {
+            // The document's object and its `steps` array are open around the step.
+            if 2 + write::depth(step) > MAX_NESTING {
+                return Err(Refusal::at(
+                    Place::of_step(at, Some(step.id.clone())),
+                    Cause::TooDeep,
+                ));
+            }
             if steps[..at].iter().any(|before| before.id == step.id) {
                 return Err(Refusal::at(
                     Place::of_step(at, Some(step.id.clone())),

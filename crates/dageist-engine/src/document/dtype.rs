@@ -5,12 +5,16 @@
 //! `List(Int64)`. There is one spelling for each dtype, so what is read is
 //! what is written back. The dtypes are the integers, the floats, `String`,
 //! `Boolean`, `Date`, `Time`, `Null`, `Datetime`, `Duration` and `List` of any
-//! of them.
+//! of them, nested up to 32 deep.
 
 use std::fmt;
 use std::str::FromStr;
 
 use polars::prelude::{DataType, PolarsError, TimeUnit, TimeZone};
+
+/// How many `List` a dtype may nest, as in `List(List(Int64))`, which is two.
+/// A text with more is no dtype of the document.
+const MAX_LIST_NESTING: usize = 32;
 
 /// A Polars dtype the document can hold.
 ///
@@ -75,8 +79,8 @@ impl Dtype {
     /// When the document cannot hold it, or when it would not read back as
     /// itself.
     pub fn new(dtype: DataType) -> Result<Self, DtypeError> {
-        match text(&dtype) {
-            Some(written) if parse(&written).is_ok_and(|read| read == dtype) => Ok(Self(dtype)),
+        match text(&dtype, 0) {
+            Some(written) if parse(&written, 0).is_ok_and(|read| read == dtype) => Ok(Self(dtype)),
             _ => Err(DtypeError::Unsupported(dtype)),
         }
     }
@@ -97,7 +101,7 @@ impl Dtype {
 impl fmt::Display for Dtype {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         // `new` and `FromStr` only make dtypes that have text.
-        formatter.write_str(&text(&self.0).unwrap_or_default())
+        formatter.write_str(&text(&self.0, 0).unwrap_or_default())
     }
 }
 
@@ -105,7 +109,7 @@ impl FromStr for Dtype {
     type Err = DtypeError;
 
     fn from_str(written: &str) -> Result<Self, Self::Err> {
-        parse(written).map(Self)
+        parse(written, 0).map(Self)
     }
 }
 
@@ -176,8 +180,9 @@ const fn simple_name(dtype: &DataType) -> Option<&'static str> {
     })
 }
 
-/// The text of `dtype`, if the document can hold it.
-fn text(dtype: &DataType) -> Option<String> {
+/// The text of `dtype`, if the document can hold it. `lists` is how many
+/// `List` are open around it.
+fn text(dtype: &DataType, lists: usize) -> Option<String> {
     if let Some(name) = simple_name(dtype) {
         return Some(name.to_owned());
     }
@@ -189,12 +194,15 @@ fn text(dtype: &DataType) -> Option<String> {
                 .map_or_else(|| "None".to_owned(), |zone| format!("'{zone}'")),
         )),
         DataType::Duration(unit) => Some(format!("Duration(time_unit='{}')", unit_name(*unit))),
-        DataType::List(inner) => text(inner).map(|inner| format!("List({inner})")),
+        DataType::List(inner) if lists < MAX_LIST_NESTING => {
+            text(inner, lists + 1).map(|inner| format!("List({inner})"))
+        }
         _ => None,
     }
 }
 
-fn parse(written: &str) -> Result<DataType, DtypeError> {
+/// `lists` is how many `List` are open around `written`.
+fn parse(written: &str, lists: usize) -> Result<DataType, DtypeError> {
     let unknown = || DtypeError::Unknown(written.to_owned());
     if let Some(dtype) = simple(written) {
         return Ok(dtype);
@@ -203,7 +211,10 @@ fn parse(written: &str) -> Result<DataType, DtypeError> {
         .strip_prefix("List(")
         .and_then(|rest| rest.strip_suffix(')'))
     {
-        return Ok(DataType::List(Box::new(parse(inner)?)));
+        if lists >= MAX_LIST_NESTING {
+            return Err(unknown());
+        }
+        return Ok(DataType::List(Box::new(parse(inner, lists + 1)?)));
     }
     if let Some(unit) = written
         .strip_prefix("Duration(time_unit='")

@@ -15,7 +15,7 @@ impl Document {
     #[must_use]
     pub fn write(&self) -> String {
         Json::Object(vec![
-            ("version".to_owned(), Json::Number(VERSION.into())),
+            ("version".to_owned(), Json::integer(VERSION.into())),
             (
                 "steps".to_owned(),
                 Json::Array(self.steps().iter().map(step).collect()),
@@ -23,6 +23,11 @@ impl Document {
         ])
         .to_text()
     }
+}
+
+/// How many arrays and objects `step` opens inside each other when written.
+pub(super) fn depth(step: &Step) -> usize {
+    self::step(step).depth()
 }
 
 fn entry(name: &str, value: Json) -> (String, Json) {
@@ -77,7 +82,7 @@ fn value(value: &Value) -> Json {
     let (kind, inner) = match value {
         Value::Expression(inner) => ("expression", expression(inner)),
         Value::Columns(names) => ("columns", strings(names)),
-        Value::Integer(number) => ("integer", Json::Number((*number).into())),
+        Value::Integer(number) => ("integer", Json::integer(*number)),
         // A float is finite wherever a `Call` holds it; `null` is not reachable.
         Value::Float(number) => ("float", Json::float(*number).unwrap_or(Json::Null)),
         Value::String(text) => ("string", Json::String(text.clone())),

@@ -11,7 +11,7 @@ use crate::catalog::entry;
 use super::VERSION;
 use super::dtype::Dtype;
 use super::error::{Cause, Position, ReadError, Refusal, Segment};
-use super::json::Json;
+use super::json::{Json, Number};
 use super::model::{Call, Document, Expression, Start, Step, StepId, Value};
 
 impl Document {
@@ -27,8 +27,10 @@ impl Document {
     ///
     /// # Errors
     ///
-    /// When the text is not JSON, repeats a field, or is not a document in
-    /// every respect above. A refusal names its place.
+    /// When the text is not JSON by RFC 8259, repeats a field, nests arrays
+    /// and objects deeper than [`MAX_NESTING`](super::MAX_NESTING), or is not
+    /// a document in every respect above. A syntax error names its line and
+    /// column; a refusal names its place.
     pub fn read(text: &str) -> Result<Self, ReadError> {
         let json = Json::parse(text).map_err(ReadError::Syntax)?;
         read_document(&json).map_err(ReadError::Refused)
@@ -95,7 +97,7 @@ fn read_document(json: &Json) -> Result<Document, Refusal> {
     let entries = entries("the document", json)?;
     let version = field(entries, "version")?;
     match version {
-        Json::Number(number) if number.as_u64() == Some(u64::from(VERSION)) => {}
+        Json::Number(Number::Integer(number)) if *number == i64::from(VERSION) => {}
         other => {
             return Err(Refusal::new(Cause::UnsupportedVersion(other.to_text())));
         }
@@ -159,15 +161,11 @@ fn read_value(json: &Json) -> Result<Value, Refusal> {
         "expression" => Value::Expression(read_expression(inner)?),
         "columns" => Value::Columns(strings("columns", inner)?),
         "integer" => match inner {
-            Json::Number(number) if number.as_i64().is_some() => {
-                Value::Integer(number.as_i64().unwrap_or_default())
-            }
+            Json::Number(Number::Integer(number)) => Value::Integer(*number),
             other => return Err(shape("integer", "a whole number", other)),
         },
         "float" => match inner {
-            Json::Number(number) if number.is_f64() => {
-                Value::Float(number.as_f64().unwrap_or_default())
-            }
+            Json::Number(Number::Float(number)) => Value::Float(*number),
             other => {
                 return Err(shape(
                     "float",
