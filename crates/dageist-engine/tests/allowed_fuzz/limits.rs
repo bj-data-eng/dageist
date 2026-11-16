@@ -56,8 +56,9 @@ pub enum Limit {
     /// inside a sort key that is one value, or inside an expression with a `len`
     /// in it, which Polars allows. What the tables say of a method's dtype was
     /// measured in `select` on a column. Of the named rules it excuses only the
-    /// refusal of a later predicate of a condition that a literal predicate
-    /// decides, with a `len` after it.
+    /// refusal of a predicate inside a sort key that is one value, and of a later
+    /// predicate of a condition that a literal predicate decides, with a `len`
+    /// after it.
     AnAggregateGivesOneValue,
     /// A pivot's aggregate is run on the values of each group, not on a
     /// column in `select`, and Polars uses other kernels for them: it takes the
@@ -782,9 +783,11 @@ fn leaves_only_nulls(links: &[Call]) -> bool {
 
 /// Whether the limit is why Polars allows what the named rule refuses. A limit
 /// excuses a rule only for a cause it names, and the evidence for each is a
-/// campaign case: a fold of a null drops the predicate, which the walk says
-/// ([`Walk::evaluation_at`]); and a condition that a literal predicate decides,
-/// with a `len` after it, does not read its later predicates.
+/// campaign case and a replay of it without the cause: a fold of a null drops
+/// the predicate, which the walk says ([`Walk::evaluation_at`]); a sort key that
+/// is one value is dropped, and Polars refuses the same key in `select`; and a
+/// condition that a literal predicate decides, with a `len` after it, does not
+/// read its later predicates.
 fn applies_to_a_rule(
     limit: Limit,
     rule: &str,
@@ -802,12 +805,21 @@ fn applies_to_a_rule(
         }
         Limit::AnAggregateGivesOneValue => {
             let locus = locate(case, &refused.place);
-            predicate_rule
+            // A sort key that is one value is dropped, so no predicate in it is
+            // evaluated; a window's key is evaluated, and is not this.
+            let dropped = is(case.document.steps()[0].call(), "LazyFrame.sort")
                 && locus
-                    .inside
-                    .iter()
-                    .zip(&locus.reach)
-                    .any(|(holder, reach)| is_decided(holder) && reached_by_a_len(holder, *reach))
+                    .top
+                    .is_some_and(|top| wholly_single(top, top.links().len(), true));
+            predicate_rule
+                && (dropped
+                    || locus
+                        .inside
+                        .iter()
+                        .zip(&locus.reach)
+                        .any(|(holder, reach)| {
+                            is_decided(holder) && reached_by_a_len(holder, *reach)
+                        }))
         }
         _ => false,
     }
