@@ -138,6 +138,24 @@ each block from disk as you scroll.
 To time the engine without the application, run
 `cargo run --release --offline --locked -p dageist-engine --example measure`.
 
+## Check The Fuzz Framework
+
+`dageist-fuzz` is a workspace member outside `default-members`, so name it. It
+does not need the view or the host:
+
+```sh
+cargo test --offline --locked -p dageist-fuzz
+cargo test --offline --locked -p dageist-fuzz --all-features
+cargo clippy --offline --locked -p dageist-fuzz --all-targets --all-features --no-deps -- -F unsafe-code -D warnings
+```
+
+The tests pass and Clippy reports no warnings. The campaign tests that build
+isolated source checkouts and run sanitizer-guided targets are ignored by
+default; the [crate README](../crates/dageist-fuzz/README.md) describes how to
+run them, and the crate's controlled author fixture under
+`crates/dageist-fuzz/tests/fixtures/subject/` is a standalone workspace with its
+own lock file.
+
 ## Check Formatting
 
 ```sh
