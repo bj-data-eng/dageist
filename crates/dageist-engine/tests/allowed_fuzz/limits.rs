@@ -1570,15 +1570,14 @@ mod tests {
     }
 
     #[test]
-    fn a_decided_condition_and_a_len_together_excuse_a_later_predicate_and_neither_alone_does() {
-        // `when(lit).then(1).when(g).then(2).otherwise(3).len()`: Polars allows
-        // the text `g` only for a decided condition that a `len` follows.
+    fn a_len_in_a_select_of_one_values_excuses_a_predicate_rule_and_nowhere_else() {
+        // `select([when(p).then(1).when(g).then(2).otherwise(3).len()])`: Polars
+        // does not evaluate what a `len` counts where every item of a `select` is
+        // one value, whether or not a literal predicate decides the condition. It
+        // evaluates it in `with_columns`, beside an item that is a column, and
+        // without the `len`.
         let value = |at: i64| chain(literal_of(at), &[]);
-        let item = |decided: Option<bool>, len: bool| {
-            let predicate = match decided {
-                Some(value) => boolean(Some(value)),
-                None => chain(column("k"), &[]),
-            };
+        let item = |first: Expression, len: bool| {
             let mut links = vec![
                 then_of(value(1)),
                 also_when(vec![chain(column("g"), &[])]),
@@ -1594,29 +1593,56 @@ mod tests {
             if len {
                 links.push(call("Expr.len", Vec::new()));
             }
-            select(vec![chain_of(when_of(vec![predicate]), links)])
+            chain_of(when_of(vec![first]), links)
         };
-        let later = at(&[
-            parameter("exprs"),
-            Segment::Item(0),
-            Segment::Link(1),
-            parameter("predicates"),
-            Segment::Item(0),
-        ]);
-        for decided in [Some(true), Some(false), None] {
-            let case = item(decided, true);
-            let found = rule_refuses(&case, later.clone(), BOOLEAN_RULE, "a rule");
-            if decided.is_some() {
-                assert_eq!(found, vec![Limit::AnAggregateGivesOneValue], "{decided:?}");
-            } else {
-                assert_eq!(found, vec![], "{decided:?}: no decision");
+        let places = [
+            start_predicate(0),
+            at(&[
+                parameter("exprs"),
+                Segment::Item(0),
+                Segment::Link(1),
+                parameter("predicates"),
+                Segment::Item(0),
+            ]),
+        ];
+        let predicates = [
+            ("a column", chain(column("k"), &[])),
+            ("a decided condition", boolean(Some(true))),
+        ];
+        for (name, first) in predicates {
+            for place in &places {
+                let case = select(vec![item(first.clone(), true)]);
+                assert_eq!(
+                    rule_refuses(&case, place.clone(), BOOLEAN_RULE, "a rule"),
+                    vec![Limit::AnAggregateGivesOneValue],
+                    "{name}"
+                );
+                // No `len`.
+                let case = select(vec![item(first.clone(), false)]);
+                assert_eq!(
+                    rule_refuses(&case, place.clone(), BOOLEAN_RULE, "a rule"),
+                    vec![],
+                    "{name}: no len"
+                );
+                // `with_columns` evaluates it.
+                let case = case_of(call(
+                    "LazyFrame.with_columns",
+                    vec![("exprs", many(vec![item(first.clone(), true)]))],
+                ));
+                assert_eq!(
+                    rule_refuses(&case, place.clone(), BOOLEAN_RULE, "a rule"),
+                    vec![],
+                    "{name}: with_columns"
+                );
+                // An item that is a column beside it.
+                let case = select(vec![item(first.clone(), true), chain(column("h"), &[])]);
+                assert_eq!(
+                    rule_refuses(&case, place.clone(), BOOLEAN_RULE, "a rule"),
+                    vec![],
+                    "{name}: beside a column"
+                );
             }
         }
-        // Decided and no `len`.
-        assert_eq!(
-            rule_refuses(&item(Some(true), false), later, BOOLEAN_RULE, "a rule"),
-            vec![]
-        );
     }
 
     /// A whole number of the dtype of `literal`, as a literal call.
