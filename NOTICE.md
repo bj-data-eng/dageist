@@ -1,16 +1,16 @@
 # Dageist
 
-[Dageist](https://github.com/bj-data-eng/dageist) is licensed under its own
-[MIT License](LICENSE). This notice records attribution for the direct Rust
+[Dageist](https://github.com/bj-data-eng/dageist) is licensed under its own [MIT
+License](LICENSE). This notice records attribution for the direct Rust
 dependencies declared in
 [crates/dageist-tauri/Cargo.toml](crates/dageist-tauri/Cargo.toml),
 [crates/dageist-engine/Cargo.toml](crates/dageist-engine/Cargo.toml) and
 [crates/dageist-fuzz/Cargo.toml](crates/dageist-fuzz/Cargo.toml), including the
-fuzz framework's optional dependencies, and the crates patched in the root [Cargo.toml](Cargo.toml), at the versions resolved
-by [Cargo.lock](Cargo.lock), for the direct dependencies of
-the public API audit generator declared in
-[api/generator/Cargo.toml](api/generator/Cargo.toml) at the versions resolved
-by [its lock file](api/generator/Cargo.lock), and for the libraries and the
+fuzz framework's optional dependencies, and the crates patched in the root
+[Cargo.toml](Cargo.toml), at the versions resolved by [Cargo.lock](Cargo.lock),
+for the direct dependencies of the public API audit generator declared in
+[api/generator/Cargo.toml](api/generator/Cargo.toml) at the versions resolved by
+[its lock file](api/generator/Cargo.lock), and for the libraries and the
 typefaces copied into the view. It does not enumerate the Rust dependencies'
 transitive, optional, platform, or compiled dependencies, and it is not a
 complete inventory for a distributed application bundle.

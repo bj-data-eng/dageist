@@ -377,11 +377,12 @@ edits production source, files issues, or uploads artifacts automatically.
 ## Build and verify
 
 The framework is a workspace member outside `default-members`, so name it in
-every Cargo command. No production crate depends on it. Build its command front door explicitly with `--features execution`.
-Ordinary library checks do not require a C++ compiler or nightly compiler.
-Coverage owners require a supported nightly, libfuzzer-sys and a C++ compiler.
-The admitted tool combination is recorded in the fixture lockfile and source;
-tool acquisition is a setup action, never a hidden campaign step.
+every Cargo command. No production crate depends on it. Build its command front
+door explicitly with `--features execution`. Ordinary library checks do not
+require a C++ compiler or nightly compiler. Coverage owners require a supported
+nightly, libfuzzer-sys and a C++ compiler. The admitted tool combination is
+recorded in the fixture lockfile and source; tool acquisition is a setup action,
+never a hidden campaign step.
 
 ```sh
 cargo test --offline --locked -p dageist-fuzz

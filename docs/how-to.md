@@ -13,7 +13,7 @@ cargo test --offline --locked -p dageist --lib
 cargo clippy --offline --locked -p dageist --all-targets --no-deps -- -F unsafe-code -D warnings
 ```
 
-The tests pass and Clippy reports no warnings. `-F unsafe-code` rejects any
+Expect the tests to pass and Clippy to report no warnings. `-F unsafe-code` rejects any
 `unsafe` code in the checked package.
 
 ## Check The View
@@ -149,7 +149,7 @@ cargo test --offline --locked -p dageist-fuzz --all-features
 cargo clippy --offline --locked -p dageist-fuzz --all-targets --all-features --no-deps -- -F unsafe-code -D warnings
 ```
 
-The tests pass and Clippy reports no warnings. The campaign tests that build
+Expect the tests to pass and Clippy to report no warnings. The campaign tests that build
 isolated source checkouts and run sanitizer-guided targets are ignored by
 default; the [crate README](../crates/dageist-fuzz/README.md) describes how to
 run them, and the crate's controlled author fixture under
