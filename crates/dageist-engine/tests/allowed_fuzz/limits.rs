@@ -783,25 +783,42 @@ fn folded_by_a_null(locus: &Locus) -> bool {
 /// runs cases on.
 const SAMPLE_ROWS: i64 = 3;
 
-/// How many rows the `shift`s among `links` move, those that fill the rows they
-/// move with nothing: a shift of a number that is not written as a whole number,
-/// or one given a value to fill with, counts for none.
-fn shifted_by(links: &[Call]) -> i64 {
-    links
-        .iter()
-        .filter(|link| is(link, "Expr.shift") && link.argument("fill_value").is_none())
-        .map(|link| match link.argument("n") {
-            None => 1,
-            Some(Value::Expression(n)) if n.links().is_empty() => match n.start() {
-                Start::Call(start) if is(start, "polars.lit") => match start.argument("value") {
-                    Some(Value::Integer(rows)) => rows.abs(),
-                    _ => 0,
-                },
+/// How many rows the `shift` `link` moves, when it fills them with nothing: a
+/// shift of a number that is not written as a whole number, or one given a value
+/// to fill with, counts for none.
+fn shift_rows(link: &Call) -> i64 {
+    if !is(link, "Expr.shift") || link.argument("fill_value").is_some() {
+        return 0;
+    }
+    match link.argument("n") {
+        None => 1,
+        Some(Value::Expression(n)) if n.links().is_empty() => match n.start() {
+            Start::Call(start) if is(start, "polars.lit") => match start.argument("value") {
+                Some(Value::Integer(rows)) => rows.abs(),
                 _ => 0,
             },
-            Some(_) => 0,
-        })
-        .sum()
+            _ => 0,
+        },
+        Some(_) => 0,
+    }
+}
+
+/// Whether `links`, taken from the sample, leave only nulls: shifts that move all
+/// its rows, or one value, which an aggregate leaves, shifted away, or the first
+/// row that a shift left null.
+fn leaves_only_nulls(links: &[Call]) -> bool {
+    let (mut rows, mut shifted) = (SAMPLE_ROWS, 0);
+    for link in links {
+        shifted += shift_rows(link);
+        if is(link, "Expr.first")
+            && !matches!(link.argument("ignore_nulls"), Some(Value::Flag(Some(true))))
+        {
+            (rows, shifted) = (1, i64::from(shifted >= 1));
+        } else if is_one_value(link) {
+            (rows, shifted) = (1, 0);
+        }
+    }
+    shifted >= rows
 }
 
 /// Whether the limit is why Polars allows what the named rule refuses. A limit
@@ -989,10 +1006,15 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
         }
         (Limit::AShiftThatEmptiesTheSample, Disagreement::PolarsAllows(refused)) => {
             let locus = locate(case, &refused.place);
+            // What the call follows, or is given, is only nulls.
             refused.stage == Some(TableStage::Rows)
-                && locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
-                    shifted_by(&chain.links()[..at.min(chain.links().len())]) >= SAMPLE_ROWS
-                })
+                && (locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
+                    leaves_only_nulls(&chain.links()[..at.min(chain.links().len())])
+                }) || locus.call.is_some_and(|call| {
+                    operands(call)
+                        .into_iter()
+                        .any(|(_, operand)| leaves_only_nulls(operand.links()))
+                }))
         }
         (Limit::ASingleValueInAKey, Disagreement::PolarsAllows(refused)) => {
             // The key the tables refused is wholly one value.
