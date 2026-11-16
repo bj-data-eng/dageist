@@ -807,6 +807,52 @@ fn a_subtraction_with_a_null_leaves_an_aggregate_in_a_join_key() {
 }
 
 #[test]
+fn a_fold_drops_an_aggregate_only_from_a_side_that_is_one_value_or_literals() {
+    // Polars refuses `(k - a.sum()) > (b.first() == null)` as not elementwise: it
+    // folds the comparison, but evaluates the side that holds a column beside the
+    // aggregate. It drops a side that is one value or literals alone.
+    let rule = Some(RefusalSource::Rule(Rule::KeyIsElementwise));
+    let aggregate = || field_then("a", vec![call("Expr.sum", json!({}))]);
+    let folds = || {
+        field_then(
+            "b",
+            vec![call("Expr.first", json!({})), compared("Expr.eq", null())],
+        )
+    };
+    let mixed_follows = field_then(
+        "k",
+        vec![
+            compared("Expr.sub", aggregate()),
+            compared("Expr.gt", folds()),
+        ],
+    );
+    assert_eq!(joined_on(mixed_follows), rule);
+    let mixed_given = field_then(
+        "a",
+        vec![
+            call("Expr.first", json!({})),
+            compared(
+                "Expr.gt",
+                field_then(
+                    "k",
+                    vec![
+                        compared("Expr.sub", aggregate()),
+                        compared("Expr.eq", null()),
+                    ],
+                ),
+            ),
+        ],
+    );
+    assert_eq!(joined_on(mixed_given), rule);
+    // One value on each side is dropped.
+    let single = field_then(
+        "a",
+        vec![call("Expr.first", json!({})), compared("Expr.gt", folds())],
+    );
+    assert_eq!(joined_on(single), None);
+}
+
+#[test]
 fn a_comparison_of_an_aggregate_with_a_null_is_no_comparison_of_a_column() {
     // `f.first() == null` is one value, and what is compared with it is a column
     // compared with a value that is not null.
