@@ -80,13 +80,15 @@ pub enum Limit {
     /// place, in a case whose join key holds a comparison with a null literal at
     /// any depth.
     ANullComparisonInAKey,
-    /// Shifts that total the sample's three rows or more, with no value to fill
-    /// them, leave every row null, and Polars does not meet a call after them
-    /// with a dtype that the tables refuse when they run rows: a comparison of a
-    /// list with a `Boolean` is refused after none, one or two shifts, and
-    /// allowed after three. The tables refusing, when they run rows, at a call
-    /// of a chain whose earlier links shift by three rows or more in all.
-    AShiftThatEmptiesTheSample,
+    /// A shift that fills nothing leaves nulls, and Polars does not meet a call
+    /// with a dtype that the tables refuse when they run rows where what it
+    /// follows or is given is only nulls: shifts that total the sample's three
+    /// rows or more, an aggregate that leaves one value which a shift moves away,
+    /// the first of what a shift moved. A comparison of a list with a `Boolean`
+    /// is refused after none, one or two shifts and allowed after three. The
+    /// tables refusing, when they run rows, at a call that follows such a chain
+    /// or is given one.
+    AShiftThatLeavesNulls,
     /// Whether values of different lengths combine, as the lists of two rows
     /// do not, depends on the rows, which the tables measured on one sample.
     TheLengthsOfTheRows,
@@ -140,7 +142,7 @@ impl Limit {
         Self::AGroupAggregate,
         Self::ASingleValueInAKey,
         Self::ANullComparisonInAKey,
-        Self::AShiftThatEmptiesTheSample,
+        Self::AShiftThatLeavesNulls,
         Self::TheLengthsOfTheRows,
         Self::AnOverflow,
         Self::TheBranchesAreOne,
@@ -161,7 +163,7 @@ impl Limit {
             Self::AGroupAggregate => "a-group-aggregate",
             Self::ASingleValueInAKey => "a-single-value-in-a-key",
             Self::ANullComparisonInAKey => "a-null-comparison-in-a-key",
-            Self::AShiftThatEmptiesTheSample => "a-shift-that-empties-the-sample",
+            Self::AShiftThatLeavesNulls => "a-shift-that-leaves-nulls",
             Self::TheLengthsOfTheRows => "the-lengths-of-the-rows",
             Self::AnOverflow => "an-overflow",
             Self::TheBranchesAreOne => "the-branches-are-one",
@@ -198,8 +200,8 @@ impl Limit {
             Self::AGroupAggregate => {
                 "a pivot's aggregate is run on groups, with kernels of its own, not on a column in select"
             }
-            Self::AShiftThatEmptiesTheSample => {
-                "shifts that total the sample's rows leave every row null, which Polars does not meet with the dtype the tables refuse"
+            Self::AShiftThatLeavesNulls => {
+                "a shift leaves nulls, which Polars does not meet with the dtype the tables refuse"
             }
             Self::ANullComparisonInAKey => {
                 "Polars folds a comparison with a null in a join key into a null, which the rule does not wholly model"
@@ -1004,7 +1006,7 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
                             .all(|key| !other_cause(key))
                 }
         }
-        (Limit::AShiftThatEmptiesTheSample, Disagreement::PolarsAllows(refused)) => {
+        (Limit::AShiftThatLeavesNulls, Disagreement::PolarsAllows(refused)) => {
             let locus = locate(case, &refused.place);
             // What the call follows, or is given, is only nulls.
             refused.stage == Some(TableStage::Rows)
@@ -2144,12 +2146,12 @@ mod tests {
         let three = case(vec![shift(None), shift(None), shift(None)]);
         assert_eq!(
             tables_refuse(&three, at_the_comparison(3), ROWS, "no"),
-            vec![Limit::AShiftThatEmptiesTheSample]
+            vec![Limit::AShiftThatLeavesNulls]
         );
         let one_of_three = case(vec![shift(Some(3))]);
         assert_eq!(
             tables_refuse(&one_of_three, at_the_comparison(1), ROWS, "no"),
-            vec![Limit::AShiftThatEmptiesTheSample]
+            vec![Limit::AShiftThatLeavesNulls]
         );
         // Fewer leave rows, and the tables' refusal stands.
         let two = case(vec![shift(None), shift(None)]);
@@ -2202,12 +2204,12 @@ mod tests {
         let first_then_shift = given(chain_of(column("b"), shift(&["Expr.first", "Expr.shift"])));
         assert_eq!(
             tables_refuse(&first_then_shift, at_the_call.clone(), ROWS, "no"),
-            vec![Limit::AShiftThatEmptiesTheSample]
+            vec![Limit::AShiftThatLeavesNulls]
         );
         let shift_then_first = given(chain_of(column("k"), shift(&["Expr.shift", "Expr.first"])));
         assert_eq!(
             tables_refuse(&shift_then_first, at_the_call.clone(), ROWS, "no"),
-            vec![Limit::AShiftThatEmptiesTheSample]
+            vec![Limit::AShiftThatLeavesNulls]
         );
         // The first that skips nulls, a shift after a first that is not one, and
         // a first with no shift are not null.
