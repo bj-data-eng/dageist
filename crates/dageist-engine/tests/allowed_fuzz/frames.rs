@@ -125,6 +125,19 @@ impl Frames {
         }
     }
 
+    /// The same tables with the other table as the one a step starts from, for
+    /// an expression that a join's `right_on` holds, which reads that table's
+    /// columns.
+    pub fn other_as_left(&self) -> Self {
+        Self {
+            rows: self.other_rows.clone(),
+            empty: self.other_empty.clone(),
+            other_rows: self.rows.clone(),
+            other_empty: self.empty.clone(),
+            on_columns: self.on_columns.clone(),
+        }
+    }
+
     /// What the steps' table arguments name: the other table, with rows or
     /// without, and the values a pivot makes columns for.
     pub fn inputs(&self, empty: bool) -> Inputs {

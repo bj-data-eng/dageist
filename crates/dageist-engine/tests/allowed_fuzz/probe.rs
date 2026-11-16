@@ -19,7 +19,7 @@ use dageist_engine::document::{
 };
 
 use super::case::{Case, STEP};
-use super::observe::observe;
+use super::observe::observe_probe;
 use super::predict::{Refused, Source};
 
 /// What a probe found: the document it ran, and why Polars refused it.
@@ -43,6 +43,8 @@ struct Found<'a> {
     rest: &'a [Segment],
     /// Whether the place is in a pivot's aggregate, where `element` stands.
     in_the_aggregate: bool,
+    /// Whether the place is in a join's `right_on`, read against the other table.
+    on_the_other_table: bool,
 }
 
 enum Node<'a> {
@@ -90,6 +92,10 @@ fn find<'a>(case: &'a Case, place: &'a Place) -> Option<Found<'a>> {
             path.first(),
             Some(Segment::Parameter(name)) if name == "aggregate_function"
         ) && step.entry().id().as_str() == "LazyFrame.pivot",
+        on_the_other_table: matches!(
+            path.first(),
+            Some(Segment::Parameter(name)) if name == "right_on"
+        ),
     })
 }
 
@@ -199,12 +205,17 @@ fn objection(reason: &str) -> String {
     let mut kept = String::new();
     let mut depth = 0_u32;
     let mut quoted = false;
+    let mut named = false;
+    let mut previous = ' ';
     for character in reason.chars() {
+        let opens_a_name = character == '\'' && !previous.is_ascii_alphabetic();
+        previous = character;
         match character {
+            '\'' if opens_a_name || named => named = !named,
             '`' => quoted = !quoted,
             '(' | '[' => depth += 1,
             ')' | ']' => depth = depth.saturating_sub(1),
-            _ if quoted || depth > 0 => {}
+            _ if quoted || named || depth > 0 => {}
             _ => kept.push(character),
         }
     }
@@ -249,7 +260,9 @@ pub fn settle(case: &Case, refused: &Refused) -> Option<Settled> {
         argument: case.argument,
         document,
     };
-    let reason = observe(&probe).refusal?.reason;
+    let reason = observe_probe(&probe, found.on_the_other_table)
+        .refusal?
+        .reason;
     same_reason(&refused.source, &refused.reason, &reason).then(|| Settled {
         probe: probe.document.write(),
         reason,

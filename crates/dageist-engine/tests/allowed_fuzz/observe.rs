@@ -266,6 +266,18 @@ fn key_dtype(case: &Case, first: &Observed) -> DataType {
         .unwrap_or(DataType::Int64)
 }
 
+/// What Polars does with a probe: the case's document, run once on the case's
+/// tables, or on the other table as the one it starts from.
+pub fn observe_probe(case: &Case, on_the_other_table: bool) -> Observed {
+    let frames = Frames::new(case.receiver, case.argument, &DataType::Int64);
+    let frames = if on_the_other_table {
+        frames.other_as_left()
+    } else {
+        frames
+    };
+    run_on(&case.document, &frames)
+}
+
 pub fn observe(case: &Case) -> Observed {
     let frames = Frames::new(case.receiver, case.argument, &DataType::Int64);
     let observed = run_on(&case.document, &frames);
