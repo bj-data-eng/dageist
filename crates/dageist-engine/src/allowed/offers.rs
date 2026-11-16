@@ -275,8 +275,10 @@ impl Fit {
 }
 
 /// What the dtype table says of a method on a receiver, with the arguments
-/// given: what it gives, or the first refusal. A parameter that must be given
-/// and is not needs only some dtype of argument that fits.
+/// given: what it gives, or the first refusal. What the arguments given decide
+/// is what it gives, as a `fill_value` of text makes a shift give text; where
+/// two of them give different results, it is not known. A parameter that must
+/// be given and is not needs only some dtype of argument that fits.
 fn on_receiver(
     entry: &'static Entry,
     receiver: Representative,
@@ -298,6 +300,9 @@ fn on_receiver(
     if required.is_empty() {
         fit = Some(line(None, None)?);
     }
+    // What the arguments given decide: each is measured on its own, so what
+    // the method gives is what they agree on, and not known where they do not.
+    let mut given_fits: Vec<Fit> = Vec::new();
     for (name, dtype) in arguments {
         let parameter = entry
             .parameters()
@@ -305,8 +310,19 @@ fn on_receiver(
             .map(catalog::Parameter::name)
             .find(|parameter| parameter == name)
             .ok_or_else(|| Refusal::structure(format!("{id} has no parameter {name}")))?;
-        let given = line(Some(parameter), Some(*dtype))?;
-        fit.get_or_insert(given);
+        given_fits.push(line(Some(parameter), Some(*dtype))?);
+    }
+    if let Some(first) = given_fits.first() {
+        let same_result = given_fits.iter().all(|found| found.result == first.result);
+        let same_shape = given_fits.iter().all(|found| found.shape == first.shape);
+        fit = Some(Fit {
+            result: if same_result {
+                first.result.clone()
+            } else {
+                None
+            },
+            shape: if same_shape { first.shape } else { Shape::Many },
+        });
     }
     for parameter in required {
         if arguments.iter().any(|(name, _)| *name == parameter) {
