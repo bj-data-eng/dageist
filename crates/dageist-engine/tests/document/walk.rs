@@ -766,6 +766,47 @@ fn an_aggregate_that_a_comparison_folded_by_a_null_reaches_is_not_a_cause() {
 }
 
 #[test]
+fn a_subtraction_with_a_null_leaves_an_aggregate_in_a_join_key() {
+    // Polars refuses `k != f.len() - null`, `f.len() - null != k` and
+    // `k - (f.len() - null)` as not elementwise: a comparison with a null drops
+    // the aggregate it follows or is given, and a subtraction with one does not.
+    let rule = Some(RefusalSource::Rule(Rule::KeyIsElementwise));
+    let subtracted = || {
+        field_then(
+            "f",
+            vec![call("Expr.len", json!({})), compared("Expr.sub", null())],
+        )
+    };
+    let keys = [
+        field_then("k", vec![compared("Expr.ne", subtracted())]),
+        chain(
+            call("polars.col", json!({ "name": { "columns": ["f"] } })),
+            vec![
+                call("Expr.len", json!({})),
+                compared("Expr.sub", null()),
+                compared("Expr.ne", field("k")),
+            ],
+        ),
+        field_then("k", vec![compared("Expr.sub", subtracted())]),
+    ];
+    for (at, key) in keys.into_iter().enumerate() {
+        assert_eq!(joined_on(key), rule, "key {at}");
+    }
+    // The comparison with a null still drops it.
+    let compared_with_a_null = field_then(
+        "k",
+        vec![compared(
+            "Expr.sub",
+            field_then(
+                "f",
+                vec![call("Expr.len", json!({})), compared("Expr.eq", null())],
+            ),
+        )],
+    );
+    assert_eq!(joined_on(compared_with_a_null), None);
+}
+
+#[test]
 fn a_comparison_of_an_aggregate_with_a_null_is_no_comparison_of_a_column() {
     // `f.first() == null` is one value, and what is compared with it is a column
     // compared with a value that is not null.
