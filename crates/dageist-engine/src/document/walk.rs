@@ -1096,11 +1096,21 @@ fn reaching_link(expression: &Expression) -> Option<usize> {
         .find(|at| is_reached_by_a_null(expression, *at))
 }
 
+/// The last comparison of an expression that a null reaches. Where a join's key
+/// is judged elementwise, Polars drops what a comparison with a null follows and
+/// is given, and does not drop what a subtraction with a null does: the key
+/// `k != f.len() - null` is not elementwise.
+fn reaching_comparison(expression: &Expression) -> Option<usize> {
+    (0..expression.links().len()).rev().find(|at| {
+        is_a_comparison(&expression.links()[*at]) && is_reached_by_a_null(expression, *at)
+    })
+}
+
 /// Whether an expression holds an aggregate. What a comparison that a null
 /// reaches follows is dropped, for the comparison is a null, and so is any
 /// aggregate in it.
 fn holds_an_aggregate(expression: &Expression) -> bool {
-    let from = reaching_link(expression).map_or(0, |at| at + 1);
+    let from = reaching_comparison(expression).map_or(0, |at| at + 1);
     let links = &expression.links()[from..];
     let start = match expression.start() {
         Start::Call(call) if from == 0 => Some(call),
