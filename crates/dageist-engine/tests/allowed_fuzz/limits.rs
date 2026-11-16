@@ -2053,6 +2053,95 @@ mod tests {
         );
     }
 
+    /// `when(h.is_null()).then(k).when(g.is_not_null()).then(k).when(h).then(1)`.
+    fn three_predicates() -> Expression {
+        chain_of(
+            when_of(vec![chain(column("h"), &["Expr.is_null"])]),
+            vec![
+                then_of(chain(column("k"), &[])),
+                also_when(vec![chain(column("g"), &["Expr.is_not_null"])]),
+                call(
+                    "ChainedWhen.then",
+                    vec![("statement", Value::Expression(chain(column("k"), &[])))],
+                ),
+                call(
+                    "ChainedThen.when",
+                    vec![("predicates", many(vec![chain(column("h"), &[])]))],
+                ),
+                call(
+                    "ChainedWhen.then",
+                    vec![("statement", Value::Expression(chain(literal_of(1), &[])))],
+                ),
+            ],
+        )
+    }
+
+    #[test]
+    fn a_sort_runs_the_partition_by_of_a_window_on_groups_and_other_steps_do_not() {
+        // `sort(by=[h.over(partition_by=[when(h.is_null()).then(k)
+        // .when(g.is_not_null()).then(k).when(h).then(1)])])`: Polars evaluates
+        // the keys of a window in a sort on groups, where a predicate that no row
+        // reaches is not evaluated, as the rows of the sample decide. `select`,
+        // `with_columns` and `filter` evaluate them, and so does a sort for the
+        // `more_exprs` of the window.
+        let window = |entry: &str, parameter_name: &str| {
+            let keys = many(vec![three_predicates()]);
+            let given = vec![(parameter_name, keys)];
+            let item = chain_of(column("h"), vec![call("Expr.over", given)]);
+            match entry {
+                "LazyFrame.sort" => case_of(call(entry, vec![("by", many(vec![item]))])),
+                "LazyFrame.filter" => case_of(call(entry, vec![("predicates", many(vec![item]))])),
+                _ => case_of(call(entry, vec![("exprs", many(vec![item]))])),
+            }
+        };
+        let in_the_key = |outer: &str, parameter_name: &str| {
+            at(&[
+                parameter(outer),
+                Segment::Item(0),
+                Segment::Link(0),
+                parameter(parameter_name),
+                Segment::Item(0),
+                Segment::Link(3),
+                parameter("predicates"),
+                Segment::Item(0),
+            ])
+        };
+        assert_eq!(
+            rule_refuses(
+                &window("LazyFrame.sort", "partition_by"),
+                in_the_key("by", "partition_by"),
+                BOOLEAN_RULE,
+                "a rule"
+            ),
+            vec![Limit::AValueThatRunsOnNoRows]
+        );
+        for (entry, outer) in [
+            ("LazyFrame.select", "exprs"),
+            ("LazyFrame.with_columns", "exprs"),
+            ("LazyFrame.filter", "predicates"),
+        ] {
+            assert_eq!(
+                rule_refuses(
+                    &window(entry, "partition_by"),
+                    in_the_key(outer, "partition_by"),
+                    BOOLEAN_RULE,
+                    "a rule"
+                ),
+                vec![],
+                "{entry}"
+            );
+        }
+        assert_eq!(
+            rule_refuses(
+                &window("LazyFrame.sort", "more_exprs"),
+                in_the_key("by", "more_exprs"),
+                BOOLEAN_RULE,
+                "a rule"
+            ),
+            vec![]
+        );
+    }
+
     /// A whole number of the dtype of `literal`, as a literal call.
     fn literal_of(value: i64) -> Call {
         call("polars.lit", vec![("value", Value::Integer(value))])
