@@ -528,7 +528,10 @@ Polars by hand, and decide which it is:
   `allowed_fuzz/probe.rs`; extend it where a part has no probe, with tests that
   Polars allowing the probe, refusing it for another reason, or refusing it at
   another call settles nothing, and that a refusal that a control meets too does not
-  settle a mismatch.
+  settle a mismatch. A part Polars skips is skipped for a cause, and the same part
+  without the cause is evaluated: `allowed_fuzz/masks.rs` holds each cause with a
+  case that differs from it in that alone, so that a part is not settled where the
+  cause is not there.
 - **A case the tables say they do not cover**, where the tables allow and Polars
   refuses, or Polars evaluates a part and accepts it (a literal it broadcasts, the
   nulls that the sample's rows leave), which the probes do not show: add or

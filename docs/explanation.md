@@ -687,7 +687,12 @@ found by what each key holds. A refusal when Polars collected rows, the empty
 table's too, and a panic, have no place. For those the reason and the feature in the
 case are what there is, and the limits that can only be gated so (the lengths of
 the rows, an overflow, a value beyond a decimal, a panic, a window over a window, an explode, the empty table
-of a pivot) say so below. Two limits may both explain one case, and it is then
+of a pivot) say so below. Where a refusal of the rows has more than one possible cause
+in the case, the target asks Polars which: the case is run again with the suspected
+cause undone, as for an `explode`, and the sample's rows are followed through a chain
+for what a shift leaves null. A part that Polars skips and a part it refuses are told
+apart the same way, by what Polars does with the part alone or without its cause, and
+each has a case that holds the cause and one that differs from it in that alone. Two limits may both explain one case, and it is then
 excused by both.
 
 A named rule is dageist's, and may be stricter than Polars only where it is so by design,
