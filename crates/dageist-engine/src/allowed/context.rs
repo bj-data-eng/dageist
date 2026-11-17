@@ -19,11 +19,12 @@ pub enum Outer {
     Filter,
     /// A key of `sort`.
     Sort,
-    /// A key of `join` evaluated against the table it starts from: `on`, or
-    /// `left_on`.
+    /// A key of `join` evaluated against the table it starts from: `left_on`,
+    /// and `on`, which is also evaluated as [`Outer::JoinRight`] is, against the
+    /// other table.
     JoinLeft,
     /// `join`'s `right_on`, evaluated against the other table's columns, not
-    /// those of the table the step starts from.
+    /// those of the table the step starts from, and `on` too.
     JoinRight,
     /// A pivot's aggregate, a chain that starts from `element()`, which
     /// stands for the values of one group.

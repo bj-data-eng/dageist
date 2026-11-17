@@ -7,19 +7,20 @@
 //! join that pairs the same two names twice. A name repeated on one side only is
 //! not refused.
 
-use dageist_engine::allowed::{Context, Outer, RefusalSource};
+use dageist_engine::allowed::{Context, Outer, RefusalSource, Rule};
 use dageist_engine::document::{Document, Inputs, Outcome, Report, RunCause, Segment, Walk};
 use polars::prelude::*;
 use serde_json::{Value, json};
 
 use crate::support::{call, chain, document, field, field_then, many, step, whole};
 
-/// The table a join starts from: `k` and `a` are whole numbers, `g` text.
+/// The table a join starts from: `k` and `a` are whole numbers, `g` text, `f` Booleans.
 fn left() -> DataFrame {
     df!(
         "a" => [1_i64, 2, 3],
         "k" => [1_i64, 1, 2],
         "g" => ["x", "y", "x"],
+        "f" => [true, false, true],
     )
     .expect("the left table")
 }
@@ -30,6 +31,7 @@ fn right() -> DataFrame {
         "ra" => [1_i64, 2, 3],
         "rk" => [1_i64, 2, 3],
         "rg" => ["x", "y", "z"],
+        "rf" => [true, false, true],
     )
     .expect("the right table")
 }
@@ -111,7 +113,10 @@ fn a_join_that_pairs_the_same_two_names_twice_is_refused_at_the_key_that_repeats
     );
     let (place, source) = refused(walk(&report)).expect("the tables refuse it");
     assert_eq!(place, item("left_on", 1));
-    assert!(matches!(source, RefusalSource::Rule(_)), "{source:?}");
+    assert!(
+        source == RefusalSource::Rule(Rule::JoinKeyNamesAreNotRepeated),
+        "{source:?}"
+    );
 }
 
 #[test]
@@ -158,7 +163,10 @@ fn a_key_is_named_by_the_column_its_chain_starts_from_whatever_follows_it() {
         let (place, source) =
             refused(walk(&report)).unwrap_or_else(|| panic!("chain {at} is refused"));
         assert_eq!(place, item("left_on", 1), "chain {at}");
-        assert!(matches!(source, RefusalSource::Rule(_)), "chain {at}");
+        assert!(
+            source == RefusalSource::Rule(Rule::JoinKeyNamesAreNotRepeated),
+            "chain {at}"
+        );
     }
 }
 
@@ -192,7 +200,7 @@ fn a_literal_is_named_literal_and_a_condition_by_its_first_value() {
         chain(
             call(
                 "polars.when",
-                json!({ "predicates": many(vec![field("g")]) }),
+                json!({ "predicates": many(vec![field("f")]) }),
             ),
             vec![
                 call("When.then", json!({ "statement": then })),

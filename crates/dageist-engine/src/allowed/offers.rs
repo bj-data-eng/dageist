@@ -839,6 +839,20 @@ pub fn rule_forbids_a_key_known_not_elementwise(context: Context) -> Result<(), 
     Rule::forbids_non_elementwise_key(context).map_or(Ok(()), |rule| Err(Refusal::rule(rule)))
 }
 
+/// The refusal of a key that the caller has already found repeats a pair of
+/// output names, where `context` holds one of a join's own keys, if the rule
+/// refuses it there. Polars refuses a join that pairs the same two names twice:
+/// a name repeated on one side only is allowed. What the keys of the two sides
+/// are named, and whether a pair comes twice, is a matter of the whole join, not
+/// of one entry, so the caller finds it, and this does not.
+///
+/// # Errors
+///
+/// The rule, as a refusal that says it in its words.
+pub fn rule_forbids_a_repeated_pair_of_key_names(context: Context) -> Result<(), Refusal> {
+    Rule::forbids_repeated_key_names(context).map_or(Ok(()), |rule| Err(Refusal::rule(rule)))
+}
+
 /// Every entry that stands in an expression, offered or refused at `place`.
 /// A step is not offered: steps stand in a list.
 ///

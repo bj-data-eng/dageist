@@ -28,6 +28,11 @@ pub enum Rule {
     FilterPredicateIsBoolean,
     /// `polars.element` stands only in a pivot's aggregate.
     ElementOnlyInPivotAggregate,
+    /// A join pairs no two output column names twice: the keys of each side
+    /// are named by the column they read, and a key that repeats the name of
+    /// an earlier one, beside a key on the other side that repeats the name it
+    /// was paired with, makes the same pair again.
+    JoinKeyNamesAreNotRepeated,
     /// A join's own key is elementwise: it holds no aggregate beside a column,
     /// and no column compared with a null.
     KeyIsElementwise,
@@ -35,10 +40,11 @@ pub enum Rule {
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::ConditionPredicateIsBoolean,
         Self::ElementOnlyInPivotAggregate,
         Self::FilterPredicateIsBoolean,
+        Self::JoinKeyNamesAreNotRepeated,
         Self::KeyIsElementwise,
         Self::PivotAggregateGivesOneValue,
     ];
@@ -51,6 +57,7 @@ impl Rule {
             Self::ConditionPredicateIsBoolean => "condition-predicate-is-boolean",
             Self::ElementOnlyInPivotAggregate => "element-only-in-pivot-aggregate",
             Self::FilterPredicateIsBoolean => "filter-predicate-is-boolean",
+            Self::JoinKeyNamesAreNotRepeated => "join-key-names-are-not-repeated",
             Self::KeyIsElementwise => "key-is-elementwise",
         }
     }
@@ -73,6 +80,9 @@ impl Rule {
                 "`polars.element` stands only in a pivot's aggregate"
             }
             Self::FilterPredicateIsBoolean => "a filter's predicate must be Boolean",
+            Self::JoinKeyNamesAreNotRepeated => {
+                "a join may not pair the same two output column names twice: where two keys on one side are named alike, the keys they are paired with must be named differently"
+            }
             Self::KeyIsElementwise => {
                 "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a column be compared with a null"
             }
@@ -88,7 +98,7 @@ impl Rule {
         match self {
             Self::ElementOnlyInPivotAggregate => entry == "polars.element",
             Self::PivotAggregateGivesOneValue => context == Context::step(Outer::PivotAggregate),
-            Self::KeyIsElementwise => context.is_join_key(),
+            Self::JoinKeyNamesAreNotRepeated | Self::KeyIsElementwise => context.is_join_key(),
             Self::ConditionPredicateIsBoolean | Self::FilterPredicateIsBoolean => {
                 self.needs_boolean_end(context)
             }
@@ -120,6 +130,17 @@ impl Rule {
     #[must_use]
     pub(super) fn forbids_non_elementwise_key(context: Context) -> Option<Self> {
         context.is_join_key().then_some(Self::KeyIsElementwise)
+    }
+
+    /// The rule that forbids a join's keys to repeat a pair of output names,
+    /// where `context` is a join's own key, if it does. Whether the keys of a
+    /// side repeat a name, and the keys they are paired with, is a matter of the
+    /// whole join, which the caller found.
+    #[must_use]
+    pub(super) fn forbids_repeated_key_names(context: Context) -> Option<Self> {
+        context
+            .is_join_key()
+            .then_some(Self::JoinKeyNamesAreNotRepeated)
     }
 
     /// The rule that forbids a chain to end in `context` with a value of the
@@ -170,6 +191,7 @@ impl Rule {
             }
             Self::PivotAggregateGivesOneValue
             | Self::ElementOnlyInPivotAggregate
+            | Self::JoinKeyNamesAreNotRepeated
             | Self::KeyIsElementwise => false,
         }
     }

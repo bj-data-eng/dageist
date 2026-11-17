@@ -11,7 +11,7 @@ use crate::allowed::offers::RefusalSource;
 use crate::allowed::{
     After, Chosen, ConditionState, Context, Ending, Nested, Outer, Place, Position, Representative,
     Rule, Shape, Stage, Unknown, Verdict, offer, offers, options,
-    rule_forbids_a_key_known_not_elementwise,
+    rule_forbids_a_key_known_not_elementwise, rule_forbids_a_repeated_pair_of_key_names,
 };
 use crate::catalog;
 
@@ -169,6 +169,62 @@ fn a_window_is_refused_as_a_join_key_with_polars_reason() {
         .right_on(vec![col("rk")])
         .finish();
     assert!(joined.and_then(|mut frame| frame.collect_schema()).is_err());
+}
+
+#[test]
+fn a_repeated_pair_of_key_names_is_refused_by_a_rule_only_in_a_joins_own_keys() {
+    for context in [
+        Context::step(Outer::JoinLeft),
+        Context::step(Outer::JoinRight),
+    ] {
+        let refusal = rule_forbids_a_repeated_pair_of_key_names(context).expect_err("a key");
+        assert_eq!(
+            refusal.source(),
+            RefusalSource::Rule(Rule::JoinKeyNamesAreNotRepeated),
+            "{context}"
+        );
+    }
+    // A key inside another expression is not one of the join's keys, and no
+    // other position of a step has keys that are paired.
+    for context in [
+        Context::inside(Outer::JoinLeft, Nested::ConditionValue),
+        Context::inside(Outer::JoinRight, Nested::PartitionBy),
+        Context::step(Outer::Select),
+        Context::step(Outer::Sort),
+    ] {
+        assert!(
+            rule_forbids_a_repeated_pair_of_key_names(context).is_ok(),
+            "{context}"
+        );
+    }
+
+    // Polars, by hand: the same pair of names twice is refused when the join is
+    // planned, and a name repeated on one side only is not.
+    let frames = Frames::new(
+        Representative::Int64,
+        Representative::Int64,
+        &DataType::Int64,
+    );
+    let planned = |left_on: Vec<Expr>, right_on: Vec<Expr>| {
+        frames
+            .rows
+            .clone()
+            .lazy()
+            .join_builder()
+            .with(frames.other_rows.clone().lazy())
+            .left_on(left_on)
+            .right_on(right_on)
+            .finish()
+            .and_then(|mut frame| frame.collect_schema())
+    };
+    assert!(
+        planned(
+            vec![col("k"), col("k").sum()],
+            vec![col("rk"), col("rk").sum()]
+        )
+        .is_err()
+    );
+    assert!(planned(vec![col("k"), col("k").sum()], vec![col("rk"), col("ra")]).is_ok());
 }
 
 #[test]
