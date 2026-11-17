@@ -168,7 +168,7 @@ pub struct Refusal {
 }
 
 impl Refusal {
-    fn structure(reason: impl Into<String>) -> Self {
+    pub(super) fn structure(reason: impl Into<String>) -> Self {
         Self {
             source: RefusalSource::Structure,
             reason: reason.into(),
@@ -480,7 +480,7 @@ enum OptionsGive {
 
 /// The word the option table writes for the default of `parameter`, when it is
 /// a flag or a choice that has one.
-fn default_word(parameter: &catalog::Parameter) -> Option<String> {
+pub(super) fn default_word(parameter: &catalog::Parameter) -> Option<String> {
     match parameter.default().value() {
         DefaultValue::Flag(flag) => Some(flag.to_string()),
         DefaultValue::Unset => Some("unset".to_owned()),

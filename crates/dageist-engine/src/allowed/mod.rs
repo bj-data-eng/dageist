@@ -27,6 +27,7 @@
 //! for a join's key whose whole expression holds an aggregate beside a column,
 //! or a column compared with a null.
 
+mod candidates;
 mod context;
 mod dtype;
 mod offers;
@@ -35,6 +36,10 @@ mod table;
 #[cfg(test)]
 mod tests;
 
+pub use candidates::{
+    ArgumentSlot, Candidate, DefaultArgument, Fit, Literal, OptionOffer, OptionWord, Slot,
+    default_argument, fit, option_offers,
+};
 pub use context::{Context, Nested, Outer, Position};
 pub use dtype::{Representative, ResultDtype, dtype_name};
 pub use offers::{
