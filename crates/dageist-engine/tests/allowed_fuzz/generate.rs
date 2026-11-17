@@ -552,13 +552,28 @@ impl Gen<'_> {
 
     /// A literal that stands for one value, as the parameters Polars takes
     /// only as a single value, such as the shift of `shift`, are given: the
-    /// number 1 of a dtype, as the tables measured them.
-    fn scalar(&mut self) -> Built {
+    /// number 1 of a dtype, as the tables measured them. With `back`, a number
+    /// of a signed dtype is sometimes the number below zero instead, a shift
+    /// back: the tables measured the dtype, which the sign does not change, and
+    /// a negative number of an unsigned dtype is not one.
+    fn scalar(&mut self, back: bool) -> Built {
         let class = self.draw.pick(&NUMBERED);
+        let signed = [
+            Representative::Int8,
+            Representative::Int16,
+            Representative::Int32,
+            Representative::Int64,
+        ]
+        .contains(&class);
+        let whole = if back && signed && self.draw.chance(35) {
+            -1
+        } else {
+            1
+        };
         let literal = match dtype_value(class) {
             Some(dtype) => call(
                 "polars.lit",
-                vec![("value", Value::Integer(1)), ("dtype", dtype)],
+                vec![("value", Value::Integer(whole)), ("dtype", dtype)],
             ),
             None => call("polars.lit", vec![("value", Value::Flag(Some(true)))]),
         };
@@ -913,7 +928,7 @@ impl Gen<'_> {
             let position = Slot::of_parameter(id, name);
             slots.extend(position);
             let built: Vec<Built> = match (id, name) {
-                ("Expr.shift", _) => vec![self.scalar()],
+                ("Expr.shift", _) => vec![self.scalar(name == "n")],
                 ("Expr.dt.offset_by", "by") => {
                     // The durations are text of the table's: `b`, whose rows
                     // are durations where it is text, as the tables measured it.
@@ -1044,4 +1059,43 @@ fn option_words(call: &Call) -> Vec<(String, String)> {
             Some((given.parameter().to_owned(), word))
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Whether the document of `case` holds a `shift` by a whole number below
+    /// zero, which is written as a literal of the number.
+    fn shifts_back(case: &Case) -> bool {
+        let written = case.document.write();
+        written.contains("\"Expr.shift\"") && written.contains("\"integer\":-")
+    }
+
+    #[test]
+    fn the_cases_include_a_shift_back_and_a_shift_forward() {
+        // The limit for what a shift leaves null follows the direction of the
+        // shift, so the target must reach both for a campaign to check it.
+        let entropy = |offset: u64| -> Vec<u8> {
+            (0..512_u64)
+                .map(|at| {
+                    let mixed = (at + offset * 977 + 11).wrapping_mul(0x9e37_79b9_7f4a_7c15);
+                    (mixed >> 29) as u8
+                })
+                .collect()
+        };
+        let cases: Vec<Case> = (0..6000_u64)
+            .filter_map(|offset| generate(&entropy(offset)))
+            .collect();
+        let back = cases.iter().filter(|case| shifts_back(case)).count();
+        let forward = cases
+            .iter()
+            .filter(|case| {
+                let written = case.document.write();
+                written.contains("\"Expr.shift\"") && !shifts_back(case)
+            })
+            .count();
+        assert!(back > 0, "no case of {} shifts back", cases.len());
+        assert!(forward > 0, "no case of {} shifts forward", cases.len());
+    }
 }

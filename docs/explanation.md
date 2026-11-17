@@ -643,7 +643,8 @@ backticks), without the dtypes and column names it quotes, and for a rule that a
 predicate be a `Boolean` by Polars' words for it. A refusal that Polars places must
 lie at the refused call or predicate. One it does not place, as the refusal of rows,
 counts only when the part before the refused call, alone (for a key, as the key), is
-not refused for the same reason. So a probe is not settled by an objection to another
+not refused for the same reason; for a call in an argument of a key's call, the part
+before it in the argument counts too, in the key with the argument cut there. So a probe is not settled by an objection to another
 call. What the target says of a schema is neither the tables' reason nor a probe's
 for these two, and is settled only by the evidence above. That evidence ties the
 refusal to the mismatch by what goes with it, not by what Polars says: the mismatch,
@@ -686,7 +687,12 @@ found by what each key holds. A refusal when Polars collected rows, the empty
 table's too, and a panic, have no place. For those the reason and the feature in the
 case are what there is, and the limits that can only be gated so (the lengths of
 the rows, an overflow, a value beyond a decimal, a panic, a window over a window, an explode, the empty table
-of a pivot) say so below. Two limits may both explain one case, and it is then
+of a pivot) say so below. Where a refusal of the rows has more than one possible cause
+in the case, the target asks Polars which: the case is run again with the suspected
+cause undone, as for an `explode`, and the sample's rows are followed through a chain
+for what a shift leaves null. A part that Polars skips and a part it refuses are told
+apart the same way, by what Polars does with the part alone or without its cause, and
+each has a case that holds the cause and one that differs from it in that alone. Two limits may both explain one case, and it is then
 excused by both.
 
 A named rule is dageist's, and may be stricter than Polars only where it is so by design,
@@ -700,24 +706,39 @@ wherever it refuses, which is about a third of the pivot cases (58 of the 158 of
 seed, and the same share in longer campaigns), so those pivot aggregates are checked
 little; the tally counts the pivot cases and those the rule refuses apart.
 
-The tally ends with the totals of the cases that agreed, that a limit excused, that
-were refused where Polars does not evaluate the part, that a rule stricter by design
-refused, and that disagreed. The fixed seed's 1000 cases give 888 agreeing, 12 excused
-by a limit, 7 refused where Polars does not evaluate the part, 58 refused by the rule
-that is stricter by design, and none disagreeing; 26 of those that agree are refused by
-the rule against a repeated pair of key names, and the tables could not be asked
-past a point in 54 more.
+A case that the tables and Polars both refuse is evidence of agreement about the
+refusal only where Polars refuses it for the reason the tables gave: the objection
+and the call it names, as for a probe, or, for a named rule, what Polars says of what
+the rule is about (that a predicate be a `Boolean`, that a join's key be elementwise,
+that `element` stand only in a pivot's aggregate, in the engine's words or in
+Polars' that it is not allowed in this context, that a join pair no key names
+twice). A key that the tables refuse as not elementwise, which Polars refuses for a
+column the other table lacks or for the key names it pairs twice, is a case where
+Polars never judged what the tables did, and a rule that Polars does not hold has no
+reason of Polars' to be refused for. Such a case is not a disagreement: both refuse,
+and the allowance is right. It is counted apart, as refused by both for another
+reason, with what each said, and is not counted among the agreeing; its outcome is
+an expected rejection that names both reasons.
+
+The tally ends with the totals of the cases that agreed, that both refused for another
+reason, that a limit excused, that were refused where Polars does not evaluate the
+part, that a rule stricter by design refused, and that disagreed. The fixed seed's
+1000 cases give 806 agreeing, 82 refused by both for another reason, 11 excused by a
+limit, 7 refused where Polars does not evaluate the part, 58 refused by the rule that
+is stricter by design, and none disagreeing; 25 of those that agree are refused by the
+rule against a repeated pair of key names, and the tables could not be asked past a
+point in 54 more.
 
 | Limit | Excuses |
 | --- | --- |
-| An `explode` changes the lengths | `Expr.over`'s `mapping_strategy` as `explode` gives other lengths, which meet those of what follows it. The tables do not measure what meets them. Polars refusing the rows, with a reason about lengths, in a case with an `explode` (no place: the reason and the `explode` gate it); and the tables refusing, with a reason about lengths, at the window or at a call after it, or in the arguments of a link after it, in the same chain, which Polars allows; not before the window, not in its own arguments, and not an `explode` in another operand or item. |
+| An `explode` changes the lengths | `Expr.over`'s `mapping_strategy` as `explode` gives other lengths, which meet those of what follows it. The tables do not measure what meets them. Polars refusing the rows, with a reason about lengths, in a case with an `explode` that is why: the case run again with each `explode` undone is not refused for lengths (no place: the reason gates it, and that run shows the cause); and the tables refusing, with a reason about lengths, at the window or at a call after it, or in the arguments of a link after it, in the same chain, which Polars allows; not before the window, not in its own arguments, and not an `explode` in another operand or item. |
 | A literal | An argument or a start is measured as a column of the dtype, except the values of `shift` and the arguments of a pivot's group. A literal, or a condition of literals, is one value, which Polars casts and broadcasts as it does not a column. The tables refusing at a call that follows a literal or is given one, which Polars allows. What a call after a literal is given, at any depth, is met by one value: the tables refusing it when they run rows, which Polars allows. |
 | A pivot's aggregate | It is run on the values of each group, with kernels of its own, and on no groups when the table is empty. Polars refusing the empty table, with a reason that an operation is not supported or that a dtype is null, in either quoting (no place); and the tables refusing, with a reason about a dtype an operation does not support, a comparison, an operation, an evaluation, a cast, a struct field or lengths of a window over a group, at a call of the aggregate, which Polars allows |
 | A single value in a key | A key that is wholly a single value, an aggregate or a null, is not one that has to be elementwise in what it holds: Polars allows a running count under a `last` there. The context table measured the entry as the whole key. The tables refusing, with a reason about a key not being elementwise, inside a key that is wholly single, which Polars allows. A key that holds an aggregate beside a column, or a column compared with a null, is refused by the rule above, and is not this. |
 | A null comparison in a key | Polars folds a comparison with a null literal into a null before it asks whether a join's key is elementwise, and what it leaves depends on the dtypes and on what the comparison follows, such as an aggregate. A column compared with a null literal is refused by the rule, and the rest, such as a comparison with what one folded, is found by running. Polars refusing the join as not elementwise, with no place, in a case where a join key, or the key of a window, holds a comparison with a null literal at any depth, and no other key of the join is a cause: a key that is not wholly one value and holds a running value, an aggregate or a window. A key that is wholly one value is allowed beside another key, so it is not. |
-| A shift that leaves nulls | The tables ran every call on columns that hold values, so what Polars does with a call that has only nulls to meet was not measured: it does not meet the dtype that the tables refuse when they run rows. A shift that fills nothing leaves nulls, and the sample's three rows decide how many: shifts that total three rows or more, an aggregate that leaves one value which a shift moves away, the first of what a shift moved, and the first value of that, which is null too (a first that skips nulls of rows that are not all null is not), the last of that where the column holds a null in the row the shifts leave last (the sample's `a` and `b` hold one in the middle row, after one shift; its other columns hold none), or after all rows are moved. Polars refuses a comparison of a list with a `Boolean` after none, one or two shifts, and allows it after three. The tables refusing, when they run rows, at a call that follows such a chain or is given one. Nulls that Polars folds whatever the rows are, as those of a comparison with a null, are not the sample's: a probe settles them. |
+| A shift that leaves nulls | The tables ran every call on columns that hold values, so what Polars does with a call that has only nulls to meet was not measured: it does not meet the dtype that the tables refuse when they run rows. A shift fills with a null unless it is given a `fill_value`, and the sample's three rows decide what is left, so the target follows them through the chain. The start column holds a value in each row, and `a` and `b` a null in the middle one; a start that is not one column of the sample holds nothing known. A shift moves the rows down for a positive number and up for a negative one, and the rows it empties hold the `fill_value` (a null where there is none). A running sum or maximum and the parts of a date keep each row where it is and null where it was; `is_null`, `is_not_null` and `cum_count` give a value in every row; a comparison, a subtraction, `offset_by`, a condition and a window that is not an `explode` keep the rows in place and leave what they hold unknown, and give the one value that an aggregate leaves to each of the sample's three rows; any other call leaves nothing known. The first and the last take a row, or the first or last that is not null where they skip nulls; the minimum and the maximum are null of rows that are all null and a value of any that holds one; a sum of rows that are all null is not known, since it is zero of numbers and null of a column of `Null`. The tables refusing, when they run rows, at a call that follows a chain whose rows are all null, or is given one. Polars refuses a comparison of a list with a `Boolean` after none, one or two shifts, and allows it after three. Nulls that Polars folds whatever the rows are, as those of a comparison with a null, are not the sample's: a probe settles them. |
 | A join key's dtype | The other table's key is made of the dtype the chain gives on its own, and the join may resolve the chain to another, as the precision of a decimal a null is taken from. Polars refusing the join, with a reason that names a decimal (no place). |
-| The lengths of the rows | Whether lists, or other values, of different lengths combine depends on the rows. Polars refusing the rows with a reason about lengths, in a case with no `explode` (no place). |
+| The lengths of the rows | Whether lists, or other values, of different lengths combine depends on the rows. Polars refusing the rows with a reason about lengths, in a case with no `explode`, or one that is refused for lengths still when each `explode` is undone, as a window that explodes beside a literal over a window that Polars refuses for it (no place). |
 | An overflow | A debug build of Polars panics where a release build wraps. Polars panicking so (no place). |
 | A value beyond a decimal | Polars compares a `UInt128` with a `Decimal` by casting the `UInt128` to `decimal[38,0]`, which holds 38 digits, and a `UInt128` holds more. The sample's values are within the decimal, so the tables measured what a value within it meets, and a comparison of a `UInt128` with a `Decimal` is allowed by the dtypes alone; a value beyond it, which a subtraction wraps to below zero, fails the cast. Polars refusing the rows with a failed conversion of `u128` to a decimal, in a case that holds a subtraction (no place: the reason and the subtraction gate it). The table with no rows holds no value to fail, and another conversion is not this. |
 | A panic | One is an internal check that failed on the plan Polars made in `select`; another place, or a combination of what was measured singly, may not reach it, or may reach another. Polars panicking where the tables allow (no place), and the tables recording a panic where Polars allows. |
@@ -728,8 +749,9 @@ past a point in 54 more.
 A case that the tables cannot be asked about, because the dtype of an argument or
 before a method is not known, is not predicted past that point and is counted. The
 generator keeps to what the tables measured where a value, not a dtype, decides: a
-`shift` by the number 1 of a dtype, durations that are text of `b`, two values of
-a condition of one dtype, a join without `validate`.
+`shift` by the number 1 of a dtype, or the number -1 of a signed integer dtype (the
+tables measured the dtype, which the sign does not change), durations that are text
+of `b`, two values of a condition of one dtype, a join without `validate`.
 
 ## What The Step Editor Storyboard Has Settled
 

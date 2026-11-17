@@ -13,9 +13,9 @@ use dageist_fuzz::{
 use super::case::Case;
 use super::generate::generate;
 use super::limits::{excuses, strict};
-use super::observe::{Observed, Seen, observe};
+use super::observe::{Observed, Refusal, Seen, is_the_targets_own, observe};
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
-use super::probe::{Settled, settle, settle_apart};
+use super::probe::{Settled, same_reason, settle, settle_apart};
 use super::reduce::candidates;
 
 /// The named rules that are stricter than Polars by design, each with why. A
@@ -28,6 +28,11 @@ const STRICTER_BY_DESIGN: [(&str, &str); 1] = [(
 /// What the outcome of a case says where the tables refuse a part that Polars
 /// does not evaluate, and a probe of the part shows the tables right.
 pub const STRICTER_WHERE_UNEVALUATED: &str = "stricter where Polars does not evaluate the part";
+
+/// What the outcome of a case says where the tables and Polars both refuse it, and
+/// not for the same reason: Polars never judged what the tables did, so the case is
+/// no agreement about the refusal, and is counted apart from the agreeing ones.
+pub const REFUSED_FOR_ANOTHER_REASON: &str = "refused by both, for another reason";
 
 pub const TARGET: &str = "dageist-engine::allowed-combinations";
 pub const ALLOWANCE: &str = "dageist-engine::tables-predict-allowance";
@@ -72,8 +77,9 @@ fn tally(what: impl Into<String>) {
 }
 
 /// What was tallied on this thread since the last call, one line each, and the
-/// totals of cases that agreed, that a limit excused, that a named rule was
-/// stricter in, and that were disagreements.
+/// totals of cases that agreed, that both refused for another reason than each
+/// other's, that a limit excused, that a named rule was stricter in, and that were
+/// disagreements.
 pub fn take_tally() -> Vec<String> {
     let tallied = TALLY.with(|tally| std::mem::take(&mut *tally.borrow_mut()));
     let total = |prefix: &str| -> u64 {
@@ -85,6 +91,7 @@ pub fn take_tally() -> Vec<String> {
     };
     let totals = [
         ("agreeing", total("agree:")),
+        ("refused by both, for another reason", total("both refuse")),
         ("excused by a limit", total("not covered")),
         (
             "refused where Polars does not evaluate the part",
@@ -287,6 +294,49 @@ fn dtype_difference(case: &Case, prediction: &Prediction, observed: &Observed) -
     None
 }
 
+/// How a refusal of the tables is worded when it is of where an expression may end.
+const CANNOT_END: &str = "it cannot end here: ";
+
+/// What Polars says of what a named rule is about, where it refuses the same: any
+/// of these words. The rule that a pivot's aggregate give one value is not Polars':
+/// it lets a running value stand, so it has no words, and Polars refusing a case it
+/// refuses is never for it.
+fn polars_words(rule: &str) -> &'static [&'static str] {
+    match rule {
+        "key-is-elementwise" => &["elementwise"],
+        // The engine says where `element` stands only, and Polars says it is not
+        // allowed outside a pivot in its own words.
+        "element-only-in-pivot-aggregate" => &[
+            "stands only in a pivot's aggregate",
+            "is not allowed in this context",
+        ],
+        "join-key-names-are-not-repeated" => &["repeated key names"],
+        _ => &[],
+    }
+}
+
+/// Whether Polars refused the case for the reason the tables gave: the objection
+/// and the call it names, for the tables' own refusals, and what Polars says of
+/// what the rule is about, for a rule. What the target says of a schema is neither
+/// the tables' nor Polars' reason, and agrees only with the same words.
+fn refused_for_the_same_reason(refused: &Refused, refusal: &Refusal) -> bool {
+    let tables = refused
+        .reason
+        .strip_prefix(CANNOT_END)
+        .unwrap_or(&refused.reason);
+    if is_the_targets_own(tables) || is_the_targets_own(&refusal.reason) {
+        return tables == refusal.reason;
+    }
+    match &refused.source {
+        Source::Polars => same_reason(&refused.source, tables, &refusal.reason),
+        Source::Rule(rule) => match polars_words(rule) {
+            [] => same_reason(&refused.source, tables, &refusal.reason),
+            words => words.iter().any(|said| refusal.reason.contains(said)),
+        },
+        Source::Silent => false,
+    }
+}
+
 impl CaseTarget for AllowedTarget {
     type Case = Case;
 
@@ -459,6 +509,27 @@ impl CaseTarget for AllowedTarget {
                 }
                 (source, false) => {
                     checked.push(allowance);
+                    // Both refuse; whether for the same reason decides what the case
+                    // is evidence of: Polars judged what the tables did, or did not.
+                    if let Some(refusal) = &observed.refusal
+                        && !refused_for_the_same_reason(&refused, refusal)
+                    {
+                        tally(format!(
+                            "both refuse, for another reason: the tables {} and Polars {}",
+                            match &source {
+                                Source::Rule(rule) => format!("by the rule {rule}"),
+                                _ => reason_slug(&refused.reason),
+                            },
+                            reason_slug(&refusal.reason)
+                        ));
+                        return CaseOutcome::expected_rejection(
+                            checked,
+                            one_line(&format!(
+                                "{REFUSED_FOR_ANOTHER_REASON}: the tables say {}; Polars says {}",
+                                refused.reason, refusal.reason
+                            )),
+                        );
+                    }
                     tally(match source {
                         Source::Rule(rule) => format!("agree: refused by the rule {rule}"),
                         _ => "agree: refused".to_owned(),
@@ -492,6 +563,178 @@ mod tests {
     use dageist_engine::allowed::Representative;
 
     use super::*;
+
+    /// The outcome of `text` and what was tallied while it was evaluated.
+    fn evaluated_and_tallied(text: &'static str) -> (CaseOutcome, Vec<String>) {
+        let case = Case::decode(text.as_bytes()).expect("a case");
+        std::thread::Builder::new()
+            .stack_size(256 << 20)
+            .spawn(move || {
+                let outcome = AllowedTarget::new().evaluate(&case).expect("an outcome");
+                (outcome, take_tally())
+            })
+            .expect("a thread")
+            .join()
+            .expect("the case is evaluated")
+    }
+
+    fn counted(tally: &[String], what: &str) -> Option<u64> {
+        tally
+            .iter()
+            .find(|line| line.contains(what))
+            .and_then(|line| line.split_whitespace().next()?.parse().ok())
+    }
+
+    /// `f.dt.date()` as a filter: the tables refuse the date part of a `Boolean`,
+    /// and Polars refuses the filter, for a predicate that is a `Date`: it never
+    /// judged what the tables did.
+    const FILTER_OF_A_DATE_PART_OF_A_BOOLEAN: &str = r#"{"a":"String","b":"Int32","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.filter","arguments":{"predicates":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["f"]}}},"then":[{"entry":"Expr.dt.date","arguments":{}}]}}]}}}}]}"#;
+
+    /// A running sum of a null: refused by the tables and by Polars for it.
+    const RUNNING_SUM_OF_A_NULL: &str = r#"{"a":"Int16","b":"Null","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.select","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"flag":null}}},"then":[{"entry":"Expr.cum_sum","arguments":{}}]}}]}}}}]}"#;
+
+    /// A filter of the whole number 1: the rule that a predicate be a `Boolean`
+    /// refuses it, and Polars does for the same reason.
+    const FILTER_OF_A_NUMBER: &str = r#"{"a":"Date","b":"Int8","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.filter","arguments":{"predicates":{"many":[{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":1}}},"then":[]}}]}}}}]}"#;
+
+    /// A join on `k == true.min()`: the rule that a key be elementwise refuses it,
+    /// and Polars refuses the join for a column that the other table lacks.
+    const JOIN_KEY_OF_A_COLUMN_THE_OTHER_TABLE_LACKS: &str = r#"{"a":"UInt16","b":"Struct(x: Int64, y: String)","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.join","arguments":{"other":{"table":"other"},"on":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[{"entry":"Expr.eq","arguments":{"other":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"flag":true}}},"then":[{"entry":"Expr.min","arguments":{}}]}}}}]}}]}}}}]}"#;
+
+    #[test]
+    fn a_refusal_by_both_for_different_reasons_is_counted_apart_from_agreement() {
+        // The tables refuse the date part of a `Boolean` and Polars refuses the
+        // filter for its predicate: both refuse, but Polars never judged what the
+        // tables did, so the case is no agreement about that refusal.
+        for text in [
+            FILTER_OF_A_DATE_PART_OF_A_BOOLEAN,
+            JOIN_KEY_OF_A_COLUMN_THE_OTHER_TABLE_LACKS,
+        ] {
+            let (outcome, tally) = evaluated_and_tallied(text);
+            assert_eq!(
+                outcome.kind(),
+                dageist_fuzz::OutcomeKind::ExpectedRejection,
+                "{text}"
+            );
+            assert!(
+                outcome
+                    .detail()
+                    .is_some_and(|detail| detail.starts_with("refused by both, for another reason")),
+                "{:?}",
+                outcome.detail()
+            );
+            assert_eq!(
+                counted(&tally, "cases refused by both, for another reason"),
+                Some(1),
+                "{tally:?}"
+            );
+            assert_eq!(counted(&tally, "cases agreeing"), Some(0), "{tally:?}");
+        }
+    }
+
+    /// A refusal by `rule`, and the refusal of Polars, as the target meets them.
+    fn same_reason_for_rule(rule: &'static str, polars: &str) -> bool {
+        use super::super::observe::Stage;
+        use dageist_engine::document::{Place, StepId};
+        let place = Place::of_step(0, Some(StepId::new("s").expect("an identifier")));
+        let refused = Refused {
+            source: Source::Rule(rule),
+            at: place.to_string(),
+            place: place.clone(),
+            stage: None,
+            reason: "it cannot end here: the rule's own words".to_owned(),
+            argument_unknown: false,
+        };
+        let refusal = Refusal {
+            stage: Stage::Schema,
+            at: place.to_string(),
+            place: Some(place),
+            reason: polars.to_owned(),
+        };
+        refused_for_the_same_reason(&refused, &refusal)
+    }
+
+    #[test]
+    fn what_polars_says_of_the_element_rule_is_either_of_its_two_refusals() {
+        // The engine says where `element` stands only, and Polars says it of an
+        // `element` that has no pivot to be in (polars-error: "`element` is not
+        // allowed in this context").
+        let rule = "element-only-in-pivot-aggregate";
+        for polars in [
+            "`element` stands only in a pivot's aggregate",
+            "`element` is not allowed in this context",
+        ] {
+            assert!(same_reason_for_rule(rule, polars), "{polars}");
+        }
+        assert!(!same_reason_for_rule(
+            rule,
+            "cannot compare string with numeric type (i64)"
+        ));
+    }
+
+    #[test]
+    fn what_polars_says_of_the_other_rules_is_what_each_is_about() {
+        for (rule, said) in [
+            (
+                "key-is-elementwise",
+                "all join key expressions must be elementwise.",
+            ),
+            (
+                "join-key-names-are-not-repeated",
+                "joining with repeated key names; already joined on u and u",
+            ),
+            (
+                "filter-predicate-is-boolean",
+                "filter predicate must be of type `Boolean`, got `Int64`",
+            ),
+            (
+                "condition-predicate-is-boolean",
+                "invalid series dtype: expected `Boolean`, got `date` for series with name `b`",
+            ),
+        ] {
+            assert!(same_reason_for_rule(rule, said), "{rule}");
+            assert!(
+                !same_reason_for_rule(rule, "`element` is not allowed in this context"),
+                "{rule}"
+            );
+        }
+        // Polars lets a running value stand in a pivot's aggregate, so it has no
+        // words of its own to refuse it by: whatever it says, it is not the rule's.
+        for polars in [
+            "`element` stands only in a pivot's aggregate",
+            "`element` is not allowed in this context",
+            "all join key expressions must be elementwise.",
+        ] {
+            assert!(
+                !same_reason_for_rule("pivot-aggregate-gives-one-value", polars),
+                "{polars}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_refusal_by_both_for_the_same_reason_agrees() {
+        // The tables and Polars refuse for the objection and the call that they
+        // name, or for the rule's own words, whatever the dtypes and names quoted.
+        for text in [RUNNING_SUM_OF_A_NULL, FILTER_OF_A_NUMBER] {
+            let (outcome, tally) = evaluated_and_tallied(text);
+            assert_eq!(
+                outcome.kind(),
+                dageist_fuzz::OutcomeKind::Evaluated,
+                "{text}"
+            );
+            assert_eq!(counted(&tally, "cases agreeing"), Some(1), "{tally:?}");
+            assert_eq!(
+                counted(&tally, "cases refused by both, for another reason").unwrap_or(0),
+                0,
+                "{tally:?}"
+            );
+        }
+    }
 
     #[test]
     fn a_probe_longer_than_an_outcome_may_say_is_still_an_outcome() {

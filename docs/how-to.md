@@ -528,7 +528,10 @@ Polars by hand, and decide which it is:
   `allowed_fuzz/probe.rs`; extend it where a part has no probe, with tests that
   Polars allowing the probe, refusing it for another reason, or refusing it at
   another call settles nothing, and that a refusal that a control meets too does not
-  settle a mismatch.
+  settle a mismatch. A part Polars skips is skipped for a cause, and the same part
+  without the cause is evaluated: `allowed_fuzz/masks.rs` holds each cause with a
+  case that differs from it in that alone, so that a part is not settled where the
+  cause is not there.
 - **A case the tables say they do not cover**, where the tables allow and Polars
   refuses, or Polars evaluates a part and accepts it (a literal it broadcasts, the
   nulls that the sample's rows leave), which the probes do not show: add or
@@ -545,9 +548,13 @@ Polars by hand, and decide which it is:
 `DAGEIST_FUZZ_STRICT=1` makes the limits and the probe excuse nothing, which shows
 what each one would otherwise report. The tally printed with `--nocapture` counts the
 cases a limit excused and the cases refused where Polars does not evaluate the part,
-and ends with the totals of the cases that agreed, that a limit excused, that were
-refused where Polars does not evaluate the part, that a stricter rule refused and
-that disagreed, so a limit that excuses most of what a campaign makes shows.
+and ends with the totals of the cases that agreed, that both the tables and Polars
+refused for different reasons, that a limit excused, that were refused where Polars
+does not evaluate the part, that a stricter rule refused and that disagreed, so a
+limit that excuses most of what a campaign makes shows. A case refused by both for
+another reason is no finding: the allowance is right, but Polars never judged what
+the tables refused, so it is not counted as agreement, and its outcome names both
+reasons.
 
 ## Check The Build Against The Polars Release
 

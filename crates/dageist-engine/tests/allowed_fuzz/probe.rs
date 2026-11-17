@@ -29,7 +29,9 @@
 //!   column of the dtype that Polars gave what reaches it, which Polars cannot fold.
 //! - [`settle_as_a_key`]: a refusal that a join's key is not elementwise is of the
 //!   position, so the part that holds the refused call is the whole key of the
-//!   same join, and what comes before the call as a key is not refused for it.
+//!   same join, and what comes before the call as a key is not refused for it:
+//!   the chain that holds the key before the call that holds the refused call, and,
+//!   for a refused call in an argument, the key with that argument cut before it.
 //! - [`settle_on_a_value_as_a_key`]: a part that is one value is allowed as a key
 //!   whatever it holds, so the refused call is asked on a column as the key.
 //!
@@ -385,7 +387,7 @@ fn objection(reason: &str) -> String {
 /// Whether `probe` is refused as the tables refused the part: for Polars' own
 /// reason the same objection, and for a rule that a predicate be a `Boolean`
 /// Polars' words for it.
-fn same_reason(source: &Source, tables: &str, probe: &str) -> bool {
+pub fn same_reason(source: &Source, tables: &str, probe: &str) -> bool {
     match source {
         // What the target says of a schema is no objection of Polars, so it is
         // neither the tables' reason nor one that a probe can be refused for.
@@ -691,13 +693,64 @@ fn join_on(case: &Case, parameter: &str, part: &Expression) -> Option<Document> 
     .ok()
 }
 
+/// `value` with the expression that `path` leads to replaced by `with`.
+fn replaced_in_value(value: &Value, path: &[Segment], with: &Expression) -> Option<Value> {
+    match (value, path) {
+        (Value::Expression(_), []) => Some(Value::Expression(with.clone())),
+        (Value::Many(items), [Segment::Item(at), rest @ ..]) => {
+            let mut items = items.clone();
+            *items.get_mut(*at)? = replaced_in_value(items.get(*at)?, rest, with)?;
+            Some(Value::Many(items))
+        }
+        (Value::Pairs(pairs), [Segment::Key(at), rest @ ..]) => {
+            let mut pairs = pairs.clone();
+            pairs.get_mut(*at)?.0 = replaced_in_value(&pairs.get(*at)?.0, rest, with)?;
+            Some(Value::Pairs(pairs))
+        }
+        (Value::Pairs(pairs), [Segment::Value(at), rest @ ..]) => {
+            let mut pairs = pairs.clone();
+            pairs.get_mut(*at)?.1 = replaced_in_value(&pairs.get(*at)?.1, rest, with)?;
+            Some(Value::Pairs(pairs))
+        }
+        _ => None,
+    }
+}
+
+/// `expression` with the expression that `path` leads to, from one of its links and
+/// through the arguments of that link, replaced by `with`.
+fn replaced_inside(
+    expression: &Expression,
+    path: &[Segment],
+    with: &Expression,
+) -> Option<Expression> {
+    let [Segment::Link(link), Segment::Parameter(name), rest @ ..] = path else {
+        return None;
+    };
+    let held = expression.links().get(*link)?;
+    let mut given: Vec<(&str, Value)> = Vec::new();
+    for argument in held.arguments() {
+        let value = if argument.parameter() == name {
+            replaced_in_value(argument.value(), rest, with)?
+        } else {
+            argument.value().clone()
+        };
+        given.push((argument.parameter(), value));
+    }
+    let mut links = expression.links().to_vec();
+    links[*link] = call(held.entry().id().as_str(), given)?;
+    Expression::new(expression.start().clone(), links).ok()
+}
+
 /// Asks Polars about the part of a join's key that the tables refused as not
 /// elementwise, standing alone as the key. The refusal is of the position, which
 /// no column or value shows, and Polars does not meet the part as a key where it
 /// folds what it is in away, as a comparison with a null: the part that holds
 /// the refused call, with the arguments as written, is the whole key of the same
 /// join. As with [`settle_on_a_value`], what this shows is that the tables are
-/// right about the part as a key.
+/// right about the part as a key. A refusal is the refused call's only when what
+/// comes before it is not refused alone for the same reason: for a call in an
+/// argument of another call, the key chain before that call, and the part with the
+/// argument cut before the refused call, whose own links are not the key's.
 pub fn settle_as_a_key(case: &Case, refused: &Refused) -> Option<Settled> {
     if !matches!(refused.source, Source::Polars) || !refused.reason.contains("elementwise") {
         return None;
@@ -728,6 +781,21 @@ pub fn settle_as_a_key(case: &Case, refused: &Refused) -> Option<Settled> {
         ),
         _ => None,
     };
+    // Where the refused call is in an argument of the call that holds it, what comes
+    // before it in that argument is a part of its own, which must not be refused for
+    // the same reason either: the part that holds the argument has it whole, and the
+    // chain that holds the key does not show it. The part with that argument cut
+    // before the refused call is that part.
+    let inner_before = match (found.levels.as_slice(), found.rest) {
+        ([.., (_, entered), (_, inner)], [Segment::Link(link)]) => {
+            let held = found.expression;
+            let cut =
+                Expression::new(held.start().clone(), held.links().get(..*link)?.to_vec()).ok()?;
+            let way = refused.place.path().get(*entered..*inner)?;
+            Some(replaced_inside(&part, way, &cut)?)
+        }
+        _ => None,
+    };
     let probed = Case {
         receiver: case.receiver,
         argument: case.argument,
@@ -737,7 +805,7 @@ pub fn settle_as_a_key(case: &Case, refused: &Refused) -> Option<Settled> {
         .then(Segment::Parameter(parameter.clone()))
         .then(Segment::Item(0));
     let refusal = refused_as(&probed, Tables::default(), refused, &[at])?;
-    if let Some(before) = before {
+    for before in before.into_iter().chain(inner_before) {
         let alone = Case {
             receiver: case.receiver,
             argument: case.argument,
@@ -1440,6 +1508,64 @@ mod tests {
         );
         // At the running sum itself it is the cause.
         assert!(settle_as_a_key(&case, &refused_in_the_right_key_at(0, reason)).is_some());
+    }
+
+    /// A join of `key` with the right key `rk > rk.cum_sum().<inner>`: the second
+    /// chain is an argument of the comparison.
+    fn join_with_a_chain_in_the_right_key(inner: &[&str]) -> Case {
+        let column = "{\"entry\":\"polars.col\",\"arguments\":{\"name\":{\"columns\":[\"rk\"]}}}";
+        let links: Vec<String> = std::iter::once("Expr.cum_sum")
+            .chain(inner.iter().copied())
+            .map(|id| format!("{{\"entry\":\"{id}\",\"arguments\":{{}}}}"))
+            .collect();
+        let key = format!(
+            "{{\"expression\":{{\"start\":{column},\"then\":[{{\"entry\":\"Expr.gt\",\"arguments\":{{\"other\":{{\"expression\":{{\"start\":{column},\"then\":[{}]}}}}}}}}]}}}}",
+            links.join(",")
+        );
+        let text = format!(
+            "{{\"a\":\"Int64\",\"b\":\"Int64\",\"revision\":1}}\n{{\"version\":1,\"steps\":[{{\"id\":\"s\",\"call\":{{\"entry\":\"LazyFrame.join\",\"arguments\":{{\"other\":{{\"table\":\"other\"}},\"left_on\":{{\"many\":[{{\"expression\":{{\"start\":{{\"entry\":\"polars.col\",\"arguments\":{{\"name\":{{\"columns\":[\"key\"]}}}}}},\"then\":[]}}}}]}},\"right_on\":{{\"many\":[{key}]}}}}}}}}]}}"
+        );
+        Case::decode(text.as_bytes()).expect("a case")
+    }
+
+    /// The tables refuse link `link` of the chain that the comparison of the
+    /// right key is given.
+    fn refused_in_the_argument_of_the_right_key(link: usize, reason: &str) -> Refused {
+        let place = Place::of_step(0, Some(StepId::new("s").expect("an identifier")))
+            .then(Segment::Parameter("right_on".to_owned()))
+            .then(Segment::Item(0))
+            .then(Segment::Link(0))
+            .then(Segment::Parameter("other".to_owned()))
+            .then(Segment::Link(link));
+        Refused {
+            source: Source::Polars,
+            at: place.to_string(),
+            place,
+            stage: None,
+            reason: reason.to_owned(),
+            argument_unknown: false,
+        }
+    }
+
+    #[test]
+    fn a_key_refused_before_the_refused_call_in_an_argument_settles_nothing() {
+        // `rk > rk.cum_sum().cum_max()`: the running sum is not elementwise, so the
+        // key is refused as the tables say, but the refused call is the running
+        // maximum, which follows it in the argument. The part of the argument before
+        // the refused call, `rk > rk.cum_sum()`, is refused alone for the same
+        // reason, so the refused call is not why, though the key before the
+        // comparison, `rk`, is allowed.
+        let reason = "all join key expressions must be elementwise.";
+        let case = join_with_a_chain_in_the_right_key(&["Expr.cum_max"]);
+        assert_eq!(
+            settle_as_a_key(&case, &refused_in_the_argument_of_the_right_key(1, reason)),
+            None
+        );
+        // At the running sum itself, nothing in the argument comes before it that is
+        // refused, and it is the cause.
+        assert!(
+            settle_as_a_key(&case, &refused_in_the_argument_of_the_right_key(0, reason)).is_some()
+        );
     }
 
     #[test]
