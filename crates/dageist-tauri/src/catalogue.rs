@@ -602,6 +602,99 @@ mod tests {
     }
 
     #[test]
+    fn an_expression_parameter_that_a_named_position_holds_carries_the_position() {
+        // The position the engine's tables name for the expression a parameter holds: the
+        // positions of a step, and those inside an expression.
+        let view = view();
+        let cases = [
+            (
+                "LazyFrame.sort",
+                "by",
+                json!({ "kind": "outer", "name": "sort" }),
+            ),
+            (
+                "LazyFrame.select",
+                "exprs",
+                json!({ "kind": "outer", "name": "select" }),
+            ),
+            (
+                "LazyFrame.filter",
+                "predicates",
+                json!({ "kind": "outer", "name": "filter" }),
+            ),
+            (
+                "LazyFrame.join",
+                "left_on",
+                json!({ "kind": "outer", "name": "join_left" }),
+            ),
+            (
+                "LazyFrame.join",
+                "right_on",
+                json!({ "kind": "outer", "name": "join_right" }),
+            ),
+            (
+                "LazyFrame.pivot",
+                "aggregate_function",
+                json!({ "kind": "outer", "name": "pivot_aggregate" }),
+            ),
+            (
+                "Expr.over",
+                "partition_by",
+                json!({ "kind": "nested", "name": "over.partition_by" }),
+            ),
+            (
+                "Expr.over",
+                "order_by",
+                json!({ "kind": "nested", "name": "over.order_by" }),
+            ),
+            (
+                "polars.when",
+                "predicates",
+                json!({ "kind": "nested", "name": "condition.predicate" }),
+            ),
+            (
+                "Then.otherwise",
+                "statement",
+                json!({ "kind": "nested", "name": "condition.value" }),
+            ),
+        ];
+        for (id, name, position) in cases {
+            assert_eq!(
+                parameter(&view, id, name)["position"],
+                position,
+                "{id} {name}"
+            );
+        }
+        // An argument of a method has no position of its own, nor has a parameter that is not
+        // an expression.
+        for (id, name) in [
+            ("Expr.shift", "n"),
+            ("Expr.sub", "other"),
+            ("LazyFrame.pivot", "on"),
+            ("LazyFrame.join", "how"),
+        ] {
+            assert_eq!(
+                parameter(&view, id, name)["position"],
+                Value::Null,
+                "{id} {name}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_catalogue_lists_the_dtypes_a_document_names_by_one_word() {
+        let listed = view()["listedDtypes"].clone();
+        assert_eq!(
+            listed,
+            json!([
+                "Boolean", "Date", "Time", "Null", "String", "Float16", "Float32", "Float64",
+                "Int8", "Int16", "Int32", "Int64", "Int128", "UInt8", "UInt16", "UInt32", "UInt64",
+                "UInt128"
+            ])
+        );
+    }
+
+    #[test]
     fn families_come_in_the_order_they_are_offered() {
         let view = view();
         let keys: Vec<&str> = view["families"]
