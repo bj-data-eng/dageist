@@ -199,10 +199,10 @@ fn stricter(settled: Option<Settled>, what: &str) -> Option<Result<CaseOutcome>>
     tally(format!("{STRICTER_WHERE_UNEVALUATED}: {what}"));
     Some(CaseOutcome::expected_rejection(
         Vec::new(),
-        format!(
+        one_line(&format!(
             "{STRICTER_WHERE_UNEVALUATED}: the probe {} is refused for the tables' reason: {}",
             settled.probe, settled.reason
-        ),
+        )),
     ))
 }
 
@@ -450,18 +450,18 @@ impl CaseTarget for AllowedTarget {
                     tally(format!("rule stricter than Polars: {rule}"));
                     return CaseOutcome::expected_rejection(
                         checked,
-                        format!(
+                        one_line(&format!(
                             "the rule {rule} refuses what Polars allows, as {why}: {}",
                             refused.reason
-                        ),
+                        )),
                     );
                 }
                 (Source::Silent, _) => {
                     tally(format!("tables silent: {}", one_line(&refused.reason)));
-                    return CaseOutcome::unsupported(format!(
+                    return CaseOutcome::unsupported(one_line(&format!(
                         "the tables hold nothing for this: {}",
                         refused.reason
-                    ));
+                    )));
                 }
                 (source, false) => {
                     checked.push(allowance);
@@ -474,7 +474,9 @@ impl CaseTarget for AllowedTarget {
             Verdict::Undetermined(why) => {
                 tally("undetermined");
                 if checked.is_empty() {
-                    return CaseOutcome::unsupported(format!("the tables cannot be asked: {why}"));
+                    return CaseOutcome::unsupported(one_line(&format!(
+                        "the tables cannot be asked: {why}"
+                    )));
                 }
             }
         }
