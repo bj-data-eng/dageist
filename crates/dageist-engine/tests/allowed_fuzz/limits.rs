@@ -1124,12 +1124,12 @@ mod tests {
     }
 
     #[test]
-    fn what_follows_an_aggregate_compared_with_the_length_of_a_literal_over_a_window_is_excused() {
+    fn what_follows_an_aggregate_compared_with_the_length_of_a_literal_over_a_window_is_no_limit() {
         // `a.min() <= 1.len().over(order_by=[true])` then `.total_days()`: Polars
         // takes the length of a literal over a window for a constant, and does not
         // evaluate what follows the comparison of a value with it, where the tables
-        // refuse a `Boolean`. It evaluates it for a sum, for a window by a column,
-        // for a column that is not one value, and for no window.
+        // refuse a `Boolean`. That is a part Polars skips, which a probe settles
+        // and no limit excuses, however the chain is made.
         let window = |length: &str, order_by: Expression| {
             chain_of(
                 literal(),
@@ -1139,50 +1139,32 @@ mod tests {
                 ],
             )
         };
-        let item = |start: Vec<Call>, operand: Expression| {
-            let mut links = start;
-            links.push(compared_with("Expr.le", operand));
-            links.push(call("Expr.dt.total_days", Vec::new()));
-            select(vec![chain_of(column("a"), links)])
+        let item = |operand: Expression| {
+            select(vec![chain_of(
+                column("a"),
+                vec![
+                    call("Expr.min", Vec::new()),
+                    compared_with("Expr.le", operand),
+                    call("Expr.dt.total_days", Vec::new()),
+                ],
+            )])
         };
-        let min = || vec![call("Expr.min", Vec::new())];
         let constant = || chain(literal(), &[]);
-        let at_total_days = |links: usize| link_of("exprs", 0, links);
-        let case = item(min(), window("Expr.len", constant()));
-        assert_eq!(
-            tables_refuse(&case, at_total_days(2), ROWS, "no"),
-            vec![Limit::ALiteral]
-        );
-        // What the tables refused when they built the step, and the comparison.
-        assert_eq!(
-            tables_refuse(&case, at_total_days(2), Some(TableStage::Schema), "no"),
-            vec![]
-        );
-        for (name, other) in [
-            ("a sum", item(min(), window("Expr.sum", constant()))),
+        for (name, operand) in [
+            ("the length of a literal", window("Expr.len", constant())),
+            ("a sum", window("Expr.sum", constant())),
             (
                 "a window by a column",
-                item(min(), window("Expr.len", chain(column("k"), &[]))),
+                window("Expr.len", chain(column("k"), &[])),
             ),
-            ("no window", item(min(), chain(literal(), &["Expr.len"]))),
-            (
-                "a column that is not one value",
-                item(Vec::new(), window("Expr.len", constant())),
-            ),
+            ("no window", chain(literal(), &["Expr.len"])),
         ] {
-            let links = if name == "a column that is not one value" {
-                1
-            } else {
-                2
-            };
             assert_eq!(
-                tables_refuse(&other, at_total_days(links), ROWS, "no"),
+                tables_refuse(&item(operand), link_of("exprs", 0, 2), ROWS, "no"),
                 vec![],
                 "{name}"
             );
         }
-        // The calls before the comparison are not what follows it.
-        assert_eq!(tables_refuse(&case, at_total_days(0), ROWS, "no"), vec![]);
     }
 
     #[test]
@@ -1613,12 +1595,11 @@ mod tests {
     }
 
     #[test]
-    fn a_running_sum_of_a_comparison_with_a_null_leaves_only_nulls() {
-        // `f > null` then `cum_sum` then `== b`: Polars meets the call with a
-        // column of nulls and does not refuse the dtype the tables refuse when
-        // they run rows. Another running value, a comparison with no running sum,
-        // a running sum of what is not a comparison with a null, and a refusal of
-        // the schema, are refused.
+    fn a_running_sum_of_a_comparison_with_a_null_is_no_limit_of_the_sample() {
+        // `f > null` then `cum_sum` then `== b`: Polars folds the comparison with
+        // a null into a null whatever the rows are, so what follows the running
+        // sum meets a column of nulls however many rows there are. That is a part
+        // Polars skips, which a probe settles and no limit excuses.
         let item = |links: Vec<Call>| {
             let mut all = links;
             all.push(compared_with("Expr.eq", chain(column("b"), &[])));
@@ -1629,36 +1610,8 @@ mod tests {
         let case = item(vec![null_comparison(), sum()]);
         assert_eq!(
             tables_refuse(&case, link_of("exprs", 0, 2), ROWS, "no"),
-            vec![Limit::AShiftThatLeavesNulls]
-        );
-        assert_eq!(
-            tables_refuse(
-                &case,
-                link_of("exprs", 0, 2),
-                Some(TableStage::Schema),
-                "no"
-            ),
             vec![]
         );
-        for (name, links) in [
-            (
-                "another running value",
-                vec![null_comparison(), call("Expr.cum_max", Vec::new())],
-            ),
-            ("no running sum", vec![null_comparison()]),
-            (
-                "a comparison with a value",
-                vec![compared_with("Expr.gt", chain(literal(), &[])), sum()],
-            ),
-            ("a running sum alone", vec![sum()]),
-        ] {
-            let at = links.len();
-            assert_eq!(
-                tables_refuse(&item(links), link_of("exprs", 0, at), ROWS, "no"),
-                vec![],
-                "{name}"
-            );
-        }
     }
 
     #[test]
