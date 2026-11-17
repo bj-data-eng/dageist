@@ -46,7 +46,10 @@ interface Call {
 }
 
 /** A scheduler over text requests, with the host replaced by one the test answers. */
-function setup(delay = 100): {
+function setup(
+  delay = 100,
+  retryAfter?: number,
+): {
   readonly latest: Latest<string, string>;
   readonly clock: Clock;
   readonly calls: Call[];
@@ -71,6 +74,7 @@ function setup(delay = 100): {
     deliver: (request, outcome) => {
       delivered.push({ request, outcome });
     },
+    ...(retryAfter === undefined ? {} : { retryAfter }),
     timers: clock,
   });
   return { latest, clock, calls, delivered };
@@ -239,6 +243,20 @@ describe('the requests the editor gives the host', () => {
     expect(delivered).toHaveLength(2);
     expect(delivered[0]?.outcome.ok).toBe(false);
     expect(delivered[1]).toEqual({ request: 'a', outcome: { ok: true, answer: 'A' } });
+  });
+
+  it('ask again after the time the options give, and not before', async () => {
+    const { latest, clock, calls } = setup(100, 500);
+    latest.submit('a');
+    clock.advance(100);
+    calls[0]?.fail('the host was not there');
+    await settled();
+
+    clock.advance(499);
+    expect(calls).toHaveLength(1);
+    clock.advance(1);
+
+    expect(calls.map((call) => call.request)).toEqual(['a', 'a']);
   });
 
   it('do not ask again after a failure once a newer request has replaced the request', async () => {

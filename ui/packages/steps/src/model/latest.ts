@@ -2,9 +2,10 @@
  * @file Asks the host for the newest request only. The editor asks the engine
  * to run its steps whenever they change, which can be many times a second, so
  * the requests are held for a moment and the newest of them is the one that
- * is sent; at most one request is out at a time; and what comes back for a
+ * is sent; at most one request is out at a time; what comes back for a
  * request that a newer one has replaced is dropped, so the view never shows
- * an older answer over a newer edit.
+ * an older answer over a newer edit; and a request that failed is asked again
+ * after a while, as the host may not have been there yet.
  */
 
 /** What a request came to. */
@@ -35,8 +36,16 @@ export interface LatestOptions<Request, Answer> {
   readonly send: (request: Request) => Promise<Answer>;
   /** Receives what the newest request came to, and never what an older one did. */
   readonly deliver: (request: Request, outcome: Outcome<Answer>) => void;
+  /**
+   * How long after a failure the same request is asked again, while it is
+   * still the newest, in milliseconds. The host may not have been there yet.
+   */
+  readonly retryAfter?: number;
   readonly timers?: Timers;
 }
+
+/** How long after a failure the request is asked again, unless the options say. */
+const RETRY_AFTER = 2000;
 
 /**
  * Sends the newest of the requests it is given: after `delay` has passed with
@@ -111,6 +120,16 @@ export class Latest<Request, Answer> {
     if (this.stopped) return;
     if (key === this.newestKey) {
       this.options.deliver(request, outcome);
+      if (!outcome.ok) {
+        // A failure is not an answer: ask again after a while, unless a newer request comes first.
+        this.sentKey = null;
+        if (this.waiting === null) {
+          this.waiting = this.timers.start(() => {
+            this.waiting = null;
+            this.send();
+          }, this.options.retryAfter ?? RETRY_AFTER);
+        }
+      }
     } else {
       // A newer request replaced it, so its answer is not wanted, and it may be asked again.
       this.sentKey = null;
