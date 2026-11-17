@@ -636,9 +636,22 @@ pub fn settle_as_a_key(case: &Case, refused: &Refused) -> Option<Settled> {
     }
     // What holds the refused call: the expression that the place is directly in,
     // through its call that holds the rest of the place, which is the part.
-    let part = match found.levels.as_slice() {
-        [.., (parent, entered), _] => chain_up_to(parent, refused.place.path().get(*entered))?,
-        _ => chain_through(&found)?,
+    let (holder, owner) = match found.levels.as_slice() {
+        [.., (parent, entered), _] => (*parent, refused.place.path().get(*entered)),
+        _ => (found.expression, found.rest.first()),
+    };
+    let part = chain_up_to(holder, owner)?;
+    // What comes before the refused call, as a key, must not be refused for the
+    // same reason: the refused call is then not why.
+    let before = match owner {
+        Some(Segment::Link(link)) => Some(
+            Expression::new(
+                holder.start().clone(),
+                holder.links().get(..*link)?.to_vec(),
+            )
+            .ok()?,
+        ),
+        _ => None,
     };
     let probed = Case {
         receiver: case.receiver,
@@ -649,6 +662,16 @@ pub fn settle_as_a_key(case: &Case, refused: &Refused) -> Option<Settled> {
         .then(Segment::Parameter(parameter.clone()))
         .then(Segment::Item(0));
     let refusal = refused_as(&probed, Tables::default(), refused, &[at])?;
+    if let Some(before) = before {
+        let alone = Case {
+            receiver: case.receiver,
+            argument: case.argument,
+            document: join_on(case, parameter, &before)?,
+        };
+        if refused_anywhere_as(&alone, Tables::default(), refused) {
+            return None;
+        }
+    }
     Some(Settled {
         probe: probed.document.write(),
         reason: refusal.reason,
