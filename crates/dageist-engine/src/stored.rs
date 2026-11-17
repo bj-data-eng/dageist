@@ -92,6 +92,7 @@ impl ParquetTable {
 }
 
 fn scan(pattern: &Path) -> PolarsResult<LazyFrame> {
+    crate::startup::ensure();
     LazyFrame::scan_parquet(
         PlRefPath::try_from_path(pattern)?,
         ScanArgsParquet::default(),

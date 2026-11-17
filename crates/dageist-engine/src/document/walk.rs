@@ -193,6 +193,7 @@ impl Step {
     /// `source`. `inputs` are what its `table` arguments name.
     #[must_use]
     pub fn walk(&self, index: usize, source: &Schema, inputs: &Inputs) -> Walk {
+        crate::startup::ensure();
         let other = self
             .call()
             .argument("other")

@@ -765,6 +765,11 @@ pub fn dageist_engine::ParquetTable::block_ipc(&self, offset: usize, length: usi
 pub fn dageist_engine::ParquetTable::columns(&self) -> &[dageist_engine::ColumnInfo]
 pub fn dageist_engine::ParquetTable::height(&self) -> usize
 pub fn dageist_engine::ParquetTable::open(directory: &std::path::Path) -> core::result::Result<Self, dageist_engine::EngineError>
+pub struct dageist_engine::PolarsSession(_)
+impl dageist_engine::PolarsSession
+pub fn dageist_engine::PolarsSession::start() -> Self
+impl core::ops::drop::Drop for dageist_engine::PolarsSession
+pub fn dageist_engine::PolarsSession::drop(&mut self)
 pub struct dageist_engine::SampleSpec
 pub dageist_engine::SampleSpec::filler_columns: u16
 pub dageist_engine::SampleSpec::keys: u32
