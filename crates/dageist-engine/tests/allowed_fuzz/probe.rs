@@ -1022,6 +1022,21 @@ mod tests {
     }
 
     #[test]
+    fn a_running_value_in_an_operand_of_a_key_that_polars_folds_is_asked_as_a_key() {
+        // `null >= rk.sum().cum_max()` then `- rk`: Polars folds the comparison with a
+        // null into a null, so the running maximum in what it is compared with is
+        // never met as a key. The part that holds the refused call, as a key, is
+        // folded the same way: the running maximum alone is the key to ask.
+        let case = kept("stricter-a-running-value-in-a-right-key-after-a-null-literal.case");
+        let refused = refusal(&case);
+        assert_eq!(settle(&case, &refused), None);
+        let found = settle_as_a_key(&case, &refused).expect("a key that Polars refuses");
+        assert!(found.reason.contains("elementwise"), "{}", found.reason);
+        assert!(found.probe.contains("Expr.cum_max"), "{}", found.probe);
+        assert!(!found.probe.contains("polars.lit"), "{}", found.probe);
+    }
+
+    #[test]
     fn a_key_that_polars_allows_alone_as_a_key_settles_nothing() {
         // A right key that tests for a null is elementwise and allowed: the
         // refusal the tables are said to give is not shown. A running sum is not
