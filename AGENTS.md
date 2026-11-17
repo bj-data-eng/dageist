@@ -129,7 +129,7 @@ Source remains authoritative; never hand-edit generated artifacts.
 | `ui/package-lock.json` | npm, from [ui/package.json](ui/package.json) |
 | `ui/dist/` (ignored) | `npm --prefix ui run build` |
 | `ui/packages/host/fixtures/catalogue.json` | the host's catalogue view, written by its snapshot test; [refresh procedure](docs/how-to.md#refresh-the-catalogue-snapshot) |
-| `ui/packages/host/fixtures/{node-inputs,step-report,step-report-refused,step-report-unreadable,step-rows}.json` | the host's node commands' views, written by their snapshot test; [refresh procedure](docs/how-to.md#refresh-the-step-report-snapshots) |
+| `ui/packages/host/fixtures/{node-inputs,step-report,step-report-refused,step-report-unreadable,step-report-variants,step-rows,vocabulary}.json` | the host's node commands' views, written by their snapshot test; [refresh procedure](docs/how-to.md#refresh-the-step-report-snapshots) |
 | `crates/dageist-tauri/gen/` (ignored) | `tauri-build`, during any build of `dageist-tauri` |
 | `crates/dageist-fuzz/tests/fixtures/subject/Cargo.lock` | Cargo, from the standalone fixture workspace's manifests; refresh it with the fixture's own Cargo command, never through the root workspace |
 | `api/catalogue/*.txt` | The engine test that runs the catalogue in Polars; [refresh procedure](docs/how-to.md#refresh-the-tables-of-allowed-combinations) |

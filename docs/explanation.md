@@ -105,7 +105,10 @@ refused, so a change of shape on the host's side fails where it is read. The
 decoders are pure TypeScript and are tested with Vitest against snapshots that
 host tests write from Rust, `ui/packages/host/fixtures/`, with expectations
 written by hand; a change of shape in the host shows up in those tests as a
-failing snapshot check in Rust and a refusing decoder in the view. The same
+failing snapshot check in Rust and a refusing decoder in the view. The words
+of each closed list, such as the rules and the positions of an expression, are
+constants in the contract that a test compares with the host's own list of
+the engine's variants, so a variant the engine adds fails a test. The same
 holds for the functions that prepare decoded data for display. Drawing is React
 that only consumes prepared values, and it has no tests while the design
 changes.

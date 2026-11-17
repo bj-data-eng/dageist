@@ -144,14 +144,19 @@ layout does not affect it. Never edit the file by hand.
 
 After a change to the sample node, the step document or its running, the walk
 of the tables, the catalogue's laziness, or the views of what they report, the
-snapshot test fails and names the file that differs. Five files in
+snapshot test fails and names the file that differs. Seven files in
 `ui/packages/host/fixtures/` are written by one test: `node-inputs.json` from
 `node_inputs`, `step-report.json` from running the claim-timing steps,
 `step-report-refused.json` from a document whose second step Polars refuses and
 whose third is not run, `step-report-unreadable.json` from text that is not a
-document, and `step-rows.json` from the rows after the `days_open` step. Write
-them from the host's own serializer, then format them, then run the view's
-tests, which decode them:
+document, `step-rows.json` from the rows after the `days_open` step,
+`step-report-variants.json`, a report the host builds by hand to hold the
+variants no real document gives together, and `vocabulary.json`, the words of
+every closed list in a report and in the catalogue, written from the engine's
+own lists of variants. The view's tests compare the decoders' word lists with
+`vocabulary.json`, so a variant the engine adds makes them fail until the
+contract and the decoders name it. Write the files from the host's own
+serializer, then format them, then run the view's tests, which decode them:
 
 ```sh
 DAGEIST_REFRESH_STEP_REPORTS=1 cargo test --offline --locked -p dageist-tauri node::tests::the_snapshots_are_what_the_commands_return
@@ -558,6 +563,9 @@ build into line with the new release:
    and review them: Polars decides what each combination does, so a new release
    can allow what was refused and refuse what was allowed. Explain each changed
    outcome, and say whether each named rule still holds what Polars does not.
+7. [Refresh the step report snapshots](#refresh-the-step-report-snapshots) and
+   review them: they hold Polars' own refusal text, which a new release can
+   word differently, and the tables' verdicts on the steps of the sample.
 
 Update the tag and commit in the [reference](reference.md#vendored-sources),
 and name the tag in the commit message.
