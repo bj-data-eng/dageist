@@ -55,8 +55,17 @@ run `npm --prefix ui ci --offline`.
 
 The view in a plain browser reaches the real engine through the bridge, a
 subcommand of the `dageist` binary that serves the host's commands over local
-HTTP. Start the bridge in one terminal, which builds the binary if it is
-missing, and Vite's development server in another:
+HTTP. The host embeds `ui/dist/` at compile time, so a fresh checkout cannot
+build the binary until the view is built once; [check the view](#check-the-view)
+or run:
+
+```sh
+npm --prefix ui ci --offline
+npm --prefix ui run build
+```
+
+Then start the bridge in one terminal, which builds the binary if it is missing,
+and Vite's development server in another:
 
 ```sh
 cargo run --offline --locked -p dageist-tauri -- bridge
