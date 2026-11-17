@@ -4,29 +4,35 @@
 //! Building Polars as the release is built does not make it behave as the
 //! release does: the release also runs a start-up function,
 //! `register_startup_deps`, in `crates/polars-python/src/on_startup.rs` of the
-//! pinned source. Most of that function connects Polars to Python. Three of
-//! its parts do not, and the engine does them:
+//! pinned source. Most of that function connects Polars to Python. Four of
+//! its parts do not, and the engine does them, in the release's order:
 //!
-//! 1. It registers the SQL resolver, so a plan written in SQL can be resolved
+//! 1. In a build with debug assertions, it raises the minimum size of the stack
+//!    below which the `recursive` crate moves a recursive call to a new stack,
+//!    to 1 MiB, and the size of each new stack to 16 MiB. The release does it
+//!    because stack frames get very large in debug mode, and dageist's own debug
+//!    and test builds are debug builds. A build without debug assertions keeps
+//!    the crate's defaults, as the release does.
+//! 2. It registers the SQL resolver, so a plan written in SQL can be resolved
 //!    when it is collected, also one that was not planned in this process.
-//! 2. It sets what happens to an extension type that nothing registered when
+//! 3. It sets what happens to an extension type that nothing registered when
 //!    it is read: it is loaded as a generic extension, or as its storage type
 //!    when the environment variable `POLARS_UNKNOWN_EXTENSION_TYPE_BEHAVIOR`
 //!    is `load_as_storage`.
-//! 3. It starts the thread that deletes the files Polars' streaming engine
+//! 4. It starts the thread that deletes the files Polars' streaming engine
 //!    spills to disk, which also deletes what a process that ended abnormally
-//!    left behind.
+//!    left behind. The release flushes that thread when the process exits;
+//!    [`PolarsSession`] does it when it is dropped.
 //!
-//! The release does them in that order, and flushes the thread at exit
-//! (4 below). Every engine entry that runs Polars calls [`ensure`] first, which
-//! does the three once however often it is called, so nothing runs Polars
-//! through the engine without them. [`PolarsSession`] is the host's part: it
-//! starts Polars at the beginning of the program and flushes at its end.
+//! Every engine entry that runs Polars calls [`ensure`] first, which does the
+//! four once however often it is called, so nothing runs Polars through the
+//! engine without them. [`PolarsSession`] is the host's part: it starts Polars
+//! at the beginning of the program and flushes at its end.
 //!
 //! # What is left out
 //!
-//! The rest of the release's start-up only connects Polars to Python, and has
-//! nothing to connect here:
+//! The rest of the release's start-up is left out. All but the last two items
+//! only connect Polars to Python, and have nothing to connect here:
 //!
 //! - The registries that carry Python values in and out of Polars: converters
 //!   between Polars' types and Python's, the builder of `Object` columns, the
@@ -42,12 +48,19 @@
 //!   the two that go with it). Polars writes them into the Parquet files it
 //!   writes, and the release's values name the Python package, which dageist is
 //!   not.
-//! - The panic hook that lets a keyboard interrupt cancel a query
-//!   (`register_polars_abort_mechanism`). It does something only inside the
-//!   catchers the Python binding wraps its queries in, and the engine has none.
-//! - Two aids for developing Polars that the release does not use: larger
-//!   stacks for debug builds, and, behind a feature the release does not turn
-//!   on, a coloured backtrace printer.
+//! - The panic hook and the interrupt handler of the query abort mechanism
+//!   (`register_polars_abort_mechanism`). The release gives Python a
+//!   `KeyboardInterrupt` by hooking `SIGINT` and aborting the running query
+//!   with a panic that the catchers around the Python binding's queries turn
+//!   into the exception. The same catchers turn a spill that runs out of disk
+//!   (`OocOutOfDisk`) into an error. The engine has no catchers, so without
+//!   them a spill that runs out of disk panics as any panic does, in the
+//!   thread that spilled. Leaving the hook out also leaves `SIGINT` to end
+//!   the process, which Ctrl-C does to the bridge; the release's hook would
+//!   take it over, and with no catcher make it do nothing.
+//! - The coloured backtrace printer for Polars' own panics, behind the
+//!   `backtrace_filter` feature. The release's Makefile turns it on for
+//!   development builds of Python Polars; the released wheels do not have it.
 //! - Flushing at exit through Python's `atexit`, which [`PolarsSession`]
 //!   replaces.
 //!
@@ -86,6 +99,12 @@ static STARTED: Once = Once::new();
 /// set later has no effect.
 pub(crate) fn ensure() {
     STARTED.call_once(|| {
+        // Stack frames can get really large in debug mode, as in the release.
+        #[cfg(debug_assertions)]
+        {
+            recursive::set_minimum_stack_size(1024 * 1024);
+            recursive::set_stack_allocation_size(1024 * 1024 * 16);
+        }
         polars::sql::register_sql_resolver();
         let setting = std::env::var(UNKNOWN_EXTENSION_TYPE_BEHAVIOR).ok();
         set_unknown_extension_type_behavior(unknown_extension_type_behavior(setting.as_deref()));

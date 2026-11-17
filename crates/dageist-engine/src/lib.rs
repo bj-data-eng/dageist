@@ -10,9 +10,10 @@
 //! It has no dependency on any host.
 //!
 //! Polars is set up as the Python Polars release sets it up, for the parts of
-//! that set-up that are not about Python: see [`PolarsSession`], and `src/startup.rs`
-//! for what is done and what is left out. Every entry here that runs Polars sets it up first, once for
-//! the process, and a host holds a [`PolarsSession`] from its start to its end.
+//! that set-up that are not about Python: see [`PolarsSession`], and
+//! `src/startup.rs` for what is done and what is left out. Every entry here that
+//! runs Polars sets it up first, once for the process, and a host holds a
+//! [`PolarsSession`] from its start to its end.
 
 #![forbid(unsafe_code)]
 
