@@ -734,6 +734,7 @@ pub fn dageist_engine::document::Walk::not_known(&self) -> core::option::Option<
 pub const fn dageist_engine::document::Walk::refusal(&self) -> core::option::Option<&dageist_engine::document::WalkRefusal>
 pub struct dageist_engine::document::WalkRefusal
 impl dageist_engine::document::WalkRefusal
+pub const fn dageist_engine::document::WalkRefusal::argument_unknown(&self) -> bool
 pub const fn dageist_engine::document::WalkRefusal::at_end(&self) -> bool
 pub const fn dageist_engine::document::WalkRefusal::place(&self) -> &dageist_engine::document::Place
 pub const fn dageist_engine::document::WalkRefusal::refusal(&self) -> &dageist_engine::allowed::Refusal
