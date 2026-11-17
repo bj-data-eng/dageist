@@ -7,7 +7,14 @@
  * list is cut short before it would wrap.
  */
 
-import { useCallback, useContext, useEffect, useLayoutEffect, useState } from 'react';
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useState,
+} from 'react';
 
 import type { Look, Tone } from './Block';
 import { Block } from './Block';
@@ -31,6 +38,13 @@ interface Listing {
   readonly wrong?: boolean;
   /** Whether to open the list as soon as the slot is shown, as for something just added. */
   readonly openNow?: boolean;
+  /**
+   * Called when the list opens and when it closes, for a caller that asks for
+   * what to offer only while the list is open.
+   */
+  readonly onOpenChange?: ((open: boolean) => void) | undefined;
+  /** Called with what is typed into the list's search box each time it changes. */
+  readonly onType?: ((typed: string) => void) | undefined;
 }
 
 /** What a slot that holds one thing shows and offers. */
@@ -62,9 +76,17 @@ export function Slot({
   waits = false,
   names = false,
   openNow = false,
+  onOpenChange,
+  onType,
   buttonRef,
 }: SlotProps): React.JSX.Element {
   const [open, setOpen] = useState(openNow);
+  const reportOpen = useEffectEvent((now: boolean) => {
+    onOpenChange?.(now);
+  });
+  useEffect(() => {
+    reportOpen(open);
+  }, [open]);
   const [button, setButton] = useState<HTMLButtonElement | null>(null);
   const note = useContext(HintContext);
   const piece = useContext(PieceContext);
@@ -116,6 +138,7 @@ export function Slot({
             keepOpen={false}
             wide={wide}
             onDone={close}
+            onType={onType}
           />
         </Popover>
       )}
@@ -219,8 +242,16 @@ export function ManySlot({
   wide = false,
   wrong = false,
   openNow = false,
+  onOpenChange,
+  onType,
 }: ManySlotProps): React.JSX.Element {
   const [open, setOpen] = useState(openNow);
+  const reportOpen = useEffectEvent((now: boolean) => {
+    onOpenChange?.(now);
+  });
+  useEffect(() => {
+    reportOpen(open);
+  }, [open]);
   const [slot, setSlot] = useState<HTMLSpanElement | null>(null);
   const close = useCallback(() => {
     setOpen(false);
@@ -301,6 +332,7 @@ export function ManySlot({
             keepOpen
             wide={wide}
             onDone={close}
+            onType={onType}
           />
         </Popover>
       )}

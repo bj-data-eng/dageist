@@ -8,10 +8,10 @@
 import type { ParameterView } from '@dageist/host';
 
 import type { MethodName } from './expr';
-import { groupHolds, verbEntry } from './catalogue';
+import { verbEntry } from './catalogue';
 import type { Catalogue } from './catalogue';
 import type { Frame } from './frame';
-import { assertNever, findColumn, quoted } from './frame';
+import { assertNever, quoted } from './frame';
 import { nextId } from './ids';
 import type { NamedTable } from './inputs';
 import type { Options, Setting } from './settings';
@@ -214,7 +214,6 @@ export function stepItems(catalogue: Catalogue, step: Step, of: string): readonl
  * connected `tables` a join or a pivot can use.
  */
 export function defaultStep(verb: Verb, frame: Frame, tables: readonly NamedTable[]): Step {
-  const first = frame[0]?.name ?? '';
   const id = nextId('step');
   const options = NO_OPTIONS;
   switch (verb) {
@@ -253,34 +252,31 @@ export function defaultStep(verb: Verb, frame: Frame, tables: readonly NamedTabl
         options,
       };
     case 'join': {
-      // Start from the first lookup table and a pair of key columns whose dtypes agree.
+      // Start from the first lookup table. Which fields are its keys is still to be picked: the
+      // engine says whether the two sides fit, and it is not guessed here.
       const [table] = tables;
-      const rightOn = table?.columns[0];
-      const leftOn = frame.find((column) => column.dtype === rightOn?.dtype);
       return {
         id,
         verb,
         table: table?.name ?? '',
         options: {
-          left_on: fieldKeys([leftOn?.name ?? first]),
-          right_on: fieldKeys([rightOn?.name ?? '']),
+          left_on: { kind: 'list', items: [UNSET] },
+          right_on: { kind: 'list', items: [UNSET] },
           // Rows with no match are kept, which is not what Polars does unless it is asked.
           how: { kind: 'word', value: 'left' },
         },
       };
     }
     case 'pivot': {
-      const text = frame.filter((column) => column.dtype === 'String');
-      const number = frame.find((column) => groupHolds('numeric', column.dtype));
-      const on = (text[1] ?? text[0])?.name ?? first;
-      // The columns come from a connected table that has the field's name, or else the first.
-      const columns = tables.find((table) => findColumn(table.columns, on) !== null) ?? tables[0];
+      // The three fields are still to be picked, and the columns come from the first connected
+      // table, which the step is then judged with.
+      const [columns] = tables;
       return {
         id,
         verb,
-        on,
-        index: first,
-        values: number?.name ?? first,
+        on: '',
+        index: '',
+        values: '',
         options: {
           on_columns: columns === undefined ? UNSET : { kind: 'word', value: columns.name },
           aggregate_function: expressionSetting({

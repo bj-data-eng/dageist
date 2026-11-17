@@ -203,6 +203,14 @@ const COMPARISON_ENTRIES: Readonly<Record<Exclude<Comparison, 'is_in'>, string>>
   '<=': 'Expr.le',
 };
 
+/**
+ * Returns the identifier of the entry a comparison is written as, or `null`
+ * for `is_in`, which the catalogue has no entry for yet.
+ */
+export function comparisonEntryId(comparison: Comparison): string | null {
+  return comparison === 'is_in' ? null : COMPARISON_ENTRIES[comparison];
+}
+
 /** An expression before it is written: where it starts, and the links that follow. */
 interface Body {
   readonly start: Json;

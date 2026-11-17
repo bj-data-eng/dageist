@@ -6,6 +6,7 @@ import catalogueFixture from '../../../host/fixtures/catalogue.json';
 import nodeFixture from '../../../host/fixtures/node-inputs.json';
 import { indexCatalogue } from './catalogue';
 import { translate } from './document';
+import { startingArgument, swappedArgument } from './expr';
 import { tablesOf } from './inputs';
 import { defaultStep } from './steps';
 
@@ -54,5 +55,56 @@ describe('a new step', () => {
     expect(defaultStep('pivot', node.source.columns, [])).toMatchObject({
       options: { on_columns: { kind: 'unset' } },
     });
+  });
+
+  it('keeps every field for a select, in the order of the rows', () => {
+    const step = defaultStep('select', node.source.columns, tables);
+
+    expect(step).toMatchObject({ verb: 'select' });
+    expect(step.verb === 'select' ? step.options.exprs : null).toMatchObject({
+      kind: 'list',
+      items: node.source.columns.map((column) => ({
+        kind: 'expression',
+        value: { kind: 'column', column: column.name },
+      })),
+    });
+  });
+});
+
+describe('the argument of a method that is added', () => {
+  it('is the default the engine allowed, a number typed in', () => {
+    expect(
+      startingArgument(catalogue, 'shift', {
+        parameter: 'n',
+        literal: { kind: 'integer', value: 1 },
+      }),
+    ).toEqual({ kind: 'literal', value: 1 });
+  });
+
+  it('is still to be picked where the engine allowed none, and none for a method that takes none', () => {
+    expect(startingArgument(catalogue, 'shift', null)).toEqual({ kind: 'unset' });
+    // An argument the engine allowed for another parameter is not this one's.
+    expect(
+      startingArgument(catalogue, 'shift', {
+        parameter: 'fill_value',
+        literal: { kind: 'text', value: 'x' },
+      }),
+    ).toEqual({ kind: 'unset' });
+    expect(startingArgument(catalogue, 'is_null', null)).toBeNull();
+    expect(startingArgument(catalogue, 'nothing', null)).toBeNull();
+  });
+
+  it('is kept when a method is swapped, and the new method’s own where there was none', () => {
+    const kept = { kind: 'column', column: 'a' } as const;
+    expect(swappedArgument(catalogue, kept, 'sub', null)).toBe(kept);
+    expect(swappedArgument(catalogue, { kind: 'unset' }, 'shift', null)).toEqual({ kind: 'unset' });
+    expect(
+      swappedArgument(catalogue, null, 'shift', {
+        parameter: 'n',
+        literal: { kind: 'integer', value: 1 },
+      }),
+    ).toEqual({ kind: 'literal', value: 1 });
+    // A method that takes no argument has none to keep.
+    expect(swappedArgument(catalogue, kept, 'is_null', null)).toBeNull();
   });
 });
