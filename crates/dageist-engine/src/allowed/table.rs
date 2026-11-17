@@ -34,6 +34,9 @@ pub enum Shape {
 }
 
 impl Shape {
+    /// Every shape.
+    pub const ALL: [Self; 2] = [Self::One, Self::Many];
+
     const fn name(self) -> &'static str {
         match self {
             Self::One => "one",
@@ -55,6 +58,9 @@ pub enum Stage {
 }
 
 impl Stage {
+    /// Every stage, in the order Polars meets them.
+    pub const ALL: [Self; 3] = [Self::Schema, Self::Rows, Self::Empty];
+
     /// The word the tables use.
     #[must_use]
     pub const fn name(self) -> &'static str {

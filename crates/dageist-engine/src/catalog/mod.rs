@@ -59,6 +59,16 @@ pub enum Applies {
     Condition,
 }
 
+impl Applies {
+    /// Every kind of thing an entry applies to.
+    pub const ALL: [Self; 4] = [
+        Self::Expression,
+        Self::Frame,
+        Self::Function,
+        Self::Condition,
+    ];
+}
+
 /// The families an entry is swapped within. An entry can be changed for
 /// another of its family without the rest of the step changing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -190,6 +200,17 @@ pub enum ValueType {
     /// A literal that has its own type: a whole number, a number, text or a
     /// flag, as typed, such as the value of `lit`.
     Any,
+}
+
+impl ValueType {
+    /// Every type of literal a parameter takes.
+    pub const ALL: [Self; 5] = [
+        Self::Integer,
+        Self::Float,
+        Self::String,
+        Self::Date,
+        Self::Any,
+    ];
 }
 
 /// What a parameter holds. The set is closed: each kind has one drawing and
