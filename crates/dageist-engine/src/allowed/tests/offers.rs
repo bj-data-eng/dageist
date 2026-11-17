@@ -790,8 +790,8 @@ fn a_window_ordered_without_a_partition_gives_what_it_gives_with_one() {
 
 #[test]
 fn a_window_with_nothing_to_group_or_order_by_is_refused_by_polars_whatever_its_options() {
-    // Only the flags and the strategy, which mean nothing without an order,
-    // are no window: Polars refuses it, so there is no dtype to carry.
+    // Nothing, or only the flags and the strategy, which mean nothing without an
+    // order, is no window: Polars refuses it, so there is no dtype to carry.
     for mapping in [
         WindowMapping::GroupsToRows,
         WindowMapping::Join,
@@ -808,7 +808,8 @@ fn a_window_with_nothing_to_group_or_order_by_is_refused_by_polars_whatever_its_
         );
     }
     for chosen in [
-        &[("nulls_last", "true")][..],
+        &[][..],
+        &[("nulls_last", "true")],
         &[("descending", "true")],
         &[("mapping_strategy", "join")],
     ] {

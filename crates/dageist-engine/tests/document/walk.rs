@@ -260,13 +260,16 @@ fn a_window_ordered_without_a_partition_gives_the_walk_its_dtype() {
 }
 
 #[test]
-fn a_window_with_nothing_to_group_or_order_by_gives_the_walk_no_dtype() {
-    // Polars refuses a window given only flags or a strategy, so there is no
-    // dtype to know after it.
+fn a_window_given_neither_partition_by_nor_order_by_gives_the_walk_no_dtype() {
+    // Polars refuses a window given neither key, bare or with only flags, a
+    // strategy, or `more_exprs`, which extends a `partition_by` it does not have,
+    // so there is no dtype to know after it.
     for arguments in [
+        json!({}),
         json!({ "nulls_last": { "flag": true } }),
         json!({ "descending": { "flag": true } }),
         json!({ "mapping_strategy": { "choice": "join" } }),
+        json!({ "more_exprs": many(vec![field("k")]) }),
     ] {
         assert_eq!(after_window(arguments.clone()), None, "{arguments}");
     }
