@@ -1177,7 +1177,9 @@ fn is_reached_by_a_null(expression: &Expression, at: usize) -> bool {
 /// that a null reaches is a null. The first of them drops what it follows and is
 /// given where that is one value or literals alone, and the comparisons after it
 /// compare a null, so they drop only what they are given where it is one value or
-/// literals alone. A side that is more is evaluated, and its aggregate counts.
+/// literals alone, except one that is given a null, which drops what it follows
+/// too where that is one value or literals alone: what comes before the last that
+/// does is not evaluated. A side that is more is evaluated, and its aggregate counts.
 /// Where a join's key is judged elementwise a subtraction with a null drops
 /// nothing: the key `k != f.len() - null` is not elementwise.
 fn holds_an_aggregate(expression: &Expression) -> bool {
@@ -1191,6 +1193,18 @@ fn holds_an_aggregate(expression: &Expression) -> bool {
     let Some(first) = (0..links.len()).find(|at| is_reached_by_a_null(expression, *at)) else {
         return start.into_iter().chain(links).any(evaluated);
     };
+    // A comparison that is given a null drops what it follows where that is one
+    // value or literals alone, as the first fold does, so what a later one drops
+    // is not evaluated either: the last of them that does is where the key is
+    // judged from.
+    let first = (first..links.len())
+        .rev()
+        .find(|at| {
+            is_a_comparison(&links[*at])
+                && operands(&links[*at]).into_iter().any(is_a_null)
+                && wholly_single(expression, *at, true)
+        })
+        .unwrap_or(first);
     // What the first comparison follows is the start and the links before it,
     // dropped as a whole where they are one value or literals alone.
     let followed = !wholly_single(expression, first, true)
