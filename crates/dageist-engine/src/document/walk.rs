@@ -301,19 +301,24 @@ struct Walker<'a> {
     not_known: Option<String>,
 }
 
-/// The expressions a join's keys parameter holds, in order.
-fn keys_of(value: &Value) -> Vec<&Expression> {
-    match value {
-        Value::Expression(expression) => vec![expression],
-        Value::Many(items) => items
+/// The output names of a join's keys before the first whose name is not known, in
+/// order. Polars expands each side's keys before it pairs them, so a key that may
+/// expand to several columns, or that is not picked yet, shifts every pair after
+/// it: only the keys before it pair by position. Such a key is one whose name is
+/// not known, as is an item that is no expression.
+fn known_key_names(value: &Value) -> Vec<String> {
+    let names = |items: &[&Value]| {
+        items
             .iter()
-            .map(|item| match item {
-                Value::Expression(expression) => Some(expression),
+            .map_while(|item| match item {
+                Value::Expression(expression) => key_name(expression),
                 _ => None,
             })
-            .collect::<Option<Vec<_>>>()
-            .unwrap_or_default(),
-        _ => Vec::new(),
+            .collect()
+    };
+    match value {
+        Value::Many(items) => names(&items.iter().collect::<Vec<_>>()),
+        other => names(&[other]),
     }
 }
 
@@ -525,8 +530,10 @@ impl Walker<'_> {
     }
 
     /// Asks whether a join's keys pair the same two output names twice, which
-    /// Polars refuses, at the later key that makes the pair again. A key whose name
-    /// is not known pairs with none.
+    /// Polars refuses, at the later key that makes the pair again. Only the pairs
+    /// before the first key on either side whose name is not known are judged:
+    /// Polars pairs the keys after expanding each side, and a key that may expand
+    /// or is not picked yet shifts every pair after it.
     fn key_names(&mut self) {
         if self.step.entry().id().as_str() != "LazyFrame.join" {
             return;
@@ -542,13 +549,9 @@ impl Walker<'_> {
         } else {
             "on"
         };
-        let (left, right) = (keys_of(left), keys_of(right));
-        let mut paired: Vec<(String, String)> = Vec::new();
-        for (at, (left, right)) in left.iter().zip(&right).enumerate() {
-            let (Some(left), Some(right)) = (key_name(left), key_name(right)) else {
-                continue;
-            };
-            let pair = (left, right);
+        let (left, right) = (known_key_names(left), known_key_names(right));
+        let mut paired: Vec<(&String, &String)> = Vec::new();
+        for (at, pair) in left.iter().zip(&right).enumerate() {
             if !paired.contains(&pair) {
                 paired.push(pair);
                 continue;
@@ -562,10 +565,12 @@ impl Walker<'_> {
                 path.push(Segment::Item(at));
             }
             let place = path.into_iter().fold(self.base.clone(), Place::then);
+            // A key already refused keeps its refusal: this one is the later reason.
             if let Some(walked) = self
                 .walked
                 .iter_mut()
                 .find(|walked| walked.place == place && walked.context == Some(context))
+                && !matches!(walked.ending, Some(Ending::Refused(_)))
             {
                 walked.ending = Some(Ending::Refused(refusal.clone()));
             }
