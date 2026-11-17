@@ -580,8 +580,8 @@ what an option gives is read as a change of what the method gives at its default
 the dtype it was measured on, and a `List` of what the method gives elsewhere.
 Polars gives a window the same result with either of the two alone, so the table is
 read for a window given one, and the dtype table measures `order_by` alone. A window
-given neither is refused by Polars, so what its options give is not known. After a
-single value, an option that changes the result leaves it not known.
+given neither is refused by Polars, bare or with options, so no dtype is known after
+it. After a single value, an option that changes the result leaves it not known.
 
 `Step::walk` finds where every call of a step stands without building it in
 Polars. It follows the document as running it does: the arguments of a call
