@@ -90,7 +90,10 @@ impl Dtype {
     /// `Duration` and `List` have parameters to be set, and are not among them.
     #[must_use]
     pub fn listed() -> Vec<Self> {
-        SIMPLE.iter().cloned().map(Self).collect()
+        SIMPLE
+            .iter()
+            .map(|(_, dtype)| Self(dtype.clone()))
+            .collect()
     }
 
     /// The Polars dtype.
@@ -138,76 +141,43 @@ fn unit_named(name: &str) -> Option<TimeUnit> {
     }
 }
 
-/// The dtypes with no parameters, in the order a list of them is given.
-const SIMPLE: [DataType; 18] = [
-    DataType::Boolean,
-    DataType::Date,
-    DataType::Time,
-    DataType::Null,
-    DataType::String,
-    DataType::Float16,
-    DataType::Float32,
-    DataType::Float64,
-    DataType::Int8,
-    DataType::Int16,
-    DataType::Int32,
-    DataType::Int64,
-    DataType::Int128,
-    DataType::UInt8,
-    DataType::UInt16,
-    DataType::UInt32,
-    DataType::UInt64,
-    DataType::UInt128,
+/// The dtypes with no parameters, each with its name, in the order a list of
+/// them is given. Reading a name and writing a dtype are both made from it.
+const SIMPLE: [(&str, DataType); 18] = [
+    ("Boolean", DataType::Boolean),
+    ("Date", DataType::Date),
+    ("Time", DataType::Time),
+    ("Null", DataType::Null),
+    ("String", DataType::String),
+    ("Float16", DataType::Float16),
+    ("Float32", DataType::Float32),
+    ("Float64", DataType::Float64),
+    ("Int8", DataType::Int8),
+    ("Int16", DataType::Int16),
+    ("Int32", DataType::Int32),
+    ("Int64", DataType::Int64),
+    ("Int128", DataType::Int128),
+    ("UInt8", DataType::UInt8),
+    ("UInt16", DataType::UInt16),
+    ("UInt32", DataType::UInt32),
+    ("UInt64", DataType::UInt64),
+    ("UInt128", DataType::UInt128),
 ];
 
-/// The dtypes with no parameters, by name.
+/// The dtype with no parameters called `name`.
 fn simple(name: &str) -> Option<DataType> {
-    Some(match name {
-        "Int8" => DataType::Int8,
-        "Int16" => DataType::Int16,
-        "Int32" => DataType::Int32,
-        "Int64" => DataType::Int64,
-        "Int128" => DataType::Int128,
-        "UInt8" => DataType::UInt8,
-        "UInt16" => DataType::UInt16,
-        "UInt32" => DataType::UInt32,
-        "UInt64" => DataType::UInt64,
-        "UInt128" => DataType::UInt128,
-        "Float16" => DataType::Float16,
-        "Float32" => DataType::Float32,
-        "Float64" => DataType::Float64,
-        "String" => DataType::String,
-        "Boolean" => DataType::Boolean,
-        "Date" => DataType::Date,
-        "Time" => DataType::Time,
-        "Null" => DataType::Null,
-        _ => return None,
-    })
+    SIMPLE
+        .iter()
+        .find(|(known, _)| *known == name)
+        .map(|(_, dtype)| dtype.clone())
 }
 
 /// The name of a dtype with no parameters.
-const fn simple_name(dtype: &DataType) -> Option<&'static str> {
-    Some(match dtype {
-        DataType::Int8 => "Int8",
-        DataType::Int16 => "Int16",
-        DataType::Int32 => "Int32",
-        DataType::Int64 => "Int64",
-        DataType::Int128 => "Int128",
-        DataType::UInt8 => "UInt8",
-        DataType::UInt16 => "UInt16",
-        DataType::UInt32 => "UInt32",
-        DataType::UInt64 => "UInt64",
-        DataType::UInt128 => "UInt128",
-        DataType::Float16 => "Float16",
-        DataType::Float32 => "Float32",
-        DataType::Float64 => "Float64",
-        DataType::String => "String",
-        DataType::Boolean => "Boolean",
-        DataType::Date => "Date",
-        DataType::Time => "Time",
-        DataType::Null => "Null",
-        _ => return None,
-    })
+fn simple_name(dtype: &DataType) -> Option<&'static str> {
+    SIMPLE
+        .iter()
+        .find(|(_, known)| known == dtype)
+        .map(|(name, _)| *name)
 }
 
 /// The text of `dtype`, if the document can hold it. `lists` is how many

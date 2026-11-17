@@ -96,7 +96,10 @@ fn a_typed_literal_fits_where_the_dtype_polars_gives_it_does() {
 #[test]
 fn a_field_and_an_input_fit_by_the_class_of_their_dtype() {
     let by = argument("Expr.dt.offset_by", "by", Representative::Datetime);
-    let input = |dtype| Candidate::Input { dtype, list: false };
+    let input = |dtype| Candidate::Input {
+        dtype,
+        shape: Shape::One,
+    };
     for (candidate, fits) in [
         (Candidate::Field(Representative::String), true),
         (Candidate::Field(Representative::Int64), false),
@@ -133,11 +136,11 @@ fn a_candidate_as_a_start_is_judged_by_the_context_it_stands_in() {
     // A connected value is a literal of its dtype, and a list gives many values.
     let value = Candidate::Input {
         dtype: Representative::Boolean,
-        list: false,
+        shape: Shape::One,
     };
     let list = Candidate::Input {
         dtype: Representative::Boolean,
-        list: true,
+        shape: Shape::Many,
     };
     let shapes = [value, list].map(|candidate| {
         fit(&candidate, &filter)

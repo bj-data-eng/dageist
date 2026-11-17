@@ -6,7 +6,7 @@ use std::fmt;
 
 use polars::prelude::{Expr, LazyFrame, PolarsError, Scalar, Series, lit};
 
-use crate::allowed::{Representative, dtype_name};
+use crate::allowed::{Representative, Shape, dtype_name};
 
 use super::columns::ColumnDescription;
 
@@ -66,7 +66,7 @@ enum Input {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct StartLiteral {
     pub(super) class: Option<Representative>,
-    pub(super) list: bool,
+    pub(super) shape: Shape,
 }
 
 /// The inputs of a node by name: tables, single values and lists. A name
@@ -190,14 +190,14 @@ impl Inputs {
     /// What the single value or list called `name` is as the start of an
     /// expression, or `None` when no value or list has the name.
     pub(super) fn start_literal(&self, name: &str) -> Option<StartLiteral> {
-        let (dtype, list) = match self.inputs.get(name)? {
-            Input::Value(value) => (value.dtype(), false),
-            Input::List(values) => (values.dtype(), true),
+        let (dtype, shape) = match self.inputs.get(name)? {
+            Input::Value(value) => (value.dtype(), Shape::One),
+            Input::List(values) => (values.dtype(), Shape::Many),
             Input::Table(_) => return None,
         };
         Some(StartLiteral {
             class: Representative::of(dtype),
-            list,
+            shape,
         })
     }
 

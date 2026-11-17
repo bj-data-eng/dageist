@@ -361,7 +361,7 @@ fn candidate_of(request: &CandidateRequest) -> Result<Candidate, String> {
         CandidateRequest::Field { dtype } => Candidate::Field(class(dtype)?),
         CandidateRequest::Input { dtype, list } => Candidate::Input {
             dtype: class(dtype)?,
-            list: *list,
+            shape: if *list { Shape::Many } else { Shape::One },
         },
         CandidateRequest::Literal { literal } => Candidate::Literal(literal.clone().into()),
     })

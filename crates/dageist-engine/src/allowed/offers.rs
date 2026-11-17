@@ -789,9 +789,9 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
 /// The run makes a connected input a literal of its dtype, so the tables' lines
 /// of `polars.lit` judge it, as they judge a literal given a dtype: where a
 /// literal may stand and may end, so may the input. A list gives many values,
-/// where a value gives one. A place that is not a start refuses it.
+/// where a value gives one, which `shape` says. A place that is not a start refuses it.
 #[must_use]
-pub fn offer_input(place: &Place, dtype: Representative, list: bool) -> Verdict {
+pub fn offer_input(place: &Place, dtype: Representative, shape: Shape) -> Verdict {
     let Some(literal) = catalog::entry("polars.lit") else {
         return Verdict::Refused(Refusal::structure("the catalogue has no polars.lit"));
     };
@@ -799,7 +799,10 @@ pub fn offer_input(place: &Place, dtype: Representative, list: bool) -> Verdict 
     offer(
         literal,
         place,
-        &if list { chosen.giving_many() } else { chosen },
+        &match shape {
+            Shape::Many => chosen.giving_many(),
+            Shape::One => chosen,
+        },
     )
 }
 

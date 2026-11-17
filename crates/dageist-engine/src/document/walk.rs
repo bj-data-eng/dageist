@@ -746,8 +746,11 @@ impl Walker<'_> {
             ));
             return Standing::not_asked();
         };
-        let verdict =
-            allowed::offer_input(&OfferPlace::new(context, After::Start), class, literal.list);
+        let verdict = allowed::offer_input(
+            &OfferPlace::new(context, After::Start),
+            class,
+            literal.shape,
+        );
         match &verdict {
             Verdict::Refused(refusal) => {
                 self.refuse(refusal, false);

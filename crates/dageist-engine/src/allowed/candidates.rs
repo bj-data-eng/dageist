@@ -17,6 +17,7 @@ use super::dtype::Representative;
 use super::offers::{
     After, Chosen, Place, Refusal, Verdict, default_word, offer, offer_input, options,
 };
+use super::table::Shape;
 
 /// A number or text typed in, as a document writes it.
 #[derive(Debug, Clone, PartialEq)]
@@ -65,8 +66,8 @@ pub enum Candidate {
     Input {
         /// The class of the dtype of the value, or of each value of the list.
         dtype: Representative,
-        /// Whether it is a list, which gives many values.
-        list: bool,
+        /// How many values it gives: one for a value, many for a list.
+        shape: Shape,
     },
     /// A number or text typed in.
     Literal(Literal),
@@ -182,8 +183,8 @@ pub fn fit(candidate: &Candidate, slot: &Slot<'_>) -> Option<Fit> {
                 || Verdict::Refused(Refusal::structure("the catalogue has no polars.col")),
                 |column| offer(column, &place, &Chosen::default().giving(dtype)),
             ),
-            Candidate::Input { list, .. } => offer_input(&place, dtype, *list),
-            Candidate::Literal(_) => offer_input(&place, dtype, false),
+            Candidate::Input { shape, .. } => offer_input(&place, dtype, *shape),
+            Candidate::Literal(_) => offer_input(&place, dtype, Shape::One),
         };
         verdict = Some(found);
     }
