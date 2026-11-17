@@ -433,8 +433,12 @@ fn a_refused_step_is_rejected_as_refused_and_the_step_after_it_as_not_run() {
 
 #[test]
 fn the_snapshots_are_what_the_commands_return() {
-    let snapshots: [(&str, Value); 7] = [
+    let snapshots: [(&str, Value); 8] = [
         ("node-inputs.json", json(&node_view().expect("the node"))),
+        (
+            "step-document.json",
+            serde_json::from_str(steps_text()).expect("the sample steps are JSON"),
+        ),
         (
             "step-report.json",
             json(&run_view(steps_text()).expect("a report")),
