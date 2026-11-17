@@ -318,3 +318,30 @@ fn starting_deletes_the_spill_directory_of_a_process_that_no_longer_exists() {
         },
     );
 }
+
+/// What the release sets in a debug build, because stack frames get very large there.
+#[cfg(debug_assertions)]
+const DEBUG_MINIMUM_STACK: usize = 1024 * 1024;
+#[cfg(debug_assertions)]
+const DEBUG_STACK_ALLOCATION: usize = 16 * 1024 * 1024;
+
+#[cfg(debug_assertions)]
+#[test]
+fn a_debug_build_gets_the_larger_stacks_the_release_sets_there() {
+    in_fresh_process(
+        "a_debug_build_gets_the_larger_stacks_the_release_sets_there",
+        Vec::new,
+        || {
+            let before = recursive::get_minimum_stack_size();
+            assert_ne!(before, DEBUG_MINIMUM_STACK, "the library's own default");
+
+            let _session = PolarsSession::start();
+
+            assert_eq!(recursive::get_minimum_stack_size(), DEBUG_MINIMUM_STACK);
+            assert_eq!(
+                recursive::get_stack_allocation_size(),
+                DEBUG_STACK_ALLOCATION
+            );
+        },
+    );
+}
