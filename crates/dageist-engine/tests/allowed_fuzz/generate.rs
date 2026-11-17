@@ -552,13 +552,28 @@ impl Gen<'_> {
 
     /// A literal that stands for one value, as the parameters Polars takes
     /// only as a single value, such as the shift of `shift`, are given: the
-    /// number 1 of a dtype, as the tables measured them.
-    fn scalar(&mut self) -> Built {
+    /// number 1 of a dtype, as the tables measured them. With `back`, a number
+    /// of a signed dtype is sometimes the number below zero instead, a shift
+    /// back: the tables measured the dtype, which the sign does not change, and
+    /// a negative number of an unsigned dtype is not one.
+    fn scalar(&mut self, back: bool) -> Built {
         let class = self.draw.pick(&NUMBERED);
+        let signed = [
+            Representative::Int8,
+            Representative::Int16,
+            Representative::Int32,
+            Representative::Int64,
+        ]
+        .contains(&class);
+        let whole = if back && signed && self.draw.chance(35) {
+            -1
+        } else {
+            1
+        };
         let literal = match dtype_value(class) {
             Some(dtype) => call(
                 "polars.lit",
-                vec![("value", Value::Integer(1)), ("dtype", dtype)],
+                vec![("value", Value::Integer(whole)), ("dtype", dtype)],
             ),
             None => call("polars.lit", vec![("value", Value::Flag(Some(true)))]),
         };
@@ -913,7 +928,7 @@ impl Gen<'_> {
             let position = Slot::of_parameter(id, name);
             slots.extend(position);
             let built: Vec<Built> = match (id, name) {
-                ("Expr.shift", _) => vec![self.scalar()],
+                ("Expr.shift", _) => vec![self.scalar(name == "n")],
                 ("Expr.dt.offset_by", "by") => {
                     // The durations are text of the table's: `b`, whose rows
                     // are durations where it is text, as the tables measured it.
