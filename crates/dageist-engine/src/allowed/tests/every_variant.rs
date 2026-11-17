@@ -1,49 +1,109 @@
 //! The lists of every variant of the closed vocabularies the host sends to the
 //! view. The view's decoders are checked against them, so a variant missing
-//! here is one the view would refuse.
+//! from a list is one the view would refuse.
+//!
+//! A list cannot be checked against the enum it lists, which Rust does not let
+//! a program enumerate. Each enum has here a `next` that names every variant,
+//! so adding one does not compile until `next` gives it a place, and a test
+//! walks the chain from the first variant and expects it to be the list. A
+//! variant given a place in `next` and left out of the list fails that test.
+//! The walk reaches only the variants `next` links, so a new variant that is
+//! made the end of its own chain is not caught; the match makes that a
+//! deliberate act.
 
-use crate::allowed::{ConditionState, Shape, Stage};
+use crate::allowed::{ConditionState, Context, Nested, Outer, Rule, Shape, Stage};
 
-/// Where a variant stands in its list. The match names every variant, so a new
-/// one fails to compile here until it is placed.
-const fn stage_position(stage: Stage) -> usize {
+/// The variants of a list reached from `first` by `next`, which ends the chain
+/// with `None`.
+fn chain<T: Copy>(first: T, next: impl Fn(T) -> Option<T>) -> Vec<T> {
+    /// More than any list here has, so a chain that loops fails and does not hang.
+    const MOST: usize = 64;
+    let mut walked = vec![first];
+    while let Some(following) = next(walked[walked.len() - 1]) {
+        assert!(walked.len() < MOST, "the chain does not end");
+        walked.push(following);
+    }
+    walked
+}
+
+const fn next_outer(outer: Outer) -> Option<Outer> {
+    match outer {
+        Outer::Select => Some(Outer::Filter),
+        Outer::Filter => Some(Outer::Sort),
+        Outer::Sort => Some(Outer::JoinLeft),
+        Outer::JoinLeft => Some(Outer::JoinRight),
+        Outer::JoinRight => Some(Outer::PivotAggregate),
+        Outer::PivotAggregate => None,
+    }
+}
+
+const fn next_nested(nested: Nested) -> Option<Nested> {
+    match nested {
+        Nested::PartitionBy => Some(Nested::OrderBy),
+        Nested::OrderBy => Some(Nested::ConditionPredicate),
+        Nested::ConditionPredicate => Some(Nested::ConditionValue),
+        Nested::ConditionValue => None,
+    }
+}
+
+const fn next_rule(rule: Rule) -> Option<Rule> {
+    match rule {
+        Rule::ConditionPredicateIsBoolean => Some(Rule::ElementOnlyInPivotAggregate),
+        Rule::ElementOnlyInPivotAggregate => Some(Rule::FilterPredicateIsBoolean),
+        Rule::FilterPredicateIsBoolean => Some(Rule::KeyIsElementwise),
+        Rule::KeyIsElementwise => Some(Rule::PivotAggregateGivesOneValue),
+        Rule::PivotAggregateGivesOneValue => None,
+    }
+}
+
+const fn next_stage(stage: Stage) -> Option<Stage> {
     match stage {
-        Stage::Schema => 0,
-        Stage::Rows => 1,
-        Stage::Empty => 2,
+        Stage::Schema => Some(Stage::Rows),
+        Stage::Rows => Some(Stage::Empty),
+        Stage::Empty => None,
     }
 }
 
-const fn shape_position(shape: Shape) -> usize {
+const fn next_shape(shape: Shape) -> Option<Shape> {
     match shape {
-        Shape::One => 0,
-        Shape::Many => 1,
+        Shape::One => Some(Shape::Many),
+        Shape::Many => None,
     }
 }
 
-const fn state_position(state: ConditionState) -> usize {
+const fn next_state(state: ConditionState) -> Option<ConditionState> {
     match state {
-        ConditionState::When => 0,
-        ConditionState::Then => 1,
-        ConditionState::ChainedWhen => 2,
-        ConditionState::ChainedThen => 3,
+        ConditionState::When => Some(ConditionState::Then),
+        ConditionState::Then => Some(ConditionState::ChainedWhen),
+        ConditionState::ChainedWhen => Some(ConditionState::ChainedThen),
+        ConditionState::ChainedThen => None,
     }
 }
 
 #[test]
-fn each_list_has_every_variant_once_in_the_order_it_is_placed() {
-    assert_eq!(Stage::ALL.len(), 3);
-    for (at, stage) in Stage::ALL.into_iter().enumerate() {
-        assert_eq!(stage_position(stage), at);
-    }
-    assert_eq!(Shape::ALL.len(), 2);
-    for (at, shape) in Shape::ALL.into_iter().enumerate() {
-        assert_eq!(shape_position(shape), at);
-    }
-    assert_eq!(ConditionState::ALL.len(), 4);
-    for (at, state) in ConditionState::ALL.into_iter().enumerate() {
-        assert_eq!(state_position(state), at);
-    }
+fn the_position_lists_are_every_variant_in_order() {
+    assert_eq!(chain(Outer::Select, next_outer), Outer::ALL);
+    assert_eq!(chain(Nested::PartitionBy, next_nested), Nested::ALL);
+    // The whole list of contexts is built from the two, so it holds each pair.
+    assert_eq!(
+        Context::all().len(),
+        Outer::ALL.len() * (1 + Nested::ALL.len())
+    );
+}
+
+#[test]
+fn the_rule_list_is_every_variant_in_order() {
+    assert_eq!(
+        chain(Rule::ConditionPredicateIsBoolean, next_rule),
+        Rule::ALL
+    );
+}
+
+#[test]
+fn the_stage_shape_and_state_lists_are_every_variant_in_order() {
+    assert_eq!(chain(Stage::Schema, next_stage), Stage::ALL);
+    assert_eq!(chain(Shape::One, next_shape), Shape::ALL);
+    assert_eq!(chain(ConditionState::When, next_state), ConditionState::ALL);
 }
 
 #[test]

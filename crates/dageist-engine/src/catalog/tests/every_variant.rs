@@ -1,38 +1,48 @@
 //! The lists of every variant of the catalogue's closed vocabularies the host
 //! sends to the view. The view's decoders are checked against them, so a
-//! variant missing here is one the view would refuse.
+//! variant missing from a list is one the view would refuse.
+//!
+//! Each enum has here a `next` that names every variant, so adding one does
+//! not compile until `next` gives it a place, and a test walks the chain from
+//! the first variant and expects it to be the list. A variant given a place
+//! in `next` and left out of the list fails that test.
 
 use crate::catalog::{Applies, ValueType};
 
-/// Where a variant stands in its list. The match names every variant, so a new
-/// one fails to compile here until it is placed.
-const fn applies_position(applies: Applies) -> usize {
+/// The variants of a list reached from `first` by `next`, which ends the chain
+/// with `None`.
+fn chain<T: Copy>(first: T, next: impl Fn(T) -> Option<T>) -> Vec<T> {
+    /// More than any list here has, so a chain that loops fails and does not hang.
+    const MOST: usize = 64;
+    let mut walked = vec![first];
+    while let Some(following) = next(walked[walked.len() - 1]) {
+        assert!(walked.len() < MOST, "the chain does not end");
+        walked.push(following);
+    }
+    walked
+}
+
+const fn next_applies(applies: Applies) -> Option<Applies> {
     match applies {
-        Applies::Expression => 0,
-        Applies::Frame => 1,
-        Applies::Function => 2,
-        Applies::Condition => 3,
+        Applies::Expression => Some(Applies::Frame),
+        Applies::Frame => Some(Applies::Function),
+        Applies::Function => Some(Applies::Condition),
+        Applies::Condition => None,
     }
 }
 
-const fn type_position(value_type: ValueType) -> usize {
+const fn next_type(value_type: ValueType) -> Option<ValueType> {
     match value_type {
-        ValueType::Integer => 0,
-        ValueType::Float => 1,
-        ValueType::String => 2,
-        ValueType::Date => 3,
-        ValueType::Any => 4,
+        ValueType::Integer => Some(ValueType::Float),
+        ValueType::Float => Some(ValueType::String),
+        ValueType::String => Some(ValueType::Date),
+        ValueType::Date => Some(ValueType::Any),
+        ValueType::Any => None,
     }
 }
 
 #[test]
-fn each_list_has_every_variant_once_in_the_order_it_is_placed() {
-    assert_eq!(Applies::ALL.len(), 4);
-    for (at, applies) in Applies::ALL.into_iter().enumerate() {
-        assert_eq!(applies_position(applies), at);
-    }
-    assert_eq!(ValueType::ALL.len(), 5);
-    for (at, value_type) in ValueType::ALL.into_iter().enumerate() {
-        assert_eq!(type_position(value_type), at);
-    }
+fn the_lists_are_every_variant_in_order() {
+    assert_eq!(chain(Applies::Expression, next_applies), Applies::ALL);
+    assert_eq!(chain(ValueType::Integer, next_type), ValueType::ALL);
 }
