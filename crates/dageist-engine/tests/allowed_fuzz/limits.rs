@@ -1553,6 +1553,47 @@ mod tests {
     }
 
     #[test]
+    fn the_last_of_a_shift_is_null_only_in_a_column_that_has_the_sample_null() {
+        // `a` and `b` hold a null in the middle row, which one shift puts last. The
+        // columns `f`, `k`, `g`, `h` and `u` hold no null, so what is last after one
+        // shift is a value, and the limit excuses nothing after it. Three shifts
+        // leave only nulls whatever the column holds.
+        let shift = || call("Expr.shift", Vec::new());
+        let last = || call("Expr.last", Vec::new());
+        let excused = |start: &str, links: Vec<Call>| {
+            let at = links.len();
+            let mut all = links;
+            all.push(compared_with("Expr.lt", chain(column("g"), &[])));
+            tables_refuse(
+                &select(vec![chain_of(column(start), all)]),
+                link_of("exprs", 0, at),
+                ROWS,
+                "no",
+            )
+        };
+        for start in ["a", "b"] {
+            assert_eq!(
+                excused(start, vec![shift(), last()]),
+                vec![Limit::AShiftThatLeavesNulls],
+                "{start}"
+            );
+        }
+        for start in ["f", "k", "g", "h", "u"] {
+            assert_eq!(excused(start, vec![shift(), last()]), vec![], "{start}");
+            assert_eq!(
+                excused(start, vec![shift(), shift(), shift(), last()]),
+                vec![Limit::AShiftThatLeavesNulls],
+                "{start}"
+            );
+        }
+        // After an aggregate there is one value, which a shift moves away.
+        assert_eq!(
+            excused("k", vec![call("Expr.max", Vec::new()), shift(), last()]),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+    }
+
+    #[test]
     fn a_running_sum_of_a_comparison_with_a_null_is_no_limit_of_the_sample() {
         // `f > null` then `cum_sum` then `== b`: Polars folds the comparison with
         // a null into a null whatever the rows are, so what follows the running
@@ -1623,10 +1664,15 @@ mod tests {
             vec![]
         );
         // The last after one shift is the sample's null; after two it is a value.
-        let last = given(chain_of(column("k"), shift(&["Expr.shift", "Expr.last"])));
+        let last = given(chain_of(column("b"), shift(&["Expr.shift", "Expr.last"])));
         assert_eq!(
             tables_refuse(&last, at_the_call.clone(), ROWS, "no"),
             vec![Limit::AShiftThatLeavesNulls]
+        );
+        let without_the_null = given(chain_of(column("k"), shift(&["Expr.shift", "Expr.last"])));
+        assert_eq!(
+            tables_refuse(&without_the_null, at_the_call.clone(), ROWS, "no"),
+            vec![]
         );
         let later = given(chain_of(
             column("k"),
