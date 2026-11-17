@@ -2291,6 +2291,37 @@ mod tests {
     }
 
     #[test]
+    fn a_call_that_broadcasts_an_aggregate_gives_the_sample_rows_again() {
+        // Polars: `k.min().sub(k).shift(1)` is `null, 0, 0` and
+        // `k.min().over(k).shift(1)` is `null, 1, 1`: the one value of the aggregate
+        // is given to each of the sample's three rows, so a shift leaves a value
+        // last, where one row would be shifted away.
+        let shifts = [Limit::AShiftThatLeavesNulls];
+        let last = || plain("Expr.last");
+        for aggregate in [
+            "Expr.min",
+            "Expr.max",
+            "Expr.sum",
+            "Expr.first",
+            "Expr.last",
+        ] {
+            let broadcast =
+                |call: Call| excused_after("k", vec![plain(aggregate), call, shift_by(1), last()]);
+            assert_eq!(
+                broadcast(compared_with("Expr.sub", chain(column("k"), &[]))),
+                vec![],
+                "{aggregate} then sub"
+            );
+            assert_eq!(broadcast(over("k", None)), vec![], "{aggregate} then over");
+        }
+        // The one value alone, shifted, leaves one null.
+        assert_eq!(
+            excused_after("k", vec![plain("Expr.min"), shift_by(1), last()]),
+            shifts
+        );
+    }
+
+    #[test]
     fn the_minimum_and_maximum_of_only_nulls_are_null_and_the_sum_is_not_known() {
         // Polars: `k.shift(3).min()` and `.max()` are null; `k.shift(3).sum()` is `0`
         // of whole numbers, and `null` of a column of the `Null` dtype.
