@@ -80,8 +80,14 @@ name that another site points at `127.0.0.1`, and only if the body is declared
 `application/json`, which a page on another site cannot send without a
 preflight that the bridge does not answer. It sends no cross-origin header, so
 no such page can read an answer either. Vite's development server forwards the
-bridge's path to it, so the view calls its own origin; it forwards the
-bridge's `Host` and answers no cross-origin request itself. The bridge has no
+bridge's path to it, so the view calls its own origin. The forwarded request
+has to carry the bridge's own `Host`, or the bridge would refuse it, so behind
+the development server the bridge's `Host` check no longer tells one page from
+another. Safety through the development server rests on two other things: the
+server's own `Host` check, which `server.allowedHosts` limits to `localhost` and
+`127.0.0.1` in [vite.config.ts](../ui/apps/desktop/vite.config.ts), as it does
+for `vite preview`, and the bridge's content-type rule, together with the
+server's `cors: false`, which answers no cross-origin request. The bridge has no
 authentication and is a development tool, not a server to expose. A later
 server that answers queries to dashboards, as
 [the exploration](https://github.com/bj-data-eng/dageist/issues/64) describes,

@@ -140,7 +140,21 @@ In the view, [bridge.ts](../ui/packages/host/src/bridge.ts) is the bridge host:
 it posts to `/bridge/<command>` on the page's own origin, and
 [vite.config.ts](../ui/apps/desktop/vite.config.ts) forwards `/bridge` to
 `127.0.0.1:7878`, or to the port in `DAGEIST_BRIDGE_PORT`, with the target's
-`Host`, so that the forwarded request passes the checks above.
+`Host`, so that the forwarded request passes the checks above. That rewrite
+means the bridge's `Host` check does not protect the forwarded path. Through
+the development server, and through `vite preview`, which forwards the same
+path, safety rests on Vite's own `Host` check, limited by `server.allowedHosts`
+and `preview.allowedHosts` to `localhost` and `127.0.0.1` (Vite also always accepts an
+IP address and a name under `.localhost`), and on the bridge's
+content-type rule with `cors: false`.
+
+A manual check: with the bridge and the server running, this request is answered
+`403` by Vite, not by the bridge, and the same command without the `Host` option
+is answered `200`:
+
+```sh
+curl -i -X POST -H 'Content-Type: application/json' -H 'Host: other.example:5173' -d '{}' http://localhost:5173/bridge/core_identity
+```
 
 ## Host Configuration
 
