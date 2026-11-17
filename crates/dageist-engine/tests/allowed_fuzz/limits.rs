@@ -95,7 +95,8 @@ pub enum Limit {
     /// each row where it is and null where it was; `is_null`, `is_not_null` and
     /// `cum_count` give a value in every row; a comparison, a subtraction, an
     /// `offset_by`, a condition and a window that is not an `explode` keep the
-    /// rows in place and leave what they hold unknown; any other call leaves
+    /// rows in place and leave what they hold unknown, and give the one value that
+    /// an aggregate leaves to each of the sample's rows; any other call leaves
     /// nothing known. The first and the last take a row (the first or last that
     /// is not null, where they skip nulls), the minimum and the maximum are null
     /// of rows that are all null and a value of any that holds one, and a sum is
@@ -696,8 +697,10 @@ enum Effect {
     Keeps,
     /// Each row is a value, whatever it was.
     Values,
-    /// The rows stay the same number and in place, and what they hold is not known:
-    /// a comparison or a window.
+    /// The rows stay in place, and what they hold is not known: a comparison, a
+    /// subtraction or a window. The number stays too, but where there is one row,
+    /// which an aggregate leaves, the call gives it to each of the sample's rows, as
+    /// what it meets may be a column of them.
     Blurs,
     /// What it gives is not known of the rows at all: another number, or another order.
     Lost,
@@ -844,7 +847,14 @@ fn rows_after(frames: &Frames, expression: &Expression, upto: usize) -> Option<V
             _ => match effect(link) {
                 Effect::Keeps => rows,
                 Effect::Values => vec![Cell::Value; rows.len()],
-                Effect::Blurs => vec![Cell::Unknown; rows.len()],
+                Effect::Blurs => {
+                    let count = if rows.len() == 1 {
+                        SAMPLE_ROWS
+                    } else {
+                        rows.len()
+                    };
+                    vec![Cell::Unknown; count]
+                }
                 Effect::Lost => return None,
             },
         };
