@@ -101,6 +101,8 @@ function chainDtypes(report: StepReportView, sent: SentStep): ReadonlyMap<string
     const expression = report.expressions.find(
       (candidate) => placeKey(candidate.place.path.map(segmentWord)) === key,
     );
+    // A join's `on` is walked twice, as a left key and as a right key, so the walk holds two
+    // expressions at its place, the left then the right; `find` reads the left.
     const walked = report.walk.expressions.find(
       (candidate) => placeKey(candidate.place.path.map(segmentWord)) === key,
     );
