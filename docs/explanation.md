@@ -246,8 +246,9 @@ are the engine's claim-timing sample and translate to the same document. A
 run is asked for after a short wait for the next edit, with one request out at
 a time, and the answer to a request that a newer edit has replaced is dropped,
 so what is shown is never older than the last answer that was wanted. A
-request that failed, such as one sent before the host was there, is asked again
-after two seconds while it is still the newest. A report is shown only for the
+request that failed because the host was not there, as a bridge that is not yet
+running, is asked again after two seconds while it is still the newest; an
+answer of the engine's, such as a refusal, is the same each time and is not. A report is shown only for the
 steps that are still what it reported of: a step an edit has changed, and the
 steps after it, wait for the engine. A `when` of more than one case is held
 back too, as a further case is a `when` after `otherwise`. A refusal

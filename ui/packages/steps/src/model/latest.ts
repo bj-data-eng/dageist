@@ -4,8 +4,8 @@
  * the requests are held for a moment and the newest of them is the one that
  * is sent; at most one request is out at a time; what comes back for a
  * request that a newer one has replaced is dropped, so the view never shows
- * an older answer over a newer edit; and a request that failed is asked again
- * after a while, as the host may not have been there yet.
+ * an older answer over a newer edit; and a request that failed in a way that
+ * may pass, as when the host is not there yet, is asked again after a while.
  */
 
 /** What a request came to. */
@@ -37,8 +37,15 @@ export interface LatestOptions<Request, Answer> {
   /** Receives what the newest request came to, and never what an older one did. */
   readonly deliver: (request: Request, outcome: Outcome<Answer>) => void;
   /**
-   * How long after a failure the same request is asked again, while it is
-   * still the newest, in milliseconds. The host may not have been there yet.
+   * Whether a failure may pass if the same request is asked again, as one
+   * from a host that is not there yet may. A failure that is not, such as a
+   * refusal the host gave on purpose, is the same each time and is not asked
+   * again. No failure is by default.
+   */
+  readonly retryable?: (error: unknown) => boolean;
+  /**
+   * How long after a retryable failure the same request is asked again, while
+   * it is still the newest, in milliseconds.
    */
   readonly retryAfter?: number;
   readonly timers?: Timers;
@@ -92,6 +99,12 @@ export class Latest<Request, Answer> {
     this.waiting = null;
   }
 
+  /** Asks `key` again if it is still the newest and nothing is out. */
+  private retry(key: string): void {
+    if (this.stopped || this.out || key !== this.newestKey) return;
+    this.send();
+  }
+
   private send(): void {
     if (this.stopped || this.newest === null || this.newestKey === null) return;
     if (this.out) {
@@ -120,13 +133,14 @@ export class Latest<Request, Answer> {
     if (this.stopped) return;
     if (key === this.newestKey) {
       this.options.deliver(request, outcome);
-      if (!outcome.ok) {
-        // A failure is not an answer: ask again after a while, unless a newer request comes first.
+      if (!outcome.ok && (this.options.retryable?.(outcome.error) ?? false)) {
+        // A failure that may pass is not an answer: ask again after a while, unless a newer
+        // request comes first.
         this.sentKey = null;
         if (this.waiting === null) {
           this.waiting = this.timers.start(() => {
             this.waiting = null;
-            this.send();
+            this.retry(key);
           }, this.options.retryAfter ?? RETRY_AFTER);
         }
       }

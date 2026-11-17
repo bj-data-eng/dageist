@@ -10,6 +10,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { Host, RowsView, RunView } from '@dageist/host';
+import { HostError } from '@dageist/host';
 
 import { useCatalogue, useNode } from './EngineProvider';
 import { translate } from './model/document';
@@ -32,6 +33,11 @@ const EDIT_DELAY = 150;
 /** How many rows a preview asks for. */
 const PREVIEW_ROWS = 200;
 
+/** Whether a failure may pass if the request is asked again: the host was not there, which is not an answer of the engine's. */
+function mayPass(error: unknown): boolean {
+  return !(error instanceof HostError);
+}
+
 /** What the engine's report of the steps came to, for a window to draw. */
 export interface RunState {
   /** The steps as the document the engine runs, and what became of each. */
@@ -48,6 +54,11 @@ export interface RunState {
 interface Answered {
   readonly document: string;
   readonly outcome: Outcome<RunView>;
+}
+
+/** Whether both are the same failure, which asking again gave again: nothing is new to draw. */
+function sameFailure<Answer>(held: Outcome<Answer>, found: Outcome<Answer>): boolean {
+  return !held.ok && !found.ok && wordsOf(held.error) === wordsOf(found.error);
 }
 
 /** Returns what was the matter, in words. */
@@ -74,9 +85,14 @@ export function useRun(host: Host, steps: readonly Step[]): RunState {
     const made = new Latest<string, RunView>({
       delay: EDIT_DELAY,
       keyOf: (document) => document,
+      retryable: mayPass,
       send: async (document) => host.runDocument(document),
       deliver: (document, outcome) => {
-        setAnswered({ document, outcome });
+        setAnswered((held) =>
+          held !== null && sameFailure(held.outcome, outcome) && held.document === document
+            ? held
+            : { document, outcome },
+        );
       },
     });
     scheduler.current = made;
@@ -155,9 +171,17 @@ export function useRows(host: Host, run: RunState, selectedId: string | null): R
     const made = new Latest<RowsRequest, RowsView>({
       delay: EDIT_DELAY,
       keyOf: keyOfRows,
+      retryable: mayPass,
       send: async ({ document, step }) => host.rowsAfterStep(document, step, PREVIEW_ROWS),
       deliver: ({ document, step }, outcome) => {
-        setAnswered({ document, step, outcome });
+        setAnswered((held) =>
+          held !== null &&
+          held.step === step &&
+          held.document === document &&
+          sameFailure(held.outcome, outcome)
+            ? held
+            : { document, step, outcome },
+        );
       },
     });
     scheduler.current = made;

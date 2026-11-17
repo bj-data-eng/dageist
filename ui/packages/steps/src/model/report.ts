@@ -23,6 +23,7 @@ import type { ChainOwner, Mark, SentStep, Translation } from './document';
 import { placeKey, segmentWord, wrongId } from './document';
 import type { Frame } from './frame';
 import type { Outcome } from './latest';
+import { isRecord } from './shape';
 import type { Step } from './steps';
 
 /** The dtype after the start of a chain and after each of its methods; `null` where the engine gives none. */
@@ -159,10 +160,6 @@ function reportsById(run: RunView | null): ReadonlyMap<string, StepReportView> {
   return run?.status === 'run'
     ? new Map(run.steps.map((report) => [report.id, report]))
     : new Map();
-}
-
-function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /** Returns each step of the document `text` as the JSON text `JSON.stringify` writes it. */

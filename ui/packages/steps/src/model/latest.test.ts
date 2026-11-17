@@ -49,6 +49,7 @@ interface Call {
 function setup(
   delay = 100,
   retryAfter?: number,
+  retryable: (error: unknown) => boolean = () => false,
 ): {
   readonly latest: Latest<string, string>;
   readonly clock: Clock;
@@ -74,6 +75,7 @@ function setup(
     deliver: (request, outcome) => {
       delivered.push({ request, outcome });
     },
+    retryable,
     ...(retryAfter === undefined ? {} : { retryAfter }),
     timers: clock,
   });
@@ -243,7 +245,7 @@ describe('the requests the editor gives the host', () => {
   });
 
   it('ask again after the time the options give, and not before', async () => {
-    const { latest, clock, calls } = setup(100, 500);
+    const { latest, clock, calls } = setup(100, 500, () => true);
     latest.submit('a');
     clock.advance(100);
     calls[0]?.fail('the host was not there');
@@ -256,8 +258,36 @@ describe('the requests the editor gives the host', () => {
     expect(calls.map((call) => call.request)).toEqual(['a', 'a']);
   });
 
+  it('ask again after a failure the options call retryable, and deliver what then comes', async () => {
+    const { latest, clock, calls, delivered } = setup(100, undefined, () => true);
+    latest.submit('a');
+    clock.advance(100);
+    calls[0]?.fail('the host was not there');
+    await settled();
+
+    clock.advance(60_000);
+    expect(calls.map((call) => call.request)).toEqual(['a', 'a']);
+    calls[1]?.answer('A');
+    await settled();
+
+    expect(delivered).toHaveLength(2);
+    expect(delivered[1]).toEqual({ request: 'a', outcome: { ok: true, answer: 'A' } });
+  });
+
+  it('ask only again for the failures the options call retryable', async () => {
+    const { latest, clock, calls } = setup(100, 500, (error) => String(error).includes('gone'));
+    latest.submit('a');
+    clock.advance(100);
+    calls[0]?.fail('refused on purpose');
+    await settled();
+
+    clock.advance(60_000);
+
+    expect(calls).toHaveLength(1);
+  });
+
   it('do not ask again after a failure once a newer request has replaced the request', async () => {
-    const { latest, clock, calls } = setup();
+    const { latest, clock, calls } = setup(100, undefined, () => true);
     latest.submit('a');
     clock.advance(100);
     calls[0]?.fail('the host was not there');
