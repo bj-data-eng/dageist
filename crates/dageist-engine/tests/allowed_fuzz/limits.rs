@@ -1890,6 +1890,181 @@ mod tests {
         assert_eq!(excused(vec![first(), skipping()]), vec![]);
     }
 
+    /// The tables refuse `lt` against the text column `g` after `links` on the
+    /// column `start`, and Polars allows the step: which limits excuse it.
+    fn excused_after(start: &str, links: Vec<Call>) -> Vec<Limit> {
+        let at = links.len();
+        let mut all = links;
+        all.push(compared_with("Expr.lt", chain(column("g"), &[])));
+        tables_refuse(
+            &select(vec![chain_of(column(start), all)]),
+            link_of("exprs", 0, at),
+            ROWS,
+            "no",
+        )
+    }
+
+    fn shift_by(rows: i64) -> Call {
+        call(
+            "Expr.shift",
+            vec![("n", Value::Expression(chain_with_integer(rows)))],
+        )
+    }
+
+    fn plain(id: &str) -> Call {
+        call(id, Vec::new())
+    }
+
+    #[test]
+    fn a_shift_back_leaves_its_nulls_at_the_end() {
+        // Polars: `a.shift(-1)` of a value, a null and a value is `null, 3, null`
+        // for the column `a` and `1, 1, 2` -> `1, 2, null` for `k`, and `shift(-2)`
+        // of `a` is `3, null, null`. The nulls a negative shift leaves are the
+        // last rows, not the first.
+        let shifts = [Limit::AShiftThatLeavesNulls];
+        // The last row is null after a shift back, whatever the column holds there.
+        assert_eq!(
+            excused_after("k", vec![shift_by(-1), plain("Expr.last")]),
+            shifts
+        );
+        assert_eq!(
+            excused_after("a", vec![shift_by(-2), plain("Expr.last")]),
+            shifts
+        );
+        // The first row is a value: `k.shift(-1)` starts with `1`, and `a.shift(-2)` with `3`.
+        assert_eq!(
+            excused_after("k", vec![shift_by(-1), plain("Expr.first")]),
+            vec![]
+        );
+        assert_eq!(
+            excused_after("a", vec![shift_by(-2), plain("Expr.first")]),
+            vec![]
+        );
+        // A shift back that moves every row leaves only nulls.
+        assert_eq!(
+            excused_after("k", vec![shift_by(-3), plain("Expr.first")]),
+            shifts
+        );
+        // A shift back, then forward: `a` is `3, null, null`, then `null, 3, null`.
+        assert_eq!(
+            excused_after("a", vec![shift_by(-2), shift_by(1), plain("Expr.first")]),
+            shifts
+        );
+        assert_eq!(
+            excused_after("a", vec![shift_by(-2), shift_by(1), plain("Expr.last")]),
+            shifts
+        );
+        // Forward, then back: `1, null, 3` is `null, 1, null`, then `1, null, null`.
+        assert_eq!(
+            excused_after("a", vec![shift_by(1), shift_by(-1), plain("Expr.first")]),
+            vec![]
+        );
+        assert_eq!(
+            excused_after("a", vec![shift_by(1), shift_by(-1), plain("Expr.last")]),
+            shifts
+        );
+    }
+
+    #[test]
+    fn what_a_call_before_a_shift_does_to_the_nulls_decides_what_the_shift_leaves() {
+        // Polars: `b.cum_sum()` keeps the null of the sample's middle row, so the
+        // last row after a shift is null as it is for the column. `b.cum_count()` is
+        // `1, 1, 2` and `b.is_null()` is `false, true, false`: neither holds a null,
+        // so the last row after a shift is a value, and the column's null does not
+        // reach it.
+        let shifts = [Limit::AShiftThatLeavesNulls];
+        let last = || plain("Expr.last");
+        assert_eq!(
+            excused_after("b", vec![plain("Expr.cum_sum"), shift_by(1), last()]),
+            shifts
+        );
+        assert_eq!(
+            excused_after("b", vec![plain("Expr.cum_max"), shift_by(1), last()]),
+            shifts
+        );
+        for gives_values in ["Expr.cum_count", "Expr.is_null", "Expr.is_not_null"] {
+            assert_eq!(
+                excused_after("b", vec![plain(gives_values), shift_by(1), last()]),
+                vec![],
+                "{gives_values}"
+            );
+        }
+        // A call whose effect on the rows is not known leaves nothing known of them.
+        assert_eq!(
+            excused_after("b", vec![over("k", None), shift_by(1), last()]),
+            vec![]
+        );
+        // Shifts that empty the rows leave only nulls whatever came before them, as
+        // long as the rows are the sample's.
+        assert_eq!(
+            excused_after(
+                "b",
+                vec![plain("Expr.cum_count"), shift_by(3), plain("Expr.first")]
+            ),
+            shifts
+        );
+    }
+
+    #[test]
+    fn a_fill_value_moves_the_rows_and_gives_the_rows_it_fills_a_value() {
+        // Polars: `b.shift(1, fill_value=7)` is `7, 1, null`: the row that was
+        // moved to the end is the sample's null, and the rows filled are values.
+        let shifts = [Limit::AShiftThatLeavesNulls];
+        let fills = |with: Expression| {
+            call(
+                "Expr.shift",
+                vec![
+                    ("n", Value::Expression(chain_with_integer(1))),
+                    ("fill_value", Value::Expression(with)),
+                ],
+            )
+        };
+        let value = || chain(literal(), &[]);
+        assert_eq!(
+            excused_after("b", vec![fills(value()), plain("Expr.last")]),
+            shifts
+        );
+        assert_eq!(
+            excused_after("k", vec![fills(value()), plain("Expr.last")]),
+            vec![]
+        );
+        assert_eq!(
+            excused_after("k", vec![fills(value()), plain("Expr.first")]),
+            vec![]
+        );
+        // Filled with a null, the first row is null.
+        assert_eq!(
+            excused_after("k", vec![fills(chain(null(), &[])), plain("Expr.first")]),
+            shifts
+        );
+    }
+
+    #[test]
+    fn the_minimum_and_maximum_of_only_nulls_are_null_and_the_sum_is_not_known() {
+        // Polars: `k.shift(3).min()` and `.max()` are null; `k.shift(3).sum()` is `0`
+        // of whole numbers, and `null` of a column of the `Null` dtype.
+        let shifts = [Limit::AShiftThatLeavesNulls];
+        for id in ["Expr.min", "Expr.max"] {
+            assert_eq!(
+                excused_after("k", vec![shift_by(3), plain(id)]),
+                shifts,
+                "{id}"
+            );
+        }
+        for id in ["Expr.sum", "Expr.len"] {
+            assert_eq!(
+                excused_after("k", vec![shift_by(3), plain(id)]),
+                vec![],
+                "{id}"
+            );
+        }
+        // One shift leaves a value for them to meet.
+        assert_eq!(
+            excused_after("k", vec![shift_by(1), plain("Expr.min")]),
+            vec![]
+        );
+    }
+
     /// A whole number as an expression: a literal of it.
     fn chain_with_integer(rows: i64) -> Expression {
         chain(
