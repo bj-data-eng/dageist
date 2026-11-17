@@ -426,11 +426,13 @@ the refusal of rows, counts only when the part before the refused call, alone (f
 key, as the key), is not refused for the same reason. So a probe is not settled by an
 objection to another call. What the target says of a schema (that the schema says one
 dtype and the rows give another) is its own comparison, not an objection of Polars, so
-no probe is settled by it, as the tables' reason or as the probe's: it is a limit's. Which of two failures of a probe Polars names depends on which of its
+no probe is settled by it, as the tables' reason or as the probe's: it is a
+limit's. Which of two failures of a probe Polars names depends on which of its
 threads gets there first, so a probe refused for another reason is run again, up to
 sixteen times, before it counts as one that is not. When Polars allows the probe, or
-refuses it for another reason or at another call, the disagreement stays, for nothing shows the tables right. The probe
-is a document of the same kind as a case, so a kept case replays it. A kept case of
+refuses it for another reason or at another call, the disagreement stays, for
+nothing shows the tables right. The probe is a document of the same kind as a case,
+so a kept case replays it. A kept case of
 this kind is filed as `regressions/stricter-<what it shows>.case`, and the normal
 run replays it and expects the outcome to say so.
 

@@ -1,6 +1,7 @@
 //! The tables a case runs on, which are the sample tables the tables of allowed
-//! combinations were measured on: every column has three rows with a null among
-//! them, and the same tables without rows are the empty ones.
+//! combinations were measured on: every column has three rows, the columns of
+//! the dtypes under test (`a`, `b`, `ra`, `rb`) hold a null in the middle one,
+//! and the same tables without rows are the empty ones.
 //!
 //! The left table has `a`, of the dtype under test, `b`, of the dtype that
 //! stands for an argument, and columns that give an expression something to
