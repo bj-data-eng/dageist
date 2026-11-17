@@ -600,7 +600,10 @@ what surrounds it, after the limits, in these ways:
 - for a link, the refused call, with its arguments as written, selected on a column of
   the dtype that Polars gave what reaches it, which Polars cannot fold as it does a
   literal. The dtype is Polars' as well as the tables', and a case where they differ is
-  a disagreement about the dtype, found first;
+  a disagreement about the dtype, found first. Where the call is given a literal, which
+  Polars folds or broadcasts however the rest is, the call is asked again with each such
+  literal a column of its dtype too, so that a part Polars skips for another cause, as
+  a branch no row takes or a sort key of one value, is not hidden by the literal in it;
 - for a refusal that a join's key is not elementwise, the part that holds the refused
   call as the whole key of the same join, for the refusal is of the position and
   Polars skips it where the key is folded away; and, where that part is one value, as
@@ -690,7 +693,10 @@ the rows, an overflow, a value beyond a decimal, a panic, a window over a window
 of a pivot) say so below. Where a refusal of the rows has more than one possible cause
 in the case, the target asks Polars which: the case is run again with the suspected
 cause undone, as for an `explode`, and the sample's rows are followed through a chain
-for what a shift leaves null. A part that Polars skips and a part it refuses are told
+for what a shift leaves null. Where the tables refuse and Polars allows, a literal at
+the place is asked the same way: the case is run again with the literal a column of
+its dtype, and the literal is why only where Polars then refuses it for the tables'
+reason. A part that Polars skips and a part it refuses are told
 apart the same way, by what Polars does with the part alone or without its cause, and
 each has a case that holds the cause and one that differs from it in that alone. Two limits may both explain one case, and it is then
 excused by both.
@@ -732,7 +738,7 @@ point in 54 more.
 | Limit | Excuses |
 | --- | --- |
 | An `explode` changes the lengths | `Expr.over`'s `mapping_strategy` as `explode` gives other lengths, which meet those of what follows it. The tables do not measure what meets them. Polars refusing the rows, with a reason about lengths, in a case with an `explode` that is why: the case run again with each `explode` undone is not refused for lengths (no place: the reason gates it, and that run shows the cause); and the tables refusing, with a reason about lengths, at the window or at a call after it, or in the arguments of a link after it, in the same chain, which Polars allows; not before the window, not in its own arguments, and not an `explode` in another operand or item. |
-| A literal | An argument or a start is measured as a column of the dtype, except the values of `shift` and the arguments of a pivot's group. A literal, or a condition of literals, is one value, which Polars casts and broadcasts as it does not a column. The tables refusing at a call that follows a literal or is given one, which Polars allows. What a call after a literal is given, at any depth, is met by one value: the tables refusing it when they run rows, which Polars allows. |
+| A literal | An argument or a start is measured as a column of the dtype, except the values of `shift` and the arguments of a pivot's group. A literal, or a condition of literals, is one value, which Polars casts and broadcasts as it does not a column. The tables refusing at a call that follows a literal or is given one, which Polars allows, and what a call after a literal is given, at any depth, is met by one value: the tables refusing it when they run rows, which Polars allows. A literal at the place is why only where Polars refuses the case for the tables' reason once each such literal is a column of its dtype (the class Polars gave it, the same case in all else): the case run again. A literal beside a part Polars skips for another cause is no cause, for the column is allowed as well, and the limit that is the cause, or the probe of the call on columns, excuses the case. A key that the tables refused for a call and not as a position is run again as the only item of a `select`, for a column beside an aggregate is not elementwise and a literal is. None in a pivot's aggregate, which reads no column. |
 | A pivot's aggregate | It is run on the values of each group, with kernels of its own, and on no groups when the table is empty. Polars refusing the empty table, with a reason that an operation is not supported or that a dtype is null, in either quoting (no place); and the tables refusing, with a reason about a dtype an operation does not support, a comparison, an operation, an evaluation, a cast, a struct field or lengths of a window over a group, at a call of the aggregate, which Polars allows |
 | A single value in a key | A key that is wholly a single value, an aggregate or a null, is not one that has to be elementwise in what it holds: Polars allows a running count under a `last` there. The context table measured the entry as the whole key. The tables refusing, with a reason about a key not being elementwise, inside a key that is wholly single, which Polars allows. A key that holds an aggregate beside a column, or a column compared with a null, is refused by the rule above, and is not this. |
 | A null comparison in a key | Polars folds a comparison with a null literal into a null before it asks whether a join's key is elementwise, and what it leaves depends on the dtypes and on what the comparison follows, such as an aggregate. A column compared with a null literal is refused by the rule, and the rest, such as a comparison with what one folded, is found by running. Polars refusing the join as not elementwise, with no place, in a case where a join key, or the key of a window, holds a comparison with a null literal at any depth, and no other key of the join is a cause: a key that is not wholly one value and holds a running value, an aggregate or a window. A key that is wholly one value is allowed beside another key, so it is not. |

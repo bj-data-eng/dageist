@@ -325,18 +325,38 @@ fn key_dtypes(case: &Case, first: &Observed) -> Vec<DataType> {
         .collect()
 }
 
+/// How many columns that stand in for a value a probe may read.
+pub const MAX_STAND_INS: usize = 4;
+
 /// How the tables a probe runs on differ from the case's.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Tables {
     /// The other table is the one the step starts from, for an expression that
     /// a join's `right_on` holds, which reads that table's columns.
     pub other_as_left: bool,
-    /// A column of this class stands in both tables, for a value of a dtype that
-    /// the case's tables lack.
-    pub stand_in: Option<Representative>,
+    /// A column of each of these classes stands in both tables, for a value of a
+    /// dtype that the case's tables lack, named by
+    /// [`stand_in_column`](super::frames::stand_in_column) in order.
+    pub stand_ins: [Option<Representative>; MAX_STAND_INS],
 }
 
 impl Tables {
+    /// The tables with a column of each of `classes` standing in, or `None` for
+    /// more than a probe may read.
+    pub fn standing(other_as_left: bool, classes: &[Representative]) -> Option<Self> {
+        if classes.len() > MAX_STAND_INS {
+            return None;
+        }
+        let mut stand_ins = [None; MAX_STAND_INS];
+        for (slot, class) in stand_ins.iter_mut().zip(classes) {
+            *slot = Some(*class);
+        }
+        Some(Self {
+            other_as_left,
+            stand_ins,
+        })
+    }
+
     fn of(self, case: &Case, keys: &[DataType]) -> Frames {
         let frames = Frames::new(case.receiver, case.argument, keys);
         let frames = if self.other_as_left {
@@ -344,10 +364,8 @@ impl Tables {
         } else {
             frames
         };
-        match self.stand_in {
-            Some(class) => frames.with_stand_in(class),
-            None => frames,
-        }
+        let classes: Vec<Representative> = self.stand_ins.into_iter().flatten().collect();
+        frames.with_stand_ins(&classes)
     }
 }
 

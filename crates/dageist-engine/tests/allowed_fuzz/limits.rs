@@ -11,8 +11,11 @@
 //!
 //! A limit excuses a disagreement only when it is the cause of it. The tables
 //! always say where they refused, and the place must lie inside the expression
-//! that holds what the limit is about. Polars says where only when it refused
-//! while it built the step and worked out its schema, and then not always: a
+//! that holds what the limit is about. Where the feature may be there beside
+//! another cause, Polars is asked: the case is run again without the feature, with
+//! no `explode` or with each literal a column of its dtype, and the limit excuses
+//! it only where that shows the feature is why. Polars says where only when it
+//! refused while it built the step and worked out its schema, and then not always: a
 //! refusal of the whole step has the step for its place. A refusal of the rows
 //! (the empty table's too) or a panic has none, and for those the reason and
 //! the feature in the case are what there is; a limit that can only be gated so
@@ -37,8 +40,13 @@ use dageist_engine::document::{Call, Document, Expression, Place, Segment, Start
 
 use super::case::Case;
 use super::frames::Frames;
-use super::observe::{Observed, Refusal, SCHEMA_SAYS, Stage, observe};
+use super::literal::{
+    LiteralCause, call_with_columns, class_of, expression_with_columns, operand_causes,
+    placed_operands, starts_from_a_literal,
+};
+use super::observe::{Observed, Refusal, SCHEMA_SAYS, Stage, Tables, observe, observe_probe};
 use super::predict::{Prediction, Refused, Source, Verdict};
+use super::probe::same_reason;
 
 /// A limit of the tables, and what it says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,7 +63,14 @@ pub enum Limit {
     /// column: it accepts a text compared with a typed number, or a window over a
     /// constant, where a column of the dtype is refused, and joins it with a
     /// column of other length. The tables measure an argument as a column of the
-    /// dtype, except the values of `shift` and a pivot's group.
+    /// dtype, except the values of `shift` and a pivot's group. The tables refusing
+    /// at a call that follows a literal or is given one, or, when they run rows,
+    /// inside what a call after a literal is given, which Polars allows. The
+    /// literal is why only where Polars refuses the case for the tables' reason
+    /// once each literal at that place is a column of the dtype Polars gave it, and
+    /// nothing else is changed: Polars allowing the column too is a part it skips
+    /// for another cause, which a probe or another limit settles. A pivot's
+    /// aggregate reads no column to stand in, so it is not this.
     ALiteral,
     /// A pivot's aggregate is run on the values of each group, not on a
     /// column in `select`, and Polars uses other kernels for them: it takes the
@@ -306,40 +321,6 @@ fn has_explode(call: &Call) -> bool {
         && matches!(call.argument("mapping_strategy"), Some(Value::Choice(word)) if word == "explode")
 }
 
-/// Whether `expression` starts from a literal, or from a condition whose
-/// values are literals, which the tables did not measure as a start.
-fn starts_from_a_literal(expression: &Expression) -> bool {
-    match expression.start() {
-        Start::Call(start) if is(start, "polars.lit") => true,
-        Start::Call(start) if is(start, "polars.when") => {
-            let values: Vec<&Expression> = expression
-                .links()
-                .iter()
-                .filter(|link| is_a_value_link(link))
-                .filter_map(|link| match link.argument("statement") {
-                    Some(Value::Expression(value)) => Some(value),
-                    _ => None,
-                })
-                .collect();
-            !values.is_empty() && values.iter().all(|value| starts_from_a_literal(value))
-        }
-        _ => false,
-    }
-}
-
-fn is_a_value_link(call: &Call) -> bool {
-    matches!(
-        call.entry().id().as_str(),
-        "When.then" | "Then.otherwise" | "ChainedWhen.then" | "ChainedThen.otherwise"
-    )
-}
-
-/// The literals the tables measured are the values `shift` takes, and, in a
-/// pivot's aggregate, every argument.
-fn measured_literal(owner: &Call, parameter: &str, pivot: bool) -> bool {
-    pivot || (is(owner, "Expr.shift") && matches!(parameter, "n" | "fill_value"))
-}
-
 /// The indexes of the links of `expression` that `found` says yes to.
 fn links_where(expression: &Expression, found: &dyn Fn(&Call) -> bool) -> Vec<usize> {
     expression
@@ -412,6 +393,8 @@ struct Locus<'a> {
     inside: Vec<&'a Expression>,
     /// How the place reaches each of them, in the same order.
     reach: Vec<Reach>,
+    /// Where each of them is, in the same order.
+    places: Vec<Place>,
 }
 
 enum Node<'a> {
@@ -429,9 +412,12 @@ fn locate<'a>(case: &'a Case, place: &Place) -> Locus<'a> {
         call: None,
         inside: Vec::new(),
         reach: Vec::new(),
+        places: Vec::new(),
     };
     let mut node = Node::Call(case.document.steps()[0].call());
+    let mut here = Place::of_step(0, Some(case.document.steps()[0].id().clone()));
     for segment in place.path() {
+        here = here.then(segment.clone());
         let value = match (&node, segment) {
             (Node::Call(call), Segment::Parameter(name)) => call.argument(name),
             (Node::Value(Value::Many(items)), Segment::Item(at)) => items.get(*at),
@@ -472,6 +458,7 @@ fn locate<'a>(case: &'a Case, place: &Place) -> Locus<'a> {
                 locus.top.get_or_insert(expression);
                 locus.inside.push(expression);
                 locus.reach.push(Reach::Whole);
+                locus.places.push(here.clone());
                 // Which call of this expression the place is at is not known
                 // until the way says; it is not the link of the chain that holds
                 // this one.
@@ -510,47 +497,6 @@ fn is_lengths(reason: &str) -> bool {
 
 fn is_panic(reason: &str) -> bool {
     reason.starts_with("Polars panicked")
-}
-
-/// The expressions a call is given, by parameter, and the place of each: the
-/// call is at `call`.
-fn placed_operands<'a>(call: &'a Call, at: &Place) -> Vec<(&'a str, Place, &'a Expression)> {
-    fn collect<'a>(
-        parameter: &'a str,
-        value: &'a Value,
-        place: Place,
-        found: &mut Vec<(&'a str, Place, &'a Expression)>,
-    ) {
-        match value {
-            Value::Expression(expression) => found.push((parameter, place, expression)),
-            Value::Many(items) => items.iter().enumerate().for_each(|(item, inside)| {
-                collect(
-                    parameter,
-                    inside,
-                    place.clone().then(Segment::Item(item)),
-                    found,
-                );
-            }),
-            Value::Pairs(pairs) => pairs.iter().enumerate().for_each(|(at, (key, entry))| {
-                collect(parameter, key, place.clone().then(Segment::Key(at)), found);
-                collect(
-                    parameter,
-                    entry,
-                    place.clone().then(Segment::Value(at)),
-                    found,
-                );
-            }),
-            _ => {}
-        }
-    }
-    let mut found = Vec::new();
-    for given in call.arguments() {
-        let place = at
-            .clone()
-            .then(Segment::Parameter(given.parameter().to_owned()));
-        collect(given.parameter(), given.value(), place, &mut found);
-    }
-    found
 }
 
 /// The keys of the step, each with its place: a join's, if `joins`, and the keys
@@ -960,8 +906,137 @@ fn refused_for_lengths_without_explodes(case: &Case) -> bool {
     })
 }
 
+/// The expressions that start from a literal and that the limit is about at the
+/// place the tables refused: the chain the call is at, an argument the call is
+/// given, and, where the tables refused when they ran rows, a chain that holds the
+/// place in an argument of a call that follows the literal (what a call after a
+/// literal is given, at any depth, is met by one value, which Polars broadcasts).
+/// None in a pivot's aggregate, which reads no column to stand in for a literal.
+fn literal_causes<'a>(case: &'a Case, refused: &Refused, pivot: bool) -> Vec<LiteralCause<'a>> {
+    if pivot {
+        return Vec::new();
+    }
+    let locus = locate(case, &refused.place);
+    let mut found: Vec<LiteralCause<'a>> = Vec::new();
+    let mut add = |cause: LiteralCause<'a>| {
+        if !found.iter().any(|known| known.place == cause.place) {
+            found.push(cause);
+        }
+    };
+    if let (Some(chain), Some(place)) = (locus.chain, locus.places.last())
+        && starts_from_a_literal(chain)
+    {
+        add(LiteralCause {
+            place: place.clone(),
+            expression: chain,
+        });
+    }
+    if let Some(call) = locus.call {
+        operand_causes(call, &refused.place, pivot)
+            .into_iter()
+            .for_each(&mut add);
+    }
+    if refused.stage == Some(TableStage::Rows) {
+        for ((holder, reach), place) in locus.inside.iter().zip(&locus.reach).zip(&locus.places) {
+            if matches!(reach, Reach::Operand(_)) && starts_from_a_literal(holder) {
+                add(LiteralCause {
+                    place: place.clone(),
+                    expression: holder,
+                });
+            }
+        }
+    }
+    found
+}
+
+/// Whether Polars refuses the case for the tables' reason when each of `causes` is
+/// a column of its dtype and nothing else is changed. Polars allows the case as it
+/// is, so a refusal is of what the literals were; the tables are then right about a
+/// column, and the literal is why Polars differs. A case run again that Polars
+/// allows still, or refuses for another reason, shows no such thing: the part is
+/// skipped or the tables are wrong about the column as well, which no literal
+/// explains. `false` where a literal has no class to stand in with.
+fn refused_with_columns_for_the_literals(
+    causes: &[LiteralCause<'_>],
+    case: &Case,
+    refused: &Refused,
+    observed: &Observed,
+) -> bool {
+    let Some(classes) = causes
+        .iter()
+        .map(|cause| class_of(cause, observed))
+        .collect::<Option<Vec<_>>>()
+    else {
+        return false;
+    };
+    let standing: Vec<&Expression> = causes.iter().map(|cause| cause.expression).collect();
+    let Some((control, other_as_left)) = control_with_columns(case, refused, &standing) else {
+        return false;
+    };
+    let Some(tables) = Tables::standing(other_as_left, &classes) else {
+        return false;
+    };
+    (0..RUNS).any(|_| {
+        observe_probe(&control, tables)
+            .refusal
+            .is_some_and(|refusal| same_reason(&refused.source, &refused.reason, &refusal.reason))
+    })
+}
+
+/// The case run again with the literals in `standing` as columns, and whether it
+/// reads the other table. A join's key must be elementwise, which a column beside
+/// an aggregate is not and a literal is, so Polars refusing the key for that is of
+/// the position and not of the call the tables refused. Unless the tables refused
+/// the position, the key that holds the literals is then the only item of a
+/// `select`, which Polars evaluates as the column it is.
+fn control_with_columns(
+    case: &Case,
+    refused: &Refused,
+    standing: &[&Expression],
+) -> Option<(Case, bool)> {
+    let step = &case.document.steps()[0];
+    let key_of_a_join = match (
+        is(step.call(), "LazyFrame.join") && !refused.reason.contains("elementwise"),
+        refused.place.path().first(),
+    ) {
+        (true, Some(Segment::Parameter(name)))
+            if ["on", "left_on", "right_on"].contains(&name.as_str()) =>
+        {
+            locate(case, &refused.place)
+                .top
+                .map(|key| (key, name == "right_on"))
+        }
+        _ => None,
+    };
+    let (call, other_as_left) = match key_of_a_join {
+        Some((key, other_as_left)) => (
+            Call::new(
+                catalog::entry("LazyFrame.select")?,
+                vec![(
+                    "exprs",
+                    Value::Many(vec![Value::Expression(expression_with_columns(
+                        key, standing, 0,
+                    )?)]),
+                )],
+            )
+            .ok()?,
+            other_as_left,
+        ),
+        None => (call_with_columns(step.call(), standing, 0)?, false),
+    };
+    let rebuilt = Step::new(step.id().clone(), call).ok()?;
+    Some((
+        Case {
+            receiver: case.receiver,
+            argument: case.argument,
+            document: Document::new(vec![rebuilt]).ok()?,
+        },
+        other_as_left,
+    ))
+}
+
 /// Whether the limit is why the tables and Polars disagree.
-fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
+fn applies(limit: Limit, case: &Case, disagreement: &Disagreement, observed: &Observed) -> bool {
     let step = case.document.steps()[0].call();
     let pivot = is(step, "LazyFrame.pivot");
     let held = operands(step);
@@ -996,25 +1071,11 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
                     || refused_for_lengths_without_explodes(case))
         }
         (Limit::ALiteral, Disagreement::PolarsAllows(refused)) => {
-            let locus = locate(case, &refused.place);
-            let chain_starts = locus.chain.is_some_and(starts_from_a_literal);
-            let operand = locus.call.is_some_and(|call| {
-                operands(call).into_iter().any(|(parameter, operand)| {
-                    !measured_literal(call, parameter, pivot) && starts_from_a_literal(operand)
-                })
-            });
-            // What a call that follows a literal is given, at any depth, is met by
-            // one value, which Polars broadcasts: a comparison of a literal with
-            // what the tables refuse when they run rows is not refused.
-            let given_to_a_literal = refused.stage == Some(TableStage::Rows)
-                && locus
-                    .inside
-                    .iter()
-                    .zip(&locus.reach)
-                    .any(|(holder, reach)| {
-                        matches!(reach, Reach::Operand(_)) && starts_from_a_literal(holder)
-                    });
-            chain_starts || operand || given_to_a_literal
+            // The literal is the cause where Polars refuses the case for the tables'
+            // reason once each literal that could be is a column of its dtype.
+            let causes = literal_causes(case, refused, pivot);
+            !causes.is_empty()
+                && refused_with_columns_for_the_literals(&causes, case, refused, observed)
         }
         (Limit::AGroupAggregate, Disagreement::PolarsRefuses(refusal)) => {
             // A table with no rows has no groups, and the values of an
@@ -1159,7 +1220,7 @@ pub fn excuses(case: &Case, prediction: &Prediction, observed: &Observed) -> Vec
     };
     Limit::ALL
         .into_iter()
-        .filter(|limit| applies(*limit, case, &disagreement))
+        .filter(|limit| applies(*limit, case, &disagreement, observed))
         .collect()
 }
 

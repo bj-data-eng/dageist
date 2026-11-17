@@ -6,7 +6,9 @@
 //! makes Polars skip the part. The same part without the cause is evaluated, and
 //! Polars refuses it for the tables' reason, which is agreement, not a part Polars
 //! does not evaluate. Each cause is shown here by a case that has it and one that
-//! differs from it in that alone, both run in Polars.
+//! differs from it in that alone, both run in Polars. A literal in the part hides
+//! the cause from a probe, so the part is also shown beside a literal that is the
+//! cause instead: the limit for a literal excuses it, and no probe settles it.
 
 use dageist_fuzz::{CaseTarget, OutcomeKind};
 
