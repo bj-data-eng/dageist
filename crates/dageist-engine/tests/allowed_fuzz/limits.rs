@@ -1720,6 +1720,44 @@ mod tests {
         assert_eq!(tables_refuse(&later, at_the_call, ROWS, "no"), vec![]);
     }
 
+    #[test]
+    fn a_first_that_skips_nulls_is_null_where_what_it_takes_is_only_nulls() {
+        // The sample's columns are a value, a null and a value. A first that
+        // skips nulls takes the first value, which is null only when every row
+        // is: after three shifts, or after a first of what a shift moved, which
+        // is one null. After one or two shifts a value is first.
+        let shift = || call("Expr.shift", Vec::new());
+        let first = || call("Expr.first", Vec::new());
+        let skipping = || {
+            call(
+                "Expr.first",
+                vec![("ignore_nulls", Value::Flag(Some(true)))],
+            )
+        };
+        let excused = |links: Vec<Call>| {
+            let at = links.len();
+            let mut all = links;
+            all.push(compared_with("Expr.gt", chain(column("h"), &[])));
+            tables_refuse(
+                &select(vec![chain_of(column("b"), all)]),
+                link_of("exprs", 0, at),
+                ROWS,
+                "no",
+            )
+        };
+        assert_eq!(
+            excused(vec![shift(), first(), skipping()]),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        assert_eq!(
+            excused(vec![shift(), shift(), shift(), skipping()]),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        assert_eq!(excused(vec![shift(), skipping()]), vec![]);
+        assert_eq!(excused(vec![shift(), shift(), skipping()]), vec![]);
+        assert_eq!(excused(vec![first(), skipping()]), vec![]);
+    }
+
     /// A whole number as an expression: a literal of it.
     fn chain_with_integer(rows: i64) -> Expression {
         chain(
