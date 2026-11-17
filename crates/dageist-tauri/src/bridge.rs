@@ -31,7 +31,7 @@ use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{IpAddr, Ipv4Addr, Shutdown, TcpListener, TcpStream};
 use std::sync::Arc;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -53,8 +53,15 @@ const JSON: &str = "application/json";
 const ARROW: &str = "application/vnd.apache.arrow.stream";
 /// How long a client may take between the bytes of a request.
 const READ_TIMEOUT: Duration = Duration::from_secs(10);
-/// How long a client may take to take the bytes of an answer.
+/// How long a client may take to take a part of an answer.
 const WRITE_TIMEOUT: Duration = Duration::from_secs(60);
+/// How long each part of one connection may take in all, so that a client that sends or takes
+/// a byte before every timeout cannot hold its thread for as long as it likes.
+const DEADLINES: Deadlines = Deadlines {
+    request: Duration::from_secs(30),
+    response: Duration::from_secs(60),
+    drain: Duration::from_secs(5),
+};
 /// The most a client may still send after it was answered, which is read and dropped so that the
 /// answer is not lost to a reset of the connection.
 const MAX_DRAIN_BYTES: u64 = 1024 * 1024;
@@ -356,22 +363,90 @@ pub fn bind(port: u16) -> io::Result<TcpListener> {
     TcpListener::bind((Ipv4Addr::LOCALHOST, port))
 }
 
+/// How long each part of a connection may take in all.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Deadlines {
+    /// Reading the whole request, its head and its body, from the first byte asked for.
+    request: Duration,
+    /// Writing the whole answer, from its first byte. The command that makes the answer takes
+    /// as long as it takes and is not counted.
+    response: Duration,
+    /// Reading what the client still sends after it was answered.
+    drain: Duration,
+}
+
+/// A connection that gives up at a deadline: each read and write waits for the time that is left,
+/// at most a timeout, and fails with `TimedOut` once none is.
+struct Bounded<'a> {
+    stream: &'a TcpStream,
+    within: Duration,
+    /// When the time is up; it is set at the first read or write.
+    deadline: Option<Instant>,
+}
+
+impl<'a> Bounded<'a> {
+    const fn new(stream: &'a TcpStream, within: Duration) -> Self {
+        Self {
+            stream,
+            within,
+            deadline: None,
+        }
+    }
+
+    /// The time that is left, or the error that says it is up.
+    fn left(&mut self) -> io::Result<Duration> {
+        let within = self.within;
+        let deadline = *self.deadline.get_or_insert_with(|| Instant::now() + within);
+        deadline
+            .checked_duration_since(Instant::now())
+            .filter(|left| !left.is_zero())
+            .ok_or_else(|| io::Error::new(io::ErrorKind::TimedOut, "the connection's time is up"))
+    }
+}
+
+impl Read for Bounded<'_> {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let left = self.left()?;
+        self.stream.set_read_timeout(Some(left.min(READ_TIMEOUT)))?;
+        let mut stream = self.stream;
+        stream.read(buffer)
+    }
+}
+
+impl Write for Bounded<'_> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let left = self.left()?;
+        self.stream
+            .set_write_timeout(Some(left.min(WRITE_TIMEOUT)))?;
+        let mut stream = self.stream;
+        stream.write(bytes)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        let mut stream = self.stream;
+        stream.flush()
+    }
+}
+
 /// Serves one connection: one request, one answer, then closes. A peer that is not loopback is
-/// closed on without a word.
-fn serve_connection(stream: &TcpStream, bridge: &Bridge) -> io::Result<()> {
+/// closed on without a word. A client that is too slow for `deadlines` is answered `408`, or
+/// closed on when it takes the answer too slowly.
+fn serve_connection(stream: &TcpStream, bridge: &Bridge, deadlines: Deadlines) -> io::Result<()> {
     if !stream.peer_addr().is_ok_and(|peer| admits(peer.ip())) {
         return Ok(());
     }
-    stream.set_read_timeout(Some(READ_TIMEOUT))?;
-    stream.set_write_timeout(Some(WRITE_TIMEOUT))?;
-    let mut reader = BufReader::new(stream);
-    let mut writer = stream;
+    let mut reader = BufReader::new(Bounded::new(stream, deadlines.request));
+    let mut writer = Bounded::new(stream, deadlines.response);
     bridge.exchange(&mut reader, &mut writer)?;
     stream.shutdown(Shutdown::Write)?;
     // What the client still sends is read and dropped: closing on unread bytes resets the
     // connection, and the client could lose the answer, which is what refuses a body that is
-    // too large without reading it.
-    io::copy(&mut reader.take(MAX_DRAIN_BYTES), &mut io::sink())?;
+    // too large without reading it. A client that sends more than that, or is too slow, is
+    // closed on, as it was told what it needs to know.
+    let _ = io::copy(
+        &mut Bounded::new(stream, deadlines.drain).take(MAX_DRAIN_BYTES),
+        &mut io::sink(),
+    );
     Ok(())
 }
 
@@ -401,7 +476,7 @@ pub fn serve(listener: &TcpListener, bridge: Bridge) -> io::Result<()> {
             .name("bridge-connection".to_owned())
             .spawn(move || {
                 // A connection that breaks has no one left to tell.
-                let _ = serve_connection(&stream, &bridge);
+                let _ = serve_connection(&stream, &bridge, DEADLINES);
             });
     }
 }

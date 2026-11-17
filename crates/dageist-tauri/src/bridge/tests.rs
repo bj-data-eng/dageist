@@ -10,12 +10,13 @@ use std::io::{Cursor, Read, Write};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpStream, UdpSocket};
 use std::path::PathBuf;
 use std::thread;
+use std::time::{Duration, Instant};
 
 use dageist_engine::SampleSpec;
 use dageist_engine::claim_timing::ClaimTiming;
 use serde_json::{Value, json};
 
-use super::{Bridge, Session, admits, bind, serve};
+use super::{Bridge, Deadlines, Session, admits, bind, serve, serve_connection};
 use crate::sample_table::Sample;
 
 const SMALL: SampleSpec = SampleSpec {
@@ -756,4 +757,61 @@ fn the_cache_folder_is_the_one_tauri_keeps_for_the_identifier() {
         super::cache::application_cache(&identifier),
         Some(tauri_cache)
     );
+}
+
+#[test]
+fn a_client_that_trickles_its_request_is_answered_408_when_the_deadline_passes() {
+    let folder = SampleFolder::new("trickle");
+    let listener = bind(0).expect("a loopback port is free");
+    let address = listener.local_addr().expect("a bound address");
+    let bridge = bridge(&folder, address.port());
+    let deadlines = Deadlines {
+        request: Duration::from_millis(300),
+        response: Duration::from_secs(5),
+        drain: Duration::from_secs(1),
+    };
+    let server = thread::spawn(move || {
+        let (stream, _peer) = listener.accept().expect("the client connects");
+        serve_connection(&stream, &bridge, deadlines)
+    });
+    let mut client = TcpStream::connect(address).expect("the bridge accepts");
+    client
+        .set_read_timeout(Some(Duration::from_secs(60)))
+        .expect("a timeout is set");
+    let mut trickling = client.try_clone().expect("the stream is cloned");
+    let head = format!(
+        "POST /bridge/core_identity HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nX-Slow: ",
+        address.port()
+    );
+    let started = Instant::now();
+    let trickler = thread::spawn(move || {
+        trickling
+            .write_all(head.as_bytes())
+            .expect("the head begins");
+        for _ in 0..100 {
+            // The time under test: a byte arrives far inside the per-read timeout and the head
+            // never ends, so only a deadline on the whole request can stop it.
+            thread::sleep(Duration::from_millis(100));
+            if trickling.write_all(b"a").is_err() {
+                break;
+            }
+        }
+    });
+
+    let mut answered = Vec::new();
+    client
+        .read_to_end(&mut answered)
+        .expect("the answer is read");
+    let elapsed = started.elapsed();
+
+    assert_eq!(Reply::parse(&answered).status, 408);
+    assert!(
+        elapsed < Duration::from_secs(5),
+        "the connection was held for {elapsed:?}"
+    );
+    server
+        .join()
+        .expect("the connection ends")
+        .expect("the connection is served");
+    trickler.join().expect("the trickle ends");
 }

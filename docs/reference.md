@@ -117,7 +117,7 @@ is 7878 unless `--port` gives one; `--port 0` lets the system choose.
 | `403` | The `Host` header is missing, or is not `127.0.0.1` or `localhost` with the bridge's own port. |
 | `404` | The path is not `/bridge/<command>` of a served command, including `open_view_window`. |
 | `405` | The method is not `POST`; the answer carries `Allow: POST`. This is also what a preflight (`OPTIONS`) gets. |
-| `413`, `408`, `501` | The head or the body is too long, the client was too slow, or the body has a transfer encoding, which the bridge does not take. |
+| `413`, `408`, `501` | The head or the body is too long; the whole request took the client more than 30 seconds, or 10 seconds passed between two of its reads; or the body has a transfer encoding, which the bridge does not take. A client that takes the answer for more than 60 seconds is closed on. |
 | `415` | The content type is not `application/json`, with or without parameters such as `charset`. |
 | Every answer | `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, `Connection: close`. No `Access-Control-*` header is ever sent. |
 
