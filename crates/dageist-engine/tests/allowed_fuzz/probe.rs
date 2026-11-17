@@ -23,7 +23,12 @@
 //!   and [`settle_on_a_value_as_a_key`] asks the refused call on a column as the
 //!   key.
 //!
-//! The last two do not tell what Polars skips from what it evaluates on a value
+//! - [`settle_in_the_position`]: a refusal that is the target's own comparison of a
+//!   schema is not shown by any probe of the call alone, so the refused call is
+//!   asked on a column in the position the case holds it, where Polars refuses it
+//!   if it evaluates it.
+//!
+//! The last ones do not tell what Polars skips from what it evaluates on a value
 //! that hides the refusal, which a limit names, so the limits are asked before
 //! them. When Polars refuses a probe for the reason the tables gave, at the
 //! refused call, the tables are stricter by design where Polars does not evaluate
@@ -750,6 +755,122 @@ pub fn settle_on_a_value_as_a_key(
     })
 }
 
+/// Polars refusing `probed`, for itself and not by what the target says of a
+/// schema, at `at` if it says where; asked again while it is allowed or refused
+/// elsewhere, as for [`refused_as`].
+fn refused_by_polars(probed: &Case, tables: Tables, at: &[Place]) -> Option<Refusal> {
+    (0..ATTEMPTS).find_map(|_| match observe_probe(probed, tables).refusal {
+        Some(refusal) if !is_the_targets_own(&refusal.reason) && lies_at(&refusal, at) => {
+            Some(Some(refusal))
+        }
+        Some(_) => None,
+        None => Some(None),
+    })?
+}
+
+/// The step of the case with the one item of the parameter `parameter` replaced
+/// by `part`, which is the step with the expression the position holds changed.
+fn step_with(case: &Case, parameter: &str, part: &Expression) -> Option<Document> {
+    let original = case.document.steps()[0].call();
+    let mut given: Vec<(&str, Value)> = Vec::new();
+    for argument in original.arguments() {
+        let value = if argument.parameter() == parameter {
+            match argument.value() {
+                Value::Many(items) if items.len() == 1 => {
+                    Value::Many(vec![Value::Expression(part.clone())])
+                }
+                _ => return None,
+            }
+        } else {
+            argument.value().clone()
+        };
+        given.push((argument.parameter(), value));
+    }
+    Document::new(vec![
+        Step::new(
+            StepId::new(STEP).ok()?,
+            call(original.entry().id().as_str(), given)?,
+        )
+        .ok()?,
+    ])
+    .ok()
+}
+
+/// Asks Polars about a call that the tables refuse by what the target says of a
+/// schema, a plan that says one dtype and rows that give another, in the position
+/// the case holds it, on a column. No probe of the call alone shows that
+/// comparison, which is the target's own, and Polars skips a part that is one
+/// value, as a sort key. Where Polars evaluates the call as the key on a column of
+/// the dtype that reaches it, it refuses it, as a panic: the call is then why, if
+/// the column alone as the key is allowed. Polars allowing it, or refusing only by
+/// what the target says, as a method that is the output of a step, settles
+/// nothing.
+pub fn settle_in_the_position(
+    case: &Case,
+    refused: &Refused,
+    predicted: &Prediction,
+    observed: &Observed,
+) -> Option<Settled> {
+    if !matches!(refused.source, Source::Polars) || !is_the_targets_own(&refused.reason) {
+        return None;
+    }
+    let found = find(case, &refused.place)?;
+    let [Segment::Link(link)] = found.rest else {
+        return None;
+    };
+    let [Segment::Parameter(parameter), Segment::Item(_), ..] = refused.place.path() else {
+        return None;
+    };
+    // The expression the position holds is the one the call is in.
+    if found.in_the_aggregate || found.levels.len() != 1 {
+        return None;
+    }
+    let consumed = refused.place.path().len() - found.rest.len();
+    let held = refused.place.path()[..consumed]
+        .iter()
+        .cloned()
+        .fold(Place::of_step(0, StepId::new(STEP).ok()), Place::then);
+    let class = dtype_reaching(&held, *link, predicted, observed)?;
+    let name = call(
+        "polars.col",
+        vec![("name", Value::Columns(vec![STAND_IN.to_owned()]))],
+    )?;
+    let alone = Expression::new(Start::Call(name.clone()), Vec::new()).ok()?;
+    let part = Expression::new(
+        Start::Call(name),
+        vec![found.expression.links().get(*link)?.clone()],
+    )
+    .ok()?;
+    let probe_of = |part: &Expression| {
+        Some(Case {
+            receiver: case.receiver,
+            argument: case.argument,
+            document: step_with(case, parameter, part)?,
+        })
+    };
+    let tables = Tables {
+        other_as_left: false,
+        stand_in: Some(class),
+    };
+    let item = Place::of_step(0, StepId::new(STEP).ok())
+        .then(Segment::Parameter(parameter.clone()))
+        .then(Segment::Item(0));
+    let probed = probe_of(&part)?;
+    let refusal = refused_by_polars(
+        &probed,
+        tables,
+        &[item.clone(), item.then(Segment::Link(0))],
+    )?;
+    // The column alone in the position is allowed, so that the call is why.
+    if observe_probe(&probe_of(&alone)?, tables).refusal.is_some() {
+        return None;
+    }
+    Some(Settled {
+        probe: probed.document.write(),
+        reason: refusal.reason,
+    })
+}
+
 /// Asks Polars about the part the tables refused apart from what surrounds it
 /// in the case, where the part as written is not asked: the refused call on a
 /// value of the dtype that reaches it, or a join's key by itself as the key, or
@@ -763,6 +884,7 @@ pub fn settle_apart(
     settle_on_a_value(case, refused, predicted, observed)
         .or_else(|| settle_as_a_key(case, refused))
         .or_else(|| settle_on_a_value_as_a_key(case, refused, predicted, observed))
+        .or_else(|| settle_in_the_position(case, refused, predicted, observed))
 }
 
 /// The predicate a rule refused: the whole expression at its place.
@@ -1218,6 +1340,29 @@ mod tests {
             found.probe
         );
         assert!(found.reason.contains("panicked"), "{}", found.reason);
+    }
+
+    #[test]
+    fn a_call_that_polars_allows_as_a_sort_key_on_a_column_settles_nothing() {
+        // The running sum of whole numbers is allowed as a sort key, so a mismatch
+        // that the tables are said to find in it is not shown there.
+        let text = "{\"a\":\"Int64\",\"b\":\"Int64\",\"revision\":1}\n{\"version\":1,\"steps\":[{\"id\":\"s\",\"call\":{\"entry\":\"LazyFrame.sort\",\"arguments\":{\"by\":{\"many\":[{\"expression\":{\"start\":{\"entry\":\"polars.col\",\"arguments\":{\"name\":{\"columns\":[\"a\"]}}},\"then\":[{\"entry\":\"Expr.cum_sum\",\"arguments\":{}}]}}]}}}}]}";
+        let case = Case::decode(text.as_bytes()).expect("a case");
+        let place = Place::of_step(0, Some(StepId::new("s").expect("an identifier")))
+            .then(Segment::Parameter("by".to_owned()))
+            .then(Segment::Item(0))
+            .then(Segment::Link(0));
+        let refused = Refused {
+            source: Source::Polars,
+            at: place.to_string(),
+            place,
+            stage: None,
+            reason: "the schema says Int64 and the rows give UInt128".to_owned(),
+        };
+        assert_eq!(
+            settle_in_the_position(&case, &refused, &predict(&case), &observe(&case)),
+            None
+        );
     }
 
     #[test]
