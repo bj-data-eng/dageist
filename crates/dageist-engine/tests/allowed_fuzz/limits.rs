@@ -31,13 +31,13 @@
 //! asked after the part as written and before the probes apart from the case,
 //! which cannot tell what Polars evaluates from what it skips.
 
-use dageist_engine::document::{Call, Expression, Place, Segment, Start, Value};
+use dageist_engine::allowed::Stage as TableStage;
+use dageist_engine::catalog;
+use dageist_engine::document::{Call, Document, Expression, Place, Segment, Start, Step, Value};
 
 use super::case::Case;
 use super::frames::Frames;
-use dageist_engine::allowed::Stage as TableStage;
-
-use super::observe::{Observed, Refusal, SCHEMA_SAYS, Stage};
+use super::observe::{Observed, Refusal, SCHEMA_SAYS, Stage, observe};
 use super::predict::{Prediction, Refused, Source, Verdict};
 
 /// A limit of the tables, and what it says.
@@ -46,9 +46,10 @@ pub enum Limit {
     /// `Expr.over`'s `mapping_strategy` `explode` gives a different number of
     /// rows, which meet another expression's with lengths that do not match. The
     /// tables do not measure what meets them. Polars refusing the rows, with a
-    /// reason about lengths, cannot be placed, so the reason and an `explode` in
-    /// the case are what gate it; the tables refusing is placed, inside an
-    /// expression that holds an `explode`.
+    /// reason about lengths, cannot be placed, so the reason gates it, and an
+    /// `explode` in the case is its cause only where Polars stops refusing for
+    /// lengths when the case is run again with each `explode` undone; the tables
+    /// refusing is placed, inside an expression that holds an `explode`.
     AnExplodeChangesTheLengths,
     /// A literal is one value, which Polars broadcasts and casts as it does not a
     /// column: it accepts a text compared with a typed number, or a window over a
@@ -107,6 +108,9 @@ pub enum Limit {
     AShiftThatLeavesNulls,
     /// Whether values of different lengths combine, as the lists of two rows
     /// do not, depends on the rows, which the tables measured on one sample.
+    /// Polars refusing the rows with a reason about lengths, in a case with no
+    /// `explode`, or one that Polars refuses for lengths still when each `explode`
+    /// is undone.
     TheLengthsOfTheRows,
     /// A debug build of Polars panics where an arithmetic overflow wraps in a
     /// release build, on keys the tables did not measure.
@@ -874,6 +878,78 @@ fn leaves_only_nulls(frames: &Frames, expression: &Expression, upto: usize) -> b
         .is_some_and(|rows| !rows.is_empty() && rows.iter().all(|cell| *cell == Cell::Null))
 }
 
+/// `value` with every window in it that explodes given the mapping it has when none
+/// is named.
+fn value_without_explodes(value: &Value) -> Value {
+    match value {
+        Value::Expression(expression) => {
+            Value::Expression(without_explodes(expression).unwrap_or_else(|| expression.clone()))
+        }
+        Value::Many(items) => Value::Many(items.iter().map(value_without_explodes).collect()),
+        Value::Pairs(pairs) => Value::Pairs(
+            pairs
+                .iter()
+                .map(|(key, entry)| (value_without_explodes(key), value_without_explodes(entry)))
+                .collect(),
+        ),
+        other => other.clone(),
+    }
+}
+
+/// `call` with the arguments that explode, and the windows in them, undone.
+fn call_without_explodes(call: &Call) -> Option<Call> {
+    let explodes = has_explode(call);
+    let given: Vec<(&str, Value)> = call
+        .arguments()
+        .iter()
+        .filter(|given| !(explodes && given.parameter() == "mapping_strategy"))
+        .map(|given| (given.parameter(), value_without_explodes(given.value())))
+        .collect();
+    Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
+}
+
+/// `expression` with no window that explodes: each is the window the same call
+/// makes when it is not told how to map.
+fn without_explodes(expression: &Expression) -> Option<Expression> {
+    let start = match expression.start() {
+        Start::Call(call) => Start::Call(call_without_explodes(call)?),
+        other => other.clone(),
+    };
+    let links = expression
+        .links()
+        .iter()
+        .map(call_without_explodes)
+        .collect::<Option<Vec<_>>>()?;
+    Expression::new(start, links).ok()
+}
+
+/// The case with no window that explodes, the same in all else.
+fn case_without_explodes(case: &Case) -> Option<Case> {
+    let step = &case.document.steps()[0];
+    let rebuilt = Step::new(step.id().clone(), call_without_explodes(step.call())?).ok()?;
+    Some(Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        document: Document::new(vec![rebuilt]).ok()?,
+    })
+}
+
+/// How often the case without its explodes is run again: which of two failures of
+/// a plan Polars names depends on which thread gets there first.
+const RUNS: usize = 8;
+
+/// Whether Polars refuses the case for lengths still when no window explodes: the
+/// explode is then no cause of the refusal, which the rows' lengths are.
+fn refused_for_lengths_without_explodes(case: &Case) -> bool {
+    case_without_explodes(case).is_some_and(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| unplaced(&refusal) && is_lengths(&refusal.reason))
+        })
+    })
+}
+
 /// Whether the limit is why the tables and Polars disagree.
 fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
     let step = case.document.steps()[0].call();
@@ -882,9 +958,12 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
     let explodes_in = |expression: &Expression| any_call(expression, &has_explode);
     match (limit, disagreement) {
         (Limit::AnExplodeChangesTheLengths, Disagreement::PolarsRefuses(refusal)) => {
+            // The explode is the cause where Polars stops refusing for lengths when
+            // no window explodes.
             unplaced(refusal)
                 && is_lengths(&refusal.reason)
                 && held.iter().any(|(_, held)| explodes_in(held))
+                && !refused_for_lengths_without_explodes(case)
         }
         (Limit::AnExplodeChangesTheLengths, Disagreement::PolarsAllows(refused)) => {
             // An `explode` changes the rows that what follows it meets, which
@@ -899,9 +978,12 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
             }
         }
         (Limit::TheLengthsOfTheRows, Disagreement::PolarsRefuses(refusal)) => {
+            // The rows' lengths are the cause where no window explodes, or Polars
+            // refuses for lengths still when none does.
             unplaced(refusal)
                 && is_lengths(&refusal.reason)
-                && !held.iter().any(|(_, held)| explodes_in(held))
+                && (!held.iter().any(|(_, held)| explodes_in(held))
+                    || refused_for_lengths_without_explodes(case))
         }
         (Limit::ALiteral, Disagreement::PolarsAllows(refused)) => {
             let locus = locate(case, &refused.place);
