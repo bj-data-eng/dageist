@@ -710,7 +710,8 @@ A case that the tables and Polars both refuse is evidence of agreement about the
 refusal only where Polars refuses it for the reason the tables gave: the objection
 and the call it names, as for a probe, or, for a named rule, what Polars says of what
 the rule is about (that a predicate be a `Boolean`, that a join's key be elementwise,
-that `element` stand only in a pivot's aggregate, that a join pair no key names
+that `element` stand only in a pivot's aggregate, in the engine's words or in
+Polars' that it is not allowed in this context, that a join pair no key names
 twice). A key that the tables refuse as not elementwise, which Polars refuses for a
 column the other table lacks or for the key names it pairs twice, is a case where
 Polars never judged what the tables did, and a rule that Polars does not hold has no
@@ -748,8 +749,9 @@ point in 54 more.
 A case that the tables cannot be asked about, because the dtype of an argument or
 before a method is not known, is not predicted past that point and is counted. The
 generator keeps to what the tables measured where a value, not a dtype, decides: a
-`shift` by the number 1 of a dtype, durations that are text of `b`, two values of
-a condition of one dtype, a join without `validate`.
+`shift` by the number 1 of a dtype, or the number -1 of a signed integer dtype (the
+tables measured the dtype, which the sign does not change), durations that are text
+of `b`, two values of a condition of one dtype, a join without `validate`.
 
 ## What The Step Editor Storyboard Has Settled
 
