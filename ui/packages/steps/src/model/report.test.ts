@@ -126,6 +126,14 @@ describe('the columns the editor shows after each step', () => {
   });
 });
 
+/** The place a link stands in, in a select, after a value of `dtype`. */
+function selectAfter(dtype: string, shape: 'one' | 'many') {
+  return {
+    context: { outer: 'select', nested: null },
+    after: { kind: 'value', dtype, shape },
+  } as const;
+}
+
 describe('the dtype the editor shows after each link of a chain', () => {
   it('is the engine’s dtype after the start and after each method', () => {
     const prepared = started();
@@ -133,10 +141,18 @@ describe('the dtype the editor shows after each link of a chain', () => {
     expect(stepOf(prepared, 'step_index').chains.get(chainIdOf('step_index'))).toEqual({
       source: 'String',
       methods: ['UInt32', 'UInt32'],
+      // Where each method stands, and where one added at the end would: after a text, then after
+      // a count, for each row, twice.
+      places: [
+        selectAfter('String', 'many'),
+        selectAfter('UInt32', 'many'),
+        selectAfter('UInt32', 'many'),
+      ],
     });
     expect(stepOf(prepared, 'resolved_day').chains.get(chainIdOf('resolved_day'))).toEqual({
       source: 'Datetime(us)',
       methods: ['Date'],
+      places: [selectAfter('Datetime(us)', 'many'), selectAfter('Date', 'many')],
     });
   });
 
@@ -146,6 +162,9 @@ describe('the dtype the editor shows after each link of a chain', () => {
     expect(stepOf(prepared, 'a_days').chains.get(chainIdOf('a_days'))).toEqual({
       source: 'Int64',
       methods: ['Int64', 'Int64'],
+      // The values of the condition end in a number typed without a dtype, which the engine
+      // gives none until the method after it is chosen: no place is known after it.
+      places: [null, null, null],
     });
   });
 
@@ -155,6 +174,8 @@ describe('the dtype the editor shows after each link of a chain', () => {
     expect(stepOf(prepared, 'holiday_count').chains.get(chainIdOf('holiday_count'))).toEqual({
       source: 'Date',
       methods: ['UInt32'],
+      // A list of dates gives many; its length is one count.
+      places: [selectAfter('Date', 'many'), selectAfter('UInt32', 'one')],
     });
   });
 
@@ -171,6 +192,17 @@ describe('the dtype the editor shows after each link of a chain', () => {
     expect(stepOf(prepared, 'pivot').chains.get(aggregate.value.id)).toEqual({
       source: null,
       methods: [null],
+      // The tables know what a group holds: the field the pivot takes its values from.
+      places: [
+        {
+          context: { outer: 'pivot_aggregate', nested: null },
+          after: { kind: 'value', dtype: 'Int64', shape: 'many' },
+        },
+        {
+          context: { outer: 'pivot_aggregate', nested: null },
+          after: { kind: 'value', dtype: 'Int64', shape: 'one' },
+        },
+      ],
     });
   });
 });
@@ -401,7 +433,7 @@ describe('a report of steps that have been edited since', () => {
       'valid',
       'valid',
     ]);
-    expect(stepOf(prepared, 'step_index').chains.get(chainIdOf('step_index'))).toEqual({
+    expect(stepOf(prepared, 'step_index').chains.get(chainIdOf('step_index'))).toMatchObject({
       source: 'String',
       methods: ['UInt32', 'UInt32'],
     });
