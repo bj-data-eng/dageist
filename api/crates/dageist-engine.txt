@@ -386,6 +386,18 @@ pub fn dageist_engine::catalog::english() -> &'static dageist_engine::catalog::W
 pub fn dageist_engine::catalog::entries() -> &'static [dageist_engine::catalog::Entry]
 pub fn dageist_engine::catalog::entry(id: &str) -> core::option::Option<&'static dageist_engine::catalog::Entry>
 pub fn dageist_engine::catalog::left_out() -> &'static [dageist_engine::catalog::LeftOut]
+pub mod dageist_engine::claim_timing
+pub struct dageist_engine::claim_timing::ClaimTiming
+impl dageist_engine::claim_timing::ClaimTiming
+pub const dageist_engine::claim_timing::ClaimTiming::SOURCE_NAME: &'static str
+pub const dageist_engine::claim_timing::ClaimTiming::STEPS_JSON: &'static str
+pub const fn dageist_engine::claim_timing::ClaimTiming::inputs(&self) -> &dageist_engine::document::Inputs
+pub fn dageist_engine::claim_timing::ClaimTiming::new() -> core::result::Result<Self, dageist_engine::EngineError>
+pub fn dageist_engine::claim_timing::ClaimTiming::preview(&self, document: &dageist_engine::document::Document, through: &dageist_engine::document::StepId, limit: usize) -> core::result::Result<dageist_engine::document::Preview, dageist_engine::document::RowsError>
+pub fn dageist_engine::claim_timing::ClaimTiming::run(&self, document: &dageist_engine::document::Document) -> polars_error::PolarsResult<dageist_engine::document::Report>
+pub const fn dageist_engine::claim_timing::ClaimTiming::source(&self) -> &polars_core::frame::dataframe::DataFrame
+pub fn dageist_engine::claim_timing::ClaimTiming::source_columns(&self) -> alloc::vec::Vec<dageist_engine::document::ColumnDescription>
+pub const fn dageist_engine::claim_timing::ClaimTiming::steps(&self) -> &dageist_engine::document::Document
 pub mod dageist_engine::document
 pub enum dageist_engine::document::Cause
 pub dageist_engine::document::Cause::ArgumentKeys(usize)
@@ -432,6 +444,10 @@ impl core::error::Error for dageist_engine::document::DtypeError
 pub fn dageist_engine::document::DtypeError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
 impl core::fmt::Display for dageist_engine::document::DtypeError
 pub fn dageist_engine::document::DtypeError::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum dageist_engine::document::InputKind
+pub dageist_engine::document::InputKind::List(alloc::string::String)
+pub dageist_engine::document::InputKind::Table(alloc::vec::Vec<dageist_engine::document::ColumnDescription>)
+pub dageist_engine::document::InputKind::Value(alloc::string::String)
 pub enum dageist_engine::document::Outcome
 pub dageist_engine::document::Outcome::NotRun
 pub dageist_engine::document::Outcome::NotRun::blocked_by: dageist_engine::document::StepId
@@ -521,10 +537,17 @@ pub const fn dageist_engine::document::Call::entry(&self) -> &'static dageist_en
 pub fn dageist_engine::document::Call::new<'a>(entry: &'static dageist_engine::catalog::Entry, arguments: impl core::iter::traits::collect::IntoIterator<Item = (&'a str, dageist_engine::document::Value)>) -> core::result::Result<Self, dageist_engine::document::Refusal>
 impl core::cmp::PartialEq for dageist_engine::document::Call
 pub fn dageist_engine::document::Call::eq(&self, other: &Self) -> bool
+pub struct dageist_engine::document::ColumnDescription
+impl dageist_engine::document::ColumnDescription
+pub fn dageist_engine::document::ColumnDescription::dtype(&self) -> &str
+pub fn dageist_engine::document::ColumnDescription::name(&self) -> &str
+pub fn dageist_engine::document::ColumnDescription::of_schema(schema: &polars_core::schema::Schema) -> alloc::vec::Vec<Self>
 pub struct dageist_engine::document::Document
 impl dageist_engine::document::Document
 pub fn dageist_engine::document::Document::new(steps: alloc::vec::Vec<dageist_engine::document::Step>) -> core::result::Result<Self, dageist_engine::document::Refusal>
 pub fn dageist_engine::document::Document::steps(&self) -> &[dageist_engine::document::Step]
+impl dageist_engine::document::Document
+pub fn dageist_engine::document::Document::preview(&self, inputs: &dageist_engine::document::Inputs, working: &polars_core::frame::dataframe::DataFrame, through: &dageist_engine::document::StepId, limit: usize) -> core::result::Result<dageist_engine::document::Preview, dageist_engine::document::RowsError>
 impl dageist_engine::document::Document
 pub fn dageist_engine::document::Document::read(text: &str) -> core::result::Result<Self, dageist_engine::document::ReadError>
 impl dageist_engine::document::Document
@@ -564,11 +587,16 @@ pub struct dageist_engine::document::Given
 impl dageist_engine::document::Given
 pub fn dageist_engine::document::Given::parameter(&self) -> &str
 pub const fn dageist_engine::document::Given::value(&self) -> &dageist_engine::document::Value
+pub struct dageist_engine::document::InputDescription
+impl dageist_engine::document::InputDescription
+pub const fn dageist_engine::document::InputDescription::kind(&self) -> &dageist_engine::document::InputKind
+pub fn dageist_engine::document::InputDescription::name(&self) -> &str
 pub struct dageist_engine::document::Inputs
 impl dageist_engine::document::Inputs
 pub fn dageist_engine::document::Inputs::add_list(&mut self, name: impl core::convert::Into<alloc::string::String>, values: polars_core::series::Series) -> core::result::Result<(), dageist_engine::document::DuplicateInput>
 pub fn dageist_engine::document::Inputs::add_table(&mut self, name: impl core::convert::Into<alloc::string::String>, table: polars_lazy::frame::LazyFrame) -> core::result::Result<(), dageist_engine::document::DuplicateInput>
 pub fn dageist_engine::document::Inputs::add_value(&mut self, name: impl core::convert::Into<alloc::string::String>, value: polars_core::scalar::Scalar) -> core::result::Result<(), dageist_engine::document::DuplicateInput>
+pub fn dageist_engine::document::Inputs::describe(&self) -> core::result::Result<alloc::vec::Vec<dageist_engine::document::InputDescription>, polars_error::PolarsError>
 pub fn dageist_engine::document::Inputs::new() -> Self
 impl core::fmt::Debug for dageist_engine::document::Inputs
 pub fn dageist_engine::document::Inputs::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
@@ -581,6 +609,10 @@ pub const fn dageist_engine::document::Place::step_index(&self) -> core::option:
 pub fn dageist_engine::document::Place::then(self, segment: dageist_engine::document::Segment) -> Self
 impl core::fmt::Display for dageist_engine::document::Place
 pub fn dageist_engine::document::Place::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct dageist_engine::document::Preview
+impl dageist_engine::document::Preview
+pub fn dageist_engine::document::Preview::columns(&self) -> &[dageist_engine::document::ColumnDescription]
+pub fn dageist_engine::document::Preview::rows(&self) -> &[alloc::vec::Vec<core::option::Option<alloc::string::String>>]
 pub struct dageist_engine::document::Refusal(_)
 impl dageist_engine::document::Refusal
 pub fn dageist_engine::document::Refusal::cause(&self) -> &dageist_engine::document::Cause
