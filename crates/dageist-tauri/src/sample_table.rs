@@ -113,15 +113,58 @@ impl TableView {
     }
 }
 
-/// A failed command, as presented to the view.
+/// What a failed command ended in, a closed list the view decides on instead
+/// of reading the message.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ErrorKind {
+    /// The document has no step of the name asked for.
+    NoSuchStep,
+    /// A step before the one asked for was refused, so the one asked for was
+    /// not run.
+    NotRun,
+    /// The step asked for was refused.
+    Refused,
+    /// More was asked for than the window of a command holds.
+    Limit,
+    /// The text sent is not a document the engine reads.
+    Unreadable,
+    /// Anything else: the command could not do what it was asked.
+    Failed,
+}
+
+#[cfg(test)]
+impl ErrorKind {
+    /// Every kind, in the order the contract lists them, for the vocabulary
+    /// snapshot.
+    pub(crate) const ALL: [Self; 6] = [
+        Self::NoSuchStep,
+        Self::NotRun,
+        Self::Refused,
+        Self::Limit,
+        Self::Unreadable,
+        Self::Failed,
+    ];
+}
+
+/// A failed command, as presented to the view: its kind, and the message that
+/// says what went wrong in words.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ErrorView {
+    kind: ErrorKind,
     message: String,
 }
 
 impl ErrorView {
+    /// A failure of no particular kind.
     pub(crate) fn new(message: impl Into<String>) -> Self {
+        Self::of(ErrorKind::Failed, message)
+    }
+
+    /// A failure of `kind`.
+    pub(crate) fn of(kind: ErrorKind, message: impl Into<String>) -> Self {
         Self {
+            kind,
             message: message.into(),
         }
     }
@@ -224,9 +267,10 @@ pub fn sample_window_view(
     keys: u32,
 ) -> Result<TableView, ErrorView> {
     if keys > MAX_WINDOW_KEYS {
-        return Err(ErrorView::new(format!(
-            "a working window holds at most {MAX_WINDOW_KEYS} keys"
-        )));
+        return Err(ErrorView::of(
+            ErrorKind::Limit,
+            format!("a working window holds at most {MAX_WINDOW_KEYS} keys"),
+        ));
     }
     let table = open_window(gate, &sample.directory, sample.spec, keys)?;
     Ok(show(open, table))
@@ -255,9 +299,10 @@ pub fn table_block_bytes(
     columns: &[String],
 ) -> Result<Vec<u8>, ErrorView> {
     if length > MAX_BLOCK_ROWS {
-        return Err(ErrorView::new(format!(
-            "a block holds at most {MAX_BLOCK_ROWS} rows"
-        )));
+        return Err(ErrorView::of(
+            ErrorKind::Limit,
+            format!("a block holds at most {MAX_BLOCK_ROWS} rows"),
+        ));
     }
     let table = open
         .current()

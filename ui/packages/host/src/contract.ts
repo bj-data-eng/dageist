@@ -421,6 +421,29 @@ export type RunView =
     }
   | { readonly status: 'unreadable'; readonly problem: ReadProblemView };
 
+/**
+ * What a failed command ended in, mirroring `ErrorKind` in
+ * crates/dageist-tauri/src/sample_table.rs. The view decides on the kind and
+ * never on the message, which is for a person to read.
+ */
+export const ERROR_KINDS = [
+  /** The document has no step of the name asked for. */
+  'noSuchStep',
+  /** A step before the one asked for was refused, so it was not run. */
+  'notRun',
+  /** The step asked for was refused. */
+  'refused',
+  /** More was asked for than the window of a command holds. */
+  'limit',
+  /** The text sent is not a document the engine reads. */
+  'unreadable',
+  /** Anything else. */
+  'failed',
+] as const;
+
+/** What a failed command ended in. */
+export type ErrorKind = (typeof ERROR_KINDS)[number];
+
 /** Mirrors `ViewWindow` in crates/dageist-tauri/src/windows.rs. */
 export type WindowName = 'steps';
 

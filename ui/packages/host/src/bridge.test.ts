@@ -102,7 +102,9 @@ describe('the host that calls the bridge', () => {
   });
 
   it('rejects with the message a failed command sent, under its name', async () => {
-    bridgeAnswers(() => jsonResponse({ message: 'a preview holds at most 1000 rows' }, 422));
+    bridgeAnswers(() =>
+      jsonResponse({ kind: 'limit', message: 'a preview holds at most 1000 rows' }, 422),
+    );
 
     await expect(bridgeHost().rowsAfterStep('{}', 'a', 5000)).rejects.toThrow(
       'rows_after_step: a preview holds at most 1000 rows',

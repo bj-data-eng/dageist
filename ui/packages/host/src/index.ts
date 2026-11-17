@@ -16,6 +16,7 @@ export type {
   ContextView,
   DefaultView,
   EndingView,
+  ErrorKind,
   EntryView,
   ExpressionDtypesView,
   FieldView,
@@ -54,10 +55,12 @@ export type {
   WordsView,
 } from './contract';
 export { BRIDGE_START_COMMAND, BridgeUnavailableError, bridgeHost } from './bridge';
+export { ERROR_KINDS } from './contract';
 export { DecodeError } from './decode';
 export { decodeCatalogue } from './decode-catalogue';
 export { decodeNode, decodeRows } from './decode-node';
 export { decodeRun } from './decode-run';
 export { decodeBytes, decodeIdentity, decodeTable } from './decode-sample';
 export { deliverMessage, sealMessage } from './envelope';
+export { HostError, decodeFailure } from './failure';
 export { tauriHost } from './tauri';
