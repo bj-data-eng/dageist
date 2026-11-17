@@ -6,8 +6,7 @@
   "license": "MIT",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./fixtures/catalogue.json": "./fixtures/catalogue.json"
+    ".": "./src/index.ts"
   },
   "dependencies": {}
 }

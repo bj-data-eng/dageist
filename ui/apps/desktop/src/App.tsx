@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 
 import { Panel, ToggleButton, cx } from '@dageist/design';
 import type { Host } from '@dageist/host';
-import { tauriHost } from '@dageist/host';
+import { bridgeHost, tauriHost } from '@dageist/host';
 import { StepsWindow, StepsWorkspace } from '@dageist/steps';
 import { TableViewer } from '@dageist/table';
 
@@ -56,12 +56,9 @@ function readStyleNonce(): string | null {
     : content;
 }
 
-/** Returns the host to use: Tauri when it is there, a stand-in otherwise. */
-async function findHost(): Promise<Host> {
-  const tauri = tauriHost();
-  if (tauri !== null) return tauri;
-  const { demoHost } = await import('./demo-host');
-  return demoHost();
+/** Returns the host to use: Tauri when it is there, the local bridge in a plain browser. */
+function findHost(): Host {
+  return tauriHost() ?? bridgeHost();
 }
 
 const STYLE_NONCE = readStyleNonce();
@@ -92,14 +89,17 @@ export function App(): React.JSX.Element {
     let live = true;
     const connect = async (): Promise<void> => {
       try {
-        const found = await findHost();
+        const found = findHost();
         // The host opens windows and carries messages whether or not the core answers.
         if (live) setHost(found);
         const identity = await found.coreIdentity();
         if (!live) return;
         setStatus({ text: `${identity.name} ${identity.version}`, tone: 'ready' });
       } catch (error) {
-        if (live) setStatus({ text: `Core unavailable: ${String(error)}`, tone: 'failed' });
+        if (live) {
+          const reason = error instanceof Error ? error.message : String(error);
+          setStatus({ text: `Core unavailable: ${reason}`, tone: 'failed' });
+        }
       }
     };
     void connect();
