@@ -36,7 +36,6 @@ impl Literal {
     /// where Polars refuses the literal or gives it a dtype that has no class.
     #[must_use]
     pub fn class(&self) -> Option<Representative> {
-        crate::startup::ensure();
         let literal = catalog::entry("polars.lit")?;
         let Build::Function(build) = literal.build() else {
             return None;

@@ -241,7 +241,6 @@ pub fn claims_generated(directory: &Path) -> bool {
 /// Returns an error when `directory` has no name, when a directory or file
 /// cannot be written, or when Polars cannot build or run the generating plan.
 pub fn generate_claims(directory: &Path, spec: SampleSpec) -> Result<Vec<PathBuf>, EngineError> {
-    crate::startup::ensure();
     let staging = staging_directory(directory)?;
     remove_directory(&staging)?;
     fs::create_dir_all(&staging)
