@@ -950,6 +950,42 @@ fn an_aggregate_that_the_first_fold_drops_stays_dropped_for_the_comparisons_afte
 }
 
 #[test]
+fn a_comparison_given_a_null_drops_the_aggregate_it_follows_after_an_earlier_fold() {
+    // `null < true`, `.last()`, `!= null`, `.is_not_null()` and `!= f` is a key
+    // Polars allows: the first comparison folds into a null, and the one that is
+    // given a null drops the aggregate before it, as the first would have, and what
+    // follows is a literal that a column is compared with. Without the comparison
+    // with a null the aggregate stays, and Polars refuses the key, as it refuses
+    // one that ends at the aggregate beside the column.
+    let rule = Some(RefusalSource::Rule(Rule::KeyIsElementwise));
+    let key = |dropped: bool, test: &str| {
+        let mut links = vec![
+            compared(
+                "Expr.lt",
+                chain(
+                    call("polars.lit", json!({ "value": { "flag": true } })),
+                    vec![],
+                ),
+            ),
+            call("Expr.last", json!({})),
+        ];
+        if dropped {
+            links.push(compared("Expr.ne", null()));
+        }
+        links.push(call(test, json!({})));
+        links.push(compared("Expr.ne", field("f")));
+        chain(
+            call("polars.lit", json!({ "value": { "flag": null } })),
+            links,
+        )
+    };
+    for test in ["Expr.is_not_null", "Expr.is_null"] {
+        assert_eq!(joined_on(key(true, test)), None, "{test}");
+        assert_eq!(joined_on(key(false, test)), rule, "{test} without the null");
+    }
+}
+
+#[test]
 fn a_comparison_of_an_aggregate_with_a_null_is_no_comparison_of_a_column() {
     // `f.first() == null` is one value, and what is compared with it is a column
     // compared with a value that is not null.
