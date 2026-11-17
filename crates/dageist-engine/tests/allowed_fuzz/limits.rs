@@ -84,16 +84,24 @@ pub enum Limit {
     ANullComparisonInAKey,
     /// The tables ran every call on columns that hold values, so what Polars does
     /// with a call that has only nulls to meet was not measured: it does not meet
-    /// the dtype that the tables refuse when they run rows. A shift that fills
-    /// nothing leaves nulls, and the sample's three rows decide how many: shifts
-    /// that total three rows or more, an aggregate that leaves one value which a
-    /// shift moves away, the first of what a shift moved and the first value of
-    /// that, which is null too, and the last of it where its column holds a null in the
-    /// row the shifts leave last (the sample's `a` and `b` hold one in the middle
-    /// row, its other columns hold none).
-    /// A comparison of a list with a `Boolean` is refused after none, one or two
-    /// shifts and allowed after three. The tables refusing, when they run rows, at
-    /// a call that follows such a chain or is given one. Nulls that Polars folds
+    /// the dtype that the tables refuse when they run rows. A shift fills with a
+    /// null unless it is given a value, and the sample's three rows decide what
+    /// is left: the target follows the rows of the sample through the chain. A
+    /// start column holds a value in each row, and a null in the middle one for
+    /// `a` and `b`. A shift moves the rows down for a positive number and up for a
+    /// negative one, and the rows it empties hold its `fill_value` (a null where
+    /// there is none). A running sum or maximum, and the parts of a date, keep
+    /// each row where it is and null where it was; `is_null`, `is_not_null` and
+    /// `cum_count` give a value in every row; a comparison, a subtraction, an
+    /// `offset_by`, a condition and a window that is not an `explode` keep the
+    /// rows in place and leave what they hold unknown; any other call leaves
+    /// nothing known. The first and the last take a row (the first or last that
+    /// is not null, where they skip nulls), the minimum and the maximum are null
+    /// of rows that are all null and a value of any that holds one, and a sum is
+    /// not known of rows that are all null. The tables refusing, when they run
+    /// rows, at a call that follows a chain whose rows are all null, or is given
+    /// one. A comparison of a list with a `Boolean` is refused after none, one or
+    /// two shifts of the sample and allowed after three. Nulls that Polars folds
     /// whatever the rows are, as those of a comparison with a null, are no matter
     /// of the sample: a probe settles them.
     AShiftThatLeavesNulls,
@@ -665,26 +673,179 @@ fn unplaced(refusal: &Refusal) -> bool {
 
 /// The rows of the sample tables the tables were measured on and the target
 /// runs cases on.
-const SAMPLE_ROWS: i64 = 3;
+const SAMPLE_ROWS: usize = 3;
 
-/// How many rows the `shift` `link` moves, when it fills them with nothing: a
-/// shift of a number that is not written as a whole number, or one given a value
-/// to fill with, counts for none.
-fn shift_rows(link: &Call) -> i64 {
-    if !is(link, "Expr.shift") || link.argument("fill_value").is_some() {
-        return 0;
+/// What a row of the values a chain gives holds, as far as the sample says.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Cell {
+    Null,
+    Value,
+    /// Not known to be either.
+    Unknown,
+}
+
+/// What a call of a chain does to the rows it is given: the number of rows, where
+/// each goes and which hold a null.
+enum Effect {
+    /// Each row stays where it is, null where it was null and a value where it was one:
+    /// a running sum or maximum, and a part of a date.
+    Keeps,
+    /// Each row is a value, whatever it was.
+    Values,
+    /// The rows stay the same number and in place, and what they hold is not known:
+    /// a comparison or a window.
+    Blurs,
+    /// What it gives is not known of the rows at all: another number, or another order.
+    Lost,
+}
+
+fn effect(call: &Call) -> Effect {
+    match call.entry().id().as_str() {
+        "Expr.cum_sum"
+        | "Expr.cum_max"
+        | "Expr.dt.date"
+        | "Expr.dt.month_start"
+        | "Expr.dt.time"
+        | "Expr.dt.total_days" => Effect::Keeps,
+        "Expr.is_null" | "Expr.is_not_null" | "Expr.cum_count" => Effect::Values,
+        "Expr.eq"
+        | "Expr.ne"
+        | "Expr.gt"
+        | "Expr.ge"
+        | "Expr.lt"
+        | "Expr.le"
+        | "Expr.sub"
+        | "Expr.dt.offset_by"
+        | "When.then"
+        | "Then.otherwise"
+        | "Then.when"
+        | "ChainedWhen.then"
+        | "ChainedThen.otherwise" => Effect::Blurs,
+        "Expr.over" if !has_explode(call) => Effect::Blurs,
+        _ => Effect::Lost,
     }
+}
+
+/// The rows a shift moves, `n` of them: positive down, negative up. The number is
+/// 1 when it is not given, and not known when it is not written as a whole number.
+fn shift_amount(link: &Call) -> Option<i64> {
     match link.argument("n") {
-        None => 1,
+        None => Some(1),
         Some(Value::Expression(n)) if n.links().is_empty() => match n.start() {
             Start::Call(start) if is(start, "polars.lit") => match start.argument("value") {
-                Some(Value::Integer(rows)) => rows.abs(),
-                _ => 0,
+                Some(Value::Integer(rows)) => Some(*rows),
+                _ => None,
             },
-            _ => 0,
+            _ => None,
         },
-        Some(_) => 0,
+        Some(_) => None,
     }
+}
+
+/// What the rows a shift moves in hold: the `fill_value`, a value where it is a
+/// literal of one, a null where it is the null literal, and nothing known where it
+/// is another expression; null when it is not given.
+fn filled_with(link: &Call) -> Cell {
+    match link.argument("fill_value") {
+        None => Cell::Null,
+        Some(Value::Expression(fill)) if fill.links().is_empty() => match fill.start() {
+            Start::Call(start) if is(start, "polars.lit") => match start.argument("value") {
+                Some(Value::Flag(None)) => Cell::Null,
+                Some(_) => Cell::Value,
+                None => Cell::Unknown,
+            },
+            _ => Cell::Unknown,
+        },
+        Some(_) => Cell::Unknown,
+    }
+}
+
+/// `rows` after the shift `link`: each moves by `n`, and the rows left empty hold
+/// what it fills them with.
+fn shifted(rows: &[Cell], link: &Call) -> Option<Vec<Cell>> {
+    let n = shift_amount(link)?;
+    let (fill, count) = (filled_with(link), rows.len());
+    let moved = usize::try_from(n.unsigned_abs()).unwrap_or(usize::MAX);
+    Some(
+        (0..count)
+            .map(|row| {
+                let from = if n >= 0 {
+                    row.checked_sub(moved)
+                } else {
+                    row.checked_add(moved).filter(|from| *from < count)
+                };
+                from.map_or(fill, |from| rows[from])
+            })
+            .collect(),
+    )
+}
+
+/// The one row that the first or last of `rows` is: the row itself, or with
+/// `skipping`, the first or last that is not null.
+fn picked(rows: &[Cell], skipping: bool, from_the_end: bool) -> Cell {
+    let mut rows: Vec<Cell> = rows.to_vec();
+    if from_the_end {
+        rows.reverse();
+    }
+    if !skipping {
+        return rows.first().copied().unwrap_or(Cell::Unknown);
+    }
+    rows.iter()
+        .copied()
+        .find(|cell| *cell != Cell::Null)
+        .unwrap_or(Cell::Null)
+}
+
+/// The rows after the first `upto` links of `expression`, taken from the sample:
+/// what each holds, by what the calls do to it. `None` when what the calls did to
+/// the rows is not known.
+fn rows_after(frames: &Frames, expression: &Expression, upto: usize) -> Option<Vec<Cell>> {
+    // A chain that starts from one column of the sample has the rows it holds, a
+    // value or a null in each; any other start is the sample's number of rows, of
+    // nothing known.
+    let mut rows: Vec<Cell> = (0..SAMPLE_ROWS)
+        .map(|row| {
+            starting_column(expression)
+                .and_then(|name| frames.holds_a_null_at(name, row))
+                .map_or(
+                    Cell::Unknown,
+                    |null| {
+                        if null { Cell::Null } else { Cell::Value }
+                    },
+                )
+        })
+        .collect();
+    for link in &expression.links()[..upto.min(expression.links().len())] {
+        let skipping = matches!(link.argument("ignore_nulls"), Some(Value::Flag(Some(true))));
+        rows = match link.entry().id().as_str() {
+            "Expr.shift" => shifted(&rows, link)?,
+            "Expr.first" => vec![picked(&rows, skipping, false)],
+            "Expr.last" => vec![picked(&rows, skipping, true)],
+            // The smallest and the largest of rows that are all null is null, and
+            // of any that holds a value is a value. The sum of rows that are all
+            // null is zero for numbers and null for a column of `Null`, so it is
+            // known only where a row holds a value.
+            "Expr.min" | "Expr.max" | "Expr.sum" => {
+                let one = if rows.contains(&Cell::Value) {
+                    Cell::Value
+                } else if rows.contains(&Cell::Unknown) || link.entry().id().as_str() == "Expr.sum"
+                {
+                    Cell::Unknown
+                } else {
+                    Cell::Null
+                };
+                vec![one]
+            }
+            "Expr.len" => vec![Cell::Value],
+            _ => match effect(link) {
+                Effect::Keeps => rows,
+                Effect::Values => vec![Cell::Value; rows.len()],
+                Effect::Blurs => vec![Cell::Unknown; rows.len()],
+                Effect::Lost => return None,
+            },
+        };
+    }
+    Some(rows)
 }
 
 /// The name of the one column `expression` starts from, when it starts from one.
@@ -701,47 +862,16 @@ fn starting_column(expression: &Expression) -> Option<&str> {
     }
 }
 
-/// Whether the first `upto` links of `expression`, taken from the sample, leave
-/// only nulls: shifts that move all its rows, or one value, which an aggregate
-/// leaves, shifted away, or the first row that a shift left null, the first value
-/// of rows that are all null, or the last row where the column the chain starts
-/// from holds a null in it (`frames` say which do: the sample's columns hold their
-/// values and a null in the middle, or none). A chain that does not start from one
-/// column of the sample is not known to hold a null anywhere.
+/// Whether the first `upto` links of `expression`, taken from the sample, leave only
+/// nulls: shifts that move all its rows, in either direction, or the row that a
+/// shift left null and a first, last, minimum or maximum then takes, or the one
+/// value that an aggregate leaves, shifted away (`rows_after` follows each call:
+/// the sample's columns hold their values and a null in the middle, or none, and a
+/// call that is not known to keep the rows where they are, or the nulls in them,
+/// leaves nothing known).
 fn leaves_only_nulls(frames: &Frames, expression: &Expression, upto: usize) -> bool {
-    let links = &expression.links()[..upto.min(expression.links().len())];
-    let column = starting_column(expression);
-    let (mut rows, mut shifted) = (SAMPLE_ROWS, 0);
-    for link in links {
-        shifted += shift_rows(link);
-        if is(link, "Expr.first") {
-            // A first takes the first row, which a shift left null; a first that
-            // skips nulls takes the first value, which is null only where every
-            // row is.
-            let skips = matches!(link.argument("ignore_nulls"), Some(Value::Flag(Some(true))));
-            let null = if skips { shifted >= rows } else { shifted >= 1 };
-            (rows, shifted) = (1, i64::from(null));
-        } else if is(link, "Expr.last") {
-            // The last of what a shift moved is the row that the shifts leave last
-            // from the start: null where the column holds a null in it, or after
-            // all rows are moved. After an aggregate it is the one value.
-            let null = if rows == 1 {
-                shifted >= 1
-            } else {
-                shifted >= rows
-                    || column.is_some_and(|name| {
-                        usize::try_from(rows - 1 - shifted)
-                            .ok()
-                            .and_then(|row| frames.holds_a_null_at(name, row))
-                            .unwrap_or(false)
-                    })
-            };
-            (rows, shifted) = (1, i64::from(null));
-        } else if is_one_value(link) {
-            (rows, shifted) = (1, 0);
-        }
-    }
-    shifted >= rows
+    rows_after(frames, expression, upto)
+        .is_some_and(|rows| !rows.is_empty() && rows.iter().all(|cell| *cell == Cell::Null))
 }
 
 /// Whether the limit is why the tables and Polars disagree.
