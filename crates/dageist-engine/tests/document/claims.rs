@@ -219,6 +219,22 @@ fn the_node_runs_a_document_on_its_own_rows_and_inputs() {
             .iter()
             .all(|step| matches!(step.outcome(), Outcome::Valid { .. }))
     );
+    let source: Vec<_> = node
+        .source_columns()
+        .iter()
+        .map(|column| (column.name().to_owned(), column.dtype().to_owned()))
+        .collect();
+    assert_eq!(
+        source,
+        [
+            ("dcn", "String"),
+            ("timestamp", "Datetime(us)"),
+            ("step_to", "String"),
+            ("owner", "String"),
+            ("row_days", "Int64"),
+        ]
+        .map(|(name, dtype)| (name.to_owned(), dtype.to_owned()))
+    );
     let preview = node
         .preview(node.steps(), &StepId::new("pivot").expect("an id"), 100)
         .expect("the pivot's rows");

@@ -13,7 +13,7 @@ use polars::prelude::{
     df, lit,
 };
 
-use crate::document::{Document, Inputs, Preview, Report, RowsError, StepId};
+use crate::document::{ColumnDescription, Document, Inputs, Preview, Report, RowsError, StepId};
 use crate::error::EngineError;
 
 /// The seven claim rows, in no useful order, as text. Two claims, `A-1001` and
@@ -67,6 +67,12 @@ impl ClaimTiming {
     #[must_use]
     pub const fn source(&self) -> &DataFrame {
         &self.source
+    }
+
+    /// The columns of [`source`](Self::source) with their dtypes.
+    #[must_use]
+    pub fn source_columns(&self) -> Vec<ColumnDescription> {
+        ColumnDescription::of_schema(self.source.schema())
     }
 
     /// What else is connected to the node: the table of the days each step may
