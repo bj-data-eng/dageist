@@ -5,7 +5,11 @@
 //! Each enum has here a `next` that names every variant, so adding one does
 //! not compile until `next` gives it a place, and a test walks the chain from
 //! the first variant and expects it to be the list. A variant given a place
-//! in `next` and left out of the list fails that test.
+//! in `next` and left out of the list fails that test. The walk reaches only
+//! the variants `next` links from the first one, so a new variant is not
+//! caught when it is made the end of its own chain, or put before the first
+//! variant the walk starts from; add a new variant inside or at the end of
+//! the chain.
 
 use crate::catalog::{Applies, ValueType};
 

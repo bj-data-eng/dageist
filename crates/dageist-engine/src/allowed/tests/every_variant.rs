@@ -7,9 +7,10 @@
 //! so adding one does not compile until `next` gives it a place, and a test
 //! walks the chain from the first variant and expects it to be the list. A
 //! variant given a place in `next` and left out of the list fails that test.
-//! The walk reaches only the variants `next` links, so a new variant that is
-//! made the end of its own chain is not caught; the match makes that a
-//! deliberate act.
+//! The walk reaches only the variants `next` links from the first one, so a
+//! new variant is not caught when it is made the end of its own chain, or put
+//! before the first variant the walk starts from; the match makes either a
+//! deliberate act. Add a new variant inside or at the end of the chain.
 
 use crate::allowed::{ConditionState, Context, Nested, Outer, Rule, Shape, Stage};
 
