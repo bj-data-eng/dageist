@@ -5,6 +5,8 @@
 //! that asks whether the set-up has happened, or sets an environment variable
 //! for it to read, needs a process no other test has touched. The test starts
 //! its own test binary again, to run only itself, with the variables it wants.
+//! The process starts without any `POLARS_` variable of the one that starts it,
+//! so what a developer has set in a shell changes none of the tests.
 
 use std::process::Command;
 
@@ -32,7 +34,13 @@ pub fn in_fresh_process(
     }
     let variables = prepare();
     let program = std::env::current_exe().expect("the test program's own path is known");
-    let output = Command::new(program)
+    let mut command = Command::new(program);
+    for (name, _) in std::env::vars_os() {
+        if name.to_string_lossy().starts_with("POLARS_") {
+            command.env_remove(name);
+        }
+    }
+    let output = command
         .args(["--exact", test, "--nocapture", "--test-threads", "1"])
         .env(BODY, test)
         .envs(variables)
