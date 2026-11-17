@@ -41,6 +41,10 @@ pub struct Refused {
     /// Polars did.
     pub stage: Option<allowed::Stage>,
     pub reason: String,
+    /// Whether the call was refused without the dtype of an argument being known:
+    /// it is refused for every dtype that argument might have, and the reason is
+    /// Polars' for one of them.
+    pub argument_unknown: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -105,6 +109,7 @@ fn refused(found: &WalkRefusal) -> Refused {
         } else {
             refusal.reason().to_owned()
         },
+        argument_unknown: found.argument_unknown(),
     }
 }
 

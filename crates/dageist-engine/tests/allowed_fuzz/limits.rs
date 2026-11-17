@@ -1051,6 +1051,7 @@ mod tests {
             place,
             stage,
             reason: reason.to_owned(),
+            argument_unknown: false,
         });
         excuses(case, &prediction(verdict, Vec::new()), &Observed::default())
     }
@@ -1063,6 +1064,7 @@ mod tests {
             place,
             stage: None,
             reason: reason.to_owned(),
+            argument_unknown: false,
         });
         excuses(case, &prediction(verdict, Vec::new()), &Observed::default())
     }

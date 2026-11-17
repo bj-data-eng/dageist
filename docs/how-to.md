@@ -509,11 +509,15 @@ Polars by hand, and decide which it is:
   refused call, settles it. Where that does not, the limits are asked next, and then
   the part apart from what surrounds it: the refused call on a column of the dtype
   that reaches it; a join's key by itself as the key, and the refused call on a
-  column as the key; and, for a refusal that is the target's own comparison of a
+  column as the key; for a refusal that is the target's own comparison of a
   call's plan with its rows (no refusal of Polars), the call on a column in the
   position the case holds it, which counts only with the evidence that Polars' plan
   and rows differ as the tables say, Polars refuses it there, and a call whose plan
-  and rows agree and the column alone are allowed there. The replay shows the probe
+  and rows agree and the column alone are allowed there; and, for a call the tables
+  refused without knowing the dtype of an argument, whose reason is Polars' for
+  another dtype, the part as written, where Polars refusing it at the refused call
+  counts without the reason being compared, and the part before the call alone is
+  allowed. The replay shows the probe
   and what it showed. Where it does not settle a case, Polars allows the probe,
   refuses it for another reason or at another call, or the evidence is missing, and
   the case is one of the other kinds. Keep a case the probe settles as

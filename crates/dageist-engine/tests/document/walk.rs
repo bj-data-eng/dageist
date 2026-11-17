@@ -986,6 +986,30 @@ fn a_comparison_given_a_null_drops_the_aggregate_it_follows_after_an_earlier_fol
 }
 
 #[test]
+fn a_call_refused_without_the_dtype_of_an_argument_says_so() {
+    // `b.sub(1)` takes text and a number that is given no dtype, which the walk
+    // cannot say the dtype of: the subtraction is refused for any dtype the
+    // number might take, and the reason is Polars' for one of them. `b.sub(a)`
+    // is refused with every dtype known.
+    let select = |argument: Value| {
+        walk_of(
+            "LazyFrame.select",
+            json!({ "exprs": many(vec![field_then("b", vec![compared("Expr.sub", argument)])]) }),
+        )
+    };
+    let number = chain(
+        call("polars.lit", json!({ "value": { "integer": 1 } })),
+        vec![],
+    );
+    let blind = select(number);
+    let refusal = blind.refusal().expect("text minus a number is refused");
+    assert!(refusal.argument_unknown());
+    let known = select(field("a"));
+    let refusal = known.refusal().expect("text minus a column is refused");
+    assert!(!refusal.argument_unknown());
+}
+
+#[test]
 fn a_comparison_of_an_aggregate_with_a_null_is_no_comparison_of_a_column() {
     // `f.first() == null` is one value, and what is compared with it is a column
     // compared with a value that is not null.

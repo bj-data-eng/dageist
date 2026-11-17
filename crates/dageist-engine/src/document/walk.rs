@@ -124,6 +124,7 @@ pub struct WalkRefusal {
     place: Place,
     refusal: Refusal,
     at_end: bool,
+    argument_unknown: bool,
 }
 
 impl WalkRefusal {
@@ -144,6 +145,14 @@ impl WalkRefusal {
     #[must_use]
     pub const fn at_end(&self) -> bool {
         self.at_end
+    }
+
+    /// Whether the call was refused without the dtype of an argument being known:
+    /// no dtype that argument might have lets the call stand, and the reason is
+    /// the one Polars gave for one of them, not for the dtype the argument has.
+    #[must_use]
+    pub const fn argument_unknown(&self) -> bool {
+        self.argument_unknown
     }
 }
 
@@ -419,11 +428,21 @@ impl Walker<'_> {
     }
 
     fn refuse(&mut self, refusal: &Refusal, at_end: bool) {
+        self.refuse_given(refusal, at_end, false);
+    }
+
+    /// Refuses a call that was asked without the dtype of one of its arguments.
+    fn refuse_blind(&mut self, refusal: &Refusal) {
+        self.refuse_given(refusal, false, true);
+    }
+
+    fn refuse_given(&mut self, refusal: &Refusal, at_end: bool, argument_unknown: bool) {
         if self.refusal.is_none() {
             self.refusal = Some(WalkRefusal {
                 place: self.here(),
                 refusal: refusal.clone(),
                 at_end,
+                argument_unknown,
             });
         }
     }
@@ -924,7 +943,7 @@ impl Walker<'_> {
                 verdict: Some(verdict.clone()),
             };
             if let Verdict::Refused(refusal) = &verdict {
-                self.refuse(refusal, false);
+                self.refuse_blind(refusal);
                 return (Cur::Dead, standing);
             }
             return (

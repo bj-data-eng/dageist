@@ -605,14 +605,22 @@ what surrounds it, after the limits, in these ways:
   as the key panics); and the call on a column whose plan and rows agree is allowed
   there, and so is the column alone. A refusal that the control meets too, as a
   filter's predicate that is not a `Boolean`, or a panic that has no part in the
-  mismatch, shows nothing.
+  mismatch, shows nothing;
+- for a call the tables refused without knowing the dtype of an argument (a window
+  whose options the tables were not measured with, or a number given no dtype), the
+  part as written, alone. The tables refuse such a call only when no dtype the
+  argument might have lets it stand, with the reason Polars gave for one of them, so
+  the reason of the probe, which has the argument's own dtype, is not the tables' in
+  words and is not compared. It counts when Polars refuses the probe for itself at the
+  refused call, and the part before the call, alone, is allowed.
 
 The first two count when Polars refuses the probe for the reason the tables gave, and
 the case then counts as **refused where Polars does not evaluate the part**: the
 tables are stricter by design, and the tally names it. The replay and the outcome say
-what the probe showed: that the probe was refused for the tables' reason, or that the
+what the probe showed: that the probe was refused for the tables' reason, that the
 call's plan and rows differ as the tables say, the call is refused in the position
-and a call whose plan and rows agree is allowed. The reasons are matched by what
+and a call whose plan and rows agree is allowed, or that Polars refuses the call that
+the tables refused for every dtype of an argument they did not know. The reasons are matched by what
 Polars objected to and the call it names (the symbol of a comparison, a name in
 backticks), without the dtypes and column names it quotes, and for a rule that a
 predicate be a `Boolean` by Polars' words for it. A refusal that Polars places must
