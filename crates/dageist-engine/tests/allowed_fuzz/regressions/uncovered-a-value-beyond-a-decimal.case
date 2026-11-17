@@ -1,0 +1,2 @@
+{"a":"UInt128","b":"Decimal(10, 2)","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.with_columns","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[{"entry":"Expr.first","arguments":{}},{"entry":"Expr.sub","arguments":{"other":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[]}}}},{"entry":"Expr.eq","arguments":{"other":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["b"]}}},"then":[]}}}}]}}]}}}}]}

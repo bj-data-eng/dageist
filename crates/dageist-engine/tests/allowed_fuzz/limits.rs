@@ -103,6 +103,13 @@ pub enum Limit {
     /// A debug build of Polars panics where an arithmetic overflow wraps in a
     /// release build, on keys the tables did not measure.
     AnOverflow,
+    /// A `UInt128` is compared with a `Decimal` by casting it to `decimal[38,0]`,
+    /// which holds up to 38 digits, and a `UInt128` holds more. The sample's values
+    /// are within the decimal, so the tables did not measure what a value beyond
+    /// it meets, which a subtraction that wraps below zero makes. Polars refusing
+    /// the rows with a failed conversion of `u128` to a decimal, which has no
+    /// place, in a case that holds a subtraction.
+    AValueBeyondADecimal,
     /// Polars panicking has no place, and is gated by its reason. A panic of
     /// Polars is an internal check that failed. The tables record
     /// one for the plan Polars made of a combination in `select`, and the plan
@@ -133,7 +140,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 13] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -142,6 +149,7 @@ impl Limit {
         Self::AShiftThatLeavesNulls,
         Self::TheLengthsOfTheRows,
         Self::AnOverflow,
+        Self::AValueBeyondADecimal,
         Self::APanic,
         Self::AWindowOverAWindow,
         Self::AJoinKeyDtype,
@@ -159,6 +167,7 @@ impl Limit {
             Self::AShiftThatLeavesNulls => "a-shift-that-leaves-nulls",
             Self::TheLengthsOfTheRows => "the-lengths-of-the-rows",
             Self::AnOverflow => "an-overflow",
+            Self::AValueBeyondADecimal => "a-value-beyond-a-decimal",
             Self::APanic => "a-panic",
             Self::AWindowOverAWindow => "a-window-over-a-window",
             Self::AJoinKeyDtype => "a-join-key-dtype",
@@ -177,6 +186,9 @@ impl Limit {
             }
             Self::AnOverflow => {
                 "a debug build of Polars panics on an overflow of the values, which the tables measured on one sample"
+            }
+            Self::AValueBeyondADecimal => {
+                "a UInt128 beyond the digits of a decimal cannot be cast to it, which the tables measured on values within it"
             }
             Self::APanic => {
                 "a panic of Polars depends on the plan it makes, which another place may not make"
@@ -866,6 +878,17 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
         (Limit::AnOverflow, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal) && refusal.reason.contains("with overflow")
         }
+        (Limit::AValueBeyondADecimal, Disagreement::PolarsRefuses(refusal)) => {
+            // The rows hold the values; a table with no rows holds none to fail.
+            unplaced(refusal)
+                && refusal.stage == Stage::Rows
+                && refusal
+                    .reason
+                    .starts_with("conversion from `u128` to `decimal[")
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &|call| is(call, "Expr.sub")))
+        }
         (Limit::APanic, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
                 && is_panic(&refusal.reason)
@@ -1432,6 +1455,98 @@ mod tests {
                 "Polars panicked: should not fail"
             ),
             vec![Limit::APanic]
+        );
+    }
+
+    // ----- A value beyond a decimal
+
+    const BEYOND_A_DECIMAL: &str = "conversion from `u128` to `decimal[38,0]` failed in column \
+        '_POLARS_TMP_PHYS_0' for 1 out of 1 values: [340282366920938463463374607431768211454]";
+
+    /// `a - a == b`: a subtraction, whose values wrap below zero in an unsigned
+    /// dtype, compared with a column.
+    fn a_subtraction_compared() -> Case {
+        select(vec![chain_of(
+            column("a"),
+            vec![
+                compared_with("Expr.sub", chain(column("a"), &[])),
+                compared_with("Expr.eq", chain(column("b"), &[])),
+            ],
+        )])
+    }
+
+    #[test]
+    fn a_failed_conversion_of_a_value_beyond_a_decimal_is_excused_where_a_subtraction_made_it() {
+        assert_eq!(
+            polars_refuses(
+                &a_subtraction_compared(),
+                None,
+                Stage::Rows,
+                BEYOND_A_DECIMAL,
+                Vec::new()
+            ),
+            vec![Limit::AValueBeyondADecimal]
+        );
+        // A subtraction in an expression the chain is given reaches it too.
+        let nested = select(vec![chain_of(
+            column("a"),
+            vec![compared_with(
+                "Expr.eq",
+                chain_of(
+                    column("k"),
+                    vec![compared_with("Expr.sub", chain(column("a"), &[]))],
+                ),
+            )],
+        )]);
+        assert_eq!(
+            polars_refuses(&nested, None, Stage::Rows, BEYOND_A_DECIMAL, Vec::new()),
+            vec![Limit::AValueBeyondADecimal]
+        );
+    }
+
+    #[test]
+    fn a_failed_conversion_of_a_value_beyond_a_decimal_without_a_subtraction_is_not_excused() {
+        // The sample's own values are within a decimal: only a call that makes a
+        // value beyond it explains the conversion failing.
+        let case = select(vec![chain_of(
+            column("a"),
+            vec![compared_with("Expr.eq", chain(column("b"), &[]))],
+        )]);
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Rows, BEYOND_A_DECIMAL, Vec::new()),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn only_a_failed_conversion_of_a_u128_to_a_decimal_of_the_rows_is_excused() {
+        let case = a_subtraction_compared();
+        for reason in [
+            "conversion from `i64` to `decimal[38,0]` failed in column 'a' for 1 out of 1 values: [1]",
+            "conversion from `u128` to `i64` failed in column 'a' for 1 out of 1 values: [1]",
+            "cannot compare u128 with decimal[10,2]",
+        ] {
+            assert_eq!(
+                polars_refuses(&case, None, Stage::Rows, reason, Vec::new()),
+                vec![],
+                "{reason}"
+            );
+        }
+        // A table with no rows holds no value to fail, and Polars saying where it
+        // refused the step is another refusal.
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Empty, BEYOND_A_DECIMAL, Vec::new()),
+            vec![]
+        );
+        assert_eq!(
+            polars_refuses(
+                &case,
+                Some(link_of("exprs", 0, 1)),
+                Stage::Schema,
+                BEYOND_A_DECIMAL,
+                Vec::new()
+            ),
+            vec![]
         );
     }
 
