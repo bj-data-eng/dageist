@@ -15,7 +15,8 @@
     "lint": "oxlint --deny-warnings --report-unused-disable-directives",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "build": "npm run build --workspace @dageist/desktop"
+    "build": "npm run build --workspace @dageist/desktop",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.4",
@@ -28,7 +29,8 @@
     "oxlint-tsgolint": "7.0.2006",
     "tailwindcss": "4.3.4",
     "typescript": "7.0.2",
-    "vite": "8.3.6"
+    "vite": "8.3.6",
+    "vitest": "4.1.12"
   },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
