@@ -83,8 +83,9 @@ pub enum Limit {
     /// with a dtype that the tables refuse when they run rows where what it
     /// follows or is given is only nulls: shifts that total the sample's three
     /// rows or more, an aggregate that leaves one value which a shift moves away,
-    /// the first of what a shift moved, and a running sum of a comparison with a
-    /// null, which Polars gives as a column of nulls. A comparison of a list with
+    /// the first of what a shift moved and the first value of that, which is
+    /// null too, and a running sum of a comparison with a null, which Polars
+    /// gives as a column of nulls. A comparison of a list with
     /// a `Boolean` is refused after none, one or two shifts and allowed after
     /// three. The tables refusing, when they run rows, at a call that follows such
     /// a chain or is given one.
@@ -655,9 +656,9 @@ fn shift_rows(link: &Call) -> i64 {
 
 /// Whether `links`, taken from the sample, leave only nulls: shifts that move all
 /// its rows, or one value, which an aggregate leaves, shifted away, or the first
-/// row that a shift left null, the last row where the sample has a null in it,
-/// or a running sum of a comparison with a null,
-/// which Polars gives as a column of nulls.
+/// row that a shift left null, the first value of rows that are all null, the
+/// last row where the sample has a null in it, or a running sum of a comparison
+/// with a null, which Polars gives as a column of nulls.
 fn leaves_only_nulls(links: &[Call]) -> bool {
     let (mut rows, mut shifted) = (SAMPLE_ROWS, 0);
     let mut compared_with_a_null = false;
@@ -676,10 +677,13 @@ fn leaves_only_nulls(links: &[Call]) -> bool {
             shifted = rows;
         }
         shifted += shift_rows(link);
-        if is(link, "Expr.first")
-            && !matches!(link.argument("ignore_nulls"), Some(Value::Flag(Some(true))))
-        {
-            (rows, shifted) = (1, i64::from(shifted >= 1));
+        if is(link, "Expr.first") {
+            // A first takes the first row, which a shift left null; a first that
+            // skips nulls takes the first value, which is null only where every
+            // row is.
+            let skips = matches!(link.argument("ignore_nulls"), Some(Value::Flag(Some(true))));
+            let null = if skips { shifted >= rows } else { shifted >= 1 };
+            (rows, shifted) = (1, i64::from(null));
         } else if is(link, "Expr.last") {
             // The sample's last row is a value and its null is the middle one, so
             // the last of what a shift moved is null after one shift, or after
