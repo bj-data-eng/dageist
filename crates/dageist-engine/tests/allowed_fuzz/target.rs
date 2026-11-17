@@ -498,6 +498,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_probe_longer_than_an_outcome_may_say_is_still_an_outcome() {
+        // The outcome of a case that the probe settles names the probe, which for a
+        // deep case is longer than the fuzz contract admits of a detail. The case
+        // is still one where the tables are stricter, and its outcome is a line.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+            "tests/allowed_fuzz/regressions/stricter-a-probe-longer-than-an-outcome-may-say.case",
+        );
+        let case = Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case");
+        let outcome = std::thread::Builder::new()
+            .stack_size(256 << 20)
+            .spawn(move || AllowedTarget::new().evaluate(&case))
+            .expect("a thread")
+            .join()
+            .expect("the case is evaluated")
+            .expect("an outcome that meets the fuzz contract");
+        assert_eq!(outcome.kind(), dageist_fuzz::OutcomeKind::ExpectedRejection);
+        let detail = outcome.detail().expect("a detail");
+        assert!(detail.starts_with(STRICTER_WHERE_UNEVALUATED), "{detail}");
+        assert!(detail.len() <= 4096 && !detail.chars().any(char::is_control));
+    }
+
+    #[test]
     fn a_wrong_prediction_of_the_dtype_before_the_refused_call_is_a_disagreement() {
         // A probe stands a value in for what reaches the refused call, so a
         // wrong prediction of that dtype must not be hidden by it: it is found
