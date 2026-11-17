@@ -10,10 +10,11 @@ import type {
   EntryView,
   KindView,
   ParameterView,
+  PositionView,
   ShapeView,
   WordsView,
 } from './contract';
-import { APPLIES, VALUE_TYPES } from './contract';
+import { APPLIES, NESTED_POSITIONS, OUTER_POSITIONS, VALUE_TYPES } from './contract';
 import type { Decode } from './decode';
 import {
   ROOT,
@@ -120,8 +121,25 @@ const readDefault: Decode<DefaultView> = readTagged<DefaultView>('kind', {
   other: { fields: [], read: () => ({ kind: 'other' }) },
 });
 
+const readPosition: Decode<PositionView> = readTagged<PositionView>('kind', {
+  outer: {
+    fields: ['name'],
+    read: (fields, path) => ({
+      kind: 'outer',
+      name: readField(fields, path, 'name', readWord(OUTER_POSITIONS)),
+    }),
+  },
+  nested: {
+    fields: ['name'],
+    read: (fields, path) => ({
+      kind: 'nested',
+      name: readField(fields, path, 'name', readWord(NESTED_POSITIONS)),
+    }),
+  },
+});
+
 const readParameter: Decode<ParameterView> = readRecord(
-  ['name', 'shown', 'label', 'kind', 'shape', 'default', 'python'],
+  ['name', 'shown', 'label', 'kind', 'shape', 'default', 'python', 'position'],
   (fields, path) => ({
     name: readField(fields, path, 'name', readString),
     shown: readField(fields, path, 'shown', readString),
@@ -130,6 +148,7 @@ const readParameter: Decode<ParameterView> = readRecord(
     shape: readField(fields, path, 'shape', readShape),
     default: readField(fields, path, 'default', readDefault),
     python: readField(fields, path, 'python', readNullable(readString)),
+    position: readField(fields, path, 'position', readNullable(readPosition)),
   }),
 );
 
@@ -154,10 +173,11 @@ const readWords: Decode<WordsView> = readRecord(['key', 'title'], (fields, path)
 }));
 
 const readCatalogue: Decode<CatalogueView> = readRecord(
-  ['families', 'dtypes', 'entries'],
+  ['families', 'dtypes', 'listedDtypes', 'entries'],
   (fields, path) => ({
     families: readField(fields, path, 'families', readList(readWords)),
     dtypes: readField(fields, path, 'dtypes', readList(readWords)),
+    listedDtypes: readField(fields, path, 'listedDtypes', readList(readString)),
     entries: readField(fields, path, 'entries', readList(readEntry)),
   }),
 );

@@ -31,6 +31,7 @@ export type {
   OutcomeView,
   ParameterView,
   PlaceView,
+  PositionView,
   ReadProblemView,
   RefusalSourceView,
   RefusalView,

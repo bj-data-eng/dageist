@@ -12,10 +12,12 @@
 
 use std::fmt;
 
+use dageist_engine::allowed::{Nested, Outer, Position};
 use dageist_engine::catalog::{
     Applies, DefaultValue, Dtypes, Entry, Family, Kind, Laziness, Parameter, ParameterDefault,
     Shape, ValueType, Words, english, entries,
 };
+use dageist_engine::document::Dtype;
 use serde::Serialize;
 
 use crate::sample_table::ErrorView;
@@ -104,6 +106,28 @@ enum DefaultView {
     Other,
 }
 
+/// A position that holds an expression, as the engine's tables name it: of a
+/// step, or inside an expression.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+enum PositionView {
+    /// A position of a step.
+    Outer { name: &'static str },
+    /// A position inside an expression.
+    Nested { name: &'static str },
+}
+
+const fn position_view(position: Position) -> PositionView {
+    match position {
+        Position::Outer(outer) => PositionView::Outer {
+            name: Outer::name(outer),
+        },
+        Position::Nested(nested) => PositionView::Nested {
+            name: Nested::name(nested),
+        },
+    }
+}
+
 /// One parameter of an entry.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 struct ParameterView {
@@ -118,6 +142,9 @@ struct ParameterView {
     default: DefaultView,
     /// Polars' default as Python writes it; `None` when it must be given.
     python: Option<&'static str>,
+    /// Where the expression the parameter holds stands, when a named position
+    /// holds it. The tables of allowed combinations are asked at that place.
+    position: Option<PositionView>,
 }
 
 /// What an entry is applied to.
@@ -154,9 +181,12 @@ struct WordsView {
 
 /// The whole catalogue with its words.
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CatalogueView {
     families: Vec<WordsView>,
     dtypes: Vec<WordsView>,
+    /// The dtypes a document names by one word, in the order a list gives them.
+    listed_dtypes: Vec<String>,
     entries: Vec<EntryView>,
 }
 
@@ -303,6 +333,7 @@ fn parameter_view(
             ParameterDefault::Required => None,
             ParameterDefault::Python(text) => Some(text),
         },
+        position: Position::of_parameter(id.as_str(), parameter.name()).map(position_view),
     })
 }
 
@@ -351,6 +382,7 @@ fn catalogue_view(words: &Words) -> Result<CatalogueView, MissingWord> {
                 })
             })
             .collect::<Result<_, MissingWord>>()?,
+        listed_dtypes: Dtype::listed().iter().map(ToString::to_string).collect(),
         entries: entries()
             .iter()
             .map(|entry| entry_view(entry, words))
@@ -427,7 +459,8 @@ mod tests {
                         "kind": { "kind": "expression", "dtypes": ["integer"] },
                         "shape": { "shape": "one" },
                         "default": { "kind": "integer", "value": 1 },
-                        "python": "1"
+                        "python": "1",
+                        "position": null
                     },
                     {
                         "name": "fill_value",
@@ -436,7 +469,8 @@ mod tests {
                         "kind": { "kind": "expression", "dtypes": ["any"] },
                         "shape": { "shape": "one" },
                         "default": { "kind": "none" },
-                        "python": "None"
+                        "python": "None",
+                        "position": null
                     }
                 ]
             })
@@ -458,7 +492,8 @@ mod tests {
                 "kind": { "kind": "choice", "words": words },
                 "shape": { "shape": "one" },
                 "default": { "kind": "text", "value": "inner" },
-                "python": "'inner'"
+                "python": "'inner'",
+                "position": null
             })
         );
     }
@@ -476,7 +511,8 @@ mod tests {
                 "kind": { "kind": "flag" },
                 "shape": { "shape": "perItem", "of": "by" },
                 "default": { "kind": "flag", "value": false },
-                "python": "False"
+                "python": "False",
+                "position": null
             })
         );
     }

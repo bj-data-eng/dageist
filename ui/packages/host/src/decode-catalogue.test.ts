@@ -86,6 +86,7 @@ describe('the catalogue the host sends', () => {
           shape: { shape: 'one' },
           default: { kind: 'integer', value: 1 },
           python: '1',
+          position: null,
         },
         {
           name: 'fill_value',
@@ -95,9 +96,47 @@ describe('the catalogue the host sends', () => {
           shape: { shape: 'one' },
           default: { kind: 'none' },
           python: 'None',
+          position: null,
         },
       ],
     });
+  });
+
+  it('is read with the position of an expression parameter that a named position holds', () => {
+    const entries = decodeCatalogue(catalogue).entries;
+    const position = (id: string, name: string) =>
+      entries.find((entry) => entry.id === id)?.parameters.find((found) => found.name === name)
+        ?.position;
+    expect(position('LazyFrame.join', 'right_on')).toEqual({ kind: 'outer', name: 'join_right' });
+    expect(position('Expr.over', 'partition_by')).toEqual({
+      kind: 'nested',
+      name: 'over.partition_by',
+    });
+    expect(position('Expr.shift', 'n')).toBeNull();
+    expect(position('LazyFrame.join', 'how')).toBeNull();
+  });
+
+  it('is read with the dtypes a document names by one word', () => {
+    expect(decodeCatalogue(catalogue).listedDtypes).toEqual([
+      'Boolean',
+      'Date',
+      'Time',
+      'Null',
+      'String',
+      'Float16',
+      'Float32',
+      'Float64',
+      'Int8',
+      'Int16',
+      'Int32',
+      'Int64',
+      'Int128',
+      'UInt8',
+      'UInt16',
+      'UInt32',
+      'UInt64',
+      'UInt128',
+    ]);
   });
 
   it('is read with a choice, a per-item shape and the kinds of a pair', () => {
@@ -144,6 +183,17 @@ describe('the catalogue the host sends', () => {
     expect(refused.problem).toBe(
       'must be one of "expression", "column", "value", "flag", "choice", "dtype", "duration", "table", "path", "pairs", not "map"',
     );
+  });
+
+  it('is refused where a parameter names a position the tables do not', () => {
+    const over = parameterPath(catalogue, 'Expr.over', 'partition_by');
+    const refused = refusal(
+      replaced(catalogue, [...over, 'position'], { kind: 'nested', name: 'over.by' }),
+    );
+    expect(refused.path).toBe(
+      `$.entries[${String(over[1])}].parameters[${String(over[3])}].position.name`,
+    );
+    expect(refused.problem).toContain('must be one of "over.partition_by"');
   });
 
   it('is refused where the kind of a pair is wrong inside the pair', () => {

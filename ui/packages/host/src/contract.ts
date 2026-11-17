@@ -80,6 +80,15 @@ export type DefaultView =
   | { readonly kind: 'empty' }
   | { readonly kind: 'other' };
 
+/**
+ * A position that holds an expression, as the engine's tables name it: of a
+ * step, or inside an expression. Mirrors `PositionView` in
+ * crates/dageist-tauri/src/catalogue.rs.
+ */
+export type PositionView =
+  | { readonly kind: 'outer'; readonly name: OuterPosition }
+  | { readonly kind: 'nested'; readonly name: NestedPosition };
+
 /** Mirrors `ParameterView` in crates/dageist-tauri/src/catalogue.rs. */
 export interface ParameterView {
   /** Python's name, which identifies the parameter. */
@@ -93,6 +102,11 @@ export interface ParameterView {
   readonly default: DefaultView;
   /** Polars' default as Python writes it, or `null` when it must be given. */
   readonly python: string | null;
+  /**
+   * Where the expression the parameter holds stands, when a named position
+   * holds it; the engine's tables are asked at that place.
+   */
+  readonly position: PositionView | null;
 }
 
 /** What an entry is applied to, mirroring `Applies` in the engine's catalogue; `condition` is one link of `when`, `then` and `otherwise`. */
@@ -133,6 +147,8 @@ export interface CatalogueView {
   readonly families: readonly WordsView[];
   /** Every dtype group. */
   readonly dtypes: readonly WordsView[];
+  /** The dtypes a document names by one word, in the order a list gives them. */
+  readonly listedDtypes: readonly string[];
   /** Every entry, ordered by identifier. */
   readonly entries: readonly EntryView[];
 }
