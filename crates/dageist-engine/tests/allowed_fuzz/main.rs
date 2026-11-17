@@ -20,6 +20,7 @@ mod case;
 mod frames;
 mod generate;
 mod limits;
+mod literal;
 mod masks;
 mod observe;
 mod predict;

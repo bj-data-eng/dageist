@@ -42,6 +42,16 @@ pub fn key_column_index(name: &str) -> Option<usize> {
 pub const OTHER: &str = "other";
 /// The name of the column a probe stands a value of some dtype in with.
 pub const STAND_IN: &str = "p";
+
+/// The name of the `index`th column that stands a value in: [`STAND_IN`], then
+/// `p2`, `p3`.
+pub fn stand_in_column(index: usize) -> String {
+    if index == 0 {
+        STAND_IN.to_owned()
+    } else {
+        format!("{STAND_IN}{}", index + 1)
+    }
+}
 /// The name of the connected table a pivot takes its columns from.
 pub const ON_COLUMNS: &str = "on_h";
 
@@ -162,14 +172,20 @@ impl Frames {
         column.is_null().get(row)
     }
 
-    /// The same tables with a column of the class `class` added to each, under
-    /// the name [`STAND_IN`]: a value of a dtype that a probe needs where the
-    /// case's own tables have none, which Polars cannot fold as it can a literal.
-    pub fn with_stand_in(self, class: Representative) -> Self {
+    /// The same tables with a column of each class added to each, named by
+    /// [`stand_in_column`] in order: values of the dtypes that a probe needs where
+    /// the case's own tables have none, which Polars cannot fold as it can a
+    /// literal.
+    pub fn with_stand_ins(self, classes: &[Representative]) -> Self {
+        let added: Vec<polars::prelude::Column> = classes
+            .iter()
+            .enumerate()
+            .map(|(at, class)| column(*class, &stand_in_column(at)).into())
+            .collect();
         let add = |frame: &DataFrame| {
             frame
-                .hstack(&[column(class, STAND_IN).into()])
-                .expect("a column of three rows beside columns of three rows")
+                .hstack(&added)
+                .expect("columns of three rows beside columns of three rows")
         };
         let rows = add(&self.rows);
         let other_rows = add(&self.other_rows);

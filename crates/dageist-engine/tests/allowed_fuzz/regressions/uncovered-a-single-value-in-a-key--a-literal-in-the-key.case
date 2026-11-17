@@ -1,0 +1,2 @@
+{"a":"Time","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.join","arguments":{"other":{"table":"other"},"on":{"many":[{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":1},"dtype":{"dtype":"UInt32"}}},"then":[{"entry":"Expr.last","arguments":{"ignore_nulls":{"flag":false}}},{"entry":"Expr.is_not_null","arguments":{}},{"entry":"Expr.cum_max","arguments":{"reverse":{"flag":true}}}]}}]},"allow_parallel":{"flag":false},"force_parallel":{"flag":true}}}}]}

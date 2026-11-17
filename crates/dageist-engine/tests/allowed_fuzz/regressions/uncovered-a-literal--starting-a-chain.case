@@ -1,0 +1,2 @@
+{"a":"String","b":"Int64","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.select","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"flag":null},"dtype":{"dtype":"Datetime(time_unit='us', time_zone='UTC')"}}},"then":[{"entry":"Expr.lt","arguments":{"other":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["h"]}}},"then":[]}}}}]}}]}}}}]}

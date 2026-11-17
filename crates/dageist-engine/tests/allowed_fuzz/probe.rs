@@ -26,7 +26,9 @@
 //! for the tables' reason as well ([`Showing::TheSameReason`]):
 //!
 //! - [`settle_on_a_value`]: the refused call, with its arguments, selected on a
-//!   column of the dtype that Polars gave what reaches it, which Polars cannot fold.
+//!   column of the dtype that Polars gave what reaches it, which Polars cannot fold;
+//!   and again with each literal it is given a column of its dtype too, for a
+//!   literal hides what Polars skips as it hides what it evaluates.
 //! - [`settle_as_a_key`]: a refusal that a join's key is not elementwise is of the
 //!   position, so the part that holds the refused call is the whole key of the
 //!   same join, and what comes before the call as a key is not refused for it:
@@ -64,6 +66,7 @@ use dageist_engine::document::{
 
 use super::case::{Case, STEP};
 use super::frames::STAND_IN;
+use super::literal::{call_with_columns, class_of, operand_causes};
 use super::observe::{
     Observed, Refusal, Seen, Tables, is_bare_key, is_the_targets_own, observe_probe,
 };
@@ -407,10 +410,7 @@ pub fn same_reason(source: &Source, tables: &str, probe: &str) -> bool {
 
 /// The tables a probe of the part runs on.
 fn tables_of(found: &Found, stand_in: Option<Representative>) -> Tables {
-    Tables {
-        other_as_left: found.on_the_other_table,
-        stand_in,
-    }
+    Tables::standing(found.on_the_other_table, stand_in.as_slice()).unwrap_or_default()
 }
 
 /// A probe: the part to evaluate, and where in it Polars' refusal may lie.
@@ -610,8 +610,11 @@ fn dtype_reaching(
 /// What this shows is that the tables are right about the call, not that Polars
 /// skipped it: a call that Polars evaluates and accepts, as one that a literal
 /// broadcasts or a null that the sample's rows leave, is a limit's, which is
-/// asked first. `None` when there is nothing to ask, Polars allows the probe,
-/// or it refuses it for another reason or not at the call.
+/// asked first, and the limit for a literal is asked only of the literals that
+/// are why. A literal the call is given that is not, because Polars allows the
+/// call with a column of its dtype as well, is a column in the probe too: it is
+/// asked as written first, and then so. `None` when there is nothing to ask,
+/// Polars allows the probe, or it refuses it for another reason or not at the call.
 pub fn settle_on_a_value(
     case: &Case,
     refused: &Refused,
@@ -638,22 +641,36 @@ pub fn settle_on_a_value(
         "polars.col",
         vec![("name", Value::Columns(vec![STAND_IN.to_owned()]))],
     )?;
-    let part = Expression::new(
-        Start::Call(name),
-        vec![found.expression.links().get(*link)?.clone()],
-    )
-    .ok()?;
-    let probed = Case {
-        receiver: case.receiver,
-        argument: case.argument,
-        document: document_of(case, &found, part, false)?,
-    };
-    let at = place_of_the_part(&found, false).then(Segment::Link(0));
-    let refusal = refused_as(&probed, tables_of(&found, Some(class)), refused, &[at])?;
-    Some(Settled {
-        probe: probed.document.write(),
-        reason: refusal.reason,
-        showing: Showing::TheSameReason,
+    let refused_call = found.expression.links().get(*link)?;
+    // The call as written, and then with each literal it is given a column of its
+    // dtype, which Polars cannot fold or broadcast as it can a literal.
+    let literals = operand_causes(refused_call, &refused.place, false);
+    let literal_classes = literals
+        .iter()
+        .map(|cause| class_of(cause, observed))
+        .collect::<Option<Vec<_>>>();
+    let mut attempts = vec![(refused_call.clone(), vec![class])];
+    if let Some(literal_classes) = literal_classes.filter(|classes| !classes.is_empty()) {
+        let standing: Vec<&Expression> = literals.iter().map(|cause| cause.expression).collect();
+        if let Some(columns) = call_with_columns(refused_call, &standing, 1) {
+            attempts.push((columns, [vec![class], literal_classes].concat()));
+        }
+    }
+    attempts.into_iter().find_map(|(link_call, classes)| {
+        let part = Expression::new(Start::Call(name.clone()), vec![link_call]).ok()?;
+        let probed = Case {
+            receiver: case.receiver,
+            argument: case.argument,
+            document: document_of(case, &found, part, false)?,
+        };
+        let at = place_of_the_part(&found, false).then(Segment::Link(0));
+        let tables = Tables::standing(found.on_the_other_table, &classes)?;
+        let refusal = refused_as(&probed, tables, refused, &[at])?;
+        Some(Settled {
+            probe: probed.document.write(),
+            reason: refusal.reason,
+            showing: Showing::TheSameReason,
+        })
     })
 }
 
@@ -872,10 +889,7 @@ pub fn settle_on_a_value_as_a_key(
     let at = Place::of_step(0, StepId::new(STEP).ok())
         .then(Segment::Parameter(parameter.clone()))
         .then(Segment::Item(0));
-    let tables = Tables {
-        other_as_left: false,
-        stand_in: Some(class),
-    };
+    let tables = Tables::standing(false, &[class])?;
     let refusal = refused_as(&probed, tables, refused, &[at])?;
     Some(Settled {
         probe: probed.document.write(),
@@ -1004,10 +1018,7 @@ pub fn settle_in_the_position(
             document: step_with(case, parameter, part)?,
         })
     };
-    let on = |class: Representative| Tables {
-        other_as_left: false,
-        stand_in: Some(class),
-    };
+    let on = |class: Representative| Tables::standing(false, &[class]).unwrap_or_default();
     // Polars' own plan and rows for the call on a column, selected on its own.
     let selected = Case {
         receiver: case.receiver,
@@ -1380,6 +1391,41 @@ mod tests {
         assert_eq!(on_a_value(&case, &wrong), None);
         let right = refused_at_the_link("`cum_sum` operation not supported for dtype `date`");
         assert!(on_a_value(&case, &right).is_some());
+    }
+
+    #[test]
+    fn a_literal_that_a_call_is_given_is_a_column_of_its_dtype_where_the_call_is_asked_on_a_value()
+    {
+        // `f < null` of `List(String)` in a `then` that no row takes: as written, Polars
+        // folds the comparison with the null literal and allows it. With the null as a
+        // column of its dtype, Polars refuses the comparison as the tables do.
+        let case = kept("stricter-a-literal-compared-in-a-then-no-row-takes.case");
+        let refused = refusal(&case);
+        assert_eq!(settle(&case, &refused), None);
+        let found = on_a_value(&case, &refused).expect("a call that Polars refuses on columns");
+        assert!(
+            found.reason.contains("could not evaluate"),
+            "{}",
+            found.reason
+        );
+        assert!(!found.probe.contains("polars.lit"), "{}", found.probe);
+        assert!(
+            found.probe.contains("\"columns\":[\"p2\"]"),
+            "{}",
+            found.probe
+        );
+    }
+
+    /// `k.eq(1)` of `Int64`, which Polars allows and the tables are said to refuse.
+    const A_COMPARISON_GIVEN_A_LITERAL_OF_ITS_DTYPE: &str = r#"{"a":"Date","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.select","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[{"entry":"Expr.eq","arguments":{"other":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":1},"dtype":{"dtype":"Int64"}}},"then":[]}}}}]}}]}}}}]}"#;
+
+    #[test]
+    fn a_call_that_polars_allows_given_a_column_of_the_literals_dtype_settles_nothing() {
+        let case =
+            Case::decode(A_COMPARISON_GIVEN_A_LITERAL_OF_ITS_DTYPE.as_bytes()).expect("a case");
+        let refused = refused_at_the_link("cannot compare string with numeric type (i64)");
+        assert_eq!(on_a_value(&case, &refused), None);
     }
 
     #[test]

@@ -509,7 +509,8 @@ Polars by hand, and decide which it is:
   is asked as it is written, and Polars refusing that for the tables' reason, at the
   refused call, settles it. Where that does not, the limits are asked next, and then
   the part apart from what surrounds it: the refused call on a column of the dtype
-  that reaches it; a join's key by itself as the key, and the refused call on a
+  that reaches it, and again with each literal it is given a column of its dtype; a
+  join's key by itself as the key, and the refused call on a
   column as the key; for a refusal that is the target's own comparison of a
   call's plan with its rows (no refusal of Polars), the call on a column in the
   position the case holds it, which counts only with the evidence that Polars' plan
@@ -537,7 +538,12 @@ Polars by hand, and decide which it is:
   nulls that the sample's rows leave), which the probes do not show: add or
   extend a `Limit` in `allowed_fuzz/limits.rs`, with the sentence that says what
   the tables were not measured on, and say it in
-  [the explanation](explanation.md#what-the-tables-are-checked-against). Keep the
+  [the explanation](explanation.md#what-the-tables-are-checked-against). A limit
+  excuses a case only where it is the cause, so where the feature it is about may be
+  there beside another cause (a literal beside a part Polars skips), gate it on the
+  case run again without the feature, as the limits for an `explode` and for a
+  literal do, and show it with a case that has the cause and one that differs in
+  that alone. Keep the
   case as `regressions/uncovered-<limit>.case`, which the normal run replays and
   expects the limit to excuse; every limit has one. A limit may have others, filed as
   `regressions/uncovered-<limit>--<what it shows>.case`.
