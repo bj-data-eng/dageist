@@ -1,0 +1,290 @@
+{
+  "status": "run",
+  "source": [
+    {
+      "name": "dcn",
+      "dtype": "String"
+    },
+    {
+      "name": "timestamp",
+      "dtype": "Datetime(us)"
+    },
+    {
+      "name": "step_to",
+      "dtype": "String"
+    },
+    {
+      "name": "owner",
+      "dtype": "String"
+    },
+    {
+      "name": "row_days",
+      "dtype": "Int64"
+    }
+  ],
+  "steps": [
+    {
+      "id": "sort",
+      "lazy": true,
+      "outcome": {
+        "status": "valid",
+        "columns": [
+          {
+            "name": "dcn",
+            "dtype": "String"
+          },
+          {
+            "name": "timestamp",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "step_to",
+            "dtype": "String"
+          },
+          {
+            "name": "owner",
+            "dtype": "String"
+          },
+          {
+            "name": "row_days",
+            "dtype": "Int64"
+          }
+        ]
+      },
+      "expressions": [
+        {
+          "place": {
+            "stepIndex": 0,
+            "stepId": "sort",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "by"
+              },
+              {
+                "kind": "item",
+                "index": 0
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "String"
+          },
+          "links": []
+        }
+      ],
+      "walk": {
+        "expressions": [
+          {
+            "place": {
+              "stepIndex": 0,
+              "stepId": "sort",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "by"
+                },
+                {
+                  "kind": "item",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "sort",
+              "nested": null
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "String",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "sort",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "many"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          }
+        ],
+        "refusal": null,
+        "notKnown": null
+      }
+    },
+    {
+      "id": "later",
+      "lazy": true,
+      "outcome": {
+        "status": "incomplete",
+        "place": {
+          "stepIndex": 1,
+          "stepId": "later",
+          "path": [
+            {
+              "kind": "parameter",
+              "name": "named_exprs"
+            },
+            {
+              "kind": "value",
+              "index": 0
+            },
+            {
+              "kind": "link",
+              "index": 0
+            },
+            {
+              "kind": "parameter",
+              "name": "n"
+            },
+            {
+              "kind": "start"
+            }
+          ]
+        }
+      },
+      "expressions": [],
+      "walk": {
+        "expressions": [
+          {
+            "place": {
+              "stepIndex": 1,
+              "stepId": "later",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "link",
+                  "index": 0
+                },
+                {
+                  "kind": "parameter",
+                  "name": "n"
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": null
+            },
+            "calls": [
+              {
+                "follows": null,
+                "verdict": null
+              }
+            ],
+            "places": [null],
+            "ending": null
+          },
+          {
+            "place": {
+              "stepIndex": 1,
+              "stepId": "later",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": null
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Datetime(us)",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "value",
+                  "dtype": "Datetime(us)",
+                  "shape": "many"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Datetime(us)",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Datetime(us)",
+                  "shape": "many"
+                }
+              },
+              null
+            ],
+            "ending": null
+          }
+        ],
+        "refusal": null,
+        "notKnown": "step \"later\", named_exprs entry 1 value, link 1: the dtype of an argument of Expr.shift is not known"
+      }
+    },
+    {
+      "id": "after",
+      "lazy": true,
+      "outcome": {
+        "status": "notRun",
+        "blockedBy": "later"
+      },
+      "expressions": [],
+      "walk": {
+        "expressions": [],
+        "refusal": null,
+        "notKnown": null
+      }
+    }
+  ]
+}

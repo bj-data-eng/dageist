@@ -82,6 +82,9 @@ pub enum RunCause {
     /// `element` outside a pivot's aggregate. Polars decides the rest, as it
     /// builds.
     NotAllowed(Refusal),
+    /// The step holds a hole: something the editor has not picked yet. The
+    /// step was not built.
+    Incomplete,
     /// Polars refused the step when it worked out its schema.
     Polars(PolarsError),
 }
@@ -95,6 +98,7 @@ impl fmt::Display for RunCause {
             }
             Self::Build(error) => error.fmt(formatter),
             Self::NotAllowed(refusal) => refusal.fmt(formatter),
+            Self::Incomplete => formatter.write_str("something in the step is still to be picked"),
             Self::Polars(error) => error.fmt(formatter),
         }
     }
@@ -155,6 +159,12 @@ pub enum Outcome {
     },
     /// The step was refused.
     Refused(StepRefusal),
+    /// The step holds a hole, where the editor has not picked something yet,
+    /// so it was walked up to it and not built. A step after it is not run.
+    Incomplete {
+        /// The start of the expression that is a hole.
+        place: Place,
+    },
     /// A step before it was refused, so it was not run.
     NotRun {
         /// The first step that was refused.
@@ -312,7 +322,13 @@ impl Document {
                 }
                 Err(refusal) => {
                     blocked_by = Some(id.clone());
-                    Outcome::Refused(refusal)
+                    if matches!(*refusal.cause, RunCause::Incomplete) {
+                        Outcome::Incomplete {
+                            place: refusal.place,
+                        }
+                    } else {
+                        Outcome::Refused(refusal)
+                    }
                 }
             };
             steps.push(StepReport {
@@ -395,6 +411,17 @@ fn run_step(
     } else {
         Walk::default()
     };
+    // A step with a hole is not built: it is walked, and says where it is incomplete.
+    if let Some(path) = step.first_hole() {
+        return StepRun {
+            result: Err(StepRefusal {
+                place: path.into_iter().fold(base, Place::then),
+                cause: Box::new(RunCause::Incomplete),
+            }),
+            expressions: Vec::new(),
+            walk,
+        };
+    }
     let frame = match builder.step(step.call(), input) {
         Ok(frame) => frame,
         Err(stop) => {
@@ -620,6 +647,8 @@ impl Builder<'_> {
                 Some(literal) => Built::Expr(literal),
                 None => return self.stop(RunCause::UnknownInput(name.clone())),
             },
+            // A step with a hole is not built.
+            Start::Hole => return self.stop(RunCause::Incomplete),
             Start::Call(call) => {
                 self.stands_here(call)?;
                 let arguments = self.arguments(call)?;

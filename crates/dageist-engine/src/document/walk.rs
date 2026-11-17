@@ -559,7 +559,7 @@ impl Walker<'_> {
                 start_arguments = self.arguments(start, values_end);
                 self.path.pop();
             }
-            Start::Input(_) => {}
+            Start::Input(_) | Start::Hole => {}
         }
         let Some(context) = context else {
             self.blind("no named position holds the expression");
@@ -618,6 +618,14 @@ impl Walker<'_> {
                     verdict: Some(verdict),
                 });
                 self.path.pop();
+            }
+            Start::Hole => {
+                // Nothing is picked, so nothing is asked of what follows.
+                calls.push(Standing::not_asked());
+                cur = Cur::Value {
+                    dtype: None,
+                    shape: Shape::Many,
+                };
             }
             Start::Input(name) => {
                 cur = Cur::Value {
@@ -1029,7 +1037,7 @@ fn calls_of(expression: &Expression) -> impl Iterator<Item = &Call> {
     std::iter::once(expression.start())
         .filter_map(|start| match start {
             Start::Call(call) => Some(call),
-            Start::Input(_) => None,
+            Start::Input(_) | Start::Hole => None,
         })
         .chain(expression.links())
 }
@@ -1083,7 +1091,7 @@ fn holds_an_aggregate(expression: &Expression) -> bool {
         |call: &Call| is_one_value(call) || operands(call).into_iter().any(holds_an_aggregate);
     let start = match expression.start() {
         Start::Call(call) => Some(call),
-        Start::Input(_) => None,
+        Start::Input(_) | Start::Hole => None,
     };
     let links = expression.links();
     let Some(first) = (0..links.len()).find(|at| is_reached_by_a_null(expression, *at)) else {
@@ -1113,7 +1121,7 @@ fn reads_a_column(expression: &Expression) -> bool {
     let calls = std::iter::once(expression.start())
         .filter_map(|start| match start {
             Start::Call(call) => Some(call),
-            Start::Input(_) => None,
+            Start::Input(_) | Start::Hole => None,
         })
         .chain(expression.links());
     matches!(
@@ -1147,7 +1155,7 @@ fn starts_from_a_null(expression: &Expression) -> bool {
 fn holds_a_null_comparison(expression: &Expression) -> bool {
     let start = match expression.start() {
         Start::Call(call) => Some(call),
-        Start::Input(_) => None,
+        Start::Input(_) | Start::Hole => None,
     };
     let mut reads = matches!(
         start,

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { ExpressionDtypesView, RunView, SegmentView, StepReportView } from './contract';
 import { DecodeError } from './decode';
 import { decodeRun } from './decode-run';
+import incompleteFixture from '../fixtures/step-report-incomplete.json';
 import refusedFixture from '../fixtures/step-report-refused.json';
 import reportFixture from '../fixtures/step-report.json';
 import unreadableFixture from '../fixtures/step-report-unreadable.json';
@@ -239,6 +240,43 @@ describe('the report of a document with a step Polars refuses', () => {
   });
 });
 
+describe('the report of a document with a step that holds something still to be picked', () => {
+  const run = decodeRun(incompleteFixture);
+  const steps = run.status === 'run' ? run.steps : [];
+
+  it('says the step is incomplete at the start of the expression that is a hole', () => {
+    expect(steps.map((step) => step.outcome.status)).toEqual(['valid', 'incomplete', 'notRun']);
+    expect(steps[1]?.outcome).toEqual({
+      status: 'incomplete',
+      place: {
+        stepIndex: 1,
+        stepId: 'later',
+        path: [
+          { kind: 'parameter', name: 'named_exprs' },
+          { kind: 'value', index: 0 },
+          { kind: 'link', index: 0 },
+          { kind: 'parameter', name: 'n' },
+          { kind: 'start' },
+        ],
+      },
+    });
+  });
+
+  it('says the next step was not run, and because of which', () => {
+    expect(steps[2]?.outcome).toEqual({ status: 'notRun', blockedBy: 'later' });
+  });
+
+  it('walks the incomplete step up to the hole: the shift stands after a timestamp', () => {
+    const value = steps[1]?.walk.expressions.find(
+      (expression) => expression.place.path.length === 2,
+    );
+    expect(value?.places[0]).toEqual({
+      context: { outer: 'select', nested: null },
+      after: { kind: 'value', dtype: 'Datetime(us)', shape: 'many' },
+    });
+  });
+});
+
 describe('the report of text that is not a document', () => {
   it('has the place and the reason, and no steps', () => {
     expect(decodeRun(unreadable)).toEqual({
@@ -323,6 +361,7 @@ describe('the report built by hand for the variants no document gives together',
   it('reads each cause a step can be refused with', () => {
     expect(refusedCause('unknown_table')).toEqual({ kind: 'unknownTable', name: 'nope' });
     expect(refusedCause('unknown_input')).toEqual({ kind: 'unknownInput', name: 'none' });
+    expect(refusedCause('incomplete')).toEqual({ kind: 'incomplete' });
     expect(refusedCause('build')).toEqual({ kind: 'build', reason: 'a parameter is missing' });
     expect(refusedCause('rule')).toEqual({
       kind: 'notAllowed',
@@ -353,7 +392,7 @@ describe('a report that is not what the host sends', () => {
       '$.status: must be one of "run", "unreadable", not "halted"',
     );
     expect(refusal(replaced(report, ['steps', 3, 'outcome', 'status'], 'skipped')).message).toBe(
-      '$.steps[3].outcome.status: must be one of "valid", "refused", "notRun", not "skipped"',
+      '$.steps[3].outcome.status: must be one of "valid", "refused", "incomplete", "notRun", not "skipped"',
     );
   });
 

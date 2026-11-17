@@ -432,6 +432,8 @@ enum CauseView {
     Build { reason: String },
     /// A named rule does not let a call stand where it does.
     NotAllowed { refusal: RefusalView },
+    /// The step holds something still to be picked.
+    Incomplete,
     /// Polars refused, with this reason.
     Polars { reason: String },
 }
@@ -446,6 +448,7 @@ fn cause_view(cause: &RunCause) -> CauseView {
         RunCause::NotAllowed(refusal) => CauseView::NotAllowed {
             refusal: refusal_view(refusal),
         },
+        RunCause::Incomplete => CauseView::Incomplete,
         RunCause::Polars(error) => CauseView::Polars {
             reason: error.to_string(),
         },
@@ -461,7 +464,10 @@ enum OutcomeView {
     /// The step was refused, here, for this reason.
     #[serde(rename_all = "camelCase")]
     Refused { place: PlaceView, cause: CauseView },
-    /// A step before it was refused, so it was not run.
+    /// The step holds something still to be picked, here, so it was walked up
+    /// to it and not built.
+    Incomplete { place: PlaceView },
+    /// A step before it was refused or incomplete, so it was not run.
     #[serde(rename_all = "camelCase")]
     NotRun { blocked_by: String },
 }
@@ -474,6 +480,9 @@ fn outcome_view(outcome: &Outcome) -> OutcomeView {
         Outcome::Refused(refusal) => OutcomeView::Refused {
             place: place_view(refusal.place()),
             cause: cause_view(refusal.cause()),
+        },
+        Outcome::Incomplete { place } => OutcomeView::Incomplete {
+            place: place_view(place),
         },
         Outcome::NotRun { blocked_by } => OutcomeView::NotRun {
             blocked_by: blocked_by.as_str().to_owned(),

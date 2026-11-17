@@ -295,6 +295,7 @@ const readCause: Decode<CauseView> = readTagged<CauseView>('kind', {
       refusal: readField(fields, path, 'refusal', readRefusal),
     }),
   },
+  incomplete: { fields: [], read: () => ({ kind: 'incomplete' }) },
   polars: {
     fields: ['reason'],
     read: (fields, path) => ({
@@ -318,6 +319,13 @@ const readOutcome: Decode<OutcomeView> = readTagged<OutcomeView>('status', {
       status: 'refused',
       place: readField(fields, path, 'place', readPlace),
       cause: readField(fields, path, 'cause', readCause),
+    }),
+  },
+  incomplete: {
+    fields: ['place'],
+    read: (fields, path) => ({
+      status: 'incomplete',
+      place: readField(fields, path, 'place', readPlace),
     }),
   },
   notRun: {

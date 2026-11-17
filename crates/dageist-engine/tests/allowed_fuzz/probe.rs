@@ -141,7 +141,7 @@ fn find<'a>(case: &'a Case, place: &'a Place) -> Option<Found<'a>> {
             (Node::Value(Value::Pairs(pairs)), Segment::Value(item)) => enter(&pairs.get(*item)?.1),
             (Node::Expression(expression), Segment::Start) => match expression.start() {
                 Start::Call(call) => Node::Call(call),
-                Start::Input(_) => return None,
+                Start::Input(_) | Start::Hole => return None,
             },
             (Node::Expression(expression), Segment::Link(link)) => {
                 Node::Call(expression.links().get(*link)?)

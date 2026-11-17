@@ -387,6 +387,8 @@ export type CauseView =
   | { readonly kind: 'build'; readonly reason: string }
   /** A named rule does not let a call stand where it does. */
   | { readonly kind: 'notAllowed'; readonly refusal: RefusalView }
+  /** The step holds something still to be picked. */
+  | { readonly kind: 'incomplete' }
   /** Polars refused, with this reason. */
   | { readonly kind: 'polars'; readonly reason: string };
 
@@ -396,7 +398,13 @@ export type OutcomeView =
   | { readonly status: 'valid'; readonly columns: readonly FieldView[] }
   /** The step was refused, here, for this reason. */
   | { readonly status: 'refused'; readonly place: PlaceView; readonly cause: CauseView }
-  /** A step before it was refused, so it was not run. */
+  /**
+   * The step holds something still to be picked, at this place, which is the
+   * start of the expression that is a hole. It was walked up to it and not
+   * built.
+   */
+  | { readonly status: 'incomplete'; readonly place: PlaceView }
+  /** A step before it was refused or incomplete, so it was not run. */
   | { readonly status: 'notRun'; readonly blockedBy: string };
 
 /** What running one step reported. Mirrors `StepReportView` in crates/dageist-tauri/src/report.rs. */

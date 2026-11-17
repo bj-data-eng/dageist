@@ -142,6 +142,8 @@ function causeWords(cause: CauseView): string {
       return firstParagraph(cause.reason);
     case 'notAllowed':
       return cause.refusal.reason;
+    case 'incomplete':
+      return 'Something in this step is still to be picked.';
     case 'polars':
       return firstParagraph(cause.reason);
     default:
@@ -309,6 +311,15 @@ function fromReport(
         wrong: found === null ? NO_WORDS : new Set([wrongId(found)]),
       };
     }
+    case 'incomplete':
+      return {
+        ...base,
+        status: 'refused',
+        after: before,
+        added: [],
+        problem: 'Something in this step is still to be picked.',
+        wrong: NO_WORDS,
+      };
     case 'notRun':
       return {
         ...base,

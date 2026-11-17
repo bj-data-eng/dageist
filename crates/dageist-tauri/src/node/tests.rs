@@ -102,6 +102,39 @@ fn refused_text() -> String {
     .to_string()
 }
 
+/// A sort, a column whose shift is by something still to be picked, and a step that is never
+/// run.
+fn incomplete_text() -> String {
+    let column = |name: &str| {
+        json!({ "expression": { "start": {
+            "entry": "polars.col",
+            "arguments": { "name": { "columns": [name] } }
+        }, "then": [] } })
+    };
+    json!({ "version": 1, "steps": [
+        { "id": "sort", "call": { "entry": "LazyFrame.sort", "arguments": {
+            "by": { "many": [column("dcn")] }
+        } } },
+        { "id": "later", "call": { "entry": "LazyFrame.with_columns", "arguments": {
+            "named_exprs": { "pairs": [[
+                { "columns": ["earlier"] },
+                { "expression": { "start": {
+                    "entry": "polars.col",
+                    "arguments": { "name": { "columns": ["timestamp"] } }
+                }, "then": [{ "entry": "Expr.shift", "arguments": {
+                    "n": { "expression": { "start": { "hole": null }, "then": [] } }
+                } }] } }
+            ]] }
+        } } },
+        { "id": "after", "call": { "entry": "LazyFrame.with_columns", "arguments": {
+            "named_exprs": { "pairs": [[
+                { "columns": ["days"] }, column("row_days")
+            ]] }
+        } } }
+    ] })
+    .to_string()
+}
+
 fn the_field(name: &str, dtype: &str) -> Value {
     json!({ "name": name, "dtype": dtype })
 }
@@ -261,6 +294,55 @@ fn a_step_polars_refuses_is_reported_at_its_link_and_the_next_is_not_run() {
     assert_eq!(walk["refusal"]["place"], refused["place"]);
     assert_eq!(walk["refusal"]["atEnd"], false);
     assert_eq!(walk["refusal"]["refusal"]["source"]["by"], "polars");
+}
+
+#[test]
+fn a_step_with_something_still_to_be_picked_is_incomplete_at_it_and_the_next_is_not_run() {
+    let answer =
+        invoke("run_document", json!({ "document": incomplete_text() })).expect("a report");
+    let steps = &answer["steps"];
+    assert_eq!(steps[0]["outcome"]["status"], "valid");
+    // The shift's argument `n`, whose start is the hole, in the first link of the pair's value.
+    assert_eq!(
+        steps[1]["outcome"],
+        json!({
+            "status": "incomplete",
+            "place": {
+                "stepIndex": 1,
+                "stepId": "later",
+                "path": [
+                    { "kind": "parameter", "name": "named_exprs" },
+                    { "kind": "value", "index": 0 },
+                    { "kind": "link", "index": 0 },
+                    { "kind": "parameter", "name": "n" },
+                    { "kind": "start" }
+                ]
+            }
+        })
+    );
+    // The step is walked up to the hole: the shift stands after a timestamp, for each row.
+    let walked = &steps[1]["walk"]["expressions"];
+    let item = walked
+        .as_array()
+        .expect("expressions")
+        .iter()
+        .find(|expression| {
+            expression["place"]["path"]
+                .as_array()
+                .is_some_and(|path| path.len() == 2)
+        })
+        .expect("the value");
+    assert_eq!(
+        item["places"][0],
+        json!({
+            "context": { "outer": "select", "nested": null },
+            "after": { "kind": "value", "dtype": "Datetime(us)", "shape": "many" }
+        })
+    );
+    assert_eq!(
+        steps[2]["outcome"],
+        json!({ "status": "notRun", "blockedBy": "later" })
+    );
 }
 
 #[test]
@@ -433,7 +515,7 @@ fn a_refused_step_is_rejected_as_refused_and_the_step_after_it_as_not_run() {
 
 #[test]
 fn the_snapshots_are_what_the_commands_return() {
-    let snapshots: [(&str, Value); 8] = [
+    let snapshots: [(&str, Value); 9] = [
         ("node-inputs.json", json(&node_view().expect("the node"))),
         (
             "step-document.json",
@@ -446,6 +528,10 @@ fn the_snapshots_are_what_the_commands_return() {
         (
             "step-report-refused.json",
             json(&run_view(&refused_text()).expect("a report")),
+        ),
+        (
+            "step-report-incomplete.json",
+            json(&run_view(&incomplete_text()).expect("a report")),
         ),
         (
             "step-report-unreadable.json",

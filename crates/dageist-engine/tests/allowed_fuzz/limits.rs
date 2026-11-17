@@ -260,7 +260,7 @@ fn any_call(expression: &Expression, found: &dyn Fn(&Call) -> bool) -> bool {
     let calls = std::iter::once(expression.start())
         .filter_map(|start| match start {
             Start::Call(call) => Some(call),
-            Start::Input(_) => None,
+            Start::Input(_) | Start::Hole => None,
         })
         .chain(expression.links());
     calls.into_iter().any(|call| {
@@ -424,7 +424,7 @@ fn locate<'a>(case: &'a Case, place: &Place) -> Locus<'a> {
                 }
                 node = match expression.start() {
                     Start::Call(call) => Node::Call(call),
-                    Start::Input(_) => return locus,
+                    Start::Input(_) | Start::Hole => return locus,
                 };
                 continue;
             }
@@ -549,7 +549,7 @@ fn keys(case: &Case, joins: bool) -> Vec<(Place, &Expression)> {
     ) {
         let starts = match expression.start() {
             Start::Call(call) => Some((call, place.clone().then(Segment::Start))),
-            Start::Input(_) => None,
+            Start::Input(_) | Start::Hole => None,
         };
         let links = expression
             .links()
@@ -604,7 +604,7 @@ fn holds_a_null_comparison(key: &Expression) -> bool {
         let calls = std::iter::once(expression.start())
             .filter_map(|start| match start {
                 Start::Call(call) => Some(call),
-                Start::Input(_) => None,
+                Start::Input(_) | Start::Hole => None,
             })
             .chain(expression.links());
         compares(expression)
@@ -622,7 +622,7 @@ fn window_over_a_window(expression: &Expression) -> bool {
     let calls: Vec<&Call> = std::iter::once(expression.start())
         .filter_map(|start| match start {
             Start::Call(call) => Some(call),
-            Start::Input(_) => None,
+            Start::Input(_) | Start::Hole => None,
         })
         .chain(expression.links())
         .collect();

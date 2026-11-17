@@ -155,6 +155,7 @@ pub(crate) fn variants() -> RunView {
                     name: "none".to_owned(),
                 },
             ),
+            refused("incomplete", CauseView::Incomplete),
             refused(
                 "build",
                 CauseView::Build {
