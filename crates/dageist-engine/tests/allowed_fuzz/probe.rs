@@ -5,13 +5,28 @@
 //! decides a condition by a constant, drops a sort key that is one value, runs a
 //! window's keys on groups. Where the tables refuse a part and Polars allows the
 //! step, the target does not model what Polars skips. It asks Polars about the
-//! part alone, in a document where the part must be evaluated: the chain through
-//! a refused link selected on its own, a condition with a refused predicate and
-//! literal values selected on its own, either in the same input and, for a part
-//! of a pivot's aggregate, in the same pivot. When Polars refuses that for the
-//! reason the tables gave, the tables are stricter by design where Polars does not
-//! evaluate the part; when it allows it, or refuses it for another reason, the
-//! disagreement is a finding.
+//! part in a document where the part must be evaluated, in the order [`settle`],
+//! the limits, [`settle_apart`]:
+//!
+//! - [`settle`]: the part as written, alone: the chain through a refused link
+//!   selected on its own, a condition with a refused predicate and literal values
+//!   selected on its own, either in the same input and, for a part of a pivot's
+//!   aggregate, in the same pivot. Polars refusing it shows the tables right for
+//!   the part it was asked to evaluate.
+//! - [`settle_on_a_value`]: Polars folds some chains as they are written, so what
+//!   follows is not evaluated in the probe either. The refused call, with its
+//!   arguments, is selected on a column of the dtype that Polars gave what reaches
+//!   it, which Polars cannot fold.
+//! - [`settle_as_a_key`]: a refusal that a join's key is not elementwise is of the
+//!   position, so the part that holds the refused call is the whole key of the
+//!   same join.
+//!
+//! The last two do not tell what Polars skips from what it evaluates on a value
+//! that hides the refusal, which a limit names, so the limits are asked before
+//! them. When Polars refuses a probe for the reason the tables gave, at the
+//! refused call, the tables are stricter by design where Polars does not evaluate
+//! the part; when it allows it, refuses it for another reason or at another call,
+//! the disagreement is a finding.
 
 use dageist_engine::allowed::Representative;
 use dageist_engine::catalog;

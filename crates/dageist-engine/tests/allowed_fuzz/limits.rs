@@ -21,12 +21,15 @@
 //! depend on the order the limits are asked in, and a case that two apply to is
 //! excused by both.
 //!
-//! A limit is for a disagreement a probe cannot settle. Where the tables refuse a
-//! part and Polars allows the step, the target first asks Polars about the part
-//! alone ([`super::probe`]): a part that Polars does not evaluate is not a limit
-//! of the tables, for the editor holds every part to its types. A limit is for
-//! the other direction, where the tables allow and Polars refuses, and for what
-//! Polars evaluates and accepts, which no probe of the part shows.
+//! A limit is never for a part Polars skips. Where the tables refuse a part and
+//! Polars allows the step, the target first asks Polars about the part as it is
+//! written ([`super::probe`]): a part that Polars does not evaluate is not a limit
+//! of the tables, for the editor holds every part to its types. A limit is for what
+//! Polars evaluates and accepts, which the part alone does not show, such as a
+//! literal it broadcasts or the nulls that the sample's rows leave, and for the
+//! other direction, where the tables allow and Polars refuses. The limits are
+//! asked after the part as written and before the probes apart from the case,
+//! which cannot tell what Polars evaluates from what it skips.
 
 use dageist_engine::document::{Call, Expression, Place, Segment, Start, Value};
 
