@@ -41,12 +41,6 @@ function firstCall(steps: readonly Step[]): {
   return { entry: at(call, ['entry']), arguments: at(call, ['arguments']) };
 }
 
-/** The number of steps the document `steps` are written as holds. */
-function stepsWritten(steps: readonly Step[]): number {
-  const found = at(written(steps), ['steps']);
-  return Array.isArray(found) ? found.length : -1;
-}
-
 /** The arguments the start of the expression of a column added with `value` is given. */
 function startOfColumnHolding(value: Value): unknown {
   const arguments_ = firstCall([adding('x', value)]).arguments;
@@ -136,7 +130,9 @@ describe('a step of the editor', () => {
 });
 
 describe('what the document cannot hold', () => {
-  it('holds back a step with something still to be picked, and every step after it waits', () => {
+  it('writes a hole where an expression is still to be picked, and still sends the steps after it', () => {
+    // The engine stops at the hole, says where it is and does not run what comes after, so the
+    // editor sends every step and the engine says why the later ones wait.
     const steps: Step[] = [
       adding('first', col('a')),
       adding('second', UNSET_VALUE),
@@ -145,13 +141,32 @@ describe('what the document cannot hold', () => {
 
     const result = translate(catalogue, steps);
 
-    expect(result.steps.map((step) => step.kind)).toEqual(['sent', 'held', 'waiting']);
-    const [, held, waiting] = result.steps;
-    expect(held).toMatchObject({ problem: { cause: 'unset', message: 'Pick a value.' } });
-    expect(waiting).toEqual({ kind: 'waiting', blockedBy: 'second' });
-    // The document holds the steps before the one that is held.
-    expect(stepsWritten(steps.slice(0, 1))).toBe(1);
-    expect(at(JSON.parse(result.text), ['steps'])).toHaveLength(1);
+    expect(result.steps.map((step) => step.kind)).toEqual(['sent', 'sent', 'sent']);
+    expect(at(JSON.parse(result.text), ['steps'])).toHaveLength(3);
+    const second = result.steps[1];
+    expect(
+      at(JSON.parse(result.text), [
+        'steps',
+        1,
+        'call',
+        'arguments',
+        'named_exprs',
+        'pairs',
+        0,
+        1,
+        'expression',
+        'start',
+      ]),
+    ).toEqual({ hole: null });
+    // The hole's place, as the engine reports it, says what is to be picked.
+    expect(second).toMatchObject({
+      holes: new Map([
+        [
+          'parameter:named_exprs/value:0/start',
+          { cause: 'unset', message: 'Pick a value.', wrong: [] },
+        ],
+      ]),
+    });
   });
 
   it('holds back a step whose name is empty', () => {
@@ -224,7 +239,7 @@ describe('what the document cannot hold', () => {
     });
   });
 
-  it('holds back a method whose argument is still to be picked, naming the method', () => {
+  it('writes a hole for a method whose argument is still to be picked, naming the method', () => {
     const step = adding('x', {
       kind: 'chain',
       id: 'c1',
@@ -234,9 +249,46 @@ describe('what the document cannot hold', () => {
       },
     });
 
-    expect(translate(catalogue, [step]).steps[0]).toMatchObject({
-      kind: 'held',
-      problem: { cause: 'unset', wrong: [wrongId({ kind: 'method', methodId: 'm1' })] },
+    const [sent] = translate(catalogue, [step]).steps;
+
+    expect(sent).toMatchObject({
+      kind: 'sent',
+      holes: new Map([
+        [
+          'parameter:named_exprs/value:0/link:0/parameter:n/start',
+          {
+            cause: 'unset',
+            message: 'Give shift a value or a field (rows).',
+            wrong: [wrongId({ kind: 'method', methodId: 'm1' })],
+          },
+        ],
+      ]),
+    });
+  });
+
+  it('writes a hole for the field a chain starts from when none is picked yet', () => {
+    const step = adding('x', {
+      kind: 'chain',
+      id: 'c1',
+      chain: {
+        source: { kind: 'column', column: '' },
+        methods: [{ id: 'm1', name: 'cum_count', argument: null, options: NO_OPTIONS }],
+      },
+    });
+
+    const [sent] = translate(catalogue, [step]).steps;
+
+    expect(sent).toMatchObject({
+      holes: new Map([
+        [
+          'parameter:named_exprs/value:0/start',
+          {
+            cause: 'unset',
+            message: 'Pick the field the chain starts from.',
+            wrong: [wrongId({ kind: 'start', chainId: 'c1' })],
+          },
+        ],
+      ]),
     });
   });
 });

@@ -6,6 +6,7 @@ import catalogueFixture from '../../../host/fixtures/catalogue.json';
 import nodeFixture from '../../../host/fixtures/node-inputs.json';
 import refusedFixture from '../../../host/fixtures/step-report-refused.json';
 import reportFixture from '../../../host/fixtures/step-report.json';
+import incompleteFixture from '../../../host/fixtures/step-report-incomplete.json';
 import unreadableFixture from '../../../host/fixtures/step-report-unreadable.json';
 import { START } from '../start';
 import type { Catalogue } from './catalogue';
@@ -497,5 +498,60 @@ describe('a report of steps that have been edited since', () => {
     );
 
     expect(prepared.steps[0]?.status).toBe('unknown');
+  });
+});
+
+describe('a step with something still to be picked', () => {
+  // A sort, a column that is the timestamp shifted by something still to be picked, and a column
+  // after it: the engine says the second is incomplete and the third was not run.
+  const steps: Step[] = [
+    { id: 'sort', verb: 'sort', options: { by: fieldKeys(['dcn']) } },
+    {
+      id: 'later',
+      verb: 'with_columns',
+      alias: 'earlier',
+      value: {
+        kind: 'chain',
+        id: 'chain-later',
+        chain: {
+          source: { kind: 'column', column: 'timestamp' },
+          methods: [
+            { id: 'method-shift', name: 'shift', argument: { kind: 'unset' }, options: NO_OPTIONS },
+          ],
+        },
+      },
+      options: NO_OPTIONS,
+    },
+    {
+      id: 'after',
+      verb: 'with_columns',
+      alias: 'days',
+      value: { kind: 'column', column: 'row_days' },
+      options: NO_OPTIONS,
+    },
+  ];
+  const translation = translate(catalogue, steps);
+  const prepared = prepareRun(
+    steps,
+    translation,
+    answeredFor(translation, decodeRun(incompleteFixture)),
+    source,
+  );
+
+  it('is said to be incomplete, with what is to be picked, on the word that is the matter', () => {
+    expect(prepared.steps.map((step) => step.status)).toEqual(['valid', 'refused', 'notRun']);
+    const later = stepOf(prepared, 'later');
+    expect(later.problem).toBe('Give shift a value or a field (rows).');
+    expect([...later.wrong]).toEqual([wrongId({ kind: 'method', methodId: 'method-shift' })]);
+  });
+
+  it('keeps the places of the chain before the hole, where the argument would stand', () => {
+    const chain = stepOf(prepared, 'later').chains.get('chain-later');
+    // The shift stands after the timestamp, for each row.
+    expect(chain?.places[0]).toEqual(selectAfter('Datetime(us)', 'many'));
+  });
+
+  it('says why the step after it was not run', () => {
+    expect(stepOf(prepared, 'after').problem).toBe('Not run: step 2 cannot be run yet.');
   });
 });
