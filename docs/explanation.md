@@ -643,7 +643,8 @@ backticks), without the dtypes and column names it quotes, and for a rule that a
 predicate be a `Boolean` by Polars' words for it. A refusal that Polars places must
 lie at the refused call or predicate. One it does not place, as the refusal of rows,
 counts only when the part before the refused call, alone (for a key, as the key), is
-not refused for the same reason. So a probe is not settled by an objection to another
+not refused for the same reason; for a call in an argument of a key's call, the part
+before it in the argument counts too, in the key with the argument cut there. So a probe is not settled by an objection to another
 call. What the target says of a schema is neither the tables' reason nor a probe's
 for these two, and is settled only by the evidence above. That evidence ties the
 refusal to the mismatch by what goes with it, not by what Polars says: the mismatch,
