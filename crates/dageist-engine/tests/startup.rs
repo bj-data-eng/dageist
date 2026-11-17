@@ -206,6 +206,36 @@ fn files_under(directory: &Path) -> Vec<PathBuf> {
     files
 }
 
+/// How many frames the spill test spills. With the memory budget far below them, nearly all
+/// are written to disk, so that the cleaner has many files to delete when they are dropped and
+/// is still deleting them when the session ends, unless the session waits for it.
+const FRAMES: i64 = 300;
+
+/// How many times the spill test tries to find files the cleaner has not yet deleted.
+const ROUNDS: usize = 50;
+
+/// Spills frames to disk, and returns them once files are in `directory`.
+fn spill_some_frames(directory: &Path) -> Vec<SpillFrame> {
+    let context = LeastRecentSpillContext::new("startup-test".into(), None);
+    let frames: Vec<_> = (0..FRAMES)
+        .map(|number| {
+            let values: Vec<i64> = (0..100_000).map(|value| value + number).collect();
+            let frame = df!("value" => values).expect("a table");
+            SpillFrame::new_blocking(frame, &context)
+        })
+        .collect();
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while files_under(directory).is_empty() {
+        assert!(
+            Instant::now() < deadline,
+            "nothing was spilled to {}",
+            directory.display()
+        );
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    frames
+}
+
 #[test]
 fn files_spilled_to_disk_are_gone_when_the_session_ends() {
     let spill = Directory::named("spill");
@@ -223,30 +253,28 @@ fn files_spilled_to_disk_are_gone_when_the_session_ends() {
             let directory = PathBuf::from(
                 std::env::var(SPILL_DIRECTORY).expect("the process is given a spill directory"),
             );
-            let session = PolarsSession::start();
+            // The cleaner deletes a file as soon as it is asked to, and a round that finds
+            // it has already deleted them all shows nothing of the flush. Rounds go on
+            // until one finds files still there at the moment the session is dropped, and
+            // that round must then find none after it.
+            let mut flushed_files_that_were_there = false;
+            for _round in 0..ROUNDS {
+                let session = PolarsSession::start();
+                let frames = spill_some_frames(&directory);
+                drop(frames);
+                let still_there = !files_under(&directory).is_empty();
+                drop(session);
 
-            let context = LeastRecentSpillContext::new("startup-test".into(), None);
-            let frames: Vec<_> = (0..4)
-                .map(|number| {
-                    let values: Vec<i64> = (0..2_000_000).map(|value| value + number).collect();
-                    let frame = df!("value" => values).expect("a table");
-                    SpillFrame::new_blocking(frame, &context)
-                })
-                .collect();
-            let deadline = Instant::now() + Duration::from_secs(30);
-            while files_under(&directory).is_empty() {
-                assert!(
-                    Instant::now() < deadline,
-                    "nothing was spilled to {}",
-                    directory.display()
-                );
-                std::thread::sleep(Duration::from_millis(20));
+                if still_there {
+                    assert_eq!(files_under(&directory), Vec::<PathBuf>::new());
+                    flushed_files_that_were_there = true;
+                    break;
+                }
             }
-
-            drop(frames);
-            drop(session);
-
-            assert_eq!(files_under(&directory), Vec::<PathBuf>::new());
+            assert!(
+                flushed_files_that_were_there,
+                "the cleaner had deleted every file before the session was dropped, in all {ROUNDS} rounds"
+            );
         },
     );
 }
