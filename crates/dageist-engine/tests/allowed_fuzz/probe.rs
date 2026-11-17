@@ -1383,6 +1383,41 @@ mod tests {
     }
 
     #[test]
+    fn a_literal_that_a_call_is_given_is_a_column_of_its_dtype_where_the_call_is_asked_on_a_value()
+    {
+        // `f < null` of `List(String)` in a `then` that no row takes: as written, Polars
+        // folds the comparison with the null literal and allows it. With the null as a
+        // column of its dtype, Polars refuses the comparison as the tables do.
+        let case = kept("stricter-a-literal-compared-in-a-then-no-row-takes.case");
+        let refused = refusal(&case);
+        assert_eq!(settle(&case, &refused), None);
+        let found = on_a_value(&case, &refused).expect("a call that Polars refuses on columns");
+        assert!(
+            found.reason.contains("could not evaluate"),
+            "{}",
+            found.reason
+        );
+        assert!(!found.probe.contains("polars.lit"), "{}", found.probe);
+        assert!(
+            found.probe.contains("\"columns\":[\"p2\"]"),
+            "{}",
+            found.probe
+        );
+    }
+
+    /// `k.eq(1)` of `Int64`, which Polars allows and the tables are said to refuse.
+    const A_COMPARISON_GIVEN_A_LITERAL_OF_ITS_DTYPE: &str = r#"{"a":"Date","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.select","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[{"entry":"Expr.eq","arguments":{"other":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":1},"dtype":{"dtype":"Int64"}}},"then":[]}}}}]}}]}}}}]}"#;
+
+    #[test]
+    fn a_call_that_polars_allows_given_a_column_of_the_literals_dtype_settles_nothing() {
+        let case =
+            Case::decode(A_COMPARISON_GIVEN_A_LITERAL_OF_ITS_DTYPE.as_bytes()).expect("a case");
+        let refused = refused_at_the_link("cannot compare string with numeric type (i64)");
+        assert_eq!(on_a_value(&case, &refused), None);
+    }
+
+    #[test]
     fn a_rule_is_not_asked_of_a_value() {
         let case = cum_sum_of("Date");
         let mut refused = refused_at_the_link("`cum_sum` operation not supported for dtype `date`");

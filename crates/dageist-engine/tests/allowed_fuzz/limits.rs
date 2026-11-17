@@ -1353,7 +1353,7 @@ mod tests {
     }
 
     #[test]
-    fn a_literal_in_a_later_call_of_the_chain_excuses_nothing() {
+    fn a_literal_given_to_a_later_call_of_the_chain_excuses_nothing_before_it() {
         let refused = chain_of(
             column("a"),
             vec![
@@ -1366,19 +1366,67 @@ mod tests {
             tables_refuse(&case, link_of("exprs", 0, 0), ROWS, "no"),
             vec![]
         );
-        // At the call that is given it, it excuses.
-        assert_eq!(
-            tables_refuse(&case, link_of("exprs", 0, 1), ROWS, "no"),
-            vec![Limit::ALiteral]
-        );
+    }
+
+    /// The limits that excuse the case a kept file holds, as the target finds them: with the tables'
+    /// verdict and what Polars does, which no limit's own tests make up.
+    fn excused_by_kept(name: &str) -> Vec<Limit> {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/allowed_fuzz/regressions")
+            .join(name);
+        let case = Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case");
+        excused_by(&case)
+    }
+
+    fn excused_by(case: &Case) -> Vec<Limit> {
+        std::thread::scope(|scope| {
+            std::thread::Builder::new()
+                .stack_size(256 << 20)
+                .spawn_scoped(scope, || {
+                    excuses(case, &super::super::predict::predict(case), &observe(case))
+                })
+                .expect("a thread")
+                .join()
+                .expect("the limits are asked")
+        })
     }
 
     #[test]
-    fn a_literal_that_starts_the_chain_with_the_refused_call_excuses_it() {
-        let case = select(vec![chain(literal(), &["Expr.cum_sum"])]);
+    fn a_literal_is_excused_where_polars_allows_it_and_refuses_a_column_of_its_dtype() {
+        // A literal that is given to a comparison, one that starts a chain, one that
+        // starts the other table's key, and a call that follows a literal and is given
+        // what the tables refuse when they run rows.
+        for name in [
+            "uncovered-a-literal--given-to-a-comparison.case",
+            "uncovered-a-literal--starting-a-chain.case",
+            "uncovered-a-literal--given-to-a-call-that-follows-a-literal.case",
+            "uncovered-a-literal.case",
+        ] {
+            assert_eq!(excused_by_kept(name), vec![Limit::ALiteral], "{name}");
+        }
+    }
+
+    #[test]
+    fn a_literal_is_no_cause_where_polars_allows_the_column_of_its_dtype_too() {
+        // Each holds a literal at the place the tables refused, as a start or an
+        // argument, and Polars allows the part for another cause: a branch no row
+        // takes, a sort key of one value, a key that is wholly one value, a panic.
+        // The literal replaced by a column of its dtype is allowed all the same, so
+        // it is not why, and a case of the other causes is excused by theirs alone.
+        for name in [
+            "stricter-a-literal-compared-in-a-then-no-row-takes.case",
+            "stricter-a-literal-compared-in-a-then-no-row-takes-in-a-join-key.case",
+            "stricter-a-literal-compared-in-a-sort-key-of-one-value.case",
+        ] {
+            assert_eq!(excused_by_kept(name), vec![], "{name}");
+        }
         assert_eq!(
-            tables_refuse(&case, link_of("exprs", 0, 0), ROWS, "no"),
-            vec![Limit::ALiteral]
+            excused_by_kept("uncovered-a-single-value-in-a-key--a-literal-in-the-key.case"),
+            vec![Limit::ASingleValueInAKey]
+        );
+        assert_eq!(
+            excused_by_kept("uncovered-a-panic--a-literal-in-a-sort-key.case"),
+            vec![Limit::APanic]
         );
     }
 
@@ -1427,9 +1475,10 @@ mod tests {
     }
 
     #[test]
-    fn what_a_call_after_a_literal_is_given_is_excused_at_any_depth_when_rows_refuse_it() {
-        // `1.cum_sum().le(b.max())`: the tables refuse `max` of a list when they
-        // run rows, and Polars meets it with one value.
+    fn what_a_call_after_a_literal_is_given_is_excused_only_where_rows_refuse_it_and_a_literal_starts_the_chain()
+     {
+        // `1.cum_sum().le(b.max())`: the tables refuse `max` of a list when they run
+        // rows, and Polars meets it with one value.
         let item = chain_of(
             literal(),
             vec![
@@ -1445,10 +1494,6 @@ mod tests {
             parameter("other"),
             Segment::Link(0),
         ]);
-        assert_eq!(
-            tables_refuse(&case, inside.clone(), ROWS, "no"),
-            vec![Limit::ALiteral]
-        );
         // What the tables refuse when they built the step is refused.
         assert_eq!(
             tables_refuse(&case, inside, Some(TableStage::Schema), "no"),
@@ -1474,6 +1519,7 @@ mod tests {
             vec![]
         );
     }
+
     #[test]
     fn the_empty_table_of_a_pivot_is_excused_for_a_null_dtype_however_it_is_quoted() {
         let case = pivot(chain(column("a"), &["Expr.cum_sum"]));
@@ -1518,20 +1564,20 @@ mod tests {
             assert_eq!(rule_refuses(&case, place, rule, "a rule"), vec![]);
         }
     }
+    /// A join key that is a null literal of `Null` with a running count: Polars allows the key because it is
+    /// wholly one value, and a column of `Null` as the key is not elementwise.
+    const A_KEY_OF_ONE_LITERAL: &str = r#"{"a":"Int16","b":"Datetime(us)","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.join","arguments":{"other":{"table":"other"},"on":{"many":[{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"flag":null},"dtype":{"dtype":"Null"}}},"then":[{"entry":"Expr.cum_count","arguments":{"reverse":{"flag":true}}}]}}]},"nulls_equal":{"flag":false},"build_side":{"choice":"prefer_left"}}}}]}"#;
+
     #[test]
     fn a_case_that_two_limits_explain_is_excused_by_both() {
-        // A literal starts the chain, and shifts leave only nulls.
-        let shift = call(
-            "Expr.shift",
-            vec![("n", Value::Expression(chain_with_integer(3)))],
-        );
-        let case = select(vec![chain_of(
-            literal(),
-            vec![shift, call("Expr.cum_sum", Vec::new())],
-        )]);
+        // The literal is why Polars allows the key: a column of its dtype is refused as
+        // the tables say. So is the key being wholly one value, which has a limit of
+        // its own, and nothing is gated on the other not applying.
+        let case = Case::decode(A_KEY_OF_ONE_LITERAL.as_bytes()).expect("a case");
         assert_eq!(
-            tables_refuse(&case, link_of("exprs", 0, 1), ROWS, "no"),
-            vec![Limit::ALiteral, Limit::AShiftThatLeavesNulls]
+            excused_by(&case),
+            vec![Limit::ALiteral, Limit::ASingleValueInAKey]
         );
     }
 
