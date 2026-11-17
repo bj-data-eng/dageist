@@ -27,6 +27,7 @@ impl Table {
     /// Returns an error when the files cannot be scanned or read, or when
     /// `key_column` does not exist.
     pub fn load_keys(directory: &Path, key_column: &str, keys: u32) -> Result<Self, EngineError> {
+        crate::startup::ensure();
         let pattern = directory.join("*.parquet");
         let scan = || {
             LazyFrame::scan_parquet(
