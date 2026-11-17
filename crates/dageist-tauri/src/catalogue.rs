@@ -6,7 +6,7 @@
 //! into one serializable value. It mirrors `CatalogueView` in
 //! `ui/packages/host/src/contract.ts`.
 //!
-//! The view's tests and the browser stand-in answer from
+//! The view's decoder tests and the bridge's tests read
 //! `ui/packages/host/fixtures/catalogue.json`, a snapshot of exactly what the
 //! command returns. A test keeps the two equal.
 
