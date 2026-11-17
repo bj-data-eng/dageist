@@ -45,6 +45,11 @@ than Python Polars and from other commits, so this is the only way for a step
 to behave in dageist as it does in Python Polars. The release's optimisation
 profile and CPU settings are not copied; they change speed, not results.
 
+Building Polars as the release is built is not all the release does: when the
+Python module loads, it also sets Polars up. [Polars Is Set Up As The Release
+Sets It Up](#polars-is-set-up-as-the-release-sets-it-up) says which parts of that
+the engine does.
+
 Either way the view asks for only the rows and columns near what is on screen,
 and the host passes them through as the raw bytes of an Arrow IPC stream. The
 view decodes those bytes and draws them; it never holds the table.
@@ -52,6 +57,58 @@ view decodes those bytes and draws them; it never holds the table.
 As the product grows, new behavior lands in the core or in crates under
 `crates/` that the core depends on. The host gains a command only when the view
 needs to reach that behavior.
+
+## Polars Is Set Up As The Release Sets It Up
+
+The Python Polars release in `vendor/polars` runs a start-up function when its
+module loads, `register_startup_deps` in
+[on_startup.rs](../vendor/polars/crates/polars-python/src/on_startup.rs). Most of
+it connects Polars to Python. Three parts do not, and without them Polars
+behaves differently in dageist than in the release:
+
+1. **The SQL resolver.** A plan written in SQL is resolved when it is collected,
+   by a resolver that must be registered. Polars registers it itself only when a
+   SQL context is built in the process, and a plan read from text or built
+   elsewhere has none.
+2. **Unknown extension types.** What Polars does with an extension type that
+   nothing registered when it reads one. It loads a generic extension type, or,
+   when the environment variable `POLARS_UNKNOWN_EXTENSION_TYPE_BEHAVIOR` is
+   `load_as_storage`, the storage type. The engine reads the same variable, with
+   the same default.
+3. **The spill-file cleaner.** When Polars' streaming engine spills data to disk
+   it hands the files to a thread that deletes them. The release starts the
+   thread when it loads, which also deletes what a process that ended abnormally
+   left behind, and waits for it to finish when the process exits.
+
+The engine does these in that order, once for the process. Every engine entry
+that runs Polars sets Polars up before it runs it, so nothing that goes through
+the engine finds Polars unprepared, however the engine is used. The set-up
+reads its environment variables the first time it runs.
+
+The host also holds a `PolarsSession` from its start to its end. Starting it
+sets Polars up, and dropping it waits for the cleaner to finish, which is the
+flush the release does at exit; holding it in `main` keeps the two together, so
+no caller has to remember a call at the end. That covers the program ending
+normally and a panic unwinding out of `main`. A process that is killed, ended by
+a signal, aborted or ended by `std::process::exit` runs no destructor and does
+not flush. Its spill files stay in a directory named for it under Polars' spill
+directory, and the next start of Polars deletes the directories of processes
+that no longer exist. The bridge ends this way, as it runs until it is
+stopped.
+
+What the engine does not do of the release's start-up only connects Polars to
+Python: the registries that carry Python values in and out of Polars and call
+Python functions, the warning function that goes through Python's `warnings`,
+allowing extension types for `Object` columns that hold Python objects, the name
+and version of the Python package that Polars writes into Parquet files, the
+panic hook that lets a keyboard interrupt cancel a query inside the catchers
+the Python binding wraps its queries in, two aids for developing Polars (larger
+stacks in debug builds, and a backtrace printer behind a feature the release
+does not turn on), and registering the flush with Python's `atexit`. The
+engine's [start-up module](../crates/dageist-engine/src/startup.rs) lists each
+with its reason. When `vendor/polars` moves to a new release, that module is
+checked against the new release's `on_startup.rs`; see
+[Move Polars To A New Release](how-to.md#move-polars-to-a-new-release).
 
 ## The Bridge
 
