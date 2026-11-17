@@ -353,19 +353,34 @@ mod tests {
         assert!(found.reason.contains("compare"), "{}", found.reason);
     }
 
-    /// A case that selects the one chain `a.cum_sum()` on columns of `receiver`.
-    fn cum_sum_of(receiver: &str) -> Case {
+    /// A case that selects the chain `a` followed by the `links` (calls with no
+    /// arguments) on columns of `receiver`.
+    fn chain_of(receiver: &str, start: &str, links: &[&str]) -> Case {
+        let links: Vec<String> = links
+            .iter()
+            .map(|id| format!("{{\"entry\":\"{id}\",\"arguments\":{{}}}}"))
+            .collect();
         let text = format!(
-            "{{\"a\":\"{receiver}\",\"b\":\"Int64\",\"revision\":1}}\n{{\"version\":1,\"steps\":[{{\"id\":\"s\",\"call\":{{\"entry\":\"LazyFrame.select\",\"arguments\":{{\"exprs\":{{\"many\":[{{\"expression\":{{\"start\":{{\"entry\":\"polars.col\",\"arguments\":{{\"name\":{{\"columns\":[\"a\"]}}}}}},\"then\":[{{\"entry\":\"Expr.cum_sum\",\"arguments\":{{}}}}]}}}}]}}}}}}}}]}}"
+            "{{\"a\":\"{receiver}\",\"b\":\"Int64\",\"revision\":1}}\n{{\"version\":1,\"steps\":[{{\"id\":\"s\",\"call\":{{\"entry\":\"LazyFrame.select\",\"arguments\":{{\"exprs\":{{\"many\":[{{\"expression\":{{\"start\":{{\"entry\":\"polars.col\",\"arguments\":{{\"name\":{{\"columns\":[\"{start}\"]}}}}}},\"then\":[{}]}}}}]}}}}}}}}]}}",
+            links.join(",")
         );
         Case::decode(text.as_bytes()).expect("a case")
     }
 
+    /// A case that selects the one chain `a.cum_sum()` on columns of `receiver`.
+    fn cum_sum_of(receiver: &str) -> Case {
+        chain_of(receiver, "a", &["Expr.cum_sum"])
+    }
+
     fn refused_at_the_link(reason: &str) -> Refused {
+        refused_at_link(0, reason)
+    }
+
+    fn refused_at_link(link: usize, reason: &str) -> Refused {
         let place = Place::of_step(0, Some(StepId::new("s").expect("an identifier")))
             .then(Segment::Parameter("exprs".to_owned()))
             .then(Segment::Item(0))
-            .then(Segment::Link(0));
+            .then(Segment::Link(link));
         Refused {
             source: Source::Polars,
             at: place.to_string(),
@@ -394,6 +409,52 @@ mod tests {
         // For the reason the tables give, it is refused alone.
         let right = refused_at_the_link("`cum_sum` operation not supported for dtype `date`");
         assert!(settle(&case, &right).is_some());
+    }
+
+    #[test]
+    fn a_refusal_of_an_earlier_call_than_the_refused_one_settles_nothing() {
+        // `a.cum_sum().cum_sum()` of dates: Polars refuses the first running sum
+        // for the reason the tables give for the second. The probe through the
+        // second is refused, but not at it, so the second is not shown refused.
+        let case = chain_of("Date", "a", &["Expr.cum_sum", "Expr.cum_sum"]);
+        let reason = "`cum_sum` operation not supported for dtype `date`";
+        assert_eq!(settle(&case, &refused_at_link(1, reason)), None);
+        // The first is refused at itself.
+        assert!(settle(&case, &refused_at_link(0, reason)).is_some());
+    }
+
+    #[test]
+    fn an_earlier_call_that_polars_refuses_when_it_runs_rows_settles_nothing() {
+        // Taking the days of a `Boolean` is refused when the rows run, which has no
+        // place, so the probe through a second call that takes them is refused
+        // and nothing says at which call. The part before it is refused alone for
+        // the same reason, so the second call is not the cause.
+        let case = chain_of(
+            "Boolean",
+            "a",
+            &["Expr.dt.total_days", "Expr.dt.total_days"],
+        );
+        let first = chain_of("Boolean", "a", &["Expr.dt.total_days"]);
+        let reason = observe_probe(&first, false)
+            .refusal
+            .expect("Polars refuses the days of a Boolean")
+            .reason;
+        assert_eq!(settle(&case, &refused_at_link(1, &reason)), None);
+        assert!(settle(&first, &refused_at_link(0, &reason)).is_some());
+    }
+
+    #[test]
+    fn the_same_words_about_another_call_are_not_the_same_objection() {
+        assert!(!same_reason(
+            &Source::Polars,
+            "`cum_sum` operation not supported for dtype `date`",
+            "`cum_max` operation not supported for dtype `date`"
+        ));
+        assert!(!same_reason(
+            &Source::Polars,
+            "could not evaluate '<' comparison between series 'a' of dtype: Boolean and series 'b' of dtype: Date",
+            "could not evaluate '>' comparison between series 'a' of dtype: Boolean and series 'b' of dtype: Date"
+        ));
     }
 
     #[test]
