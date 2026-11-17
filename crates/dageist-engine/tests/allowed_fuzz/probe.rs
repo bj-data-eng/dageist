@@ -1051,6 +1051,29 @@ mod tests {
     }
 
     #[test]
+    fn what_the_target_says_of_a_schema_is_no_refusal_of_polars() {
+        // `a > a.cum_sum()` of `UInt128`: Polars evaluates the running sum and
+        // allows the step. The tables' reason, that the schema says `Int64` and the
+        // rows give `UInt128`, is the target's own comparison of a column's plan with
+        // its rows, which only shows where the running sum is the output, so the
+        // probe that selects it alone matches it though Polars refused nothing.
+        let case = kept("uncovered-a-hidden-schema.case");
+        let refused = refusal(&case);
+        assert!(
+            refused.reason.starts_with("the schema says"),
+            "{}",
+            refused.reason
+        );
+        assert_eq!(settle(&case, &refused), None);
+        assert_eq!(
+            settle_apart(&case, &refused, &predict(&case), &observe(&case)),
+            None
+        );
+        let said = "the schema says Int64 and the rows give UInt128";
+        assert!(!same_reason(&Source::Polars, said, said));
+    }
+
+    #[test]
     fn the_catalogue_has_what_a_probe_is_made_of() {
         for id in ["LazyFrame.select", "LazyFrame.pivot", "LazyFrame.filter"] {
             assert!(catalog::entry(id).is_some(), "{id}");
