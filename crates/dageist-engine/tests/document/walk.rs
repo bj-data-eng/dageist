@@ -14,7 +14,7 @@ use dageist_engine::document::{Document, Inputs, Resolution, Segment, Walk, Walk
 use polars::prelude::*;
 use serde_json::{Value, json};
 
-use crate::support::{call, chain, document, field, field_then, many, step};
+use crate::support::{call, chain, document, field, field_then, many, step, whole};
 
 fn source() -> DataFrame {
     df!(
@@ -394,8 +394,10 @@ fn element_has_no_dtype_where_a_pivot_takes_values_from_several_columns() {
 }
 
 #[test]
-fn whether_a_literal_of_no_dtype_may_end_a_predicate_is_not_known() {
-    // `lit(1)` is whatever the other operand makes it: it may be a Boolean.
+fn an_untyped_whole_number_is_the_dtype_polars_gives_it_and_is_no_predicate() {
+    // `lit(1)` is an `Int32` by itself, which Polars refuses as a filter predicate when it runs.
+    let table = source().lazy();
+    assert!(table.filter(lit(1)).collect().is_err());
     let walk = walk_of(
         "LazyFrame.filter",
         json!({ "predicates": many(vec![chain(
@@ -403,13 +405,80 @@ fn whether_a_literal_of_no_dtype_may_end_a_predicate_is_not_known() {
             vec![],
         )]) }),
     );
-    assert_eq!(walk.refusal(), None);
-    let predicate = expression_at(&walk, &item("predicates", 0));
+    let refusal = walk.refusal().expect("a whole number is no predicate");
+    assert!(refusal.at_end());
     assert_eq!(
-        predicate.ending(),
-        Some(&Ending::NotKnown(Unknown::TheStartsDtype))
+        refusal.refusal().source(),
+        RefusalSource::Rule(Rule::FilterPredicateIsBoolean)
     );
-    assert!(walk.not_known().is_some());
+}
+
+#[test]
+fn an_untyped_number_is_asked_of_the_tables_as_the_dtype_polars_gives_it() {
+    let walk = walk_of(
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![
+            chain(
+                call("polars.lit", json!({ "value": { "integer": 1 } })),
+                vec![call("Expr.is_null", json!({}))],
+            ),
+            chain(
+                call("polars.lit", json!({ "value": { "float": 1.5 } })),
+                vec![call("Expr.is_null", json!({}))],
+            ),
+        ]) }),
+    );
+    assert_eq!(walk.not_known(), None);
+    let select = Context::step(Outer::Select);
+    assert_eq!(
+        expression_at(&walk, &item("exprs", 0)).places(),
+        vec![
+            at(select, after(Representative::Int32, Shape::One)),
+            at(select, after(Representative::Boolean, Shape::One)),
+        ]
+    );
+    assert_eq!(
+        expression_at(&walk, &item("exprs", 1)).places(),
+        vec![
+            at(select, after(Representative::Float64, Shape::One)),
+            at(select, after(Representative::Boolean, Shape::One)),
+        ]
+    );
+}
+
+#[test]
+fn an_untyped_number_that_ends_a_condition_takes_the_dtype_of_the_values_beside_it() {
+    // `when(f).then(a).otherwise(0)`: the number adapts to the whole numbers `a` holds, so the
+    // condition gives `Int64`, as Polars gives it.
+    let condition = chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![field("f")]) }),
+        ),
+        vec![
+            call("When.then", json!({ "statement": field("a") })),
+            call("Then.otherwise", json!({ "statement": whole(0) })),
+            call("Expr.is_null", json!({})),
+        ],
+    );
+    let adapted = source()
+        .lazy()
+        .select([when(col("f")).then(col("a")).otherwise(lit(0))])
+        .collect_schema()
+        .expect("Polars resolves it");
+    assert_eq!(adapted.get("a"), Some(&DataType::Int64));
+    let walk = walk_of(
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![condition]) }),
+    );
+    let select = Context::step(Outer::Select);
+    assert_eq!(
+        expression_at(&walk, &item("exprs", 0)).places()[2..],
+        [
+            at(select, after(Representative::Int64, Shape::Many)),
+            at(select, after(Representative::Boolean, Shape::Many)),
+        ]
+    );
 }
 
 #[test]
