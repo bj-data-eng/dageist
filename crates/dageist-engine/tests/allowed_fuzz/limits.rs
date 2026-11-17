@@ -1443,6 +1443,45 @@ mod tests {
         );
     }
 
+    /// Two predicates of a filter: a literal over a window, which Polars refuses for
+    /// the lengths of the rows, and, after it, a window that explodes, which has
+    /// nothing to do with the refusal.
+    const LENGTHS_OF_THE_ROWS_BESIDE_AN_EXPLODE: &str = r#"{"a":"Date","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.filter","arguments":{"predicates":{"many":[{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":1},"dtype":{"dtype":"Datetime(time_unit='us', time_zone=None)"}}},"then":[{"entry":"Expr.over","arguments":{"order_by":{"many":[{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"flag":null}}},"then":[]}}]}}},{"entry":"Expr.lt","arguments":{"other":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":1},"dtype":{"dtype":"Int32"}}},"then":[]}}}}]}},{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["f"]}}},"then":[{"entry":"Expr.first","arguments":{}},{"entry":"Expr.over","arguments":{"partition_by":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[]}}]},"mapping_strategy":{"choice":"explode"}}}]}}]}}}}]}"#;
+
+    /// The window that explodes, alone: its groups are fewer than the rows.
+    const AN_EXPLODE_ALONE: &str = r#"{"a":"Date","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.filter","arguments":{"predicates":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["f"]}}},"then":[{"entry":"Expr.first","arguments":{}},{"entry":"Expr.over","arguments":{"partition_by":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[]}}]},"mapping_strategy":{"choice":"explode"}}}]}}]}}}}]}"#;
+
+    #[test]
+    fn a_lengths_refusal_that_remains_without_the_explode_is_the_rows_and_not_the_explode() {
+        // Polars refuses `lit(1).over(order_by=null) < 1` as a filter for lengths with
+        // no explode in sight; the explode in the second predicate is no cause of it,
+        // and the same filter with that window not exploding is refused the same
+        // way. Where the refusal goes when the explode does, it is the explode's.
+        let case = |text: &str| Case::decode(text.as_bytes()).expect("a case");
+        let refused = |case: &Case| {
+            std::thread::scope(|scope| {
+                std::thread::Builder::new()
+                    .stack_size(256 << 20)
+                    .spawn_scoped(scope, || {
+                        polars_refuses(case, None, Stage::Rows, LENGTHS, Vec::new())
+                    })
+                    .expect("a thread")
+                    .join()
+                    .expect("the limits are asked")
+            })
+        };
+        assert_eq!(
+            refused(&case(LENGTHS_OF_THE_ROWS_BESIDE_AN_EXPLODE)),
+            vec![Limit::TheLengthsOfTheRows]
+        );
+        assert_eq!(
+            refused(&case(AN_EXPLODE_ALONE)),
+            vec![Limit::AnExplodeChangesTheLengths]
+        );
+    }
+
     // ----- Options, lengths, overflow, panic: the reason gates what has no place
 
     fn explode() -> Call {
