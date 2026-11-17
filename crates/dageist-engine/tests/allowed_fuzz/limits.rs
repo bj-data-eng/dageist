@@ -878,6 +878,17 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
         (Limit::AnOverflow, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal) && refusal.reason.contains("with overflow")
         }
+        (Limit::AValueBeyondADecimal, Disagreement::PolarsRefuses(refusal)) => {
+            // The rows hold the values; a table with no rows holds none to fail.
+            unplaced(refusal)
+                && refusal.stage == Stage::Rows
+                && refusal
+                    .reason
+                    .starts_with("conversion from `u128` to `decimal[")
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &|call| is(call, "Expr.sub")))
+        }
         (Limit::APanic, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
                 && is_panic(&refusal.reason)
