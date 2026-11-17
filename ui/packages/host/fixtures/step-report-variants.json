@@ -195,31 +195,6 @@
       }
     },
     {
-      "id": "incomplete",
-      "lazy": true,
-      "outcome": {
-        "status": "refused",
-        "place": {
-          "stepIndex": 1,
-          "stepId": "incomplete",
-          "path": [
-            {
-              "kind": "start"
-            }
-          ]
-        },
-        "cause": {
-          "kind": "incomplete"
-        }
-      },
-      "expressions": [],
-      "walk": {
-        "expressions": [],
-        "refusal": null,
-        "notKnown": null
-      }
-    },
-    {
       "id": "build",
       "lazy": true,
       "outcome": {

@@ -3,7 +3,7 @@
 //! place, and not built; the steps after it are not run.
 
 use dageist_engine::allowed::{After, Context, Outer, Place as OfferPlace, Representative, Shape};
-use dageist_engine::document::{Document, Inputs, Outcome, ReadError, Segment};
+use dageist_engine::document::{Document, Inputs, Outcome, ReadError, RowsError, Segment};
 use polars::prelude::*;
 use serde_json::{Value, json};
 
@@ -125,5 +125,11 @@ fn a_step_with_a_hole_gives_no_rows() {
     )]);
     let document = Document::read(&text).expect("a document");
     let id = document.steps()[0].id().clone();
-    assert!(document.rows(&Inputs::new(), &source(), &id, 10).is_err());
+    let error = document
+        .rows(&Inputs::new(), &source(), &id, 10)
+        .expect_err("a step with a hole gives no rows");
+    let RowsError::Incomplete(place) = error else {
+        panic!("incomplete, not {error:?}");
+    };
+    assert_eq!(place.step_id().map(|id| id.as_str()), Some("first"));
 }

@@ -361,7 +361,6 @@ describe('the report built by hand for the variants no document gives together',
   it('reads each cause a step can be refused with', () => {
     expect(refusedCause('unknown_table')).toEqual({ kind: 'unknownTable', name: 'nope' });
     expect(refusedCause('unknown_input')).toEqual({ kind: 'unknownInput', name: 'none' });
-    expect(refusedCause('incomplete')).toEqual({ kind: 'incomplete' });
     expect(refusedCause('build')).toEqual({ kind: 'build', reason: 'a parameter is missing' });
     expect(refusedCause('rule')).toEqual({
       kind: 'notAllowed',

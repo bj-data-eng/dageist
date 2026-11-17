@@ -82,9 +82,6 @@ pub enum RunCause {
     /// `element` outside a pivot's aggregate. Polars decides the rest, as it
     /// builds.
     NotAllowed(Refusal),
-    /// The step holds a hole: something the editor has not picked yet. The
-    /// step was not built.
-    Incomplete,
     /// Polars refused the step when it worked out its schema.
     Polars(PolarsError),
 }
@@ -98,7 +95,6 @@ impl fmt::Display for RunCause {
             }
             Self::Build(error) => error.fmt(formatter),
             Self::NotAllowed(refusal) => refusal.fmt(formatter),
-            Self::Incomplete => formatter.write_str("something in the step is still to be picked"),
             Self::Polars(error) => error.fmt(formatter),
         }
     }
@@ -256,6 +252,9 @@ pub enum RowsError {
     NoSuchStep(StepId),
     /// This step, up to the one asked for, was refused.
     Refused(StepRefusal),
+    /// This step, up to the one asked for, holds something still to be picked,
+    /// at this place.
+    Incomplete(Place),
     /// Polars could not collect the rows.
     Polars(PolarsError),
 }
@@ -265,6 +264,12 @@ impl fmt::Display for RowsError {
         match self {
             Self::NoSuchStep(id) => write!(formatter, "there is no step {:?}", id.as_str()),
             Self::Refused(refusal) => refusal.fmt(formatter),
+            Self::Incomplete(place) => {
+                write!(
+                    formatter,
+                    "{place}: something in the step is still to be picked"
+                )
+            }
             Self::Polars(error) => error.fmt(formatter),
         }
     }
@@ -275,6 +280,7 @@ impl std::error::Error for RowsError {
         match self {
             Self::NoSuchStep(_) => None,
             Self::Refused(refusal) => Some(refusal),
+            Self::Incomplete(_) => None,
             Self::Polars(error) => Some(error),
         }
     }
@@ -320,15 +326,13 @@ impl Document {
                         schema: next_schema,
                     }
                 }
-                Err(refusal) => {
+                Err(Halt::Refused(refusal)) => {
                     blocked_by = Some(id.clone());
-                    if matches!(*refusal.cause, RunCause::Incomplete) {
-                        Outcome::Incomplete {
-                            place: refusal.place,
-                        }
-                    } else {
-                        Outcome::Refused(refusal)
-                    }
+                    Outcome::Refused(refusal)
+                }
+                Err(Halt::Incomplete(place)) => {
+                    blocked_by = Some(id.clone());
+                    Outcome::Incomplete { place }
                 }
             };
             steps.push(StepReport {
@@ -369,7 +373,10 @@ impl Document {
         for (index, step) in self.steps()[..=last].iter().enumerate() {
             let (next, next_schema) = run_step(index, step, inputs, frame, &schema, false)
                 .result
-                .map_err(RowsError::Refused)?;
+                .map_err(|halt| match halt {
+                    Halt::Refused(refusal) => RowsError::Refused(refusal),
+                    Halt::Incomplete(place) => RowsError::Incomplete(place),
+                })?;
             frame = next;
             schema = next_schema;
         }
@@ -385,7 +392,15 @@ impl Document {
 struct StepRun {
     expressions: Vec<ExpressionDtypes>,
     walk: Walk,
-    result: Result<(LazyFrame, SchemaRef), StepRefusal>,
+    result: Result<(LazyFrame, SchemaRef), Halt>,
+}
+
+/// Why a step was not built.
+enum Halt {
+    /// It was refused.
+    Refused(StepRefusal),
+    /// It holds a hole, at this place.
+    Incomplete(Place),
 }
 
 fn run_step(
@@ -414,10 +429,7 @@ fn run_step(
     // A step with a hole is not built: it is walked, and says where it is incomplete.
     if let Some(path) = step.first_hole() {
         return StepRun {
-            result: Err(StepRefusal {
-                place: path.into_iter().fold(base, Place::then),
-                cause: Box::new(RunCause::Incomplete),
-            }),
+            result: Err(Halt::Incomplete(path.into_iter().fold(base, Place::then))),
             expressions: Vec::new(),
             walk,
         };
@@ -425,10 +437,11 @@ fn run_step(
     let frame = match builder.step(step.call(), input) {
         Ok(frame) => frame,
         Err(stop) => {
+            let place = stop.place(&base);
             return StepRun {
-                result: Err(StepRefusal {
-                    place: stop.place(&base),
-                    cause: stop.cause,
+                result: Err(match stop.cause {
+                    Some(cause) => Halt::Refused(StepRefusal { place, cause }),
+                    None => Halt::Incomplete(place),
                 }),
                 expressions: builder.traces,
                 walk,
@@ -437,7 +450,7 @@ fn run_step(
     };
     let result = match frame.clone().collect_schema() {
         Ok(schema) => Ok((frame, schema)),
-        Err(error) => Err(builder.polars_refusal(error)),
+        Err(error) => Err(Halt::Refused(builder.polars_refusal(error))),
     };
     StepRun {
         expressions: builder.traces,
@@ -456,7 +469,8 @@ fn probe_of(table: LazyFrame) -> Option<LazyFrame> {
 /// Where building stopped, and why.
 struct Stop {
     path: Vec<Segment>,
-    cause: Box<RunCause>,
+    /// Why, or `None` where it stopped at a hole.
+    cause: Option<Box<RunCause>>,
 }
 
 impl Stop {
@@ -489,7 +503,7 @@ impl Builder<'_> {
     fn stop<T>(&self, cause: RunCause) -> Result<T, Stop> {
         Err(Stop {
             path: self.path.clone(),
-            cause: Box::new(cause),
+            cause: Some(Box::new(cause)),
         })
     }
 
@@ -508,7 +522,7 @@ impl Builder<'_> {
             path.extend(parameter.map(Segment::Parameter));
             Stop {
                 path,
-                cause: Box::new(RunCause::Build(error)),
+                cause: Some(Box::new(RunCause::Build(error))),
             }
         })
     }
@@ -648,7 +662,12 @@ impl Builder<'_> {
                 None => return self.stop(RunCause::UnknownInput(name.clone())),
             },
             // A step with a hole is not built.
-            Start::Hole => return self.stop(RunCause::Incomplete),
+            Start::Hole => {
+                return Err(Stop {
+                    path: self.path.clone(),
+                    cause: None,
+                });
+            }
             Start::Call(call) => {
                 self.stands_here(call)?;
                 let arguments = self.arguments(call)?;

@@ -145,6 +145,8 @@ pub fn rows_view(document: &str, step: &str, limit: usize) -> Result<RowsView, E
                 ErrorKind::Refused
             }
             RowsError::Refused(_) => ErrorKind::NotRun,
+            RowsError::Incomplete(place) if place.step_id() == Some(&step) => ErrorKind::Refused,
+            RowsError::Incomplete(_) => ErrorKind::NotRun,
             RowsError::Polars(_) => ErrorKind::Failed,
         };
         ErrorView::of(kind, format!("previewing the rows: {error}"))

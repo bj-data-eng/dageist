@@ -147,8 +147,6 @@ function causeWords(cause: CauseView): string {
       return firstParagraph(cause.reason);
     case 'notAllowed':
       return cause.refusal.reason;
-    case 'incomplete':
-      return 'Something in this step is still to be picked.';
     case 'polars':
       return firstParagraph(cause.reason);
     default:

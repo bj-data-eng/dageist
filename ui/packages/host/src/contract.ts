@@ -383,8 +383,6 @@ export type CauseView =
   | { readonly kind: 'build'; readonly reason: string }
   /** A named rule does not let a call stand where it does. */
   | { readonly kind: 'notAllowed'; readonly refusal: RefusalView }
-  /** The step holds something still to be picked. */
-  | { readonly kind: 'incomplete' }
   /** Polars refused, with this reason. */
   | { readonly kind: 'polars'; readonly reason: string };
 

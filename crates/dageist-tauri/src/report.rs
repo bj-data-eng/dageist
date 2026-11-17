@@ -432,8 +432,6 @@ enum CauseView {
     Build { reason: String },
     /// A named rule does not let a call stand where it does.
     NotAllowed { refusal: RefusalView },
-    /// The step holds something still to be picked.
-    Incomplete,
     /// Polars refused, with this reason.
     Polars { reason: String },
 }
@@ -448,7 +446,6 @@ fn cause_view(cause: &RunCause) -> CauseView {
         RunCause::NotAllowed(refusal) => CauseView::NotAllowed {
             refusal: refusal_view(refusal),
         },
-        RunCause::Incomplete => CauseView::Incomplete,
         RunCause::Polars(error) => CauseView::Polars {
             reason: error.to_string(),
         },

@@ -346,6 +346,21 @@ fn a_step_with_something_still_to_be_picked_is_incomplete_at_it_and_the_next_is_
 }
 
 #[test]
+fn the_rows_of_an_incomplete_step_are_refused_and_those_after_it_are_not_run() {
+    let rows = |step: &str| {
+        invoke(
+            "rows_after_step",
+            json!({ "document": incomplete_text(), "step": step, "limit": 2 }),
+        )
+        .expect_err("no rows")
+    };
+    // The step that holds something still to be picked is refused, and the step after it is
+    // not run.
+    assert_eq!(rows("later")["kind"], "refused");
+    assert_eq!(rows("after")["kind"], "notRun");
+}
+
+#[test]
 fn a_text_that_is_not_a_document_is_reported_with_its_place_not_as_a_failure() {
     let unreadable = invoke(
         "run_document",
