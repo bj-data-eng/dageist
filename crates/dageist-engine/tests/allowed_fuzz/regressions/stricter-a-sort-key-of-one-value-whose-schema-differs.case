@@ -1,0 +1,2 @@
+{"a":"UInt128","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.sort","arguments":{"by":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[{"entry":"Expr.last","arguments":{}},{"entry":"Expr.cum_sum","arguments":{}}]}}]}}}}]}

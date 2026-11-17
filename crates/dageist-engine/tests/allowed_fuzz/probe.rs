@@ -1195,6 +1195,32 @@ mod tests {
     }
 
     #[test]
+    fn a_sort_key_of_one_value_that_polars_drops_is_asked_where_it_is_evaluated() {
+        // `sort(by=a.last().cum_sum())` of `UInt128`: the tables refuse the running
+        // sum because its plan says `Int64` and its rows give `UInt128`, the target's
+        // own comparison, which no probe of the call alone can show. Polars drops a
+        // sort key that is one value, so it never meets the mismatch; as the key
+        // on a column it panics, and that is where the call is asked.
+        let case = kept("stricter-a-sort-key-of-one-value-whose-schema-differs.case");
+        let refused = refusal(&case);
+        assert!(
+            refused.reason.starts_with("the schema says"),
+            "{}",
+            refused.reason
+        );
+        assert_eq!(settle(&case, &refused), None);
+        let found = settle_apart(&case, &refused, &predict(&case), &observe(&case))
+            .expect("a key that Polars refuses");
+        assert!(found.probe.contains("LazyFrame.sort"), "{}", found.probe);
+        assert!(
+            found.probe.contains("\"columns\":[\"p\"]"),
+            "{}",
+            found.probe
+        );
+        assert!(found.reason.contains("panicked"), "{}", found.reason);
+    }
+
+    #[test]
     fn the_catalogue_has_what_a_probe_is_made_of() {
         for id in ["LazyFrame.select", "LazyFrame.pivot", "LazyFrame.filter"] {
             assert!(catalog::entry(id).is_some(), "{id}");
