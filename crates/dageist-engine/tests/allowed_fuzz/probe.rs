@@ -1437,6 +1437,38 @@ mod tests {
     }
 
     #[test]
+    fn a_comparison_given_no_known_dtype_is_settled_by_polars_refusing_it() {
+        // `sort(by=when(b <= b - 1).then(b).last())` of `List(Int64)`: the tables
+        // do not know what `b - 1` gives, and refuse the comparison for every
+        // dtype it might give, with the reason Polars gave for one of them. Polars
+        // drops a sort key that is one value; asked as written, it refuses the
+        // comparison, for the dtype the argument really has.
+        let case =
+            kept("stricter-a-comparison-given-no-known-dtype-in-a-sort-key-of-one-value.case");
+        let refused = refusal(&case);
+        assert_eq!(settle(&case, &refused), None);
+        let found = settle_apart(&case, &refused, &predict(&case), &observe(&case))
+            .expect("a comparison that Polars refuses");
+        assert!(found.probe.contains("LazyFrame.select"), "{}", found.probe);
+        assert!(found.reason.contains("comparison"), "{}", found.reason);
+    }
+
+    #[test]
+    fn an_arithmetic_given_no_known_dtype_is_settled_by_polars_refusing_it() {
+        // `sort(by=g.over(order_by=[g - h.over(order_by=[k], nulls_last=true)]).sum())`:
+        // the tables do not know the dtype of the window that is subtracted from a
+        // text column, and refuse the subtraction for every dtype it might give.
+        let case =
+            kept("stricter-an-arithmetic-given-no-known-dtype-in-a-sort-key-of-one-value.case");
+        let refused = refusal(&case);
+        assert_eq!(settle(&case, &refused), None);
+        let found = settle_apart(&case, &refused, &predict(&case), &observe(&case))
+            .expect("a subtraction that Polars refuses");
+        assert!(found.probe.contains("LazyFrame.select"), "{}", found.probe);
+        assert!(found.reason.contains("sub operation"), "{}", found.reason);
+    }
+
+    #[test]
     fn a_call_that_polars_allows_as_a_sort_key_on_a_column_settles_nothing() {
         // The running sum of whole numbers is allowed as a sort key, so a mismatch
         // that the tables are said to find in it is not shown there.
