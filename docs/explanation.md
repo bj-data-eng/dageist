@@ -612,7 +612,13 @@ what surrounds it, after the limits, in these ways:
   argument might have lets it stand, with the reason Polars gave for one of them, so
   the reason of the probe, which has the argument's own dtype, is not the tables' in
   words and is not compared. It counts when Polars refuses the probe for itself at the
-  refused call, and the part before the call, alone, is allowed.
+  refused call, and the part before the call, alone, is allowed. It shows that Polars
+  refuses the part at that call, not why: a refusal there for another argument or
+  option would count too, and the reason the editor shows for such a call is the
+  tables' for a stand-in dtype, not Polars' for the argument's own. That a window
+  given options and no `partition_by` has no known dtype is one gap that makes
+  a call blind in this way, which [#73](https://github.com/bj-data-eng/dageist/issues/73)
+  tracks.
 
 The first two count when Polars refuses the probe for the reason the tables gave, and
 the case then counts as **refused where Polars does not evaluate the part**: the

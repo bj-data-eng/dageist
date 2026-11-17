@@ -39,7 +39,10 @@
 //! of a probe that has the argument's own dtype is not the tables' in words
 //! ([`Showing::ForAnyDtypeOfTheArgument`]). Polars refusing the part as written, for
 //! itself, at the refused call, with the part before the call allowed, shows the
-//! refusal right.
+//! refusal right. It shows that Polars refuses the part at that call, not why: a
+//! refusal there for another argument or option would count too, and the reason the
+//! editor shows for such a call is the tables' for a stand-in dtype, not Polars' for
+//! the argument's own.
 //!
 //! The last has no reason to match. [`settle_in_the_position`] is for a refusal
 //! that is the target's own comparison of a call's plan with its rows, which is no
