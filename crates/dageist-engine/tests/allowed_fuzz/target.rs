@@ -493,6 +493,98 @@ mod tests {
 
     use super::*;
 
+    /// The outcome of `text` and what was tallied while it was evaluated.
+    fn evaluated_and_tallied(text: &'static str) -> (CaseOutcome, Vec<String>) {
+        let case = Case::decode(text.as_bytes()).expect("a case");
+        std::thread::Builder::new()
+            .stack_size(256 << 20)
+            .spawn(move || {
+                let outcome = AllowedTarget::new().evaluate(&case).expect("an outcome");
+                (outcome, take_tally())
+            })
+            .expect("a thread")
+            .join()
+            .expect("the case is evaluated")
+    }
+
+    fn counted(tally: &[String], what: &str) -> Option<u64> {
+        tally
+            .iter()
+            .find(|line| line.contains(what))
+            .and_then(|line| line.split_whitespace().next()?.parse().ok())
+    }
+
+    /// `f.dt.date()` as a filter: the tables refuse the date part of a `Boolean`,
+    /// and Polars refuses the filter, for a predicate that is a `Date`: it never
+    /// judged what the tables did.
+    const FILTER_OF_A_DATE_PART_OF_A_BOOLEAN: &str = r#"{"a":"String","b":"Int32","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.filter","arguments":{"predicates":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["f"]}}},"then":[{"entry":"Expr.dt.date","arguments":{}}]}}]}}}}]}"#;
+
+    /// A running sum of a null: refused by the tables and by Polars for it.
+    const RUNNING_SUM_OF_A_NULL: &str = r#"{"a":"Int16","b":"Null","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.select","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"flag":null}}},"then":[{"entry":"Expr.cum_sum","arguments":{}}]}}]}}}}]}"#;
+
+    /// A filter of the whole number 1: the rule that a predicate be a `Boolean`
+    /// refuses it, and Polars does for the same reason.
+    const FILTER_OF_A_NUMBER: &str = r#"{"a":"Date","b":"Int8","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.filter","arguments":{"predicates":{"many":[{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":1}}},"then":[]}}]}}}}]}"#;
+
+    /// A join on `k == true.min()`: the rule that a key be elementwise refuses it,
+    /// and Polars refuses the join for a column that the other table lacks.
+    const JOIN_KEY_OF_A_COLUMN_THE_OTHER_TABLE_LACKS: &str = r#"{"a":"UInt16","b":"Struct(x: Int64, y: String)","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.join","arguments":{"other":{"table":"other"},"on":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[{"entry":"Expr.eq","arguments":{"other":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"flag":true}}},"then":[{"entry":"Expr.min","arguments":{}}]}}}}]}}]}}}}]}"#;
+
+    #[test]
+    fn a_refusal_by_both_for_different_reasons_is_counted_apart_from_agreement() {
+        // The tables refuse the date part of a `Boolean` and Polars refuses the
+        // filter for its predicate: both refuse, but Polars never judged what the
+        // tables did, so the case is no agreement about that refusal.
+        for text in [
+            FILTER_OF_A_DATE_PART_OF_A_BOOLEAN,
+            JOIN_KEY_OF_A_COLUMN_THE_OTHER_TABLE_LACKS,
+        ] {
+            let (outcome, tally) = evaluated_and_tallied(text);
+            assert_eq!(
+                outcome.kind(),
+                dageist_fuzz::OutcomeKind::ExpectedRejection,
+                "{text}"
+            );
+            assert!(
+                outcome
+                    .detail()
+                    .is_some_and(|detail| detail.starts_with("refused by both, for another reason")),
+                "{:?}",
+                outcome.detail()
+            );
+            assert_eq!(
+                counted(&tally, "cases refused by both, for another reason"),
+                Some(1),
+                "{tally:?}"
+            );
+            assert_eq!(counted(&tally, "cases agreeing"), Some(0), "{tally:?}");
+        }
+    }
+
+    #[test]
+    fn a_refusal_by_both_for_the_same_reason_agrees() {
+        // The tables and Polars refuse for the objection and the call that they
+        // name, or for the rule's own words, whatever the dtypes and names quoted.
+        for text in [RUNNING_SUM_OF_A_NULL, FILTER_OF_A_NUMBER] {
+            let (outcome, tally) = evaluated_and_tallied(text);
+            assert_eq!(
+                outcome.kind(),
+                dageist_fuzz::OutcomeKind::Evaluated,
+                "{text}"
+            );
+            assert_eq!(counted(&tally, "cases agreeing"), Some(1), "{tally:?}");
+            assert_eq!(
+                counted(&tally, "cases refused by both, for another reason").unwrap_or(0),
+                0,
+                "{tally:?}"
+            );
+        }
+    }
+
     #[test]
     fn a_probe_longer_than_an_outcome_may_say_is_still_an_outcome() {
         // The outcome of a case that the probe settles names the probe, which for a
