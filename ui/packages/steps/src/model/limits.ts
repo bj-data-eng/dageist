@@ -7,7 +7,7 @@
  * cannot offer lists it from the engine's own offers.
  */
 
-import type { AfterView, EntryView, OfferPlaceView } from '@dageist/host';
+import type { AfterView, EntryView, KindView, OfferPlaceView } from '@dageist/host';
 
 import type { Catalogue } from './catalogue';
 
@@ -47,11 +47,22 @@ const SET_BY_THE_EDITOR: Readonly<Record<string, readonly string[]>> = {
   'ChainedThen.when': ['predicates'],
 };
 
-/** Returns the parameters of `entry` that the editor has no way to set. */
+/** Whether the editor draws a parameter of `kind`: each kind has a drawing, but a pair does not hold pairs. */
+function drawn(kind: KindView): boolean {
+  return kind.kind !== 'pairs' || (kind.key.kind !== 'pairs' && kind.value.kind !== 'pairs');
+}
+
+/**
+ * Returns the parameters of `entry` that the editor has no way to set: those a function or a
+ * condition it draws only in part leaves out, and those of a kind it has no drawing for.
+ */
 export function unexpressedParameters(entry: EntryView): readonly string[] {
   const set = Object.hasOwn(SET_BY_THE_EDITOR, entry.id) ? SET_BY_THE_EDITOR[entry.id] : undefined;
-  if (set === undefined) return [];
-  return entry.parameters.map((parameter) => parameter.name).filter((name) => !set.includes(name));
+  return entry.parameters
+    .filter(
+      (parameter) => !drawn(parameter.kind) || (set !== undefined && !set.includes(parameter.name)),
+    )
+    .map((parameter) => parameter.name);
 }
 
 /** The place of one cell of the grid of every place the engine was asked about, and which entries may stand there. */

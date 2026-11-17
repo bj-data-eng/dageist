@@ -114,7 +114,7 @@ describe('the parameters of an entry that the editor cannot set', () => {
     ]);
   });
 
-  it('are none for a method, whose every parameter has a drawing', () => {
+  it('are none for a method, whose every parameter is of a kind the editor draws', () => {
     const methods = [...catalogue.entries.values()].filter(
       (entry) => entry.applies === 'expression',
     );
@@ -122,5 +122,28 @@ describe('the parameters of an entry that the editor cannot set', () => {
     for (const entry of methods) {
       expect(unexpressedParameters(entry), entry.id).toEqual([]);
     }
+  });
+
+  it('include a parameter of a kind the editor has no drawing for, as pairs of pairs', () => {
+    const base = catalogue.entries.get('Expr.shift');
+    const parameter = base?.parameters[0];
+    if (base === undefined || parameter === undefined) throw new Error('no shift');
+    const odd = {
+      ...base,
+      parameters: [
+        {
+          ...parameter,
+          name: 'nested',
+          kind: {
+            kind: 'pairs',
+            key: { kind: 'column' },
+            value: { kind: 'pairs', key: { kind: 'column' }, value: { kind: 'flag' } },
+          },
+        },
+        ...base.parameters,
+      ],
+    } as const;
+
+    expect(unexpressedParameters(odd)).toEqual(['nested']);
   });
 });

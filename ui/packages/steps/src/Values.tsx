@@ -168,6 +168,8 @@ export function ValueSlot({
           onChange({ kind: 'input', name: input.name });
         }),
       );
+    // The values of `is_in` are lists, which the engine has no entry to judge yet, so they are offered
+    // as they are connected.
     if (lists) return [counted('Inputs', connected)];
 
     const rows = {

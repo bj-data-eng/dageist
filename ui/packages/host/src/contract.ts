@@ -564,7 +564,7 @@ export const ERROR_KINDS = [
   'limit',
   /** The text sent is not a document the engine reads. */
   'unreadable',
-  /** The request names something the engine does not have: an entry, a parameter, a dtype or a place. */
+  /** The request names an entry or a parameter the catalogue lacks, or a way down to an expression that starts at no position of a step. */
   'unknownName',
   /** Anything else. */
   'failed',
