@@ -6,6 +6,7 @@ import { decodeRun } from './decode-run';
 import refusedFixture from '../fixtures/step-report-refused.json';
 import reportFixture from '../fixtures/step-report.json';
 import unreadableFixture from '../fixtures/step-report-unreadable.json';
+import variantsFixture from '../fixtures/step-report-variants.json';
 import { replaced, withField, without } from '../test-support/tamper';
 
 // The fixtures are what the host's `run_document` command answers for the claim-timing steps,
@@ -15,6 +16,7 @@ import { replaced, withField, without } from '../test-support/tamper';
 const report: unknown = reportFixture;
 const refused: unknown = refusedFixture;
 const unreadable: unknown = unreadableFixture;
+const variants: unknown = variantsFixture;
 
 /** The steps of a run that was read. */
 function stepsOf(run: RunView): readonly StepReportView[] {
@@ -230,6 +232,93 @@ describe('the report of text that is not a document', () => {
       problem: { kind: 'syntax', line: 2, column: 10, reason: 'the text ends too soon' },
     };
     expect(decodeRun(syntax)).toEqual(syntax);
+  });
+});
+
+describe('the report built by hand for the variants no document gives together', () => {
+  // The host writes it from views it builds itself, so each variant is read in the shape the
+  // host really serializes it, and each expectation below is written out by hand.
+  const run = decodeRun(variants);
+  const refusedCause = (id: string) => {
+    const outcome = stepNamed(run, id).outcome;
+    if (outcome.status !== 'refused') throw new Error(`${id} was not refused`);
+    return outcome.cause;
+  };
+
+  it('reads a start that has several columns', () => {
+    expect(stepNamed(run, 'variants').expressions[0]).toEqual({
+      place: {
+        stepIndex: 0,
+        stepId: 'variants',
+        path: [
+          { kind: 'parameter', name: 'named_exprs' },
+          { kind: 'key', index: 1 },
+          { kind: 'start' },
+        ],
+      },
+      start: { kind: 'several', dtypes: ['Int64', 'String'] },
+      links: [{ kind: 'refused', reason: 'no' }],
+    });
+  });
+
+  it('reads a condition that has been chained, and a context two positions deep', () => {
+    const walked = stepNamed(run, 'variants').walk.expressions[0];
+    expect(walked?.context).toEqual({ outer: 'filter', nested: 'over.order_by' });
+    expect(walked?.calls).toEqual([
+      {
+        follows: { kind: 'condition', state: 'chainedWhen' },
+        verdict: {
+          kind: 'refused',
+          refusal: { source: { by: 'structure' }, reason: 'the reason' },
+        },
+      },
+      { follows: { kind: 'condition', state: 'chainedThen' }, verdict: null },
+    ]);
+    expect(walked?.places).toEqual([
+      {
+        context: { outer: 'sort', nested: null },
+        after: { kind: 'condition', state: 'chainedThen' },
+      },
+      null,
+    ]);
+  });
+
+  it('reads an ending the tables do not know and a refusal at the end', () => {
+    const walk = stepNamed(run, 'variants').walk;
+    expect(walk.expressions[0]?.ending).toEqual({
+      kind: 'notKnown',
+      because: 'the dtype is not known',
+    });
+    expect(walk.refusal?.refusal.source).toEqual({ by: 'polars', stage: 'empty' });
+    expect(walk.refusal?.atEnd).toBe(true);
+    expect(walk.notKnown).toBe('why');
+    expect(stepNamed(run, 'variants').lazy).toBe(false);
+  });
+
+  it('reads each cause a step can be refused with', () => {
+    expect(refusedCause('unknown_table')).toEqual({ kind: 'unknownTable', name: 'nope' });
+    expect(refusedCause('unknown_input')).toEqual({ kind: 'unknownInput', name: 'none' });
+    expect(refusedCause('build')).toEqual({ kind: 'build', reason: 'a parameter is missing' });
+    expect(refusedCause('rule')).toEqual({
+      kind: 'notAllowed',
+      refusal: {
+        source: { by: 'rule', rule: 'element-only-in-pivot-aggregate' },
+        reason: 'the reason',
+      },
+    });
+    expect(refusedCause('rows_stage')).toEqual({
+      kind: 'notAllowed',
+      refusal: { source: { by: 'polars', stage: 'rows' }, reason: 'the reason' },
+    });
+  });
+
+  it('places a refusal at the start of an expression', () => {
+    const outcome = stepNamed(run, 'build').outcome;
+    expect(outcome.status === 'refused' && outcome.place).toEqual({
+      stepIndex: 1,
+      stepId: 'build',
+      path: [{ kind: 'start' }],
+    });
   });
 });
 
