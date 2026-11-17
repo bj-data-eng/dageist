@@ -85,6 +85,14 @@ impl Dtype {
         }
     }
 
+    /// The dtypes a document names by one word, for a list that offers them:
+    /// those with no parameters, in the order a list gives them. `Datetime`,
+    /// `Duration` and `List` have parameters to be set, and are not among them.
+    #[must_use]
+    pub fn listed() -> Vec<Self> {
+        SIMPLE.iter().cloned().map(Self).collect()
+    }
+
     /// The Polars dtype.
     #[must_use]
     pub const fn as_polars(&self) -> &DataType {
@@ -129,6 +137,28 @@ fn unit_named(name: &str) -> Option<TimeUnit> {
         _ => None,
     }
 }
+
+/// The dtypes with no parameters, in the order a list of them is given.
+const SIMPLE: [DataType; 18] = [
+    DataType::Boolean,
+    DataType::Date,
+    DataType::Time,
+    DataType::Null,
+    DataType::String,
+    DataType::Float16,
+    DataType::Float32,
+    DataType::Float64,
+    DataType::Int8,
+    DataType::Int16,
+    DataType::Int32,
+    DataType::Int64,
+    DataType::Int128,
+    DataType::UInt8,
+    DataType::UInt16,
+    DataType::UInt32,
+    DataType::UInt64,
+    DataType::UInt128,
+];
 
 /// The dtypes with no parameters, by name.
 fn simple(name: &str) -> Option<DataType> {

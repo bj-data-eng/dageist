@@ -173,3 +173,21 @@ fn a_polars_dtype_of_lists_nests_up_to_the_same_limit() {
         Err(DtypeError::Unsupported(_))
     ));
 }
+
+#[test]
+fn the_dtypes_a_list_offers_are_those_with_no_parameters_and_read_back_as_themselves() {
+    let listed: Vec<String> = Dtype::listed().iter().map(ToString::to_string).collect();
+    assert_eq!(
+        listed,
+        [
+            "Boolean", "Date", "Time", "Null", "String", "Float16", "Float32", "Float64", "Int8",
+            "Int16", "Int32", "Int64", "Int128", "UInt8", "UInt16", "UInt32", "UInt64", "UInt128",
+        ]
+    );
+    // Each is one of the spellings the document reads.
+    let spelled: Vec<&str> = spellings().iter().map(|(text, _)| *text).collect();
+    for name in &listed {
+        assert!(spelled.contains(&name.as_str()), "{name}");
+        assert_eq!(name.parse::<Dtype>().expect("it reads").to_string(), *name);
+    }
+}
