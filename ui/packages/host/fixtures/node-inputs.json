@@ -1,0 +1,68 @@
+{
+  "source": {
+    "name": "claims",
+    "columns": [
+      {
+        "name": "dcn",
+        "dtype": "String"
+      },
+      {
+        "name": "timestamp",
+        "dtype": "Datetime(us)"
+      },
+      {
+        "name": "step_to",
+        "dtype": "String"
+      },
+      {
+        "name": "owner",
+        "dtype": "String"
+      },
+      {
+        "name": "row_days",
+        "dtype": "Int64"
+      }
+    ]
+  },
+  "inputs": [
+    {
+      "kind": "value",
+      "name": "as_of",
+      "dtype": "Date"
+    },
+    {
+      "kind": "list",
+      "name": "holidays",
+      "dtype": "Date"
+    },
+    {
+      "kind": "value",
+      "name": "sla_cutoff",
+      "dtype": "Int64"
+    },
+    {
+      "kind": "table",
+      "name": "step_names",
+      "columns": [
+        {
+          "name": "step_to",
+          "dtype": "String"
+        }
+      ]
+    },
+    {
+      "kind": "table",
+      "name": "step_sla",
+      "columns": [
+        {
+          "name": "step",
+          "dtype": "String"
+        },
+        {
+          "name": "sla_days",
+          "dtype": "Int64"
+        }
+      ]
+    }
+  ]
+}

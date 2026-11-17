@@ -9,7 +9,7 @@ import { tableFromArrays, tableToIPC } from '@uwdata/flechette';
 import type { BlockRequest, CatalogueView, ColumnView, Host, TableView } from '@dageist/host';
 import { deliverMessage, sealMessage } from '@dageist/host';
 
-import snapshot from './catalogue.json';
+import snapshot from '@dageist/host/fixtures/catalogue.json';
 
 /**
  * What the host's `operation_catalogue` command returns, as a snapshot of it. TypeScript
