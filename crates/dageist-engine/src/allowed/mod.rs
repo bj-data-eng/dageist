@@ -23,7 +23,9 @@
 //! beside the tables. [`offers`] and [`offer`] answer, from the committed
 //! tables embedded in the engine and those rules, whether an entry may stand
 //! at a [`Place`], and give a reason for each refusal, without running Polars.
-//! [`rule_forbids`] answers from the rules alone.
+//! [`rule_forbids`] answers from the rules alone, and [`rule_forbids_a_key_known_not_elementwise`]
+//! for a join's key whose whole expression holds an aggregate beside a column,
+//! or a column compared with a null.
 
 mod context;
 mod dtype;
@@ -36,8 +38,9 @@ mod tests;
 pub use context::{Context, Nested, Outer, Position};
 pub use dtype::{Representative, ResultDtype, dtype_name};
 pub use offers::{
-    After, Allowance, ConditionState, Offer, Place, Refusal, RefusalSource, Verdict,
-    argument_dtypes, offer, offers, options, rule_forbids,
+    After, Allowance, Chosen, ConditionState, Ending, Offer, Place, Refusal, RefusalSource,
+    Unknown, Verdict, argument_dtypes, offer, offers, options, rule_forbids,
+    rule_forbids_a_key_known_not_elementwise,
 };
 pub use rules::Rule;
 pub use table::{Outcome, Produces, Reason, Shape, Stage};

@@ -19,6 +19,7 @@ use crate::catalog::{Argument, Arguments, Build, BuildError, Conditional, Lazine
 use super::error::{Place, Segment};
 use super::inputs::Inputs;
 use super::model::{Call, Document, Expression, Start, Step, StepId, Value};
+use super::walk::Walk;
 
 /// What an expression has, up to one of its links.
 #[derive(Debug, Clone)]
@@ -167,6 +168,7 @@ pub struct StepReport {
     id: StepId,
     laziness: Laziness,
     expressions: Vec<ExpressionDtypes>,
+    walk: Walk,
     outcome: Outcome,
 }
 
@@ -190,6 +192,14 @@ impl StepReport {
     #[must_use]
     pub fn expressions(&self) -> &[ExpressionDtypes] {
         &self.expressions
+    }
+
+    /// What the tables of allowed combinations say of the step: every
+    /// expression in it, including those Polars was not asked about because it
+    /// refused the step first. Empty for a step that was not run.
+    #[must_use]
+    pub const fn walk(&self) -> &Walk {
+        &self.walk
     }
 
     /// What came of the step.
@@ -284,6 +294,7 @@ impl Document {
                     id,
                     laziness,
                     expressions: Vec::new(),
+                    walk: Walk::default(),
                     outcome: Outcome::NotRun {
                         blocked_by: blocked_by.clone(),
                     },
@@ -308,6 +319,7 @@ impl Document {
                 id,
                 laziness,
                 expressions: run.expressions,
+                walk: run.walk,
                 outcome,
             });
         }
@@ -356,6 +368,7 @@ impl Document {
 /// the way.
 struct StepRun {
     expressions: Vec<ExpressionDtypes>,
+    walk: Walk,
     result: Result<(LazyFrame, SchemaRef), StepRefusal>,
 }
 
@@ -376,6 +389,12 @@ fn run_step(
         positions: Vec::new(),
         traces: Vec::new(),
     };
+    // What the tables say of the step does not depend on Polars building it.
+    let walk = if trace {
+        step.walk(index, schema, inputs)
+    } else {
+        Walk::default()
+    };
     let frame = match builder.step(step.call(), input) {
         Ok(frame) => frame,
         Err(stop) => {
@@ -385,6 +404,7 @@ fn run_step(
                     cause: stop.cause,
                 }),
                 expressions: builder.traces,
+                walk,
             };
         }
     };
@@ -394,6 +414,7 @@ fn run_step(
     };
     StepRun {
         expressions: builder.traces,
+        walk,
         result,
     }
 }

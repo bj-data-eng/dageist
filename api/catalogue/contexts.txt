@@ -43,6 +43,7 @@
 #   condition-predicate-is-boolean: a condition's predicate must be Boolean.
 #   element-only-in-pivot-aggregate: `polars.element` stands only in a pivot's aggregate.
 #   filter-predicate-is-boolean: a filter's predicate must be Boolean.
+#   key-is-elementwise: a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a column be compared with a null.
 #   pivot-aggregate-gives-one-value: a pivot's aggregate must give one value for each group.
 #
 # An outcome is `allowed <dtype of the result> <one|many>` (`-` for a step), or
@@ -73,8 +74,8 @@ ChainedThen.otherwise | join_left > over.order_by | continues | - | - | - | refu
 ChainedThen.otherwise | join_left > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 ChainedThen.otherwise | join_left > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 ChainedThen.otherwise | join_left > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-ChainedThen.otherwise | join_left | continues | - | - | - | allowed -
-ChainedThen.otherwise | join_left | ends | - | - | - | allowed -
+ChainedThen.otherwise | join_left | continues | - | - | key-is-elementwise | allowed -
+ChainedThen.otherwise | join_left | ends | - | - | key-is-elementwise | allowed -
 ChainedThen.otherwise | join_right > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 ChainedThen.otherwise | join_right > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
 ChainedThen.otherwise | join_right > condition.value | continues | - | - | - | allowed -
@@ -83,8 +84,8 @@ ChainedThen.otherwise | join_right > over.order_by | continues | - | - | - | ref
 ChainedThen.otherwise | join_right > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 ChainedThen.otherwise | join_right > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 ChainedThen.otherwise | join_right > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-ChainedThen.otherwise | join_right | continues | - | - | - | allowed -
-ChainedThen.otherwise | join_right | ends | - | - | - | allowed -
+ChainedThen.otherwise | join_right | continues | - | - | key-is-elementwise | allowed -
+ChainedThen.otherwise | join_right | ends | - | - | key-is-elementwise | allowed -
 ChainedThen.otherwise | pivot_aggregate > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 ChainedThen.otherwise | pivot_aggregate > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
 ChainedThen.otherwise | pivot_aggregate > condition.value | continues | - | - | - | allowed -
@@ -133,8 +134,8 @@ ChainedThen.when | join_left > over.order_by | continues | - | - | - | refused s
 ChainedThen.when | join_left > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 ChainedThen.when | join_left > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 ChainedThen.when | join_left > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-ChainedThen.when | join_left | continues | - | - | - | allowed -
-ChainedThen.when | join_left | ends | - | - | - | allowed -
+ChainedThen.when | join_left | continues | - | - | key-is-elementwise | allowed -
+ChainedThen.when | join_left | ends | - | - | key-is-elementwise | allowed -
 ChainedThen.when | join_right > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 ChainedThen.when | join_right > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
 ChainedThen.when | join_right > condition.value | continues | - | - | - | allowed -
@@ -143,8 +144,8 @@ ChainedThen.when | join_right > over.order_by | continues | - | - | - | refused 
 ChainedThen.when | join_right > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 ChainedThen.when | join_right > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 ChainedThen.when | join_right > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-ChainedThen.when | join_right | continues | - | - | - | allowed -
-ChainedThen.when | join_right | ends | - | - | - | allowed -
+ChainedThen.when | join_right | continues | - | - | key-is-elementwise | allowed -
+ChainedThen.when | join_right | ends | - | - | key-is-elementwise | allowed -
 ChainedThen.when | pivot_aggregate > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 ChainedThen.when | pivot_aggregate > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
 ChainedThen.when | pivot_aggregate > condition.value | continues | - | - | - | allowed -
@@ -193,8 +194,8 @@ ChainedWhen.then | join_left > over.order_by | continues | - | - | - | refused s
 ChainedWhen.then | join_left > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 ChainedWhen.then | join_left > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 ChainedWhen.then | join_left > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-ChainedWhen.then | join_left | continues | - | - | - | allowed -
-ChainedWhen.then | join_left | ends | - | - | - | allowed -
+ChainedWhen.then | join_left | continues | - | - | key-is-elementwise | allowed -
+ChainedWhen.then | join_left | ends | - | - | key-is-elementwise | allowed -
 ChainedWhen.then | join_right > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 ChainedWhen.then | join_right > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
 ChainedWhen.then | join_right > condition.value | continues | - | - | - | allowed -
@@ -203,8 +204,8 @@ ChainedWhen.then | join_right > over.order_by | continues | - | - | - | refused 
 ChainedWhen.then | join_right > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 ChainedWhen.then | join_right > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 ChainedWhen.then | join_right > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-ChainedWhen.then | join_right | continues | - | - | - | allowed -
-ChainedWhen.then | join_right | ends | - | - | - | allowed -
+ChainedWhen.then | join_right | continues | - | - | key-is-elementwise | allowed -
+ChainedWhen.then | join_right | ends | - | - | key-is-elementwise | allowed -
 ChainedWhen.then | pivot_aggregate > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 ChainedWhen.then | pivot_aggregate > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
 ChainedWhen.then | pivot_aggregate > condition.value | continues | - | - | - | allowed -
@@ -253,8 +254,8 @@ Expr.cum_count | join_left > over.order_by | continues | Int64 | - | - | refused
 Expr.cum_count | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.cum_count | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.cum_count | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.cum_count | join_left | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.cum_count | join_left | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.cum_count | join_left | continues | Int64 | - | key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.cum_count | join_left | ends | Int64 | - | key-is-elementwise | refused schema: all join key expressions must be elementwise.
 Expr.cum_count | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
 Expr.cum_count | join_right > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
 Expr.cum_count | join_right > condition.value | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
@@ -263,8 +264,8 @@ Expr.cum_count | join_right > over.order_by | continues | Int64 | - | - | refuse
 Expr.cum_count | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.cum_count | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.cum_count | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.cum_count | join_right | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.cum_count | join_right | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.cum_count | join_right | continues | Int64 | - | key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.cum_count | join_right | ends | Int64 | - | key-is-elementwise | refused schema: all join key expressions must be elementwise.
 Expr.cum_count | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed UInt32 many
 Expr.cum_count | pivot_aggregate > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `u32` for series with name `a`
 Expr.cum_count | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed UInt32 many
@@ -313,8 +314,8 @@ Expr.cum_max | join_left > over.order_by | continues | Int64 | - | - | refused s
 Expr.cum_max | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.cum_max | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.cum_max | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.cum_max | join_left | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.cum_max | join_left | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.cum_max | join_left | continues | Int64 | - | key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.cum_max | join_left | ends | Int64 | - | key-is-elementwise | refused schema: all join key expressions must be elementwise.
 Expr.cum_max | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
 Expr.cum_max | join_right > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
 Expr.cum_max | join_right > condition.value | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
@@ -323,8 +324,8 @@ Expr.cum_max | join_right > over.order_by | continues | Int64 | - | - | refused 
 Expr.cum_max | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.cum_max | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.cum_max | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.cum_max | join_right | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.cum_max | join_right | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.cum_max | join_right | continues | Int64 | - | key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.cum_max | join_right | ends | Int64 | - | key-is-elementwise | refused schema: all join key expressions must be elementwise.
 Expr.cum_max | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 many
 Expr.cum_max | pivot_aggregate > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean many
 Expr.cum_max | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed Int64 many
@@ -373,8 +374,8 @@ Expr.cum_sum | join_left > over.order_by | continues | Int64 | - | - | refused s
 Expr.cum_sum | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.cum_sum | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.cum_sum | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.cum_sum | join_left | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.cum_sum | join_left | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.cum_sum | join_left | continues | Int64 | - | key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.cum_sum | join_left | ends | Int64 | - | key-is-elementwise | refused schema: all join key expressions must be elementwise.
 Expr.cum_sum | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
 Expr.cum_sum | join_right > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
 Expr.cum_sum | join_right > condition.value | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
@@ -383,8 +384,8 @@ Expr.cum_sum | join_right > over.order_by | continues | Int64 | - | - | refused 
 Expr.cum_sum | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.cum_sum | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.cum_sum | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.cum_sum | join_right | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.cum_sum | join_right | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.cum_sum | join_right | continues | Int64 | - | key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.cum_sum | join_right | ends | Int64 | - | key-is-elementwise | refused schema: all join key expressions must be elementwise.
 Expr.cum_sum | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 many
 Expr.cum_sum | pivot_aggregate > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `i64` for series with name `a`
 Expr.cum_sum | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed Int64 many
@@ -433,8 +434,8 @@ Expr.dt.date | join_left > over.order_by | continues | Date | - | - | refused sc
 Expr.dt.date | join_left > over.order_by | ends | Date | - | - | refused schema: all join key expressions must be elementwise.
 Expr.dt.date | join_left > over.partition_by | continues | Date | - | - | refused schema: all join key expressions must be elementwise.
 Expr.dt.date | join_left > over.partition_by | ends | Date | - | - | refused schema: all join key expressions must be elementwise.
-Expr.dt.date | join_left | continues | Date | - | - | allowed Date many
-Expr.dt.date | join_left | ends | Date | - | - | allowed Date many
+Expr.dt.date | join_left | continues | Date | - | key-is-elementwise | allowed Date many
+Expr.dt.date | join_left | ends | Date | - | key-is-elementwise | allowed Date many
 Expr.dt.date | join_right > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed Date many
 Expr.dt.date | join_right > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `ra`
 Expr.dt.date | join_right > condition.value | continues | Date | - | - | allowed Date many
@@ -443,8 +444,8 @@ Expr.dt.date | join_right > over.order_by | continues | Date | - | - | refused s
 Expr.dt.date | join_right > over.order_by | ends | Date | - | - | refused schema: all join key expressions must be elementwise.
 Expr.dt.date | join_right > over.partition_by | continues | Date | - | - | refused schema: all join key expressions must be elementwise.
 Expr.dt.date | join_right > over.partition_by | ends | Date | - | - | refused schema: all join key expressions must be elementwise.
-Expr.dt.date | join_right | continues | Date | - | - | allowed Date many
-Expr.dt.date | join_right | ends | Date | - | - | allowed Date many
+Expr.dt.date | join_right | continues | Date | - | key-is-elementwise | allowed Date many
+Expr.dt.date | join_right | ends | Date | - | key-is-elementwise | allowed Date many
 Expr.dt.date | pivot_aggregate > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed Date many
 Expr.dt.date | pivot_aggregate > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `a`
 Expr.dt.date | pivot_aggregate > condition.value | continues | Date | - | - | allowed Date many
@@ -493,8 +494,8 @@ Expr.dt.month_start | join_left > over.order_by | continues | Date | - | - | ref
 Expr.dt.month_start | join_left > over.order_by | ends | Date | - | - | refused schema: all join key expressions must be elementwise.
 Expr.dt.month_start | join_left > over.partition_by | continues | Date | - | - | refused schema: all join key expressions must be elementwise.
 Expr.dt.month_start | join_left > over.partition_by | ends | Date | - | - | refused schema: all join key expressions must be elementwise.
-Expr.dt.month_start | join_left | continues | Date | - | - | allowed Date many
-Expr.dt.month_start | join_left | ends | Date | - | - | allowed Date many
+Expr.dt.month_start | join_left | continues | Date | - | key-is-elementwise | allowed Date many
+Expr.dt.month_start | join_left | ends | Date | - | key-is-elementwise | allowed Date many
 Expr.dt.month_start | join_right > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed Date many
 Expr.dt.month_start | join_right > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `ra`
 Expr.dt.month_start | join_right > condition.value | continues | Date | - | - | allowed Date many
@@ -503,8 +504,8 @@ Expr.dt.month_start | join_right > over.order_by | continues | Date | - | - | re
 Expr.dt.month_start | join_right > over.order_by | ends | Date | - | - | refused schema: all join key expressions must be elementwise.
 Expr.dt.month_start | join_right > over.partition_by | continues | Date | - | - | refused schema: all join key expressions must be elementwise.
 Expr.dt.month_start | join_right > over.partition_by | ends | Date | - | - | refused schema: all join key expressions must be elementwise.
-Expr.dt.month_start | join_right | continues | Date | - | - | allowed Date many
-Expr.dt.month_start | join_right | ends | Date | - | - | allowed Date many
+Expr.dt.month_start | join_right | continues | Date | - | key-is-elementwise | allowed Date many
+Expr.dt.month_start | join_right | ends | Date | - | key-is-elementwise | allowed Date many
 Expr.dt.month_start | pivot_aggregate > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed Date many
 Expr.dt.month_start | pivot_aggregate > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `a`
 Expr.dt.month_start | pivot_aggregate > condition.value | continues | Date | - | - | allowed Date many
@@ -553,8 +554,8 @@ Expr.dt.offset_by | join_left > over.order_by | continues | Date | String | - | 
 Expr.dt.offset_by | join_left > over.order_by | ends | Date | String | - | refused schema: all join key expressions must be elementwise.
 Expr.dt.offset_by | join_left > over.partition_by | continues | Date | String | - | refused schema: all join key expressions must be elementwise.
 Expr.dt.offset_by | join_left > over.partition_by | ends | Date | String | - | refused schema: all join key expressions must be elementwise.
-Expr.dt.offset_by | join_left | continues | Date | String | - | allowed Date many
-Expr.dt.offset_by | join_left | ends | Date | String | - | allowed Date many
+Expr.dt.offset_by | join_left | continues | Date | String | key-is-elementwise | allowed Date many
+Expr.dt.offset_by | join_left | ends | Date | String | key-is-elementwise | allowed Date many
 Expr.dt.offset_by | join_right > condition.predicate | continues | Date | String | condition-predicate-is-boolean | allowed Date many
 Expr.dt.offset_by | join_right > condition.predicate | ends | Date | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `ra`
 Expr.dt.offset_by | join_right > condition.value | continues | Date | String | - | allowed Date many
@@ -563,8 +564,8 @@ Expr.dt.offset_by | join_right > over.order_by | continues | Date | String | - |
 Expr.dt.offset_by | join_right > over.order_by | ends | Date | String | - | refused schema: all join key expressions must be elementwise.
 Expr.dt.offset_by | join_right > over.partition_by | continues | Date | String | - | refused schema: all join key expressions must be elementwise.
 Expr.dt.offset_by | join_right > over.partition_by | ends | Date | String | - | refused schema: all join key expressions must be elementwise.
-Expr.dt.offset_by | join_right | continues | Date | String | - | allowed Date many
-Expr.dt.offset_by | join_right | ends | Date | String | - | allowed Date many
+Expr.dt.offset_by | join_right | continues | Date | String | key-is-elementwise | allowed Date many
+Expr.dt.offset_by | join_right | ends | Date | String | key-is-elementwise | allowed Date many
 Expr.dt.offset_by | pivot_aggregate > condition.predicate | continues | Date | String | condition-predicate-is-boolean | allowed Date many
 Expr.dt.offset_by | pivot_aggregate > condition.predicate | ends | Date | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `a`
 Expr.dt.offset_by | pivot_aggregate > condition.value | continues | Date | String | - | allowed Date many
@@ -613,8 +614,8 @@ Expr.dt.time | join_left > over.order_by | continues | Time | - | - | refused sc
 Expr.dt.time | join_left > over.order_by | ends | Time | - | - | refused schema: all join key expressions must be elementwise.
 Expr.dt.time | join_left > over.partition_by | continues | Time | - | - | refused schema: all join key expressions must be elementwise.
 Expr.dt.time | join_left > over.partition_by | ends | Time | - | - | refused schema: all join key expressions must be elementwise.
-Expr.dt.time | join_left | continues | Time | - | - | allowed Time many
-Expr.dt.time | join_left | ends | Time | - | - | allowed Time many
+Expr.dt.time | join_left | continues | Time | - | key-is-elementwise | allowed Time many
+Expr.dt.time | join_left | ends | Time | - | key-is-elementwise | allowed Time many
 Expr.dt.time | join_right > condition.predicate | continues | Time | - | condition-predicate-is-boolean | allowed Time many
 Expr.dt.time | join_right > condition.predicate | ends | Time | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `time` for series with name `ra`
 Expr.dt.time | join_right > condition.value | continues | Time | - | - | allowed Time many
@@ -623,8 +624,8 @@ Expr.dt.time | join_right > over.order_by | continues | Time | - | - | refused s
 Expr.dt.time | join_right > over.order_by | ends | Time | - | - | refused schema: all join key expressions must be elementwise.
 Expr.dt.time | join_right > over.partition_by | continues | Time | - | - | refused schema: all join key expressions must be elementwise.
 Expr.dt.time | join_right > over.partition_by | ends | Time | - | - | refused schema: all join key expressions must be elementwise.
-Expr.dt.time | join_right | continues | Time | - | - | allowed Time many
-Expr.dt.time | join_right | ends | Time | - | - | allowed Time many
+Expr.dt.time | join_right | continues | Time | - | key-is-elementwise | allowed Time many
+Expr.dt.time | join_right | ends | Time | - | key-is-elementwise | allowed Time many
 Expr.dt.time | pivot_aggregate > condition.predicate | continues | Time | - | condition-predicate-is-boolean | allowed Time many
 Expr.dt.time | pivot_aggregate > condition.predicate | ends | Time | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `time` for series with name `a`
 Expr.dt.time | pivot_aggregate > condition.value | continues | Time | - | - | allowed Time many
@@ -673,8 +674,8 @@ Expr.dt.total_days | join_left > over.order_by | continues | Duration(us) | - | 
 Expr.dt.total_days | join_left > over.order_by | ends | Duration(us) | - | - | refused schema: all join key expressions must be elementwise.
 Expr.dt.total_days | join_left > over.partition_by | continues | Duration(us) | - | - | refused schema: all join key expressions must be elementwise.
 Expr.dt.total_days | join_left > over.partition_by | ends | Duration(us) | - | - | refused schema: all join key expressions must be elementwise.
-Expr.dt.total_days | join_left | continues | Duration(us) | - | - | allowed Int64 many
-Expr.dt.total_days | join_left | ends | Duration(us) | - | - | allowed Int64 many
+Expr.dt.total_days | join_left | continues | Duration(us) | - | key-is-elementwise | allowed Int64 many
+Expr.dt.total_days | join_left | ends | Duration(us) | - | key-is-elementwise | allowed Int64 many
 Expr.dt.total_days | join_right > condition.predicate | continues | Duration(us) | - | condition-predicate-is-boolean | allowed Int64 many
 Expr.dt.total_days | join_right > condition.predicate | ends | Duration(us) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `i64` for series with name `ra`
 Expr.dt.total_days | join_right > condition.value | continues | Duration(us) | - | - | allowed Int64 many
@@ -683,8 +684,8 @@ Expr.dt.total_days | join_right > over.order_by | continues | Duration(us) | - |
 Expr.dt.total_days | join_right > over.order_by | ends | Duration(us) | - | - | refused schema: all join key expressions must be elementwise.
 Expr.dt.total_days | join_right > over.partition_by | continues | Duration(us) | - | - | refused schema: all join key expressions must be elementwise.
 Expr.dt.total_days | join_right > over.partition_by | ends | Duration(us) | - | - | refused schema: all join key expressions must be elementwise.
-Expr.dt.total_days | join_right | continues | Duration(us) | - | - | allowed Int64 many
-Expr.dt.total_days | join_right | ends | Duration(us) | - | - | allowed Int64 many
+Expr.dt.total_days | join_right | continues | Duration(us) | - | key-is-elementwise | allowed Int64 many
+Expr.dt.total_days | join_right | ends | Duration(us) | - | key-is-elementwise | allowed Int64 many
 Expr.dt.total_days | pivot_aggregate > condition.predicate | continues | Duration(us) | - | condition-predicate-is-boolean | allowed Int64 many
 Expr.dt.total_days | pivot_aggregate > condition.predicate | ends | Duration(us) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `i64` for series with name `a`
 Expr.dt.total_days | pivot_aggregate > condition.value | continues | Duration(us) | - | - | allowed Int64 many
@@ -733,8 +734,8 @@ Expr.eq | join_left > over.order_by | continues | Int64 | Int64 | - | refused sc
 Expr.eq | join_left > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.eq | join_left > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.eq | join_left > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.eq | join_left | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.eq | join_left | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.eq | join_left | continues | Int64 | Int64 | key-is-elementwise | allowed Boolean many
+Expr.eq | join_left | ends | Int64 | Int64 | key-is-elementwise | allowed Boolean many
 Expr.eq | join_right > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.eq | join_right > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.eq | join_right > condition.value | continues | Int64 | Int64 | - | allowed Boolean many
@@ -743,8 +744,8 @@ Expr.eq | join_right > over.order_by | continues | Int64 | Int64 | - | refused s
 Expr.eq | join_right > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.eq | join_right > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.eq | join_right > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.eq | join_right | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.eq | join_right | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.eq | join_right | continues | Int64 | Int64 | key-is-elementwise | allowed Boolean many
+Expr.eq | join_right | ends | Int64 | Int64 | key-is-elementwise | allowed Boolean many
 Expr.eq | pivot_aggregate > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.eq | pivot_aggregate > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.eq | pivot_aggregate > condition.value | continues | Int64 | Int64 | - | allowed Boolean many
@@ -793,8 +794,8 @@ Expr.first | join_left > over.order_by | continues | Int64 | - | - | refused sch
 Expr.first | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.first | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.first | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.first | join_left | continues | Int64 | - | - | allowed Int64 one
-Expr.first | join_left | ends | Int64 | - | - | allowed Int64 one
+Expr.first | join_left | continues | Int64 | - | key-is-elementwise | allowed Int64 one
+Expr.first | join_left | ends | Int64 | - | key-is-elementwise | allowed Int64 one
 Expr.first | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 one
 Expr.first | join_right > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean one
 Expr.first | join_right > condition.value | continues | Int64 | - | - | allowed Int64 one
@@ -803,8 +804,8 @@ Expr.first | join_right > over.order_by | continues | Int64 | - | - | refused sc
 Expr.first | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.first | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.first | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.first | join_right | continues | Int64 | - | - | allowed Int64 one
-Expr.first | join_right | ends | Int64 | - | - | allowed Int64 one
+Expr.first | join_right | continues | Int64 | - | key-is-elementwise | allowed Int64 one
+Expr.first | join_right | ends | Int64 | - | key-is-elementwise | allowed Int64 one
 Expr.first | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 one
 Expr.first | pivot_aggregate > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean one
 Expr.first | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed Int64 one
@@ -853,8 +854,8 @@ Expr.ge | join_left > over.order_by | continues | Int64 | Int64 | - | refused sc
 Expr.ge | join_left > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.ge | join_left > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.ge | join_left > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.ge | join_left | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.ge | join_left | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.ge | join_left | continues | Int64 | Int64 | key-is-elementwise | allowed Boolean many
+Expr.ge | join_left | ends | Int64 | Int64 | key-is-elementwise | allowed Boolean many
 Expr.ge | join_right > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.ge | join_right > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.ge | join_right > condition.value | continues | Int64 | Int64 | - | allowed Boolean many
@@ -863,8 +864,8 @@ Expr.ge | join_right > over.order_by | continues | Int64 | Int64 | - | refused s
 Expr.ge | join_right > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.ge | join_right > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.ge | join_right > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.ge | join_right | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.ge | join_right | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.ge | join_right | continues | Int64 | Int64 | key-is-elementwise | allowed Boolean many
+Expr.ge | join_right | ends | Int64 | Int64 | key-is-elementwise | allowed Boolean many
 Expr.ge | pivot_aggregate > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.ge | pivot_aggregate > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.ge | pivot_aggregate > condition.value | continues | Int64 | Int64 | - | allowed Boolean many
@@ -913,8 +914,8 @@ Expr.gt | join_left > over.order_by | continues | Int64 | Int64 | - | refused sc
 Expr.gt | join_left > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.gt | join_left > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.gt | join_left > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.gt | join_left | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.gt | join_left | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.gt | join_left | continues | Int64 | Int64 | key-is-elementwise | allowed Boolean many
+Expr.gt | join_left | ends | Int64 | Int64 | key-is-elementwise | allowed Boolean many
 Expr.gt | join_right > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.gt | join_right > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.gt | join_right > condition.value | continues | Int64 | Int64 | - | allowed Boolean many
@@ -923,8 +924,8 @@ Expr.gt | join_right > over.order_by | continues | Int64 | Int64 | - | refused s
 Expr.gt | join_right > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.gt | join_right > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.gt | join_right > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.gt | join_right | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.gt | join_right | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.gt | join_right | continues | Int64 | Int64 | key-is-elementwise | allowed Boolean many
+Expr.gt | join_right | ends | Int64 | Int64 | key-is-elementwise | allowed Boolean many
 Expr.gt | pivot_aggregate > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.gt | pivot_aggregate > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.gt | pivot_aggregate > condition.value | continues | Int64 | Int64 | - | allowed Boolean many
@@ -973,8 +974,8 @@ Expr.is_not_null | join_left > over.order_by | continues | Int64 | - | - | refus
 Expr.is_not_null | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.is_not_null | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.is_not_null | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.is_not_null | join_left | continues | Int64 | - | - | allowed Boolean many
-Expr.is_not_null | join_left | ends | Int64 | - | - | allowed Boolean many
+Expr.is_not_null | join_left | continues | Int64 | - | key-is-elementwise | allowed Boolean many
+Expr.is_not_null | join_left | ends | Int64 | - | key-is-elementwise | allowed Boolean many
 Expr.is_not_null | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Boolean many
 Expr.is_not_null | join_right > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | allowed Boolean many
 Expr.is_not_null | join_right > condition.value | continues | Int64 | - | - | allowed Boolean many
@@ -983,8 +984,8 @@ Expr.is_not_null | join_right > over.order_by | continues | Int64 | - | - | refu
 Expr.is_not_null | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.is_not_null | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.is_not_null | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.is_not_null | join_right | continues | Int64 | - | - | allowed Boolean many
-Expr.is_not_null | join_right | ends | Int64 | - | - | allowed Boolean many
+Expr.is_not_null | join_right | continues | Int64 | - | key-is-elementwise | allowed Boolean many
+Expr.is_not_null | join_right | ends | Int64 | - | key-is-elementwise | allowed Boolean many
 Expr.is_not_null | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Boolean many
 Expr.is_not_null | pivot_aggregate > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | allowed Boolean many
 Expr.is_not_null | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed Boolean many
@@ -1033,8 +1034,8 @@ Expr.is_null | join_left > over.order_by | continues | Int64 | - | - | refused s
 Expr.is_null | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.is_null | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.is_null | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.is_null | join_left | continues | Int64 | - | - | allowed Boolean many
-Expr.is_null | join_left | ends | Int64 | - | - | allowed Boolean many
+Expr.is_null | join_left | continues | Int64 | - | key-is-elementwise | allowed Boolean many
+Expr.is_null | join_left | ends | Int64 | - | key-is-elementwise | allowed Boolean many
 Expr.is_null | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Boolean many
 Expr.is_null | join_right > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | allowed Boolean many
 Expr.is_null | join_right > condition.value | continues | Int64 | - | - | allowed Boolean many
@@ -1043,8 +1044,8 @@ Expr.is_null | join_right > over.order_by | continues | Int64 | - | - | refused 
 Expr.is_null | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.is_null | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.is_null | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.is_null | join_right | continues | Int64 | - | - | allowed Boolean many
-Expr.is_null | join_right | ends | Int64 | - | - | allowed Boolean many
+Expr.is_null | join_right | continues | Int64 | - | key-is-elementwise | allowed Boolean many
+Expr.is_null | join_right | ends | Int64 | - | key-is-elementwise | allowed Boolean many
 Expr.is_null | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Boolean many
 Expr.is_null | pivot_aggregate > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | allowed Boolean many
 Expr.is_null | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed Boolean many
@@ -1093,8 +1094,8 @@ Expr.last | join_left > over.order_by | continues | Int64 | - | - | refused sche
 Expr.last | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.last | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.last | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.last | join_left | continues | Int64 | - | - | allowed Int64 one
-Expr.last | join_left | ends | Int64 | - | - | allowed Int64 one
+Expr.last | join_left | continues | Int64 | - | key-is-elementwise | allowed Int64 one
+Expr.last | join_left | ends | Int64 | - | key-is-elementwise | allowed Int64 one
 Expr.last | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 one
 Expr.last | join_right > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean one
 Expr.last | join_right > condition.value | continues | Int64 | - | - | allowed Int64 one
@@ -1103,8 +1104,8 @@ Expr.last | join_right > over.order_by | continues | Int64 | - | - | refused sch
 Expr.last | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.last | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.last | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.last | join_right | continues | Int64 | - | - | allowed Int64 one
-Expr.last | join_right | ends | Int64 | - | - | allowed Int64 one
+Expr.last | join_right | continues | Int64 | - | key-is-elementwise | allowed Int64 one
+Expr.last | join_right | ends | Int64 | - | key-is-elementwise | allowed Int64 one
 Expr.last | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 one
 Expr.last | pivot_aggregate > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean one
 Expr.last | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed Int64 one
@@ -1153,8 +1154,8 @@ Expr.le | join_left > over.order_by | continues | Int64 | Int64 | - | refused sc
 Expr.le | join_left > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.le | join_left > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.le | join_left > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.le | join_left | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.le | join_left | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.le | join_left | continues | Int64 | Int64 | key-is-elementwise | allowed Boolean many
+Expr.le | join_left | ends | Int64 | Int64 | key-is-elementwise | allowed Boolean many
 Expr.le | join_right > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.le | join_right > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.le | join_right > condition.value | continues | Int64 | Int64 | - | allowed Boolean many
@@ -1163,8 +1164,8 @@ Expr.le | join_right > over.order_by | continues | Int64 | Int64 | - | refused s
 Expr.le | join_right > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.le | join_right > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.le | join_right > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.le | join_right | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.le | join_right | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.le | join_right | continues | Int64 | Int64 | key-is-elementwise | allowed Boolean many
+Expr.le | join_right | ends | Int64 | Int64 | key-is-elementwise | allowed Boolean many
 Expr.le | pivot_aggregate > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.le | pivot_aggregate > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.le | pivot_aggregate > condition.value | continues | Int64 | Int64 | - | allowed Boolean many
@@ -1213,8 +1214,8 @@ Expr.len | join_left > over.order_by | continues | Int64 | - | - | refused schem
 Expr.len | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.len | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.len | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.len | join_left | continues | Int64 | - | - | allowed UInt32 one
-Expr.len | join_left | ends | Int64 | - | - | allowed UInt32 one
+Expr.len | join_left | continues | Int64 | - | key-is-elementwise | allowed UInt32 one
+Expr.len | join_left | ends | Int64 | - | key-is-elementwise | allowed UInt32 one
 Expr.len | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed UInt32 one
 Expr.len | join_right > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `u32` for series with name `_POLARS_TMP_PHYS_`
 Expr.len | join_right > condition.value | continues | Int64 | - | - | allowed UInt32 one
@@ -1223,8 +1224,8 @@ Expr.len | join_right > over.order_by | continues | Int64 | - | - | refused sche
 Expr.len | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.len | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.len | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.len | join_right | continues | Int64 | - | - | allowed UInt32 one
-Expr.len | join_right | ends | Int64 | - | - | allowed UInt32 one
+Expr.len | join_right | continues | Int64 | - | key-is-elementwise | allowed UInt32 one
+Expr.len | join_right | ends | Int64 | - | key-is-elementwise | allowed UInt32 one
 Expr.len | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed UInt32 one
 Expr.len | pivot_aggregate > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `u32` for series with name `_POLARS_TMP_PHYS_`
 Expr.len | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed UInt32 one
@@ -1273,8 +1274,8 @@ Expr.lt | join_left > over.order_by | continues | Int64 | Int64 | - | refused sc
 Expr.lt | join_left > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.lt | join_left > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.lt | join_left > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.lt | join_left | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.lt | join_left | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.lt | join_left | continues | Int64 | Int64 | key-is-elementwise | allowed Boolean many
+Expr.lt | join_left | ends | Int64 | Int64 | key-is-elementwise | allowed Boolean many
 Expr.lt | join_right > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.lt | join_right > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.lt | join_right > condition.value | continues | Int64 | Int64 | - | allowed Boolean many
@@ -1283,8 +1284,8 @@ Expr.lt | join_right > over.order_by | continues | Int64 | Int64 | - | refused s
 Expr.lt | join_right > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.lt | join_right > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.lt | join_right > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.lt | join_right | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.lt | join_right | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.lt | join_right | continues | Int64 | Int64 | key-is-elementwise | allowed Boolean many
+Expr.lt | join_right | ends | Int64 | Int64 | key-is-elementwise | allowed Boolean many
 Expr.lt | pivot_aggregate > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.lt | pivot_aggregate > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.lt | pivot_aggregate > condition.value | continues | Int64 | Int64 | - | allowed Boolean many
@@ -1333,8 +1334,8 @@ Expr.max | join_left > over.order_by | continues | Int64 | - | - | refused schem
 Expr.max | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.max | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.max | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.max | join_left | continues | Int64 | - | - | allowed Int64 one
-Expr.max | join_left | ends | Int64 | - | - | allowed Int64 one
+Expr.max | join_left | continues | Int64 | - | key-is-elementwise | allowed Int64 one
+Expr.max | join_left | ends | Int64 | - | key-is-elementwise | allowed Int64 one
 Expr.max | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 one
 Expr.max | join_right > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean one
 Expr.max | join_right > condition.value | continues | Int64 | - | - | allowed Int64 one
@@ -1343,8 +1344,8 @@ Expr.max | join_right > over.order_by | continues | Int64 | - | - | refused sche
 Expr.max | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.max | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.max | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.max | join_right | continues | Int64 | - | - | allowed Int64 one
-Expr.max | join_right | ends | Int64 | - | - | allowed Int64 one
+Expr.max | join_right | continues | Int64 | - | key-is-elementwise | allowed Int64 one
+Expr.max | join_right | ends | Int64 | - | key-is-elementwise | allowed Int64 one
 Expr.max | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 one
 Expr.max | pivot_aggregate > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean one
 Expr.max | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed Int64 one
@@ -1393,8 +1394,8 @@ Expr.min | join_left > over.order_by | continues | Int64 | - | - | refused schem
 Expr.min | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.min | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.min | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.min | join_left | continues | Int64 | - | - | allowed Int64 one
-Expr.min | join_left | ends | Int64 | - | - | allowed Int64 one
+Expr.min | join_left | continues | Int64 | - | key-is-elementwise | allowed Int64 one
+Expr.min | join_left | ends | Int64 | - | key-is-elementwise | allowed Int64 one
 Expr.min | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 one
 Expr.min | join_right > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean one
 Expr.min | join_right > condition.value | continues | Int64 | - | - | allowed Int64 one
@@ -1403,8 +1404,8 @@ Expr.min | join_right > over.order_by | continues | Int64 | - | - | refused sche
 Expr.min | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.min | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.min | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.min | join_right | continues | Int64 | - | - | allowed Int64 one
-Expr.min | join_right | ends | Int64 | - | - | allowed Int64 one
+Expr.min | join_right | continues | Int64 | - | key-is-elementwise | allowed Int64 one
+Expr.min | join_right | ends | Int64 | - | key-is-elementwise | allowed Int64 one
 Expr.min | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 one
 Expr.min | pivot_aggregate > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean one
 Expr.min | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed Int64 one
@@ -1453,8 +1454,8 @@ Expr.ne | join_left > over.order_by | continues | Int64 | Int64 | - | refused sc
 Expr.ne | join_left > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.ne | join_left > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.ne | join_left > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.ne | join_left | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.ne | join_left | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.ne | join_left | continues | Int64 | Int64 | key-is-elementwise | allowed Boolean many
+Expr.ne | join_left | ends | Int64 | Int64 | key-is-elementwise | allowed Boolean many
 Expr.ne | join_right > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.ne | join_right > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.ne | join_right > condition.value | continues | Int64 | Int64 | - | allowed Boolean many
@@ -1463,8 +1464,8 @@ Expr.ne | join_right > over.order_by | continues | Int64 | Int64 | - | refused s
 Expr.ne | join_right > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.ne | join_right > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.ne | join_right > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.ne | join_right | continues | Int64 | Int64 | - | allowed Boolean many
-Expr.ne | join_right | ends | Int64 | Int64 | - | allowed Boolean many
+Expr.ne | join_right | continues | Int64 | Int64 | key-is-elementwise | allowed Boolean many
+Expr.ne | join_right | ends | Int64 | Int64 | key-is-elementwise | allowed Boolean many
 Expr.ne | pivot_aggregate > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.ne | pivot_aggregate > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | allowed Boolean many
 Expr.ne | pivot_aggregate > condition.value | continues | Int64 | Int64 | - | allowed Boolean many
@@ -1513,8 +1514,8 @@ Expr.over | join_left > over.order_by | continues | Int64 | - | - | refused sche
 Expr.over | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.over | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.over | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.over | join_left | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.over | join_left | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.over | join_left | continues | Int64 | - | key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.over | join_left | ends | Int64 | - | key-is-elementwise | refused schema: all join key expressions must be elementwise.
 Expr.over | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
 Expr.over | join_right > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
 Expr.over | join_right > condition.value | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
@@ -1523,8 +1524,8 @@ Expr.over | join_right > over.order_by | continues | Int64 | - | - | refused sch
 Expr.over | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.over | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.over | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.over | join_right | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.over | join_right | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.over | join_right | continues | Int64 | - | key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.over | join_right | ends | Int64 | - | key-is-elementwise | refused schema: all join key expressions must be elementwise.
 Expr.over | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | refused rows: lengths don't match: the length of the window expression did not match that of the group
 Expr.over | pivot_aggregate > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused rows: lengths don't match: the length of the window expression did not match that of the group
 Expr.over | pivot_aggregate > condition.value | continues | Int64 | - | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
@@ -1573,8 +1574,8 @@ Expr.shift | join_left > over.order_by | continues | Int64 | - | - | refused sch
 Expr.shift | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.shift | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.shift | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.shift | join_left | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.shift | join_left | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.shift | join_left | continues | Int64 | - | key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.shift | join_left | ends | Int64 | - | key-is-elementwise | refused schema: all join key expressions must be elementwise.
 Expr.shift | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
 Expr.shift | join_right > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | refused schema: all join key expressions must be elementwise.
 Expr.shift | join_right > condition.value | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
@@ -1583,8 +1584,8 @@ Expr.shift | join_right > over.order_by | continues | Int64 | - | - | refused sc
 Expr.shift | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.shift | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.shift | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.shift | join_right | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.shift | join_right | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.shift | join_right | continues | Int64 | - | key-is-elementwise | refused schema: all join key expressions must be elementwise.
+Expr.shift | join_right | ends | Int64 | - | key-is-elementwise | refused schema: all join key expressions must be elementwise.
 Expr.shift | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 many
 Expr.shift | pivot_aggregate > condition.predicate | ends | Boolean | - | condition-predicate-is-boolean | allowed Boolean many
 Expr.shift | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed Int64 many
@@ -1633,8 +1634,8 @@ Expr.sub | join_left > over.order_by | continues | Int64 | Int64 | - | refused s
 Expr.sub | join_left > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.sub | join_left > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.sub | join_left > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.sub | join_left | continues | Int64 | Int64 | - | allowed Int64 many
-Expr.sub | join_left | ends | Int64 | Int64 | - | allowed Int64 many
+Expr.sub | join_left | continues | Int64 | Int64 | key-is-elementwise | allowed Int64 many
+Expr.sub | join_left | ends | Int64 | Int64 | key-is-elementwise | allowed Int64 many
 Expr.sub | join_right > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Int64 many
 Expr.sub | join_right > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `i64` for series with name `ra`
 Expr.sub | join_right > condition.value | continues | Int64 | Int64 | - | allowed Int64 many
@@ -1643,8 +1644,8 @@ Expr.sub | join_right > over.order_by | continues | Int64 | Int64 | - | refused 
 Expr.sub | join_right > over.order_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.sub | join_right > over.partition_by | continues | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.sub | join_right > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
-Expr.sub | join_right | continues | Int64 | Int64 | - | allowed Int64 many
-Expr.sub | join_right | ends | Int64 | Int64 | - | allowed Int64 many
+Expr.sub | join_right | continues | Int64 | Int64 | key-is-elementwise | allowed Int64 many
+Expr.sub | join_right | ends | Int64 | Int64 | key-is-elementwise | allowed Int64 many
 Expr.sub | pivot_aggregate > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Int64 many
 Expr.sub | pivot_aggregate > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `i64` for series with name `a`
 Expr.sub | pivot_aggregate > condition.value | continues | Int64 | Int64 | - | allowed Int64 many
@@ -1693,8 +1694,8 @@ Expr.sum | join_left > over.order_by | continues | Int64 | - | - | refused schem
 Expr.sum | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.sum | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.sum | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.sum | join_left | continues | Int64 | - | - | allowed Int64 one
-Expr.sum | join_left | ends | Int64 | - | - | allowed Int64 one
+Expr.sum | join_left | continues | Int64 | - | key-is-elementwise | allowed Int64 one
+Expr.sum | join_left | ends | Int64 | - | key-is-elementwise | allowed Int64 one
 Expr.sum | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 one
 Expr.sum | join_right > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `i64` for series with name `_POLARS_TMP_PHYS_`
 Expr.sum | join_right > condition.value | continues | Int64 | - | - | allowed Int64 one
@@ -1703,8 +1704,8 @@ Expr.sum | join_right > over.order_by | continues | Int64 | - | - | refused sche
 Expr.sum | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.sum | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
 Expr.sum | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
-Expr.sum | join_right | continues | Int64 | - | - | allowed Int64 one
-Expr.sum | join_right | ends | Int64 | - | - | allowed Int64 one
+Expr.sum | join_right | continues | Int64 | - | key-is-elementwise | allowed Int64 one
+Expr.sum | join_right | ends | Int64 | - | key-is-elementwise | allowed Int64 one
 Expr.sum | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 one
 Expr.sum | pivot_aggregate > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `i64` for series with name `_POLARS_TMP_PHYS_`
 Expr.sum | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed Int64 one
@@ -1753,8 +1754,8 @@ Then.otherwise | join_left > over.order_by | continues | - | - | - | refused sch
 Then.otherwise | join_left > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 Then.otherwise | join_left > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 Then.otherwise | join_left > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-Then.otherwise | join_left | continues | - | - | - | allowed -
-Then.otherwise | join_left | ends | - | - | - | allowed -
+Then.otherwise | join_left | continues | - | - | key-is-elementwise | allowed -
+Then.otherwise | join_left | ends | - | - | key-is-elementwise | allowed -
 Then.otherwise | join_right > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 Then.otherwise | join_right > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
 Then.otherwise | join_right > condition.value | continues | - | - | - | allowed -
@@ -1763,8 +1764,8 @@ Then.otherwise | join_right > over.order_by | continues | - | - | - | refused sc
 Then.otherwise | join_right > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 Then.otherwise | join_right > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 Then.otherwise | join_right > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-Then.otherwise | join_right | continues | - | - | - | allowed -
-Then.otherwise | join_right | ends | - | - | - | allowed -
+Then.otherwise | join_right | continues | - | - | key-is-elementwise | allowed -
+Then.otherwise | join_right | ends | - | - | key-is-elementwise | allowed -
 Then.otherwise | pivot_aggregate > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 Then.otherwise | pivot_aggregate > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
 Then.otherwise | pivot_aggregate > condition.value | continues | - | - | - | allowed -
@@ -1813,8 +1814,8 @@ Then.when | join_left > over.order_by | continues | - | - | - | refused schema: 
 Then.when | join_left > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 Then.when | join_left > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 Then.when | join_left > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-Then.when | join_left | continues | - | - | - | allowed -
-Then.when | join_left | ends | - | - | - | allowed -
+Then.when | join_left | continues | - | - | key-is-elementwise | allowed -
+Then.when | join_left | ends | - | - | key-is-elementwise | allowed -
 Then.when | join_right > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 Then.when | join_right > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
 Then.when | join_right > condition.value | continues | - | - | - | allowed -
@@ -1823,8 +1824,8 @@ Then.when | join_right > over.order_by | continues | - | - | - | refused schema:
 Then.when | join_right > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 Then.when | join_right > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 Then.when | join_right > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-Then.when | join_right | continues | - | - | - | allowed -
-Then.when | join_right | ends | - | - | - | allowed -
+Then.when | join_right | continues | - | - | key-is-elementwise | allowed -
+Then.when | join_right | ends | - | - | key-is-elementwise | allowed -
 Then.when | pivot_aggregate > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 Then.when | pivot_aggregate > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
 Then.when | pivot_aggregate > condition.value | continues | - | - | - | allowed -
@@ -1873,8 +1874,8 @@ When.then | join_left > over.order_by | continues | - | - | - | refused schema: 
 When.then | join_left > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 When.then | join_left > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 When.then | join_left > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-When.then | join_left | continues | - | - | - | allowed -
-When.then | join_left | ends | - | - | - | allowed -
+When.then | join_left | continues | - | - | key-is-elementwise | allowed -
+When.then | join_left | ends | - | - | key-is-elementwise | allowed -
 When.then | join_right > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 When.then | join_right > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
 When.then | join_right > condition.value | continues | - | - | - | allowed -
@@ -1883,8 +1884,8 @@ When.then | join_right > over.order_by | continues | - | - | - | refused schema:
 When.then | join_right > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 When.then | join_right > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 When.then | join_right > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-When.then | join_right | continues | - | - | - | allowed -
-When.then | join_right | ends | - | - | - | allowed -
+When.then | join_right | continues | - | - | key-is-elementwise | allowed -
+When.then | join_right | ends | - | - | key-is-elementwise | allowed -
 When.then | pivot_aggregate > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 When.then | pivot_aggregate > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
 When.then | pivot_aggregate > condition.value | continues | - | - | - | allowed -
@@ -1933,8 +1934,8 @@ polars.col | join_left > over.order_by | continues | - | - | - | refused schema:
 polars.col | join_left > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.col | join_left > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.col | join_left > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-polars.col | join_left | continues | - | - | - | allowed Int64 many
-polars.col | join_left | ends | - | - | - | allowed Int64 many
+polars.col | join_left | continues | - | - | key-is-elementwise | allowed Int64 many
+polars.col | join_left | ends | - | - | key-is-elementwise | allowed Int64 many
 polars.col | join_right > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Int64 many
 polars.col | join_right > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed Boolean many
 polars.col | join_right > condition.value | continues | - | - | - | allowed Int64 many
@@ -1943,8 +1944,8 @@ polars.col | join_right > over.order_by | continues | - | - | - | refused schema
 polars.col | join_right > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.col | join_right > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.col | join_right > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-polars.col | join_right | continues | - | - | - | allowed Int64 many
-polars.col | join_right | ends | - | - | - | allowed Int64 many
+polars.col | join_right | continues | - | - | key-is-elementwise | allowed Int64 many
+polars.col | join_right | ends | - | - | key-is-elementwise | allowed Int64 many
 polars.col | pivot_aggregate > condition.predicate | continues | - | - | condition-predicate-is-boolean | refused schema: explicit column references are not allowed in the `aggregate_function` of `pivot`
 polars.col | pivot_aggregate > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused schema: explicit column references are not allowed in the `aggregate_function` of `pivot`
 polars.col | pivot_aggregate > condition.value | continues | - | - | - | refused schema: explicit column references are not allowed in the `aggregate_function` of `pivot`
@@ -1993,8 +1994,8 @@ polars.element | join_left > over.order_by | continues | - | - | element-only-in
 polars.element | join_left > over.order_by | ends | - | - | element-only-in-pivot-aggregate | refused schema: `element` is not allowed in this context
 polars.element | join_left > over.partition_by | continues | - | - | element-only-in-pivot-aggregate | refused schema: `element` is not allowed in this context
 polars.element | join_left > over.partition_by | ends | - | - | element-only-in-pivot-aggregate | refused schema: `element` is not allowed in this context
-polars.element | join_left | continues | - | - | element-only-in-pivot-aggregate | refused schema: `element` is not allowed in this context
-polars.element | join_left | ends | - | - | element-only-in-pivot-aggregate | refused schema: `element` is not allowed in this context
+polars.element | join_left | continues | - | - | element-only-in-pivot-aggregate,key-is-elementwise | refused schema: `element` is not allowed in this context
+polars.element | join_left | ends | - | - | element-only-in-pivot-aggregate,key-is-elementwise | refused schema: `element` is not allowed in this context
 polars.element | join_right > condition.predicate | continues | - | - | condition-predicate-is-boolean,element-only-in-pivot-aggregate | refused rows: Polars panicked: internal error: entered unreachable code
 polars.element | join_right > condition.predicate | ends | - | - | condition-predicate-is-boolean,element-only-in-pivot-aggregate | refused rows: Polars panicked: internal error: entered unreachable code
 polars.element | join_right > condition.value | continues | - | - | element-only-in-pivot-aggregate | refused schema: `element` is not allowed in this context
@@ -2003,8 +2004,8 @@ polars.element | join_right > over.order_by | continues | - | - | element-only-i
 polars.element | join_right > over.order_by | ends | - | - | element-only-in-pivot-aggregate | refused schema: `element` is not allowed in this context
 polars.element | join_right > over.partition_by | continues | - | - | element-only-in-pivot-aggregate | refused schema: `element` is not allowed in this context
 polars.element | join_right > over.partition_by | ends | - | - | element-only-in-pivot-aggregate | refused schema: `element` is not allowed in this context
-polars.element | join_right | continues | - | - | element-only-in-pivot-aggregate | refused schema: `element` is not allowed in this context
-polars.element | join_right | ends | - | - | element-only-in-pivot-aggregate | refused schema: `element` is not allowed in this context
+polars.element | join_right | continues | - | - | element-only-in-pivot-aggregate,key-is-elementwise | refused schema: `element` is not allowed in this context
+polars.element | join_right | ends | - | - | element-only-in-pivot-aggregate,key-is-elementwise | refused schema: `element` is not allowed in this context
 polars.element | pivot_aggregate > condition.predicate | continues | - | - | condition-predicate-is-boolean,element-only-in-pivot-aggregate | allowed -
 polars.element | pivot_aggregate > condition.predicate | ends | - | - | condition-predicate-is-boolean,element-only-in-pivot-aggregate | refused rows: invalid series dtype: expected `Boolean`, got `i64` for series with name `a`
 polars.element | pivot_aggregate > condition.value | continues | - | - | element-only-in-pivot-aggregate | allowed -
@@ -2053,8 +2054,8 @@ polars.lit | join_left > over.order_by | continues | - | - | - | refused schema:
 polars.lit | join_left > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.lit | join_left > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.lit | join_left > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-polars.lit | join_left | continues | - | - | - | allowed Int32 one
-polars.lit | join_left | ends | - | - | - | allowed Int32 one
+polars.lit | join_left | continues | - | - | key-is-elementwise | allowed Int32 one
+polars.lit | join_left | ends | - | - | key-is-elementwise | allowed Int32 one
 polars.lit | join_right > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Int32 one
 polars.lit | join_right > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed Boolean one
 polars.lit | join_right > condition.value | continues | - | - | - | allowed Int32 one
@@ -2063,8 +2064,8 @@ polars.lit | join_right > over.order_by | continues | - | - | - | refused schema
 polars.lit | join_right > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.lit | join_right > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.lit | join_right > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-polars.lit | join_right | continues | - | - | - | allowed Int32 one
-polars.lit | join_right | ends | - | - | - | allowed Int32 one
+polars.lit | join_right | continues | - | - | key-is-elementwise | allowed Int32 one
+polars.lit | join_right | ends | - | - | key-is-elementwise | allowed Int32 one
 polars.lit | pivot_aggregate > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Int32 one
 polars.lit | pivot_aggregate > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed Boolean one
 polars.lit | pivot_aggregate > condition.value | continues | - | - | - | allowed Int32 one
@@ -2113,8 +2114,8 @@ polars.when | join_left > over.order_by | continues | - | - | - | refused schema
 polars.when | join_left > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.when | join_left > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.when | join_left > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-polars.when | join_left | continues | - | - | - | allowed -
-polars.when | join_left | ends | - | - | - | allowed -
+polars.when | join_left | continues | - | - | key-is-elementwise | allowed -
+polars.when | join_left | ends | - | - | key-is-elementwise | allowed -
 polars.when | join_right > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 polars.when | join_right > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
 polars.when | join_right > condition.value | continues | - | - | - | allowed -
@@ -2123,8 +2124,8 @@ polars.when | join_right > over.order_by | continues | - | - | - | refused schem
 polars.when | join_right > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.when | join_right > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.when | join_right > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-polars.when | join_right | continues | - | - | - | allowed -
-polars.when | join_right | ends | - | - | - | allowed -
+polars.when | join_right | continues | - | - | key-is-elementwise | allowed -
+polars.when | join_right | ends | - | - | key-is-elementwise | allowed -
 polars.when | pivot_aggregate > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 polars.when | pivot_aggregate > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
 polars.when | pivot_aggregate > condition.value | continues | - | - | - | allowed -

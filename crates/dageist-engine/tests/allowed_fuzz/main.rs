@@ -22,6 +22,7 @@ mod generate;
 mod limits;
 mod observe;
 mod predict;
+mod probe;
 mod reduce;
 mod target;
 
@@ -232,9 +233,12 @@ fn replay_a_case() {
 
 /// Every kept case replays, and no longer disagrees. A file named
 /// `fixed-*.case` was a disagreement the tables or a named rule now settle,
-/// and replays as checked; a file named `uncovered-<limit>.case` is a case the
+/// and replays as checked; a file named `stricter-<what it shows>.case` is a
+/// case where the tables refuse a part Polars does not evaluate, and a probe of
+/// that part shows the tables right; a file named `uncovered-<limit>.case` is a case the
 /// tables state they do not cover, and replays as excused by that limit, and
-/// every limit has one.
+/// every limit has one. A limit may have others, named
+/// `uncovered-<limit>--<what it shows>.case`.
 #[test]
 fn every_kept_case_replays_as_settled() {
     on_a_large_stack(kept_cases_replay_as_settled);
@@ -252,6 +256,7 @@ fn kept_cases_replay_as_settled() {
         .collect();
     files.sort();
     let mut fixed = 0;
+    let mut stricter = 0;
     let mut excused = std::collections::BTreeSet::new();
     for path in files {
         let bytes = std::fs::read(&path).expect("a kept case is read");
@@ -270,9 +275,21 @@ fn kept_cases_replay_as_settled() {
                 detail_of(outcome)
             );
             fixed += 1;
+        } else if name.starts_with("stricter-") {
+            assert_eq!(outcome.kind(), OutcomeKind::ExpectedRejection, "{name}");
+            assert!(
+                outcome
+                    .detail()
+                    .is_some_and(|detail| detail.starts_with(target::STRICTER_WHERE_UNEVALUATED)),
+                "{name} is stricter where Polars does not evaluate the part: {}",
+                detail_of(outcome)
+            );
+            stricter += 1;
         } else if let Some(slug) = name
             .strip_prefix("uncovered-")
             .and_then(|rest| rest.strip_suffix(".case"))
+            // `uncovered-<limit>--<what it shows>.case` is another case of a limit.
+            .map(|rest| rest.split("--").next().unwrap_or(rest))
         {
             let limit = Limit::ALL
                 .into_iter()
@@ -289,6 +306,7 @@ fn kept_cases_replay_as_settled() {
         }
     }
     assert!(fixed > 0, "a disagreement that was settled is kept");
+    assert!(stricter > 0, "a part Polars does not evaluate is kept");
     for limit in Limit::ALL {
         assert!(
             excused.contains(limit.slug()),

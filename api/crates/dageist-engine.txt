@@ -14,6 +14,13 @@ pub dageist_engine::allowed::ConditionState::ChainedThen
 pub dageist_engine::allowed::ConditionState::ChainedWhen
 pub dageist_engine::allowed::ConditionState::Then
 pub dageist_engine::allowed::ConditionState::When
+pub enum dageist_engine::allowed::Ending
+pub dageist_engine::allowed::Ending::Allowed
+pub dageist_engine::allowed::Ending::NotKnown(dageist_engine::allowed::Unknown)
+pub dageist_engine::allowed::Ending::Refused(dageist_engine::allowed::Refusal)
+impl dageist_engine::allowed::Ending
+pub const fn dageist_engine::allowed::Ending::is_allowed(&self) -> bool
+pub const fn dageist_engine::allowed::Ending::refusal(&self) -> core::option::Option<&dageist_engine::allowed::Refusal>
 pub enum dageist_engine::allowed::Nested
 pub dageist_engine::allowed::Nested::ConditionPredicate
 pub dageist_engine::allowed::Nested::ConditionValue
@@ -88,9 +95,10 @@ pub enum dageist_engine::allowed::Rule
 pub dageist_engine::allowed::Rule::ConditionPredicateIsBoolean
 pub dageist_engine::allowed::Rule::ElementOnlyInPivotAggregate
 pub dageist_engine::allowed::Rule::FilterPredicateIsBoolean
+pub dageist_engine::allowed::Rule::KeyIsElementwise
 pub dageist_engine::allowed::Rule::PivotAggregateGivesOneValue
 impl dageist_engine::allowed::Rule
-pub const dageist_engine::allowed::Rule::ALL: [Self; 4]
+pub const dageist_engine::allowed::Rule::ALL: [Self; 5]
 pub fn dageist_engine::allowed::Rule::from_name(name: &str) -> core::option::Option<Self>
 pub const fn dageist_engine::allowed::Rule::name(self) -> &'static str
 pub const fn dageist_engine::allowed::Rule::statement(self) -> &'static str
@@ -105,6 +113,11 @@ pub dageist_engine::allowed::Stage::Rows
 pub dageist_engine::allowed::Stage::Schema
 impl dageist_engine::allowed::Stage
 pub const fn dageist_engine::allowed::Stage::name(self) -> &'static str
+pub enum dageist_engine::allowed::Unknown
+pub dageist_engine::allowed::Unknown::TheResultsDtype
+pub dageist_engine::allowed::Unknown::TheStartsDtype
+impl core::fmt::Display for dageist_engine::allowed::Unknown
+pub fn dageist_engine::allowed::Unknown::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub enum dageist_engine::allowed::Verdict
 pub dageist_engine::allowed::Verdict::Allowed(dageist_engine::allowed::Allowance)
 pub dageist_engine::allowed::Verdict::Refused(dageist_engine::allowed::Refusal)
@@ -114,15 +127,21 @@ pub const fn dageist_engine::allowed::Verdict::is_allowed(&self) -> bool
 pub const fn dageist_engine::allowed::Verdict::refusal(&self) -> core::option::Option<&dageist_engine::allowed::Refusal>
 pub struct dageist_engine::allowed::Allowance
 impl dageist_engine::allowed::Allowance
-pub fn dageist_engine::allowed::Allowance::can_end(&self) -> core::result::Result<(), &dageist_engine::allowed::Refusal>
+pub const fn dageist_engine::allowed::Allowance::can_end(&self) -> &dageist_engine::allowed::Ending
 pub const fn dageist_engine::allowed::Allowance::result(&self) -> core::option::Option<&dageist_engine::allowed::ResultDtype>
 pub const fn dageist_engine::allowed::Allowance::shape(&self) -> dageist_engine::allowed::Shape
+pub struct dageist_engine::allowed::Chosen<'a>
+impl<'a> dageist_engine::allowed::Chosen<'a>
+pub const fn dageist_engine::allowed::Chosen<'a>::giving(self, dtype: dageist_engine::allowed::Representative) -> Self
+pub const fn dageist_engine::allowed::Chosen<'a>::with_arguments(self, arguments: &'a [(&'a str, dageist_engine::allowed::Representative)]) -> Self
+pub const fn dageist_engine::allowed::Chosen<'a>::with_options(self, options: &'a [(&'a str, &'a str)]) -> Self
 pub struct dageist_engine::allowed::Context
 impl dageist_engine::allowed::Context
 pub fn dageist_engine::allowed::Context::all() -> alloc::vec::Vec<Self>
 pub fn dageist_engine::allowed::Context::from_name(name: &str) -> core::option::Option<Self>
 pub fn dageist_engine::allowed::Context::from_positions(positions: &[dageist_engine::allowed::Position]) -> core::option::Option<Self>
 pub const fn dageist_engine::allowed::Context::inside(outer: dageist_engine::allowed::Outer, nested: dageist_engine::allowed::Nested) -> Self
+pub const fn dageist_engine::allowed::Context::is_join_key(&self) -> bool
 pub fn dageist_engine::allowed::Context::name(&self) -> alloc::string::String
 pub const fn dageist_engine::allowed::Context::nested(&self) -> core::option::Option<dageist_engine::allowed::Nested>
 pub const fn dageist_engine::allowed::Context::outer(&self) -> dageist_engine::allowed::Outer
@@ -159,10 +178,11 @@ impl core::fmt::Display for dageist_engine::allowed::ResultDtype
 pub fn dageist_engine::allowed::ResultDtype::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub fn dageist_engine::allowed::argument_dtypes(entry: &dageist_engine::catalog::Entry, parameter: &str, receiver: dageist_engine::allowed::Representative) -> alloc::vec::Vec<(dageist_engine::allowed::Representative, dageist_engine::allowed::Outcome)>
 pub fn dageist_engine::allowed::dtype_name(dtype: &polars_core::datatypes::dtype::DataType) -> alloc::string::String
-pub fn dageist_engine::allowed::offer(entry: &'static dageist_engine::catalog::Entry, place: &dageist_engine::allowed::Place, arguments: &[(&str, dageist_engine::allowed::Representative)]) -> dageist_engine::allowed::Verdict
+pub fn dageist_engine::allowed::offer(entry: &'static dageist_engine::catalog::Entry, place: &dageist_engine::allowed::Place, chosen: &dageist_engine::allowed::Chosen<'_>) -> dageist_engine::allowed::Verdict
 pub fn dageist_engine::allowed::offers(place: &dageist_engine::allowed::Place) -> alloc::vec::Vec<dageist_engine::allowed::Offer>
 pub fn dageist_engine::allowed::options(entry: &dageist_engine::catalog::Entry, chosen: &[(&str, &str)]) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids(entry: &dageist_engine::catalog::Entry, context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
+pub fn dageist_engine::allowed::rule_forbids_a_key_known_not_elementwise(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub mod dageist_engine::catalog
 pub enum dageist_engine::catalog::Applies
 pub dageist_engine::catalog::Applies::Condition
@@ -575,11 +595,17 @@ pub struct dageist_engine::document::Report
 impl dageist_engine::document::Report
 pub const fn dageist_engine::document::Report::source(&self) -> &polars_core::schema::SchemaRef
 pub fn dageist_engine::document::Report::steps(&self) -> &[dageist_engine::document::StepReport]
+pub struct dageist_engine::document::Standing
+impl dageist_engine::document::Standing
+pub const fn dageist_engine::document::Standing::follows(&self) -> core::option::Option<dageist_engine::allowed::After>
+pub const fn dageist_engine::document::Standing::verdict(&self) -> core::option::Option<&dageist_engine::allowed::Verdict>
 pub struct dageist_engine::document::Step
 impl dageist_engine::document::Step
 pub const fn dageist_engine::document::Step::call(&self) -> &dageist_engine::document::Call
 pub const fn dageist_engine::document::Step::id(&self) -> &dageist_engine::document::StepId
 pub fn dageist_engine::document::Step::new(id: dageist_engine::document::StepId, call: dageist_engine::document::Call) -> core::result::Result<Self, dageist_engine::document::Refusal>
+impl dageist_engine::document::Step
+pub fn dageist_engine::document::Step::walk(&self, index: usize, source: &polars_core::schema::Schema, inputs: &dageist_engine::document::Inputs) -> dageist_engine::document::Walk
 pub struct dageist_engine::document::StepId(_)
 impl dageist_engine::document::StepId
 pub fn dageist_engine::document::StepId::as_str(&self) -> &str
@@ -601,6 +627,7 @@ pub const fn dageist_engine::document::StepReport::id(&self) -> &dageist_engine:
 pub const fn dageist_engine::document::StepReport::laziness(&self) -> dageist_engine::catalog::Laziness
 pub const fn dageist_engine::document::StepReport::outcome(&self) -> &dageist_engine::document::Outcome
 pub const fn dageist_engine::document::StepReport::schema(&self) -> core::option::Option<&polars_core::schema::SchemaRef>
+pub const fn dageist_engine::document::StepReport::walk(&self) -> &dageist_engine::document::Walk
 pub struct dageist_engine::document::SyntaxError
 impl dageist_engine::document::SyntaxError
 pub const fn dageist_engine::document::SyntaxError::column(&self) -> usize
@@ -609,6 +636,23 @@ pub const fn dageist_engine::document::SyntaxError::problem(&self) -> &dageist_e
 impl core::error::Error for dageist_engine::document::SyntaxError
 impl core::fmt::Display for dageist_engine::document::SyntaxError
 pub fn dageist_engine::document::SyntaxError::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct dageist_engine::document::Walk
+impl dageist_engine::document::Walk
+pub fn dageist_engine::document::Walk::expressions(&self) -> &[dageist_engine::document::WalkedExpression]
+pub fn dageist_engine::document::Walk::not_known(&self) -> core::option::Option<&str>
+pub const fn dageist_engine::document::Walk::refusal(&self) -> core::option::Option<&dageist_engine::document::WalkRefusal>
+pub struct dageist_engine::document::WalkRefusal
+impl dageist_engine::document::WalkRefusal
+pub const fn dageist_engine::document::WalkRefusal::at_end(&self) -> bool
+pub const fn dageist_engine::document::WalkRefusal::place(&self) -> &dageist_engine::document::Place
+pub const fn dageist_engine::document::WalkRefusal::refusal(&self) -> &dageist_engine::allowed::Refusal
+pub struct dageist_engine::document::WalkedExpression
+impl dageist_engine::document::WalkedExpression
+pub fn dageist_engine::document::WalkedExpression::calls(&self) -> &[dageist_engine::document::Standing]
+pub const fn dageist_engine::document::WalkedExpression::context(&self) -> core::option::Option<dageist_engine::allowed::Context>
+pub const fn dageist_engine::document::WalkedExpression::ending(&self) -> core::option::Option<&dageist_engine::allowed::Ending>
+pub const fn dageist_engine::document::WalkedExpression::place(&self) -> &dageist_engine::document::Place
+pub fn dageist_engine::document::WalkedExpression::places(&self) -> alloc::vec::Vec<core::option::Option<dageist_engine::allowed::Place>>
 pub const dageist_engine::document::MAX_NESTING: usize
 pub const dageist_engine::document::VERSION: u32
 pub struct dageist_engine::ColumnInfo

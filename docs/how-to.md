@@ -310,7 +310,10 @@ A named rule is in `crates/dageist-engine/src/allowed/rules.rs`. Adding one
 changes the `rules` column of the context table, so refresh the tables with it.
 A rule of how a chain ends, which is about a dtype, also says in
 `Rule::forbids_end` what it makes of a result whose dtype is not known: it does
-not refuse it.
+not refuse it, and `offer` then reports that whether the chain may end is not
+known. A rule about a whole expression, such as `key-is-elementwise`, is asked by
+the walk in `crates/dageist-engine/src/document/walk.rs`, which finds what the
+expression holds.
 
 ## Check The Tables Against Polars
 
@@ -356,8 +359,10 @@ DAGEIST_FUZZ_REPLAY=$PWD/target/tmp/allowed-fuzz/<file>.case cargo test --offlin
 ```
 
 It prints the case, what the tables predicted of it and where, what Polars did and
-where, which limits excuse the difference if there is one, and the outcome. Name the
-file by its whole path, since the test runs from the crate's directory.
+where, the probe and what Polars said of it where the tables refuse a part and
+Polars allows the step, which limits excuse the difference if there is one, and the
+outcome. Name the file by its whole path, since the test runs from the crate's
+directory.
 
 A disagreement is a finding to settle, not to silence. Read it, run the case in
 Polars by hand, and decide which it is:
@@ -368,21 +373,48 @@ Polars by hand, and decide which it is:
   [above](#refresh-the-tables-of-allowed-combinations) if they change. Keep the
   case as `crates/dageist-engine/tests/allowed_fuzz/regressions/fixed-<what>.case`.
   The normal run replays it and expects it to check something.
-- **A case the tables say they do not cover**: add or extend a `Limit` in
-  `allowed_fuzz/limits.rs`, with the sentence that says what the tables were not
-  measured on, and say it in
+- **A part Polars does not evaluate**: the tables refuse a part, and Polars allows
+  the step because it never evaluates the part. The target settles it by itself: it
+  asks Polars about the part with a probe, and counts the case as refused where
+  Polars does not evaluate the part when the probe shows the tables right. The part
+  is asked as it is written, and Polars refusing that for the tables' reason, at the
+  refused call, settles it. Where that does not, the limits are asked next, and then
+  the part apart from what surrounds it: the refused call on a column of the dtype
+  that reaches it; a join's key by itself as the key, and the refused call on a
+  column as the key; and, for a refusal that is the target's own comparison of a
+  call's plan with its rows (no refusal of Polars), the call on a column in the
+  position the case holds it, which counts only with the evidence that Polars' plan
+  and rows differ as the tables say, Polars refuses it there, and a call whose plan
+  and rows agree and the column alone are allowed there. The replay shows the probe
+  and what it showed. Where it does not settle a case, Polars allows the probe,
+  refuses it for another reason or at another call, or the evidence is missing, and
+  the case is one of the other kinds. Keep a case the probe settles as
+  `regressions/stricter-<what it shows>.case`, which the normal run replays and
+  expects to say so. Do not add a limit for it; a part Polars skips is not a limit
+  of the tables, since the editor holds every part to its types. The probe is in
+  `allowed_fuzz/probe.rs`; extend it where a part has no probe, with tests that
+  Polars allowing the probe, refusing it for another reason, or refusing it at
+  another call settles nothing, and that a refusal that a control meets too does not
+  settle a mismatch.
+- **A case the tables say they do not cover**, where the tables allow and Polars
+  refuses, or Polars evaluates a part and accepts it (a literal it broadcasts, the
+  nulls that the sample's rows leave), which the probes do not show: add or
+  extend a `Limit` in `allowed_fuzz/limits.rs`, with the sentence that says what
+  the tables were not measured on, and say it in
   [the explanation](explanation.md#what-the-tables-are-checked-against). Keep the
   case as `regressions/uncovered-<limit>.case`, which the normal run replays and
-  expects the limit to excuse; every limit has one.
+  expects the limit to excuse; every limit has one. A limit may have others, filed as
+  `regressions/uncovered-<limit>--<what it shows>.case`.
 - **A mistake of the generator** (a case that Polars refuses for what no table
   is about, such as a value that depends on the rows): correct
   `allowed_fuzz/generate.rs` and say why in a comment there.
 
-`DAGEIST_FUZZ_STRICT=1` makes the limits excuse nothing, which shows what each
-one would otherwise report. The tally printed with `--nocapture` counts the
-cases a limit excused, and ends with the totals of the cases that agreed, that a limit excused, that a stricter
-rule refused and that disagreed, so a limit that excuses most of what a campaign makes
-shows.
+`DAGEIST_FUZZ_STRICT=1` makes the limits and the probe excuse nothing, which shows
+what each one would otherwise report. The tally printed with `--nocapture` counts the
+cases a limit excused and the cases refused where Polars does not evaluate the part,
+and ends with the totals of the cases that agreed, that a limit excused, that were
+refused where Polars does not evaluate the part, that a stricter rule refused and
+that disagreed, so a limit that excuses most of what a campaign makes shows.
 
 ## Check The Build Against The Polars Release
 

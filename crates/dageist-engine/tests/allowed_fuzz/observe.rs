@@ -14,6 +14,20 @@ use polars::prelude::{DataType, IntoLazy};
 use super::case::Case;
 use super::frames::Frames;
 
+/// How a reason that is the target's own comparison of a step's schema with its
+/// rows begins: it is no refusal of Polars, and shows only where the method that
+/// the schema is of is the output of the step.
+pub const SCHEMA_SAYS: &str = "the schema says";
+
+/// How the reason begins when the sample table cannot be given a schema.
+const NO_SCHEMA: &str = "the sample table has no schema";
+
+/// Whether `reason` is something the target says of a case, from its own
+/// comparison or its own tables, and not what Polars said when it refused it.
+pub fn is_the_targets_own(reason: &str) -> bool {
+    reason.starts_with(SCHEMA_SAYS) || reason.starts_with(NO_SCHEMA)
+}
+
 /// Where Polars refused a case.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Stage {
@@ -128,7 +142,7 @@ fn run_on(document: &Document, frames: &Frames) -> Observed {
                 stage: Stage::Schema,
                 at: "the table".to_owned(),
                 place: None,
-                reason: format!("the sample table has no schema: {error}"),
+                reason: format!("{NO_SCHEMA}: {error}"),
             });
             return observed;
         }
@@ -213,7 +227,7 @@ fn schema_disagrees(
             .join(", ")
     };
     Some(format!(
-        "the schema says {} and the rows give {}",
+        "{SCHEMA_SAYS} {} and the rows give {}",
         names(schema),
         names(ran)
     ))
@@ -221,7 +235,7 @@ fn schema_disagrees(
 
 /// Whether `expression` is only the join key column the other side is
 /// matched against.
-fn is_bare_key(expression: &Expression) -> bool {
+pub fn is_bare_key(expression: &Expression) -> bool {
     expression.links().is_empty()
         && matches!(expression.start(), Start::Call(call)
             if call.entry().id().as_str() == "polars.col"
@@ -266,9 +280,44 @@ fn key_dtype(case: &Case, first: &Observed) -> DataType {
         .unwrap_or(DataType::Int64)
 }
 
+/// How the tables a probe runs on differ from the case's.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Tables {
+    /// The other table is the one the step starts from, for an expression that
+    /// a join's `right_on` holds, which reads that table's columns.
+    pub other_as_left: bool,
+    /// A column of this class stands in both tables, for a value of a dtype that
+    /// the case's tables lack.
+    pub stand_in: Option<Representative>,
+}
+
+impl Tables {
+    fn of(self, case: &Case, key: &DataType) -> Frames {
+        let frames = Frames::new(case.receiver, case.argument, key);
+        let frames = if self.other_as_left {
+            frames.other_as_left()
+        } else {
+            frames
+        };
+        match self.stand_in {
+            Some(class) => frames.with_stand_in(class),
+            None => frames,
+        }
+    }
+}
+
+/// What Polars does with a probe: the case's document, run once on the case's
+/// tables as `tables` changes them.
+pub fn observe_probe(case: &Case, tables: Tables) -> Observed {
+    observe_on(case, tables)
+}
+
 pub fn observe(case: &Case) -> Observed {
-    let frames = Frames::new(case.receiver, case.argument, &DataType::Int64);
-    let observed = run_on(&case.document, &frames);
+    observe_on(case, Tables::default())
+}
+
+fn observe_on(case: &Case, tables: Tables) -> Observed {
+    let observed = run_on(&case.document, &tables.of(case, &DataType::Int64));
     let is_join = case.document.steps()[0].call().entry().id().as_str() == "LazyFrame.join";
     if !is_join {
         return observed;
@@ -277,8 +326,5 @@ pub fn observe(case: &Case) -> Observed {
     if key == DataType::Int64 {
         return observed;
     }
-    run_on(
-        &case.document,
-        &Frames::new(case.receiver, case.argument, &key),
-    )
+    run_on(&case.document, &tables.of(case, &key))
 }

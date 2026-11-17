@@ -14,8 +14,8 @@
 //! is [`super::predict`]'s, and Polars' is [`super::observe`]'s.
 
 use dageist_engine::allowed::{
-    self, After, ConditionState, Context, Place as OfferPlace, Position as Slot, Representative,
-    Shape, Verdict as OfferVerdict,
+    self, After, Chosen, ConditionState, Context, Place as OfferPlace, Position as Slot,
+    Representative, Shape, Verdict as OfferVerdict,
 };
 use dageist_engine::catalog::{self, Applies, Entry, Kind, ParameterDefault, Shape as ParamShape};
 use dageist_engine::document::{Call, Document, Dtype, Expression, Start, Step, StepId, Value};
@@ -524,7 +524,11 @@ impl Gen<'_> {
             links = condition;
             cur_class = unify(&values);
         } else {
-            match allowed::offer(start.entry(), &OfferPlace::new(context, After::Start), &[]) {
+            match allowed::offer(
+                start.entry(),
+                &OfferPlace::new(context, After::Start),
+                &Chosen::default(),
+            ) {
                 OfferVerdict::Allowed(allowance) => shape = allowance.shape(),
                 OfferVerdict::Refused(_) => alive = false,
             }
@@ -675,6 +679,11 @@ impl Gen<'_> {
                 .iter()
                 .filter_map(|(name, class)| class.map(|class| (name.as_str(), class)))
                 .collect();
+            let words = option_words(&call);
+            let words: Vec<(&str, &str)> = words
+                .iter()
+                .map(|(name, word)| (name.as_str(), word.as_str()))
+                .collect();
             let verdict = allowed::offer(
                 chosen,
                 &OfferPlace::new(
@@ -684,7 +693,9 @@ impl Gen<'_> {
                         shape,
                     },
                 ),
-                &given,
+                &Chosen::default()
+                    .with_arguments(&given)
+                    .with_options(&words),
             );
             match verdict {
                 OfferVerdict::Allowed(allowance) => {
@@ -726,6 +737,11 @@ impl Gen<'_> {
             .iter()
             .filter_map(|(name, class)| class.map(|class| (name.as_str(), class)))
             .collect();
+        let words = option_words(&call);
+        let words: Vec<(&str, &str)> = words
+            .iter()
+            .map(|(name, word)| (name.as_str(), word.as_str()))
+            .collect();
         match allowed::offer(
             chosen,
             &OfferPlace::new(
@@ -735,7 +751,9 @@ impl Gen<'_> {
                     shape,
                 },
             ),
-            &given,
+            &Chosen::default()
+                .with_arguments(&given)
+                .with_options(&words),
         ) {
             OfferVerdict::Allowed(allowance) => Some((
                 call,
@@ -880,4 +898,29 @@ fn unify(values: &[Option<Representative>]) -> Option<Representative> {
         .iter()
         .all(|value| *value == Some(first))
         .then_some(first)
+}
+
+/// The options `call` was given, each by the parameter and its word as the
+/// option table writes it, which `offer` is asked with.
+fn option_words(call: &Call) -> Vec<(String, String)> {
+    let entry = call.entry();
+    call.arguments()
+        .iter()
+        .filter(|given| {
+            entry.parameters().iter().any(|parameter| {
+                parameter.name() == given.parameter()
+                    && matches!(parameter.kind(), Kind::Flag | Kind::Choice(_))
+            })
+        })
+        .filter_map(|given| {
+            let word = match given.value() {
+                Value::Flag(Some(true)) => "true".to_owned(),
+                Value::Flag(Some(false)) => "false".to_owned(),
+                Value::Flag(None) => "unset".to_owned(),
+                Value::Choice(word) => word.clone(),
+                _ => return None,
+            };
+            Some((given.parameter().to_owned(), word))
+        })
+        .collect()
 }

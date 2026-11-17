@@ -9,8 +9,9 @@ use std::sync::Arc;
 use crate::allowed::dtype::ResultDtype;
 use crate::allowed::offers::RefusalSource;
 use crate::allowed::{
-    After, ConditionState, Context, Nested, Outer, Place, Representative, Rule, Shape, Stage,
-    Verdict, offer, offers, options,
+    After, Chosen, ConditionState, Context, Ending, Nested, Outer, Place, Position, Representative,
+    Rule, Shape, Stage, Unknown, Verdict, offer, offers, options,
+    rule_forbids_a_key_known_not_elementwise,
 };
 use crate::catalog;
 
@@ -33,7 +34,11 @@ fn select_after(dtype: Representative) -> Place {
 }
 
 fn verdict(id: &str, place: &Place, arguments: &[(&str, Representative)]) -> Verdict {
-    offer(entry(id), place, arguments)
+    offer(
+        entry(id),
+        place,
+        &Chosen::default().with_arguments(arguments),
+    )
 }
 
 fn result_of(verdict: &Verdict) -> Option<&str> {
@@ -167,6 +172,64 @@ fn a_window_is_refused_as_a_join_key_with_polars_reason() {
 }
 
 #[test]
+fn a_key_with_a_single_value_beside_a_column_is_refused_by_a_rule_only_in_a_joins_own_keys() {
+    for context in [
+        Context::step(Outer::JoinLeft),
+        Context::step(Outer::JoinRight),
+    ] {
+        let refusal = rule_forbids_a_key_known_not_elementwise(context).expect_err("a key");
+        assert_eq!(
+            refusal.source(),
+            RefusalSource::Rule(Rule::KeyIsElementwise),
+            "{context}"
+        );
+    }
+    // Polars accepts a window whose key holds a single value beside a column,
+    // in every position that holds a window, and a sort key.
+    for context in [
+        Context::inside(Outer::Select, Nested::PartitionBy),
+        Context::inside(Outer::Select, Nested::OrderBy),
+        Context::inside(Outer::Filter, Nested::PartitionBy),
+        Context::inside(Outer::Filter, Nested::OrderBy),
+        Context::inside(Outer::Sort, Nested::PartitionBy),
+        Context::step(Outer::Select),
+        Context::step(Outer::Sort),
+        Context::inside(Outer::JoinLeft, Nested::ConditionValue),
+        Context::inside(Outer::Select, Nested::ConditionPredicate),
+    ] {
+        assert!(
+            rule_forbids_a_key_known_not_elementwise(context).is_ok(),
+            "{context}"
+        );
+    }
+
+    // Polars, by hand: a key that adds an aggregate to a column is
+    // refused when the join is planned, and one that adds another column to it
+    // is not.
+    let frames = Frames::new(
+        Representative::Int64,
+        Representative::Int64,
+        &DataType::Int64,
+    );
+    let planned = |key: Expr| {
+        frames
+            .rows
+            .clone()
+            .lazy()
+            .join_builder()
+            .with(frames.other_rows.clone().lazy())
+            .left_on(vec![key])
+            .right_on(vec![col("rk")])
+            .finish()
+            .and_then(|mut frame| frame.collect_schema())
+    };
+    let mixed = col("k") + col("u").max();
+    let reason = planned(mixed).expect_err("not elementwise").to_string();
+    assert!(reason.contains("elementwise"), "{reason}");
+    assert!(planned(col("k") + col("u")).is_ok());
+}
+
+#[test]
 fn a_pivot_aggregate_must_give_one_value_although_polars_lets_it_give_more() {
     let pivot = |shape| {
         Place::new(
@@ -181,20 +244,23 @@ fn a_pivot_aggregate_must_give_one_value_although_polars_lets_it_give_more() {
     let sum = verdict("Expr.sum", &pivot(Shape::Many), &[]);
     let sum = sum.allowance().expect("a sum is offered");
     assert_eq!(sum.shape(), Shape::One);
-    assert!(sum.can_end().is_ok());
+    assert!(sum.can_end().is_allowed());
     let running = verdict("Expr.cum_sum", &pivot(Shape::Many), &[]);
     let running = running
         .allowance()
         .expect("a running sum is offered to be continued");
     assert_eq!(running.shape(), Shape::Many);
-    let refusal = running.can_end().expect_err("it cannot end the aggregate");
+    let refusal = running
+        .can_end()
+        .refusal()
+        .expect("it cannot end the aggregate");
     assert_eq!(
         refusal.source(),
         RefusalSource::Rule(Rule::PivotAggregateGivesOneValue)
     );
     // A chain that has given one value keeps giving one.
     let one = verdict("Expr.cum_sum", &pivot(Shape::One), &[]);
-    assert!(one.allowance().expect("offered").can_end().is_ok());
+    assert!(one.allowance().expect("offered").can_end().is_allowed());
 
     // Polars, by hand: the first group holds two values, and a running sum
     // over them is not refused: the rule is dageist's, not Polars'.
@@ -256,6 +322,384 @@ fn element_stands_in_a_pivot_aggregate_and_nowhere_else() {
     );
 }
 
+/// The place of what follows a value of `dtype` in an expression that stands in
+/// `positions`, the outermost first.
+fn deep_place(positions: &[Position], dtype: Representative) -> Place {
+    Place::new(
+        Context::from_positions(positions).expect("a position of a step comes first"),
+        after(dtype),
+    )
+}
+
+#[test]
+fn a_key_of_a_window_inside_the_value_of_a_filters_condition_need_not_be_boolean() {
+    // `filter(when(p).then(x.over(key)))`: the key is judged as a key, not as
+    // the value of the condition that the filter needs to be Boolean.
+    let key = deep_place(
+        &[
+            Position::Outer(Outer::Filter),
+            Position::Nested(Nested::ConditionValue),
+            Position::Nested(Nested::PartitionBy),
+        ],
+        Representative::Int64,
+    );
+    let offered = verdict("Expr.cum_sum", &key, &[]);
+    let ending = offered.allowance().expect("offered").can_end();
+    assert!(ending.is_allowed(), "{ending:?}");
+}
+
+#[test]
+fn a_predicate_inside_the_value_of_a_condition_must_be_boolean() {
+    // `select(when(p).then(when(q).then(..)))`: `q` is a predicate, though the
+    // place it stands in is also inside a value.
+    let predicate = deep_place(
+        &[
+            Position::Outer(Outer::Select),
+            Position::Nested(Nested::ConditionValue),
+            Position::Nested(Nested::ConditionPredicate),
+        ],
+        Representative::Int64,
+    );
+    let offered = verdict("Expr.cum_sum", &predicate, &[]);
+    let refusal = offered
+        .allowance()
+        .expect("offered, to be continued")
+        .can_end()
+        .refusal()
+        .expect("a whole number is no condition");
+    assert_eq!(
+        refusal.source(),
+        RefusalSource::Rule(Rule::ConditionPredicateIsBoolean)
+    );
+}
+
+/// What is offered at `place` for the entry `id` that gives `dtype`, by what
+/// the call decides.
+fn giving(id: &str, place: &Place, dtype: Representative) -> Verdict {
+    offer(entry(id), place, &Chosen::default().giving(dtype))
+}
+
+#[test]
+fn a_start_given_the_dtype_of_its_column_gives_it() {
+    let start = Place::new(Context::step(Outer::Select), After::Start);
+    let unknown = verdict("polars.col", &start, &[]);
+    assert_eq!(result_of(&unknown), None);
+    for dtype in [Representative::Int64, Representative::Datetime] {
+        let given = giving("polars.col", &start, dtype);
+        assert_eq!(result_of(&given), Some(dtype.name()), "{given:?}");
+        assert_eq!(given.allowance().expect("offered").shape(), Shape::Many);
+    }
+    // A literal is one value.
+    let literal = giving("polars.lit", &start, Representative::Int8);
+    assert_eq!(result_of(&literal), Some("Int8"), "{literal:?}");
+    assert_eq!(literal.allowance().expect("offered").shape(), Shape::One);
+}
+
+#[test]
+fn a_column_that_is_not_boolean_cannot_end_a_filters_predicate() {
+    let start = Place::new(Context::step(Outer::Filter), After::Start);
+    let number = giving("polars.col", &start, Representative::Int64);
+    let refusal = number
+        .allowance()
+        .expect("offered, to be continued")
+        .can_end()
+        .refusal()
+        .expect("a whole number is no predicate");
+    assert_eq!(
+        refusal.source(),
+        RefusalSource::Rule(Rule::FilterPredicateIsBoolean)
+    );
+    let boolean = giving("polars.col", &start, Representative::Boolean);
+    assert!(boolean.allowance().expect("offered").can_end().is_allowed());
+}
+
+#[test]
+fn a_literal_of_text_cannot_end_a_conditions_predicate() {
+    let start = Place::new(
+        Context::inside(Outer::Select, Nested::ConditionPredicate),
+        After::Start,
+    );
+    let text = giving("polars.lit", &start, Representative::String);
+    let refusal = text
+        .allowance()
+        .expect("offered, to be continued")
+        .can_end()
+        .refusal()
+        .expect("text is no condition");
+    assert_eq!(
+        refusal.source(),
+        RefusalSource::Rule(Rule::ConditionPredicateIsBoolean)
+    );
+}
+
+#[test]
+fn the_values_of_a_condition_that_ends_in_otherwise_give_the_dtype_it_is_told() {
+    let ended = Place::new(
+        Context::step(Outer::Filter),
+        After::Condition(ConditionState::Then),
+    );
+    let number = giving("Then.otherwise", &ended, Representative::Int64);
+    assert_eq!(result_of(&number), Some("Int64"), "{number:?}");
+    let refusal = number
+        .allowance()
+        .expect("offered")
+        .can_end()
+        .refusal()
+        .expect("a whole number is no predicate");
+    assert_eq!(
+        refusal.source(),
+        RefusalSource::Rule(Rule::FilterPredicateIsBoolean)
+    );
+    let boolean = giving("Then.otherwise", &ended, Representative::Boolean);
+    assert!(boolean.allowance().expect("offered").can_end().is_allowed());
+}
+
+#[test]
+fn a_start_whose_arguments_decide_whether_it_ends_is_not_known_until_its_dtype_is_given() {
+    let ends = |verdict: &Verdict| verdict.allowance().expect("offered").can_end().clone();
+    // A predicate needs a Boolean, which the column's dtype decides.
+    let filter = Place::new(Context::step(Outer::Filter), After::Start);
+    assert_eq!(
+        ends(&verdict("polars.col", &filter, &[])),
+        Ending::NotKnown(Unknown::TheStartsDtype)
+    );
+    // An untyped literal cannot end a join key's condition value, and a typed
+    // one can: the table was measured with an untyped one.
+    let key = Place::new(
+        Context::inside(Outer::JoinLeft, Nested::ConditionValue),
+        After::Start,
+    );
+    assert_eq!(
+        ends(&verdict("polars.lit", &key, &[])),
+        Ending::NotKnown(Unknown::TheStartsDtype)
+    );
+    assert_eq!(
+        ends(&giving("polars.lit", &key, Representative::Int8)),
+        Ending::Allowed
+    );
+    // In a pivot's aggregate, `element` stands for the values of a group.
+    let predicate = Place::new(
+        Context::inside(Outer::PivotAggregate, Nested::ConditionPredicate),
+        After::Start,
+    );
+    assert_eq!(
+        ends(&verdict("polars.element", &predicate, &[])),
+        Ending::NotKnown(Unknown::TheStartsDtype)
+    );
+    assert_eq!(
+        ends(&giving(
+            "polars.element",
+            &predicate,
+            Representative::Boolean
+        )),
+        Ending::Allowed
+    );
+}
+
+#[test]
+fn a_start_that_its_arguments_do_not_decide_ends_without_its_dtype() {
+    // Any column ends a select's item.
+    let select = Place::new(Context::step(Outer::Select), After::Start);
+    let offered = verdict("polars.col", &select, &[]);
+    assert_eq!(
+        offered.allowance().expect("offered").can_end(),
+        &Ending::Allowed
+    );
+}
+
+#[test]
+fn a_method_whose_result_the_arguments_decide_is_not_known_to_end_a_predicate() {
+    // A subtraction gives what its argument decides, so without it nothing says
+    // whether a filter's predicate may end there.
+    let place = Place::new(Context::step(Outer::Filter), after(Representative::Date));
+    let undecided = verdict("Expr.sub", &place, &[]);
+    assert_eq!(result_of(&undecided), None);
+    assert_eq!(
+        undecided.allowance().expect("offered").can_end(),
+        &Ending::NotKnown(Unknown::TheResultsDtype)
+    );
+    // Where no rule needs a Boolean, the result does not matter.
+    let select = verdict("Expr.sub", &select_after(Representative::Date), &[]);
+    assert_eq!(
+        select.allowance().expect("offered").can_end(),
+        &Ending::Allowed
+    );
+}
+
+#[test]
+fn a_method_is_offered_with_the_options_chosen_and_refused_for_one_it_does_not_have() {
+    let place = select_after(Representative::Int64);
+    let chosen = |options: &'static [(&'static str, &'static str)]| {
+        offer(
+            entry("Expr.cum_sum"),
+            &place,
+            &Chosen::default().with_options(options),
+        )
+    };
+    let reversed = chosen(&[("reverse", "true")]);
+    assert_eq!(result_of(&reversed), Some("Int64"), "{reversed:?}");
+    let refusal = chosen(&[("backwards", "true")])
+        .refusal()
+        .cloned()
+        .expect("cum_sum has no such option");
+    assert_eq!(refusal.source(), RefusalSource::Structure);
+}
+
+/// What the method `id` gives after `receiver` at a `select` item, with the
+/// options `chosen` set, and for a window the partition it is measured with.
+fn given_options(id: &str, receiver: Representative, chosen: &[(&str, &str)]) -> Option<String> {
+    let partitioned = [("partition_by", Representative::Int64)];
+    let arguments: &[(&str, Representative)] = if id == "Expr.over" { &partitioned } else { &[] };
+    let verdict = offer(
+        entry(id),
+        &select_after(receiver),
+        &Chosen::default()
+            .with_arguments(arguments)
+            .with_options(chosen),
+    );
+    verdict
+        .allowance()
+        .unwrap_or_else(|| panic!("{id} after {receiver} is offered: {verdict:?}"))
+        .result()
+        .map(|result| result.name().to_owned())
+}
+
+#[test]
+fn a_window_that_joins_gives_a_list_and_the_other_strategies_what_it_follows() {
+    let over = |receiver, strategy| {
+        given_options("Expr.over", receiver, &[("mapping_strategy", strategy)])
+    };
+    assert_eq!(
+        over(Representative::Int64, "join").as_deref(),
+        Some("List(Int64)")
+    );
+    for strategy in ["group_to_rows", "explode"] {
+        assert_eq!(
+            over(Representative::Int64, strategy).as_deref(),
+            Some("Int64"),
+            "{strategy}"
+        );
+    }
+    // The option table was measured on a whole number, and a list of what it
+    // follows is what a window that joins gives after any dtype.
+    assert_eq!(
+        over(Representative::String, "join").as_deref(),
+        Some("List(String)")
+    );
+    assert_eq!(
+        over(Representative::String, "group_to_rows").as_deref(),
+        Some("String")
+    );
+}
+
+#[test]
+fn a_window_that_joins_after_one_value_is_not_known_to_give_a_list() {
+    // The option table was measured on a column. After an aggregate, a window
+    // that joins gives the value again, and Polars says so.
+    let place = Place::new(
+        Context::step(Outer::Select),
+        After::Value {
+            dtype: Representative::Int64,
+            shape: Shape::One,
+        },
+    );
+    let over = |options: &'static [(&'static str, &'static str)]| {
+        offer(
+            entry("Expr.over"),
+            &place,
+            &Chosen::default()
+                .with_arguments(&[("partition_by", Representative::Int64)])
+                .with_options(options),
+        )
+    };
+    let joined = over(&[("mapping_strategy", "join")]);
+    assert_eq!(result_of(&joined), None, "{joined:?}");
+    let grouped = over(&[("mapping_strategy", "group_to_rows")]);
+    assert_eq!(result_of(&grouped), Some("Int64"), "{grouped:?}");
+
+    let frames = Frames::new(
+        Representative::Int64,
+        Representative::Int64,
+        &DataType::Int64,
+    );
+    let mut frame = frames.rows.clone().lazy().select([col("a")
+        .sum()
+        .over_with_options(Some([col("k")]), None, WindowMapping::Join)
+        .expect("a window")]);
+    assert_eq!(
+        frame.collect_schema().expect("a schema").get("a"),
+        Some(&DataType::Int64)
+    );
+}
+
+#[test]
+fn a_window_without_a_partition_is_not_known_to_give_a_list_for_a_joining_strategy() {
+    // The option table measured a window with `partition_by`, and a window
+    // without one is not grouped.
+    let place = select_after(Representative::Int64);
+    let joined = offer(
+        entry("Expr.over"),
+        &place,
+        &Chosen::default().with_options(&[("mapping_strategy", "join")]),
+    );
+    assert_eq!(result_of(&joined), None, "{joined:?}");
+}
+
+#[test]
+fn an_option_set_to_its_default_is_not_a_choice() {
+    let chosen = [
+        ("descending", "false"),
+        ("nulls_last", "false"),
+        ("mapping_strategy", "join"),
+    ];
+    assert_eq!(
+        given_options("Expr.over", Representative::Int64, &chosen).as_deref(),
+        Some("List(Int64)")
+    );
+}
+
+#[test]
+fn options_whose_lines_give_different_results_leave_the_result_unknown() {
+    // Each of the three pairs is measured: the two flags together give what
+    // `over` follows, and each with a window that joins gives a list.
+    let chosen = [
+        ("descending", "true"),
+        ("nulls_last", "true"),
+        ("mapping_strategy", "join"),
+    ];
+    assert_eq!(
+        given_options("Expr.over", Representative::Int64, &chosen),
+        None
+    );
+}
+
+#[test]
+fn a_duration_in_fractional_days_is_a_float() {
+    let days = |fractional| {
+        given_options(
+            "Expr.dt.total_days",
+            Representative::Duration,
+            &[("fractional", fractional)],
+        )
+    };
+    assert_eq!(days("true").as_deref(), Some("Float64"));
+    assert_eq!(days("false").as_deref(), Some("Int64"));
+}
+
+#[test]
+fn an_option_that_does_not_change_the_result_leaves_what_the_method_gives() {
+    let first = |receiver| given_options("Expr.first", receiver, &[("ignore_nulls", "true")]);
+    assert_eq!(first(Representative::Int64).as_deref(), Some("Int64"));
+    assert_eq!(first(Representative::String).as_deref(), Some("String"));
+}
+
+#[test]
+fn a_method_gives_what_the_tables_say_whatever_it_is_told() {
+    let place = select_after(Representative::Int64);
+    let told = giving("Expr.cum_sum", &place, Representative::String);
+    assert_eq!(result_of(&told), Some("Int64"), "{told:?}");
+}
+
 #[test]
 fn a_condition_predicate_that_is_not_boolean_cannot_end_the_predicate() {
     let predicate = |dtype| {
@@ -270,13 +714,14 @@ fn a_condition_predicate_that_is_not_boolean_cannot_end_the_predicate() {
         .allowance()
         .expect("offered, to be continued")
         .can_end()
-        .expect_err("a whole number is no condition");
+        .refusal()
+        .expect("a whole number is no condition");
     assert_eq!(
         refusal.source(),
         RefusalSource::Rule(Rule::ConditionPredicateIsBoolean)
     );
     let boolean = verdict("Expr.first", &predicate(Representative::Boolean), &[]);
-    assert!(boolean.allowance().expect("offered").can_end().is_ok());
+    assert!(boolean.allowance().expect("offered").can_end().is_allowed());
     // A comparison gives a Boolean whatever it compares.
     let comparison = verdict(
         "Expr.gt",
@@ -284,7 +729,13 @@ fn a_condition_predicate_that_is_not_boolean_cannot_end_the_predicate() {
         &[("other", Representative::Int64)],
     );
     assert_eq!(result_of(&comparison), Some("Boolean"));
-    assert!(comparison.allowance().expect("offered").can_end().is_ok());
+    assert!(
+        comparison
+            .allowance()
+            .expect("offered")
+            .can_end()
+            .is_allowed()
+    );
 
     // Polars, by hand: a whole number as the predicate of a condition resolves
     // a schema, and its rows are refused.
@@ -452,7 +903,8 @@ fn assert_stands_in_the_middle_of_a_filter_predicate(
     assert_eq!(allowance.shape(), shape, "{id} after {receiver}");
     let refusal = allowance
         .can_end()
-        .expect_err("a filter's predicate must end Boolean, and this is not one");
+        .refusal()
+        .expect("a filter's predicate must end Boolean, and this is not one");
     assert!(
         matches!(refusal.source(), RefusalSource::Rule(_)),
         "{id} after {receiver}: {refusal:?}"

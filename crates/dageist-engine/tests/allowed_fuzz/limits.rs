@@ -20,44 +20,42 @@
 //! elsewhere in the case excuses nothing. Whether a limit applies does not
 //! depend on the order the limits are asked in, and a case that two apply to is
 //! excused by both.
+//!
+//! A limit is never for a part Polars skips. Where the tables refuse a part and
+//! Polars allows the step, the target first asks Polars about the part as it is
+//! written ([`super::probe`]): a part that Polars does not evaluate is not a limit
+//! of the tables, for the editor holds every part to its types. A limit is for what
+//! Polars evaluates and accepts, which the part alone does not show, such as a
+//! literal it broadcasts or the nulls that the sample's rows leave, and for the
+//! other direction, where the tables allow and Polars refuses. The limits are
+//! asked after the part as written and before the probes apart from the case,
+//! which cannot tell what Polars evaluates from what it skips.
 
 use dageist_engine::document::{Call, Expression, Place, Segment, Start, Value};
 
 use super::case::Case;
+use super::frames::Frames;
 use dageist_engine::allowed::Stage as TableStage;
 
-use super::observe::{Observed, Refusal, Stage};
+use super::observe::{Observed, Refusal, SCHEMA_SAYS, Stage};
 use super::predict::{Prediction, Refused, Source, Verdict};
 
 /// A limit of the tables, and what it says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Limit {
     /// `Expr.over`'s `mapping_strategy` `explode` gives a different number of
-    /// rows, which meets another expression's with lengths that do not match.
-    /// `options.txt` records what it gives, but
-    /// [`allowed::offer`](dageist_engine::allowed::offer) is asked of a method
-    /// without its options. Polars refusing the rows, with a reason about
-    /// lengths, cannot be placed, so the reason and an `explode` in the case are
-    /// what gate it; the tables refusing is placed, inside an expression that
-    /// holds an `explode`. (That `join` gives a `List` and `fractional` a
-    /// `Float64` is not a limit but a stop: the prediction does not go past
-    /// them, and the tally counts it.)
-    OptionsChangeTheResult,
-    /// A comparison or a subtraction with a null literal is null, and Polars does not evaluate
-    /// the other side of it, wherever in the expression that comparison is. A
-    /// literal is one value, which Polars broadcasts and casts as it does not
-    /// a column: it accepts a text compared with a typed number, or a window
-    /// over a constant, where a column of the dtype is refused, and joins it
-    /// with a column of other length. The tables measure an argument as a
-    /// column of the dtype, except the values of `shift` and a pivot's group.
+    /// rows, which meet another expression's with lengths that do not match. The
+    /// tables do not measure what meets them. Polars refusing the rows, with a
+    /// reason about lengths, cannot be placed, so the reason and an `explode` in
+    /// the case are what gate it; the tables refusing is placed, inside an
+    /// expression that holds an `explode`.
+    AnExplodeChangesTheLengths,
+    /// A literal is one value, which Polars broadcasts and casts as it does not a
+    /// column: it accepts a text compared with a typed number, or a window over a
+    /// constant, where a column of the dtype is refused, and joins it with a
+    /// column of other length. The tables measure an argument as a column of the
+    /// dtype, except the values of `shift` and a pivot's group.
     ALiteral,
-    /// Polars does not evaluate what it does not need for one value: a sort key
-    /// that is one value is dropped, and `len` does not read what it counts. The
-    /// tables refusing at a call that follows an aggregate in its own chain, or
-    /// inside a sort key that is one value, or inside an expression with a `len`
-    /// in it, which Polars allows. What the tables say of a method's dtype was
-    /// measured in `select` on a column.
-    AnAggregateGivesOneValue,
     /// A pivot's aggregate is run on the values of each group, not on a
     /// column in `select`, and Polars uses other kernels for them: it takes the
     /// `max` of a `Struct` there, which `select` refuses, and compares, casts
@@ -66,125 +64,116 @@ pub enum Limit {
     /// refusal is gated by its reason, which has no place; the tables refusing
     /// is placed, in the aggregate, with a reason about a kernel.
     AGroupAggregate,
-    /// A single value in a key, a join's or a window's, beside a column is not
-    /// elementwise, and Polars refuses it: an aggregate, or a null literal. The
-    /// context table measured the entry as the whole key. A key that is wholly a
-    /// single value is the whole key, and is not this. Polars refusing the step
-    /// has the step for its place, so the key itself is found by what it holds;
-    /// a refusal of the rows of a window has none and is gated by its reason.
-    /// The tables refusing a key that is wholly single, which Polars allows, is
-    /// placed in that key.
+    /// A key that is wholly a single value, an aggregate or a null, is not one
+    /// that has to be elementwise: Polars allows in it what a key may not hold,
+    /// such as a running count under a `last`. The tables measured the entry as
+    /// the whole key. The tables refusing it, with a reason about elementwise,
+    /// placed inside that key. A key that holds an aggregate beside a column, or
+    /// a column compared with a null, is refused by a named rule, and is not
+    /// this.
     ASingleValueInAKey,
+    /// Polars folds a comparison with a null literal into a null, before it asks
+    /// whether a join's key is elementwise, and what it leaves depends on the
+    /// dtypes and on what the comparison follows, which the tables did not
+    /// measure and the named rule, which holds what the evidence settles, does
+    /// not model: a column compared with a null is refused by the rule, and an
+    /// aggregate compared with a null, or a comparison that follows one, is
+    /// found by running. Polars refusing the join as not elementwise, with no
+    /// place, in a case whose join key holds a comparison with a null literal at
+    /// any depth.
+    ANullComparisonInAKey,
+    /// The tables ran every call on columns that hold values, so what Polars does
+    /// with a call that has only nulls to meet was not measured: it does not meet
+    /// the dtype that the tables refuse when they run rows. A shift that fills
+    /// nothing leaves nulls, and the sample's three rows decide how many: shifts
+    /// that total three rows or more, an aggregate that leaves one value which a
+    /// shift moves away, the first of what a shift moved and the first value of
+    /// that, which is null too, and the last of it where its column holds a null in the
+    /// row the shifts leave last (the sample's `a` and `b` hold one in the middle
+    /// row, its other columns hold none).
+    /// A comparison of a list with a `Boolean` is refused after none, one or two
+    /// shifts and allowed after three. The tables refusing, when they run rows, at
+    /// a call that follows such a chain or is given one. Nulls that Polars folds
+    /// whatever the rows are, as those of a comparison with a null, are no matter
+    /// of the sample: a probe settles them.
+    AShiftThatLeavesNulls,
     /// Whether values of different lengths combine, as the lists of two rows
     /// do not, depends on the rows, which the tables measured on one sample.
     TheLengthsOfTheRows,
     /// A debug build of Polars panics where an arithmetic overflow wraps in a
     /// release build, on keys the tables did not measure.
     AnOverflow,
-    /// A condition whose values are one expression is simplified to it, and
-    /// its predicates are dropped, so what Polars refuses in them it does not.
-    TheBranchesAreOne,
     /// Polars panicking has no place, and is gated by its reason. A panic of
     /// Polars is an internal check that failed. The tables record
     /// one for the plan Polars made of a combination in `select`, and the plan
     /// of another place may not reach it; a combination of what they measured
     /// singly, such as two keys of a window, may reach another.
     APanic,
-    /// A place more than two positions deep is judged by its first two, so a
-    /// predicate inside a value of a condition is judged as a value, which need
-    /// not be a `Boolean`: the tables allow a predicate of a known dtype that is
-    /// no `Boolean`, and refuse a value inside a predicate as a predicate.
-    ADeeperPlace,
-    /// A condition with a predicate made of literals alone is decided before it
-    /// is run: Polars takes the branch it selects and drops the others, so what
-    /// the predicates and values it drops would refuse, it does not. A predicate
-    /// that only starts from a literal, and goes on to a column, is not this.
-    ADecidedCondition,
-    /// A value of a condition runs on the rows its predicate selects, and a
-    /// predicate after the first on the rows left to it. On the rows of the
-    /// sample that may be none, and what would be refused is not raised. Only
-    /// what the tables refused when it ran rows is excused; what they refused
-    /// when it built the step is refused whatever the rows.
-    AValueThatRunsOnNoRows,
     /// The other table's key is made of the dtype its chain gives on its own,
     /// and the join may resolve the chain to another, as the precision of a
     /// decimal that a null is taken from. Polars' message names the decimal, and
     /// the refusal is of the step.
     AJoinKeyDtype,
-    /// The tables hold the schema of a method and what its rows give as one
-    /// thing, and refuse a method whose plan says another dtype than its rows
-    /// give. Inside an expression that goes on from it or compares it, the rows
-    /// of the step do not show it.
-    AHiddenSchema,
     /// A window whose receiver holds another window is run by Polars in the
     /// aggregation context of the outer one, where a key that is not elementwise
     /// is refused; the tables measured one window. The receiver is what comes
     /// before the outer `over` in its chain, with the arguments of those calls.
     /// Polars refuses the rows, so there is no place and the reason gates it.
     AWindowOverAWindow,
-    /// The tables are asked what a chain gives so that a predicate, which needs
-    /// a `Boolean`, can be checked, and a start, or a method that gives what its
-    /// arguments decide, gives nothing to check: the dtype of a column is the
-    /// caller's to say, and [`offer`](dageist_engine::allowed::offer) is not told
-    /// it. Only an expression in a predicate position is meant. The tables
-    /// refusing a start there is judged on the dtype it was measured on.
-    ABooleanIsNeededAndTheDtypeUnknown,
+    /// The tables hold the schema of a method and what its rows give as one thing,
+    /// and refuse a method whose plan says another dtype than its rows give: the
+    /// target's own comparison, not a refusal of Polars, which shows only where the
+    /// method is the output of the step. Inside an expression that goes on from it
+    /// or compares it, Polars evaluates the method and the step's rows do not show
+    /// the difference. The tables refusing, with the reason that the schema says one
+    /// dtype and the rows give another, at a call that is not the last of the
+    /// step's own expression, which Polars allows.
+    AHiddenSchema,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 16] = [
-        Self::OptionsChangeTheResult,
+    pub const ALL: [Self; 12] = [
+        Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
-        Self::AnAggregateGivesOneValue,
         Self::AGroupAggregate,
         Self::ASingleValueInAKey,
+        Self::ANullComparisonInAKey,
+        Self::AShiftThatLeavesNulls,
         Self::TheLengthsOfTheRows,
         Self::AnOverflow,
-        Self::TheBranchesAreOne,
         Self::APanic,
-        Self::ABooleanIsNeededAndTheDtypeUnknown,
-        Self::ADeeperPlace,
-        Self::AHiddenSchema,
         Self::AWindowOverAWindow,
-        Self::ADecidedCondition,
-        Self::AValueThatRunsOnNoRows,
         Self::AJoinKeyDtype,
+        Self::AHiddenSchema,
     ];
 
     /// The name a kept case is filed under.
     pub const fn slug(self) -> &'static str {
         match self {
-            Self::OptionsChangeTheResult => "options-change-the-result",
+            Self::AnExplodeChangesTheLengths => "an-explode-changes-the-lengths",
             Self::ALiteral => "a-literal",
-            Self::AnAggregateGivesOneValue => "an-aggregate-gives-one-value",
             Self::AGroupAggregate => "a-group-aggregate",
             Self::ASingleValueInAKey => "a-single-value-in-a-key",
+            Self::ANullComparisonInAKey => "a-null-comparison-in-a-key",
+            Self::AShiftThatLeavesNulls => "a-shift-that-leaves-nulls",
             Self::TheLengthsOfTheRows => "the-lengths-of-the-rows",
             Self::AnOverflow => "an-overflow",
-            Self::TheBranchesAreOne => "the-branches-are-one",
             Self::APanic => "a-panic",
-            Self::ABooleanIsNeededAndTheDtypeUnknown => "a-boolean-is-needed",
-            Self::ADeeperPlace => "a-deeper-place",
-            Self::AHiddenSchema => "a-hidden-schema",
             Self::AWindowOverAWindow => "a-window-over-a-window",
-            Self::ADecidedCondition => "a-decided-condition",
             Self::AJoinKeyDtype => "a-join-key-dtype",
-            Self::AValueThatRunsOnNoRows => "a-value-that-runs-on-no-rows",
+            Self::AHiddenSchema => "a-hidden-schema",
         }
     }
 
     pub const fn statement(self) -> &'static str {
         match self {
-            Self::OptionsChangeTheResult => {
-                "an option changes what a method gives (over's mapping_strategy, total_days' fractional), which offer is not told"
+            Self::AnExplodeChangesTheLengths => {
+                "an explode gives other lengths, which meet those of what follows it, as the tables did not measure"
             }
             Self::ALiteral => "a literal is one value, which the tables measured as a column",
             Self::TheLengthsOfTheRows => {
                 "whether values of different lengths combine depends on the rows, which the tables measured on one sample"
-            }
-            Self::TheBranchesAreOne => {
-                "a condition whose values are one expression is that expression, without its predicates"
             }
             Self::AnOverflow => {
                 "a debug build of Polars panics on an overflow of the values, which the tables measured on one sample"
@@ -192,35 +181,26 @@ impl Limit {
             Self::APanic => {
                 "a panic of Polars depends on the plan it makes, which another place may not make"
             }
-            Self::AnAggregateGivesOneValue => {
-                "an expression with an aggregate in it gives one value, which Polars need not evaluate"
-            }
             Self::AGroupAggregate => {
                 "a pivot's aggregate is run on groups, with kernels of its own, not on a column in select"
             }
+            Self::AShiftThatLeavesNulls => {
+                "a shift leaves nulls, which Polars does not meet with the dtype the tables refuse"
+            }
+            Self::ANullComparisonInAKey => {
+                "Polars folds a comparison with a null in a join key into a null, which the rule does not wholly model"
+            }
             Self::ASingleValueInAKey => {
-                "a single value, an aggregate or a null, in a key beside a column is not elementwise"
+                "a key that is wholly a single value, an aggregate or a null, need not be elementwise in what it holds"
             }
             Self::AJoinKeyDtype => {
                 "the join resolves a key to a dtype other than the one its chain gives on its own"
             }
-            Self::AValueThatRunsOnNoRows => {
-                "a value of a condition, or a predicate after the first, runs on the rows left to it, which may be none"
-            }
-            Self::ADecidedCondition => {
-                "a condition with a literal predicate is decided before it is run, and drops the other branches"
-            }
-            Self::AHiddenSchema => {
-                "a method whose plan and rows differ in dtype is hidden by what goes on from it"
-            }
             Self::AWindowOverAWindow => {
                 "a window over a window is run in an aggregation context, where a key that is not elementwise is refused"
             }
-            Self::ADeeperPlace => {
-                "a place more than two positions deep is judged by its first two, as the tables hold them"
-            }
-            Self::ABooleanIsNeededAndTheDtypeUnknown => {
-                "the dtype a column or an argument decides is not asked, where a Boolean is needed"
+            Self::AHiddenSchema => {
+                "a method whose plan and rows differ in dtype is hidden by what goes on from it"
             }
         }
     }
@@ -335,11 +315,6 @@ fn measured_literal(owner: &Call, parameter: &str, pivot: bool) -> bool {
     pivot || (is(owner, "Expr.shift") && matches!(parameter, "n" | "fill_value"))
 }
 
-/// Whether `call` is a null literal on its own.
-fn is_a_null(call: &Call) -> bool {
-    is(call, "polars.lit") && matches!(call.argument("value"), Some(Value::Flag(None)))
-}
-
 /// The indexes of the links of `expression` that `found` says yes to.
 fn links_where(expression: &Expression, found: &dyn Fn(&Call) -> bool) -> Vec<usize> {
     expression
@@ -349,41 +324,6 @@ fn links_where(expression: &Expression, found: &dyn Fn(&Call) -> bool) -> Vec<us
         .filter(|(_, link)| found(link))
         .map(|(at, _)| at)
         .collect()
-}
-
-/// Whether a place reached `holder` where a comparison with a null literal
-/// reaches: what the comparison follows, its own arguments, and the calls from
-/// it on, and not the arguments of the links after it.
-fn reached_by_a_null(holder: &Expression, reach: Reach) -> bool {
-    let comparisons = [
-        "Expr.eq", "Expr.ne", "Expr.gt", "Expr.ge", "Expr.lt", "Expr.le", "Expr.sub",
-    ];
-    let null_start = matches!(holder.start(), Start::Call(start) if is_a_null(start));
-    holder.links().iter().enumerate().any(|(at, link)| {
-        let null_operand = operands(link).into_iter().any(|(_, operand)| {
-            operand.links().is_empty()
-                && matches!(operand.start(), Start::Call(start) if is_a_null(start))
-        });
-        comparisons.contains(&link.entry().id().as_str())
-            && (null_operand || (at == 0 && null_start))
-            && match reach {
-                Reach::Whole | Reach::Start | Reach::At(_) => true,
-                Reach::Operand(j) => j <= at,
-            }
-    })
-}
-
-/// Whether a place reached `holder` where a `len` does not read what it counts:
-/// what the `len` follows, and the arguments of the links before it.
-fn reached_by_a_len(holder: &Expression, reach: Reach) -> bool {
-    links_where(holder, &|call| is(call, "Expr.len"))
-        .into_iter()
-        .any(|at| match reach {
-            Reach::Whole => at + 1 == holder.links().len(),
-            Reach::Start => true,
-            Reach::Operand(j) => j < at,
-            Reach::At(k) => k <= at,
-        })
 }
 
 /// Whether a place reached `holder` where an `explode` changes the rows it
@@ -397,36 +337,6 @@ fn reached_by_an_explode(holder: &Expression, reach: Reach) -> bool {
             Reach::Operand(j) => j > at,
             Reach::At(k) => k >= at,
         })
-}
-
-/// Whether `expression` is made of literals alone: nothing in it, at its start
-/// or in the arguments of its calls, reads a column.
-fn only_literals(expression: &Expression) -> bool {
-    let start = match expression.start() {
-        Start::Call(start) if is(start, "polars.lit") => true,
-        Start::Call(start) if is(start, "polars.when") => operands(start)
-            .into_iter()
-            .all(|(_, inside)| only_literals(inside)),
-        _ => false,
-    };
-    start
-        && expression.links().iter().all(|link| {
-            operands(link)
-                .into_iter()
-                .all(|(_, inside)| only_literals(inside))
-        })
-}
-
-/// Whether a condition has a predicate that is made of literals alone.
-fn is_decided(expression: &Expression) -> bool {
-    let Start::Call(start) = expression.start() else {
-        return false;
-    };
-    is(start, "polars.when")
-        && std::iter::once(start)
-            .chain(expression.links())
-            .flat_map(|call| operands(call))
-            .any(|(parameter, predicate)| parameter == "predicates" && only_literals(predicate))
 }
 
 /// Whether the first `upto` links of `expression` give one value and nothing
@@ -464,8 +374,7 @@ enum Reach {
 }
 
 /// Where a place is in the document: the expression a position of the step
-/// holds that it is inside, the chain and the call it is at, and the
-/// conditions whose predicates it is inside.
+/// holds that it is inside, and the chain and the call it is at.
 struct Locus<'a> {
     /// The expression the step holds, outermost.
     top: Option<&'a Expression>,
@@ -474,16 +383,10 @@ struct Locus<'a> {
     /// The link the place is at, `None` for the start.
     index: Option<usize>,
     call: Option<&'a Call>,
-    /// The conditions the place is inside a predicate of.
-    in_predicates: Vec<&'a Expression>,
-    /// The conditions the place is inside a value or a later predicate of.
-    in_values: Vec<&'a Expression>,
     /// Every expression the place is inside, outermost first.
     inside: Vec<&'a Expression>,
     /// How the place reaches each of them, in the same order.
     reach: Vec<Reach>,
-    /// How many positions inside an expression hold the place.
-    nested: usize,
 }
 
 enum Node<'a> {
@@ -499,43 +402,13 @@ fn locate<'a>(case: &'a Case, place: &Place) -> Locus<'a> {
         chain: None,
         index: None,
         call: None,
-        in_predicates: Vec::new(),
-        in_values: Vec::new(),
         inside: Vec::new(),
         reach: Vec::new(),
-        nested: 0,
     };
     let mut node = Node::Call(case.document.steps()[0].call());
     for segment in place.path() {
         let value = match (&node, segment) {
-            (Node::Call(call), Segment::Parameter(name)) => {
-                if matches!(
-                    call.entry().id().as_str(),
-                    "polars.when" | "Then.when" | "ChainedThen.when"
-                ) && name == "predicates"
-                    && let Some(chain) = locus.chain
-                {
-                    locus.in_predicates.push(chain);
-                }
-                // A value, and a predicate after the first, run on the rows that
-                // are left to them.
-                if ((is_a_value_link(call) && name == "statement")
-                    || (matches!(call.entry().id().as_str(), "Then.when" | "ChainedThen.when")
-                        && name == "predicates"))
-                    && let Some(chain) = locus.chain
-                {
-                    locus.in_values.push(chain);
-                }
-                if matches!(
-                    name.as_str(),
-                    "predicates" | "statement" | "partition_by" | "more_exprs" | "order_by"
-                ) && !matches!(call.entry().id().as_str(), "LazyFrame.filter")
-                    && locus.top.is_some()
-                {
-                    locus.nested += 1;
-                }
-                call.argument(name)
-            }
+            (Node::Call(call), Segment::Parameter(name)) => call.argument(name),
             (Node::Value(Value::Many(items)), Segment::Item(at)) => items.get(*at),
             (Node::Value(Value::Pairs(pairs)), Segment::Key(at)) => {
                 pairs.get(*at).map(|(key, _)| key)
@@ -574,6 +447,10 @@ fn locate<'a>(case: &'a Case, place: &Place) -> Locus<'a> {
                 locus.top.get_or_insert(expression);
                 locus.inside.push(expression);
                 locus.reach.push(Reach::Whole);
+                // Which call of this expression the place is at is not known
+                // until the way says; it is not the link of the chain that holds
+                // this one.
+                locus.index = None;
                 Node::Expression(expression)
             }
             Some(other) => Node::Value(other),
@@ -610,81 +487,134 @@ fn is_panic(reason: &str) -> bool {
     reason.starts_with("Polars panicked")
 }
 
-/// Whether an expression is in a predicate position, which needs a `Boolean`:
-/// the last parameter on the way to it is `predicates`.
-fn in_a_predicate_position(place: &Place) -> bool {
-    place.path().iter().rev().find_map(|segment| match segment {
-        Segment::Parameter(name) => Some(name.as_str()),
-        _ => None,
-    }) == Some("predicates")
+/// The expressions a call is given, by parameter, and the place of each: the
+/// call is at `call`.
+fn placed_operands<'a>(call: &'a Call, at: &Place) -> Vec<(&'a str, Place, &'a Expression)> {
+    fn collect<'a>(
+        parameter: &'a str,
+        value: &'a Value,
+        place: Place,
+        found: &mut Vec<(&'a str, Place, &'a Expression)>,
+    ) {
+        match value {
+            Value::Expression(expression) => found.push((parameter, place, expression)),
+            Value::Many(items) => items.iter().enumerate().for_each(|(item, inside)| {
+                collect(
+                    parameter,
+                    inside,
+                    place.clone().then(Segment::Item(item)),
+                    found,
+                );
+            }),
+            Value::Pairs(pairs) => pairs.iter().enumerate().for_each(|(at, (key, entry))| {
+                collect(parameter, key, place.clone().then(Segment::Key(at)), found);
+                collect(
+                    parameter,
+                    entry,
+                    place.clone().then(Segment::Value(at)),
+                    found,
+                );
+            }),
+            _ => {}
+        }
+    }
+    let mut found = Vec::new();
+    for given in call.arguments() {
+        let place = at
+            .clone()
+            .then(Segment::Parameter(given.parameter().to_owned()));
+        collect(given.parameter(), given.value(), place, &mut found);
+    }
+    found
 }
 
-/// The predicates the tables were asked of that gave nothing to check against a
-/// `Boolean`: no link, or a last link whose dtype they did not give.
-fn predicates_of_unknown_dtype(prediction: &Prediction) -> Vec<&Place> {
-    prediction
-        .expressions
-        .iter()
-        .filter(|expression| {
-            in_a_predicate_position(&expression.place)
-                && (!expression.told || expression.links.last().is_none_or(Option::is_none))
-        })
-        .map(|expression| &expression.place)
-        .collect()
-}
-
-/// Whether `place` lies inside `inside`, as the way to it begins with the way
-/// to `inside`.
-fn lies_inside(place: &Place, inside: &Place) -> bool {
-    place.path().starts_with(inside.path())
-}
-
-/// The keys of the step: a join's, if `joins`, and the keys of every window in it.
-fn keys(case: &Case, joins: bool) -> Vec<&Expression> {
-    let step = case.document.steps()[0].call();
-    let mut found: Vec<&Expression> = Vec::new();
-    if joins && is(step, "LazyFrame.join") {
+/// The keys of the step, each with its place: a join's, if `joins`, and the keys
+/// of every window in it.
+fn keys(case: &Case, joins: bool) -> Vec<(Place, &Expression)> {
+    let step = &case.document.steps()[0];
+    let origin = Place::of_step(0, Some(step.id().clone()));
+    let mut found: Vec<(Place, &Expression)> = Vec::new();
+    if joins && is(step.call(), "LazyFrame.join") {
         found.extend(
-            operands(step)
+            placed_operands(step.call(), &origin)
                 .into_iter()
-                .filter(|(parameter, _)| ["on", "left_on", "right_on"].contains(parameter))
-                .map(|(_, key)| key),
+                .filter(|(parameter, _, _)| ["on", "left_on", "right_on"].contains(parameter))
+                .map(|(_, place, key)| (place, key)),
         );
     }
-    fn windows<'a>(expression: &'a Expression, found: &mut Vec<&'a Expression>) {
+    fn windows<'a>(
+        expression: &'a Expression,
+        place: &Place,
+        found: &mut Vec<(Place, &'a Expression)>,
+    ) {
+        let starts = match expression.start() {
+            Start::Call(call) => Some((call, place.clone().then(Segment::Start))),
+            Start::Input(_) => None,
+        };
+        let links = expression
+            .links()
+            .iter()
+            .enumerate()
+            .map(|(at, link)| (link, place.clone().then(Segment::Link(at))));
+        for (call, at) in starts.into_iter().chain(links) {
+            let held = placed_operands(call, &at);
+            if is(call, "Expr.over") {
+                found.extend(
+                    held.iter()
+                        .filter(|(parameter, _, _)| {
+                            ["partition_by", "more_exprs", "order_by"].contains(parameter)
+                        })
+                        .map(|(_, key_at, key)| (key_at.clone(), *key)),
+                );
+            }
+            for (_, inside_at, inside) in held {
+                windows(inside, &inside_at, found);
+            }
+        }
+    }
+    for (_, held_at, held) in placed_operands(step.call(), &origin) {
+        windows(held, &held_at, &mut found);
+    }
+    found
+}
+
+/// Whether a key holds, at any depth, a comparison with a null literal: one that
+/// is given it, or one that follows it.
+fn holds_a_null_comparison(key: &Expression) -> bool {
+    let comparisons = [
+        "Expr.eq", "Expr.ne", "Expr.gt", "Expr.ge", "Expr.lt", "Expr.le",
+    ];
+    let is_null = |expression: &Expression| {
+        expression.links().is_empty()
+            && matches!(expression.start(), Start::Call(start)
+                if is(start, "polars.lit") && matches!(start.argument("value"), Some(Value::Flag(None))))
+    };
+    let compares = |expression: &Expression| {
+        let null_start = matches!(expression.start(), Start::Call(start)
+            if is(start, "polars.lit") && matches!(start.argument("value"), Some(Value::Flag(None))));
+        expression.links().iter().enumerate().any(|(at, link)| {
+            comparisons.contains(&link.entry().id().as_str())
+                && ((null_start && at == 0)
+                    || operands(link)
+                        .into_iter()
+                        .any(|(_, operand)| is_null(operand)))
+        })
+    };
+    fn walk(expression: &Expression, compares: &dyn Fn(&Expression) -> bool) -> bool {
         let calls = std::iter::once(expression.start())
             .filter_map(|start| match start {
                 Start::Call(call) => Some(call),
                 Start::Input(_) => None,
             })
             .chain(expression.links());
-        for call in calls {
-            if is(call, "Expr.over") {
-                found.extend(
-                    operands(call)
-                        .into_iter()
-                        .filter(|(parameter, _)| {
-                            ["partition_by", "more_exprs", "order_by"].contains(parameter)
-                        })
-                        .map(|(_, key)| key),
-                );
-            }
-            for (_, inside) in operands(call) {
-                windows(inside, found);
-            }
-        }
+        compares(expression)
+            || calls.into_iter().any(|call| {
+                operands(call)
+                    .into_iter()
+                    .any(|(_, inside)| walk(inside, compares))
+            })
     }
-    for (_, held) in operands(step) {
-        windows(held, &mut found);
-    }
-    found
-}
-
-/// Whether a key holds a single value that is no column, an aggregate or a null
-/// literal, beside what is not one: a key that is wholly one is the whole key,
-/// which the tables measured.
-fn holds_a_single_value_beside_a_column(key: &Expression) -> bool {
-    any_call(key, &is_a_single_value) && !wholly_single(key, key.links().len(), true)
+    walk(key, &compares)
 }
 
 /// Whether an `over` has, before it in its chain, another window.
@@ -712,14 +642,6 @@ fn window_over_a_window(expression: &Expression) -> bool {
     })
 }
 
-/// The place Polars refused at, inside the step, if it said.
-fn placed(refusal: &Refusal) -> Option<&Place> {
-    refusal
-        .place
-        .as_ref()
-        .filter(|place| !place.path().is_empty())
-}
-
 /// Whether a refusal by Polars has no place inside the step: it refused the
 /// rows or panicked, or refused the step as a whole.
 fn unplaced(refusal: &Refusal) -> bool {
@@ -729,24 +651,100 @@ fn unplaced(refusal: &Refusal) -> bool {
         .is_none_or(|place| place.path().is_empty())
 }
 
+/// The rows of the sample tables the tables were measured on and the target
+/// runs cases on.
+const SAMPLE_ROWS: i64 = 3;
+
+/// How many rows the `shift` `link` moves, when it fills them with nothing: a
+/// shift of a number that is not written as a whole number, or one given a value
+/// to fill with, counts for none.
+fn shift_rows(link: &Call) -> i64 {
+    if !is(link, "Expr.shift") || link.argument("fill_value").is_some() {
+        return 0;
+    }
+    match link.argument("n") {
+        None => 1,
+        Some(Value::Expression(n)) if n.links().is_empty() => match n.start() {
+            Start::Call(start) if is(start, "polars.lit") => match start.argument("value") {
+                Some(Value::Integer(rows)) => rows.abs(),
+                _ => 0,
+            },
+            _ => 0,
+        },
+        Some(_) => 0,
+    }
+}
+
+/// The name of the one column `expression` starts from, when it starts from one.
+fn starting_column(expression: &Expression) -> Option<&str> {
+    match expression.start() {
+        Start::Call(start) if is(start, "polars.col") => match start.argument("name") {
+            Some(Value::Columns(names)) => match names.as_slice() {
+                [name] => Some(name),
+                _ => None,
+            },
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Whether the first `upto` links of `expression`, taken from the sample, leave
+/// only nulls: shifts that move all its rows, or one value, which an aggregate
+/// leaves, shifted away, or the first row that a shift left null, the first value
+/// of rows that are all null, or the last row where the column the chain starts
+/// from holds a null in it (`frames` say which do: the sample's columns hold their
+/// values and a null in the middle, or none). A chain that does not start from one
+/// column of the sample is not known to hold a null anywhere.
+fn leaves_only_nulls(frames: &Frames, expression: &Expression, upto: usize) -> bool {
+    let links = &expression.links()[..upto.min(expression.links().len())];
+    let column = starting_column(expression);
+    let (mut rows, mut shifted) = (SAMPLE_ROWS, 0);
+    for link in links {
+        shifted += shift_rows(link);
+        if is(link, "Expr.first") {
+            // A first takes the first row, which a shift left null; a first that
+            // skips nulls takes the first value, which is null only where every
+            // row is.
+            let skips = matches!(link.argument("ignore_nulls"), Some(Value::Flag(Some(true))));
+            let null = if skips { shifted >= rows } else { shifted >= 1 };
+            (rows, shifted) = (1, i64::from(null));
+        } else if is(link, "Expr.last") {
+            // The last of what a shift moved is the row that the shifts leave last
+            // from the start: null where the column holds a null in it, or after
+            // all rows are moved. After an aggregate it is the one value.
+            let null = if rows == 1 {
+                shifted >= 1
+            } else {
+                shifted >= rows
+                    || column.is_some_and(|name| {
+                        usize::try_from(rows - 1 - shifted)
+                            .ok()
+                            .and_then(|row| frames.holds_a_null_at(name, row))
+                            .unwrap_or(false)
+                    })
+            };
+            (rows, shifted) = (1, i64::from(null));
+        } else if is_one_value(link) {
+            (rows, shifted) = (1, 0);
+        }
+    }
+    shifted >= rows
+}
+
 /// Whether the limit is why the tables and Polars disagree.
-fn applies(
-    limit: Limit,
-    case: &Case,
-    prediction: &Prediction,
-    disagreement: &Disagreement,
-) -> bool {
+fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
     let step = case.document.steps()[0].call();
     let pivot = is(step, "LazyFrame.pivot");
     let held = operands(step);
     let explodes_in = |expression: &Expression| any_call(expression, &has_explode);
     match (limit, disagreement) {
-        (Limit::OptionsChangeTheResult, Disagreement::PolarsRefuses(refusal)) => {
+        (Limit::AnExplodeChangesTheLengths, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
                 && is_lengths(&refusal.reason)
                 && held.iter().any(|(_, held)| explodes_in(held))
         }
-        (Limit::OptionsChangeTheResult, Disagreement::PolarsAllows(refused)) => {
+        (Limit::AnExplodeChangesTheLengths, Disagreement::PolarsAllows(refused)) => {
             // An `explode` changes the rows that what follows it meets, which
             // Polars refuses with a reason about lengths.
             is_lengths(&refused.reason) && {
@@ -771,41 +769,18 @@ fn applies(
                     !measured_literal(call, parameter, pivot) && starts_from_a_literal(operand)
                 })
             });
-            // A comparison with a null literal is null, and Polars does not
-            // evaluate what it follows or what it is given.
-            let folded = locus
-                .inside
-                .iter()
-                .zip(&locus.reach)
-                .any(|(holder, reach)| reached_by_a_null(holder, *reach));
-            chain_starts || operand || folded
-        }
-        (Limit::AnAggregateGivesOneValue, Disagreement::PolarsAllows(refused)) => {
-            let locus = locate(case, &refused.place);
-            // What the refused call follows in its chain is one value, which
-            // Polars broadcasts.
-            let receiver = locus.inside.last().is_some_and(|chain| {
-                locus
-                    .index
-                    .is_some_and(|at| at > 0 && wholly_single(chain, at, false))
-            });
-            // A sort key that is one value is dropped, and so is a window's.
-            let keys = keys(case, false);
-            let dropped = (is(step, "LazyFrame.sort")
+            // What a call that follows a literal is given, at any depth, is met by
+            // one value, which Polars broadcasts: a comparison of a literal with
+            // what the tables refuse when they run rows is not refused.
+            let given_to_a_literal = refused.stage == Some(TableStage::Rows)
                 && locus
-                    .top
-                    .is_some_and(|top| wholly_single(top, top.links().len(), true)))
-                || locus.inside.iter().any(|holder| {
-                    keys.iter().any(|key| std::ptr::eq(*key, *holder))
-                        && wholly_single(holder, holder.links().len(), true)
-                });
-            // `len` does not read what it counts.
-            let counted = locus
-                .inside
-                .iter()
-                .zip(&locus.reach)
-                .any(|(holder, reach)| reached_by_a_len(holder, *reach));
-            receiver || dropped || counted
+                    .inside
+                    .iter()
+                    .zip(&locus.reach)
+                    .any(|(holder, reach)| {
+                        matches!(reach, Reach::Operand(_)) && starts_from_a_literal(holder)
+                    });
+            chain_starts || operand || given_to_a_literal
         }
         (Limit::AGroupAggregate, Disagreement::PolarsRefuses(refusal)) => {
             // A table with no rows has no groups, and the values of an
@@ -813,7 +788,8 @@ fn applies(
             pivot
                 && refusal.stage == Stage::Empty
                 && (refusal.reason.contains("not supported")
-                    || refusal.reason.contains("got `null`"))
+                    || refusal.reason.contains("got `null`")
+                    || refusal.reason.contains("got null"))
         }
         (Limit::AGroupAggregate, Disagreement::PolarsAllows(refused)) => {
             // The kernels that take the values of a group accept what the ones of
@@ -834,46 +810,61 @@ fn applies(
                 .any(|words| refused.reason.contains(words))
                 && locate(case, &refused.place).call.is_some()
         }
-        (Limit::ASingleValueInAKey, Disagreement::PolarsRefuses(refusal)) => {
-            let keys = keys(case, true);
-            let mixed = |key: &Expression| holds_a_single_value_beside_a_column(key);
-            refusal.reason.contains("elementwise")
-                && match placed(refusal) {
-                    // The refusal is inside a key, and that key holds it.
-                    Some(place) => locate(case, place).inside.iter().any(|inside| {
-                        keys.iter().any(|key| std::ptr::eq(*key, *inside)) && mixed(inside)
-                    }),
-                    // Of the step, or of the rows of a window: some key does.
-                    None => keys.iter().any(|key| mixed(key)),
+        (Limit::ANullComparisonInAKey, Disagreement::PolarsRefuses(refusal)) => {
+            is(step, "LazyFrame.join")
+                && unplaced(refusal)
+                && refusal.reason.contains("elementwise")
+                && {
+                    // Another key may be why Polars refuses the join: one that
+                    // holds a running value, an aggregate or a window.
+                    let keys = keys(case, true);
+                    let other_cause = |key: &Expression| {
+                        any_call(key, &|call| {
+                            is_one_value(call)
+                                || matches!(
+                                    call.entry().id().as_str(),
+                                    "Expr.over"
+                                        | "Expr.cum_sum"
+                                        | "Expr.cum_max"
+                                        | "Expr.cum_count"
+                                )
+                        })
+                    };
+                    keys.iter().any(|(_, key)| holds_a_null_comparison(key))
+                        && keys
+                            .iter()
+                            .filter(|(_, key)| !holds_a_null_comparison(key))
+                            .all(|(_, key)| !other_cause(key))
                 }
         }
+        (Limit::AShiftThatLeavesNulls, Disagreement::PolarsAllows(refused)) => {
+            let locus = locate(case, &refused.place);
+            let frames = Frames::with_key(case.receiver, case.argument, None);
+            // What the call follows, or is given, is only nulls.
+            refused.stage == Some(TableStage::Rows)
+                && (locus
+                    .chain
+                    .zip(locus.index)
+                    .is_some_and(|(chain, at)| leaves_only_nulls(&frames, chain, at))
+                    || locus.call.is_some_and(|call| {
+                        operands(call).into_iter().any(|(_, operand)| {
+                            leaves_only_nulls(&frames, operand, operand.links().len())
+                        })
+                    }))
+        }
         (Limit::ASingleValueInAKey, Disagreement::PolarsAllows(refused)) => {
-            // The key the tables refused is the one that holds the single value.
+            // The key the tables refused is wholly one value.
             refused.reason.contains("elementwise")
                 && locate(case, &refused.place).top.is_some_and(|top| {
-                    keys(case, true).iter().any(|key| std::ptr::eq(*key, top))
+                    keys(case, true)
+                        .iter()
+                        .any(|(_, key)| std::ptr::eq(*key, top))
                         && any_call(top, &is_a_single_value)
+                        && wholly_single(top, top.links().len(), true)
                 })
         }
         (Limit::AnOverflow, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal) && refusal.reason.contains("with overflow")
-        }
-        (Limit::TheBranchesAreOne, Disagreement::PolarsAllows(refused)) => {
-            locate(case, &refused.place)
-                .in_predicates
-                .iter()
-                .any(|condition| {
-                    let values: Vec<&Expression> = condition
-                        .links()
-                        .iter()
-                        .filter(|link| is_a_value_link(link))
-                        .filter_map(|link| match link.argument("statement") {
-                            Some(Value::Expression(value)) => Some(value),
-                            _ => None,
-                        })
-                        .collect();
-                    values.len() > 1 && values.windows(2).all(|pair| pair[0] == pair[1])
-                })
         }
         (Limit::APanic, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
@@ -881,72 +872,22 @@ fn applies(
                 && !refusal.reason.contains("with overflow")
         }
         (Limit::APanic, Disagreement::PolarsAllows(refused)) => is_panic(&refused.reason),
-        (Limit::ADeeperPlace, Disagreement::PolarsRefuses(refusal)) => {
-            // The tables judged a predicate of two positions deep as a value,
-            // which need not be a `Boolean`, and it is a dtype that is not.
-            refusal.reason.contains("Boolean")
-                && prediction.expressions.iter().any(|expression| {
-                    let class = expression.links.last().copied().unwrap_or(expression.start);
-                    expression.nested >= 2
-                        && in_a_predicate_position(&expression.place)
-                        && class.is_some_and(|class| {
-                            class != dageist_engine::allowed::Representative::Boolean
-                        })
-                        && placed(refusal).is_none_or(|place| lies_inside(place, &expression.place))
-                })
-        }
-        (Limit::ADeeperPlace, Disagreement::PolarsAllows(refused)) => {
-            refused.reason.contains("Boolean") && locate(case, &refused.place).nested >= 2
-        }
         (Limit::AJoinKeyDtype, Disagreement::PolarsRefuses(refusal)) => {
             is(step, "LazyFrame.join")
                 && unplaced(refusal)
                 && refusal.reason.contains("datatypes of join keys")
                 && refusal.reason.contains("decimal")
         }
-        (Limit::AValueThatRunsOnNoRows, Disagreement::PolarsAllows(refused)) => {
-            // Only what the tables refused when it ran rows. A condition that is
-            // decided has dropped its other branches, which is its own cause.
-            refused.stage == Some(TableStage::Rows)
-                && locate(case, &refused.place)
-                    .in_values
-                    .iter()
-                    .any(|condition| !is_decided(condition))
-        }
-        (Limit::ADecidedCondition, Disagreement::PolarsAllows(refused)) => {
-            locate(case, &refused.place)
-                .inside
-                .iter()
-                .any(|holder| is_decided(holder))
-        }
         (Limit::AHiddenSchema, Disagreement::PolarsAllows(refused)) => {
             let locus = locate(case, &refused.place);
             let last = locus.inside.last().map(|chain| chain.links().len());
-            refused.reason.starts_with("the schema says")
+            refused.reason.starts_with(SCHEMA_SAYS)
                 && (locus.inside.len() > 1 || locus.index.is_some_and(|at| Some(at + 1) != last))
         }
         (Limit::AWindowOverAWindow, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
                 && refusal.reason.contains("aggregation context")
                 && held.iter().any(|(_, held)| window_over_a_window(held))
-        }
-        (Limit::ABooleanIsNeededAndTheDtypeUnknown, Disagreement::PolarsAllows(refused)) => {
-            // The tables judged a start where a `Boolean` is needed on the dtype
-            // they were measured on, which is not the dtype of this case.
-            let locus = locate(case, &refused.place);
-            refused.reason.contains("Boolean")
-                && in_a_predicate_position(&refused.place)
-                && locus.chain.is_some_and(|chain| {
-                    chain.links().is_empty() || (locus.call.is_some() && locus.index.is_none())
-                })
-        }
-        (Limit::ABooleanIsNeededAndTheDtypeUnknown, Disagreement::PolarsRefuses(refusal)) => {
-            refusal.reason.contains("Boolean")
-                && predicates_of_unknown_dtype(prediction)
-                    .into_iter()
-                    .any(|predicate| {
-                        placed(refusal).is_none_or(|place| lies_inside(place, predicate))
-                    })
         }
         _ => false,
     }
@@ -963,14 +904,14 @@ pub fn excuses(case: &Case, prediction: &Prediction, observed: &Observed) -> Vec
     }
     let disagreement = match (&prediction.verdict, &observed.refusal) {
         (Verdict::Allows, Some(refusal)) => Disagreement::PolarsRefuses(refusal),
-        (Verdict::Refuses(refused), None) if refused.source == Source::Polars => {
+        (Verdict::Refuses(refused), None) if matches!(refused.source, Source::Polars) => {
             Disagreement::PolarsAllows(refused)
         }
         _ => return Vec::new(),
     };
     Limit::ALL
         .into_iter()
-        .filter(|limit| applies(*limit, case, prediction, &disagreement))
+        .filter(|limit| applies(*limit, case, &disagreement))
         .collect()
 }
 
@@ -1038,23 +979,6 @@ mod tests {
         call("Expr.over", given)
     }
 
-    /// `when(predicate).then(value).otherwise(value)`.
-    fn condition(predicate: Expression, value: Expression) -> Expression {
-        chain_of(
-            call("polars.when", vec![("predicates", many(vec![predicate]))]),
-            vec![
-                call(
-                    "When.then",
-                    vec![("statement", Value::Expression(value.clone()))],
-                ),
-                call(
-                    "Then.otherwise",
-                    vec![("statement", Value::Expression(value))],
-                ),
-            ],
-        )
-    }
-
     fn case_of(step: Call) -> Case {
         let step = Step::new(StepId::new("s").expect("an identifier"), step).expect("a step");
         Case {
@@ -1067,15 +991,6 @@ mod tests {
     fn select(items: Vec<Expression>) -> Case {
         case_of(call("LazyFrame.select", vec![("exprs", many(items))]))
     }
-
-    fn sort(items: Vec<Expression>) -> Case {
-        case_of(call("LazyFrame.sort", vec![("by", many(items))]))
-    }
-
-    fn filter(items: Vec<Expression>) -> Case {
-        case_of(call("LazyFrame.filter", vec![("predicates", many(items))]))
-    }
-
     fn join(left: Expression, right: Expression) -> Case {
         case_of(call(
             "LazyFrame.join",
@@ -1120,7 +1035,6 @@ mod tests {
         Prediction {
             verdict,
             expressions,
-            stopped_by_options: false,
         }
     }
 
@@ -1136,6 +1050,18 @@ mod tests {
             at: place.to_string(),
             place,
             stage,
+            reason: reason.to_owned(),
+        });
+        excuses(case, &prediction(verdict, Vec::new()), &Observed::default())
+    }
+
+    /// A named rule refuses the case at `place`, and Polars allows it.
+    fn rule_refuses(case: &Case, place: Place, rule: &'static str, reason: &str) -> Vec<Limit> {
+        let verdict = Verdict::Refuses(Refused {
+            source: Source::Rule(rule),
+            at: place.to_string(),
+            place,
+            stage: None,
             reason: reason.to_owned(),
         });
         excuses(case, &prediction(verdict, Vec::new()), &Observed::default())
@@ -1207,171 +1133,155 @@ mod tests {
     }
 
     #[test]
-    fn an_aggregate_before_the_refused_call_excuses_it_and_after_it_does_not() {
-        let case = select(vec![chain(column("a"), &["Expr.sum", "Expr.cum_sum"])]);
-        assert_eq!(
-            tables_refuse(&case, link_of("exprs", 0, 1), ROWS, "no"),
-            vec![Limit::AnAggregateGivesOneValue]
-        );
-        let after = select(vec![chain(column("a"), &["Expr.cum_sum", "Expr.sum"])]);
-        assert_eq!(
-            tables_refuse(&after, link_of("exprs", 0, 0), ROWS, "no"),
-            vec![]
-        );
+    fn what_follows_an_aggregate_compared_with_the_length_of_a_literal_over_a_window_is_no_limit() {
+        // `a.min() <= 1.len().over(order_by=[true])` then `.total_days()`: Polars
+        // takes the length of a literal over a window for a constant, and does not
+        // evaluate what follows the comparison of a value with it, where the tables
+        // refuse a `Boolean`. That is a part Polars skips, which a probe settles
+        // and no limit excuses, however the chain is made.
+        let window = |length: &str, order_by: Expression| {
+            chain_of(
+                literal(),
+                vec![
+                    call(length, Vec::new()),
+                    call("Expr.over", vec![("order_by", many(vec![order_by]))]),
+                ],
+            )
+        };
+        let item = |operand: Expression| {
+            select(vec![chain_of(
+                column("a"),
+                vec![
+                    call("Expr.min", Vec::new()),
+                    compared_with("Expr.le", operand),
+                    call("Expr.dt.total_days", Vec::new()),
+                ],
+            )])
+        };
+        let constant = || chain(literal(), &[]);
+        for (name, operand) in [
+            ("the length of a literal", window("Expr.len", constant())),
+            ("a sum", window("Expr.sum", constant())),
+            (
+                "a window by a column",
+                window("Expr.len", chain(column("k"), &[])),
+            ),
+            ("no window", chain(literal(), &["Expr.len"])),
+        ] {
+            assert_eq!(
+                tables_refuse(&item(operand), link_of("exprs", 0, 2), ROWS, "no"),
+                vec![],
+                "{name}"
+            );
+        }
     }
 
     #[test]
-    fn an_aggregate_in_another_expression_excuses_nothing() {
-        let case = select(vec![
-            chain(column("a"), &["Expr.cum_sum"]),
-            chain(column("b"), &["Expr.sum", "Expr.len"]),
+    fn what_a_call_after_a_literal_is_given_is_excused_at_any_depth_when_rows_refuse_it() {
+        // `1.cum_sum().le(b.max())`: the tables refuse `max` of a list when they
+        // run rows, and Polars meets it with one value.
+        let item = chain_of(
+            literal(),
+            vec![
+                call("Expr.cum_sum", Vec::new()),
+                compared_with("Expr.le", chain(column("b"), &["Expr.max"])),
+            ],
+        );
+        let case = select(vec![item]);
+        let inside = at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Link(1),
+            parameter("other"),
+            Segment::Link(0),
         ]);
         assert_eq!(
-            tables_refuse(&case, link_of("exprs", 0, 0), ROWS, "no"),
+            tables_refuse(&case, inside.clone(), ROWS, "no"),
+            vec![Limit::ALiteral]
+        );
+        // What the tables refuse when they built the step is refused.
+        assert_eq!(
+            tables_refuse(&case, inside, Some(TableStage::Schema), "no"),
             vec![]
         );
-    }
-
-    #[test]
-    fn a_sort_key_that_is_one_value_is_dropped_and_a_select_item_is_not() {
-        let key = chain(column("a"), &["Expr.cum_sum", "Expr.sum"]);
-        assert_eq!(
-            tables_refuse(&sort(vec![key.clone()]), link_of("by", 0, 0), ROWS, "no"),
-            vec![Limit::AnAggregateGivesOneValue]
-        );
-        assert_eq!(
-            tables_refuse(&select(vec![key]), link_of("exprs", 0, 0), ROWS, "no"),
-            vec![]
-        );
-        // A sort key that is not one value is not dropped, whatever is in the
-        // other key.
-        let case = case_of(call(
-            "LazyFrame.sort",
-            vec![(
-                "by",
-                many(vec![
-                    chain(column("a"), &["Expr.cum_sum"]),
-                    chain(column("b"), &["Expr.sum"]),
-                ]),
-            )],
-        ));
-        assert_eq!(
-            tables_refuse(&case, link_of("by", 0, 0), ROWS, "no"),
-            vec![]
-        );
-    }
-
-    #[test]
-    fn len_does_not_read_what_it_counts_and_the_other_aggregates_do() {
-        let counted = select(vec![chain(column("a"), &["Expr.cum_sum", "Expr.len"])]);
-        assert_eq!(
-            tables_refuse(&counted, link_of("exprs", 0, 0), ROWS, "no"),
-            vec![Limit::AnAggregateGivesOneValue]
-        );
-        let summed = select(vec![chain(column("a"), &["Expr.cum_sum", "Expr.sum"])]);
-        assert_eq!(
-            tables_refuse(&summed, link_of("exprs", 0, 0), ROWS, "no"),
-            vec![]
-        );
-        // What the links before the `len` are given, it does not count either.
-        let given = select(vec![chain_of(
-            column("a"),
-            vec![
-                compared_with("Expr.eq", chain(column("b"), &["Expr.cum_sum"])),
-                call("Expr.len", Vec::new()),
-            ],
-        )]);
-        assert_eq!(
-            tables_refuse(&given, in_operand(0, "other", 0), ROWS, "no"),
-            vec![Limit::AnAggregateGivesOneValue]
-        );
-    }
-
-    #[test]
-    fn a_len_before_an_unrelated_later_operand_excuses_nothing() {
-        let case = select(vec![chain_of(
-            column("a"),
-            vec![
-                call("Expr.len", Vec::new()),
-                compared_with("Expr.sub", chain(column("b"), &["Expr.cum_sum"])),
-            ],
-        )]);
-        assert_eq!(
-            tables_refuse(&case, in_operand(1, "other", 0), ROWS, "no"),
-            vec![]
-        );
-        // The `len` itself, and what it follows, are excused.
-        assert_eq!(
-            tables_refuse(&case, link_of("exprs", 0, 0), ROWS, "no"),
-            vec![Limit::AnAggregateGivesOneValue]
-        );
-    }
-
-    // ----- A null literal folds a comparison
-
-    #[test]
-    fn a_comparison_with_a_null_excuses_what_it_follows_and_is_given_and_not_later_operands() {
-        // `a.cum_sum().eq(null).sub(b.cum_sum())`
-        let case = select(vec![chain_of(
+        // Nothing starts from a literal.
+        let plain = chain_of(
             column("a"),
             vec![
                 call("Expr.cum_sum", Vec::new()),
-                compared_with("Expr.eq", chain(null(), &[])),
-                compared_with("Expr.sub", chain(column("b"), &["Expr.cum_sum"])),
+                compared_with("Expr.le", chain(column("b"), &["Expr.max"])),
             ],
-        )]);
-        assert_eq!(
-            tables_refuse(&case, link_of("exprs", 0, 0), ROWS, "no"),
-            vec![Limit::ALiteral]
         );
-        assert_eq!(
-            tables_refuse(&case, link_of("exprs", 0, 2), ROWS, "no"),
-            vec![Limit::ALiteral]
-        );
-        // The argument of the subtraction after it is evaluated.
-        assert_eq!(
-            tables_refuse(&case, in_operand(2, "other", 0), ROWS, "no"),
-            vec![]
-        );
-    }
-
-    #[test]
-    fn a_comparison_given_a_column_that_a_null_follows_excuses_that_column() {
-        // `null.eq(b.cum_sum())`: the null is what the comparison follows.
-        let case = select(vec![chain_of(
-            null(),
-            vec![compared_with(
-                "Expr.eq",
-                chain(column("b"), &["Expr.cum_sum"]),
-            )],
-        )]);
-        assert_eq!(
-            tables_refuse(&case, in_operand(0, "other", 0), ROWS, "no"),
-            vec![Limit::ALiteral]
-        );
-    }
-
-    #[test]
-    fn a_null_comparison_in_another_item_excuses_nothing() {
-        let case = select(vec![
-            chain(column("a"), &["Expr.cum_sum"]),
-            chain_of(
-                column("b"),
-                vec![compared_with("Expr.eq", chain(null(), &[]))],
-            ),
+        let inside = at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Link(1),
+            parameter("other"),
+            Segment::Link(0),
         ]);
         assert_eq!(
-            tables_refuse(&case, link_of("exprs", 0, 0), ROWS, "no"),
+            tables_refuse(&select(vec![plain]), inside, ROWS, "no"),
             vec![]
         );
     }
+    #[test]
+    fn the_empty_table_of_a_pivot_is_excused_for_a_null_dtype_however_it_is_quoted() {
+        let case = pivot(chain(column("a"), &["Expr.cum_sum"]));
+        for reason in [
+            "invalid series dtype: expected `Duration`, got `null` for series with name `a`",
+            "expected Date or Datetime, got null",
+        ] {
+            assert_eq!(
+                polars_refuses(&case, None, Stage::Empty, reason, Vec::new()),
+                vec![Limit::AGroupAggregate],
+                "{reason}"
+            );
+        }
+    }
 
+    // ----- Rules that refuse what Polars allows
+    #[test]
+    fn a_rule_refusing_a_whole_key_is_excused_by_no_limit_that_does_not_name_it() {
+        // `true.first() <= (null != true) > b` and the same from a column: the
+        // rule that a join's key is elementwise is refused for what the key holds,
+        // which no literal start, null comparison or aggregate in it explains.
+        let key = |start: Call| {
+            chain_of(
+                start,
+                vec![
+                    call("Expr.first", Vec::new()),
+                    compared_with(
+                        "Expr.le",
+                        chain_of(
+                            null(),
+                            vec![compared_with("Expr.ne", chain(literal(), &[]))],
+                        ),
+                    ),
+                    compared_with("Expr.gt", chain(column("b"), &[])),
+                ],
+            )
+        };
+        let rule = "key-is-elementwise";
+        for start in [literal(), column("f")] {
+            let case = join(key(start), chain(column("rf"), &[]));
+            let place = at(&[parameter("left_on"), Segment::Item(0)]);
+            assert_eq!(rule_refuses(&case, place, rule, "a rule"), vec![]);
+        }
+    }
     #[test]
     fn a_case_that_two_limits_explain_is_excused_by_both() {
-        let case = select(vec![chain(literal(), &["Expr.sum", "Expr.cum_sum"])]);
+        // A literal starts the chain, and shifts leave only nulls.
+        let shift = call(
+            "Expr.shift",
+            vec![("n", Value::Expression(chain_with_integer(3)))],
+        );
+        let case = select(vec![chain_of(
+            literal(),
+            vec![shift, call("Expr.cum_sum", Vec::new())],
+        )]);
         assert_eq!(
             tables_refuse(&case, link_of("exprs", 0, 1), ROWS, "no"),
-            vec![Limit::ALiteral, Limit::AnAggregateGivesOneValue]
+            vec![Limit::ALiteral, Limit::AShiftThatLeavesNulls]
         );
     }
 
@@ -1409,11 +1319,11 @@ mod tests {
         )]);
         assert_eq!(
             tables_refuse(&case, link_of("exprs", 0, 2), ROWS, LENGTHS),
-            vec![Limit::OptionsChangeTheResult]
+            vec![Limit::AnExplodeChangesTheLengths]
         );
         assert_eq!(
             tables_refuse(&case, in_operand(2, "other", 0), ROWS, LENGTHS),
-            vec![Limit::OptionsChangeTheResult]
+            vec![Limit::AnExplodeChangesTheLengths]
         );
         // Before the window, or in its own arguments, they are not.
         assert_eq!(
@@ -1460,7 +1370,7 @@ mod tests {
         let with = select(vec![chain_of(column("a"), vec![explode()])]);
         assert_eq!(
             polars_refuses(&with, None, Stage::Rows, reason, Vec::new()),
-            vec![Limit::OptionsChangeTheResult]
+            vec![Limit::AnExplodeChangesTheLengths]
         );
         let without = select(vec![chain(column("a"), &["Expr.cum_sum"])]);
         assert_eq!(
@@ -1526,86 +1436,6 @@ mod tests {
     // ----- Keys
 
     #[test]
-    fn a_key_that_holds_a_single_value_beside_a_column_excuses_the_refused_step() {
-        let mixed = chain_of(
-            column("f"),
-            vec![compared_with("Expr.le", chain(null(), &[]))],
-        );
-        let reason = "all join key expressions must be elementwise.";
-        let case = join(mixed, chain(column("key"), &[]));
-        assert_eq!(
-            polars_refuses(&case, Some(step_place()), Stage::Schema, reason, Vec::new()),
-            vec![Limit::ASingleValueInAKey]
-        );
-    }
-
-    #[test]
-    fn a_single_value_in_the_other_key_does_not_excuse_a_bad_key() {
-        let bad = chain(column("a"), &["Expr.cum_max"]);
-        let whole = chain(column("x"), &["Expr.first"]);
-        let reason = "all join key expressions must be elementwise.";
-        let case = join(bad, whole);
-        assert_eq!(
-            polars_refuses(&case, Some(step_place()), Stage::Schema, reason, Vec::new()),
-            vec![]
-        );
-    }
-
-    #[test]
-    fn a_refusal_inside_a_key_is_excused_by_that_key_and_not_by_the_other() {
-        let bad = chain(column("a"), &["Expr.cum_max"]);
-        let mixed = chain_of(
-            column("f"),
-            vec![compared_with("Expr.le", chain(null(), &[]))],
-        );
-        let reason = "all join key expressions must be elementwise.";
-        let case = join(bad, mixed);
-        let in_left = link_of("left_on", 0, 0);
-        let in_right = link_of("right_on", 0, 0);
-        assert_eq!(
-            polars_refuses(&case, Some(in_left), Stage::Schema, reason, Vec::new()),
-            vec![]
-        );
-        assert_eq!(
-            polars_refuses(&case, Some(in_right), Stage::Schema, reason, Vec::new()),
-            vec![Limit::ASingleValueInAKey]
-        );
-    }
-
-    #[test]
-    fn the_tables_refusing_a_key_are_excused_when_that_key_holds_the_single_value() {
-        let reason = "all join key expressions must be elementwise.";
-        let single = chain_of(
-            column("f"),
-            vec![
-                call("Expr.cum_max", Vec::new()),
-                compared_with("Expr.le", chain(column("x"), &["Expr.max"])),
-            ],
-        );
-        let plain = chain(column("a"), &["Expr.cum_max"]);
-        let case = join(single.clone(), plain.clone());
-        assert_eq!(
-            tables_refuse(
-                &case,
-                link_of("left_on", 0, 0),
-                Some(TableStage::Schema),
-                reason
-            ),
-            vec![Limit::ASingleValueInAKey]
-        );
-        let other = join(plain, single);
-        assert_eq!(
-            tables_refuse(
-                &other,
-                link_of("left_on", 0, 0),
-                Some(TableStage::Schema),
-                reason
-            ),
-            vec![]
-        );
-    }
-
-    #[test]
     fn a_join_key_dtype_is_the_refusal_of_a_join_that_names_a_decimal() {
         let reason = "datatypes of join keys don't match - `a`: decimal[38,2] on left does not match `key`: decimal[10,2] on right";
         let case = join(chain(column("a"), &[]), chain(column("key"), &[]));
@@ -1627,6 +1457,404 @@ mod tests {
         let select = select(vec![chain(column("a"), &[])]);
         assert_eq!(
             polars_refuses(&select, None, Stage::Schema, reason, Vec::new()),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_join_key_with_a_null_comparison_at_any_depth_excuses_the_refused_step() {
+        let reason = "all join key expressions must be elementwise.";
+        // The comparison is one level down, in an operand, and before another.
+        let nested = chain_of(
+            column("b"),
+            vec![compared_with(
+                "Expr.le",
+                chain_of(
+                    column("a"),
+                    vec![compared_with("Expr.gt", chain(null(), &[]))],
+                ),
+            )],
+        );
+        let after_one = chain_of(
+            column("rb"),
+            vec![
+                call("Expr.max", Vec::new()),
+                compared_with("Expr.le", chain(null(), &[])),
+                compared_with("Expr.eq", chain(column("rg"), &[])),
+            ],
+        );
+        for key in [nested, after_one] {
+            let case = join(key, chain(column("key"), &[]));
+            assert_eq!(
+                polars_refuses(&case, Some(step_place()), Stage::Schema, reason, Vec::new()),
+                vec![Limit::ANullComparisonInAKey]
+            );
+        }
+        // A key that compares nothing with a null, and another reason.
+        let plain = join(
+            chain(column("a"), &["Expr.cum_max"]),
+            chain(column("key"), &[]),
+        );
+        assert_eq!(
+            polars_refuses(
+                &plain,
+                Some(step_place()),
+                Stage::Schema,
+                reason,
+                Vec::new()
+            ),
+            vec![]
+        );
+        let case = join(
+            chain_of(
+                column("a"),
+                vec![compared_with("Expr.gt", chain(null(), &[]))],
+            ),
+            chain(column("key"), &[]),
+        );
+        assert_eq!(
+            polars_refuses(&case, Some(step_place()), Stage::Schema, "no", Vec::new()),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn shifts_that_total_the_sample_excuse_the_tables_refusing_what_follows_them() {
+        let shift = |rows: Option<i64>| {
+            call(
+                "Expr.shift",
+                rows.map(|rows| vec![("n", Value::Expression(chain_with_integer(rows)))])
+                    .unwrap_or_default(),
+            )
+        };
+        let compare = compared_with("Expr.gt", chain(column("b"), &[]));
+        let case = |shifts: Vec<Call>| {
+            let mut links = shifts;
+            links.push(compare.clone());
+            select(vec![chain_of(column("a"), links)])
+        };
+        let at_the_comparison = |shifts: usize| link_of("exprs", 0, shifts);
+        // Three shifts of one row, or one of three, empty the sample.
+        let three = case(vec![shift(None), shift(None), shift(None)]);
+        assert_eq!(
+            tables_refuse(&three, at_the_comparison(3), ROWS, "no"),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        let one_of_three = case(vec![shift(Some(3))]);
+        assert_eq!(
+            tables_refuse(&one_of_three, at_the_comparison(1), ROWS, "no"),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        // Fewer leave rows, and the tables' refusal stands.
+        let two = case(vec![shift(None), shift(None)]);
+        assert_eq!(
+            tables_refuse(&two, at_the_comparison(2), ROWS, "no"),
+            vec![]
+        );
+        // The rows are filled, or the refusal is of the schema, or is before them.
+        let filled = case(vec![
+            shift(None),
+            shift(None),
+            call(
+                "Expr.shift",
+                vec![("fill_value", Value::Expression(chain(literal(), &[])))],
+            ),
+        ]);
+        assert_eq!(
+            tables_refuse(&filled, at_the_comparison(3), ROWS, "no"),
+            vec![]
+        );
+        assert_eq!(
+            tables_refuse(&three, at_the_comparison(3), Some(TableStage::Schema), "no"),
+            vec![]
+        );
+        assert_eq!(
+            tables_refuse(&three, at_the_comparison(1), ROWS, "no"),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn the_last_of_a_shift_is_null_where_the_sample_has_a_null_there() {
+        // The sample's columns are a value, a null and a value. One shift puts the
+        // null last, so `b.shift().last()` is null, and three shifts leave only
+        // nulls; two shifts put a value last, and no shift leaves the value.
+        let shift = || call("Expr.shift", Vec::new());
+        let last = || call("Expr.last", Vec::new());
+        let item = |links: Vec<Call>| {
+            let mut all = links;
+            all.push(compared_with("Expr.lt", chain(column("g"), &[])));
+            select(vec![chain_of(column("b"), all)])
+        };
+        let excused = |links: Vec<Call>| {
+            let at = links.len();
+            tables_refuse(&item(links), link_of("exprs", 0, at), ROWS, "no")
+        };
+        assert_eq!(
+            excused(vec![shift(), last()]),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        assert_eq!(
+            excused(vec![shift(), shift(), shift(), last()]),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        assert_eq!(excused(vec![shift(), shift(), last()]), vec![]);
+        assert_eq!(excused(vec![last()]), vec![]);
+        assert_eq!(excused(vec![shift(), call("Expr.max", Vec::new())]), vec![]);
+    }
+
+    #[test]
+    fn the_last_of_a_shift_is_null_only_in_a_column_that_has_the_sample_null() {
+        // `a` and `b` hold a null in the middle row, which one shift puts last. The
+        // columns `f`, `k`, `g`, `h` and `u` hold no null, so what is last after one
+        // shift is a value, and the limit excuses nothing after it. Three shifts
+        // leave only nulls whatever the column holds.
+        let shift = || call("Expr.shift", Vec::new());
+        let last = || call("Expr.last", Vec::new());
+        let excused = |start: &str, links: Vec<Call>| {
+            let at = links.len();
+            let mut all = links;
+            all.push(compared_with("Expr.lt", chain(column("g"), &[])));
+            tables_refuse(
+                &select(vec![chain_of(column(start), all)]),
+                link_of("exprs", 0, at),
+                ROWS,
+                "no",
+            )
+        };
+        for start in ["a", "b"] {
+            assert_eq!(
+                excused(start, vec![shift(), last()]),
+                vec![Limit::AShiftThatLeavesNulls],
+                "{start}"
+            );
+        }
+        for start in ["f", "k", "g", "h", "u"] {
+            assert_eq!(excused(start, vec![shift(), last()]), vec![], "{start}");
+            assert_eq!(
+                excused(start, vec![shift(), shift(), shift(), last()]),
+                vec![Limit::AShiftThatLeavesNulls],
+                "{start}"
+            );
+        }
+        // After an aggregate there is one value, which a shift moves away.
+        assert_eq!(
+            excused("k", vec![call("Expr.max", Vec::new()), shift(), last()]),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+    }
+
+    #[test]
+    fn a_running_sum_of_a_comparison_with_a_null_is_no_limit_of_the_sample() {
+        // `f > null` then `cum_sum` then `== b`: Polars folds the comparison with
+        // a null into a null whatever the rows are, so what follows the running
+        // sum meets a column of nulls however many rows there are. That is a part
+        // Polars skips, which a probe settles and no limit excuses.
+        let item = |links: Vec<Call>| {
+            let mut all = links;
+            all.push(compared_with("Expr.eq", chain(column("b"), &[])));
+            select(vec![chain_of(column("f"), all)])
+        };
+        let null_comparison = || compared_with("Expr.gt", chain(null(), &[]));
+        let sum = || call("Expr.cum_sum", Vec::new());
+        let case = item(vec![null_comparison(), sum()]);
+        assert_eq!(
+            tables_refuse(&case, link_of("exprs", 0, 2), ROWS, "no"),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn what_a_shift_leaves_null_excuses_the_tables_refusing_a_call_it_is_given_to() {
+        // `b.first().shift()` is a null, and `k.shift().first()` is the null
+        // that the shift left first: a comparison with either is met with
+        // nothing, which Polars allows where the tables refuse the dtype.
+        let given = |operand: Expression| {
+            select(vec![chain_of(
+                column("g"),
+                vec![compared_with("Expr.lt", operand)],
+            )])
+        };
+        let shift = |links: &[&str]| {
+            let mut all: Vec<Call> = Vec::new();
+            for id in links {
+                all.push(call(id, Vec::new()));
+            }
+            all
+        };
+        let at_the_call = link_of("exprs", 0, 0);
+        let first_then_shift = given(chain_of(column("b"), shift(&["Expr.first", "Expr.shift"])));
+        assert_eq!(
+            tables_refuse(&first_then_shift, at_the_call.clone(), ROWS, "no"),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        let shift_then_first = given(chain_of(column("k"), shift(&["Expr.shift", "Expr.first"])));
+        assert_eq!(
+            tables_refuse(&shift_then_first, at_the_call.clone(), ROWS, "no"),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        // The first that skips nulls, a shift after a first that is not one, and
+        // a first with no shift are not null.
+        let skipping = given(chain_of(
+            column("k"),
+            vec![
+                call("Expr.shift", Vec::new()),
+                call(
+                    "Expr.first",
+                    vec![("ignore_nulls", Value::Flag(Some(true)))],
+                ),
+            ],
+        ));
+        assert_eq!(
+            tables_refuse(&skipping, at_the_call.clone(), ROWS, "no"),
+            vec![]
+        );
+        let plain = given(chain_of(column("k"), shift(&["Expr.first"])));
+        assert_eq!(
+            tables_refuse(&plain, at_the_call.clone(), ROWS, "no"),
+            vec![]
+        );
+        // The last after one shift is the sample's null; after two it is a value.
+        let last = given(chain_of(column("b"), shift(&["Expr.shift", "Expr.last"])));
+        assert_eq!(
+            tables_refuse(&last, at_the_call.clone(), ROWS, "no"),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        let without_the_null = given(chain_of(column("k"), shift(&["Expr.shift", "Expr.last"])));
+        assert_eq!(
+            tables_refuse(&without_the_null, at_the_call.clone(), ROWS, "no"),
+            vec![]
+        );
+        let later = given(chain_of(
+            column("k"),
+            shift(&["Expr.shift", "Expr.shift", "Expr.last"]),
+        ));
+        assert_eq!(tables_refuse(&later, at_the_call, ROWS, "no"), vec![]);
+    }
+
+    #[test]
+    fn a_first_that_skips_nulls_is_null_where_what_it_takes_is_only_nulls() {
+        // The sample's columns are a value, a null and a value. A first that
+        // skips nulls takes the first value, which is null only when every row
+        // is: after three shifts, or after a first of what a shift moved, which
+        // is one null. After one or two shifts a value is first.
+        let shift = || call("Expr.shift", Vec::new());
+        let first = || call("Expr.first", Vec::new());
+        let skipping = || {
+            call(
+                "Expr.first",
+                vec![("ignore_nulls", Value::Flag(Some(true)))],
+            )
+        };
+        let excused = |links: Vec<Call>| {
+            let at = links.len();
+            let mut all = links;
+            all.push(compared_with("Expr.gt", chain(column("h"), &[])));
+            tables_refuse(
+                &select(vec![chain_of(column("b"), all)]),
+                link_of("exprs", 0, at),
+                ROWS,
+                "no",
+            )
+        };
+        assert_eq!(
+            excused(vec![shift(), first(), skipping()]),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        assert_eq!(
+            excused(vec![shift(), shift(), shift(), skipping()]),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        assert_eq!(excused(vec![shift(), skipping()]), vec![]);
+        assert_eq!(excused(vec![shift(), shift(), skipping()]), vec![]);
+        assert_eq!(excused(vec![first(), skipping()]), vec![]);
+    }
+
+    /// A whole number as an expression: a literal of it.
+    fn chain_with_integer(rows: i64) -> Expression {
+        chain(
+            call("polars.lit", vec![("value", Value::Integer(rows))]),
+            &[],
+        )
+    }
+
+    #[test]
+    fn a_null_comparison_in_one_key_does_not_excuse_what_another_key_may_have_caused() {
+        let reason = "all join key expressions must be elementwise.";
+        let compared = chain_of(
+            column("f"),
+            vec![compared_with("Expr.gt", chain(null(), &[]))],
+        );
+        // The other key holds a running value, an aggregate or a window, any of
+        // which may be why Polars refuses the join.
+        for other in [
+            chain(column("rb"), &["Expr.cum_max"]),
+            chain(column("rb"), &["Expr.sum"]),
+        ] {
+            let case = case_of(call(
+                "LazyFrame.join",
+                vec![
+                    ("other", Value::Table("other".to_owned())),
+                    ("left_on", many(vec![compared.clone(), other])),
+                    ("right_on", many(vec![chain(column("rk"), &[]); 2])),
+                ],
+            ));
+            assert_eq!(
+                polars_refuses(&case, Some(step_place()), Stage::Schema, reason, Vec::new()),
+                vec![]
+            );
+        }
+        // With the other key plain it is excused.
+        let case = join(compared, chain(column("key"), &[]));
+        assert_eq!(
+            polars_refuses(&case, Some(step_place()), Stage::Schema, reason, Vec::new()),
+            vec![Limit::ANullComparisonInAKey]
+        );
+    }
+
+    #[test]
+    fn the_tables_refusing_inside_a_key_that_is_wholly_one_value_are_excused() {
+        let reason = "all join key expressions must be elementwise.";
+        let whole = chain(column("a"), &["Expr.cum_max", "Expr.max"]);
+        let plain = chain(column("a"), &["Expr.cum_max"]);
+        let case = join(whole.clone(), plain.clone());
+        let refuse = |case: &Case, parameter: &str, reason: &str| {
+            tables_refuse(
+                case,
+                link_of(parameter, 0, 0),
+                Some(TableStage::Schema),
+                reason,
+            )
+        };
+        assert_eq!(
+            refuse(&case, "left_on", reason),
+            vec![Limit::ASingleValueInAKey]
+        );
+        // The other key is not one value, so what is refused in it is refused.
+        assert_eq!(refuse(&join(plain, whole), "left_on", reason), vec![]);
+        // Another reason.
+        assert_eq!(refuse(&case, "left_on", "no"), vec![]);
+    }
+
+    #[test]
+    fn a_key_that_holds_a_single_value_beside_a_column_is_not_excused() {
+        // That key is refused by a rule, and Polars refuses it too.
+        let reason = "all join key expressions must be elementwise.";
+        let mixed = chain_of(
+            column("f"),
+            vec![
+                call("Expr.cum_max", Vec::new()),
+                compared_with("Expr.le", chain(column("x"), &["Expr.max"])),
+            ],
+        );
+        let case = join(mixed, chain(column("key"), &[]));
+        assert_eq!(
+            tables_refuse(
+                &case,
+                link_of("left_on", 0, 0),
+                Some(TableStage::Schema),
+                reason
+            ),
             vec![]
         );
     }
@@ -1675,225 +1903,7 @@ mod tests {
         );
     }
 
-    // ----- Conditions
-
-    /// The place of link 0 of the value of link 0 of item 0 of `exprs`: inside a
-    /// value of the condition at the item.
-    fn in_the_value() -> Place {
-        at(&[
-            parameter("exprs"),
-            Segment::Item(0),
-            Segment::Link(0),
-            parameter("statement"),
-            Segment::Link(0),
-        ])
-    }
-
-    /// The place of link 0 of the predicate of the condition at item 0.
-    fn in_the_predicate() -> Place {
-        at(&[
-            parameter("exprs"),
-            Segment::Item(0),
-            Segment::Start,
-            parameter("predicates"),
-            Segment::Item(0),
-            Segment::Link(0),
-        ])
-    }
-
-    fn undecided() -> Expression {
-        condition(
-            chain(column("g"), &["Expr.is_null"]),
-            chain(column("a"), &["Expr.cum_sum"]),
-        )
-    }
-
-    /// A condition whose values are not one expression.
-    fn distinct() -> Expression {
-        chain_of(
-            call(
-                "polars.when",
-                vec![(
-                    "predicates",
-                    many(vec![chain(column("g"), &["Expr.is_null"])]),
-                )],
-            ),
-            vec![
-                call(
-                    "When.then",
-                    vec![(
-                        "statement",
-                        Value::Expression(chain(column("a"), &["Expr.cum_sum"])),
-                    )],
-                ),
-                call(
-                    "Then.otherwise",
-                    vec![(
-                        "statement",
-                        Value::Expression(chain(column("b"), &["Expr.cum_sum"])),
-                    )],
-                ),
-            ],
-        )
-    }
-
-    fn decided() -> Expression {
-        condition(
-            chain(null(), &["Expr.is_null"]),
-            chain(column("a"), &["Expr.cum_sum"]),
-        )
-    }
-
-    #[test]
-    fn branches_that_are_one_excuse_a_refusal_in_their_predicate_and_not_elsewhere() {
-        let with = select(vec![undecided()]);
-        assert_eq!(
-            tables_refuse(&with, in_the_predicate(), Some(TableStage::Schema), "no"),
-            vec![Limit::TheBranchesAreOne]
-        );
-        // The same condition in another item.
-        let elsewhere = select(vec![chain(column("a"), &["Expr.cum_sum"]), undecided()]);
-        assert_eq!(
-            tables_refuse(
-                &elsewhere,
-                link_of("exprs", 0, 0),
-                Some(TableStage::Schema),
-                "no"
-            ),
-            vec![]
-        );
-        // A refusal in the value, not the predicate, is not this.
-        assert!(
-            !tables_refuse(&with, in_the_value(), Some(TableStage::Schema), "no")
-                .contains(&Limit::TheBranchesAreOne)
-        );
-    }
-
-    #[test]
-    fn a_predicate_that_only_starts_from_a_literal_does_not_decide_a_condition() {
-        let predicate = chain_of(
-            null(),
-            vec![compared_with("Expr.lt", chain(column("a"), &[]))],
-        );
-        let leans = condition(predicate, chain(column("a"), &["Expr.cum_sum"]));
-        let case = select(vec![leans]);
-        assert_eq!(
-            tables_refuse(&case, in_the_value(), Some(TableStage::Schema), "no"),
-            vec![]
-        );
-        let case = select(vec![decided()]);
-        assert_eq!(
-            tables_refuse(&case, in_the_value(), Some(TableStage::Schema), "no"),
-            vec![Limit::ADecidedCondition]
-        );
-        // A decided condition in another item decides nothing here.
-        let elsewhere = select(vec![undecided(), decided()]);
-        assert_eq!(
-            tables_refuse(&elsewhere, in_the_value(), Some(TableStage::Schema), "no"),
-            vec![]
-        );
-    }
-
-    #[test]
-    fn a_value_runs_on_no_rows_only_for_what_the_tables_refused_when_they_ran_rows() {
-        let case = select(vec![distinct()]);
-        assert_eq!(
-            tables_refuse(&case, in_the_value(), ROWS, "no"),
-            vec![Limit::AValueThatRunsOnNoRows]
-        );
-        assert_eq!(
-            tables_refuse(&case, in_the_value(), Some(TableStage::Schema), "no"),
-            vec![]
-        );
-        // A refusal outside the value, and a condition elsewhere.
-        assert_eq!(tables_refuse(&case, in_the_predicate(), ROWS, "no"), vec![]);
-        let elsewhere = select(vec![chain(column("a"), &["Expr.cum_sum"]), distinct()]);
-        assert_eq!(
-            tables_refuse(&elsewhere, link_of("exprs", 0, 0), ROWS, "no"),
-            vec![]
-        );
-        // A decided condition has dropped its branches, which is its own cause.
-        let case = select(vec![decided()]);
-        assert_eq!(
-            tables_refuse(&case, in_the_value(), ROWS, "no"),
-            vec![Limit::ADecidedCondition]
-        );
-    }
-
     // ----- Places, schemas, Booleans, pivots
-
-    fn traced(place: Place, nested: usize, class: Option<Representative>) -> Traced {
-        Traced {
-            place,
-            nested,
-            start: None,
-            links: vec![class],
-            told: true,
-        }
-    }
-
-    fn predicate_at(item: usize) -> Place {
-        at(&[parameter("predicates"), Segment::Item(item)])
-    }
-
-    #[test]
-    fn a_predicate_two_positions_deep_of_a_dtype_that_is_no_boolean_is_judged_as_a_value() {
-        let case = filter(vec![chain(column("a"), &[]), chain(column("b"), &[])]);
-        let reason = "invalid series dtype: expected `Boolean`, got `i8`";
-        let deep = traced(predicate_at(0), 2, Some(Representative::Int8));
-        assert_eq!(
-            polars_refuses(&case, None, Stage::Rows, reason, vec![deep.clone()]),
-            vec![Limit::ADeeperPlace]
-        );
-        // Not so deep, or a Boolean, or another reason.
-        let shallow = traced(predicate_at(0), 1, Some(Representative::Int8));
-        assert_eq!(
-            polars_refuses(&case, None, Stage::Rows, reason, vec![shallow]),
-            vec![]
-        );
-        let boolean = traced(predicate_at(0), 2, Some(Representative::Boolean));
-        assert_eq!(
-            polars_refuses(&case, None, Stage::Rows, reason, vec![boolean]),
-            vec![]
-        );
-        assert_eq!(
-            polars_refuses(&case, None, Stage::Rows, "no", vec![deep.clone()]),
-            vec![]
-        );
-        // A refusal placed outside that predicate.
-        let outside = Some(at(&[
-            parameter("predicates"),
-            Segment::Item(1),
-            Segment::Link(0),
-        ]));
-        assert_eq!(
-            polars_refuses(&case, outside, Stage::Schema, reason, vec![deep]),
-            vec![]
-        );
-    }
-
-    #[test]
-    fn the_tables_refusing_deep_is_excused_for_a_boolean_and_only_where_deep() {
-        let deep = at(&[
-            parameter("exprs"),
-            Segment::Item(0),
-            Segment::Link(0),
-            parameter("statement"),
-            Segment::Start,
-            parameter("predicates"),
-            Segment::Item(0),
-        ]);
-        let case = select(vec![distinct()]);
-        let reason = "it cannot end here: expected `Boolean`";
-        assert_eq!(
-            tables_refuse(&case, deep, Some(TableStage::Schema), reason),
-            vec![Limit::ADeeperPlace]
-        );
-        assert_eq!(
-            tables_refuse(&case, in_the_predicate(), Some(TableStage::Schema), reason),
-            vec![]
-        );
-    }
 
     #[test]
     fn a_hidden_schema_is_excused_inside_an_expression_and_not_at_its_end() {
@@ -1913,128 +1923,6 @@ mod tests {
         assert_eq!(
             tables_refuse(&case, link_of("exprs", 0, 0), ROWS, "no"),
             vec![]
-        );
-    }
-
-    #[test]
-    fn a_boolean_is_needed_only_of_a_predicate_whose_dtype_was_not_given() {
-        let case = filter(vec![chain(column("a"), &[]), chain(column("b"), &[])]);
-        let reason = "filter predicate must be of type `Boolean`, got `Int64`";
-        let unknown = Traced {
-            place: predicate_at(0),
-            nested: 1,
-            start: Some(Representative::Int64),
-            links: Vec::new(),
-            told: false,
-        };
-        assert_eq!(
-            polars_refuses(
-                &case,
-                Some(step_place()),
-                Stage::Schema,
-                reason,
-                vec![unknown.clone()]
-            ),
-            vec![Limit::ABooleanIsNeededAndTheDtypeUnknown]
-        );
-        // A predicate with a last link whose dtype the walk worked out, as a
-        // condition's, is as unknown to `offer`; one the tables gave is not.
-        let worked_out = Traced {
-            links: vec![Some(Representative::String)],
-            ..unknown.clone()
-        };
-        assert_eq!(
-            polars_refuses(
-                &case,
-                Some(step_place()),
-                Stage::Schema,
-                reason,
-                vec![worked_out.clone()]
-            ),
-            vec![Limit::ABooleanIsNeededAndTheDtypeUnknown]
-        );
-        let told = Traced {
-            told: true,
-            ..worked_out
-        };
-        assert_eq!(
-            polars_refuses(&case, Some(step_place()), Stage::Schema, reason, vec![told]),
-            vec![]
-        );
-        // A refusal placed in another predicate, and a value that is no predicate.
-        let elsewhere = Some(at(&[
-            parameter("predicates"),
-            Segment::Item(1),
-            Segment::Link(0),
-        ]));
-        assert_eq!(
-            polars_refuses(
-                &case,
-                elsewhere,
-                Stage::Schema,
-                reason,
-                vec![unknown.clone()]
-            ),
-            vec![]
-        );
-        let value = Traced {
-            place: at(&[
-                parameter("predicates"),
-                Segment::Item(0),
-                Segment::Link(0),
-                parameter("statement"),
-            ]),
-            ..unknown
-        };
-        assert_eq!(
-            polars_refuses(
-                &case,
-                Some(step_place()),
-                Stage::Schema,
-                reason,
-                vec![value]
-            ),
-            vec![]
-        );
-    }
-
-    #[test]
-    fn the_tables_refusing_a_start_where_a_boolean_is_needed_is_excused_for_a_predicate() {
-        let reason = "it cannot end here: invalid series dtype: expected `Boolean`, got `i64`";
-        let case = pivot(chain_of(
-            call(
-                "polars.when",
-                vec![("predicates", many(vec![chain(column("a"), &[])]))],
-            ),
-            vec![
-                call(
-                    "When.then",
-                    vec![("statement", Value::Expression(chain(column("a"), &[])))],
-                ),
-                call(
-                    "Then.otherwise",
-                    vec![("statement", Value::Expression(chain(column("b"), &[])))],
-                ),
-            ],
-        ));
-        let predicate = at(&[
-            parameter("aggregate_function"),
-            Segment::Start,
-            parameter("predicates"),
-            Segment::Item(0),
-        ]);
-        assert_eq!(
-            tables_refuse(&case, predicate, Some(TableStage::Rows), reason),
-            vec![Limit::ABooleanIsNeededAndTheDtypeUnknown]
-        );
-        let value = at(&[
-            parameter("aggregate_function"),
-            Segment::Link(0),
-            parameter("statement"),
-        ]);
-        assert_eq!(
-            tables_refuse(&case, value, Some(TableStage::Rows), reason),
-            vec![Limit::AValueThatRunsOnNoRows]
         );
     }
 

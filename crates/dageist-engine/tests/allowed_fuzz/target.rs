@@ -12,10 +12,22 @@ use dageist_fuzz::{
 
 use super::case::Case;
 use super::generate::generate;
-use super::limits::excuses;
+use super::limits::{excuses, strict};
 use super::observe::{Observed, Seen, observe};
-use super::predict::{Prediction, Source, Verdict, predict};
+use super::predict::{Prediction, Refused, Source, Verdict, predict};
+use super::probe::{Settled, settle, settle_apart};
 use super::reduce::candidates;
+
+/// The named rules that are stricter than Polars by design, each with why. A
+/// rule that refuses what Polars allows and is not here is a disagreement.
+const STRICTER_BY_DESIGN: [(&str, &str); 1] = [(
+    "pivot-aggregate-gives-one-value",
+    "a pivot's aggregate gives one value for each group, though Polars lets a running value stand",
+)];
+
+/// What the outcome of a case says where the tables refuse a part that Polars
+/// does not evaluate, and a probe of the part shows the tables right.
+pub const STRICTER_WHERE_UNEVALUATED: &str = "stricter where Polars does not evaluate the part";
 
 pub const TARGET: &str = "dageist-engine::allowed-combinations";
 pub const ALLOWANCE: &str = "dageist-engine::tables-predict-allowance";
@@ -75,6 +87,10 @@ pub fn take_tally() -> Vec<String> {
         ("agreeing", total("agree:")),
         ("excused by a limit", total("not covered")),
         (
+            "refused where Polars does not evaluate the part",
+            total("stricter where"),
+        ),
+        (
             "refused by a rule that is stricter than Polars",
             total("rule stricter"),
         ),
@@ -124,18 +140,64 @@ pub fn describe(case: &Case) -> String {
             )
         },
     );
-    let limits: Vec<&str> = excuses(case, &prediction, &observed)
-        .iter()
-        .map(|limit| limit.slug())
-        .collect();
+    let excused = excuses(case, &prediction, &observed);
+    // The order the case is judged in: the part as written, then the limits, then
+    // the refused call apart from what surrounds it.
+    let probed = match (&prediction.verdict, &observed.refusal) {
+        (Verdict::Refuses(refused), None) => probe_of(case, refused).or_else(|| {
+            excused
+                .is_empty()
+                .then(|| probe_apart(case, refused, &prediction, &observed))
+                .flatten()
+        }),
+        _ => None,
+    }
+    .map_or_else(String::new, |settled| {
+        format!("\nprobe: {}", settled.said())
+    });
+    let limits: Vec<&str> = excused.iter().map(|limit| limit.slug()).collect();
     format!(
-        "{predicted}\n{done}\nexcused by: {}",
+        "{predicted}\n{done}{probed}\nexcused by: {}",
         if limits.is_empty() {
             "no limit".to_owned()
         } else {
             limits.join(", ")
         }
     )
+}
+
+/// What a probe of the part the tables refuse, as it is written, shows, unless
+/// the limits are held to everything.
+fn probe_of(case: &Case, refused: &Refused) -> Option<Settled> {
+    if strict() {
+        return None;
+    }
+    settle(case, refused)
+}
+
+/// What a probe of the refused call apart from what surrounds it shows, unless
+/// the limits are held to everything.
+fn probe_apart(
+    case: &Case,
+    refused: &Refused,
+    prediction: &Prediction,
+    observed: &Observed,
+) -> Option<Settled> {
+    if strict() {
+        return None;
+    }
+    settle_apart(case, refused, prediction, observed)
+}
+
+/// The outcome of a case where the tables refuse a part Polars does not
+/// evaluate, and the probe `settled` of the part shows the tables right.
+fn stricter(settled: Option<Settled>, what: &str) -> Option<Result<CaseOutcome>> {
+    let settled = settled?;
+    tally(format!("{STRICTER_WHERE_UNEVALUATED}: {what}"));
+    Some(CaseOutcome::expected_rejection(
+        Vec::new(),
+        one_line(&format!("{STRICTER_WHERE_UNEVALUATED}: {}", settled.said())),
+    ))
 }
 
 /// The first words of a reason, as a name: the same disagreement is not
@@ -260,9 +322,6 @@ impl CaseTarget for AllowedTarget {
         let prediction = predict(case);
         let observed = observe(case);
         let allowed_by_polars = observed.refusal.is_none();
-        if prediction.stopped_by_options {
-            tally("prediction stops after an option that changes the dtype");
-        }
         if case.document.steps()[0].call().entry().id().as_str() == "LazyFrame.pivot" {
             tally("pivot case");
         }
@@ -334,12 +393,24 @@ impl CaseTarget for AllowedTarget {
                 checked.push(allowance);
                 tally("agree: allowed");
             }
-            Verdict::Refuses(refused) => match (refused.source, allowed_by_polars) {
+            Verdict::Refuses(refused) => match (refused.source.clone(), allowed_by_polars) {
                 (Source::Polars, true) => {
+                    let why = reason_slug(&refused.reason);
+                    // What Polars refuses of the part as written shows the tables
+                    // right where it skips the part; the limits then say what it
+                    // evaluates and accepts; what is left is asked of the refused
+                    // call apart from what surrounds it.
+                    if let Some(outcome) = stricter(probe_of(case, &refused), &why) {
+                        return outcome;
+                    }
                     if let Some(outcome) = excused("refused, Polars allows") {
                         return outcome;
                     }
-                    let why = reason_slug(&refused.reason);
+                    if let Some(outcome) =
+                        stricter(probe_apart(case, &refused, &prediction, &observed), &why)
+                    {
+                        return outcome;
+                    }
                     return failure(
                         ALLOWANCE,
                         &format!("refused-but-allowed-{why}"),
@@ -351,23 +422,40 @@ impl CaseTarget for AllowedTarget {
                 }
                 (Source::Rule(rule), true) => {
                     // A named rule is dageist's, and may be stricter than
-                    // Polars. It is a result of the target's own, not a
-                    // property of the tables.
+                    // Polars only where it is so by design, which is named.
+                    // Any other rule refusing what Polars allows is a
+                    // disagreement.
+                    let Some((_, why)) = STRICTER_BY_DESIGN.iter().find(|(name, _)| *name == rule)
+                    else {
+                        // Polars does not evaluate everything: a probe of the part
+                        // says whether the rule is right where it does.
+                        if let Some(outcome) = stricter(probe_of(case, &refused), rule) {
+                            return outcome;
+                        }
+                        return failure(
+                            ALLOWANCE,
+                            &format!("rule-refuses-what-polars-allows-{rule}"),
+                            format!(
+                                "the rule {rule} refuses it at {}: {}; Polars allows it",
+                                refused.at, refused.reason
+                            ),
+                        );
+                    };
                     tally(format!("rule stricter than Polars: {rule}"));
                     return CaseOutcome::expected_rejection(
                         checked,
-                        format!(
-                            "the rule {rule} refuses what Polars allows: {}",
+                        one_line(&format!(
+                            "the rule {rule} refuses what Polars allows, as {why}: {}",
                             refused.reason
-                        ),
+                        )),
                     );
                 }
                 (Source::Silent, _) => {
                     tally(format!("tables silent: {}", one_line(&refused.reason)));
-                    return CaseOutcome::unsupported(format!(
+                    return CaseOutcome::unsupported(one_line(&format!(
                         "the tables hold nothing for this: {}",
                         refused.reason
-                    ));
+                    )));
                 }
                 (source, false) => {
                     checked.push(allowance);
@@ -380,7 +468,9 @@ impl CaseTarget for AllowedTarget {
             Verdict::Undetermined(why) => {
                 tally("undetermined");
                 if checked.is_empty() {
-                    return CaseOutcome::unsupported(format!("the tables cannot be asked: {why}"));
+                    return CaseOutcome::unsupported(one_line(&format!(
+                        "the tables cannot be asked: {why}"
+                    )));
                 }
             }
         }
@@ -394,5 +484,81 @@ impl CaseTarget for AllowedTarget {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use dageist_engine::allowed::Representative;
+
+    use super::*;
+
+    #[test]
+    fn a_probe_longer_than_an_outcome_may_say_is_still_an_outcome() {
+        // The outcome of a case that the probe settles names the probe, which for a
+        // deep case is longer than the fuzz contract admits of a detail. The case
+        // is still one where the tables are stricter, and its outcome is a line.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+            "tests/allowed_fuzz/regressions/stricter-a-probe-longer-than-an-outcome-may-say.case",
+        );
+        let case = Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case");
+        let outcome = std::thread::Builder::new()
+            .stack_size(256 << 20)
+            .spawn(move || AllowedTarget::new().evaluate(&case))
+            .expect("a thread")
+            .join()
+            .expect("the case is evaluated")
+            .expect("an outcome that meets the fuzz contract");
+        assert_eq!(outcome.kind(), dageist_fuzz::OutcomeKind::ExpectedRejection);
+        let detail = outcome.detail().expect("a detail");
+        assert!(detail.starts_with(STRICTER_WHERE_UNEVALUATED), "{detail}");
+        assert!(detail.len() <= 4096 && !detail.chars().any(char::is_control));
+    }
+
+    #[test]
+    fn the_outcome_of_a_schema_mismatch_probe_says_what_the_probe_showed() {
+        // The tables' reason is the target's own comparison of plan and rows, and
+        // the probe in the position is refused by Polars with a panic that says
+        // nothing of it, so the outcome says what was shown: the call's plan and
+        // rows differ as the tables say, and a call whose plan and rows agree is
+        // allowed there.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/allowed_fuzz/regressions/stricter-a-sort-key-of-one-value-whose-schema-differs.case");
+        let case = Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case");
+        let outcome = std::thread::Builder::new()
+            .stack_size(256 << 20)
+            .spawn(move || AllowedTarget::new().evaluate(&case))
+            .expect("a thread")
+            .join()
+            .expect("the case is evaluated")
+            .expect("an outcome");
+        let detail = outcome.detail().expect("a detail");
+        assert!(detail.contains("plan and rows"), "{detail}");
+        assert!(!detail.contains("for the tables' reason"), "{detail}");
+    }
+
+    #[test]
+    fn a_wrong_prediction_of_the_dtype_before_the_refused_call_is_a_disagreement() {
+        // A probe stands a value in for what reaches the refused call, so a
+        // wrong prediction of that dtype must not be hidden by it: it is found
+        // as a difference of the dtypes of the case itself, whatever is probed.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+            "tests/allowed_fuzz/regressions/stricter-a-window-over-the-length-of-a-literal.case",
+        );
+        let case = Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case");
+        let observed = observe(&case);
+        let right = predict(&case);
+        assert_eq!(dtype_difference(&case, &right, &observed), None);
+        let mut wrong = right.clone();
+        for traced in &mut wrong.expressions {
+            for held in &mut traced.links {
+                // The comparison gives a `Boolean`; say it gives whole numbers.
+                if *held == Some(Representative::Boolean) {
+                    *held = Some(Representative::Int64);
+                }
+            }
+        }
+        let difference = dtype_difference(&case, &wrong, &observed).expect("a difference");
+        assert!(difference.contains("Polars gives"), "{difference}");
     }
 }

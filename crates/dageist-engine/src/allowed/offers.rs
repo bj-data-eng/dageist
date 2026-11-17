@@ -9,6 +9,7 @@ use super::context::Context;
 use super::dtype::{Representative, ResultDtype};
 use super::rules::Rule;
 use super::table::{Outcome, Produces, Reason, Shape, Stage, Tables, is_method};
+use crate::catalog::DefaultValue;
 
 /// What an expression has so far, where an entry would follow it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,6 +61,50 @@ impl ConditionState {
             "ChainedThen.otherwise" | "ChainedThen.when" => Self::ChainedThen,
             _ => return None,
         })
+    }
+}
+
+/// What has been chosen for a call of an entry, so far as it decides what the
+/// entry gives: the dtypes of the arguments given to its expression
+/// parameters, the options set, and the dtype of the value an entry makes that
+/// the tables cannot give.
+///
+/// Nothing chosen is the [`Default`]: an entry that takes an expression it needs is
+/// then judged for any dtype of argument that fits.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Chosen<'a> {
+    arguments: &'a [(&'a str, Representative)],
+    options: &'a [(&'a str, &'a str)],
+    gives: Option<Representative>,
+}
+
+impl<'a> Chosen<'a> {
+    /// The dtypes of the arguments given to expression parameters, each by the
+    /// parameter's name.
+    #[must_use]
+    pub const fn with_arguments(mut self, arguments: &'a [(&'a str, Representative)]) -> Self {
+        self.arguments = arguments;
+        self
+    }
+
+    /// The options set, each by the parameter's name and the value as the
+    /// option table writes it (`true`, `false`, `unset`, or the word of a
+    /// choice), as [`options`] takes them. A method is refused for the options
+    /// that Polars refuses.
+    #[must_use]
+    pub const fn with_options(mut self, options: &'a [(&'a str, &'a str)]) -> Self {
+        self.options = options;
+        self
+    }
+
+    /// The dtype the entry gives, where the call decides it and the tables
+    /// cannot: the column `polars.col` reads, the literal `polars.lit` makes
+    /// when it is given a dtype, the values of a condition that `otherwise`
+    /// ends. The tables give what a method gives, so a method ignores it.
+    #[must_use]
+    pub const fn giving(mut self, dtype: Representative) -> Self {
+        self.gives = Some(dtype);
+        self
     }
 }
 
@@ -153,12 +198,61 @@ impl fmt::Display for Refusal {
 
 impl std::error::Error for Refusal {}
 
+/// Why whether an expression may end is not known.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Unknown {
+    /// A start takes the dtype of a column or of a literal, which its arguments
+    /// decide, and the table measured it with one argument. The dtype of what
+    /// it gives was not told to [`offer`].
+    TheStartsDtype,
+    /// A dtype that is needed is not known: the argument that decides what a
+    /// method gives is not chosen.
+    TheResultsDtype,
+}
+
+impl fmt::Display for Unknown {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::TheStartsDtype => "the dtype of the start is not given",
+            Self::TheResultsDtype => "the dtype that the arguments decide is not known",
+        })
+    }
+}
+
+/// Whether an expression may end after an entry, in the context it stands in.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Ending {
+    /// It may.
+    Allowed,
+    /// It may not, for this reason.
+    Refused(Refusal),
+    /// What the tables and the rules hold does not say.
+    NotKnown(Unknown),
+}
+
+impl Ending {
+    /// Whether it may end there.
+    #[must_use]
+    pub const fn is_allowed(&self) -> bool {
+        matches!(self, Self::Allowed)
+    }
+
+    /// The refusal, when it may not.
+    #[must_use]
+    pub const fn refusal(&self) -> Option<&Refusal> {
+        match self {
+            Self::Refused(refusal) => Some(refusal),
+            _ => None,
+        }
+    }
+}
+
 /// What an entry that may stand at a place gives.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Allowance {
     result: Option<ResultDtype>,
     shape: Shape,
-    cannot_end: Option<Refusal>,
+    ending: Ending,
 }
 
 impl Allowance {
@@ -181,13 +275,12 @@ impl Allowance {
     /// that cannot end it may be followed by one that can: an entry that may
     /// not end a chain may still stand.
     ///
-    /// # Errors
-    ///
-    /// The rule that the expression, ended here, would break, or else the
-    /// reason Polars refused the entry ending a chain in this context, as the
-    /// table of contexts recorded it.
-    pub fn can_end(&self) -> Result<(), &Refusal> {
-        self.cannot_end.as_ref().map_or(Ok(()), Err)
+    /// A refusal is the rule that the expression, ended here, would break, or
+    /// else the reason Polars refused the entry ending a chain in this context,
+    /// as the table of contexts recorded it.
+    #[must_use]
+    pub const fn can_end(&self) -> &Ending {
+        &self.ending
     }
 }
 
@@ -357,8 +450,126 @@ fn on_receiver(
     fit.ok_or_else(missing)
 }
 
-/// Whether the entry `entry` may stand at `place`, given the dtypes of the
-/// arguments that have been chosen for its expression parameters.
+/// What the option table says the options chosen give.
+enum OptionsGive {
+    /// They change nothing the table records: no option is set to other than its
+    /// default.
+    Nothing,
+    /// The lines that bear on them agree on this, measured on a receiver of this
+    /// dtype.
+    Gives {
+        produces: Produces,
+        measured_on: Option<Representative>,
+    },
+    /// The lines that bear on them give different results.
+    Unknown,
+}
+
+/// The word the option table writes for the default of `parameter`, when it is
+/// a flag or a choice that has one.
+fn default_word(parameter: &catalog::Parameter) -> Option<String> {
+    match parameter.default().value() {
+        DefaultValue::Flag(flag) => Some(flag.to_string()),
+        DefaultValue::Unset => Some("unset".to_owned()),
+        DefaultValue::Text(word) => Some(word),
+        _ => None,
+    }
+}
+
+/// What the option table says the options `chosen` of `entry` give. An option
+/// set to its default is not a choice. One option chosen is read from the lines
+/// that set it with every other option at its default, and more from the line
+/// of each pair of them; where those lines give different results, the result
+/// is not known.
+fn read_options(entry: &Entry, chosen: &[(&str, &str)]) -> OptionsGive {
+    let tables = Tables::committed();
+    let id = entry.id().as_str();
+    let parameter = |name: &str| entry.parameters().iter().find(|found| found.name() == name);
+    let changed: Vec<(&str, &str)> = chosen
+        .iter()
+        .copied()
+        .filter(|(name, word)| {
+            parameter(name).is_some_and(|found| default_word(found).as_deref() != Some(word))
+        })
+        .collect();
+    let at_default = |(name, word): &(&str, String)| {
+        parameter(name).is_some_and(|found| default_word(found).as_deref() == Some(word.as_str()))
+    };
+    let is_chosen = |(name, word): &(&str, String)| {
+        changed
+            .iter()
+            .any(|(chosen_name, chosen_word)| chosen_name == name && chosen_word == word)
+    };
+    let mut gives: Vec<(&Produces, Option<Representative>)> = Vec::new();
+    for ((line_id, line), cell) in &tables.options {
+        let bears = match changed.as_slice() {
+            [] => false,
+            [_] => {
+                line.iter().any(is_chosen)
+                    && line
+                        .iter()
+                        .all(|option| is_chosen(option) || at_default(option))
+            }
+            _ => line.len() > 1 && line.iter().all(is_chosen),
+        };
+        if *line_id == id
+            && bears
+            && let Outcome::Allowed(Some(produces)) = &cell.outcome
+        {
+            gives.push((produces, cell.receiver));
+        }
+    }
+    let Some((first, measured_on)) = gives.first().copied() else {
+        return OptionsGive::Nothing;
+    };
+    if gives.iter().all(|(produces, _)| *produces == first) {
+        OptionsGive::Gives {
+            produces: first.clone(),
+            measured_on,
+        }
+    } else {
+        OptionsGive::Unknown
+    }
+}
+
+/// The expression parameters the option table was measured with, for an entry
+/// whose options mean nothing without them: a window is grouped by
+/// `partition_by`, and without it a mapping strategy changes nothing.
+fn measured_with(entry: &Entry) -> &'static [&'static str] {
+    match entry.id().as_str() {
+        "Expr.over" => &["partition_by"],
+        _ => &[],
+    }
+}
+
+/// The result an option gives where the method follows `receiver`, from the
+/// result `option` the table measured on `measured_on`, and the results the
+/// method gives at its default options on each. The option table was measured
+/// on one dtype: where the receiver is another, the option is read as it
+/// changes what the method gives there, which is to leave it, or to make a
+/// list of it, and not known where it does otherwise.
+fn changed_result(
+    receiver: Representative,
+    measured_on: Option<Representative>,
+    option: &ResultDtype,
+    default_there: Option<&ResultDtype>,
+    default_here: Option<&ResultDtype>,
+) -> Option<ResultDtype> {
+    if measured_on == Some(receiver) {
+        return Some(option.clone());
+    }
+    let there = default_there?;
+    if option == there {
+        return default_here.cloned();
+    }
+    (option.name() == format!("List({})", there.name()))
+        .then(|| default_here.map(|here| ResultDtype::from_name(&format!("List({})", here.name()))))
+        .flatten()
+}
+
+/// Whether the entry `entry` may stand at `place`, given what has been
+/// [chosen](Chosen) for it, the dtypes of the arguments for its expression
+/// parameters.
 ///
 /// A rule that forbids the entry where it stands is applied first, so that its
 /// words explain the refusal. A method is then judged by the dtype table for
@@ -371,7 +582,10 @@ fn on_receiver(
 /// at the entry is worked out: the rules of how a chain ends are applied to
 /// what it gives, and what the table says of an entry that ends there. A chain
 /// that may not end does not refuse the entry, which may be continued; that is
-/// what [`Allowance::can_end`] reports.
+/// what [`Allowance::can_end`] reports. Where what decides it is not known, it
+/// says so: a start whose arguments decide, and was not told the dtype it gives
+/// (see [`Chosen::giving`]), or a method whose result an argument decides in a
+/// place that needs a `Boolean`.
 ///
 /// The context table was measured at the receiver that best fits each entry,
 /// so where the context cares about the receiver, as a predicate cares that it
@@ -379,22 +593,14 @@ fn on_receiver(
 /// result whose dtype is not known, which the argument will decide, does not
 /// break a rule that is about a dtype: it is not refused for what is not known.
 #[must_use]
-pub fn offer(
-    entry: &'static Entry,
-    place: &Place,
-    arguments: &[(&str, Representative)],
-) -> Verdict {
-    match judge(entry, place, arguments) {
+pub fn offer(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Verdict {
+    match judge(entry, place, chosen) {
         Ok(allowance) => Verdict::Allowed(allowance),
         Err(refusal) => Verdict::Refused(refusal),
     }
 }
 
-fn judge(
-    entry: &'static Entry,
-    place: &Place,
-    arguments: &[(&str, Representative)],
-) -> Result<Allowance, Refusal> {
+fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Allowance, Refusal> {
     let id = entry.id().as_str();
     let tables = Tables::committed();
     // Whether the entry can follow what the expression has.
@@ -443,11 +649,67 @@ fn judge(
     if let Some(rule) = Rule::forbids(id, place.context) {
         return Err(Refusal::rule(rule));
     }
+    // What the options set are refused for.
+    if is_method(entry) {
+        options(entry, chosen.options)?;
+    }
     // What the dtype table says of a method on the value it follows.
     let (mut result, mut shape) = (None, Shape::Many);
-    if let (After::Value { dtype, .. }, true) = (place.after, is_method(entry)) {
-        let fit = on_receiver(entry, dtype, arguments)?;
-        (result, shape) = (fit.result, fit.shape);
+    if let (
+        After::Value {
+            dtype,
+            shape: receiver_shape,
+        },
+        true,
+    ) = (place.after, is_method(entry))
+    {
+        let fit = on_receiver(entry, dtype, chosen.arguments)?;
+        (result, shape) = (fit.result.clone(), fit.shape);
+        // And of the options chosen, which the option table says what they give
+        // on the dtype it was measured on.
+        match read_options(entry, chosen.options) {
+            OptionsGive::Nothing => {}
+            OptionsGive::Unknown => result = None,
+            OptionsGive::Gives {
+                produces,
+                measured_on,
+            } => {
+                let there = measured_on.and_then(|measured| {
+                    on_receiver(entry, measured, chosen.arguments)
+                        .ok()
+                        .and_then(|fit| fit.result)
+                });
+                result = changed_result(
+                    dtype,
+                    measured_on,
+                    &produces.result,
+                    there.as_ref(),
+                    fit.result.as_ref(),
+                );
+                // The option table was measured on a column. What follows one
+                // value is another matter: a window that joins gives that value
+                // again, not a list of it. Where the option changes what the
+                // method gives, it is not known after one value.
+                if receiver_shape == Shape::One && result != fit.result {
+                    result = None;
+                }
+                // And the call has to be given what the table was measured
+                // with.
+                if measured_with(entry)
+                    .iter()
+                    .any(|parameter| !chosen.arguments.iter().any(|(name, _)| name == parameter))
+                {
+                    result = None;
+                }
+                shape = produces.shape;
+            }
+        }
+    }
+    // What the call says of what it gives, where the tables do not.
+    if result.is_none() && !is_method(entry) {
+        result = chosen
+            .gives
+            .map(|dtype| ResultDtype::from_name(dtype.name()));
     }
     // What the context table says of the entry where it stands.
     // The entry stands there when the chain may go on from it: what Polars
@@ -474,17 +736,34 @@ fn judge(
     }
     // Whether it may also end the chain there: a rule first, so that its words
     // explain the refusal, then what Polars said of an entry that ends.
-    let cannot_end = match Rule::forbids_end(place.context, result.as_ref(), shape) {
-        Some(rule) => Some(Refusal::rule(rule)),
-        None => match &ends {
-            Outcome::Refused(reason) => Some(Refusal::polars(reason)),
-            Outcome::Allowed(_) => None,
-        },
+    let boolean_needed = Rule::boolean_needed(place.context);
+    let ending = if let Some(rule) = Rule::forbids_end(place.context, result.as_ref(), shape) {
+        Ending::Refused(Refusal::rule(rule))
+    } else if entry.applies() == Applies::Function {
+        // The table measured a start with one argument, and what its arguments
+        // decide is the dtype of the value: a column's own, a literal's. Told
+        // it, the rules above have judged it; not told, the table speaks only
+        // where the dtype does not matter, and a refusal it recorded may be one
+        // that another argument does not meet.
+        if chosen.gives.is_some() {
+            Ending::Allowed
+        } else if boolean_needed || matches!(ends, Outcome::Refused(_)) {
+            Ending::NotKnown(Unknown::TheStartsDtype)
+        } else {
+            Ending::Allowed
+        }
+    } else if result.is_none() && boolean_needed {
+        Ending::NotKnown(Unknown::TheResultsDtype)
+    } else {
+        match &ends {
+            Outcome::Refused(reason) => Ending::Refused(Refusal::polars(reason)),
+            Outcome::Allowed(_) => Ending::Allowed,
+        }
     };
     Ok(Allowance {
         result,
         shape,
-        cannot_end,
+        ending,
     })
 }
 
@@ -499,6 +778,20 @@ pub fn rule_forbids(entry: &Entry, context: Context) -> Result<(), Refusal> {
     Rule::forbids(entry.id().as_str(), context).map_or(Ok(()), |rule| Err(Refusal::rule(rule)))
 }
 
+/// The refusal of a key that the caller has already found is not elementwise, as
+/// it holds an aggregate beside a column, or a column compared with a null,
+/// where `context` holds one of a join's own keys, if the rule refuses it there.
+/// Polars accepts such a key in a window, so the rule is silent there. What a
+/// key holds is a matter of the whole expression, not of one entry, so the
+/// caller finds it, and this does not.
+///
+/// # Errors
+///
+/// The rule, as a refusal that says it in its words.
+pub fn rule_forbids_a_key_known_not_elementwise(context: Context) -> Result<(), Refusal> {
+    Rule::forbids_non_elementwise_key(context).map_or(Ok(()), |rule| Err(Refusal::rule(rule)))
+}
+
 /// Every entry that stands in an expression, offered or refused at `place`.
 /// A step is not offered: steps stand in a list.
 ///
@@ -511,7 +804,7 @@ pub fn offers(place: &Place) -> Vec<Offer> {
         .filter(|entry| entry.applies() != Applies::Frame)
         .map(|entry| Offer {
             entry,
-            verdict: offer(entry, place, &[]),
+            verdict: offer(entry, place, &Chosen::default()),
         })
         .collect()
 }
@@ -579,8 +872,11 @@ pub fn options(entry: &Entry, chosen: &[(&str, &str)]) -> Result<(), Refusal> {
         named
     };
     let check = |key: Vec<(&'static str, String)>| match tables.options.get(&(id, key)) {
-        Some(Outcome::Refused(reason)) => Err(Refusal::polars(reason)),
-        _ => Ok(()),
+        Some(cell) => match &cell.outcome {
+            Outcome::Refused(reason) => Err(Refusal::polars(reason)),
+            Outcome::Allowed(_) => Ok(()),
+        },
+        None => Ok(()),
     };
     match named.as_slice() {
         [] => Ok(()),

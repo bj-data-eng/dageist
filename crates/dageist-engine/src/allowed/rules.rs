@@ -28,14 +28,18 @@ pub enum Rule {
     FilterPredicateIsBoolean,
     /// `polars.element` stands only in a pivot's aggregate.
     ElementOnlyInPivotAggregate,
+    /// A join's own key is elementwise: it holds no aggregate beside a column,
+    /// and no column compared with a null.
+    KeyIsElementwise,
 }
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
         Self::ConditionPredicateIsBoolean,
         Self::ElementOnlyInPivotAggregate,
         Self::FilterPredicateIsBoolean,
+        Self::KeyIsElementwise,
         Self::PivotAggregateGivesOneValue,
     ];
 
@@ -47,6 +51,7 @@ impl Rule {
             Self::ConditionPredicateIsBoolean => "condition-predicate-is-boolean",
             Self::ElementOnlyInPivotAggregate => "element-only-in-pivot-aggregate",
             Self::FilterPredicateIsBoolean => "filter-predicate-is-boolean",
+            Self::KeyIsElementwise => "key-is-elementwise",
         }
     }
 
@@ -68,6 +73,9 @@ impl Rule {
                 "`polars.element` stands only in a pivot's aggregate"
             }
             Self::FilterPredicateIsBoolean => "a filter's predicate must be Boolean",
+            Self::KeyIsElementwise => {
+                "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a column be compared with a null"
+            }
         }
     }
 
@@ -80,6 +88,7 @@ impl Rule {
         match self {
             Self::ElementOnlyInPivotAggregate => entry == "polars.element",
             Self::PivotAggregateGivesOneValue => context == Context::step(Outer::PivotAggregate),
+            Self::KeyIsElementwise => context.is_join_key(),
             Self::ConditionPredicateIsBoolean | Self::FilterPredicateIsBoolean => {
                 self.needs_boolean_end(context)
             }
@@ -102,6 +111,15 @@ impl Rule {
     pub(super) fn forbids(entry: &str, context: Context) -> Option<Self> {
         (entry == "polars.element" && context.outer() != Outer::PivotAggregate)
             .then_some(Self::ElementOnlyInPivotAggregate)
+    }
+
+    /// The rule that forbids a key that holds an aggregate beside a column, or a
+    /// column compared with a null, where `context` is a join's own key, if it
+    /// does. Whether the key holds one is a
+    /// matter of the whole expression, which the caller found.
+    #[must_use]
+    pub(super) fn forbids_non_elementwise_key(context: Context) -> Option<Self> {
+        context.is_join_key().then_some(Self::KeyIsElementwise)
     }
 
     /// The rule that forbids a chain to end in `context` with a value of the
@@ -132,6 +150,13 @@ impl Rule {
         }
     }
 
+    /// Whether some rule says a chain must end `Boolean` in `context`.
+    pub(super) fn boolean_needed(context: Context) -> bool {
+        Self::ALL
+            .into_iter()
+            .any(|rule| rule.needs_boolean_end(context))
+    }
+
     /// Whether the rule says a chain must end `Boolean` in `context`. At most
     /// one rule does, for no two of them govern the same context.
     pub(super) fn needs_boolean_end(self, context: Context) -> bool {
@@ -143,7 +168,9 @@ impl Rule {
                 context.outer() == Outer::Filter
                     && matches!(context.nested(), None | Some(Nested::ConditionValue))
             }
-            Self::PivotAggregateGivesOneValue | Self::ElementOnlyInPivotAggregate => false,
+            Self::PivotAggregateGivesOneValue
+            | Self::ElementOnlyInPivotAggregate
+            | Self::KeyIsElementwise => false,
         }
     }
 }

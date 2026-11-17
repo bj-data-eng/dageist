@@ -1,0 +1,2 @@
+{"a":"Date","b":"Struct(x: Int64, y: String)","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.filter","arguments":{"predicates":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["f"]}}},"then":[{"entry":"Expr.gt","arguments":{"other":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"flag":null}}},"then":[]}}}},{"entry":"Expr.cum_sum","arguments":{}},{"entry":"Expr.eq","arguments":{"other":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["b"]}}},"then":[]}}}}]}}]}}}}]}
