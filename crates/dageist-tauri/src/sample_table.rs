@@ -129,8 +129,10 @@ pub enum ErrorKind {
     Limit,
     /// The text sent is not a document the engine reads.
     Unreadable,
-    /// The request names something the engine does not have: an entry, a
-    /// parameter, a dtype or a place.
+    /// The request names an entry or a parameter the catalogue lacks, or a way
+    /// down to an expression that starts at no position of a step. A position
+    /// or a dtype that the engine has no word for is not an argument at all, and
+    /// Tauri and the bridge refuse it as one.
     UnknownName,
     /// Anything else: the command could not do what it was asked.
     Failed,

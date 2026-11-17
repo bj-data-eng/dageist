@@ -194,13 +194,14 @@ layout does not affect it. Never edit the file by hand.
 
 After a change to the sample node, the step document or its running, the walk
 of the tables, the catalogue's laziness, or the views of what they report, the
-snapshot test fails and names the file that differs. Eight files in
+snapshot test fails and names the file that differs. Nine files in
 `ui/packages/host/fixtures/` are written by one test: `node-inputs.json` from
 `node_inputs`, `step-document.json`, the claim-timing sample's own steps as the
 engine's document, which the view's tests compare the editor's starting steps
 with, `step-report.json` from running the claim-timing steps,
 `step-report-refused.json` from a document whose second step Polars refuses and
-whose third is not run, `step-report-unreadable.json` from text that is not a
+whose third is not run, `step-report-incomplete.json` from one whose second step
+holds something still to be picked, which the third waits for, `step-report-unreadable.json` from text that is not a
 document, `step-rows.json` from the rows after the `days_open` step,
 `step-report-variants.json`, a report the host builds by hand to hold the
 variants no real document gives together, and `vocabulary.json`, the words of

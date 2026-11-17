@@ -93,8 +93,10 @@ kind is one of a closed list the view decides on, and the message is for a
 person: `noSuchStep` (the document has no such step), `notRun` (a step before
 the one asked for was refused), `refused` (the step asked for was refused),
 `limit` (more was asked for than the command's window holds), `unreadable` (the
-text sent is not a document), `unknownName` (an entry, a parameter, a dtype or a
-place the engine does not have) and `failed` (anything else). The bridge answers a
+text sent is not a document), `unknownName` (an entry or a parameter the catalogue lacks,
+or a way down to an expression that starts at no position of a step; a position
+or a dtype the engine has no word for is no argument, which Tauri refuses with
+its own text and the bridge with a `400`) and `failed` (anything else). The bridge answers a
 failed command with the same object. The view's hosts reject with a `HostError`
 that carries the kind; arguments of the wrong type are rejected by Tauri with
 its own text, which the view reads as `failed`. The first call to

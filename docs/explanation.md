@@ -237,10 +237,18 @@ engine reports of them, in
 [ui/packages/steps/src/model/](../ui/packages/steps/src/model/document.ts).
 Translating the steps into a document and preparing the report for display are
 plain TypeScript with no React, tested against the snapshots the host writes.
-A step is held back from the document, with the reason, when something in it
-is still to be picked or the catalogue has no entry for it yet, such as a
-comparison with `is_in` or a condition of which any line is enough; the steps
-after it are not run, as they are not after a step the engine refuses. The
+Where an expression is still to be picked, a value, the field or input a chain
+starts from, a method's argument or a comparison's field, the editor writes a
+hole, which the document reads as an expression that starts from nothing. The
+engine walks the step up to the hole, so it reports the places before it, and
+does not build it: the step is incomplete at the hole's place, and the steps
+after it are not run, naming it. The editor reads the place back into what is to
+be picked and the word that is the matter. A step is held back from the
+document, with the reason, only where what is missing is not an expression to
+pick, such as an empty name, a field of a pivot or a table, or where the catalogue
+has no entry for it yet, such as a comparison with `is_in` or a condition of
+which any line is enough; the steps after it are not run, as they are not after
+a step the engine refuses. The
 document keeps the editor's step identifiers, so the editor's starting steps
 are the engine's claim-timing sample and translate to the same document. A
 run is asked for after a short wait for the next edit, with one request out at
@@ -284,6 +292,13 @@ The offers are prepared for display by plain functions in
 snapshots written from Rust: calls grouped by family, the shortest group first,
 with hints, reasons and where a chain may end.
 
+A method that is swapped keeps its argument, and the engine refuses it when the
+steps run if the new method does not take it, with its reason. A flag or a
+choice that is already set shows a word Polars refuses beside the other options
+as a refusal when the steps run, not in its list; only the list that adds an
+option asks. The values of `is_in` are connected lists the engine has no entry
+to judge yet, so that list offers them unjudged.
+
 ### What The Editor Cannot Offer
 
 What the editor has no way to draw is written once, in
@@ -297,7 +312,10 @@ list. Today that is a further case of a condition, which the editor draws as a
 `when` after `otherwise`, in the 24 contexts where the engine allows one, and the
 parameters of a start or a condition that it does not set: `col`'s further
 names, `lit`'s dtype and its object flag, and the keyword constraints of a
-condition. Changing either side changes the list, which the test then fails on.
+condition. Changing either side changes the list, which the test then fails on. The check
+covers entries and their parameters. It does not cover which classes of dtype
+the editor can type as an argument: it types a number or text, so a typed date,
+duration or Boolean literal, which the engine may allow, is not on the list.
 
 ## The Step Document
 
@@ -307,7 +325,8 @@ with a version, and a version the reader does not know is refused: dageist is
 before 1.0, so an older document is not upgraded. A step is a call of a frame
 entry of the catalogue, with its arguments by Python parameter name, and a
 parameter left out takes its default. An expression is a start, a function
-such as `polars.col` or `polars.lit`, `polars.when`, or a connected input,
+such as `polars.col` or `polars.lit`, `polars.when`, a connected input, or a hole,
+`{ "hole": null }`, where nothing is picked yet,
 followed by a list of calls, one for each method or link of a condition, so
 columns, literals and conditions are written the same way. Dtypes are written
 as Python prints them, such as `Datetime(time_unit='us', time_zone=None)`.
@@ -340,6 +359,11 @@ A chain that starts from a connected input is walked as the run makes it, a
 literal of the input's dtype, so the tables' lines for a literal judge it, and a
 list gives many values where a value gives one. A name that is not connected
 leaves what follows it not known.
+A number typed without a dtype is walked as the dtype Polars gives it by
+itself, a whole number an `Int32` and one with a fraction a `Float64`, which `fit`
+reads the same way, and among the values of a condition that are numbers it
+takes their dtype, so `when(f).then(a).otherwise(0)` gives what `a` holds.
+A hole starts an expression that nothing is asked of.
 The runner asks the named rules beside those tables, and not the tables, for
 where an expression may start: `element` starts a chain only in a pivot's
 aggregate. A row of the context table was measured with the chain ending at one
