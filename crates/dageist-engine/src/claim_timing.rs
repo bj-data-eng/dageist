@@ -13,7 +13,7 @@ use polars::prelude::{
     df, lit,
 };
 
-use crate::document::{Document, Inputs};
+use crate::document::{Document, Inputs, Preview, Report, RowsError, StepId};
 use crate::error::EngineError;
 
 /// The seven claim rows, in no useful order, as text. Two claims, `A-1001` and
@@ -81,6 +81,31 @@ impl ClaimTiming {
     #[must_use]
     pub const fn steps(&self) -> &Document {
         &self.steps
+    }
+
+    /// Runs `document` on the node: its first step on [`source`](Self::source),
+    /// with [`inputs`](Self::inputs) connected. It is [`Document::run`].
+    ///
+    /// # Errors
+    ///
+    /// When Polars cannot work out the schema of the source.
+    pub fn run(&self, document: &Document) -> PolarsResult<Report> {
+        document.run(&self.inputs, self.source.clone().lazy())
+    }
+
+    /// The rows after the step `through` of `document`, at most `limit`, as
+    /// text, with the steps run on the node. It is [`Document::preview`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Document::preview`] is.
+    pub fn preview(
+        &self,
+        document: &Document,
+        through: &StepId,
+        limit: usize,
+    ) -> Result<Preview, RowsError> {
+        document.preview(&self.inputs, &self.source, through, limit)
     }
 }
 

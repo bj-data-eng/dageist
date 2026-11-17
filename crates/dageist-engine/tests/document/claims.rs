@@ -209,6 +209,29 @@ fn the_sample_rows_are_the_instants_the_calendar_works_out() {
 }
 
 #[test]
+fn the_node_runs_a_document_on_its_own_rows_and_inputs() {
+    let node = ClaimTiming::new().expect("the sample node");
+    let report = node.run(node.steps()).expect("the claims have a schema");
+    assert_eq!(report.steps().len(), 12);
+    assert!(
+        report
+            .steps()
+            .iter()
+            .all(|step| matches!(step.outcome(), Outcome::Valid { .. }))
+    );
+    let preview = node
+        .preview(node.steps(), &StepId::new("pivot").expect("an id"), 100)
+        .expect("the pivot's rows");
+    let names: Vec<_> = preview
+        .columns()
+        .iter()
+        .map(|column| column.name())
+        .collect();
+    assert_eq!(names, ["dcn", "Intake", "Review", "Pending", "Complete"]);
+    assert_eq!(preview.rows().len(), 2);
+}
+
+#[test]
 fn every_step_of_the_storyboard_is_valid_and_only_the_pivot_collects() {
     let report = run();
     assert_eq!(report.steps().len(), 12);
