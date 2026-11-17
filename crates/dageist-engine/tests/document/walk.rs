@@ -986,6 +986,33 @@ fn a_comparison_given_a_null_drops_the_aggregate_it_follows_after_an_earlier_fol
 }
 
 #[test]
+fn a_column_compared_with_the_null_that_a_dropping_comparison_gives_is_left_to_a_limit() {
+    // Polars refuses `null < true`, `.last()`, `!= null`, `!= f` as not
+    // elementwise, for a column compared with the null that the fold gave. The
+    // walk allows it: the comparison given a null drops the aggregate, and a
+    // comparison with what an earlier one folded is left to the limit
+    // `a-null-comparison-in-a-key`, which excuses the difference. A later
+    // tightening of the rule turns this test, and the kept case of the limit
+    // that says the same, over.
+    let key = chain(
+        call("polars.lit", json!({ "value": { "flag": null } })),
+        vec![
+            compared(
+                "Expr.lt",
+                chain(
+                    call("polars.lit", json!({ "value": { "flag": true } })),
+                    vec![],
+                ),
+            ),
+            call("Expr.last", json!({})),
+            compared("Expr.ne", null()),
+            compared("Expr.ne", field("f")),
+        ],
+    );
+    assert_eq!(joined_on(key), None);
+}
+
+#[test]
 fn a_call_refused_without_the_dtype_of_an_argument_says_so() {
     // `b.sub(1)` takes text and a number that is given no dtype, which the walk
     // cannot say the dtype of: the subtraction is refused for any dtype the
