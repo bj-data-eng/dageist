@@ -528,6 +528,7 @@ pub dageist_engine::document::Resolution::Refused(polars_error::PolarsError)
 pub dageist_engine::document::Resolution::Several(alloc::vec::Vec<polars_core::datatypes::dtype::DataType>)
 pub dageist_engine::document::Resolution::Unfinished
 pub enum dageist_engine::document::RowsError
+pub dageist_engine::document::RowsError::Incomplete(dageist_engine::document::Place)
 pub dageist_engine::document::RowsError::NoSuchStep(dageist_engine::document::StepId)
 pub dageist_engine::document::RowsError::Polars(polars_error::PolarsError)
 pub dageist_engine::document::RowsError::Refused(dageist_engine::document::StepRefusal)
@@ -537,7 +538,6 @@ impl core::fmt::Display for dageist_engine::document::RowsError
 pub fn dageist_engine::document::RowsError::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub enum dageist_engine::document::RunCause
 pub dageist_engine::document::RunCause::Build(dageist_engine::catalog::BuildError)
-pub dageist_engine::document::RunCause::Incomplete
 pub dageist_engine::document::RunCause::NotAllowed(dageist_engine::allowed::Refusal)
 pub dageist_engine::document::RunCause::Polars(polars_error::PolarsError)
 pub dageist_engine::document::RunCause::UnknownInput(alloc::string::String)
