@@ -36,8 +36,8 @@ export type KindView =
   /** A chain; `dtypes` names the dtype groups it may have. */
   | { readonly kind: 'expression'; readonly dtypes: readonly string[] }
   | { readonly kind: 'column' }
-  /** A literal typed in; `type` is `integer`, `float`, `string`, `date` or `any`. */
-  | { readonly kind: 'value'; readonly type: 'integer' | 'float' | 'string' | 'date' | 'any' }
+  /** A literal typed in; `type` is the type of literal it takes. */
+  | { readonly kind: 'value'; readonly type: ValueTypeView }
   | { readonly kind: 'flag' }
   | { readonly kind: 'choice'; readonly words: readonly ChoiceView[] }
   | { readonly kind: 'dtype' }
@@ -45,6 +45,12 @@ export type KindView =
   | { readonly kind: 'table' }
   | { readonly kind: 'path' }
   | { readonly kind: 'pairs'; readonly key: KindView; readonly value: KindView };
+
+/** The types of literal a parameter takes, mirroring `ValueType` in the engine's catalogue. */
+export const VALUE_TYPES = ['integer', 'float', 'string', 'date', 'any'] as const;
+
+/** The type of a literal typed in. */
+export type ValueTypeView = (typeof VALUE_TYPES)[number];
 
 /** One word of a choice: as Polars spells it, and as it is shown. */
 export interface ChoiceView {
@@ -89,12 +95,18 @@ export interface ParameterView {
   readonly python: string | null;
 }
 
+/** What an entry is applied to, mirroring `Applies` in the engine's catalogue; `condition` is one link of `when`, `then` and `otherwise`. */
+export const APPLIES = ['expression', 'frame', 'function', 'condition'] as const;
+
+/** What an entry is applied to. */
+export type AppliesView = (typeof APPLIES)[number];
+
 /** Mirrors `EntryView` in crates/dageist-tauri/src/catalogue.rs. */
 export interface EntryView {
   /** The stable identifier saved steps keep, such as `Expr.shift`. */
   readonly id: string;
   /** `condition` is one link of `when`, `then` and `otherwise`. */
-  readonly applies: 'expression' | 'frame' | 'function' | 'condition';
+  readonly applies: AppliesView;
   /** The key of the family it is swapped within. */
   readonly family: string;
   /** The name shown for it; in English, Polars' own name. */
@@ -206,11 +218,17 @@ export interface ExpressionDtypesView {
   readonly links: readonly ResolutionView[];
 }
 
-/** How many values a chain gives: `one` as an aggregate does, or a value for every row. */
-export type ValueShapeView = 'one' | 'many';
+/** How many values a chain gives, mirroring `Shape` in the engine: `one` as an aggregate does, or `many`. */
+export const VALUE_SHAPES = ['one', 'many'] as const;
 
-/** How far a condition has come: the call that was last made. */
-export type ConditionStateView = 'when' | 'then' | 'chainedWhen' | 'chainedThen';
+/** How many values a chain gives. */
+export type ValueShapeView = (typeof VALUE_SHAPES)[number];
+
+/** How far a condition has come, mirroring `ConditionState` in the engine: the call that was last made. */
+export const CONDITION_STATES = ['when', 'then', 'chainedWhen', 'chainedThen'] as const;
+
+/** How far a condition has come. */
+export type ConditionStateView = (typeof CONDITION_STATES)[number];
 
 /** What an expression has so far, where a call would follow it. */
 export type AfterView =
@@ -221,21 +239,29 @@ export type AfterView =
   /** A condition that is not finished. */
   | { readonly kind: 'condition'; readonly state: ConditionStateView };
 
-/** The position of a step that holds an expression, as the engine's tables name it. */
-export type OuterPosition =
-  | 'select'
-  | 'filter'
-  | 'sort'
-  | 'join_left'
-  | 'join_right'
-  | 'pivot_aggregate';
+/** The positions of a step that hold an expression, as the engine's tables name them. */
+export const OUTER_POSITIONS = [
+  'select',
+  'filter',
+  'sort',
+  'join_left',
+  'join_right',
+  'pivot_aggregate',
+] as const;
 
-/** A position inside an expression that holds another one, as the tables name it. */
-export type NestedPosition =
-  | 'over.partition_by'
-  | 'over.order_by'
-  | 'condition.predicate'
-  | 'condition.value';
+/** The position of a step that holds an expression. */
+export type OuterPosition = (typeof OUTER_POSITIONS)[number];
+
+/** The positions inside an expression that hold another one, as the engine's tables name them. */
+export const NESTED_POSITIONS = [
+  'over.partition_by',
+  'over.order_by',
+  'condition.predicate',
+  'condition.value',
+] as const;
+
+/** A position inside an expression that holds another one. */
+export type NestedPosition = (typeof NESTED_POSITIONS)[number];
 
 /** Where an expression stands. */
 export interface ContextView {
@@ -250,15 +276,22 @@ export interface OfferPlaceView {
 }
 
 /** Where Polars refused a combination, as the tables record it. */
-export type StageView = 'schema' | 'rows' | 'empty';
+export const STAGES = ['schema', 'rows', 'empty'] as const;
+
+/** Where Polars refused a combination. */
+export type StageView = (typeof STAGES)[number];
 
 /** The rules the engine holds that Polars does not, by the name the tables give them. */
-export type RuleName =
-  | 'pivot-aggregate-gives-one-value'
-  | 'condition-predicate-is-boolean'
-  | 'element-only-in-pivot-aggregate'
-  | 'filter-predicate-is-boolean'
-  | 'key-is-elementwise';
+export const RULE_NAMES = [
+  'pivot-aggregate-gives-one-value',
+  'condition-predicate-is-boolean',
+  'element-only-in-pivot-aggregate',
+  'filter-predicate-is-boolean',
+  'key-is-elementwise',
+] as const;
+
+/** The name of a rule the engine holds that Polars does not. */
+export type RuleName = (typeof RULE_NAMES)[number];
 
 /** Who refused a call. */
 export type RefusalSourceView =

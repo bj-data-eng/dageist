@@ -6,6 +6,7 @@
 
 export type {
   AfterView,
+  AppliesView,
   BlockRequest,
   CatalogueView,
   CauseView,
@@ -44,6 +45,7 @@ export type {
   StepReportView,
   TableView,
   ValueShapeView,
+  ValueTypeView,
   VerdictView,
   WalkRefusalView,
   WalkView,

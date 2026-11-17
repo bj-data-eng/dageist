@@ -31,6 +31,14 @@ import type {
   WalkView,
   WalkedExpressionView,
 } from './contract';
+import {
+  CONDITION_STATES,
+  NESTED_POSITIONS,
+  OUTER_POSITIONS,
+  RULE_NAMES,
+  STAGES,
+  VALUE_SHAPES,
+} from './contract';
 import type { Decode } from './decode';
 import {
   ROOT,
@@ -120,14 +128,9 @@ const readExpressionDtypes: Decode<ExpressionDtypesView> = readRecord(
   }),
 );
 
-const readValueShape: Decode<ValueShapeView> = readWord(['one', 'many']);
+const readValueShape: Decode<ValueShapeView> = readWord(VALUE_SHAPES);
 
-const readConditionState: Decode<ConditionStateView> = readWord([
-  'when',
-  'then',
-  'chainedWhen',
-  'chainedThen',
-]);
+const readConditionState: Decode<ConditionStateView> = readWord(CONDITION_STATES);
 
 const readAfter: Decode<AfterView> = readTagged<AfterView>('kind', {
   start: { fields: [], read: () => ({ kind: 'start' }) },
@@ -148,21 +151,9 @@ const readAfter: Decode<AfterView> = readTagged<AfterView>('kind', {
   },
 });
 
-const readOuter: Decode<OuterPosition> = readWord([
-  'select',
-  'filter',
-  'sort',
-  'join_left',
-  'join_right',
-  'pivot_aggregate',
-]);
+const readOuter: Decode<OuterPosition> = readWord(OUTER_POSITIONS);
 
-const readNested: Decode<NestedPosition> = readWord([
-  'over.partition_by',
-  'over.order_by',
-  'condition.predicate',
-  'condition.value',
-]);
+const readNested: Decode<NestedPosition> = readWord(NESTED_POSITIONS);
 
 const readContext: Decode<ContextView> = readRecord(['outer', 'nested'], (fields, path) => ({
   outer: readField(fields, path, 'outer', readOuter),
@@ -174,15 +165,9 @@ const readOfferPlace: Decode<OfferPlaceView> = readRecord(['context', 'after'], 
   after: readField(fields, path, 'after', readAfter),
 }));
 
-const readStage: Decode<StageView> = readWord(['schema', 'rows', 'empty']);
+const readStage: Decode<StageView> = readWord(STAGES);
 
-const readRule: Decode<RuleName> = readWord([
-  'pivot-aggregate-gives-one-value',
-  'condition-predicate-is-boolean',
-  'element-only-in-pivot-aggregate',
-  'filter-predicate-is-boolean',
-  'key-is-elementwise',
-]);
+const readRule: Decode<RuleName> = readWord(RULE_NAMES);
 
 const readRefusalSource: Decode<RefusalSourceView> = readTagged<RefusalSourceView>('by', {
   polars: {

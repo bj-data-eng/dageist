@@ -13,6 +13,7 @@ import type {
   ShapeView,
   WordsView,
 } from './contract';
+import { APPLIES, VALUE_TYPES } from './contract';
 import type { Decode } from './decode';
 import {
   ROOT,
@@ -46,12 +47,7 @@ const readKind: Decode<KindView> = readTagged<KindView>('kind', {
     fields: ['type'],
     read: (fields, path) => ({
       kind: 'value',
-      type: readField(
-        fields,
-        path,
-        'type',
-        readWord(['integer', 'float', 'string', 'date', 'any']),
-      ),
+      type: readField(fields, path, 'type', readWord(VALUE_TYPES)),
     }),
   },
   flag: { fields: [], read: () => ({ kind: 'flag' }) },
@@ -141,12 +137,7 @@ const readEntry: Decode<EntryView> = readRecord(
   ['id', 'applies', 'family', 'name', 'hint', 'head', 'accepts', 'lazy', 'parameters'],
   (fields, path) => ({
     id: readField(fields, path, 'id', readString),
-    applies: readField(
-      fields,
-      path,
-      'applies',
-      readWord(['expression', 'frame', 'function', 'condition']),
-    ),
+    applies: readField(fields, path, 'applies', readWord(APPLIES)),
     family: readField(fields, path, 'family', readString),
     name: readField(fields, path, 'name', readString),
     hint: readField(fields, path, 'hint', readString),
