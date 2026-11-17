@@ -1,0 +1,4251 @@
+{
+  "status": "run",
+  "source": [
+    {
+      "name": "dcn",
+      "dtype": "String"
+    },
+    {
+      "name": "timestamp",
+      "dtype": "Datetime(us)"
+    },
+    {
+      "name": "step_to",
+      "dtype": "String"
+    },
+    {
+      "name": "owner",
+      "dtype": "String"
+    },
+    {
+      "name": "row_days",
+      "dtype": "Int64"
+    }
+  ],
+  "steps": [
+    {
+      "id": "sort",
+      "lazy": true,
+      "outcome": {
+        "status": "valid",
+        "columns": [
+          {
+            "name": "dcn",
+            "dtype": "String"
+          },
+          {
+            "name": "timestamp",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "step_to",
+            "dtype": "String"
+          },
+          {
+            "name": "owner",
+            "dtype": "String"
+          },
+          {
+            "name": "row_days",
+            "dtype": "Int64"
+          }
+        ]
+      },
+      "expressions": [
+        {
+          "place": {
+            "stepIndex": 0,
+            "stepId": "sort",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "by"
+              },
+              {
+                "kind": "item",
+                "index": 0
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "String"
+          },
+          "links": []
+        },
+        {
+          "place": {
+            "stepIndex": 0,
+            "stepId": "sort",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "by"
+              },
+              {
+                "kind": "item",
+                "index": 1
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "Datetime(us)"
+          },
+          "links": []
+        }
+      ],
+      "walk": {
+        "expressions": [
+          {
+            "place": {
+              "stepIndex": 0,
+              "stepId": "sort",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "by"
+                },
+                {
+                  "kind": "item",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "sort",
+              "nested": null
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "String",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "sort",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "many"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          },
+          {
+            "place": {
+              "stepIndex": 0,
+              "stepId": "sort",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "by"
+                },
+                {
+                  "kind": "item",
+                  "index": 1
+                }
+              ]
+            },
+            "context": {
+              "outer": "sort",
+              "nested": null
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Datetime(us)",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "sort",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Datetime(us)",
+                  "shape": "many"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          }
+        ],
+        "refusal": null,
+        "notKnown": null
+      }
+    },
+    {
+      "id": "step_index",
+      "lazy": true,
+      "outcome": {
+        "status": "valid",
+        "columns": [
+          {
+            "name": "dcn",
+            "dtype": "String"
+          },
+          {
+            "name": "timestamp",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "step_to",
+            "dtype": "String"
+          },
+          {
+            "name": "owner",
+            "dtype": "String"
+          },
+          {
+            "name": "row_days",
+            "dtype": "Int64"
+          },
+          {
+            "name": "step_index",
+            "dtype": "UInt32"
+          }
+        ]
+      },
+      "expressions": [
+        {
+          "place": {
+            "stepIndex": 1,
+            "stepId": "step_index",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "link",
+                "index": 1
+              },
+              {
+                "kind": "parameter",
+                "name": "partition_by"
+              },
+              {
+                "kind": "item",
+                "index": 0
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "String"
+          },
+          "links": []
+        },
+        {
+          "place": {
+            "stepIndex": 1,
+            "stepId": "step_index",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "String"
+          },
+          "links": [
+            {
+              "kind": "dtype",
+              "dtype": "UInt32"
+            },
+            {
+              "kind": "dtype",
+              "dtype": "UInt32"
+            }
+          ]
+        }
+      ],
+      "walk": {
+        "expressions": [
+          {
+            "place": {
+              "stepIndex": 1,
+              "stepId": "step_index",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "link",
+                  "index": 1
+                },
+                {
+                  "kind": "parameter",
+                  "name": "partition_by"
+                },
+                {
+                  "kind": "item",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": "over.partition_by"
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "String",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "over.partition_by"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "many"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          },
+          {
+            "place": {
+              "stepIndex": 1,
+              "stepId": "step_index",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": null
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "String",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "many"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "UInt32",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "value",
+                  "dtype": "UInt32",
+                  "shape": "many"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "UInt32",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "many"
+                }
+              },
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "UInt32",
+                  "shape": "many"
+                }
+              },
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "UInt32",
+                  "shape": "many"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          }
+        ],
+        "refusal": null,
+        "notKnown": null
+      }
+    },
+    {
+      "id": "resolved_at",
+      "lazy": true,
+      "outcome": {
+        "status": "valid",
+        "columns": [
+          {
+            "name": "dcn",
+            "dtype": "String"
+          },
+          {
+            "name": "timestamp",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "step_to",
+            "dtype": "String"
+          },
+          {
+            "name": "owner",
+            "dtype": "String"
+          },
+          {
+            "name": "row_days",
+            "dtype": "Int64"
+          },
+          {
+            "name": "step_index",
+            "dtype": "UInt32"
+          },
+          {
+            "name": "resolved_at",
+            "dtype": "Datetime(us)"
+          }
+        ]
+      },
+      "expressions": [
+        {
+          "place": {
+            "stepIndex": 2,
+            "stepId": "resolved_at",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "link",
+                "index": 0
+              },
+              {
+                "kind": "parameter",
+                "name": "n"
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "Int32"
+          },
+          "links": []
+        },
+        {
+          "place": {
+            "stepIndex": 2,
+            "stepId": "resolved_at",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "link",
+                "index": 1
+              },
+              {
+                "kind": "parameter",
+                "name": "partition_by"
+              },
+              {
+                "kind": "item",
+                "index": 0
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "String"
+          },
+          "links": []
+        },
+        {
+          "place": {
+            "stepIndex": 2,
+            "stepId": "resolved_at",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "Datetime(us)"
+          },
+          "links": [
+            {
+              "kind": "dtype",
+              "dtype": "Datetime(us)"
+            },
+            {
+              "kind": "dtype",
+              "dtype": "Datetime(us)"
+            }
+          ]
+        }
+      ],
+      "walk": {
+        "expressions": [
+          {
+            "place": {
+              "stepIndex": 2,
+              "stepId": "resolved_at",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "link",
+                  "index": 0
+                },
+                {
+                  "kind": "parameter",
+                  "name": "n"
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": null
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": null,
+                  "shape": "one",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [null],
+            "ending": null
+          },
+          {
+            "place": {
+              "stepIndex": 2,
+              "stepId": "resolved_at",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "link",
+                  "index": 1
+                },
+                {
+                  "kind": "parameter",
+                  "name": "partition_by"
+                },
+                {
+                  "kind": "item",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": "over.partition_by"
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "String",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "over.partition_by"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "many"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          },
+          {
+            "place": {
+              "stepIndex": 2,
+              "stepId": "resolved_at",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": null
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Datetime(us)",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "value",
+                  "dtype": "Datetime(us)",
+                  "shape": "many"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Datetime(us)",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              },
+              {
+                "follows": null,
+                "verdict": null
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Datetime(us)",
+                  "shape": "many"
+                }
+              },
+              null,
+              null
+            ],
+            "ending": null
+          }
+        ],
+        "refusal": null,
+        "notKnown": "step \"resolved_at\", named_exprs entry 1 value, link 1: the dtype of an argument of Expr.shift is not known"
+      }
+    },
+    {
+      "id": "received_at",
+      "lazy": true,
+      "outcome": {
+        "status": "valid",
+        "columns": [
+          {
+            "name": "dcn",
+            "dtype": "String"
+          },
+          {
+            "name": "timestamp",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "step_to",
+            "dtype": "String"
+          },
+          {
+            "name": "owner",
+            "dtype": "String"
+          },
+          {
+            "name": "row_days",
+            "dtype": "Int64"
+          },
+          {
+            "name": "step_index",
+            "dtype": "UInt32"
+          },
+          {
+            "name": "resolved_at",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "received_at",
+            "dtype": "Datetime(us)"
+          }
+        ]
+      },
+      "expressions": [
+        {
+          "place": {
+            "stepIndex": 3,
+            "stepId": "received_at",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "Datetime(us)"
+          },
+          "links": []
+        }
+      ],
+      "walk": {
+        "expressions": [
+          {
+            "place": {
+              "stepIndex": 3,
+              "stepId": "received_at",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": null
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Datetime(us)",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Datetime(us)",
+                  "shape": "many"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          }
+        ],
+        "refusal": null,
+        "notKnown": null
+      }
+    },
+    {
+      "id": "resolved_day",
+      "lazy": true,
+      "outcome": {
+        "status": "valid",
+        "columns": [
+          {
+            "name": "dcn",
+            "dtype": "String"
+          },
+          {
+            "name": "timestamp",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "step_to",
+            "dtype": "String"
+          },
+          {
+            "name": "owner",
+            "dtype": "String"
+          },
+          {
+            "name": "row_days",
+            "dtype": "Int64"
+          },
+          {
+            "name": "step_index",
+            "dtype": "UInt32"
+          },
+          {
+            "name": "resolved_at",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "received_at",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "resolved_day",
+            "dtype": "Date"
+          }
+        ]
+      },
+      "expressions": [
+        {
+          "place": {
+            "stepIndex": 4,
+            "stepId": "resolved_day",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "Datetime(us)"
+          },
+          "links": [
+            {
+              "kind": "dtype",
+              "dtype": "Date"
+            }
+          ]
+        }
+      ],
+      "walk": {
+        "expressions": [
+          {
+            "place": {
+              "stepIndex": 4,
+              "stepId": "resolved_day",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": null
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Datetime(us)",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "value",
+                  "dtype": "Datetime(us)",
+                  "shape": "many"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Date",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Datetime(us)",
+                  "shape": "many"
+                }
+              },
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Date",
+                  "shape": "many"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          }
+        ],
+        "refusal": null,
+        "notKnown": null
+      }
+    },
+    {
+      "id": "days_open",
+      "lazy": true,
+      "outcome": {
+        "status": "valid",
+        "columns": [
+          {
+            "name": "dcn",
+            "dtype": "String"
+          },
+          {
+            "name": "timestamp",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "step_to",
+            "dtype": "String"
+          },
+          {
+            "name": "owner",
+            "dtype": "String"
+          },
+          {
+            "name": "row_days",
+            "dtype": "Int64"
+          },
+          {
+            "name": "step_index",
+            "dtype": "UInt32"
+          },
+          {
+            "name": "resolved_at",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "received_at",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "resolved_day",
+            "dtype": "Date"
+          },
+          {
+            "name": "days_open",
+            "dtype": "Int64"
+          }
+        ]
+      },
+      "expressions": [
+        {
+          "place": {
+            "stepIndex": 5,
+            "stepId": "days_open",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "link",
+                "index": 0
+              },
+              {
+                "kind": "parameter",
+                "name": "other"
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "Datetime(us)"
+          },
+          "links": []
+        },
+        {
+          "place": {
+            "stepIndex": 5,
+            "stepId": "days_open",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "Datetime(us)"
+          },
+          "links": [
+            {
+              "kind": "dtype",
+              "dtype": "Duration(us)"
+            },
+            {
+              "kind": "dtype",
+              "dtype": "Int64"
+            }
+          ]
+        }
+      ],
+      "walk": {
+        "expressions": [
+          {
+            "place": {
+              "stepIndex": 5,
+              "stepId": "days_open",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "link",
+                  "index": 0
+                },
+                {
+                  "kind": "parameter",
+                  "name": "other"
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": null
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Datetime(us)",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Datetime(us)",
+                  "shape": "many"
+                }
+              }
+            ],
+            "ending": null
+          },
+          {
+            "place": {
+              "stepIndex": 5,
+              "stepId": "days_open",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": null
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Datetime(us)",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "value",
+                  "dtype": "Datetime(us)",
+                  "shape": "many"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Duration(us)",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "value",
+                  "dtype": "Duration(us)",
+                  "shape": "many"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Int64",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Datetime(us)",
+                  "shape": "many"
+                }
+              },
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Duration(us)",
+                  "shape": "many"
+                }
+              },
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Int64",
+                  "shape": "many"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          }
+        ],
+        "refusal": null,
+        "notKnown": null
+      }
+    },
+    {
+      "id": "a_days",
+      "lazy": true,
+      "outcome": {
+        "status": "valid",
+        "columns": [
+          {
+            "name": "dcn",
+            "dtype": "String"
+          },
+          {
+            "name": "timestamp",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "step_to",
+            "dtype": "String"
+          },
+          {
+            "name": "owner",
+            "dtype": "String"
+          },
+          {
+            "name": "row_days",
+            "dtype": "Int64"
+          },
+          {
+            "name": "step_index",
+            "dtype": "UInt32"
+          },
+          {
+            "name": "resolved_at",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "received_at",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "resolved_day",
+            "dtype": "Date"
+          },
+          {
+            "name": "days_open",
+            "dtype": "Int64"
+          },
+          {
+            "name": "a_days",
+            "dtype": "Int64"
+          }
+        ]
+      },
+      "expressions": [
+        {
+          "place": {
+            "stepIndex": 6,
+            "stepId": "a_days",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "start"
+              },
+              {
+                "kind": "parameter",
+                "name": "predicates"
+              },
+              {
+                "kind": "item",
+                "index": 0
+              },
+              {
+                "kind": "link",
+                "index": 0
+              },
+              {
+                "kind": "parameter",
+                "name": "other"
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "String"
+          },
+          "links": []
+        },
+        {
+          "place": {
+            "stepIndex": 6,
+            "stepId": "a_days",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "start"
+              },
+              {
+                "kind": "parameter",
+                "name": "predicates"
+              },
+              {
+                "kind": "item",
+                "index": 0
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "String"
+          },
+          "links": [
+            {
+              "kind": "dtype",
+              "dtype": "Boolean"
+            }
+          ]
+        },
+        {
+          "place": {
+            "stepIndex": 6,
+            "stepId": "a_days",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "link",
+                "index": 0
+              },
+              {
+                "kind": "parameter",
+                "name": "statement"
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "Int64"
+          },
+          "links": []
+        },
+        {
+          "place": {
+            "stepIndex": 6,
+            "stepId": "a_days",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "link",
+                "index": 1
+              },
+              {
+                "kind": "parameter",
+                "name": "statement"
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "Int32"
+          },
+          "links": []
+        },
+        {
+          "place": {
+            "stepIndex": 6,
+            "stepId": "a_days",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "link",
+                "index": 3
+              },
+              {
+                "kind": "parameter",
+                "name": "partition_by"
+              },
+              {
+                "kind": "item",
+                "index": 0
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "String"
+          },
+          "links": []
+        },
+        {
+          "place": {
+            "stepIndex": 6,
+            "stepId": "a_days",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              }
+            ]
+          },
+          "start": {
+            "kind": "unfinished"
+          },
+          "links": [
+            {
+              "kind": "dtype",
+              "dtype": "Int64"
+            },
+            {
+              "kind": "dtype",
+              "dtype": "Int64"
+            },
+            {
+              "kind": "dtype",
+              "dtype": "Int64"
+            },
+            {
+              "kind": "dtype",
+              "dtype": "Int64"
+            }
+          ]
+        }
+      ],
+      "walk": {
+        "expressions": [
+          {
+            "place": {
+              "stepIndex": 6,
+              "stepId": "a_days",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "start"
+                },
+                {
+                  "kind": "parameter",
+                  "name": "predicates"
+                },
+                {
+                  "kind": "item",
+                  "index": 0
+                },
+                {
+                  "kind": "link",
+                  "index": 0
+                },
+                {
+                  "kind": "parameter",
+                  "name": "other"
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": "condition.predicate"
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "String",
+                  "shape": "one",
+                  "ending": {
+                    "kind": "refused",
+                    "refusal": {
+                      "source": {
+                        "by": "rule",
+                        "rule": "condition-predicate-is-boolean"
+                      },
+                      "reason": "a condition's predicate must be Boolean"
+                    }
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.predicate"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "one"
+                }
+              }
+            ],
+            "ending": null
+          },
+          {
+            "place": {
+              "stepIndex": 6,
+              "stepId": "a_days",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "start"
+                },
+                {
+                  "kind": "parameter",
+                  "name": "predicates"
+                },
+                {
+                  "kind": "item",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": "condition.predicate"
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "String",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "refused",
+                    "refusal": {
+                      "source": {
+                        "by": "rule",
+                        "rule": "condition-predicate-is-boolean"
+                      },
+                      "reason": "a condition's predicate must be Boolean"
+                    }
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "many"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Boolean",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.predicate"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "many"
+                }
+              },
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.predicate"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Boolean",
+                  "shape": "many"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          },
+          {
+            "place": {
+              "stepIndex": 6,
+              "stepId": "a_days",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "link",
+                  "index": 0
+                },
+                {
+                  "kind": "parameter",
+                  "name": "statement"
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": "condition.value"
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Int64",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.value"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Int64",
+                  "shape": "many"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          },
+          {
+            "place": {
+              "stepIndex": 6,
+              "stepId": "a_days",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "link",
+                  "index": 1
+                },
+                {
+                  "kind": "parameter",
+                  "name": "statement"
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": "condition.value"
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": null,
+                  "shape": "one",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [null],
+            "ending": {
+              "kind": "allowed"
+            }
+          },
+          {
+            "place": {
+              "stepIndex": 6,
+              "stepId": "a_days",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "link",
+                  "index": 3
+                },
+                {
+                  "kind": "parameter",
+                  "name": "partition_by"
+                },
+                {
+                  "kind": "item",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": "over.partition_by"
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "String",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "over.partition_by"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "many"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          },
+          {
+            "place": {
+              "stepIndex": 6,
+              "stepId": "a_days",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": null
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": null,
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "condition",
+                  "state": "when"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": null,
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "condition",
+                  "state": "then"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": null,
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              },
+              {
+                "follows": null,
+                "verdict": null
+              },
+              {
+                "follows": null,
+                "verdict": null
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "condition",
+                  "state": "when"
+                }
+              },
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "condition",
+                  "state": "then"
+                }
+              },
+              null,
+              null,
+              null
+            ],
+            "ending": null
+          }
+        ],
+        "refusal": null,
+        "notKnown": "step \"a_days\", named_exprs entry 1 value, link 2: the dtype of an argument of Then.otherwise is not known"
+      }
+    },
+    {
+      "id": "join",
+      "lazy": true,
+      "outcome": {
+        "status": "valid",
+        "columns": [
+          {
+            "name": "dcn",
+            "dtype": "String"
+          },
+          {
+            "name": "timestamp",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "step_to",
+            "dtype": "String"
+          },
+          {
+            "name": "owner",
+            "dtype": "String"
+          },
+          {
+            "name": "row_days",
+            "dtype": "Int64"
+          },
+          {
+            "name": "step_index",
+            "dtype": "UInt32"
+          },
+          {
+            "name": "resolved_at",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "received_at",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "resolved_day",
+            "dtype": "Date"
+          },
+          {
+            "name": "days_open",
+            "dtype": "Int64"
+          },
+          {
+            "name": "a_days",
+            "dtype": "Int64"
+          },
+          {
+            "name": "sla_days",
+            "dtype": "Int64"
+          }
+        ]
+      },
+      "expressions": [
+        {
+          "place": {
+            "stepIndex": 7,
+            "stepId": "join",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "left_on"
+              },
+              {
+                "kind": "item",
+                "index": 0
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "String"
+          },
+          "links": []
+        },
+        {
+          "place": {
+            "stepIndex": 7,
+            "stepId": "join",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "right_on"
+              },
+              {
+                "kind": "item",
+                "index": 0
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "String"
+          },
+          "links": []
+        }
+      ],
+      "walk": {
+        "expressions": [
+          {
+            "place": {
+              "stepIndex": 7,
+              "stepId": "join",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "left_on"
+                },
+                {
+                  "kind": "item",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "join_left",
+              "nested": null
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "String",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "join_left",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "many"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          },
+          {
+            "place": {
+              "stepIndex": 7,
+              "stepId": "join",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "right_on"
+                },
+                {
+                  "kind": "item",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "join_right",
+              "nested": null
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "String",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "join_right",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "many"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          }
+        ],
+        "refusal": null,
+        "notKnown": null
+      }
+    },
+    {
+      "id": "sla_status",
+      "lazy": true,
+      "outcome": {
+        "status": "valid",
+        "columns": [
+          {
+            "name": "dcn",
+            "dtype": "String"
+          },
+          {
+            "name": "timestamp",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "step_to",
+            "dtype": "String"
+          },
+          {
+            "name": "owner",
+            "dtype": "String"
+          },
+          {
+            "name": "row_days",
+            "dtype": "Int64"
+          },
+          {
+            "name": "step_index",
+            "dtype": "UInt32"
+          },
+          {
+            "name": "resolved_at",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "received_at",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "resolved_day",
+            "dtype": "Date"
+          },
+          {
+            "name": "days_open",
+            "dtype": "Int64"
+          },
+          {
+            "name": "a_days",
+            "dtype": "Int64"
+          },
+          {
+            "name": "sla_days",
+            "dtype": "Int64"
+          },
+          {
+            "name": "sla_status",
+            "dtype": "String"
+          }
+        ]
+      },
+      "expressions": [
+        {
+          "place": {
+            "stepIndex": 8,
+            "stepId": "sla_status",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "start"
+              },
+              {
+                "kind": "parameter",
+                "name": "predicates"
+              },
+              {
+                "kind": "item",
+                "index": 0
+              },
+              {
+                "kind": "link",
+                "index": 0
+              },
+              {
+                "kind": "parameter",
+                "name": "other"
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "Int64"
+          },
+          "links": []
+        },
+        {
+          "place": {
+            "stepIndex": 8,
+            "stepId": "sla_status",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "start"
+              },
+              {
+                "kind": "parameter",
+                "name": "predicates"
+              },
+              {
+                "kind": "item",
+                "index": 0
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "Int64"
+          },
+          "links": [
+            {
+              "kind": "dtype",
+              "dtype": "Boolean"
+            }
+          ]
+        },
+        {
+          "place": {
+            "stepIndex": 8,
+            "stepId": "sla_status",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "link",
+                "index": 0
+              },
+              {
+                "kind": "parameter",
+                "name": "statement"
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "String"
+          },
+          "links": []
+        },
+        {
+          "place": {
+            "stepIndex": 8,
+            "stepId": "sla_status",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "link",
+                "index": 1
+              },
+              {
+                "kind": "parameter",
+                "name": "statement"
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "String"
+          },
+          "links": []
+        },
+        {
+          "place": {
+            "stepIndex": 8,
+            "stepId": "sla_status",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              }
+            ]
+          },
+          "start": {
+            "kind": "unfinished"
+          },
+          "links": [
+            {
+              "kind": "dtype",
+              "dtype": "String"
+            },
+            {
+              "kind": "dtype",
+              "dtype": "String"
+            }
+          ]
+        }
+      ],
+      "walk": {
+        "expressions": [
+          {
+            "place": {
+              "stepIndex": 8,
+              "stepId": "sla_status",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "start"
+                },
+                {
+                  "kind": "parameter",
+                  "name": "predicates"
+                },
+                {
+                  "kind": "item",
+                  "index": 0
+                },
+                {
+                  "kind": "link",
+                  "index": 0
+                },
+                {
+                  "kind": "parameter",
+                  "name": "other"
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": "condition.predicate"
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Int64",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "refused",
+                    "refusal": {
+                      "source": {
+                        "by": "rule",
+                        "rule": "condition-predicate-is-boolean"
+                      },
+                      "reason": "a condition's predicate must be Boolean"
+                    }
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.predicate"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Int64",
+                  "shape": "many"
+                }
+              }
+            ],
+            "ending": null
+          },
+          {
+            "place": {
+              "stepIndex": 8,
+              "stepId": "sla_status",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "start"
+                },
+                {
+                  "kind": "parameter",
+                  "name": "predicates"
+                },
+                {
+                  "kind": "item",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": "condition.predicate"
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Int64",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "refused",
+                    "refusal": {
+                      "source": {
+                        "by": "rule",
+                        "rule": "condition-predicate-is-boolean"
+                      },
+                      "reason": "a condition's predicate must be Boolean"
+                    }
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "value",
+                  "dtype": "Int64",
+                  "shape": "many"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Boolean",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.predicate"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Int64",
+                  "shape": "many"
+                }
+              },
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.predicate"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Boolean",
+                  "shape": "many"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          },
+          {
+            "place": {
+              "stepIndex": 8,
+              "stepId": "sla_status",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "link",
+                  "index": 0
+                },
+                {
+                  "kind": "parameter",
+                  "name": "statement"
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": "condition.value"
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "String",
+                  "shape": "one",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.value"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "one"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          },
+          {
+            "place": {
+              "stepIndex": 8,
+              "stepId": "sla_status",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "link",
+                  "index": 1
+                },
+                {
+                  "kind": "parameter",
+                  "name": "statement"
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": "condition.value"
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "String",
+                  "shape": "one",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.value"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "one"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          },
+          {
+            "place": {
+              "stepIndex": 8,
+              "stepId": "sla_status",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": null
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": null,
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "condition",
+                  "state": "when"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": null,
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "condition",
+                  "state": "then"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "String",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "condition",
+                  "state": "when"
+                }
+              },
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "condition",
+                  "state": "then"
+                }
+              },
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "many"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          }
+        ],
+        "refusal": null,
+        "notKnown": null
+      }
+    },
+    {
+      "id": "flag",
+      "lazy": true,
+      "outcome": {
+        "status": "valid",
+        "columns": [
+          {
+            "name": "dcn",
+            "dtype": "String"
+          },
+          {
+            "name": "timestamp",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "step_to",
+            "dtype": "String"
+          },
+          {
+            "name": "owner",
+            "dtype": "String"
+          },
+          {
+            "name": "row_days",
+            "dtype": "Int64"
+          },
+          {
+            "name": "step_index",
+            "dtype": "UInt32"
+          },
+          {
+            "name": "resolved_at",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "received_at",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "resolved_day",
+            "dtype": "Date"
+          },
+          {
+            "name": "days_open",
+            "dtype": "Int64"
+          },
+          {
+            "name": "a_days",
+            "dtype": "Int64"
+          },
+          {
+            "name": "sla_days",
+            "dtype": "Int64"
+          },
+          {
+            "name": "sla_status",
+            "dtype": "String"
+          },
+          {
+            "name": "flag",
+            "dtype": "String"
+          }
+        ]
+      },
+      "expressions": [
+        {
+          "place": {
+            "stepIndex": 9,
+            "stepId": "flag",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "start"
+              },
+              {
+                "kind": "parameter",
+                "name": "predicates"
+              },
+              {
+                "kind": "item",
+                "index": 0
+              },
+              {
+                "kind": "link",
+                "index": 1
+              },
+              {
+                "kind": "parameter",
+                "name": "other"
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "Date"
+          },
+          "links": []
+        },
+        {
+          "place": {
+            "stepIndex": 9,
+            "stepId": "flag",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "start"
+              },
+              {
+                "kind": "parameter",
+                "name": "predicates"
+              },
+              {
+                "kind": "item",
+                "index": 0
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "Datetime(us)"
+          },
+          "links": [
+            {
+              "kind": "dtype",
+              "dtype": "Date"
+            },
+            {
+              "kind": "dtype",
+              "dtype": "Boolean"
+            }
+          ]
+        },
+        {
+          "place": {
+            "stepIndex": 9,
+            "stepId": "flag",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "link",
+                "index": 0
+              },
+              {
+                "kind": "parameter",
+                "name": "statement"
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "String"
+          },
+          "links": []
+        },
+        {
+          "place": {
+            "stepIndex": 9,
+            "stepId": "flag",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "link",
+                "index": 1
+              },
+              {
+                "kind": "parameter",
+                "name": "statement"
+              },
+              {
+                "kind": "start"
+              },
+              {
+                "kind": "parameter",
+                "name": "predicates"
+              },
+              {
+                "kind": "item",
+                "index": 0
+              },
+              {
+                "kind": "link",
+                "index": 0
+              },
+              {
+                "kind": "parameter",
+                "name": "other"
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "Int64"
+          },
+          "links": []
+        },
+        {
+          "place": {
+            "stepIndex": 9,
+            "stepId": "flag",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "link",
+                "index": 1
+              },
+              {
+                "kind": "parameter",
+                "name": "statement"
+              },
+              {
+                "kind": "start"
+              },
+              {
+                "kind": "parameter",
+                "name": "predicates"
+              },
+              {
+                "kind": "item",
+                "index": 0
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "Int64"
+          },
+          "links": [
+            {
+              "kind": "dtype",
+              "dtype": "Boolean"
+            }
+          ]
+        },
+        {
+          "place": {
+            "stepIndex": 9,
+            "stepId": "flag",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "link",
+                "index": 1
+              },
+              {
+                "kind": "parameter",
+                "name": "statement"
+              },
+              {
+                "kind": "link",
+                "index": 0
+              },
+              {
+                "kind": "parameter",
+                "name": "statement"
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "String"
+          },
+          "links": []
+        },
+        {
+          "place": {
+            "stepIndex": 9,
+            "stepId": "flag",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "link",
+                "index": 1
+              },
+              {
+                "kind": "parameter",
+                "name": "statement"
+              },
+              {
+                "kind": "link",
+                "index": 1
+              },
+              {
+                "kind": "parameter",
+                "name": "statement"
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "String"
+          },
+          "links": []
+        },
+        {
+          "place": {
+            "stepIndex": 9,
+            "stepId": "flag",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "link",
+                "index": 1
+              },
+              {
+                "kind": "parameter",
+                "name": "statement"
+              }
+            ]
+          },
+          "start": {
+            "kind": "unfinished"
+          },
+          "links": [
+            {
+              "kind": "dtype",
+              "dtype": "String"
+            },
+            {
+              "kind": "dtype",
+              "dtype": "String"
+            }
+          ]
+        },
+        {
+          "place": {
+            "stepIndex": 9,
+            "stepId": "flag",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              }
+            ]
+          },
+          "start": {
+            "kind": "unfinished"
+          },
+          "links": [
+            {
+              "kind": "dtype",
+              "dtype": "String"
+            },
+            {
+              "kind": "dtype",
+              "dtype": "String"
+            }
+          ]
+        }
+      ],
+      "walk": {
+        "expressions": [
+          {
+            "place": {
+              "stepIndex": 9,
+              "stepId": "flag",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "start"
+                },
+                {
+                  "kind": "parameter",
+                  "name": "predicates"
+                },
+                {
+                  "kind": "item",
+                  "index": 0
+                },
+                {
+                  "kind": "link",
+                  "index": 1
+                },
+                {
+                  "kind": "parameter",
+                  "name": "other"
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": "condition.predicate"
+            },
+            "calls": [
+              {
+                "follows": null,
+                "verdict": null
+              }
+            ],
+            "places": [null],
+            "ending": null
+          },
+          {
+            "place": {
+              "stepIndex": 9,
+              "stepId": "flag",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "start"
+                },
+                {
+                  "kind": "parameter",
+                  "name": "predicates"
+                },
+                {
+                  "kind": "item",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": "condition.predicate"
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Datetime(us)",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "refused",
+                    "refusal": {
+                      "source": {
+                        "by": "rule",
+                        "rule": "condition-predicate-is-boolean"
+                      },
+                      "reason": "a condition's predicate must be Boolean"
+                    }
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "value",
+                  "dtype": "Datetime(us)",
+                  "shape": "many"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Date",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "refused",
+                    "refusal": {
+                      "source": {
+                        "by": "rule",
+                        "rule": "condition-predicate-is-boolean"
+                      },
+                      "reason": "a condition's predicate must be Boolean"
+                    }
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "value",
+                  "dtype": "Date",
+                  "shape": "many"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Boolean",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.predicate"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Datetime(us)",
+                  "shape": "many"
+                }
+              },
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.predicate"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Date",
+                  "shape": "many"
+                }
+              },
+              null
+            ],
+            "ending": null
+          },
+          {
+            "place": {
+              "stepIndex": 9,
+              "stepId": "flag",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "link",
+                  "index": 0
+                },
+                {
+                  "kind": "parameter",
+                  "name": "statement"
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": "condition.value"
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "String",
+                  "shape": "one",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.value"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "one"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          },
+          {
+            "place": {
+              "stepIndex": 9,
+              "stepId": "flag",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "link",
+                  "index": 1
+                },
+                {
+                  "kind": "parameter",
+                  "name": "statement"
+                },
+                {
+                  "kind": "start"
+                },
+                {
+                  "kind": "parameter",
+                  "name": "predicates"
+                },
+                {
+                  "kind": "item",
+                  "index": 0
+                },
+                {
+                  "kind": "link",
+                  "index": 0
+                },
+                {
+                  "kind": "parameter",
+                  "name": "other"
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": "condition.predicate"
+            },
+            "calls": [
+              {
+                "follows": null,
+                "verdict": null
+              }
+            ],
+            "places": [null],
+            "ending": null
+          },
+          {
+            "place": {
+              "stepIndex": 9,
+              "stepId": "flag",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "link",
+                  "index": 1
+                },
+                {
+                  "kind": "parameter",
+                  "name": "statement"
+                },
+                {
+                  "kind": "start"
+                },
+                {
+                  "kind": "parameter",
+                  "name": "predicates"
+                },
+                {
+                  "kind": "item",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": "condition.predicate"
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Int64",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "refused",
+                    "refusal": {
+                      "source": {
+                        "by": "rule",
+                        "rule": "condition-predicate-is-boolean"
+                      },
+                      "reason": "a condition's predicate must be Boolean"
+                    }
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "value",
+                  "dtype": "Int64",
+                  "shape": "many"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Boolean",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.predicate"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Int64",
+                  "shape": "many"
+                }
+              },
+              null
+            ],
+            "ending": null
+          },
+          {
+            "place": {
+              "stepIndex": 9,
+              "stepId": "flag",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "link",
+                  "index": 1
+                },
+                {
+                  "kind": "parameter",
+                  "name": "statement"
+                },
+                {
+                  "kind": "link",
+                  "index": 0
+                },
+                {
+                  "kind": "parameter",
+                  "name": "statement"
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": "condition.value"
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "String",
+                  "shape": "one",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.value"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "one"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          },
+          {
+            "place": {
+              "stepIndex": 9,
+              "stepId": "flag",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "link",
+                  "index": 1
+                },
+                {
+                  "kind": "parameter",
+                  "name": "statement"
+                },
+                {
+                  "kind": "link",
+                  "index": 1
+                },
+                {
+                  "kind": "parameter",
+                  "name": "statement"
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": "condition.value"
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "String",
+                  "shape": "one",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.value"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "one"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          },
+          {
+            "place": {
+              "stepIndex": 9,
+              "stepId": "flag",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                },
+                {
+                  "kind": "link",
+                  "index": 1
+                },
+                {
+                  "kind": "parameter",
+                  "name": "statement"
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": "condition.value"
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": null,
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "condition",
+                  "state": "when"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": null,
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "condition",
+                  "state": "then"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "String",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.value"
+                },
+                "after": {
+                  "kind": "condition",
+                  "state": "when"
+                }
+              },
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.value"
+                },
+                "after": {
+                  "kind": "condition",
+                  "state": "then"
+                }
+              },
+              null
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          },
+          {
+            "place": {
+              "stepIndex": 9,
+              "stepId": "flag",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": null
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": null,
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "condition",
+                  "state": "when"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": null,
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "condition",
+                  "state": "then"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": null,
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "condition",
+                  "state": "when"
+                }
+              },
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "condition",
+                  "state": "then"
+                }
+              },
+              null
+            ],
+            "ending": null
+          }
+        ],
+        "refusal": null,
+        "notKnown": "step \"flag\", named_exprs entry 1 value, the start, predicates item 1, link 2, other: a connected input starts the chain"
+      }
+    },
+    {
+      "id": "holiday_count",
+      "lazy": true,
+      "outcome": {
+        "status": "valid",
+        "columns": [
+          {
+            "name": "dcn",
+            "dtype": "String"
+          },
+          {
+            "name": "timestamp",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "step_to",
+            "dtype": "String"
+          },
+          {
+            "name": "owner",
+            "dtype": "String"
+          },
+          {
+            "name": "row_days",
+            "dtype": "Int64"
+          },
+          {
+            "name": "step_index",
+            "dtype": "UInt32"
+          },
+          {
+            "name": "resolved_at",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "received_at",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "resolved_day",
+            "dtype": "Date"
+          },
+          {
+            "name": "days_open",
+            "dtype": "Int64"
+          },
+          {
+            "name": "a_days",
+            "dtype": "Int64"
+          },
+          {
+            "name": "sla_days",
+            "dtype": "Int64"
+          },
+          {
+            "name": "sla_status",
+            "dtype": "String"
+          },
+          {
+            "name": "flag",
+            "dtype": "String"
+          },
+          {
+            "name": "holiday_count",
+            "dtype": "UInt32"
+          }
+        ]
+      },
+      "expressions": [
+        {
+          "place": {
+            "stepIndex": 10,
+            "stepId": "holiday_count",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "Date"
+          },
+          "links": [
+            {
+              "kind": "dtype",
+              "dtype": "UInt32"
+            }
+          ]
+        }
+      ],
+      "walk": {
+        "expressions": [
+          {
+            "place": {
+              "stepIndex": 10,
+              "stepId": "holiday_count",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": null
+            },
+            "calls": [
+              {
+                "follows": null,
+                "verdict": null
+              },
+              {
+                "follows": null,
+                "verdict": null
+              }
+            ],
+            "places": [null, null],
+            "ending": null
+          }
+        ],
+        "refusal": null,
+        "notKnown": "step \"holiday_count\", named_exprs entry 1 value: a connected input starts the chain"
+      }
+    },
+    {
+      "id": "pivot",
+      "lazy": false,
+      "outcome": {
+        "status": "valid",
+        "columns": [
+          {
+            "name": "dcn",
+            "dtype": "String"
+          },
+          {
+            "name": "Intake",
+            "dtype": "Int64"
+          },
+          {
+            "name": "Review",
+            "dtype": "Int64"
+          },
+          {
+            "name": "Pending",
+            "dtype": "Int64"
+          },
+          {
+            "name": "Complete",
+            "dtype": "Int64"
+          }
+        ]
+      },
+      "expressions": [
+        {
+          "place": {
+            "stepIndex": 11,
+            "stepId": "pivot",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "aggregate_function"
+              }
+            ]
+          },
+          "start": {
+            "kind": "noContext"
+          },
+          "links": [
+            {
+              "kind": "noContext"
+            }
+          ]
+        }
+      ],
+      "walk": {
+        "expressions": [
+          {
+            "place": {
+              "stepIndex": 11,
+              "stepId": "pivot",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "aggregate_function"
+                }
+              ]
+            },
+            "context": {
+              "outer": "pivot_aggregate",
+              "nested": null
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Int64",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "refused",
+                    "refusal": {
+                      "source": {
+                        "by": "rule",
+                        "rule": "pivot-aggregate-gives-one-value"
+                      },
+                      "reason": "a pivot's aggregate must give one value for each group"
+                    }
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "value",
+                  "dtype": "Int64",
+                  "shape": "many"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Int64",
+                  "shape": "one",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "pivot_aggregate",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Int64",
+                  "shape": "many"
+                }
+              },
+              {
+                "context": {
+                  "outer": "pivot_aggregate",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Int64",
+                  "shape": "one"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          }
+        ],
+        "refusal": null,
+        "notKnown": null
+      }
+    }
+  ]
+}

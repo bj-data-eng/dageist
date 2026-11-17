@@ -206,8 +206,8 @@
   },
   "overrides": [
     {
-      // The build configuration runs in Node, not in the webview.
-      "files": ["apps/*/vite.config.ts"],
+      // The build and test configuration runs in Node, not in the webview.
+      "files": ["apps/*/vite.config.ts", "vitest.config.ts"],
       "plugins": ["typescript", "import", "unicorn", "jsdoc", "oxc", "node"],
       "env": {
         "browser": false,

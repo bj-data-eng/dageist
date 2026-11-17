@@ -1,0 +1,307 @@
+{
+  "status": "run",
+  "source": [
+    {
+      "name": "dcn",
+      "dtype": "String"
+    },
+    {
+      "name": "timestamp",
+      "dtype": "Datetime(us)"
+    },
+    {
+      "name": "step_to",
+      "dtype": "String"
+    },
+    {
+      "name": "owner",
+      "dtype": "String"
+    },
+    {
+      "name": "row_days",
+      "dtype": "Int64"
+    }
+  ],
+  "steps": [
+    {
+      "id": "sort",
+      "lazy": true,
+      "outcome": {
+        "status": "valid",
+        "columns": [
+          {
+            "name": "dcn",
+            "dtype": "String"
+          },
+          {
+            "name": "timestamp",
+            "dtype": "Datetime(us)"
+          },
+          {
+            "name": "step_to",
+            "dtype": "String"
+          },
+          {
+            "name": "owner",
+            "dtype": "String"
+          },
+          {
+            "name": "row_days",
+            "dtype": "Int64"
+          }
+        ]
+      },
+      "expressions": [
+        {
+          "place": {
+            "stepIndex": 0,
+            "stepId": "sort",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "by"
+              },
+              {
+                "kind": "item",
+                "index": 0
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "String"
+          },
+          "links": []
+        }
+      ],
+      "walk": {
+        "expressions": [
+          {
+            "place": {
+              "stepIndex": 0,
+              "stepId": "sort",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "by"
+                },
+                {
+                  "kind": "item",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "sort",
+              "nested": null
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "String",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "sort",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "many"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
+          }
+        ],
+        "refusal": null,
+        "notKnown": null
+      }
+    },
+    {
+      "id": "total",
+      "lazy": true,
+      "outcome": {
+        "status": "refused",
+        "place": {
+          "stepIndex": 1,
+          "stepId": "total",
+          "path": [
+            {
+              "kind": "parameter",
+              "name": "named_exprs"
+            },
+            {
+              "kind": "value",
+              "index": 0
+            },
+            {
+              "kind": "link",
+              "index": 0
+            }
+          ]
+        },
+        "cause": {
+          "kind": "polars",
+          "reason": "`sum` operation not supported for dtype `str`\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\nDF [\"dcn\", \"timestamp\", \"step_to\", \"owner\", ...]; PROJECT */5 COLUMNS\n\nThis error occurred with the following context stack:\n\t[1] 'select'\n"
+        }
+      },
+      "expressions": [
+        {
+          "place": {
+            "stepIndex": 1,
+            "stepId": "total",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              }
+            ]
+          },
+          "start": {
+            "kind": "dtype",
+            "dtype": "String"
+          },
+          "links": [
+            {
+              "kind": "refused",
+              "reason": "`sum` operation not supported for dtype `str`\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\nDF [\"dcn\", \"timestamp\", \"step_to\", \"owner\", ...]; PROJECT */5 COLUMNS\n\nThis error occurred with the following context stack:\n\t[1] 'select'\n"
+            }
+          ]
+        }
+      ],
+      "walk": {
+        "expressions": [
+          {
+            "place": {
+              "stepIndex": 1,
+              "stepId": "total",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "value",
+                  "index": 0
+                }
+              ]
+            },
+            "context": {
+              "outer": "select",
+              "nested": null
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "String",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "many"
+                },
+                "verdict": {
+                  "kind": "refused",
+                  "refusal": {
+                    "source": {
+                      "by": "polars",
+                      "stage": "schema"
+                    },
+                    "reason": "`sum` operation not supported for dtype `str`"
+                  }
+                }
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "many"
+                }
+              },
+              null
+            ],
+            "ending": null
+          }
+        ],
+        "refusal": {
+          "place": {
+            "stepIndex": 1,
+            "stepId": "total",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "value",
+                "index": 0
+              },
+              {
+                "kind": "link",
+                "index": 0
+              }
+            ]
+          },
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "`sum` operation not supported for dtype `str`"
+          },
+          "atEnd": false
+        },
+        "notKnown": null
+      }
+    },
+    {
+      "id": "after",
+      "lazy": true,
+      "outcome": {
+        "status": "notRun",
+        "blockedBy": "total"
+      },
+      "expressions": [],
+      "walk": {
+        "expressions": [],
+        "refusal": null,
+        "notKnown": null
+      }
+    }
+  ]
+}

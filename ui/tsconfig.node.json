@@ -16,5 +16,5 @@
     "types": ["node"],
     "skipLibCheck": true
   },
-  "include": ["apps/*/vite.config.ts"]
+  "include": ["apps/*/vite.config.ts", "vitest.config.ts"]
 }

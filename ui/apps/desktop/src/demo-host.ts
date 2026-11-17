@@ -6,18 +6,16 @@
 
 import { tableFromArrays, tableToIPC } from '@uwdata/flechette';
 
-import type { BlockRequest, CatalogueView, ColumnView, Host, TableView } from '@dageist/host';
-import { deliverMessage, sealMessage } from '@dageist/host';
-
-import snapshot from './catalogue.json';
+import type { BlockRequest, ColumnView, Host, TableView } from '@dageist/host';
+import { decodeCatalogue, deliverMessage, sealMessage } from '@dageist/host';
+import snapshot from '@dageist/host/fixtures/catalogue.json';
 
 /**
- * What the host's `operation_catalogue` command returns, as a snapshot of it. TypeScript
- * types the JSON by its text, where each tag is a plain `string`, so the contract is asserted
- * here. A host test keeps the file equal to the Rust view that the contract mirrors.
+ * What the host's `operation_catalogue` command returns, as a snapshot of it that a host test
+ * keeps equal to the Rust view. TypeScript types the JSON by its text, where each tag is a plain
+ * `string`, so it is read as the contract names it.
  */
-// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the JSON is the serialized Rust view, kept equal to it by a host test; its tags only read as `string` here
-const CATALOGUE = snapshot as CatalogueView;
+const CATALOGUE = decodeCatalogue(snapshot);
 
 const COLUMNS: readonly ColumnView[] = [
   { name: 'dcn', dataType: 'str' },
@@ -45,6 +43,11 @@ function makeBlock(request: BlockRequest, rows: number): ArrayBuffer {
   return bytes.slice().buffer;
 }
 
+/** Rejects as a command the stand-in host cannot answer. */
+async function unavailable(command: string): Promise<never> {
+  return Promise.reject(new Error(`${command}: the engine is not available in a browser`));
+}
+
 /** Returns a host that answers from made-up data. */
 export function demoHost(): Host {
   let rows = 0;
@@ -55,6 +58,11 @@ export function demoHost(): Host {
   return {
     coreIdentity: async () => Promise.resolve({ name: 'Browser preview', version: 'made-up data' }),
     operationCatalogue: async () => Promise.resolve(CATALOGUE),
+    // The engine runs in the host. A page open in a browser reaches it through the local
+    // bridge, which is not here yet, so these are not available.
+    nodeInputs: async () => unavailable('nodeInputs'),
+    runDocument: async () => unavailable('runDocument'),
+    rowsAfterStep: async () => unavailable('rowsAfterStep'),
     openSampleWindow: async () => Promise.resolve(open(WINDOW_ROWS)),
     openSampleResult: async () => Promise.resolve(open(RESULT_ROWS)),
     fetchTableBlock: async (request) => Promise.resolve(makeBlock(request, rows)),

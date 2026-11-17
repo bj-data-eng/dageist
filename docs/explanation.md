@@ -96,6 +96,23 @@ The view reaches Tauri through the `window.__TAURI__` global that
 `app.withGlobalTauri` injects. The host bridge declares the global's types by
 hand, covering only the members it uses.
 
+What the host sends is JSON, which TypeScript can only call `unknown`, so the
+host package does not trust it with a type assertion. A decoder beside the
+contract reads each answer and returns it typed, or refuses it with the place
+and the reason, such as `$.steps[3].outcome.status`. Its objects are closed: a
+missing field, a field the contract lacks and a tag it does not name are all
+refused, so a change of shape on the host's side fails where it is read. The
+decoders are pure TypeScript and are tested with Vitest against snapshots that
+host tests write from Rust, `ui/packages/host/fixtures/`, with expectations
+written by hand; a change of shape in the host shows up in those tests as a
+failing snapshot check in Rust and a refusing decoder in the view. The words
+of each closed list, such as the rules and the positions of an expression, are
+constants in the contract that a test compares with the host's own list of
+the engine's variants, so a variant the engine adds fails a test. The same
+holds for the functions that prepare decoded data for display. Drawing is React
+that only consumes prepared values, and it has no tests while the design
+changes.
+
 ## The Catalogue Of Operations
 
 The engine holds a catalogue of the Polars operations the step editor can
@@ -202,10 +219,13 @@ also gives the context it stands in and where each link stands, as the
 [walk](#which-combinations-polars-allows) of the tables finds them, so that a
 caller can ask for offers at any link. Steps after a refused one are reported
 as not run. The rows of any step come from running
-it on an in-memory working window. Polars' own message is the reason when
-Polars refuses. Some mistakes, such as `dt.date` on a String column, are only
-found when rows are read, not from the schema; the editor learns them in
-advance from the [tables of allowed combinations](#which-combinations-polars-allows).
+it on an in-memory working window, and a preview gives them as text, every
+cell written as Polars writes it and each dtype by the engine's short name,
+such as `Datetime(us)`, so the view formats no value. Polars' own message is
+the reason when Polars refuses. Some mistakes, such as `dt.date` on a String
+column, are only found when rows are read, not from the schema; the editor
+learns them in advance from the
+[tables of allowed combinations](#which-combinations-polars-allows).
 The runner asks the named rules beside those tables, and not the tables, for
 where an expression may start: `element` starts a chain only in a pivot's
 aggregate. A row of the context table was measured with the chain ending at one
@@ -214,6 +234,11 @@ it cannot judge a start that other arguments or more links follow. Polars decide
 the rest as the step is built, and when it refuses a pivot because of a column in
 its aggregate, it refuses the step, not the expression. The contexts the tables
 are measured in also say which table a join's `right_on` is read against.
+
+The claim-timing steps the step editor opens with, the seven claim rows they run
+on and the inputs connected to them are one sample node in the engine,
+`dageist_engine::claim_timing`. The host serves it to the view and the engine's
+tests run it, so there is one copy.
 
 ## Which Combinations Polars Allows
 
@@ -615,9 +640,10 @@ are a storyboard that works on fixed sample rows in the view, offering the
 operations of the engine's catalogue; its two windows
 keep the steps the same by telling each other of every change, where the core
 will later own them. The table viewer shows a
-generated sample through the engine. The graph model, node types, pipeline
-execution, previews from the core and canvas interactions are not implemented
-yet.
+generated sample through the engine. The host reports a node's inputs, runs
+a step document and gives the rows after a step, and the view decodes those
+answers, but the step editor does not use them yet. The graph model, node
+types, pipeline execution and canvas interactions are not implemented yet.
 
 A third tab shows the Pieces page. It is a design prototype, not a feature:
 a static page in plain HTML, CSS and JavaScript where the way the step

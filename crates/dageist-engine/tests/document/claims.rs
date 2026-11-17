@@ -1,19 +1,17 @@
 //! The claim-timing steps the step editor's storyboard opens with, written as
 //! a document and run on seven claim rows.
 //!
-//! Every expected value is worked out by hand from the seven rows below and
-//! from what Polars documents for each operation, not read from a run.
+//! The sample node is the engine's own, `ClaimTiming`, which the host serves
+//! to the view too. Every expected value is worked out by hand from its seven
+//! rows and from what Polars documents for each operation, not read from a
+//! run.
 
 use dageist_engine::catalog::Laziness;
+use dageist_engine::claim_timing::ClaimTiming;
 use dageist_engine::document::{
     Document, ExpressionDtypes, Inputs, Outcome, Report, Resolution, Segment, StepId, StepReport,
 };
 use polars::prelude::*;
-use serde_json::{Value, json};
-
-use crate::support::{
-    call, chain, document, field, field_then, input, many, named, step, text, whole,
-};
 
 /// Microseconds since the Unix epoch at `hour:minute` on `day` of March 2026.
 /// 2026-03-01 is day 20,513 of the epoch: 56 years of 365 days and the 14 leap
@@ -33,225 +31,23 @@ fn datetime() -> DataType {
 
 /// The seven claim rows of the storyboard, in no useful order.
 pub fn claims() -> DataFrame {
-    df!(
-        "dcn" => ["A-1002", "A-1001", "A-1002", "A-1001", "A-1002", "A-1001", "A-1001"],
-        "timestamp" => [
-            at(2, 13, 30), at(5, 7, 50), at(6, 10, 0), at(2, 9, 15),
-            at(4, 17, 20), at(9, 11, 5), at(3, 16, 40),
-        ],
-        "step_to" => ["Intake", "Pending", "Complete", "Intake", "Review", "Complete", "Review"],
-        "owner" => [
-            "Company A", "Company A", "Company B", "Company A",
-            "Company A", "Company B", "Company B",
-        ],
-        "row_days" => [0_i64, 2, 2, 0, 2, 2, 1],
-    )
-    .expect("the claims")
-    .lazy()
-    .with_column(col("timestamp").cast(datetime()))
-    .collect()
-    .expect("the claims with their timestamps")
+    ClaimTiming::new()
+        .expect("the sample node")
+        .source()
+        .clone()
 }
 
 pub fn inputs() -> Inputs {
-    let mut inputs = Inputs::new();
-    inputs
-        .add_table(
-            "step_sla",
-            df!(
-                "step" => ["Intake", "Review", "Pending", "Complete"],
-                "sla_days" => [1_i64, 1, 2, 3],
-            )
-            .expect("the SLA table")
-            .lazy(),
-        )
-        .expect("a table");
-    inputs
-        .add_table(
-            "step_names",
-            df!("step_to" => ["Intake", "Review", "Pending", "Complete"])
-                .expect("the step names")
-                .lazy(),
-        )
-        .expect("a table");
-    inputs
-        .add_value(
-            "sla_cutoff",
-            Scalar::new(DataType::Int64, AnyValue::Int64(1)),
-        )
-        .expect("a value");
-    inputs
-        .add_value(
-            "as_of",
-            Scalar::new(DataType::Date, AnyValue::Date(date(2))),
-        )
-        .expect("a value");
-    inputs
-        .add_list(
-            "holidays",
-            Series::new("holidays".into(), [date(3), date(5)])
-                .cast(&DataType::Date)
-                .expect("dates"),
-        )
-        .expect("a list");
-    inputs
-}
-
-fn over_dcn() -> Value {
-    call(
-        "Expr.over",
-        json!({ "partition_by": many(vec![field("dcn")]) }),
-    )
-}
-
-fn add_column(id: &str, name: &str, expression: Value) -> Value {
-    step(
-        id,
-        "LazyFrame.with_columns",
-        json!({ "named_exprs": named(vec![(name, expression)]) }),
-    )
-}
-
-/// `when(predicate).then(then).otherwise(otherwise)`, then `more`.
-fn condition(predicate: Value, then: Value, otherwise: Value, more: Vec<Value>) -> Value {
-    let mut links = vec![
-        call("When.then", json!({ "statement": then })),
-        call("Then.otherwise", json!({ "statement": otherwise })),
-    ];
-    links.extend(more);
-    chain(
-        call(
-            "polars.when",
-            json!({ "predicates": many(vec![predicate]) }),
-        ),
-        links,
-    )
+    ClaimTiming::new()
+        .expect("the sample node")
+        .inputs()
+        .clone()
 }
 
 /// The storyboard's starting steps, with what the catalogue covers: `is_in`
 /// is not in it, so the holiday test is a comparison with a connected date.
 pub fn storyboard_text() -> String {
-    let steps = vec![
-        step(
-            "sort",
-            "LazyFrame.sort",
-            json!({ "by": many(vec![field("dcn"), field("timestamp")]) }),
-        ),
-        add_column(
-            "step_index",
-            "step_index",
-            field_then("dcn", vec![call("Expr.cum_count", json!({})), over_dcn()]),
-        ),
-        add_column(
-            "resolved_at",
-            "resolved_at",
-            field_then(
-                "timestamp",
-                vec![call("Expr.shift", json!({ "n": whole(1) })), over_dcn()],
-            ),
-        ),
-        add_column("received_at", "received_at", field("timestamp")),
-        add_column(
-            "resolved_day",
-            "resolved_day",
-            field_then("resolved_at", vec![call("Expr.dt.date", json!({}))]),
-        ),
-        add_column(
-            "days_open",
-            "days_open",
-            field_then(
-                "received_at",
-                vec![
-                    call("Expr.sub", json!({ "other": field("resolved_at") })),
-                    call("Expr.dt.total_days", json!({})),
-                ],
-            ),
-        ),
-        add_column(
-            "a_days",
-            "a_days",
-            condition(
-                field_then(
-                    "owner",
-                    vec![call("Expr.eq", json!({ "other": text("Company A") }))],
-                ),
-                field("row_days"),
-                whole(0),
-                vec![call("Expr.cum_sum", json!({})), over_dcn()],
-            ),
-        ),
-        step(
-            "join",
-            "LazyFrame.join",
-            json!({
-                "other": { "table": "step_sla" },
-                "left_on": many(vec![field("step_to")]),
-                "right_on": many(vec![field("step")]),
-                "how": { "choice": "left" },
-                "maintain_order": { "choice": "left" },
-            }),
-        ),
-        add_column(
-            "sla_status",
-            "sla_status",
-            condition(
-                field_then(
-                    "row_days",
-                    vec![call("Expr.le", json!({ "other": field("sla_days") }))],
-                ),
-                text("within"),
-                text("late"),
-                vec![],
-            ),
-        ),
-        add_column(
-            "flag",
-            "flag",
-            condition(
-                field_then(
-                    "received_at",
-                    vec![
-                        call("Expr.dt.date", json!({})),
-                        call("Expr.eq", json!({ "other": input("as_of", vec![]) })),
-                    ],
-                ),
-                text("holiday"),
-                condition(
-                    field_then(
-                        "row_days",
-                        vec![call(
-                            "Expr.gt",
-                            json!({ "other": input("sla_cutoff", vec![]) }),
-                        )],
-                    ),
-                    text("over"),
-                    text("ok"),
-                    vec![],
-                ),
-                vec![],
-            ),
-        ),
-        add_column(
-            "holiday_count",
-            "holiday_count",
-            input("holidays", vec![call("Expr.len", json!({}))]),
-        ),
-        step(
-            "pivot",
-            "LazyFrame.pivot",
-            json!({
-                "on": { "columns": ["step_to"] },
-                "on_columns": { "table": "step_names" },
-                "index": { "columns": ["dcn"] },
-                "values": { "columns": ["row_days"] },
-                "aggregate_function": chain(
-                    call("polars.element", json!({})),
-                    vec![call("Expr.first", json!({}))],
-                ),
-            }),
-        ),
-    ];
-    document(steps)
+    ClaimTiming::STEPS_JSON.to_owned()
 }
 
 fn storyboard() -> Document {
@@ -377,6 +173,78 @@ fn the_hand_computed_calendar_matches_the_dates_it_stands_for() {
         .and_then(|series| series.cast(&DataType::String))
         .expect("text");
     assert_eq!(day.str().expect("text").get(0), Some("2026-03-05"));
+}
+
+#[test]
+fn the_sample_rows_are_the_instants_the_calendar_works_out() {
+    let claims = claims();
+    assert_eq!(claims.height(), 7);
+    let timestamps = claims
+        .column("timestamp")
+        .expect("a column")
+        .as_materialized_series()
+        .cast(&DataType::Int64)
+        .expect("microseconds");
+    assert_eq!(
+        timestamps
+            .i64()
+            .expect("microseconds")
+            .iter()
+            .collect::<Vec<_>>(),
+        [
+            at(2, 13, 30),
+            at(5, 7, 50),
+            at(6, 10, 0),
+            at(2, 9, 15),
+            at(4, 17, 20),
+            at(9, 11, 5),
+            at(3, 16, 40),
+        ]
+        .map(Some)
+    );
+    assert_eq!(
+        claims.column("timestamp").expect("a column").dtype(),
+        &datetime()
+    );
+}
+
+#[test]
+fn the_node_runs_a_document_on_its_own_rows_and_inputs() {
+    let node = ClaimTiming::new().expect("the sample node");
+    let report = node.run(node.steps()).expect("the claims have a schema");
+    assert_eq!(report.steps().len(), 12);
+    assert!(
+        report
+            .steps()
+            .iter()
+            .all(|step| matches!(step.outcome(), Outcome::Valid { .. }))
+    );
+    let source: Vec<_> = node
+        .source_columns()
+        .iter()
+        .map(|column| (column.name().to_owned(), column.dtype().to_owned()))
+        .collect();
+    assert_eq!(
+        source,
+        [
+            ("dcn", "String"),
+            ("timestamp", "Datetime(us)"),
+            ("step_to", "String"),
+            ("owner", "String"),
+            ("row_days", "Int64"),
+        ]
+        .map(|(name, dtype)| (name.to_owned(), dtype.to_owned()))
+    );
+    let preview = node
+        .preview(node.steps(), &StepId::new("pivot").expect("an id"), 100)
+        .expect("the pivot's rows");
+    let names: Vec<_> = preview
+        .columns()
+        .iter()
+        .map(|column| column.name())
+        .collect();
+    assert_eq!(names, ["dcn", "Intake", "Review", "Pending", "Complete"]);
+    assert_eq!(preview.rows().len(), 2);
 }
 
 #[test]

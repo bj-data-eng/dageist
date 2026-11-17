@@ -16,10 +16,11 @@ transitive, optional, platform, or compiled dependencies, and it is not a
 complete inventory for a distributed application bundle.
 
 Vite and its React plugin, the Tailwind CSS Vite plugin, TypeScript, oxlint,
-oxlint-tsgolint, oxfmt and the React and Node type declarations, declared in
-[ui/package.json](ui/package.json), are development-only tools and are not
-redistributed. The view in `ui/dist/` contains this repository's compiled
-source bundled with the libraries listed below, and the typefaces' files.
+oxlint-tsgolint, oxfmt, Vitest and the React and Node type declarations,
+declared in [ui/package.json](ui/package.json), are development-only tools and
+are not redistributed. The view in `ui/dist/` contains this repository's
+compiled source bundled with the libraries listed below, and the typefaces'
+files.
 The public API audit generator is maintenance tooling: it is built and run
 from the repository and is not part of the application.
 

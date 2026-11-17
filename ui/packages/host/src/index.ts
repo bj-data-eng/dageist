@@ -5,20 +5,58 @@
  */
 
 export type {
+  AfterView,
+  AppliesView,
   BlockRequest,
   CatalogueView,
+  CauseView,
   ChoiceView,
   ColumnView,
+  ConditionStateView,
+  ContextView,
   DefaultView,
+  EndingView,
   EntryView,
+  ExpressionDtypesView,
+  FieldView,
   Host,
   IdentityView,
+  InputView,
   KindView,
+  NestedPosition,
+  NodeView,
+  OfferPlaceView,
+  OuterPosition,
+  OutcomeView,
   ParameterView,
+  PlaceView,
+  ReadProblemView,
+  RefusalSourceView,
+  RefusalView,
+  ResolutionView,
+  RowsView,
+  RuleName,
+  RunView,
+  SegmentView,
   ShapeView,
+  SourceView,
+  StageView,
+  StandingView,
+  StepReportView,
   TableView,
+  ValueShapeView,
+  ValueTypeView,
+  VerdictView,
+  WalkRefusalView,
+  WalkView,
+  WalkedExpressionView,
   WindowName,
   WordsView,
 } from './contract';
+export { DecodeError } from './decode';
+export { decodeCatalogue } from './decode-catalogue';
+export { decodeNode, decodeRows } from './decode-node';
+export { decodeRun } from './decode-run';
+export { decodeBytes, decodeIdentity, decodeTable } from './decode-sample';
 export { deliverMessage, sealMessage } from './envelope';
 export { tauriHost } from './tauri';

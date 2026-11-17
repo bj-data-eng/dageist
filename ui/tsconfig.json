@@ -22,5 +22,5 @@
     // not checked by themselves. Every use of them from our source still is.
     "skipLibCheck": true
   },
-  "include": ["apps/*/src", "packages/*/src"]
+  "include": ["apps/*/src", "packages/*/src", "packages/*/test-support"]
 }

@@ -60,11 +60,12 @@ and current source establishes behavior.
 | The operations the step editor offers, their parameter kinds and shown words | [crates/dageist-engine/src/catalog/](crates/dageist-engine/src/catalog/mod.rs), its language file [en.toml](crates/dageist-engine/src/catalog/en.toml) |
 | The step document's format, its reading and the running of its steps | [crates/dageist-engine/src/document/](crates/dageist-engine/src/document/mod.rs) |
 | IPC commands and their serialized views | [crates/dageist-tauri/src/](crates/dageist-tauri/src/main.rs) |
-| The view's IPC calls and their shapes | [ui/packages/host/src/](ui/packages/host/src/contract.ts) |
+| The view's IPC calls, their shapes and the decoders that read what the host sends | [ui/packages/host/src/](ui/packages/host/src/contract.ts) |
+| Snapshots of what the host's commands return, which the decoders' tests read | [ui/packages/host/fixtures/](ui/packages/host/fixtures/catalogue.json) |
 | The view's packages and what each may depend on | each `package.json` under [ui/apps/](ui/apps/desktop/package.json) and [ui/packages/](ui/packages/) |
 | The view's bundler and design tokens | [ui/apps/desktop/vite.config.ts](ui/apps/desktop/vite.config.ts), [ui/apps/desktop/src/styles.css](ui/apps/desktop/src/styles.css) |
 | View toolchain, scripts and compiler settings | [ui/package.json](ui/package.json), [ui/package-lock.json](ui/package-lock.json), [ui/tsconfig.json](ui/tsconfig.json), [ui/tsconfig.node.json](ui/tsconfig.node.json) |
-| View lint rules and formatter settings | [ui/.oxlintrc.json](ui/.oxlintrc.json), [ui/.oxfmtrc.json](ui/.oxfmtrc.json) |
+| View lint rules, formatter settings and test settings | [ui/.oxlintrc.json](ui/.oxlintrc.json), [ui/.oxfmtrc.json](ui/.oxfmtrc.json), [ui/vitest.config.ts](ui/vitest.config.ts) |
 | Architecture and integration boundaries | [docs/explanation.md](docs/explanation.md) |
 | Documentation navigation and source locations | [README.md](README.md), [docs/reference.md](docs/reference.md) |
 | Licensing and dependency attribution | [LICENSE](LICENSE), [NOTICE.md](NOTICE.md) |
@@ -96,6 +97,8 @@ features are composed. `ui/packages/host` is the only package that knows Tauri.
 `ui/packages/design` holds primitive components and knows no domain. Each
 feature has its own package, exports one entry file and never imports another
 feature. Follow the [view structure](docs/explanation.md#how-the-view-is-divided).
+Decoders in `ui/packages/host` read what the host sends and refuse a value of
+the wrong shape instead of trusting a type assertion.
 
 Tauri is the interim host. [Surgeist](https://github.com/bj-data-eng/surgeist)
 is the intended eventual host, so keep host-specific code inside the host
@@ -125,7 +128,8 @@ Source remains authoritative; never hand-edit generated artifacts.
 | Raster icons in `crates/dageist-tauri/icons/` | [icon procedure](docs/how-to.md#regenerate-the-application-icons) from `icon.svg` |
 | `ui/package-lock.json` | npm, from [ui/package.json](ui/package.json) |
 | `ui/dist/` (ignored) | `npm --prefix ui run build` |
-| `ui/apps/desktop/src/catalogue.json` | the host's catalogue view, written by its snapshot test; [refresh procedure](docs/how-to.md#refresh-the-catalogue-snapshot) |
+| `ui/packages/host/fixtures/catalogue.json` | the host's catalogue view, written by its snapshot test; [refresh procedure](docs/how-to.md#refresh-the-catalogue-snapshot) |
+| `ui/packages/host/fixtures/{node-inputs,step-report,step-report-refused,step-report-unreadable,step-report-variants,step-rows,vocabulary}.json` | the host's node commands' views, written by their snapshot test; [refresh procedure](docs/how-to.md#refresh-the-step-report-snapshots) |
 | `crates/dageist-tauri/gen/` (ignored) | `tauri-build`, during any build of `dageist-tauri` |
 | `crates/dageist-fuzz/tests/fixtures/subject/Cargo.lock` | Cargo, from the standalone fixture workspace's manifests; refresh it with the fixture's own Cargo command, never through the root workspace |
 | `api/catalogue/*.txt` | The engine test that runs the catalogue in Polars; [refresh procedure](docs/how-to.md#refresh-the-tables-of-allowed-combinations) |
@@ -179,8 +183,12 @@ npm --prefix ui run check
 npm --prefix ui run lint
 npm --prefix ui run format:check
 npm --prefix ui run build
+npm --prefix ui run test
 ```
 
+`test` is Vitest. It tests the view's data layers only, the decoders in
+`ui/packages/host` and pure preparation functions, against the fixtures written
+from Rust, with expectations written by hand; React components have no tests.
 The lint denies warnings and reports unused suppressions.
 `npm --prefix ui run format` rewrites files; `format:check` only reports.
 

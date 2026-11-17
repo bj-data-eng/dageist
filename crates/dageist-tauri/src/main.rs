@@ -8,7 +8,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod catalogue;
+mod node;
+mod report;
 mod sample_table;
+#[cfg(test)]
+mod snapshot;
 mod windows;
 
 use serde::Serialize;
@@ -39,6 +43,9 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             core_identity,
             catalogue::operation_catalogue,
+            node::node_inputs,
+            node::run_document,
+            node::rows_after_step,
             sample_table::open_sample_window,
             sample_table::open_sample_result,
             sample_table::table_block,

@@ -4,7 +4,11 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
-use polars::prelude::{Expr, LazyFrame, Scalar, Series, lit};
+use polars::prelude::{Expr, LazyFrame, PolarsError, Scalar, Series, lit};
+
+use crate::allowed::dtype_name;
+
+use super::columns::ColumnDescription;
 
 /// An input name given twice.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,6 +21,38 @@ impl fmt::Display for DuplicateInput {
 }
 
 impl std::error::Error for DuplicateInput {}
+
+/// What an input holds, as the view is told of it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InputKind {
+    /// A table, with the columns it has.
+    Table(Vec<ColumnDescription>),
+    /// A single value, with the short name of its dtype.
+    Value(String),
+    /// A list of values, with the short name of their dtype.
+    List(String),
+}
+
+/// An input of a node: its name and what it holds.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InputDescription {
+    name: String,
+    kind: InputKind,
+}
+
+impl InputDescription {
+    /// The name a document refers to the input by.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// What the input holds.
+    #[must_use]
+    pub const fn kind(&self) -> &InputKind {
+        &self.kind
+    }
+}
 
 #[derive(Clone)]
 enum Input {
@@ -105,6 +141,34 @@ impl Inputs {
         values: Series,
     ) -> Result<(), DuplicateInput> {
         self.add(name.into(), Input::List(values))
+    }
+
+    /// What each input holds, in the order of their names: a table's columns
+    /// with their dtypes, a value's or a list's dtype. Dtypes are given by
+    /// their [short names](crate::allowed::dtype_name), such as
+    /// `Datetime(us)`. No data is read.
+    ///
+    /// # Errors
+    ///
+    /// When Polars cannot work out the schema of a connected table.
+    pub fn describe(&self) -> Result<Vec<InputDescription>, PolarsError> {
+        self.inputs
+            .iter()
+            .map(|(name, input)| {
+                let kind = match input {
+                    Input::Table(table) => {
+                        let schema = LazyFrame::clone(table).collect_schema()?;
+                        InputKind::Table(ColumnDescription::of_schema(&schema))
+                    }
+                    Input::Value(value) => InputKind::Value(dtype_name(value.dtype())),
+                    Input::List(values) => InputKind::List(dtype_name(values.dtype())),
+                };
+                Ok(InputDescription {
+                    name: name.clone(),
+                    kind,
+                })
+            })
+            .collect()
     }
 
     /// The table called `name`, if there is one.

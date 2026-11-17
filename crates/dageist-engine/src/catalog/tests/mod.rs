@@ -6,5 +6,6 @@ mod arguments;
 mod build;
 mod condition;
 mod defaults;
+mod every_variant;
 mod inventory;
 mod language;

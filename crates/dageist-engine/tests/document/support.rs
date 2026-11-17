@@ -46,11 +46,6 @@ pub fn whole(number: i64) -> Value {
     )
 }
 
-/// An expression argument that starts from the connected input `name`.
-pub fn input(name: &str, then: Vec<Value>) -> Value {
-    chain(json!({ "input": name }), then)
-}
-
 /// A list argument.
 pub fn many(items: Vec<Value>) -> Value {
     json!({ "many": items })

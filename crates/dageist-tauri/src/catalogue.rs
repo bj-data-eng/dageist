@@ -6,8 +6,9 @@
 //! into one serializable value. It mirrors `CatalogueView` in
 //! `ui/packages/host/src/contract.ts`.
 //!
-//! The browser stand-in answers from `ui/apps/desktop/src/catalogue.json`, a
-//! snapshot of exactly what the command returns. A test keeps the two equal.
+//! The view's tests and the browser stand-in answer from
+//! `ui/packages/host/fixtures/catalogue.json`, a snapshot of exactly what the
+//! command returns. A test keeps the two equal.
 
 use std::fmt;
 
@@ -365,17 +366,9 @@ pub fn operation_catalogue() -> Result<CatalogueView, ErrorView> {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-
     use serde_json::{Value, json};
 
     use super::*;
-
-    /// The committed snapshot the browser stand-in answers from.
-    const SNAPSHOT: &str = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../ui/apps/desktop/src/catalogue.json"
-    );
 
     /// Set to rewrite the snapshot instead of checking it.
     const REFRESH: &str = "DAGEIST_REFRESH_CATALOGUE";
@@ -659,25 +652,15 @@ mod tests {
 
     #[test]
     fn the_snapshot_is_what_the_command_returns() {
-        let path = Path::new(SNAPSHOT);
-        let returned = view();
-        if std::env::var_os(REFRESH).is_some() {
-            let mut text = serde_json::to_string_pretty(&returned).expect("it serializes");
-            text.push('\n');
-            std::fs::write(path, text).expect("the snapshot is written");
-            return;
-        }
-        // The values are compared, not the text: the view's formatter lays short lists out
-        // on one line, so the committed file is formatted after it is written.
-        let committed: Option<Value> = std::fs::read_to_string(path)
-            .ok()
-            .and_then(|text| serde_json::from_str(&text).ok());
-        assert!(
-            committed.as_ref() == Some(&returned),
-            "ui/apps/desktop/src/catalogue.json is not what the operation_catalogue command \
-             returns. Refresh it with: {REFRESH}=1 cargo test --offline --locked -p \
-             dageist-tauri catalogue::tests::the_snapshot_is_what_the_command_returns && npm \
-             --prefix ui run format"
+        crate::snapshot::check(
+            "catalogue.json",
+            &view(),
+            REFRESH,
+            "cargo test --offline --locked -p dageist-tauri \
+             catalogue::tests::the_snapshot_is_what_the_command_returns",
         );
     }
 }
+
+#[cfg(test)]
+pub(crate) mod fixtures;

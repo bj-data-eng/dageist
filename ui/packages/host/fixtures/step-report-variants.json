@@ -1,0 +1,288 @@
+{
+  "status": "run",
+  "source": [],
+  "steps": [
+    {
+      "id": "variants",
+      "lazy": false,
+      "outcome": {
+        "status": "valid",
+        "columns": [
+          {
+            "name": "a",
+            "dtype": "Int64"
+          }
+        ]
+      },
+      "expressions": [
+        {
+          "place": {
+            "stepIndex": 0,
+            "stepId": "variants",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "key",
+                "index": 1
+              },
+              {
+                "kind": "start"
+              }
+            ]
+          },
+          "start": {
+            "kind": "several",
+            "dtypes": ["Int64", "String"]
+          },
+          "links": [
+            {
+              "kind": "refused",
+              "reason": "no"
+            }
+          ]
+        }
+      ],
+      "walk": {
+        "expressions": [
+          {
+            "place": {
+              "stepIndex": 0,
+              "stepId": "variants",
+              "path": [
+                {
+                  "kind": "parameter",
+                  "name": "named_exprs"
+                },
+                {
+                  "kind": "key",
+                  "index": 1
+                },
+                {
+                  "kind": "start"
+                }
+              ]
+            },
+            "context": {
+              "outer": "filter",
+              "nested": "over.order_by"
+            },
+            "calls": [
+              {
+                "follows": {
+                  "kind": "condition",
+                  "state": "chainedWhen"
+                },
+                "verdict": {
+                  "kind": "refused",
+                  "refusal": {
+                    "source": {
+                      "by": "structure"
+                    },
+                    "reason": "the reason"
+                  }
+                }
+              },
+              {
+                "follows": {
+                  "kind": "condition",
+                  "state": "chainedThen"
+                },
+                "verdict": null
+              }
+            ],
+            "places": [
+              {
+                "context": {
+                  "outer": "sort",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "condition",
+                  "state": "chainedThen"
+                }
+              },
+              null
+            ],
+            "ending": {
+              "kind": "notKnown",
+              "because": "the dtype is not known"
+            }
+          }
+        ],
+        "refusal": {
+          "place": {
+            "stepIndex": 0,
+            "stepId": "variants",
+            "path": [
+              {
+                "kind": "parameter",
+                "name": "named_exprs"
+              },
+              {
+                "kind": "key",
+                "index": 1
+              },
+              {
+                "kind": "start"
+              }
+            ]
+          },
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "empty"
+            },
+            "reason": "the reason"
+          },
+          "atEnd": true
+        },
+        "notKnown": "why"
+      }
+    },
+    {
+      "id": "unknown_table",
+      "lazy": true,
+      "outcome": {
+        "status": "refused",
+        "place": {
+          "stepIndex": 1,
+          "stepId": "unknown_table",
+          "path": [
+            {
+              "kind": "start"
+            }
+          ]
+        },
+        "cause": {
+          "kind": "unknownTable",
+          "name": "nope"
+        }
+      },
+      "expressions": [],
+      "walk": {
+        "expressions": [],
+        "refusal": null,
+        "notKnown": null
+      }
+    },
+    {
+      "id": "unknown_input",
+      "lazy": true,
+      "outcome": {
+        "status": "refused",
+        "place": {
+          "stepIndex": 1,
+          "stepId": "unknown_input",
+          "path": [
+            {
+              "kind": "start"
+            }
+          ]
+        },
+        "cause": {
+          "kind": "unknownInput",
+          "name": "none"
+        }
+      },
+      "expressions": [],
+      "walk": {
+        "expressions": [],
+        "refusal": null,
+        "notKnown": null
+      }
+    },
+    {
+      "id": "build",
+      "lazy": true,
+      "outcome": {
+        "status": "refused",
+        "place": {
+          "stepIndex": 1,
+          "stepId": "build",
+          "path": [
+            {
+              "kind": "start"
+            }
+          ]
+        },
+        "cause": {
+          "kind": "build",
+          "reason": "a parameter is missing"
+        }
+      },
+      "expressions": [],
+      "walk": {
+        "expressions": [],
+        "refusal": null,
+        "notKnown": null
+      }
+    },
+    {
+      "id": "rule",
+      "lazy": true,
+      "outcome": {
+        "status": "refused",
+        "place": {
+          "stepIndex": 1,
+          "stepId": "rule",
+          "path": [
+            {
+              "kind": "start"
+            }
+          ]
+        },
+        "cause": {
+          "kind": "notAllowed",
+          "refusal": {
+            "source": {
+              "by": "rule",
+              "rule": "element-only-in-pivot-aggregate"
+            },
+            "reason": "the reason"
+          }
+        }
+      },
+      "expressions": [],
+      "walk": {
+        "expressions": [],
+        "refusal": null,
+        "notKnown": null
+      }
+    },
+    {
+      "id": "rows_stage",
+      "lazy": false,
+      "outcome": {
+        "status": "refused",
+        "place": {
+          "stepIndex": 1,
+          "stepId": "rows_stage",
+          "path": [
+            {
+              "kind": "start"
+            }
+          ]
+        },
+        "cause": {
+          "kind": "notAllowed",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "rows"
+            },
+            "reason": "the reason"
+          }
+        }
+      },
+      "expressions": [],
+      "walk": {
+        "expressions": [],
+        "refusal": null,
+        "notKnown": null
+      }
+    }
+  ]
+}

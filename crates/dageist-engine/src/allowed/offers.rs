@@ -43,6 +43,9 @@ pub enum ConditionState {
 }
 
 impl ConditionState {
+    /// Every state, in the order a condition comes to them.
+    pub const ALL: [Self; 4] = [Self::When, Self::Then, Self::ChainedWhen, Self::ChainedThen];
+
     const fn name(self) -> &'static str {
         match self {
             Self::When => "when",

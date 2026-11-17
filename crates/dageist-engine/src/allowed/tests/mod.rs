@@ -3,6 +3,7 @@
 
 mod artifacts;
 mod build;
+mod every_variant;
 mod generate;
 mod offers;
 mod oracle;
