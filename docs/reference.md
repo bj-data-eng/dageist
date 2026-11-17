@@ -58,7 +58,7 @@ The host registers these commands in
 [crates/dageist-tauri/src/main.rs](../crates/dageist-tauri/src/main.rs) and
 defines the table commands in
 [sample_table.rs](../crates/dageist-tauri/src/sample_table.rs). The view calls
-them through the host bridge in
+them through the host package in
 [ui/packages/host/src/](../ui/packages/host/src/tauri.ts).
 
 | Command | Arguments | Result |
@@ -73,7 +73,7 @@ them through the host bridge in
 | `table_block` | `offset`, `length`: the rows, at most 10,000; `columns`: the column names, each once, or an empty list for all | That block of whichever table is open, as the raw bytes of an Arrow IPC stream, not JSON. Rows past the end are left out. |
 | `open_view_window` | `name`: which window, `"steps"` | Nothing. Opens that window, or brings it forward when it is already open. Defined in [windows.rs](../crates/dageist-tauri/src/windows.rs). |
 
-The windows also talk to each other without the core. The host bridge sends a
+The windows also talk to each other without the core. The host package sends a
 message as a Tauri event named `dageist:<topic>`, and every other window that
 listens to the topic receives it. The steps window and the main window keep
 the steps the same this way while the steps are a storyboard in the view.
@@ -94,6 +94,53 @@ it; delete the folder to reclaim the space. The sample is written beside that
 folder and moved into place when it is complete, and within one running
 application only one command generates it at a time. Two copies of the
 application generating at once are not guarded against.
+
+## The Bridge
+
+`dageist bridge [--port N]` serves the commands above, except
+`open_view_window`, to a browser over HTTP, for the development server's
+browser preview. It is defined in
+[bridge.rs](../crates/dageist-tauri/src/bridge.rs) over the same functions the
+Tauri commands call, and its command line is read in
+[cli.rs](../crates/dageist-tauri/src/cli.rs). `dageist` with no arguments opens
+the application; any other command is refused with the usage. The bridge opens
+no window and starts no Tauri, listens on `127.0.0.1` only, and prints
+`dageist bridge listening on http://127.0.0.1:<port>` when it is ready. The port
+is 7878 unless `--port` gives one; `--port 0` lets the system choose.
+
+| Part | Behaviour |
+| --- | --- |
+| Request | `POST /bridge/<command>`, with `Content-Type: application/json` and the command's arguments as a JSON object by their Tauri names, `{}` for a command that takes none. The arguments are `deny_unknown_fields`. Only `Content-Length` bodies up to 8 MiB are read; a request is one per connection. |
+| `200` | The command's JSON with `Content-Type: application/json`; for `table_block`, the bytes of the Arrow IPC stream with `Content-Type: application/vnd.apache.arrow.stream`. |
+| `422` | The command ran and failed: `{ "message": string }`, the same view the Tauri command rejects with. |
+| `400` | The request or its body is not a request or the command's arguments: `{ "message": string }`. |
+| `403` | The `Host` header is missing, or is not `127.0.0.1` or `localhost` with the bridge's own port. |
+| `404` | The path is not `/bridge/<command>` of a served command, including `open_view_window`. |
+| `405` | The method is not `POST`; the answer carries `Allow: POST`. This is also what a preflight (`OPTIONS`) gets. |
+| `413`, `408`, `501` | The head or the body is too long, the client was too slow, or the body has a transfer encoding, which the bridge does not take. |
+| `415` | The content type is not `application/json`, with or without parameters such as `charset`. |
+| Every answer | `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, `Connection: close`. No `Access-Control-*` header is ever sent. |
+
+A connection whose peer address is not loopback is closed without an answer.
+The checks run in the order of the table's `403`, `404`, `405`, `415`, `400`,
+and no command runs before all pass. Each answer is a view that Tauri's IPC
+would give, so the snapshots in
+[ui/packages/host/fixtures/](../ui/packages/host/fixtures/step-report.json) hold
+for both.
+
+The bridge keeps the sample gate and the open table for as long as it runs,
+as the application keeps them as managed state, and reads and writes the sample
+in the application's cache folder. It finds that folder from the platform's
+cache folder and the identifier in `tauri.conf.json`, as Tauri does; a test
+holds the two equal. Release builds set `windows_subsystem = "windows"`, so on
+Windows a release binary has no console to print to; the bridge is run from
+`cargo run`, which is a debug build.
+
+In the view, [bridge.ts](../ui/packages/host/src/bridge.ts) is the bridge host:
+it posts to `/bridge/<command>` on the page's own origin, and
+[vite.config.ts](../ui/apps/desktop/vite.config.ts) forwards `/bridge` to
+`127.0.0.1:7878`, or to the port in `DAGEIST_BRIDGE_PORT`, with the target's
+`Host`, so that the forwarded request passes the checks above.
 
 ## Host Configuration
 
@@ -121,8 +168,8 @@ Every package is private and is consumed as TypeScript source.
 
 | Package | Path | Role | May depend on |
 | --- | --- | --- | --- |
-| `@dageist/desktop` | [ui/apps/desktop/](../ui/apps/desktop/src/App.tsx) | The shell: picks the host, composes the features, owns the page, the bundler configuration and the design tokens. | Every package below, React, and flechette for the stand-in host |
-| `@dageist/host` | [ui/packages/host/](../ui/packages/host/src/contract.ts) | The contract of every IPC command, the decoders that read what the host sends, and the implementation over Tauri. | Nothing |
+| `@dageist/desktop` | [ui/apps/desktop/](../ui/apps/desktop/src/App.tsx) | The shell: picks the host, composes the features, owns the page, the bundler configuration and the design tokens. | Every package below and React |
+| `@dageist/host` | [ui/packages/host/](../ui/packages/host/src/contract.ts) | The contract of every IPC command, the decoders that read what the host sends, and the two hosts: over Tauri, and over the [bridge](#the-bridge) in a plain browser. | Nothing |
 | `@dageist/design` | [ui/packages/design/](../ui/packages/design/src/index.ts) | Primitive components: `Block` (a word that can be pressed), `Piece`, `Slot`, `ManySlot`, `OfferList`, `TypedBlock`, `Popover`, `Hint`, `Peek`, `ToggleButton`, `Panel`, and `blocks.css`, the styles of the words a step is written in. `Popover` is placed by Floating UI. | Floating UI, React, React DOM |
 | `@dageist/steps` | [ui/packages/steps/](../ui/packages/steps/src/StepsWorkspace.tsx) | The steps of a transform and their storyboard model: the main window's table with its list of steps, and the window the steps are edited in. | `@dageist/design`, `@dageist/host`, dnd kit, React, React DOM |
 | `@dageist/table` | [ui/packages/table/](../ui/packages/table/src/TableViewer.tsx) | The table viewer: fetches blocks as Arrow bytes and draws only those. | `@dageist/design`, `@dageist/host`, flechette, React |
@@ -133,10 +180,9 @@ Every package is private and is consumed as TypeScript source.
 | [ui/apps/desktop/vite.config.ts](../ui/apps/desktop/vite.config.ts) | Bundler settings; the bundle is written to `ui/dist/`. |
 | [ui/apps/desktop/src/styles.css](../ui/apps/desktop/src/styles.css) | Tailwind entry, the colour and font tokens, and the declarations of the two typefaces. |
 | [ui/apps/desktop/public/fonts/](../ui/apps/desktop/public/fonts/) | The typefaces the view is set in, each with the licence it comes under, copied into the bundle as they are: Inter for everything that is not code or data, and JetBrains Mono for code and data. |
-| [ui/apps/desktop/src/demo-host.ts](../ui/apps/desktop/src/demo-host.ts) | A stand-in host with made-up rows and the catalogue snapshot, loaded only when the page is open outside Tauri. It answers the node commands as unavailable. |
 | [ui/packages/host/src/decode.ts](../ui/packages/host/src/decode.ts) | The readers every decoder is made of. A decoder reads what the host sent, which is `unknown`, and returns it typed or refuses it with a `DecodeError` that names the place, such as `$.steps[3].outcome.status`, and the reason. Objects are closed: a missing field, a field the contract lacks and a tag it does not name are refused. [decode-catalogue.ts](../ui/packages/host/src/decode-catalogue.ts), [decode-node.ts](../ui/packages/host/src/decode-node.ts) and [decode-run.ts](../ui/packages/host/src/decode-run.ts) read the catalogue, a node's inputs with the rows after a step, and the report of a run, and [decode-sample.ts](../ui/packages/host/src/decode-sample.ts) the core's identity, the shape of the sample table and the bytes of a block. The closed lists of words they read are constants in [contract.ts](../ui/packages/host/src/contract.ts). |
 | [ui/packages/host/test-support/](../ui/packages/host/test-support/tamper.ts) | Test support that is not part of the package's source: copies of a fixture with one thing changed, to see what a decoder says of a value the host does not send. The compiler settings include it. |
-| [ui/packages/host/fixtures/](../ui/packages/host/fixtures/catalogue.json) | Snapshots of what the host's commands return, which the decoders' tests read and the stand-in host serves: `catalogue.json`, `node-inputs.json`, `step-report.json` (the claim-timing steps), `step-report-refused.json` (a step Polars refuses and the step after it), `step-report-unreadable.json` (text that is not a document), `step-rows.json`, `step-report-variants.json` (a report the host builds by hand to hold the variants no real document gives together) and `vocabulary.json` (the words of every closed list, from the engine's own lists of variants, which the decoders' tests compare their word lists with). The package exports only `catalogue.json`, for the stand-in host. Generated by host tests; [refresh the catalogue snapshot](how-to.md#refresh-the-catalogue-snapshot) and [the step report snapshots](how-to.md#refresh-the-step-report-snapshots), never edit them. |
+| [ui/packages/host/fixtures/](../ui/packages/host/fixtures/catalogue.json) | Snapshots of what the host's commands return, which the decoders' tests read, and which the bridge's tests compare the bridge's answers with: `catalogue.json`, `node-inputs.json`, `step-report.json` (the claim-timing steps), `step-report-refused.json` (a step Polars refuses and the step after it), `step-report-unreadable.json` (text that is not a document), `step-rows.json`, `step-report-variants.json` (a report the host builds by hand to hold the variants no real document gives together) and `vocabulary.json` (the words of every closed list, from the engine's own lists of variants, which the decoders' tests compare their word lists with). Generated by host tests; [refresh the catalogue snapshot](how-to.md#refresh-the-catalogue-snapshot) and [the step report snapshots](how-to.md#refresh-the-step-report-snapshots), never edit them. |
 | [ui/vitest.config.ts](../ui/vitest.config.ts) | Vitest settings: it runs the `*.test.ts` files under `apps/*/src` and `packages/*/src` in Node. |
 | [ui/apps/desktop/public/pieces/](../ui/apps/desktop/public/pieces/index.html) | The Pieces page: a prototype of how the step editor is drawn, in plain HTML, CSS and JavaScript, copied into the bundle as it is and shown in the Pieces tab. |
 | [ui/tsconfig.json](../ui/tsconfig.json) | Strict compiler settings for every package's `src/` and `test-support/`; emits nothing. |
