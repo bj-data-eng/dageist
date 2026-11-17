@@ -102,6 +102,11 @@ Ritchie Vink, with some portions by NVIDIA Corporation and affiliates:
 * License: [MIT License](licenses/polars/LICENSE)
 * Homepage: [Polars](https://www.pola.rs/)
 
+This product depends on recursive 0.1.1, distributed by Orson Peters:
+
+* License: [MIT License](licenses/recursive/LICENSE)
+* Homepage: [recursive](https://github.com/orlp/recursive)
+
 This product's public API audit generator depends on public-api 0.50.0 and
 rustdoc-json 0.9.7, distributed by the contributors to cargo-public-api:
 
