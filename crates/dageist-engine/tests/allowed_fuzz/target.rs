@@ -631,6 +631,86 @@ mod tests {
         }
     }
 
+    /// A refusal by `rule`, and the refusal of Polars, as the target meets them.
+    fn same_reason_for_rule(rule: &'static str, polars: &str) -> bool {
+        use super::super::observe::Stage;
+        use dageist_engine::document::{Place, StepId};
+        let place = Place::of_step(0, Some(StepId::new("s").expect("an identifier")));
+        let refused = Refused {
+            source: Source::Rule(rule),
+            at: place.to_string(),
+            place: place.clone(),
+            stage: None,
+            reason: "it cannot end here: the rule's own words".to_owned(),
+            argument_unknown: false,
+        };
+        let refusal = Refusal {
+            stage: Stage::Schema,
+            at: place.to_string(),
+            place: Some(place),
+            reason: polars.to_owned(),
+        };
+        refused_for_the_same_reason(&refused, &refusal)
+    }
+
+    #[test]
+    fn what_polars_says_of_the_element_rule_is_either_of_its_two_refusals() {
+        // The engine says where `element` stands only, and Polars says it of an
+        // `element` that has no pivot to be in (polars-error: "`element` is not
+        // allowed in this context").
+        let rule = "element-only-in-pivot-aggregate";
+        for polars in [
+            "`element` stands only in a pivot's aggregate",
+            "`element` is not allowed in this context",
+        ] {
+            assert!(same_reason_for_rule(rule, polars), "{polars}");
+        }
+        assert!(!same_reason_for_rule(
+            rule,
+            "cannot compare string with numeric type (i64)"
+        ));
+    }
+
+    #[test]
+    fn what_polars_says_of_the_other_rules_is_what_each_is_about() {
+        for (rule, said) in [
+            (
+                "key-is-elementwise",
+                "all join key expressions must be elementwise.",
+            ),
+            (
+                "join-key-names-are-not-repeated",
+                "joining with repeated key names; already joined on u and u",
+            ),
+            (
+                "filter-predicate-is-boolean",
+                "filter predicate must be of type `Boolean`, got `Int64`",
+            ),
+            (
+                "condition-predicate-is-boolean",
+                "invalid series dtype: expected `Boolean`, got `date` for series with name `b`",
+            ),
+        ] {
+            assert!(same_reason_for_rule(rule, said), "{rule}");
+            assert!(
+                !same_reason_for_rule(rule, "`element` is not allowed in this context"),
+                "{rule}"
+            );
+        }
+        // Polars lets a running value stand in a pivot's aggregate, so it has no
+        // words of its own to refuse it by: whatever it says, it is not the rule's.
+        for polars in [
+            "`element` stands only in a pivot's aggregate",
+            "`element` is not allowed in this context",
+            "all join key expressions must be elementwise.",
+        ] {
+            assert!(
+                !same_reason_for_rule("pivot-aggregate-gives-one-value", polars),
+                "{polars}"
+            );
+        }
+    }
+
     #[test]
     fn a_refusal_by_both_for_the_same_reason_agrees() {
         // The tables and Polars refuse for the objection and the call that they
