@@ -56,10 +56,11 @@ fn json(view: &impl serde::Serialize) -> Value {
 
 /// The words of every closed vocabulary the views use.
 fn vocabulary() -> Value {
-    let mut words = crate::report::vocabulary();
-    let (Some(words), Value::Object(catalogue)) =
-        (words.as_object_mut(), crate::catalogue::vocabulary())
-    else {
+    let mut words = crate::report::fixtures::vocabulary();
+    let (Some(words), Value::Object(catalogue)) = (
+        words.as_object_mut(),
+        crate::catalogue::fixtures::vocabulary(),
+    ) else {
         panic!("a vocabulary is an object");
     };
     words.extend(catalogue);
@@ -413,7 +414,7 @@ fn the_snapshots_are_what_the_commands_return() {
         ),
         (
             "step-report-variants.json",
-            json(&crate::report::variants()),
+            json(&crate::report::fixtures::variants()),
         ),
         ("vocabulary.json", vocabulary()),
         (
