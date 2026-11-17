@@ -7,6 +7,9 @@
 export type {
   AfterView,
   AppliesView,
+  ArgumentRequest,
+  CandidateRequest,
+  ChosenOption,
   BlockRequest,
   CatalogueView,
   CauseView,
@@ -14,22 +17,33 @@ export type {
   ColumnView,
   ConditionStateView,
   ContextView,
+  DefaultArgumentView,
   DefaultView,
   EndingView,
+  EntryOfferView,
   ErrorKind,
   EntryView,
   ExpressionDtypesView,
   FieldView,
+  FitView,
+  FitsRequest,
+  FitsView,
   Host,
   IdentityView,
   InputView,
   KindView,
+  LiteralView,
   NestedPosition,
   NodeView,
   OfferPlaceView,
+  OffersView,
+  OptionView,
+  OptionWordView,
+  OptionsView,
   OuterPosition,
   OutcomeView,
   ParameterView,
+  PlaceRequest,
   PlaceView,
   PositionView,
   ReadProblemView,
@@ -60,6 +74,7 @@ export { ERROR_KINDS } from './contract';
 export { DecodeError } from './decode';
 export { decodeCatalogue } from './decode-catalogue';
 export { decodeNode, decodeRows } from './decode-node';
+export { decodeFits, decodeOffers, decodeOptions } from './decode-offers';
 export { decodeRun } from './decode-run';
 export { decodeBytes, decodeIdentity, decodeTable } from './decode-sample';
 export { deliverMessage, sealMessage } from './envelope';

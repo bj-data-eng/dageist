@@ -438,6 +438,113 @@ export type RunView =
   | { readonly status: 'unreadable'; readonly problem: ReadProblemView };
 
 /**
+ * Where a call would stand, as a request names it: the positions that hold
+ * the expression, outermost first, and what it has so far. The engine works
+ * out the context from the positions. A walk's `OfferPlaceView` is the same
+ * place, whose context is its outer position and the nested one if it has one.
+ */
+export interface PlaceRequest {
+  readonly positions: readonly PositionView[];
+  readonly after: AfterView;
+}
+
+/** A number or text typed in, as a step document writes it. Mirrors `LiteralView` in crates/dageist-tauri/src/offers.rs. */
+export type LiteralView =
+  | { readonly kind: 'integer'; readonly value: number }
+  | { readonly kind: 'float'; readonly value: number }
+  | { readonly kind: 'text'; readonly value: string };
+
+/**
+ * A value that may be picked for a slot: the short name of the dtype of a
+ * field or an input, or a literal typed in, whose dtype the engine decides.
+ */
+export type CandidateRequest =
+  | { readonly kind: 'field'; readonly dtype: string }
+  | { readonly kind: 'input'; readonly dtype: string; readonly list: boolean }
+  | { readonly kind: 'literal'; readonly literal: LiteralView };
+
+/** The argument a candidate would be given: a parameter of a method that stands at a place. */
+export interface ArgumentRequest {
+  /** The method, by the identifier the catalogue gives it. */
+  readonly entry: string;
+  /** The parameter, by Python's name. */
+  readonly parameter: string;
+  /** Where the method stands. */
+  readonly place: PlaceRequest;
+}
+
+/** Which candidates are asked about, and where they would be given. */
+export interface FitsRequest {
+  /** The positions that hold the expression a candidate would start, or `null` when it is only an argument. */
+  readonly start: readonly PositionView[] | null;
+  /** The argument a candidate would be given, or `null` when it only starts an expression. */
+  readonly argument: ArgumentRequest | null;
+  readonly candidates: readonly CandidateRequest[];
+}
+
+/** An option of an entry that is already chosen. */
+export interface ChosenOption {
+  /** The parameter, by Python's name. */
+  readonly parameter: string;
+  /** The word as the option table writes it: `true`, `false`, `unset`, or the word of a choice. */
+  readonly word: string;
+}
+
+/** What a method is given for its first parameter when it is added, where the tables allow Polars' default there. */
+export interface DefaultArgumentView {
+  readonly parameter: string;
+  readonly literal: LiteralView;
+}
+
+/** An entry and whether it may stand at a place. Mirrors `EntryOfferView` in crates/dageist-tauri/src/offers.rs. */
+export interface EntryOfferView {
+  /** The identifier the catalogue gives the entry. */
+  readonly entry: string;
+  readonly verdict: VerdictView;
+  /** What a method that may stand is given when it is added, or `null`. */
+  readonly argument: DefaultArgumentView | null;
+}
+
+/** Every call that stands in an expression, offered or refused at a place. Mirrors `OffersView` in crates/dageist-tauri/src/offers.rs. */
+export interface OffersView {
+  /** The place that was asked about, as the engine took it. */
+  readonly place: OfferPlaceView;
+  /** One for each entry that stands in an expression, ordered by identifier. */
+  readonly entries: readonly EntryOfferView[];
+}
+
+/** What the tables say of a candidate in a slot. */
+export type FitView =
+  /** The candidate has this class of dtype, and the tables judged it. */
+  | { readonly kind: 'judged'; readonly dtype: string; readonly verdict: VerdictView }
+  /** The candidate has no class of dtype the tables cover. */
+  | { readonly kind: 'unjudged'; readonly reason: string };
+
+/** What the tables say of each candidate, in the order they were asked. Mirrors `FitsView` in crates/dageist-tauri/src/offers.rs. */
+export interface FitsView {
+  readonly fits: readonly FitView[];
+}
+
+/** One word an option may be set to, and why Polars refuses it, if it does. */
+export interface OptionWordView {
+  readonly word: string;
+  readonly refusal: RefusalView | null;
+}
+
+/** An option of an entry: its default, and the words it may be set to. */
+export interface OptionView {
+  readonly parameter: string;
+  /** The word the option has when it is not set. */
+  readonly default: string | null;
+  readonly words: readonly OptionWordView[];
+}
+
+/** The flags and choices of an entry. Mirrors `OptionsView` in crates/dageist-tauri/src/offers.rs. */
+export interface OptionsView {
+  readonly options: readonly OptionView[];
+}
+
+/**
  * What a failed command ended in, mirroring `ErrorKind` in
  * crates/dageist-tauri/src/sample_table.rs. The view decides on the kind and
  * never on the message, which is for a person to read.
@@ -485,6 +592,24 @@ export interface Host {
    * not in it or was refused, or `limit` is over what a preview may hold.
    */
   readonly rowsAfterStep: (document: string, step: string, limit: number) => Promise<RowsView>;
+  /**
+   * Asks which calls may stand at `place`: every entry that stands in an
+   * expression, offered or refused, with whether the chain may end there.
+   * It rejects with `unknownName` for a place the engine does not know.
+   */
+  readonly offersAt: (place: PlaceRequest) => Promise<OffersView>;
+  /**
+   * Asks which of the candidates fit a slot: as the start of an expression,
+   * as the argument of a method, or both. It rejects with `unknownName` for an
+   * entry, a parameter or a place the engine does not know.
+   */
+  readonly candidateFits: (request: FitsRequest) => Promise<FitsView>;
+  /**
+   * Asks what the flags and choices of the entry `entry` may be set to,
+   * beside the options already `chosen`. It rejects with `unknownName` for an
+   * entry or a parameter the catalogue lacks.
+   */
+  readonly optionOffers: (entry: string, chosen: readonly ChosenOption[]) => Promise<OptionsView>;
   /** Opens a working window of `keys` whole keys of the sample table, held in memory. */
   readonly openSampleWindow: (keys: number) => Promise<TableView>;
   /** Opens the whole sample table where it is stored, without loading it. */
