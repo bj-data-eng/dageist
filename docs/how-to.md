@@ -220,6 +220,28 @@ The test compares the files with the views by value. Review the diff: a change
 that the decoders refuse is a change of shape the view has to follow, in the
 contract and in `ui/packages/host/src/`. Never edit the files by hand.
 
+### Refresh The Offers Snapshots
+
+After a change to the tables of allowed combinations, the rules, the offers or
+the views of them, `offers::tests::the_snapshots_are_what_the_commands_return`
+fails and names the file that differs. Seven files in
+`ui/packages/host/fixtures/` are written by it: `offers-start.json`,
+`offers-value.json` and `offers-condition.json` from `offers_at`,
+`fits-start.json` and `fits-argument.json` from `candidate_fits`, `options.json`
+from `option_offers`, and `offers-grid.json`, every call at every place of every
+kind, from which the view lists what the editor cannot offer:
+
+```sh
+DAGEIST_REFRESH_OFFERS=1 cargo test --offline --locked -p dageist-tauri offers::tests::the_snapshots_are_what_the_commands_return
+npm --prefix ui run format
+npm --prefix ui run test
+```
+
+Review the diff. When `offers-grid.json` changes, the view's check of what the
+editor cannot offer, in `ui/packages/steps/src/model/limits.test.ts`, may
+fail: its written list is to be updated with the change, or the editor is to
+draw what the engine allows. Never edit the files by hand.
+
 ## Open The Sample Table
 
 The `Table` workspace shows a generated claims table of about two million rows

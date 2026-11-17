@@ -253,9 +253,51 @@ steps that are still what it reported of: a step an edit has changed, and the
 steps after it, wait for the engine. A `when` of more than one case is held
 back too, as a further case is a `when` after `otherwise`. A refusal
 carries the place of the engine's document it is at, which the translation maps
-back to the word of the editor it marks. The view's lists still sort fields by
-the dtype groups the catalogue names; offers from the engine are a later part
-of the same work.
+back to the word of the editor it marks.
+
+The editor's lists offer what the engine allows and nothing of their own. A list
+asks the engine only while it is open, through a scheduler of its own that sends
+the newest request after a short wait, drops the answer to one that a newer
+request replaced and asks again only a failure that may pass, as the runs do. A
+list says that it is waiting, or that the engine has not reported on the place,
+and never shows what was answered for another place. Three commands answer:
+
+- `offers_at` says which calls may stand where an expression has what it has so
+  far, each with the engine's verdict, whether the chain may end there and the
+  argument a method starts with. A method's place is the one the engine's walk
+  reported for its link, which a chain's prepared dtypes carry; a chain's start
+  is the positions that hold it and nothing yet.
+- `candidate_fits` says which fields, connected inputs and numbers or text typed
+  in fit a slot, as the start of an expression, as the argument of a method or
+  both. The dtype of each is the engine's: a typed literal has the dtype Polars
+  gives it, so a whole number is the narrowest integer it fits and `1.5` is a
+  `Float64`. A start is offered a connected input where the engine allows a
+  literal of its dtype, which is what a run makes of an input.
+- `option_offers` says what the flags and choices of an entry may be set to
+  beside those already chosen, so that an option is added with a word Polars
+  allows, or not at all.
+
+The catalogue gives each expression parameter the position the tables name for
+it, so the editor says where a slot stands and the engine works out the context.
+The offers are prepared for display by plain functions in
+[model/offers.ts](../ui/packages/steps/src/model/offers.ts), tested against
+snapshots written from Rust: calls grouped by family, the shortest group first,
+with hints, reasons and where a chain may end.
+
+### What The Editor Cannot Offer
+
+What the editor has no way to draw is written once, in
+[model/limits.ts](../ui/packages/steps/src/model/limits.ts), and a list shows
+such a call disabled with the reason. The host writes the grid of every call the
+engine allows at every place of every kind, 30 contexts each with nothing, 26
+dtypes in two shapes and 4 states of a condition, as
+`ui/packages/host/fixtures/offers-grid.json`, and a view test lists every
+combination the engine allows that the editor cannot draw against a written
+list. Today that is a further case of a condition, which the editor draws as a
+`when` after `otherwise`, in the 24 contexts where the engine allows one, and the
+parameters of a start or a condition that it does not set: `col`'s further
+names, `lit`'s dtype and its object flag, and the keyword constraints of a
+condition. Changing either side changes the list, which the test then fails on.
 
 ## The Step Document
 
@@ -294,6 +336,10 @@ the reason when Polars refuses. Some mistakes, such as `dt.date` on a String
 column, are only found when rows are read, not from the schema; the editor
 learns them in advance from the
 [tables of allowed combinations](#which-combinations-polars-allows).
+A chain that starts from a connected input is walked as the run makes it, a
+literal of the input's dtype, so the tables' lines for a literal judge it, and a
+list gives many values where a value gives one. A name that is not connected
+leaves what follows it not known.
 The runner asks the named rules beside those tables, and not the tables, for
 where an expression may start: `element` starts a chain only in a pivot's
 aggregate. A row of the context table was measured with the chain ending at one
