@@ -1692,9 +1692,10 @@ mod tests {
 
     #[test]
     fn an_arithmetic_given_no_known_dtype_is_settled_by_polars_refusing_it() {
-        // `sort(by=g.over(order_by=[g - h.over(order_by=[k], nulls_last=true)]).sum())`:
-        // the tables do not know the dtype of the window that is subtracted from a
-        // text column, and refuse the subtraction for every dtype it might give.
+        // `sort(by=g.over(order_by=[g - h.first().over(order_by=[k], mapping_strategy=join)]).sum())`:
+        // the tables do not know the dtype of the window that joins after one value,
+        // which is subtracted from a text column, and refuse the subtraction for every
+        // dtype it might give.
         let case =
             kept("stricter-an-arithmetic-given-no-known-dtype-in-a-sort-key-of-one-value.case");
         let refused = refusal(&case);

@@ -730,57 +730,17 @@ fn a_window_ordered_without_a_partition_gives_what_it_gives_with_one() {
     // with no `partition_by` as with one: the rows are one group, and `join`
     // gives each row the list of the group.
     let ordered = [("order_by", Representative::Int64)];
-    let sorted = |descending, nulls_last| SortOptions {
-        descending,
-        nulls_last,
-        maintain_order: true,
-        ..SortOptions::default()
-    };
-    let cases: [(&[(&str, &str)], SortOptions, WindowMapping, &str); 7] = [
-        (
-            &[],
-            sorted(false, false),
-            WindowMapping::GroupsToRows,
-            "Int64",
-        ),
-        (
-            &[("nulls_last", "true")],
-            sorted(false, true),
-            WindowMapping::GroupsToRows,
-            "Int64",
-        ),
-        (
-            &[("descending", "true")],
-            sorted(true, false),
-            WindowMapping::GroupsToRows,
-            "Int64",
-        ),
-        (
-            &[("descending", "true"), ("nulls_last", "true")],
-            sorted(true, true),
-            WindowMapping::GroupsToRows,
-            "Int64",
-        ),
-        (
-            &[("mapping_strategy", "join")],
-            sorted(false, false),
-            WindowMapping::Join,
-            "List(Int64)",
-        ),
-        (
-            &[("mapping_strategy", "explode")],
-            sorted(false, false),
-            WindowMapping::Explode,
-            "Int64",
-        ),
-        (
-            &[("nulls_last", "true"), ("mapping_strategy", "join")],
-            sorted(false, true),
-            WindowMapping::Join,
-            "List(Int64)",
-        ),
-    ];
-    for (chosen, options, mapping, expected) in cases {
+    let check = |chosen: &[(&str, &str)],
+                 descending: bool,
+                 nulls_last: bool,
+                 mapping: WindowMapping,
+                 expected: &str| {
+        let options = SortOptions {
+            descending,
+            nulls_last,
+            maintain_order: true,
+            ..SortOptions::default()
+        };
         let polars = polars_window_ordered_by_k(options, mapping);
         assert_eq!(
             Representative::of(&polars).map(|class| class.to_string()),
@@ -792,7 +752,40 @@ fn a_window_ordered_without_a_partition_gives_what_it_gives_with_one() {
             Some(expected),
             "the tables, {chosen:?}"
         );
-    }
+    };
+    let rows = WindowMapping::GroupsToRows;
+    check(&[], false, false, rows, "Int64");
+    check(&[("nulls_last", "true")], false, true, rows, "Int64");
+    check(&[("descending", "true")], true, false, rows, "Int64");
+    check(
+        &[("descending", "true"), ("nulls_last", "true")],
+        true,
+        true,
+        rows,
+        "Int64",
+    );
+    check(
+        &[("mapping_strategy", "explode")],
+        false,
+        false,
+        WindowMapping::Explode,
+        "Int64",
+    );
+    let join = WindowMapping::Join;
+    check(
+        &[("mapping_strategy", "join")],
+        false,
+        false,
+        join,
+        "List(Int64)",
+    );
+    check(
+        &[("nulls_last", "true"), ("mapping_strategy", "join")],
+        false,
+        true,
+        join,
+        "List(Int64)",
+    );
 }
 
 #[test]
@@ -821,19 +814,6 @@ fn a_window_with_nothing_to_group_or_order_by_is_refused_by_polars_whatever_its_
     ] {
         assert_eq!(given_window(&[], chosen), None, "{chosen:?}");
     }
-}
-
-#[test]
-fn a_window_without_a_partition_is_not_known_to_give_a_list_for_a_joining_strategy() {
-    // The option table measured a window with `partition_by`, and a window
-    // without one is not grouped.
-    let place = select_after(Representative::Int64);
-    let joined = offer(
-        entry("Expr.over"),
-        &place,
-        &Chosen::default().with_options(&[("mapping_strategy", "join")]),
-    );
-    assert_eq!(result_of(&joined), None, "{joined:?}");
 }
 
 #[test]

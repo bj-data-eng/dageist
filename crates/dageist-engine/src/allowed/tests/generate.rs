@@ -130,11 +130,11 @@ fn argument_expression(
 
 /// What a call needs besides the parameter under test to mean anything.
 /// Python's `over` is refused without something to group or order by, and
-/// `*more_exprs` extends `partition_by`, so unless `partition_by` is what is
-/// tested it is given the key.
+/// `*more_exprs` extends `partition_by`, so unless `partition_by` or `order_by`
+/// is what is tested, which each stand alone, it is given the key.
 fn companions(entry: &str, parameter: Option<&str>, key: &Expr) -> Vec<(&'static str, Argument)> {
     match (entry, parameter) {
-        ("Expr.over", Some("partition_by")) => Vec::new(),
+        ("Expr.over", Some("partition_by" | "order_by")) => Vec::new(),
         ("Expr.over", _) => vec![("partition_by", expressions(vec![key.clone()]))],
         _ => Vec::new(),
     }

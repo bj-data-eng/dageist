@@ -575,11 +575,13 @@ with `fractional` true a `Float64`. An option set to its default is not a choice
 One option chosen is read from the lines that set it with the others at their
 defaults, and more from the line of each pair of them; where those lines give
 different results the result is not known. The option table was measured on one
-dtype, on a column, and for a window given a `partition_by`, so what an option
-gives is read as a change of what the method gives at its defaults: the dtype it
-was measured on, and a `List` of what the method gives elsewhere. After a single
-value, or for a window without a `partition_by`, an option that changes the
-result leaves it not known.
+dtype, on a column, and for a window given a `partition_by` and an `order_by`, so
+what an option gives is read as a change of what the method gives at its defaults:
+the dtype it was measured on, and a `List` of what the method gives elsewhere.
+Polars gives a window the same result with either of the two alone, so the table is
+read for a window given one, and the dtype table measures `order_by` alone. A window
+given neither is refused by Polars, so what its options give is not known. After a
+single value, an option that changes the result leaves it not known.
 
 `Step::walk` finds where every call of a step stands without building it in
 Polars. It follows the document as running it does: the arguments of a call
@@ -703,10 +705,9 @@ what surrounds it, after the limits, in these ways:
   refused call, and the part before the call, alone, is allowed. It shows that Polars
   refuses the part at that call, not why: a refusal there for another argument or
   option would count too, and the reason the editor shows for such a call is the
-  tables' for a stand-in dtype, not Polars' for the argument's own. That a window
-  given options and no `partition_by` has no known dtype is one gap that makes
-  a call blind in this way, which [#73](https://github.com/bj-data-eng/dageist/issues/73)
-  tracks.
+  tables' for a stand-in dtype, not Polars' for the argument's own. A window that
+  joins after a single value, which gives that value again where the table says a
+  list, has no known dtype, and is one thing that makes a call blind in this way.
 
 The first two count when Polars refuses the probe for the reason the tables gave, and
 the case then counts as **refused where Polars does not evaluate the part**: the

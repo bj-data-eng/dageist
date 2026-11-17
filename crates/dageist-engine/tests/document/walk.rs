@@ -197,15 +197,15 @@ fn a_window_that_joins_gives_a_list() {
     );
 }
 
-/// The place after a window `arguments` of `a` in a `select`, and what Polars
-/// gives for the same window run on its own API.
+/// The place the walk finds after the window given `arguments`, which follows
+/// `a` in a `select`.
 fn after_window(arguments: Value) -> Option<OfferPlace> {
     let walk = walk_of(
         "LazyFrame.select",
         json!({ "exprs": many(vec![field_then("a", vec![call("Expr.over", arguments)])]) }),
     );
     let item = expression_at(&walk, &item("exprs", 0));
-    item.places()[1].clone()
+    item.places()[1]
 }
 
 #[test]

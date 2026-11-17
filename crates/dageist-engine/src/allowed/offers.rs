@@ -554,11 +554,13 @@ fn read_options(entry: &Entry, chosen: &[(&str, &str)]) -> OptionsGive {
 }
 
 /// The expression parameters the option table was measured with, for an entry
-/// whose options mean nothing without them: a window is grouped by
-/// `partition_by`, and without it a mapping strategy changes nothing.
+/// whose options mean nothing without one of them: a window is grouped by
+/// `partition_by` or ordered by `order_by`, and Polars refuses one given
+/// neither. The table was measured with both, and Polars gives a window the
+/// same result with either alone, so it is read for a call given one.
 fn measured_with(entry: &Entry) -> &'static [&'static str] {
     match entry.id().as_str() {
-        "Expr.over" => &["partition_by"],
+        "Expr.over" => &["partition_by", "order_by"],
         _ => &[],
     }
 }
@@ -716,9 +718,11 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
                 }
                 // And the call has to be given what the table was measured
                 // with.
-                if measured_with(entry)
-                    .iter()
-                    .any(|parameter| !chosen.arguments.iter().any(|(name, _)| name == parameter))
+                let measured = measured_with(entry);
+                if !measured.is_empty()
+                    && !measured
+                        .iter()
+                        .any(|parameter| chosen.arguments.iter().any(|(name, _)| name == parameter))
                 {
                     result = None;
                 }
