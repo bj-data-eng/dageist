@@ -38,6 +38,18 @@ fn inputs() -> Inputs {
         )
         .expect("a first input");
     inputs
+        .add_value("cutoff", Scalar::new(DataType::Int64, AnyValue::Int64(2)))
+        .expect("a value");
+    inputs
+        .add_value(
+            "on",
+            Scalar::new(DataType::Boolean, AnyValue::Boolean(true)),
+        )
+        .expect("a flag");
+    inputs
+        .add_list("holidays", Series::new("holidays".into(), [1_i64, 2]))
+        .expect("a list");
+    inputs
 }
 
 fn parameter(name: &str) -> Segment {
@@ -1132,4 +1144,96 @@ fn an_expression_after_a_refused_one_is_walked_all_the_same() {
     let second = expression_at(step.walk(), &item("exprs", 1));
     assert_eq!(second.calls().len(), 2);
     assert!(second.calls()[1].verdict().is_some_and(|v| v.is_allowed()));
+}
+
+/// The expression argument that starts from the connected input `name` and
+/// continues with `then`.
+fn from_input(name: &str, then: Vec<Value>) -> Value {
+    chain(json!({ "input": name }), then)
+}
+
+#[test]
+fn a_chain_that_starts_from_a_connected_value_is_walked_as_a_literal_of_its_dtype() {
+    // A connected value is run as a literal of its dtype, so what is true of
+    // `lit` of a whole number is true of it: one value, and a test for a null
+    // of one value is a Boolean, one value.
+    let walk = walk_of(
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![from_input(
+            "cutoff",
+            vec![call("Expr.is_null", json!({}))],
+        )]) }),
+    );
+    assert_eq!(walk.not_known(), None);
+    assert_eq!(walk.refusal(), None);
+    let walked = expression_at(&walk, &item("exprs", 0));
+    let select = Context::step(Outer::Select);
+    assert_eq!(walked.calls()[0].follows(), Some(After::Start));
+    assert!(walked.calls()[0].verdict().is_some_and(|v| v.is_allowed()));
+    assert_eq!(
+        walked.places(),
+        vec![
+            at(select, after(Representative::Int64, Shape::One)),
+            at(select, after(Representative::Boolean, Shape::One)),
+        ]
+    );
+    assert_eq!(walked.ending(), Some(&Ending::Allowed));
+}
+
+#[test]
+fn a_connected_list_gives_many_values_of_its_dtype() {
+    let walk = walk_of(
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![from_input("holidays", vec![])]) }),
+    );
+    assert_eq!(walk.not_known(), None);
+    let walked = expression_at(&walk, &item("exprs", 0));
+    assert_eq!(
+        walked.places(),
+        vec![at(
+            Context::step(Outer::Select),
+            after(Representative::Int64, Shape::Many)
+        )]
+    );
+}
+
+#[test]
+fn a_connected_input_is_held_to_what_a_place_needs_of_the_dtype_it_gives() {
+    // A filter's predicate is a Boolean, which a rule decides from the dtype.
+    let predicate = |name: &str| {
+        walk_of(
+            "LazyFrame.filter",
+            json!({ "predicates": many(vec![from_input(name, vec![])]) }),
+        )
+    };
+    let flag = predicate("on");
+    assert_eq!(flag.refusal(), None);
+    assert_eq!(
+        expression_at(&flag, &item("predicates", 0)).ending(),
+        Some(&Ending::Allowed)
+    );
+    let number = predicate("cutoff");
+    let refusal = number.refusal().expect("a whole number is no predicate");
+    assert!(refusal.at_end());
+    assert_eq!(
+        refusal.refusal().source(),
+        RefusalSource::Rule(Rule::FilterPredicateIsBoolean)
+    );
+}
+
+#[test]
+fn an_input_that_is_not_connected_leaves_what_follows_it_not_known() {
+    let walk = walk_of(
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![from_input(
+            "missing",
+            vec![call("Expr.is_null", json!({}))],
+        )]) }),
+    );
+    assert_eq!(
+        walk.not_known(),
+        Some("step \"s\", exprs item 1: there is no connected value or list called \"missing\"")
+    );
+    let walked = expression_at(&walk, &item("exprs", 0));
+    assert_eq!(walked.places(), vec![None, None]);
 }
