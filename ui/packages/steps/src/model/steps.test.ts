@@ -29,8 +29,9 @@ describe('a new step', () => {
         how: { kind: 'word', value: 'left' },
       },
     });
-    const [held] = translate(catalogue, [step]).steps;
-    expect(held).toMatchObject({ kind: 'held', problem: { cause: 'unset' } });
+    // The keys are holes in the document, so the engine says the step is incomplete.
+    const [sent] = translate(catalogue, [step]).steps;
+    expect(sent).toMatchObject({ kind: 'sent' });
   });
 
   it('is a pivot whose three fields are still to be picked, over the first connected table', () => {

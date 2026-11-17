@@ -291,7 +291,7 @@ describe('a step the document cannot hold', () => {
       id: 'second',
       verb: 'with_columns',
       alias: 'second',
-      value: { kind: 'unset' },
+      value: { kind: 'literal', value: null },
       options: NO_OPTIONS,
     },
     {
@@ -307,7 +307,7 @@ describe('a step the document cannot hold', () => {
     const prepared = prepareRun(steps, translate(catalogue, steps), null, source);
 
     expect(prepared.steps.map((step) => step.status)).toEqual(['unknown', 'refused', 'notRun']);
-    expect(prepared.steps[1]?.problem).toBe('Pick a value.');
+    expect(prepared.steps[1]?.problem).toBe('The engine does not take None as a value yet.');
     expect(prepared.steps[2]?.problem).toBe('Not run: step 2 cannot be run yet.');
   });
 
