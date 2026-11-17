@@ -651,12 +651,21 @@ build into line with the new release:
    A feature the Python binding turns on in a Polars crate directly is added
    to the engine's dependency on that crate, unless it only connects Polars to
    Python.
-5. Build and test the engine, and [refresh the Polars audits](#refresh-the-audits-after-a-change).
-6. [Refresh the tables of allowed combinations](#refresh-the-tables-of-allowed-combinations)
+5. Check the engine's start-up against the new release. Read
+   `vendor/polars/crates/polars-python/src/on_startup.rs` beside the engine's
+   [start-up module](../crates/dageist-engine/src/startup.rs), which lists what it
+   does of the release's start-up and what it leaves out, each with its reason.
+   A part the release added that does not only connect Polars to Python is done
+   in the module, in the release's order, with a test in
+   [startup.rs](../crates/dageist-engine/tests/startup.rs); a part the release
+   changed, moved or removed is changed the same way; and a part left out is
+   still one that only connects Polars to Python.
+6. Build and test the engine, and [refresh the Polars audits](#refresh-the-audits-after-a-change).
+7. [Refresh the tables of allowed combinations](#refresh-the-tables-of-allowed-combinations)
    and review them: Polars decides what each combination does, so a new release
    can allow what was refused and refuse what was allowed. Explain each changed
    outcome, and say whether each named rule still holds what Polars does not.
-7. [Refresh the step report snapshots](#refresh-the-step-report-snapshots) and
+8. [Refresh the step report snapshots](#refresh-the-step-report-snapshots) and
    review them: they hold Polars' own refusal text, which a new release can
    word differently, and the tables' verdicts on the steps of the sample.
 
