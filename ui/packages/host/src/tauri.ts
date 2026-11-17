@@ -3,11 +3,12 @@
  * view that knows Tauri exists.
  */
 
-import type { BlockRequest, Host, IdentityView, TableView } from './contract';
+import type { BlockRequest, Host } from './contract';
 import { DecodeError } from './decode';
 import { decodeCatalogue } from './decode-catalogue';
 import { decodeNode, decodeRows } from './decode-node';
 import { decodeRun } from './decode-run';
+import { decodeBytes, decodeIdentity, decodeTable } from './decode-sample';
 import { deliverMessage, sealMessage } from './envelope';
 
 /** Turns what a failed command rejected with into an `Error`. */
@@ -27,9 +28,10 @@ export function tauriHost(): Host | null {
   if (found === undefined) return null;
   const { core, event: events } = found;
 
-  async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+  /** Invokes `command` and gives what it answered, which is not yet known to be anything. */
+  async function invoke(command: string, args?: Record<string, unknown>): Promise<unknown> {
     try {
-      return await core.invoke<T>(command, args);
+      return await core.invoke<unknown>(command, args);
     } catch (error) {
       throw commandError(command, error);
     }
@@ -41,7 +43,7 @@ export function tauriHost(): Host | null {
     decode: (value: unknown) => T,
     args?: Record<string, unknown>,
   ): Promise<T> {
-    const answer = await invoke<unknown>(command, args);
+    const answer = await invoke(command, args);
     try {
       return decode(answer);
     } catch (error) {
@@ -51,21 +53,24 @@ export function tauriHost(): Host | null {
   }
 
   return {
-    coreIdentity: async () => invoke<IdentityView>('core_identity'),
+    coreIdentity: async () => invokeDecoded('core_identity', decodeIdentity),
     operationCatalogue: async () => invokeDecoded('operation_catalogue', decodeCatalogue),
     nodeInputs: async () => invokeDecoded('node_inputs', decodeNode),
     runDocument: async (document) => invokeDecoded('run_document', decodeRun, { document }),
     rowsAfterStep: async (document, step, limit) =>
       invokeDecoded('rows_after_step', decodeRows, { document, step, limit }),
-    openSampleWindow: async (keys) => invoke<TableView>('open_sample_window', { keys }),
-    openSampleResult: async () => invoke<TableView>('open_sample_result'),
+    openSampleWindow: async (keys) => invokeDecoded('open_sample_window', decodeTable, { keys }),
+    openSampleResult: async () => invokeDecoded('open_sample_result', decodeTable),
     fetchTableBlock: async (request: BlockRequest) =>
-      invoke<ArrayBuffer>('table_block', {
+      invokeDecoded('table_block', decodeBytes, {
         offset: request.offset,
         length: request.length,
         columns: request.columns,
       }),
-    openWindow: async (name) => invoke<undefined>('open_view_window', { name }),
+    openWindow: async (name) => {
+      // The command answers nothing, so there is nothing to read.
+      await invoke('open_view_window', { name });
+    },
     broadcast: (topic, message) => {
       // A message that cannot be sent is one the other window never sees; it asks again.
       void events.emit(`dageist:${topic}`, sealMessage(message)).catch(() => undefined);

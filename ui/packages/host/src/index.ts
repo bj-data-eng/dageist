@@ -57,5 +57,6 @@ export { DecodeError } from './decode';
 export { decodeCatalogue } from './decode-catalogue';
 export { decodeNode, decodeRows } from './decode-node';
 export { decodeRun } from './decode-run';
+export { decodeBytes, decodeIdentity, decodeTable } from './decode-sample';
 export { deliverMessage, sealMessage } from './envelope';
 export { tauriHost } from './tauri';
