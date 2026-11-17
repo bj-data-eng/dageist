@@ -377,7 +377,7 @@ const fn is_float(class: Representative) -> bool {
 /// number typed without a dtype adapts to the values beside it that are typed,
 /// as Polars gives it: a whole number to whole numbers and numbers with a
 /// fraction it fits, and a number with a fraction only to numbers with a
-/// fraction. Among such numbers alone it keeps its own. A condition of values
+/// fraction. Among such numbers alone it has no class. A condition of values
 /// of different dtypes has the supertype, which the tables do not give.
 fn unify(values: &[Valued]) -> Option<Representative> {
     let classes: Option<Vec<(Representative, Option<Loose>)>> = values
@@ -389,12 +389,13 @@ fn unify(values: &[Valued]) -> Option<Representative> {
         .iter()
         .find(|(_, loose)| loose.is_none())
         .map(|(class, _)| *class);
-    let first = first_strict.or_else(|| classes.first().map(|(class, _)| *class))?;
-    let same = |(class, loose): &(Representative, Option<Loose>)| match (loose, first_strict) {
-        (None, _) => *class == first,
-        (Some(_), None) => *class == first,
-        (Some(Loose::Integer(value)), Some(strict)) => integer_fits(*value, strict),
-        (Some(Loose::Float), Some(strict)) => is_float(strict),
+    // Numbers typed without a dtype alone have none to give: Polars cannot resolve them where
+    // it runs, in a sort key, for one.
+    let first = first_strict?;
+    let same = |(class, loose): &(Representative, Option<Loose>)| match loose {
+        None => *class == first,
+        Some(Loose::Integer(value)) => integer_fits(*value, first),
+        Some(Loose::Float) => is_float(first),
     };
     classes.iter().all(same).then_some(first)
 }
@@ -701,6 +702,13 @@ impl Walker<'_> {
             calls.push(standing);
             self.path.pop();
         }
+        // A condition that has no `otherwise` and holds a number typed without a dtype has no
+        // dtype to give it: Polars cannot resolve the number, and refuses where it runs.
+        if let Cur::Condition { values, .. } = &cur
+            && values.iter().any(|(_, loose)| loose.is_some())
+        {
+            last_end = Some(Ending::NotKnown(Unknown::TheResultsDtype));
+        }
         let mut ending = None;
         if held.is_some() && !matches!(cur, Cur::Dead) {
             // A value of a condition in a filter need be a Boolean only where
@@ -994,9 +1002,16 @@ impl Walker<'_> {
                     "Then.when" | "ChainedThen.when" => ConditionState::ChainedWhen,
                     _ => {
                         values.push(statement_class);
+                        let dtype = if known { unify(&values) } else { None };
+                        // Numbers typed without a dtype that have no typed value beside them
+                        // have none to give, and Polars cannot always resolve them where it
+                        // runs, so whether the expression may end here is not known.
+                        if dtype.is_none() && values.iter().any(|(_, loose)| loose.is_some()) {
+                            *last_end = Some(Ending::NotKnown(Unknown::TheResultsDtype));
+                        }
                         return (
                             Cur::Value {
-                                dtype: if known { unify(&values) } else { None },
+                                dtype,
                                 // Where the values are one expression the predicates
                                 // are dropped, and the values give the shape.
                                 shape: if (branches_are_one && values_single)
