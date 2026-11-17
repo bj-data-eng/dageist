@@ -227,22 +227,19 @@ describe('the requests the editor gives the host', () => {
     expect(calls.map((call) => call.request)).toEqual(['a', 'a']);
   });
 
-  it('ask again after a failure while the request is still the newest, and deliver what then comes', async () => {
+  it('do not ask again after a failure unless the options say that kind of failure may pass', async () => {
+    // An answer the host gave on purpose, such as a refusal, is the same each time it is asked.
     const { latest, clock, calls, delivered } = setup();
     latest.submit('a');
     clock.advance(100);
-    calls[0]?.fail('the host was not there');
+    calls[0]?.fail('the step was refused');
     await settled();
 
-    // Nothing has changed, and the host may be there now.
     clock.advance(60_000);
-    expect(calls.map((call) => call.request)).toEqual(['a', 'a']);
-    calls[1]?.answer('A');
-    await settled();
 
-    expect(delivered).toHaveLength(2);
+    expect(calls.map((call) => call.request)).toEqual(['a']);
+    expect(delivered).toHaveLength(1);
     expect(delivered[0]?.outcome.ok).toBe(false);
-    expect(delivered[1]).toEqual({ request: 'a', outcome: { ok: true, answer: 'A' } });
   });
 
   it('ask again after the time the options give, and not before', async () => {
