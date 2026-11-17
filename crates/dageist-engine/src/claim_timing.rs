@@ -53,6 +53,7 @@ impl ClaimTiming {
     /// document the engine reads. Neither happens in a built program: the
     /// engine's tests build it.
     pub fn new() -> Result<Self, EngineError> {
+        crate::startup::ensure();
         Ok(Self {
             source: source().map_err(|error| EngineError::polars("building the claims", error))?,
             inputs: inputs()?,

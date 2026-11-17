@@ -8,6 +8,12 @@
 //! and running it, and the tables of which combinations of its entries Polars
 //! allows. It serves the claim-timing sample node the step editor opens with.
 //! It has no dependency on any host.
+//!
+//! Polars is set up as the Python Polars release sets it up, for the parts of
+//! that set-up that are not about Python: see [`PolarsSession`], and
+//! `src/startup.rs` for what is done and what is left out. Every entry here that
+//! runs Polars sets it up first, once for the process, and a host holds a
+//! [`PolarsSession`] from its start to its end.
 
 #![forbid(unsafe_code)]
 
@@ -18,12 +24,14 @@ pub mod claim_timing;
 pub mod document;
 mod error;
 mod sample;
+mod startup;
 mod stored;
 mod table;
 
 pub use block::ColumnInfo;
 pub use error::EngineError;
 pub use sample::{SampleSpec, claims_generated, generate_claims};
+pub use startup::PolarsSession;
 pub use stored::ParquetTable;
 pub use table::Table;
 

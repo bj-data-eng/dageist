@@ -160,6 +160,7 @@ impl Inputs {
     ///
     /// When Polars cannot work out the schema of a connected table.
     pub fn describe(&self) -> Result<Vec<InputDescription>, PolarsError> {
+        crate::startup::ensure();
         self.inputs
             .iter()
             .map(|(name, input)| {
