@@ -13,7 +13,7 @@ pub enum dageist_engine::allowed::Candidate
 pub dageist_engine::allowed::Candidate::Field(dageist_engine::allowed::Representative)
 pub dageist_engine::allowed::Candidate::Input
 pub dageist_engine::allowed::Candidate::Input::dtype: dageist_engine::allowed::Representative
-pub dageist_engine::allowed::Candidate::Input::list: bool
+pub dageist_engine::allowed::Candidate::Input::shape: dageist_engine::allowed::Shape
 pub dageist_engine::allowed::Candidate::Literal(dageist_engine::allowed::Literal)
 impl dageist_engine::allowed::Candidate
 pub fn dageist_engine::allowed::Candidate::class(&self) -> core::option::Option<dageist_engine::allowed::Representative>
@@ -225,7 +225,7 @@ pub fn dageist_engine::allowed::default_argument(entry: &'static dageist_engine:
 pub fn dageist_engine::allowed::dtype_name(dtype: &polars_core::datatypes::dtype::DataType) -> alloc::string::String
 pub fn dageist_engine::allowed::fit(candidate: &dageist_engine::allowed::Candidate, slot: &dageist_engine::allowed::Slot<'_>) -> core::option::Option<dageist_engine::allowed::Fit>
 pub fn dageist_engine::allowed::offer(entry: &'static dageist_engine::catalog::Entry, place: &dageist_engine::allowed::Place, chosen: &dageist_engine::allowed::Chosen<'_>) -> dageist_engine::allowed::Verdict
-pub fn dageist_engine::allowed::offer_input(place: &dageist_engine::allowed::Place, dtype: dageist_engine::allowed::Representative, list: bool) -> dageist_engine::allowed::Verdict
+pub fn dageist_engine::allowed::offer_input(place: &dageist_engine::allowed::Place, dtype: dageist_engine::allowed::Representative, shape: dageist_engine::allowed::Shape) -> dageist_engine::allowed::Verdict
 pub fn dageist_engine::allowed::offers(place: &dageist_engine::allowed::Place) -> alloc::vec::Vec<dageist_engine::allowed::Offer>
 pub fn dageist_engine::allowed::option_offers(entry: &dageist_engine::catalog::Entry, chosen: &[(&str, &str)]) -> alloc::vec::Vec<dageist_engine::allowed::OptionOffer>
 pub fn dageist_engine::allowed::options(entry: &dageist_engine::catalog::Entry, chosen: &[(&str, &str)]) -> core::result::Result<(), dageist_engine::allowed::Refusal>
@@ -501,6 +501,8 @@ pub dageist_engine::document::InputKind::List(alloc::string::String)
 pub dageist_engine::document::InputKind::Table(alloc::vec::Vec<dageist_engine::document::ColumnDescription>)
 pub dageist_engine::document::InputKind::Value(alloc::string::String)
 pub enum dageist_engine::document::Outcome
+pub dageist_engine::document::Outcome::Incomplete
+pub dageist_engine::document::Outcome::Incomplete::place: dageist_engine::document::Place
 pub dageist_engine::document::Outcome::NotRun
 pub dageist_engine::document::Outcome::NotRun::blocked_by: dageist_engine::document::StepId
 pub dageist_engine::document::Outcome::Refused(dageist_engine::document::StepRefusal)
@@ -535,6 +537,7 @@ impl core::fmt::Display for dageist_engine::document::RowsError
 pub fn dageist_engine::document::RowsError::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub enum dageist_engine::document::RunCause
 pub dageist_engine::document::RunCause::Build(dageist_engine::catalog::BuildError)
+pub dageist_engine::document::RunCause::Incomplete
 pub dageist_engine::document::RunCause::NotAllowed(dageist_engine::allowed::Refusal)
 pub dageist_engine::document::RunCause::Polars(polars_error::PolarsError)
 pub dageist_engine::document::RunCause::UnknownInput(alloc::string::String)
@@ -552,6 +555,7 @@ pub dageist_engine::document::Segment::Start
 pub dageist_engine::document::Segment::Value(usize)
 pub enum dageist_engine::document::Start
 pub dageist_engine::document::Start::Call(dageist_engine::document::Call)
+pub dageist_engine::document::Start::Hole
 pub dageist_engine::document::Start::Input(alloc::string::String)
 pub enum dageist_engine::document::SyntaxProblem
 pub dageist_engine::document::SyntaxProblem::ControlCharacter(char)
@@ -689,6 +693,8 @@ impl dageist_engine::document::Step
 pub const fn dageist_engine::document::Step::call(&self) -> &dageist_engine::document::Call
 pub const fn dageist_engine::document::Step::id(&self) -> &dageist_engine::document::StepId
 pub fn dageist_engine::document::Step::new(id: dageist_engine::document::StepId, call: dageist_engine::document::Call) -> core::result::Result<Self, dageist_engine::document::Refusal>
+impl dageist_engine::document::Step
+pub fn dageist_engine::document::Step::first_hole(&self) -> core::option::Option<alloc::vec::Vec<dageist_engine::document::Segment>>
 impl dageist_engine::document::Step
 pub fn dageist_engine::document::Step::walk(&self, index: usize, source: &polars_core::schema::Schema, inputs: &dageist_engine::document::Inputs) -> dageist_engine::document::Walk
 pub struct dageist_engine::document::StepId(_)
