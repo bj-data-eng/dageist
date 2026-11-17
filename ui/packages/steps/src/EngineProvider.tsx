@@ -16,6 +16,7 @@ import { indexCatalogue } from './model/catalogue';
 
 /** What the editor is made of. */
 interface Parts {
+  readonly host: Host;
   readonly catalogue: Catalogue;
   readonly node: NodeView;
 }
@@ -46,6 +47,11 @@ export function useNode(): NodeView {
   return useParts().node;
 }
 
+/** Returns the host the editor asks the engine through. It is only there below an `EngineProvider` that has the parts. */
+export function useHost(): Host {
+  return useParts().host;
+}
+
 /** What the provider needs. */
 export interface EngineProviderProps {
   readonly host: Host;
@@ -65,7 +71,7 @@ export function EngineProvider({ host, title, children }: EngineProviderProps): 
         if (!live) return;
         setFetched({
           host,
-          outcome: { state: 'ready', parts: { catalogue: indexCatalogue(view), node } },
+          outcome: { state: 'ready', parts: { host, catalogue: indexCatalogue(view), node } },
         });
       })
       .catch((error: unknown) => {

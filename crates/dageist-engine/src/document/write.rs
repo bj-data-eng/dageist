@@ -69,7 +69,7 @@ fn expression_depth(expression: &Expression, limit: usize) -> Option<usize> {
     nested(limit, |left| {
         let start = match expression.start() {
             Start::Call(start) => call_depth(start, left)?,
-            Start::Input(_) => nested(left, |_| Some(0))?,
+            Start::Input(_) | Start::Hole => nested(left, |_| Some(0))?,
         };
         let links = nested(left, |left| deepest(expression.links(), left, call_depth))?;
         Some(start.max(links))
@@ -128,6 +128,7 @@ fn expression(expression: &Expression) -> Json {
                 Start::Input(name) => {
                     Json::Object(vec![entry("input", Json::String(name.clone()))])
                 }
+                Start::Hole => Json::Object(vec![entry("hole", Json::Null)]),
             },
         ),
         entry(

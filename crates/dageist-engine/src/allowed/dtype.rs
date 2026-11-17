@@ -142,6 +142,13 @@ impl Representative {
         Self::ALL.into_iter().find(|dtype| dtype.name() == name)
     }
 
+    /// The class of the dtype written `name` the way [`dtype_name`] writes it,
+    /// such as `Datetime(ns)`, if it is one of the representative classes.
+    #[must_use]
+    pub fn of_name(name: &str) -> Option<Self> {
+        class_of_name(name)
+    }
+
     /// The class of `dtype`, if it is one of the representative classes.
     #[must_use]
     pub fn of(dtype: &DataType) -> Option<Self> {

@@ -48,8 +48,12 @@ import {
   stepText,
 } from './model/steps';
 import { optionOf, starterSetting, withOption } from './model/settings';
+import { chosenOptions } from './model/offers';
+import { NO_POSITIONS, within } from './model/place';
+import { useOptions } from './ask';
+import { useListState } from './positions';
 import type { Catalogue } from './model/catalogue';
-import { verbEntry, verbId } from './model/catalogue';
+import { positionOfParameter, verbEntry, verbId } from './model/catalogue';
 import { findTable, tablesOf } from './model/inputs';
 import { VERB_COLOURS, verbHead, verbNote } from './verbs';
 
@@ -94,6 +98,9 @@ interface HeadProps<S extends Step> {
 
 function AddColumnHead({ step, frame, onChange }: HeadProps<WithColumnsStep>): React.JSX.Element {
   const fresh = useContext(FreshContext);
+  const catalogue = useCatalogue();
+  // What the new column holds is an item of what the step selects.
+  const holds = positionOfParameter(verbEntry(catalogue, 'with_columns'), 'named_exprs');
   return (
     <>
       <TypedBlock
@@ -113,6 +120,8 @@ function AddColumnHead({ step, frame, onChange }: HeadProps<WithColumnsStep>): R
         frame={frame}
         label={`What ${step.alias === '' ? 'the column' : step.alias} holds`}
         lists={false}
+        positions={within(NO_POSITIONS, holds)}
+        argument={null}
         onChange={(value) => {
           onChange({ ...step, value });
         }}
@@ -127,8 +136,6 @@ interface StepParameterProps {
   readonly name: string;
   /** The rows the parameter's fields are picked from. */
   readonly frame: Frame;
-  /** Whether `element` is meant, for a parameter worked out for the values of one pivot cell. */
-  readonly element?: boolean | undefined;
   /** Tells what was just added from the rest. */
   readonly keyPrefix: string;
   readonly onChange: (step: Step) => void;
@@ -139,7 +146,6 @@ function StepParameter({
   step,
   name,
   frame,
-  element,
   keyPrefix,
   onChange,
 }: StepParameterProps): React.JSX.Element {
@@ -158,7 +164,7 @@ function StepParameter({
     <ParameterDrawing
       parameter={parameter}
       setting={optionOf(step.options, name) ?? starterSetting(parameter)}
-      around={{ frame, items: (of) => stepItems(catalogue, step, of), element }}
+      around={{ frame, items: (of) => stepItems(catalogue, step, of) }}
       keyPrefix={keyPrefix}
       onChange={(setting) => {
         onChange({ ...step, options: withOption(step.options, name, setting) });
@@ -195,10 +201,15 @@ function RenameHead({ step, frame, onChange }: HeadProps<RenameStep>): React.JSX
 }
 
 function FilterHead({ step, frame, onChange }: HeadProps<FilterStep>): React.JSX.Element {
+  const catalogue = useCatalogue();
   return (
     <ConditionBlocks
       condition={step.condition}
       frame={frame}
+      positions={within(
+        NO_POSITIONS,
+        positionOfParameter(verbEntry(catalogue, 'filter'), 'predicates'),
+      )}
       tone="verb"
       onChange={(condition) => {
         onChange({ ...step, condition });
@@ -286,7 +297,6 @@ function PivotHead({ step, frame, onChange }: HeadProps<PivotStep>): React.JSX.E
         step={step}
         name="aggregate_function"
         frame={frame}
-        element
         keyPrefix={`${step.id}:aggregate_function`}
         onChange={onChange}
       />
@@ -396,6 +406,7 @@ export function StepRow({
 }: StepRowProps): React.JSX.Element {
   const catalogue = useCatalogue();
   const fresh = useContext(FreshContext);
+  const list = useListState();
   const { ref, handleRef, isDragSource } = useSortable({
     id: step.id,
     index,
@@ -411,6 +422,12 @@ export function StepRow({
   const name = verbHead(catalogue, step.verb);
   const entry = verbEntry(catalogue, step.verb);
   const missing = entry === null;
+  // What the step's options may be set to, asked of the engine while the step's list is open.
+  const optionsAsked = useOptions(
+    list.open && entry !== null
+      ? { entry: entry.id, chosen: chosenOptions(entry, step.options) }
+      : null,
+  );
   const node = useNode();
   const parameters = stepOptionParameters(catalogue, step.verb);
   return (
@@ -463,10 +480,16 @@ export function StepRow({
                   ...(parameters.length === 0
                     ? []
                     : [
-                        optionOffers(parameters, step.options, typed, (options, added) => {
-                          onChange({ ...step, options });
-                          if (added !== null) fresh.mark(`${step.id}:${added}`);
-                        }),
+                        optionOffers(
+                          parameters,
+                          step.options,
+                          typed,
+                          (options, added) => {
+                            onChange({ ...step, options });
+                            if (added !== null) fresh.mark(`${step.id}:${added}`);
+                          },
+                          optionsAsked,
+                        ),
                       ]),
                   ...verbOffers(catalogue, typed, (verb) => {
                     if (verb !== step.verb) {
@@ -474,6 +497,7 @@ export function StepRow({
                     }
                   }),
                 ]}
+                onOpenChange={list.onOpenChange}
               />
             </Hint>
           </Piece>

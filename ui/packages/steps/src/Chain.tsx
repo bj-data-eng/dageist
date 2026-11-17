@@ -16,17 +16,21 @@ import { DragDropProvider } from '@dnd-kit/react';
 import { isSortable, useSortable } from '@dnd-kit/react/sortable';
 import { createContext, useCallback, useContext, useState } from 'react';
 
-import type { Look, Offer, OfferGroup, Tone } from '@dageist/design';
+import type { Look, OfferGroup, Tone } from '@dageist/design';
+import type { OfferPlaceView } from '@dageist/host';
 import { Hint, OfferList, Piece, Popover, Seam, Slot, Word } from '@dageist/design';
 
+import { useCandidateFits, useOffers, useOptions } from './ask';
+import type { FitSlot } from './ask';
 import { useCatalogue, useNode } from './EngineProvider';
+import { fieldGroup, inputGroup, methodGroups, startFunctions, valueGroup } from './engineLists';
 import { inputLines } from './InputsStrip';
 import { FreshContext, Line, Lines } from './Lists';
 import { OptionRows, optionOffers } from './Parameters';
+import { useListState, usePositions } from './positions';
 import { ConditionBlocks, ValueSlot, emptyTest } from './Values';
-import { anyField, counted, fieldOffers, matches, offer, titled } from './offers';
+import { matches, offer, titled } from './offers';
 import { useFieldHint } from './origins';
-import type { Catalogue } from './model/catalogue';
 import type { ConditionWord } from './model/catalogue';
 import {
   conditionEntry,
@@ -34,25 +38,25 @@ import {
   elementEntry,
   methodEntry,
   methodId,
+  positionOfParameter,
 } from './model/catalogue';
 import { wrongId } from './model/document';
 import type { ArgumentRule, Method, MethodName } from './model/expr';
 import {
-  acceptanceMisfit,
-  argumentReason,
   argumentRule,
-  LITERAL_DTYPES,
-  defaultArgument,
   methodOptionParameters,
-  offeredMethods,
+  startingArgument,
   swappedArgument,
 } from './model/expr';
 import type { Dtype, Frame } from './model/frame';
 import { assertNever, findColumn } from './model/frame';
 import { findInput } from './model/inputs';
 import { nextId } from './model/ids';
+import { chosenOptions } from './model/offers';
+import type { PreparedOffer } from './model/offers';
+import { placeRequest, startRequest, within } from './model/place';
 import { NO_OPTIONS, carriedOptions } from './model/settings';
-import type { Arm, Chain, Source, Value } from './model/source';
+import type { Arm, Cell, Chain, Source, Value } from './model/source';
 import type { ChainDtypes } from './model/report';
 import { usePreparedStep } from './engine';
 
@@ -101,8 +105,6 @@ const PART_SENSORS = [
   }),
 ];
 
-const WHOLE_NUMBER = /^-?\d+$/;
-
 /** No word of the editor is the matter. */
 const NO_WRONG: ReadonlySet<string> = new Set();
 
@@ -118,45 +120,6 @@ function withMethodMoved(chain: Chain, from: number, to: number): Chain {
   return withMethods(chain, methods);
 }
 
-/**
- * Lists the methods the catalogue offers that can be handed `input`, under the
- * catalogue's families from the shortest to the longest. A method that does
- * not fit says what it needs.
- */
-function methodOffers(
-  catalogue: Catalogue,
-  typed: string,
-  input: Dtype | null,
-  onPick: (name: MethodName) => void,
-): OfferGroup[] {
-  const methods = offeredMethods(catalogue);
-  const groups = catalogue.view.families
-    .map((family) =>
-      counted(
-        family.title,
-        methods
-          .filter(
-            ({ entry }) => entry.family === family.key && matches(typed, entry.name, entry.hint),
-          )
-          .map(({ name, entry }) => {
-            const misfit = input === null ? null : acceptanceMisfit(catalogue, name, input);
-            return offer(
-              entry.name,
-              'function',
-              entry.hint,
-              () => {
-                onPick(name);
-              },
-              { reason: misfit?.short ?? null },
-            );
-          }),
-      ),
-    )
-    .filter((group) => group.offers.length > 0);
-  groups.sort((left, right) => left.offers.length - right.offers.length);
-  return groups;
-}
-
 /** Returns a condition with nothing picked yet, and the value it gives. */
 function emptyArm(): Arm {
   return { id: nextId('arm'), condition: emptyTest(), returns: { kind: 'unset' } };
@@ -166,6 +129,10 @@ interface ArgumentSlotProps {
   readonly method: Method;
   /** What the catalogue says the method's argument is. */
   readonly rule: ArgumentRule;
+  /** The identifier the catalogue gives the method. */
+  readonly entryId: string;
+  /** Where the method stands, as the engine reported it, or `null` where it did not. */
+  readonly place: OfferPlaceView | null;
   readonly frame: Frame;
   /** Whether the engine refused the method. */
   readonly wrong: boolean;
@@ -197,67 +164,60 @@ function shownArgument(
 }
 
 /**
- * Draws an argument that takes an expression: a field, or a value typed in.
- * It opens the list it is picked from, which offers the values and the fields
- * whose dtype the parameter takes. Every method's argument of this kind is
- * drawn here.
+ * Draws an argument that takes an expression: a field, an input, or a value
+ * typed in. It opens the list it is picked from, which offers what fits the
+ * method's parameter, as the engine says it does. Every method's argument of
+ * this kind is drawn here.
  */
 function ArgumentSlot({
   method,
   rule,
+  entryId,
+  place,
   frame,
   wrong,
   onCommit,
 }: ArgumentSlotProps): React.JSX.Element {
-  const catalogue = useCatalogue();
+  const node = useNode();
   const fresh = useContext(FreshContext);
   const fieldHint = useFieldHint();
+  const outer = usePositions();
+  const list = useListState();
   const argument: Value = method.argument ?? { kind: 'unset' };
   const column = argument.kind === 'column' ? findColumn(frame, argument.column) : null;
   const shown = shownArgument(argument, rule);
-  // Why a value or a field is not what the parameter takes, or `null` when it is.
-  const reasonFor = (dtype: Dtype): string | null => argumentReason(rule, catalogue, dtype);
+  // The argument stands in the context of the chain, and is the argument of the method where
+  // the engine has reported where the method stands.
+  const start = within(outer, rule.parameter.position);
+  const slot: FitSlot | null =
+    start.length === 0 && place === null
+      ? null
+      : {
+          start: start.length === 0 ? null : start,
+          argument:
+            place === null
+              ? null
+              : { entry: entryId, parameter: rule.parameter.name, place: placeRequest(place) },
+        };
+  const fits = useCandidateFits(slot, list.open, frame, node, list.typed);
   const offers = (typed: string): OfferGroup[] => {
-    const written: Offer[] = [];
-    const text = typed.trim();
-    if (WHOLE_NUMBER.test(text) && Number.isSafeInteger(Number(text))) {
-      written.push(
-        offer(
-          text,
-          'value',
-          'a number',
-          () => {
-            onCommit({ kind: 'literal', value: Number(text) });
-          },
-          { id: 'number', reason: reasonFor(LITERAL_DTYPES.number) },
-        ),
-      );
-    }
-    if (typed !== '') {
-      written.push(
-        offer(
-          typed,
-          'value',
-          'String',
-          () => {
-            onCommit({ kind: 'literal', value: typed });
-          },
-          { id: 'text', look: 'quoted', reason: reasonFor(LITERAL_DTYPES.text) },
-        ),
-      );
-    }
-    return [
-      titled('Value', written),
-      counted(
-        'Fields',
-        fieldOffers(frame, typed, {
-          ...anyField((name) => {
-            onCommit({ kind: 'column', column: name });
-          }),
-          reasonFor,
-        }),
-      ),
-    ];
+    const rows = {
+      frame,
+      node,
+      typed,
+      fits,
+      inputs: ['value', 'list'] as const,
+      onLiteral: (value: Cell) => {
+        onCommit({ kind: 'literal', value });
+      },
+      onInput: (name: string) => {
+        onCommit({ kind: 'input', name });
+      },
+      onField: (name: string) => {
+        onCommit({ kind: 'column', column: name });
+      },
+    };
+    return [valueGroup(rows), inputGroup(rows), fieldGroup(rows)];
   };
   return (
     <Hint lines={fieldHint(column)} code={false}>
@@ -270,6 +230,8 @@ function ArgumentSlot({
         describedAs={`${rule.shown}: ${rule.parameter.label}`}
         placeholder="Type a value, or search the fields"
         offers={offers}
+        onOpenChange={list.onOpenChange}
+        onType={list.onType}
       />
     </Hint>
   );
@@ -317,7 +279,16 @@ function MethodLink({
   const shown = entry?.name ?? method.name;
   const input = dtypeBefore(dtypes, index);
   const output = dtypes?.methods[index] ?? null;
+  // Where the method stands, as the engine reported it: what may follow what comes before it.
+  const place = dtypes?.places[index] ?? null;
   const wrong = wrongWords.has(wrongId({ kind: 'method', methodId: method.id }));
+  const list = useListState();
+  const offered = useOffers(list.open && place !== null ? placeRequest(place) : null);
+  const optionsAsked = useOptions(
+    list.open && entry !== null
+      ? { entry: entry.id, chosen: chosenOptions(entry, method.options) }
+      : null,
+  );
   const { ref, handleRef, isDragSource } = useSortable({
     id: method.id,
     index,
@@ -334,12 +305,12 @@ function MethodLink({
       ),
     );
   };
-  const swap = (name: MethodName): void => {
+  const swap = (name: MethodName, picked: PreparedOffer): void => {
     const next = methodEntry(catalogue, name);
     replace({
       id: method.id,
       name,
-      argument: swappedArgument(catalogue, method.argument, name, frame),
+      argument: swappedArgument(catalogue, method.argument, name, picked.argument),
       // What is set carries over to a method that takes the same parameter.
       options: next === null ? NO_OPTIONS : carriedOptions(method.options, entry, next),
     });
@@ -383,13 +354,21 @@ function MethodLink({
               ...(parameters.length === 0
                 ? []
                 : [
-                    optionOffers(parameters, method.options, typed, (options, added) => {
-                      replace({ ...method, options });
-                      if (added !== null) fresh.mark(`${method.id}:${added}`);
-                    }),
+                    optionOffers(
+                      parameters,
+                      method.options,
+                      typed,
+                      (options, added) => {
+                        replace({ ...method, options });
+                        if (added !== null) fresh.mark(`${method.id}:${added}`);
+                      },
+                      optionsAsked,
+                    ),
                   ]),
-              ...methodOffers(catalogue, typed, input, swap),
+              ...methodGroups(catalogue, offered, place !== null, typed, swap),
             ]}
+            onOpenChange={list.onOpenChange}
+            onType={list.onType}
             buttonRef={handleRef}
           />
         </Hint>
@@ -397,6 +376,8 @@ function MethodLink({
           <ArgumentSlot
             method={method}
             rule={rule}
+            entryId={entry?.id ?? methodId(method.name)}
+            place={place}
             frame={frame}
             wrong={wrong}
             onCommit={(argument) => {
@@ -409,7 +390,11 @@ function MethodLink({
           entry={entry}
           parameters={parameters}
           options={method.options}
-          around={{ frame, items: () => [] }}
+          around={{
+            frame,
+            items: () => [],
+            method: entry === null ? undefined : { entry: entry.id, place },
+          }}
           layout="inline"
           onChange={(options) => {
             replace({ ...method, options });
@@ -461,6 +446,7 @@ export function ChainBlocks({
   const prepared = usePreparedStep();
   const dtypes = prepared?.chains.get(chainId);
   const wrongWords = prepared?.wrong ?? NO_WRONG;
+  const positions = usePositions();
   const [insertion, setInsertion] = useState<Insertion | null>(null);
   // A chain made by carrying a field on opens its list of methods as soon as it is shown.
   const [opensMethods, setOpensMethods] = useState(() => fresh.id === `${chainId}:method`);
@@ -472,11 +458,11 @@ export function ChainBlocks({
   const withSource = (next: Source): void => {
     onChange({ source: next, methods: chain.methods });
   };
-  const insert = (at: number, name: MethodName): void => {
+  const insert = (at: number, name: MethodName, picked: PreparedOffer): void => {
     const method = {
       id: nextId('method'),
       name,
-      argument: defaultArgument(catalogue, name),
+      argument: startingArgument(catalogue, name, picked.argument),
       options: NO_OPTIONS,
     };
     const methods = [...chain.methods];
@@ -517,6 +503,20 @@ export function ChainBlocks({
   const adding: Insertion | null =
     insertion ??
     (opensMethods && start !== null ? { at: chain.methods.length, anchor: start } : null);
+  // What may stand where a method would be added, as the engine says of the place it reported.
+  const addPlace = adding === null ? null : (dtypes?.places[adding.at] ?? null);
+  const inserting = useOffers(addPlace === null ? null : placeRequest(addPlace));
+  // What may start the chain: the functions, the connected inputs and the fields the engine allows.
+  const startList = useListState();
+  const startKnown = positions.length > 0;
+  const startOffers = useOffers(startList.open && startKnown ? startRequest(positions) : null);
+  const startFits = useCandidateFits(
+    startKnown ? { start: positions, argument: null } : null,
+    startList.open,
+    frame,
+    node,
+    '',
+  );
 
   // Each chain sorts its own methods, so a method cannot leave its chain.
   const methods = (
@@ -546,12 +546,26 @@ export function ChainBlocks({
       ))}
     </DragDropProvider>
   );
+  // What a condition holds stands in a position inside the expression: its predicates in one, its
+  // values in another.
   const given = (
     value: Value,
     label: string,
+    which: 'then' | 'otherwise',
     onValue: (next: Value) => void,
   ): React.JSX.Element => (
-    <ValueSlot value={value} frame={frame} label={label} lists={false} onChange={onValue} />
+    <ValueSlot
+      value={value}
+      frame={frame}
+      label={label}
+      lists={false}
+      positions={within(
+        positions,
+        positionOfParameter(conditionEntry(catalogue, which), 'statement'),
+      )}
+      argument={null}
+      onChange={onValue}
+    />
   );
   const [arm] = source.kind === 'when' ? source.arms : [];
   // The word `element` comes from the catalogue; one it lacks keeps its Polars name and says so.
@@ -614,40 +628,38 @@ export function ChainBlocks({
                 buttonRef={setStart}
                 describedAs="What the chain starts from"
                 placeholder="Search the fields and functions"
-                offers={(typed) => [
-                  titled(
-                    'Functions',
-                    matches(typed, whenWord.text, whenWord.hint)
-                      ? [
-                          offer(
-                            whenWord.text,
-                            'function',
-                            whenWord.hint,
-                            () => {
-                              const made = emptyArm();
-                              withSource({
-                                kind: 'when',
-                                arms: [made],
-                                otherwise: { kind: 'unset' },
-                              });
-                              fresh.mark(made.condition.id);
-                            },
-                            { reason: whenWord.lacking ? 'not in the catalogue' : null },
-                          ),
-                        ]
-                      : [],
-                  ),
-                  counted(
-                    'Fields',
-                    fieldOffers(
-                      frame,
-                      typed,
-                      anyField((name) => {
-                        withSource({ kind: 'column', column: name });
-                      }),
-                    ),
-                  ),
-                ]}
+                offers={(typed) => {
+                  const rows = {
+                    frame,
+                    node,
+                    typed,
+                    fits: startFits,
+                    inputs: ['value', 'list'] as const,
+                    onLiteral: () => undefined,
+                    onInput: (name: string) => {
+                      withSource({ kind: 'input', name });
+                    },
+                    onField: (name: string) => {
+                      withSource({ kind: 'column', column: name });
+                    },
+                  };
+                  return [
+                    ...startFunctions(catalogue, startOffers, startKnown, typed, (id) => {
+                      if (id === 'polars.when') {
+                        const made = emptyArm();
+                        withSource({ kind: 'when', arms: [made], otherwise: { kind: 'unset' } });
+                        fresh.mark(made.condition.id);
+                      } else {
+                        withSource({ kind: 'element' });
+                        fresh.mark(`${chainId}:method`);
+                      }
+                    }),
+                    inputGroup(rows),
+                    fieldGroup(rows),
+                  ];
+                }}
+                onOpenChange={startList.onOpenChange}
+                onType={startList.onType}
               />
             </Hint>
           </Piece>
@@ -684,6 +696,10 @@ export function ChainBlocks({
             <ConditionBlocks
               condition={arm.condition}
               frame={frame}
+              positions={within(
+                positions,
+                positionOfParameter(conditionEntry(catalogue, 'when'), 'predicates'),
+              )}
               tone="function"
               onChange={(condition) => {
                 withSource({ ...source, arms: [{ ...arm, condition }] });
@@ -692,15 +708,20 @@ export function ChainBlocks({
           </Line>
           <Line>
             <Word title={thenWord.hint}>{thenWord.text}</Word>
-            {given(arm.returns, 'The value where the condition holds', (returns) => {
+            {given(arm.returns, 'The value where the condition holds', 'then', (returns) => {
               withSource({ ...source, arms: [{ ...arm, returns }] });
             })}
           </Line>
           <Line>
             <Word title={otherwiseWord.hint}>{otherwiseWord.text}</Word>
-            {given(source.otherwise, 'The value where the condition does not hold', (otherwise) => {
-              withSource({ ...source, otherwise });
-            })}
+            {given(
+              source.otherwise,
+              'The value where the condition does not hold',
+              'otherwise',
+              (otherwise) => {
+                withSource({ ...source, otherwise });
+              },
+            )}
           </Line>
           {lacking.length > 0 && (
             <Line>
@@ -715,8 +736,8 @@ export function ChainBlocks({
           <OfferList
             placeholder="Search the methods"
             groups={(typed) =>
-              methodOffers(catalogue, typed, dtypeBefore(dtypes, adding.at), (name) => {
-                insert(adding.at, name);
+              methodGroups(catalogue, inserting, addPlace !== null, typed, (name, picked) => {
+                insert(adding.at, name, picked);
               })
             }
             keepOpen={false}

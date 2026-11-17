@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { BRIDGE_START_COMMAND, BridgeUnavailableError, bridgeHost } from './bridge';
+import fitsFixture from '../fixtures/fits-argument.json';
 import nodeFixture from '../fixtures/node-inputs.json';
+import offersFixture from '../fixtures/offers-value.json';
+import optionsFixture from '../fixtures/options.json';
 import reportFixture from '../fixtures/step-report.json';
 import rowsFixture from '../fixtures/step-rows.json';
 import { withField } from '../test-support/tamper';
@@ -68,6 +71,49 @@ describe('the host that calls the bridge', () => {
 
     expect(node.source.name).toBe('claims');
     expect(sent[0]).toMatchObject({ path: '/bridge/node_inputs', body: {} });
+  });
+
+  it('names the arguments of the offers commands as the host does', async () => {
+    const place = {
+      positions: [{ kind: 'outer', name: 'select' }],
+      after: { kind: 'value', dtype: 'Datetime(us)', shape: 'many' },
+    } as const;
+    bridgeAnswers(() => jsonResponse(offersFixture));
+    const offers = await bridgeHost().offersAt(place);
+    bridgeAnswers(() => jsonResponse(fitsFixture));
+    const request = {
+      start: null,
+      argument: { entry: 'Expr.dt.offset_by', parameter: 'by', place },
+      candidates: [{ kind: 'literal', literal: { kind: 'text', value: '1d' } }],
+    } as const;
+    const fits = await bridgeHost().candidateFits(request);
+    const fitsSent = [...sent];
+    bridgeAnswers(() => jsonResponse(optionsFixture));
+    const chosen = [{ parameter: 'how', word: 'cross' }];
+    const found = await bridgeHost().optionOffers('LazyFrame.join', chosen);
+
+    expect(offers.entries).toHaveLength(35);
+    expect(fits.fits).toHaveLength(5);
+    expect(found.options.length).toBeGreaterThan(0);
+    expect(fitsSent[0]).toMatchObject({
+      path: '/bridge/candidate_fits',
+      body: request,
+    });
+    expect(sent[0]).toMatchObject({
+      path: '/bridge/option_offers',
+      body: { entry: 'LazyFrame.join', chosen },
+    });
+  });
+
+  it('sends the place of the offers as the positions and what the expression has', async () => {
+    bridgeAnswers(() => jsonResponse(offersFixture));
+    const place = {
+      positions: [{ kind: 'outer', name: 'select' }],
+      after: { kind: 'start' },
+    } as const;
+    await bridgeHost().offersAt(place);
+
+    expect(sent[0]).toMatchObject({ path: '/bridge/offers_at', body: place });
   });
 
   it('names the arguments of the rows and the sample commands as the host does', async () => {

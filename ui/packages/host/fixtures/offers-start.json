@@ -1,0 +1,466 @@
+{
+  "place": {
+    "context": {
+      "outer": "select",
+      "nested": null
+    },
+    "after": {
+      "kind": "start"
+    }
+  },
+  "entries": [
+    {
+      "entry": "ChainedThen.otherwise",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "this continues a condition that is at its chained then"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "ChainedThen.when",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "this continues a condition that is at its chained then"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "ChainedWhen.then",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "this continues a condition that is at its chained when"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.cum_count",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.cum_max",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.cum_sum",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.dt.date",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.dt.month_start",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.dt.offset_by",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.dt.time",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.dt.total_days",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.eq",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.first",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.ge",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.gt",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_not_null",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_null",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.last",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.le",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.len",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.lt",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.max",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.min",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.ne",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.over",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.shift",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.sub",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.sum",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Then.otherwise",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "this continues a condition that is at its then"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Then.when",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "this continues a condition that is at its then"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "When.then",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "this continues a condition that is at its when"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "polars.col",
+      "verdict": {
+        "kind": "allowed",
+        "result": null,
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "polars.element",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "rule",
+            "rule": "element-only-in-pivot-aggregate"
+          },
+          "reason": "`polars.element` stands only in a pivot's aggregate"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "polars.lit",
+      "verdict": {
+        "kind": "allowed",
+        "result": null,
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "polars.when",
+      "verdict": {
+        "kind": "allowed",
+        "result": null,
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    }
+  ]
+}

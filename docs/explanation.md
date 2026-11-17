@@ -237,10 +237,22 @@ engine reports of them, in
 [ui/packages/steps/src/model/](../ui/packages/steps/src/model/document.ts).
 Translating the steps into a document and preparing the report for display are
 plain TypeScript with no React, tested against the snapshots the host writes.
-A step is held back from the document, with the reason, when something in it
-is still to be picked or the catalogue has no entry for it yet, such as a
-comparison with `is_in` or a condition of which any line is enough; the steps
-after it are not run, as they are not after a step the engine refuses. The
+Where an expression is still to be picked, a value, the field or input a chain
+starts from, a method's argument or a comparison's field, the editor writes a
+hole, which the document reads as an expression that starts from nothing. The
+engine walks the step up to the hole, so it reports the places before it, and
+does not build it: the step is incomplete at the hole's place, and the steps
+after it are not run, naming it. The editor reads the place back into what is to
+be picked and the word that is the matter. The steps after an incomplete step have no walk, so their chains have no lists of
+methods until the step before is finished. A new add-column step holds a hole, so
+its chain starts from nothing and has no methods to list until a field is picked,
+and a new pivot is held back until its three fields are picked, so its aggregate
+has no lists of methods until then. A step is held back from the
+document, with the reason, only where what is missing is not an expression to
+pick, such as an empty name, a field of a pivot or a table, or where the catalogue
+has no entry for it yet, such as a comparison with `is_in` or a condition of
+which any line is enough; the steps after it are not run, as they are not after
+a step the engine refuses. The
 document keeps the editor's step identifiers, so the editor's starting steps
 are the engine's claim-timing sample and translate to the same document. A
 run is asked for after a short wait for the next edit, with one request out at
@@ -253,9 +265,61 @@ steps that are still what it reported of: a step an edit has changed, and the
 steps after it, wait for the engine. A `when` of more than one case is held
 back too, as a further case is a `when` after `otherwise`. A refusal
 carries the place of the engine's document it is at, which the translation maps
-back to the word of the editor it marks. The view's lists still sort fields by
-the dtype groups the catalogue names; offers from the engine are a later part
-of the same work.
+back to the word of the editor it marks.
+
+The editor's lists offer what the engine allows and nothing of their own. A list
+asks the engine only while it is open, through a scheduler of its own that sends
+the newest request after a short wait, drops the answer to one that a newer
+request replaced and asks again only a failure that may pass, as the runs do. A
+list says that it is waiting, or that the engine has not reported on the place,
+and never shows what was answered for another place. Three commands answer:
+
+- `offers_at` says which calls may stand where an expression has what it has so
+  far, each with the engine's verdict, whether the chain may end there and the
+  argument a method starts with. A method's place is the one the engine's walk
+  reported for its link, which a chain's prepared dtypes carry; a chain's start
+  is the positions that hold it and nothing yet.
+- `candidate_fits` says which fields, connected inputs and numbers or text typed
+  in fit a slot, as the start of an expression, as the argument of a method or
+  both. The dtype of each is the engine's: a typed literal has the dtype Polars
+  gives it, so a whole number is the narrowest integer it fits and `1.5` is a
+  `Float64`. A start is offered a connected input where the engine allows a
+  literal of its dtype, which is what a run makes of an input.
+- `option_offers` says what the flags and choices of an entry may be set to
+  beside those already chosen, so that an option is added with a word Polars
+  allows, or not at all.
+
+The catalogue gives each expression parameter the position the tables name for
+it, so the editor says where a slot stands and the engine works out the context.
+The offers are prepared for display by plain functions in
+[model/offers.ts](../ui/packages/steps/src/model/offers.ts), tested against
+snapshots written from Rust: calls grouped by family, the shortest group first,
+with hints, reasons and where a chain may end.
+
+A method that is swapped keeps its argument, and the engine refuses it when the
+steps run if the new method does not take it, with its reason. A flag or a
+choice that is already set shows a word Polars refuses beside the other options
+as a refusal when the steps run, not in its list; only the list that adds an
+option asks. The values of `is_in` are connected lists the engine has no entry
+to judge yet, so that list offers them unjudged.
+
+### What The Editor Cannot Offer
+
+What the editor has no way to draw is written once, in
+[model/limits.ts](../ui/packages/steps/src/model/limits.ts), and a list shows
+such a call disabled with the reason. The host writes the grid of every call the
+engine allows at every place of every kind, 30 contexts each with nothing, 26
+dtypes in two shapes and 4 states of a condition, as
+`ui/packages/host/fixtures/offers-grid.json`, and a view test lists every
+combination the engine allows that the editor cannot draw against a written
+list. Today that is a further case of a condition, which the editor draws as a
+`when` after `otherwise`, in the 24 contexts where the engine allows one, and the
+parameters of a start or a condition that it does not set: `col`'s further
+names, `lit`'s dtype and its object flag, and the keyword constraints of a
+condition. Changing either side changes the list, which the test then fails on. The check
+covers entries and their parameters. It does not cover which classes of dtype
+the editor can type as an argument: it types a number or text, so a typed date,
+duration or Boolean literal, which the engine may allow, is not on the list.
 
 ## The Step Document
 
@@ -265,7 +329,8 @@ with a version, and a version the reader does not know is refused: dageist is
 before 1.0, so an older document is not upgraded. A step is a call of a frame
 entry of the catalogue, with its arguments by Python parameter name, and a
 parameter left out takes its default. An expression is a start, a function
-such as `polars.col` or `polars.lit`, `polars.when`, or a connected input,
+such as `polars.col` or `polars.lit`, `polars.when`, a connected input, or a hole,
+`{ "hole": null }`, where nothing is picked yet,
 followed by a list of calls, one for each method or link of a condition, so
 columns, literals and conditions are written the same way. Dtypes are written
 as Python prints them, such as `Datetime(time_unit='us', time_zone=None)`.
@@ -294,6 +359,25 @@ the reason when Polars refuses. Some mistakes, such as `dt.date` on a String
 column, are only found when rows are read, not from the schema; the editor
 learns them in advance from the
 [tables of allowed combinations](#which-combinations-polars-allows).
+A chain that starts from a connected input is walked as the run makes it, a
+literal of the input's dtype, so the tables' lines for a literal judge it, and a
+list gives many values where a value gives one. A name that is not connected
+leaves what follows it not known.
+A number typed without a dtype is walked as the dtype Polars gives it by
+itself, a whole number an `Int32` and one with a fraction a `Float64`, which `fit`
+reads the same way, and among the values of a condition that are numbers it
+takes their dtype, so `when(f).then(a).otherwise(0)` gives what `a` holds.
+A hole starts an expression that nothing is asked of.
+The tables are measured with typed columns, and a number typed without a dtype is a
+dyn literal that adapts to the operand it is used with, so `u8 - 1` is a `UInt8`.
+The walk and `fit` therefore leave what a call gives not known where such a number
+is an operand of a method that takes one or the receiver of one, and know it where
+it stands alone, counts rows as `shift` does, or is a value of a condition beside
+typed values that it fits: a whole number adapts to whole numbers and numbers with a
+fraction it fits, a number with a fraction only to numbers with a fraction, and
+numbers alone have no class. A condition with no `otherwise` that holds one is not
+known to end, as Polars refuses it. The fuzz target draws such numbers, outside the
+values of a condition, so that its campaigns hold these answers to Polars.
 The runner asks the named rules beside those tables, and not the tables, for
 where an expression may start: `element` starts a chain only in a pivot's
 aggregate. A row of the context table was measured with the chain ending at one
@@ -521,14 +605,28 @@ what surrounds it, after the limits, in these ways:
   as the key panics); and the call on a column whose plan and rows agree is allowed
   there, and so is the column alone. A refusal that the control meets too, as a
   filter's predicate that is not a `Boolean`, or a panic that has no part in the
-  mismatch, shows nothing.
+  mismatch, shows nothing;
+- for a call the tables refused without knowing the dtype of an argument (a window
+  whose options the tables were not measured with, or a number given no dtype), the
+  part as written, alone. The tables refuse such a call only when no dtype the
+  argument might have lets it stand, with the reason Polars gave for one of them, so
+  the reason of the probe, which has the argument's own dtype, is not the tables' in
+  words and is not compared. It counts when Polars refuses the probe for itself at the
+  refused call, and the part before the call, alone, is allowed. It shows that Polars
+  refuses the part at that call, not why: a refusal there for another argument or
+  option would count too, and the reason the editor shows for such a call is the
+  tables' for a stand-in dtype, not Polars' for the argument's own. That a window
+  given options and no `partition_by` has no known dtype is one gap that makes
+  a call blind in this way, which [#73](https://github.com/bj-data-eng/dageist/issues/73)
+  tracks.
 
 The first two count when Polars refuses the probe for the reason the tables gave, and
 the case then counts as **refused where Polars does not evaluate the part**: the
 tables are stricter by design, and the tally names it. The replay and the outcome say
-what the probe showed: that the probe was refused for the tables' reason, or that the
+what the probe showed: that the probe was refused for the tables' reason, that the
 call's plan and rows differ as the tables say, the call is refused in the position
-and a call whose plan and rows agree is allowed. The reasons are matched by what
+and a call whose plan and rows agree is allowed, or that Polars refuses the call that
+the tables refused for every dtype of an argument they did not know. The reasons are matched by what
 Polars objected to and the call it names (the symbol of a comparison, a name in
 backticks), without the dtypes and column names it quotes, and for a rule that a
 predicate be a `Boolean` by Polars' words for it. A refusal that Polars places must

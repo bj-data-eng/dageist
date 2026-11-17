@@ -132,7 +132,7 @@ const readValueShape: Decode<ValueShapeView> = readWord(VALUE_SHAPES);
 
 const readConditionState: Decode<ConditionStateView> = readWord(CONDITION_STATES);
 
-const readAfter: Decode<AfterView> = readTagged<AfterView>('kind', {
+export const readAfter: Decode<AfterView> = readTagged<AfterView>('kind', {
   start: { fields: [], read: () => ({ kind: 'start' }) },
   value: {
     fields: ['dtype', 'shape'],
@@ -155,15 +155,18 @@ const readOuter: Decode<OuterPosition> = readWord(OUTER_POSITIONS);
 
 const readNested: Decode<NestedPosition> = readWord(NESTED_POSITIONS);
 
-const readContext: Decode<ContextView> = readRecord(['outer', 'nested'], (fields, path) => ({
+export const readContext: Decode<ContextView> = readRecord(['outer', 'nested'], (fields, path) => ({
   outer: readField(fields, path, 'outer', readOuter),
   nested: readField(fields, path, 'nested', readNullable(readNested)),
 }));
 
-const readOfferPlace: Decode<OfferPlaceView> = readRecord(['context', 'after'], (fields, path) => ({
-  context: readField(fields, path, 'context', readContext),
-  after: readField(fields, path, 'after', readAfter),
-}));
+export const readOfferPlace: Decode<OfferPlaceView> = readRecord(
+  ['context', 'after'],
+  (fields, path) => ({
+    context: readField(fields, path, 'context', readContext),
+    after: readField(fields, path, 'after', readAfter),
+  }),
+);
 
 const readStage: Decode<StageView> = readWord(STAGES);
 
@@ -184,10 +187,13 @@ const readRefusalSource: Decode<RefusalSourceView> = readTagged<RefusalSourceVie
   structure: { fields: [], read: () => ({ by: 'structure' }) },
 });
 
-const readRefusal: Decode<RefusalView> = readRecord(['source', 'reason'], (fields, path) => ({
-  source: readField(fields, path, 'source', readRefusalSource),
-  reason: readField(fields, path, 'reason', readString),
-}));
+export const readRefusal: Decode<RefusalView> = readRecord(
+  ['source', 'reason'],
+  (fields, path) => ({
+    source: readField(fields, path, 'source', readRefusalSource),
+    reason: readField(fields, path, 'reason', readString),
+  }),
+);
 
 const readEnding: Decode<EndingView> = readTagged<EndingView>('kind', {
   allowed: { fields: [], read: () => ({ kind: 'allowed' }) },
@@ -207,7 +213,7 @@ const readEnding: Decode<EndingView> = readTagged<EndingView>('kind', {
   },
 });
 
-const readVerdict: Decode<VerdictView> = readTagged<VerdictView>('kind', {
+export const readVerdict: Decode<VerdictView> = readTagged<VerdictView>('kind', {
   allowed: {
     fields: ['result', 'shape', 'ending'],
     read: (fields, path) => ({
@@ -312,6 +318,13 @@ const readOutcome: Decode<OutcomeView> = readTagged<OutcomeView>('status', {
       status: 'refused',
       place: readField(fields, path, 'place', readPlace),
       cause: readField(fields, path, 'cause', readCause),
+    }),
+  },
+  incomplete: {
+    fields: ['place'],
+    read: (fields, path) => ({
+      status: 'incomplete',
+      place: readField(fields, path, 'place', readPlace),
     }),
   },
   notRun: {

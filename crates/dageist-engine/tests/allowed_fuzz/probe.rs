@@ -33,7 +33,18 @@
 //! - [`settle_on_a_value_as_a_key`]: a part that is one value is allowed as a key
 //!   whatever it holds, so the refused call is asked on a column as the key.
 //!
-//! The fourth has no reason to match. [`settle_in_the_position`] is for a refusal
+//! The fourth, [`settle_given_no_known_dtype`], is for a call the tables refused
+//! without knowing the dtype of an argument: they refuse it for every dtype that
+//! argument might have, with the reason Polars gave for one of them, so the reason
+//! of a probe that has the argument's own dtype is not the tables' in words
+//! ([`Showing::ForAnyDtypeOfTheArgument`]). Polars refusing the part as written, for
+//! itself, at the refused call, with the part before the call allowed, shows the
+//! refusal right. It shows that Polars refuses the part at that call, not why: a
+//! refusal there for another argument or option would count too, and the reason the
+//! editor shows for such a call is the tables' for a stand-in dtype, not Polars' for
+//! the argument's own.
+//!
+//! The last has no reason to match. [`settle_in_the_position`] is for a refusal
 //! that is the target's own comparison of a call's plan with its rows, which is no
 //! refusal of Polars and so is neither the tables' reason nor one a probe is refused
 //! for. It settles the case only when Polars' own plan and rows for the call on a
@@ -66,6 +77,10 @@ pub enum Showing {
     /// call on that column is refused by Polars in the position, and a column
     /// whose plan and rows agree is not.
     TheSchemaMismatch,
+    /// The tables refused the call for every dtype that an argument they did not
+    /// know might have, and Polars refuses the part as written at the call, for
+    /// the dtype the argument has.
+    ForAnyDtypeOfTheArgument,
 }
 
 /// What a probe found: the document it ran, why Polars refused it, and what that
@@ -87,6 +102,10 @@ impl Settled {
             ),
             Showing::TheSchemaMismatch => format!(
                 "the probe {} is refused by Polars ({}), where the call on a column of the dtype that reaches it has a plan and rows that differ as the tables say and one whose plan and rows agree is allowed",
+                self.probe, self.reason
+            ),
+            Showing::ForAnyDtypeOfTheArgument => format!(
+                "the probe {} is refused by Polars at the call the tables refused for every dtype of an argument they did not know: {}",
                 self.probe, self.reason
             ),
         }
@@ -141,7 +160,7 @@ fn find<'a>(case: &'a Case, place: &'a Place) -> Option<Found<'a>> {
             (Node::Value(Value::Pairs(pairs)), Segment::Value(item)) => enter(&pairs.get(*item)?.1),
             (Node::Expression(expression), Segment::Start) => match expression.start() {
                 Start::Call(call) => Node::Call(call),
-                Start::Input(_) => return None,
+                Start::Input(_) | Start::Hole => return None,
             },
             (Node::Expression(expression), Segment::Link(link)) => {
                 Node::Call(expression.links().get(*link)?)
@@ -978,6 +997,49 @@ pub fn settle_apart(
         .or_else(|| settle_as_a_key(case, refused))
         .or_else(|| settle_on_a_value_as_a_key(case, refused, predicted, observed))
         .or_else(|| settle_in_the_position(case, refused, predicted, observed))
+        .or_else(|| settle_given_no_known_dtype(case, refused))
+}
+
+/// Asks Polars about a call the tables refused without knowing the dtype of an
+/// argument, as it is written and alone. The tables refuse such a call only when
+/// no dtype the argument might have lets it stand, and say the reason Polars gave
+/// for one of them, so Polars refusing the probe for the argument's own dtype is
+/// in other words: the reason is not compared. What shows the tables right is that
+/// Polars refuses the part for itself at the refused call, and that the part before
+/// the call alone is allowed, for a refusal of that is another call's. `None` when
+/// the tables knew every dtype, the reason is the target's own comparison, there is
+/// nothing to ask, or Polars allows the probe, refuses it elsewhere or refuses the
+/// part before the call.
+pub fn settle_given_no_known_dtype(case: &Case, refused: &Refused) -> Option<Settled> {
+    if !refused.argument_unknown
+        || !matches!(refused.source, Source::Polars)
+        || is_the_targets_own(&refused.reason)
+    {
+        return None;
+    }
+    let found = find(case, &refused.place)?;
+    let probe = probe_of_the_part(&found, &refused.source)?;
+    let run = |part: Expression| {
+        Some(Case {
+            receiver: case.receiver,
+            argument: case.argument,
+            document: document_of(case, &found, part, false)?,
+        })
+    };
+    let probed = run(probe.part)?;
+    let tables = tables_of(&found, None);
+    let refusal = refused_by_polars(&probed, tables, &probe.at)?;
+    if let Some(before) = probe.before {
+        let alone = run(before)?;
+        if observe_probe(&alone, tables).refusal.is_some() {
+            return None;
+        }
+    }
+    Some(Settled {
+        probe: probed.document.write(),
+        reason: refusal.reason,
+        showing: Showing::ForAnyDtypeOfTheArgument,
+    })
 }
 
 /// The predicate a rule refused: the whole expression at its place.
@@ -1099,6 +1161,7 @@ mod tests {
             place,
             stage: None,
             reason: reason.to_owned(),
+            argument_unknown: false,
         }
     }
 
@@ -1299,6 +1362,7 @@ mod tests {
             place,
             stage: None,
             reason: reason.to_owned(),
+            argument_unknown: false,
         }
     }
 
@@ -1437,6 +1501,93 @@ mod tests {
     }
 
     #[test]
+    fn a_comparison_given_no_known_dtype_is_settled_by_polars_refusing_it() {
+        // `sort(by=when(b <= b - 1).then(b).last())` of `List(Int64)`: the tables
+        // do not know what `b - 1` gives, and refuse the comparison for every
+        // dtype it might give, with the reason Polars gave for one of them. Polars
+        // drops a sort key that is one value; asked as written, it refuses the
+        // comparison, for the dtype the argument really has.
+        let case =
+            kept("stricter-a-comparison-given-no-known-dtype-in-a-sort-key-of-one-value.case");
+        let refused = refusal(&case);
+        assert_eq!(settle(&case, &refused), None);
+        let found = settle_apart(&case, &refused, &predict(&case), &observe(&case))
+            .expect("a comparison that Polars refuses");
+        assert!(found.probe.contains("LazyFrame.select"), "{}", found.probe);
+        assert!(found.reason.contains("comparison"), "{}", found.reason);
+        assert_eq!(found.showing, Showing::ForAnyDtypeOfTheArgument);
+    }
+
+    #[test]
+    fn an_arithmetic_given_no_known_dtype_is_settled_by_polars_refusing_it() {
+        // `sort(by=g.over(order_by=[g - h.over(order_by=[k], nulls_last=true)]).sum())`:
+        // the tables do not know the dtype of the window that is subtracted from a
+        // text column, and refuse the subtraction for every dtype it might give.
+        let case =
+            kept("stricter-an-arithmetic-given-no-known-dtype-in-a-sort-key-of-one-value.case");
+        let refused = refusal(&case);
+        assert_eq!(settle(&case, &refused), None);
+        let found = settle_apart(&case, &refused, &predict(&case), &observe(&case))
+            .expect("a subtraction that Polars refuses");
+        assert!(found.probe.contains("LazyFrame.select"), "{}", found.probe);
+        assert!(found.reason.contains("sub operation"), "{}", found.reason);
+        assert_eq!(found.showing, Showing::ForAnyDtypeOfTheArgument);
+    }
+
+    #[test]
+    fn a_call_refused_with_every_dtype_known_is_asked_for_its_reason() {
+        // The probe of a call given no known dtype does not compare reasons, so it is
+        // asked only of a refusal the walk says was made that way.
+        let case =
+            kept("stricter-a-comparison-given-no-known-dtype-in-a-sort-key-of-one-value.case");
+        let refused = Refused {
+            argument_unknown: false,
+            ..refusal(&case)
+        };
+        assert_eq!(settle_given_no_known_dtype(&case, &refused), None);
+    }
+
+    #[test]
+    fn a_call_given_no_known_dtype_that_polars_allows_alone_settles_nothing() {
+        // The running sum of whole numbers is allowed, whatever the tables say of it.
+        let case = in_a_position("LazyFrame.select", "exprs", "Int64", &["Expr.cum_sum"]);
+        let refused = Refused {
+            argument_unknown: true,
+            ..refused_at_the_link("cannot perform `cum_sum`")
+        };
+        assert_eq!(settle_given_no_known_dtype(&case, &refused), None);
+    }
+
+    #[test]
+    fn a_call_given_no_known_dtype_after_a_call_polars_refuses_settles_nothing() {
+        // The sum of text is refused by Polars at the first call, so its refusal is
+        // not the second call's.
+        let case = in_a_position(
+            "LazyFrame.select",
+            "exprs",
+            "String",
+            &["Expr.sum", "Expr.cum_sum"],
+        );
+        let refused = Refused {
+            argument_unknown: true,
+            ..refused_at_link(1, "cannot perform `cum_sum`")
+        };
+        assert_eq!(settle_given_no_known_dtype(&case, &refused), None);
+    }
+
+    #[test]
+    fn a_refusal_that_is_the_targets_own_is_not_settled_for_a_call_given_no_known_dtype() {
+        let case =
+            kept("stricter-a-comparison-given-no-known-dtype-in-a-sort-key-of-one-value.case");
+        let refused = Refused {
+            argument_unknown: true,
+            reason: "the schema says Int64 and the rows give UInt128".to_owned(),
+            ..refusal(&case)
+        };
+        assert_eq!(settle_given_no_known_dtype(&case, &refused), None);
+    }
+
+    #[test]
     fn a_call_that_polars_allows_as_a_sort_key_on_a_column_settles_nothing() {
         // The running sum of whole numbers is allowed as a sort key, so a mismatch
         // that the tables are said to find in it is not shown there.
@@ -1452,6 +1603,7 @@ mod tests {
             place,
             stage: None,
             reason: "the schema says Int64 and the rows give UInt128".to_owned(),
+            argument_unknown: false,
         };
         assert_eq!(
             settle_in_the_position(&case, &refused, &predict(&case), &observe(&case)),
@@ -1484,6 +1636,7 @@ mod tests {
             place,
             stage: None,
             reason: "the schema says Int64 and the rows give UInt128".to_owned(),
+            argument_unknown: false,
         }
     }
 

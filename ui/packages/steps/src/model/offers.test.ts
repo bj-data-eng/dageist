@@ -1,0 +1,259 @@
+import { describe, expect, it } from 'vitest';
+
+import type { CandidateRequest, FitsView, LiteralView, OfferPlaceView } from '@dageist/host';
+import { decodeCatalogue, decodeFits, decodeOffers, decodeOptions } from '@dageist/host';
+
+import catalogueFixture from '../../../host/fixtures/catalogue.json';
+import fitsArgumentFixture from '../../../host/fixtures/fits-argument.json';
+import fitsStartFixture from '../../../host/fixtures/fits-start.json';
+import offersConditionFixture from '../../../host/fixtures/offers-condition.json';
+import offersStartFixture from '../../../host/fixtures/offers-start.json';
+import offersValueFixture from '../../../host/fixtures/offers-value.json';
+import optionsFixture from '../../../host/fixtures/options.json';
+import { indexCatalogue } from './catalogue';
+import { candidateKey, chosenOptions, prepareFits, prepareOffers, prepareOptions } from './offers';
+import { literalOf, numberTyped, typedValues } from './literal';
+import { NO_POSITIONS, placeRequest, positionsOf, startRequest, within } from './place';
+
+// The catalogue and the answers the host writes from the engine, as the editor gets them.
+const catalogue = indexCatalogue(decodeCatalogue(catalogueFixture));
+const afterDatetime = decodeOffers(offersValueFixture);
+const atStart = decodeOffers(offersStartFixture);
+const afterThen = decodeOffers(offersConditionFixture);
+
+describe('the methods the engine offers after a timestamp', () => {
+  const families = prepareOffers(catalogue, afterDatetime, ['expression']);
+  const offerNamed = (name: string) =>
+    families.flatMap((family) => family.offers).find((offer) => offer.name === name);
+
+  it('are grouped by family, the shortest group first, and those of a length in the catalogue order', () => {
+    // The methods of each family: arithmetic and window one, rows and cumulative three,
+    // aggregate four, temporal five and compare eight.
+    expect(families.map((family) => [family.key, family.offers.length])).toEqual([
+      ['arithmetic', 1],
+      ['window', 1],
+      ['rows', 3],
+      ['cumulative', 3],
+      ['aggregate', 4],
+      ['temporal', 5],
+      ['compare', 8],
+    ]);
+    expect(families[0]?.title).toBe('Arithmetic');
+  });
+
+  it('carry the hint of the catalogue and are offered in the engine’s order', () => {
+    expect(
+      families.find((family) => family.key === 'rows')?.offers.map((offer) => offer.name),
+    ).toEqual(['first', 'last', 'shift']);
+    expect(offerNamed('shift')?.hint).toBe('value n rows earlier');
+  });
+
+  it('are refused with the engine’s reason, which says who refused', () => {
+    const refused = offerNamed('cum_sum');
+    expect(refused?.stoppedBy).toBe('engine');
+    expect(refused?.reason).toContain('`cum_sum` operation not supported for dtype');
+    expect(offerNamed('dt.date')).toMatchObject({ reason: null, stoppedBy: null });
+  });
+
+  it('say whether a chain may end at each of them', () => {
+    expect(offerNamed('dt.date')?.ends).toEqual({ kind: 'allowed' });
+    // A call that is refused has no end to speak of.
+    expect(offerNamed('sum')?.ends).toEqual({ kind: 'notKnown' });
+  });
+
+  it('give the argument a method starts with, only where the engine says it fits', () => {
+    expect(offerNamed('shift')?.argument).toEqual({
+      parameter: 'n',
+      literal: { kind: 'integer', value: 1 },
+    });
+    expect(offerNamed('dt.date')?.argument).toBeNull();
+    expect(offerNamed('sum')?.argument).toBeNull();
+  });
+});
+
+describe('the calls the engine offers at the start of an expression', () => {
+  it('are the functions and the links of a condition, each with who refused it', () => {
+    const families = prepareOffers(catalogue, atStart, ['function', 'condition']);
+    expect(families.map((family) => [family.key, family.offers.length])).toEqual([
+      ['start', 3],
+      ['condition', 7],
+    ]);
+    const start = families.find((family) => family.key === 'start')?.offers ?? [];
+    // `element` stands only in a pivot's aggregate, by a rule the engine holds.
+    const element = start.find((offer) => offer.name === 'element');
+    expect(element?.stoppedBy).toBe('engine');
+    expect(element?.reason).toBe("`polars.element` stands only in a pivot's aggregate");
+    expect(start.find((offer) => offer.name === 'col')).toMatchObject({ reason: null });
+  });
+
+  it('cannot be a further case of a condition, which the editor does not draw', () => {
+    const rows = prepareOffers(catalogue, afterThen, ['condition']).flatMap(
+      (family) => family.offers,
+    );
+    const byName = (id: string) => rows.find((offer) => offer.id === id);
+    // After `then`, `otherwise` ends the condition, which the editor draws, and a further `when`
+    // goes on, which it does not.
+    expect(byName('Then.otherwise')).toMatchObject({ reason: null, stoppedBy: null });
+    expect(byName('Then.when')).toMatchObject({
+      stoppedBy: 'editor',
+      reason: 'the editor draws one case of a when; a further case follows otherwise',
+    });
+    expect(byName('When.then')?.stoppedBy).toBe('engine');
+  });
+});
+
+const field = (dtype: string): CandidateRequest => ({ kind: 'field', dtype });
+const input = (dtype: string, list = false): CandidateRequest => ({ kind: 'input', dtype, list });
+const literal = (value: LiteralView): CandidateRequest => ({ kind: 'literal', literal: value });
+
+describe('the candidates that fit a slot', () => {
+  it('are each given the dtype the engine gave them, and whether a chain may end at them', () => {
+    // The candidates are the ones the host's snapshot of the fits of a predicate was asked about.
+    const boolean = field('Boolean');
+    const number = field('Int64');
+    const whole = literal({ kind: 'integer', value: 1 });
+    const candidates: CandidateRequest[] = [
+      boolean,
+      number,
+      input('Boolean'),
+      input('Date', true),
+      whole,
+      literal({ kind: 'float', value: 1.5 }),
+      literal({ kind: 'text', value: 'x' }),
+      field('Categorical'),
+    ];
+    const fits = prepareFits(candidates, decodeFits(fitsStartFixture), true);
+    const fit = (candidate: CandidateRequest) => fits.get(candidateKey(candidate));
+
+    // A predicate is a Boolean: every candidate may stand to be continued, and a number may not
+    // end it.
+    expect(fit(boolean)).toEqual({ dtype: 'Boolean', reason: null, ends: { kind: 'allowed' } });
+    expect(fit(number)).toMatchObject({ dtype: 'Int64', reason: null, ends: { kind: 'refused' } });
+    // The engine, not the editor, says what a number is: a whole number, and one with a fraction.
+    expect(fit(whole)?.dtype).toBe('Int32');
+    expect(fit(literal({ kind: 'float', value: 1.5 }))?.dtype).toBe('Float64');
+    expect(fit(literal({ kind: 'text', value: 'x' }))?.dtype).toBe('String');
+    // What the tables cover no class of is not refused: it is left to the run.
+    expect(fit(field('Categorical'))).toEqual({ dtype: null, reason: null, ends: null });
+  });
+
+  it('are refused with the engine’s reason as the argument of a method, with no end to speak of', () => {
+    const text = field('String');
+    const candidates: CandidateRequest[] = [
+      text,
+      field('Int64'),
+      input('String'),
+      literal({ kind: 'text', value: '1d' }),
+      literal({ kind: 'integer', value: 1 }),
+    ];
+    const fits = prepareFits(candidates, decodeFits(fitsArgumentFixture), false);
+    const reasons = candidates.map((candidate) => fits.get(candidateKey(candidate))?.reason);
+
+    // `offset_by` takes text: a whole number is no duration.
+    expect(reasons.map((reason) => reason === null)).toEqual([true, false, true, true, false]);
+    expect(reasons[1]).toContain('expected `String`');
+    expect(fits.get(candidateKey(text))?.ends).toBeNull();
+  });
+
+  it('are left out where the engine answered for fewer candidates than were asked', () => {
+    const none: FitsView = { fits: [] };
+    expect(prepareFits([field('Int64')], none, true).size).toBe(0);
+  });
+});
+
+describe('the options of an entry', () => {
+  const options = prepareOptions(decodeOptions(optionsFixture));
+
+  it('start with the first word that is not the default and that Polars allows', () => {
+    // A choice whose default is `inner`: the next word is `left`.
+    expect(options.get('how')).toMatchObject({ default: 'inner', starter: 'left', stuck: null });
+    // Beside a cross join every flag is refused: Polars takes no keys, and no option of them.
+    expect(options.get('coalesce')).toMatchObject({ default: 'unset', starter: null });
+    expect(options.get('coalesce')?.stuck).toContain('cross join');
+  });
+
+  it('cannot be added where Polars refuses every word but the default, and say why', () => {
+    // A cross join takes no keys: every validation is refused, the default `m:m` as well.
+    const validate = options.get('validate');
+    expect(validate?.starter).toBeNull();
+    expect(validate?.stuck).toContain('cross');
+    expect(validate?.words.map((word) => word.word)).toEqual(['m:m', 'm:1', '1:m', '1:1']);
+  });
+
+  it('are the flags and choices a step sets, as the words of the engine’s option table', () => {
+    const join = catalogue.entries.get('LazyFrame.join');
+    if (join === undefined) throw new Error('no join');
+    expect(
+      chosenOptions(join, {
+        coalesce: { kind: 'flag', value: true },
+        how: { kind: 'word', value: 'cross' },
+        suffix: { kind: 'text', value: '_r' },
+        left_on: { kind: 'list', items: [] },
+      }),
+    ).toEqual([
+      { parameter: 'how', word: 'cross' },
+      { parameter: 'coalesce', word: 'true' },
+    ]);
+  });
+});
+
+describe('where a slot stands', () => {
+  const place: OfferPlaceView = {
+    context: { outer: 'select', nested: 'condition.value' },
+    after: { kind: 'value', dtype: 'Int64', shape: 'one' },
+  };
+
+  it('is the positions that hold the expression, which the engine reads as a context', () => {
+    expect(positionsOf(place.context)).toEqual([
+      { kind: 'outer', name: 'select' },
+      { kind: 'nested', name: 'condition.value' },
+    ]);
+    expect(positionsOf({ outer: 'sort', nested: null })).toEqual([{ kind: 'outer', name: 'sort' }]);
+    expect(placeRequest(place)).toEqual({
+      positions: [
+        { kind: 'outer', name: 'select' },
+        { kind: 'nested', name: 'condition.value' },
+      ],
+      after: { kind: 'value', dtype: 'Int64', shape: 'one' },
+    });
+  });
+
+  it('goes one position deeper by a parameter inside the expression', () => {
+    const outer = [{ kind: 'outer', name: 'filter' }] as const;
+    expect(within(outer, { kind: 'nested', name: 'over.partition_by' })).toEqual([
+      { kind: 'outer', name: 'filter' },
+      { kind: 'nested', name: 'over.partition_by' },
+    ]);
+    // A parameter that no named position holds leaves it where it is.
+    expect(within(outer, null)).toBe(outer);
+    expect(within(NO_POSITIONS, null)).toEqual([]);
+  });
+
+  it('starts an expression with a call that follows nothing', () => {
+    expect(startRequest([{ kind: 'outer', name: 'sort' }])).toEqual({
+      positions: [{ kind: 'outer', name: 'sort' }],
+      after: { kind: 'start' },
+    });
+  });
+});
+
+describe('a number or text typed in', () => {
+  it('is written as the document writes it, a whole number as an integer and any other as a float', () => {
+    expect(literalOf(1)).toEqual({ kind: 'integer', value: 1 });
+    expect(literalOf(1.5)).toEqual({ kind: 'float', value: 1.5 });
+    expect(literalOf(2 ** 60)).toEqual({ kind: 'float', value: 2 ** 60 });
+    expect(literalOf('x')).toEqual({ kind: 'text', value: 'x' });
+    expect(literalOf(null)).toBeNull();
+  });
+
+  it('is a number when it is written as one, with or without a fraction', () => {
+    expect(numberTyped('12')).toBe(12);
+    expect(numberTyped(' -1.5 ')).toBe(-1.5);
+    expect(numberTyped('1.')).toBeNull();
+    expect(numberTyped('1e3')).toBeNull();
+    expect(numberTyped('abc')).toBeNull();
+    expect(typedValues('1.5')).toEqual([1.5, '1.5']);
+    expect(typedValues('hi')).toEqual(['hi']);
+    expect(typedValues('')).toEqual([]);
+  });
+});

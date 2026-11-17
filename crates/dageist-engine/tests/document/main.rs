@@ -4,6 +4,7 @@
 mod claims;
 mod dtypes;
 mod floats;
+mod holes;
 mod inputs;
 mod nesting;
 mod preview;
@@ -11,5 +12,6 @@ mod reading;
 mod refusals;
 mod support;
 mod syntax;
+mod untyped;
 mod walk;
 mod writing;

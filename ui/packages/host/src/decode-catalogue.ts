@@ -10,10 +10,11 @@ import type {
   EntryView,
   KindView,
   ParameterView,
+  PositionView,
   ShapeView,
   WordsView,
 } from './contract';
-import { APPLIES, VALUE_TYPES } from './contract';
+import { APPLIES, NESTED_POSITIONS, OUTER_POSITIONS, VALUE_TYPES } from './contract';
 import type { Decode } from './decode';
 import {
   ROOT,
@@ -35,13 +36,7 @@ const readChoice: Decode<ChoiceView> = readRecord(['word', 'shown'], (fields, pa
 }));
 
 const readKind: Decode<KindView> = readTagged<KindView>('kind', {
-  expression: {
-    fields: ['dtypes'],
-    read: (fields, path) => ({
-      kind: 'expression',
-      dtypes: readField(fields, path, 'dtypes', readList(readString)),
-    }),
-  },
+  expression: { fields: [], read: () => ({ kind: 'expression' }) },
   column: { fields: [], read: () => ({ kind: 'column' }) },
   value: {
     fields: ['type'],
@@ -120,8 +115,25 @@ const readDefault: Decode<DefaultView> = readTagged<DefaultView>('kind', {
   other: { fields: [], read: () => ({ kind: 'other' }) },
 });
 
+const readPosition: Decode<PositionView> = readTagged<PositionView>('kind', {
+  outer: {
+    fields: ['name'],
+    read: (fields, path) => ({
+      kind: 'outer',
+      name: readField(fields, path, 'name', readWord(OUTER_POSITIONS)),
+    }),
+  },
+  nested: {
+    fields: ['name'],
+    read: (fields, path) => ({
+      kind: 'nested',
+      name: readField(fields, path, 'name', readWord(NESTED_POSITIONS)),
+    }),
+  },
+});
+
 const readParameter: Decode<ParameterView> = readRecord(
-  ['name', 'shown', 'label', 'kind', 'shape', 'default', 'python'],
+  ['name', 'shown', 'label', 'kind', 'shape', 'default', 'python', 'position'],
   (fields, path) => ({
     name: readField(fields, path, 'name', readString),
     shown: readField(fields, path, 'shown', readString),
@@ -130,11 +142,12 @@ const readParameter: Decode<ParameterView> = readRecord(
     shape: readField(fields, path, 'shape', readShape),
     default: readField(fields, path, 'default', readDefault),
     python: readField(fields, path, 'python', readNullable(readString)),
+    position: readField(fields, path, 'position', readNullable(readPosition)),
   }),
 );
 
 const readEntry: Decode<EntryView> = readRecord(
-  ['id', 'applies', 'family', 'name', 'hint', 'head', 'accepts', 'lazy', 'parameters'],
+  ['id', 'applies', 'family', 'name', 'hint', 'head', 'lazy', 'parameters'],
   (fields, path) => ({
     id: readField(fields, path, 'id', readString),
     applies: readField(fields, path, 'applies', readWord(APPLIES)),
@@ -142,7 +155,6 @@ const readEntry: Decode<EntryView> = readRecord(
     name: readField(fields, path, 'name', readString),
     hint: readField(fields, path, 'hint', readString),
     head: readField(fields, path, 'head', readNullable(readString)),
-    accepts: readField(fields, path, 'accepts', readList(readString)),
     lazy: readField(fields, path, 'lazy', readBoolean),
     parameters: readField(fields, path, 'parameters', readList(readParameter)),
   }),
@@ -154,10 +166,10 @@ const readWords: Decode<WordsView> = readRecord(['key', 'title'], (fields, path)
 }));
 
 const readCatalogue: Decode<CatalogueView> = readRecord(
-  ['families', 'dtypes', 'entries'],
+  ['families', 'listedDtypes', 'entries'],
   (fields, path) => ({
     families: readField(fields, path, 'families', readList(readWords)),
-    dtypes: readField(fields, path, 'dtypes', readList(readWords)),
+    listedDtypes: readField(fields, path, 'listedDtypes', readList(readString)),
     entries: readField(fields, path, 'entries', readList(readEntry)),
   }),
 );

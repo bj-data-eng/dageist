@@ -14,17 +14,28 @@
 
 import { useContext } from 'react';
 
-import type { ChoiceView, EntryView, KindView, ParameterView } from '@dageist/host';
+import type {
+  ArgumentRequest,
+  ChoiceView,
+  EntryView,
+  KindView,
+  OfferPlaceView,
+  ParameterView,
+} from '@dageist/host';
 import type { Entry, Offer, OfferGroup } from '@dageist/design';
 import { Block, Hint, ManySlot, Piece, Slot, Word } from '@dageist/design';
 
+import type { Asked } from './ask';
 import { FreshContext, Line, Lines } from './Lists';
-import { useNode } from './EngineProvider';
+import { useCatalogue, useNode } from './EngineProvider';
 import { ValueSlot } from './Values';
 import { anyField, counted, fieldOffers, matches, offer, titled } from './offers';
 import { useFieldHint } from './origins';
-import { DTYPES, findColumn } from './model/frame';
+import { usePositions } from './positions';
+import { findColumn } from './model/frame';
 import type { Dtype, Frame } from './model/frame';
+import { placeRequest, within } from './model/place';
+import type { PreparedOption } from './model/offers';
 import { findInput } from './model/inputs';
 import type { Options, PairSetting, SetParameter, Setting } from './model/settings';
 import {
@@ -58,8 +69,11 @@ export interface Surroundings {
   readonly frame: Frame;
   /** Returns the items of the parameter named `of`, for a parameter that holds one value for each. */
   readonly items: (of: string) => readonly string[];
-  /** Whether `element` is meant, for an expression that is worked out for the values of one pivot cell. */
-  readonly element?: boolean | undefined;
+  /**
+   * The method whose parameters these are, and where the engine reported it stands, when they
+   * are a method's: an expression one of them holds is the argument of that method.
+   */
+  readonly method?: { readonly entry: string; readonly place: OfferPlaceView | null } | undefined;
 }
 
 /** Returns how `setting` is written as a word. */
@@ -198,9 +212,9 @@ export function ColumnDrawing({
   return (
     <Hint lines={fieldHint(column)} code={false}>
       <Slot
-        label={value ?? 'field'}
-        tone={value === null ? 'value' : 'column'}
-        look={value === null ? 'none' : 'plain'}
+        label={value === null || value === '' ? 'field' : value}
+        tone={value === null || value === '' ? 'value' : 'column'}
+        look={value === null || value === '' ? 'none' : 'plain'}
         wrong={value === null || column === null}
         names={names ?? false}
         openNow={useIsFresh(openId)}
@@ -333,6 +347,8 @@ export function DtypeDrawing({
   value,
   onChange,
 }: DrawingProps<string | null>): React.JSX.Element {
+  // The dtypes a document names by one word, which the engine lists.
+  const { listedDtypes } = useCatalogue().view;
   return (
     <Slot
       label={value ?? 'dtype'}
@@ -346,11 +362,13 @@ export function DtypeDrawing({
       offers={(typed) => [
         counted(
           'Dtypes',
-          DTYPES.filter((dtype) => matches(typed, dtype)).map((dtype) =>
-            offer(dtype, 'value', '', () => {
-              onChange(dtype);
-            }),
-          ),
+          listedDtypes
+            .filter((dtype) => matches(typed, dtype))
+            .map((dtype) =>
+              offer(dtype, 'value', '', () => {
+                onChange(dtype);
+              }),
+            ),
         ),
       ]}
     />
@@ -487,6 +505,8 @@ export function LiteralDrawing({
 /** What drawing a setting of one kind needs to know. */
 interface OneProps {
   readonly kind: KindView;
+  /** The parameter that holds the setting, which says where an expression it holds stands. */
+  readonly parameter: ParameterView;
   readonly setting: Setting;
   readonly describedAs: string;
   readonly around: Surroundings;
@@ -510,6 +530,7 @@ function nameOf(setting: Setting): string | null {
 /** Draws one setting of one kind. Every kind has one drawing; `pairs` and the shapes are drawn around these. */
 function OneDrawing({
   kind,
+  parameter,
   setting,
   describedAs,
   around,
@@ -519,9 +540,21 @@ function OneDrawing({
   onChange,
 }: OneProps): React.JSX.Element {
   const common = { describedAs, names, openId };
+  const outer = usePositions();
   const word = (name: string): void => {
     onChange({ kind: 'word', value: name });
   };
+  // An expression a parameter holds stands where its position says, or else where the chain
+  // that holds the parameter stands, and is the argument of the method the parameter is of.
+  const stands = within(outer, parameter.position);
+  const argument: ArgumentRequest | null =
+    around.method?.place == null
+      ? null
+      : {
+          entry: around.method.entry,
+          parameter: parameter.name,
+          place: placeRequest(around.method.place),
+        };
   switch (kind.kind) {
     case 'expression':
       return (
@@ -530,8 +563,8 @@ function OneDrawing({
           frame={around.frame}
           label={describedAs}
           lists={false}
-          takes={kind.dtypes}
-          within={around.element}
+          positions={stands.length === 0 ? null : stands}
+          argument={argument}
           openId={openId}
           onRemove={onRemove}
           onChange={(value) => {
@@ -649,6 +682,7 @@ function ManyDrawing({
           {at > 0 && <Word>,</Word>}
           <OneDrawing
             kind={kind}
+            parameter={parameter}
             setting={item}
             describedAs={describe(parameter)}
             around={around}
@@ -712,6 +746,7 @@ function PairsDrawing({
           >
             <OneDrawing
               kind={kind.key}
+              parameter={parameter}
               setting={entry.key}
               describedAs={`${describedAs}, the name`}
               around={around}
@@ -724,6 +759,7 @@ function PairsDrawing({
             <Word>{between}</Word>
             <OneDrawing
               kind={kind.value}
+              parameter={parameter}
               setting={entry.value}
               describedAs={`${describedAs}, what it holds`}
               around={around}
@@ -987,6 +1023,7 @@ export function ParameterDrawing({
     drawing = (
       <OneDrawing
         kind={kind}
+        parameter={parameter}
         setting={setting}
         describedAs={describe(parameter)}
         around={around}
@@ -1002,12 +1039,47 @@ export function ParameterDrawing({
   );
 }
 
-/** Lists the parameters that can be added, with those that are set ticked: picking one sets it or takes it away. */
+/**
+ * Returns what a parameter that is added is first set to, and why it cannot
+ * be: the engine says which word a flag or a choice starts with, and where
+ * Polars refuses every word but the default, the reason. Any other kind
+ * starts as it always has. While the engine has not said, a flag or a choice
+ * waits for it.
+ */
+function starting(
+  parameter: ParameterView,
+  engine: Asked<ReadonlyMap<string, PreparedOption>>,
+): { readonly setting: Setting | null; readonly reason: string | null } {
+  const { kind } = parameter;
+  if (kind.kind !== 'flag' && kind.kind !== 'choice') {
+    return { setting: starterSetting(parameter), reason: null };
+  }
+  if (engine.state === 'failed') return { setting: null, reason: engine.reason };
+  if (engine.state !== 'ready') return { setting: null, reason: 'waiting for the engine' };
+  const option = engine.answer.get(parameter.name);
+  if (option === undefined) return { setting: starterSetting(parameter), reason: null };
+  if (option.starter === null) return { setting: null, reason: option.stuck };
+  return {
+    setting:
+      kind.kind === 'flag'
+        ? { kind: 'flag', value: option.starter === 'true' }
+        : { kind: 'word', value: option.starter },
+    reason: null,
+  };
+}
+
+/**
+ * Lists the parameters that can be added, with those that are set ticked:
+ * picking one sets it or takes it away. A flag or a choice starts with the
+ * word the engine says it may have beside what is already set, and cannot be
+ * added where Polars refuses every other word.
+ */
 export function optionOffers(
   parameters: readonly ParameterView[],
   options: Options,
   typed: string,
   onChange: (options: Options, added: string | null) => void,
+  engine: Asked<ReadonlyMap<string, PreparedOption>>,
 ): OfferGroup {
   return counted(
     'Options',
@@ -1015,6 +1087,7 @@ export function optionOffers(
       .filter((parameter) => matches(typed, parameter.shown, parameter.label, parameter.name))
       .map((parameter) => {
         const set = Object.hasOwn(options, parameter.name);
+        const first = set ? { setting: null, reason: null } : starting(parameter, engine);
         return offer(
           parameter.shown,
           'ink',
@@ -1022,14 +1095,11 @@ export function optionOffers(
           () => {
             if (set) {
               onChange(withoutOption(options, parameter.name), null);
-            } else {
-              onChange(
-                withOption(options, parameter.name, starterSetting(parameter)),
-                parameter.name,
-              );
+            } else if (first.setting !== null) {
+              onChange(withOption(options, parameter.name, first.setting), parameter.name);
             }
           },
-          { id: `option:${parameter.name}`, ticked: set },
+          { id: `option:${parameter.name}`, ticked: set, reason: first.reason },
         );
       }),
   );

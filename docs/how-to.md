@@ -194,13 +194,14 @@ layout does not affect it. Never edit the file by hand.
 
 After a change to the sample node, the step document or its running, the walk
 of the tables, the catalogue's laziness, or the views of what they report, the
-snapshot test fails and names the file that differs. Eight files in
+snapshot test fails and names the file that differs. Nine files in
 `ui/packages/host/fixtures/` are written by one test: `node-inputs.json` from
 `node_inputs`, `step-document.json`, the claim-timing sample's own steps as the
 engine's document, which the view's tests compare the editor's starting steps
 with, `step-report.json` from running the claim-timing steps,
 `step-report-refused.json` from a document whose second step Polars refuses and
-whose third is not run, `step-report-unreadable.json` from text that is not a
+whose third is not run, `step-report-incomplete.json` from one whose second step
+holds something still to be picked, which the third waits for, `step-report-unreadable.json` from text that is not a
 document, `step-rows.json` from the rows after the `days_open` step,
 `step-report-variants.json`, a report the host builds by hand to hold the
 variants no real document gives together, and `vocabulary.json`, the words of
@@ -219,6 +220,28 @@ npm --prefix ui run test
 The test compares the files with the views by value. Review the diff: a change
 that the decoders refuse is a change of shape the view has to follow, in the
 contract and in `ui/packages/host/src/`. Never edit the files by hand.
+
+### Refresh The Offers Snapshots
+
+After a change to the tables of allowed combinations, the rules, the offers or
+the views of them, `offers::tests::the_snapshots_are_what_the_commands_return`
+fails and names the file that differs. Seven files in
+`ui/packages/host/fixtures/` are written by it: `offers-start.json`,
+`offers-value.json` and `offers-condition.json` from `offers_at`,
+`fits-start.json` and `fits-argument.json` from `candidate_fits`, `options.json`
+from `option_offers`, and `offers-grid.json`, every call at every place of every
+kind, from which the view lists what the editor cannot offer:
+
+```sh
+DAGEIST_REFRESH_OFFERS=1 cargo test --offline --locked -p dageist-tauri offers::tests::the_snapshots_are_what_the_commands_return
+npm --prefix ui run format
+npm --prefix ui run test
+```
+
+Review the diff. When `offers-grid.json` changes, the view's check of what the
+editor cannot offer, in `ui/packages/steps/src/model/limits.test.ts`, may
+fail: its written list is to be updated with the change, or the editor is to
+draw what the engine allows. Never edit the files by hand.
 
 ## Open The Sample Table
 
@@ -486,11 +509,15 @@ Polars by hand, and decide which it is:
   refused call, settles it. Where that does not, the limits are asked next, and then
   the part apart from what surrounds it: the refused call on a column of the dtype
   that reaches it; a join's key by itself as the key, and the refused call on a
-  column as the key; and, for a refusal that is the target's own comparison of a
+  column as the key; for a refusal that is the target's own comparison of a
   call's plan with its rows (no refusal of Polars), the call on a column in the
   position the case holds it, which counts only with the evidence that Polars' plan
   and rows differ as the tables say, Polars refuses it there, and a call whose plan
-  and rows agree and the column alone are allowed there. The replay shows the probe
+  and rows agree and the column alone are allowed there; and, for a call the tables
+  refused without knowing the dtype of an argument, whose reason is Polars' for
+  another dtype, the part as written, where Polars refusing it at the refused call
+  counts without the reason being compared, and the part before the call alone is
+  allowed. The replay shows the probe
   and what it showed. Where it does not settle a case, Polars allows the probe,
   refuses it for another reason or at another call, or the evidence is missing, and
   the case is one of the other kinds. Keep a case the probe settles as

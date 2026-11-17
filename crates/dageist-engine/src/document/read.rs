@@ -236,8 +236,18 @@ fn read_expression(json: &Json) -> Result<Expression, Refusal> {
     Expression::new(start, links)
 }
 
-/// A start is a call, or `{ "input": "<name>" }`.
+/// A start is a call, `{ "input": "<name>" }`, or `{ "hole": null }`.
 fn read_start(json: &Json) -> Result<Start, Refusal> {
+    if let Json::Object(fields) = json
+        && find(fields, "hole").is_some()
+        && find(fields, "entry").is_none()
+    {
+        let fields = object("a hole", json, &["hole"])?;
+        return match field(fields, "hole")? {
+            Json::Null => Ok(Start::Hole),
+            other => Err(shape("hole", "null", other)),
+        };
+    }
     if let Json::Object(fields) = json
         && find(fields, "input").is_some()
         && find(fields, "entry").is_none()

@@ -79,6 +79,7 @@ pub struct Chosen<'a> {
     arguments: &'a [(&'a str, Representative)],
     options: &'a [(&'a str, &'a str)],
     gives: Option<Representative>,
+    many: bool,
 }
 
 impl<'a> Chosen<'a> {
@@ -107,6 +108,15 @@ impl<'a> Chosen<'a> {
     #[must_use]
     pub const fn giving(mut self, dtype: Representative) -> Self {
         self.gives = Some(dtype);
+        self
+    }
+
+    /// That the values the entry gives are many, as those of a connected list
+    /// are, and not one as a literal's is. An entry that makes a value gives
+    /// one unless told so; a method's shape is the table's.
+    #[must_use]
+    pub const fn giving_many(mut self) -> Self {
+        self.many = true;
         self
     }
 }
@@ -158,7 +168,7 @@ pub struct Refusal {
 }
 
 impl Refusal {
-    fn structure(reason: impl Into<String>) -> Self {
+    pub(super) fn structure(reason: impl Into<String>) -> Self {
         Self {
             source: RefusalSource::Structure,
             reason: reason.into(),
@@ -259,6 +269,14 @@ pub struct Allowance {
 }
 
 impl Allowance {
+    /// The same allowance with no dtype for the result, where the argument that
+    /// was judged adapts to what it follows and the tables, measured with typed
+    /// columns, cannot say what the call gives.
+    pub(super) fn without_result(mut self) -> Self {
+        self.result = None;
+        self
+    }
+
     /// The dtype the chain has after the entry. `None` where it is not known
     /// from the entry: a start takes the dtype of a column or of a group, and
     /// a method that takes an argument gives a dtype the argument decides.
@@ -470,7 +488,7 @@ enum OptionsGive {
 
 /// The word the option table writes for the default of `parameter`, when it is
 /// a flag or a choice that has one.
-fn default_word(parameter: &catalog::Parameter) -> Option<String> {
+pub(super) fn default_word(parameter: &catalog::Parameter) -> Option<String> {
     match parameter.default().value() {
         DefaultValue::Flag(flag) => Some(flag.to_string()),
         DefaultValue::Unset => Some("unset".to_owned()),
@@ -731,6 +749,9 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         }
         ends = cell.ends.clone();
     }
+    if chosen.many && !is_method(entry) {
+        shape = Shape::Many;
+    }
     if let After::Value {
         shape: Shape::One, ..
     } = place.after
@@ -768,6 +789,29 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         shape,
         ending,
     })
+}
+
+/// Whether a connected value, or a connected list of values, of the dtype
+/// class `dtype` may start an expression at `place`.
+///
+/// The run makes a connected input a literal of its dtype, so the tables' lines
+/// of `polars.lit` judge it, as they judge a literal given a dtype: where a
+/// literal may stand and may end, so may the input. A list gives many values,
+/// where a value gives one, which `shape` says. A place that is not a start refuses it.
+#[must_use]
+pub fn offer_input(place: &Place, dtype: Representative, shape: Shape) -> Verdict {
+    let Some(literal) = catalog::entry("polars.lit") else {
+        return Verdict::Refused(Refusal::structure("the catalogue has no polars.lit"));
+    };
+    let chosen = Chosen::default().giving(dtype);
+    offer(
+        literal,
+        place,
+        &match shape {
+            Shape::Many => chosen.giving_many(),
+            Shape::One => chosen,
+        },
+    )
 }
 
 /// The refusal of a rule that forbids `entry` to start or continue a chain in

@@ -11,20 +11,23 @@ import { useCallback, useContext, useState } from 'react';
 
 import type { Look, Offer, OfferGroup, Tone } from '@dageist/design';
 import { Hint, OfferList, Piece, Popover, Slot } from '@dageist/design';
+import type { ArgumentRequest, PositionView } from '@dageist/host';
 
+import { useCandidateFits, useOffers } from './ask';
 import { useCatalogue, useNode } from './EngineProvider';
 import { usePreparedStep } from './engine';
-import { wrongId } from './model/document';
+import { comparisonEntryId, wrongId } from './model/document';
 import { ChainBlocks } from './Chain';
 import { COMPARISON_SIGNS } from './comparisons';
+import { fieldGroup, inputGroup, refusalOf, startFunctions, valueGroup } from './engineLists';
 import { inputLines } from './InputsStrip';
 import { FreshContext, Line, Lines } from './Lists';
+import { PositionsContext, useListState, usePositions } from './positions';
 import { anyField, counted, fieldOffers, matches, offer, titled } from './offers';
 import { useFieldHint } from './origins';
-import { elementEntry, groupWords, groupsHold } from './model/catalogue';
-import { LITERAL_DTYPES } from './model/expr';
-import type { Dtype, Frame } from './model/frame';
+import type { Frame } from './model/frame';
 import { findColumn } from './model/frame';
+import { NO_POSITIONS, startRequest } from './model/place';
 import { nextId } from './model/ids';
 import { findInput } from './model/inputs';
 import type {
@@ -38,8 +41,6 @@ import type {
 } from './model/source';
 import { COMPARISONS } from './model/source';
 
-const WHOLE_NUMBER = /^-?\d+$/;
-
 /** What each comparison means, for someone who reads the symbol for the first time. */
 const COMPARISON_WORDS: Readonly<Record<Comparison, string>> = {
   '==': 'equal to',
@@ -50,6 +51,9 @@ const COMPARISON_WORDS: Readonly<Record<Comparison, string>> = {
   '<=': 'at most',
   is_in: 'one of a list',
 };
+
+/** A value that is still to be picked. */
+const UNSET_VALUE: Value = { kind: 'unset' };
 
 /** Returns how a typed value is shown as a block. */
 function literalBlock(value: Cell): { label: string; look: Look } {
@@ -100,13 +104,13 @@ export interface ValueSlotProps {
   readonly label: string;
   /** Whether the slot takes a connected list, as `is_in` does, instead of a single value. */
   readonly lists: boolean;
-  /** The dtype groups the value may have, when its parameter limits them. */
-  readonly takes?: readonly string[] | undefined;
   /**
-   * Set when the value is worked out for the values of one pivot cell, which
-   * `element` stands for: then a chain can only start from `element`.
+   * The positions that hold an expression picked here, which is where the engine's tables are
+   * asked what may start it; `null` where no named position does.
    */
-  readonly within?: boolean | undefined;
+  readonly positions: readonly PositionView[] | null;
+  /** The argument of a method that is picked here, which the engine says what fits; `null` where it is not one. */
+  readonly argument: ArgumentRequest | null;
   /** The id that, when it is what was just added, opens the slot's list as soon as it is shown. */
   readonly openId?: string | undefined;
   /** Takes the value away from where it stands, when it is one of several; otherwise it can only be unset. */
@@ -125,8 +129,8 @@ export function ValueSlot({
   frame,
   label,
   lists,
-  takes,
-  within,
+  positions,
+  argument,
   openId,
   onRemove,
   onChange,
@@ -135,13 +139,20 @@ export function ValueSlot({
   const node = useNode();
   const fresh = useContext(FreshContext);
   const fieldHint = useFieldHint();
-  // Why a value of `dtype` is not taken: the dtypes the catalogue says the parameter takes.
-  const reasonFor = (dtype: Dtype): string | null => {
-    if (takes !== undefined && !groupsHold(takes, dtype)) {
-      return `needs ${groupWords(catalogue, takes)}`;
-    }
-    return null;
-  };
+  const list = useListState();
+  // What may stand here, as the engine says of the place: the functions that may start an
+  // expression, and which of the fields, inputs and values typed in fit.
+  const startKnown = positions !== null && positions.length > 0;
+  const startOffers = useOffers(list.open && startKnown && !lists ? startRequest(positions) : null);
+  const fits = useCandidateFits(
+    lists || (!startKnown && argument === null)
+      ? null
+      : { start: startKnown ? positions : null, argument },
+    list.open,
+    frame,
+    node,
+    list.typed,
+  );
   const literal = (cell: Cell): (() => void) => {
     return () => {
       onChange({ kind: 'literal', value: cell });
@@ -149,53 +160,36 @@ export function ValueSlot({
   };
 
   const offers = (typed: string): OfferGroup[] => {
-    if (within === true) {
-      // The values of a pivot cell are what is combined, so a chain starts from them.
-      const start = elementEntry(catalogue);
-      const name = start?.name ?? 'element';
-      const hint = start?.hint ?? 'not in the catalogue';
-      return [
-        titled(
-          'Functions',
-          matches(typed, name, hint)
-            ? [
-                offer(
-                  name,
-                  'function',
-                  hint,
-                  () => {
-                    const id = nextId('chain');
-                    onChange({
-                      kind: 'chain',
-                      id,
-                      chain: { source: { kind: 'element' }, methods: [] },
-                    });
-                    // Its first method is the next thing to pick.
-                    fresh.mark(`${id}:method`);
-                  },
-                  { reason: start === null ? 'not in the catalogue' : null },
-                ),
-              ]
-            : [],
-        ),
-      ];
-    }
     const connected = node.inputs
       .flatMap((input) => (input.kind === (lists ? 'list' : 'value') ? [input] : []))
       .filter((input) => matches(typed, input.name))
       .map((input) =>
-        offer(
-          input.name,
-          'input',
-          lists ? `list of ${input.dtype}` : input.dtype,
-          () => {
-            onChange({ kind: 'input', name: input.name });
-          },
-          { reason: reasonFor(input.dtype) },
-        ),
+        offer(input.name, 'input', lists ? `list of ${input.dtype}` : input.dtype, () => {
+          onChange({ kind: 'input', name: input.name });
+        }),
       );
+    // The values of `is_in` are lists, which the engine has no entry to judge yet, so they are offered
+    // as they are connected.
     if (lists) return [counted('Inputs', connected)];
 
+    const rows = {
+      frame,
+      node,
+      typed,
+      fits,
+      inputs: ['value', 'list'] as const,
+      onLiteral: (cell: Cell) => {
+        literal(cell)();
+      },
+      onInput: (name: string) => {
+        onChange({ kind: 'input', name });
+      },
+      onField: (column: string) => {
+        onChange({ kind: 'column', column });
+      },
+    };
+    // A chain of its own starts from a field, which the engine says may stand here or not.
+    const chainRefusal = refusalOf(startOffers, 'polars.col');
     const chain = offer(
       '…',
       'function',
@@ -209,60 +203,61 @@ export function ValueSlot({
         });
         fresh.mark(id);
       },
-      { id: 'chain', look: 'dots', act: true },
+      { id: 'chain', look: 'dots', act: true, reason: chainRefusal },
     );
-    const written: Offer[] = [];
-    const text = typed.trim();
-    if (WHOLE_NUMBER.test(text) && Number.isSafeInteger(Number(text))) {
-      written.push(
-        offer(text, 'value', 'a number', literal(Number(text)), {
-          id: 'number',
-          reason: reasonFor(LITERAL_DTYPES.number),
-        }),
-      );
-    }
-    if (typed !== '') {
-      written.push(
-        offer(typed, 'value', 'String', literal(typed), {
-          id: 'text',
-          look: 'quoted',
-          reason: reasonFor(LITERAL_DTYPES.text),
-        }),
-      );
-    }
-    written.push(offer('None', 'value', 'no value', literal(null), { id: 'none', look: 'none' }));
-    const fields = fieldOffers(frame, typed, {
-      ...anyField((column) => {
-        onChange({ kind: 'column', column });
-      }),
-      reasonFor,
-    });
+    const written = valueGroup(rows);
+    const none = offer('None', 'value', 'no value', literal(null), { id: 'none', look: 'none' });
     // The groups go from the shortest to the longest, so a long one never hides a short one.
     return [
       titled(null, typed === '' ? [chain] : []),
-      titled('Value', written),
-      counted('Inputs', connected),
-      counted('Fields', fields),
+      titled('Value', [...written.offers, none]),
+      inputGroup(rows),
+      fieldGroup(rows),
+      ...startFunctions(catalogue, startOffers, startKnown, typed, (id) => {
+        const made = nextId('chain');
+        if (id === 'polars.when') {
+          const arm = { id: nextId('arm'), condition: emptyTest(), returns: UNSET_VALUE };
+          onChange({
+            kind: 'chain',
+            id: made,
+            chain: {
+              source: { kind: 'when', arms: [arm], otherwise: UNSET_VALUE },
+              methods: [],
+            },
+          });
+          fresh.mark(arm.condition.id);
+        } else {
+          onChange({
+            kind: 'chain',
+            id: made,
+            chain: { source: { kind: 'element' }, methods: [] },
+          });
+          // Its first method is the next thing to pick.
+          fresh.mark(`${made}:method`);
+        }
+      }),
     ];
   };
 
   if (value.kind === 'chain') {
     // A chain is written where it stands. Its start takes the whole chain away.
     return (
-      <ChainBlocks
-        chainId={value.id}
-        chain={value.chain}
-        frame={frame}
-        onRemove={
-          onRemove ??
-          (() => {
-            onChange({ kind: 'unset' });
-          })
-        }
-        onChange={(chain) => {
-          onChange({ kind: 'chain', id: value.id, chain });
-        }}
-      />
+      <PositionsContext.Provider value={positions ?? NO_POSITIONS}>
+        <ChainBlocks
+          chainId={value.id}
+          chain={value.chain}
+          frame={frame}
+          onRemove={
+            onRemove ??
+            (() => {
+              onChange({ kind: 'unset' });
+            })
+          }
+          onChange={(chain) => {
+            onChange({ kind: 'chain', id: value.id, chain });
+          }}
+        />
+      </PositionsContext.Provider>
     );
   }
 
@@ -328,14 +323,10 @@ export function ValueSlot({
           openNow={openId !== undefined && fresh.id === openId}
           names
           describedAs={label}
-          placeholder={
-            within === true
-              ? 'Search the functions'
-              : lists
-                ? 'Search the lists'
-                : 'Type a value, or search'
-          }
+          placeholder={lists ? 'Search the lists' : 'Type a value, or search'}
           offers={offers}
+          onOpenChange={list.onOpenChange}
+          onType={list.onType}
         />
       </Hint>
     </Piece>
@@ -355,8 +346,20 @@ function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Eleme
   const node = useNode();
   const prepared = usePreparedStep();
   const fieldHint = useFieldHint();
+  const positions = usePositions();
   const column = findColumn(frame, test.column);
   const unset = test.column === '';
+  // The value is the argument of the method the comparison is written as, which follows the
+  // field: the engine says what fits it.
+  const comparisonId = comparisonEntryId(test.comparison);
+  const argument: ArgumentRequest | null =
+    comparisonId === null || column === null || positions.length === 0
+      ? null
+      : {
+          entry: comparisonId,
+          parameter: 'other',
+          place: { positions, after: { kind: 'value', dtype: column.dtype, shape: 'many' } },
+        };
   const wrongSign = prepared?.wrong.has(wrongId({ kind: 'test', testId: test.id })) ?? false;
 
   const compare = (comparison: Comparison): void => {
@@ -434,6 +437,8 @@ function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Eleme
         frame={frame}
         label={unset ? 'The value it is compared with' : `Value compared with ${test.column}`}
         lists={test.comparison === 'is_in'}
+        positions={positions.length === 0 ? null : positions}
+        argument={argument}
         onChange={(value) => {
           onChange({ ...test, value });
         }}
@@ -676,6 +681,8 @@ function GroupLines({ group, frame, nested, onChange }: GroupLinesProps): React.
 export interface ConditionBlocksProps {
   readonly condition: Condition;
   readonly frame: Frame;
+  /** The positions that hold the condition: a filter's predicates, or a `when`'s. */
+  readonly positions: readonly PositionView[];
   /** The colour of the group that heads the list: that of the step, or a function's under a `when`. */
   readonly tone: Tone;
   readonly onChange: (condition: Condition) => void;
@@ -690,7 +697,15 @@ export interface ConditionBlocksProps {
  * in it is an empty slot, which offers how to start one again: as a list of
  * comparisons, or as a chain.
  */
-export function ConditionBlocks({
+export function ConditionBlocks(props: ConditionBlocksProps): React.JSX.Element {
+  return (
+    <PositionsContext.Provider value={props.positions}>
+      <ConditionContent {...props} />
+    </PositionsContext.Provider>
+  );
+}
+
+function ConditionContent({
   condition,
   frame,
   tone,

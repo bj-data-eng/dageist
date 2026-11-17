@@ -103,6 +103,12 @@ export interface SentStep {
   readonly marks: ReadonlyMap<string, Mark>;
   /** Which chain of the editor an expression of the step is, by the key of its path. */
   readonly chains: ReadonlyMap<string, ChainOwner>;
+  /**
+   * What is still to be picked, by the key of the place of each hole the step holds: the start
+   * of the expression that stands for it. The engine reports the first of them when it says the
+   * step is incomplete.
+   */
+  readonly holes: ReadonlyMap<string, HeldProblem>;
 }
 
 /** Why a step is not in the document. */
@@ -159,6 +165,7 @@ function unsupported(message: string, wrong: readonly string[] = []): Held {
 interface Notes {
   readonly marks: Map<string, Mark>;
   readonly chains: Map<string, ChainOwner>;
+  readonly holes: Map<string, HeldProblem>;
 }
 
 /** Everything a step is written with. */
@@ -203,6 +210,14 @@ const COMPARISON_ENTRIES: Readonly<Record<Exclude<Comparison, 'is_in'>, string>>
   '<=': 'Expr.le',
 };
 
+/**
+ * Returns the identifier of the entry a comparison is written as, or `null`
+ * for `is_in`, which the catalogue has no entry for yet.
+ */
+export function comparisonEntryId(comparison: Comparison): string | null {
+  return comparison === 'is_in' ? null : COMPARISON_ENTRIES[comparison];
+}
+
 /** An expression before it is written: where it starts, and the links that follow. */
 interface Body {
   readonly start: Json;
@@ -216,6 +231,18 @@ function expressionJson(start: Json, links: readonly Json[]): Json {
   return { start, then: links };
 }
 
+/** What an expression that is still to be picked starts from: nothing, which the engine reports as incomplete. */
+const HOLE: Json = { hole: null };
+
+/**
+ * Notes that something is still to be picked at the start of the expression at `path`, and says
+ * what, by the word of the editor that is the matter.
+ */
+function holeAt(context: Context, path: Path, message: string, wrong: readonly string[]): Json {
+  context.notes.holes.set(placeKey(under(path, 'start')), { cause: 'unset', message, wrong });
+  return HOLE;
+}
+
 /** Writes a value as an expression's body: where it starts, then the links that follow. */
 function expressionBody(
   context: Context,
@@ -225,9 +252,11 @@ function expressionBody(
 ): Body {
   switch (value.kind) {
     case 'unset':
-      throw unset('Pick a value.', wrong);
+      return { start: holeAt(context, path, 'Pick a value.', wrong), links: [] };
     case 'column':
-      if (value.column === '') throw unset('Pick a field.', wrong);
+      if (value.column === '') {
+        return { start: holeAt(context, path, 'Pick a field.', wrong), links: [] };
+      }
       return { start: call('polars.col', { name: columnsOf(value.column) }), links: [] };
     case 'literal':
       if (value.value === null) {
@@ -238,7 +267,9 @@ function expressionBody(
         links: [],
       };
     case 'input':
-      if (value.name === '') throw unset('Pick an input.', wrong);
+      if (value.name === '') {
+        return { start: holeAt(context, path, 'Pick an input.', wrong), links: [] };
+      }
       return { start: { input: value.name }, links: [] };
     case 'chain':
       return chainBody(context, value.chain, value.id, path);
@@ -268,7 +299,12 @@ function methodArgument(
 ): Json {
   const given = method.argument ?? { kind: 'unset' };
   if (given.kind === 'unset') {
-    throw unset(`Give ${method.name} a value or a field (${parameter.label}).`, wrong);
+    // Still to be picked: a hole stands for it, so the method before it is still walked.
+    const message = `Give ${method.name} a value or a field (${parameter.label}).`;
+    const hole = (at: Path): Json => ({
+      expression: expressionJson(holeAt(context, at, message, wrong), []),
+    });
+    return parameter.shape.shape === 'many' ? { many: [hole(under(path, 'item:0'))] } : hole(path);
   }
   if (parameter.shape.shape === 'many') {
     return { many: [expressionArgument(context, given, under(path, 'item:0'), wrong)] };
@@ -366,7 +402,6 @@ function testPredicate(
   path: Path,
 ): Json {
   const wrong = [wrongId({ kind: 'test', testId: test.id })];
-  if (test.column === '') throw unset('Pick the field to compare.', wrong);
   if (test.comparison === 'is_in') {
     throw unsupported('The engine has no is_in for conditions yet.', wrong);
   }
@@ -378,10 +413,12 @@ function testPredicate(
     under(path, 'link:0', 'parameter:other'),
     wrong,
   );
+  const start =
+    test.column === ''
+      ? holeAt(context, path, 'Pick the field to compare.', wrong)
+      : call('polars.col', { name: columnsOf(test.column) });
   return {
-    expression: expressionJson(call('polars.col', { name: columnsOf(test.column) }), [
-      call(COMPARISON_ENTRIES[test.comparison], { other }),
-    ]),
+    expression: expressionJson(start, [call(COMPARISON_ENTRIES[test.comparison], { other })]),
   };
 }
 
@@ -395,7 +432,12 @@ function chainStart(
   const wrong = [wrongId({ kind: 'start', chainId })];
   switch (source.kind) {
     case 'column':
-      if (source.column === '') throw unset('Pick the field the chain starts from.', wrong);
+      if (source.column === '') {
+        return {
+          start: holeAt(context, path, 'Pick the field the chain starts from.', wrong),
+          links: [],
+        };
+      }
       return {
         start: call('polars.col', { name: columnsOf(source.column) }),
         links: [],
@@ -403,7 +445,12 @@ function chainStart(
     case 'element':
       return { start: call('polars.element', {}), links: [] };
     case 'input':
-      if (source.name === '') throw unset('Pick the input the chain starts from.', wrong);
+      if (source.name === '') {
+        return {
+          start: holeAt(context, path, 'Pick the input the chain starts from.', wrong),
+          links: [],
+        };
+      }
       return { start: { input: source.name }, links: [] };
     case 'when': {
       const [arm, ...further] = source.arms;
@@ -707,7 +754,7 @@ function stepArguments(context: Context, step: Step, entry: EntryView): Record<s
 
 /** Writes one step as a document step, or says why it cannot be written. */
 function stepJson(catalogue: Catalogue, step: Step): { json: Json; sent: SentStep } | Held {
-  const notes: Notes = { marks: new Map(), chains: new Map() };
+  const notes: Notes = { marks: new Map(), chains: new Map(), holes: new Map() };
   try {
     const entry = verbEntry(catalogue, step.verb);
     if (entry === null) {
@@ -724,6 +771,7 @@ function stepJson(catalogue: Catalogue, step: Step): { json: Json; sent: SentSte
         canonical: JSON.stringify(json),
         marks: notes.marks,
         chains: notes.chains,
+        holes: notes.holes,
       },
     };
   } catch (error) {

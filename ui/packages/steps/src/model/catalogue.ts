@@ -1,30 +1,27 @@
 /**
  * @file The catalogue the host serves, indexed for the step editor: the
- * entry of each method and verb the editor knows, and the words for the
- * dtype groups an entry accepts.
+ * entry of each method and verb the editor knows.
  *
- * The catalogue owns every word the editor shows and which dtypes a method
- * takes. This file only looks them up; it does not know them.
+ * The catalogue owns every word the editor shows. This file only looks them
+ * up; it does not know them. Which calls may stand where, and which dtypes
+ * an argument may have, is the engine's to say, through its offers.
  */
 
-import type { CatalogueView, EntryView, ParameterView } from '@dageist/host';
+import type { CatalogueView, EntryView, ParameterView, PositionView } from '@dageist/host';
 
-import type { Dtype } from './frame';
 import { assertNever } from './frame';
 
 /** The catalogue as the editor reads it. */
 export interface Catalogue {
   readonly view: CatalogueView;
   readonly entries: ReadonlyMap<string, EntryView>;
-  readonly dtypeTitles: ReadonlyMap<string, string>;
 }
 
-/** Indexes `view` by entry identifier and dtype group. */
+/** Indexes `view` by entry identifier. */
 export function indexCatalogue(view: CatalogueView): Catalogue {
   return {
     view,
     entries: new Map(view.entries.map((entry) => [entry.id, entry])),
-    dtypeTitles: new Map(view.dtypes.map((words) => [words.key, words.title])),
   };
 }
 
@@ -56,8 +53,6 @@ export function verbEntry(catalogue: Catalogue, verb: string): EntryView | null 
 /** A method's argument: the first parameter of its entry, when that takes an expression. */
 export interface ArgumentParameter {
   readonly parameter: ParameterView;
-  /** The dtype groups the argument may have. */
-  readonly dtypes: readonly string[];
 }
 
 /**
@@ -68,62 +63,12 @@ export interface ArgumentParameter {
 export function argumentOf(entry: EntryView): ArgumentParameter | null {
   const [first] = entry.parameters;
   if (first?.kind.kind !== 'expression') return null;
-  return { parameter: first, dtypes: first.kind.dtypes };
+  return { parameter: first };
 }
 
-/** The engine's names of the dtypes that hold whole numbers. */
-const INTEGERS: readonly string[] = [
-  'Int8',
-  'Int16',
-  'Int32',
-  'Int64',
-  'Int128',
-  'UInt8',
-  'UInt16',
-  'UInt32',
-  'UInt64',
-];
-
-/** The engine's names of the dtypes that hold numbers with a fraction. */
-const FLOATS: readonly string[] = ['Float16', 'Float32', 'Float64'];
-
-/** The engine's names of the dtypes that hold a moment or a length of time. */
-const TEMPORAL: readonly string[] = ['Date', 'Datetime', 'Time', 'Duration'];
-
-/**
- * Reports whether `dtype`, the engine's short name of one, belongs to the
- * dtype group `group` the catalogue names: every dtype, the numbers, the
- * integers, the temporal dtypes, or one dtype by its name. A dtype with a
- * parameter, such as `Datetime(us)`, belongs by the name before it. This only
- * sorts the fields a list offers; whether a call may stand is the engine's.
- */
-export function groupHolds(group: string, dtype: Dtype): boolean {
-  const name = dtype.split('(')[0] ?? dtype;
-  switch (group) {
-    case 'any':
-      return true;
-    case 'numeric':
-      return INTEGERS.includes(name) || FLOATS.includes(name);
-    case 'integer':
-      return INTEGERS.includes(name);
-    case 'temporal':
-      return TEMPORAL.includes(name);
-    default:
-      return group === name;
-  }
-}
-
-/** Reports whether `dtype` belongs to any of `groups`. */
-export function groupsHold(groups: readonly string[], dtype: Dtype): boolean {
-  return groups.some((group) => groupHolds(group, dtype));
-}
-
-/** Returns the words for `groups`, such as "numeric or Duration", from the catalogue. */
-export function groupWords(catalogue: Catalogue, groups: readonly string[]): string {
-  const titles = groups.map((group) => catalogue.dtypeTitles.get(group) ?? group);
-  const last = titles.at(-1);
-  if (last === undefined) return 'nothing';
-  return titles.length === 1 ? last : `${titles.slice(0, -1).join(', ')} or ${last}`;
+/** Returns the position that holds the expression the parameter `name` of `entry` takes, or `null` when no named position does. */
+export function positionOfParameter(entry: EntryView | null, name: string): PositionView | null {
+  return entry?.parameters.find((parameter) => parameter.name === name)?.position ?? null;
 }
 
 /** The words of a condition that the catalogue gives entries to. */

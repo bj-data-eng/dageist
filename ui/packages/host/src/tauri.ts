@@ -7,6 +7,7 @@ import type { BlockRequest, Host } from './contract';
 import { DecodeError } from './decode';
 import { decodeCatalogue } from './decode-catalogue';
 import { decodeNode, decodeRows } from './decode-node';
+import { decodeFits, decodeOffers, decodeOptions } from './decode-offers';
 import { decodeRun } from './decode-run';
 import { decodeBytes, decodeIdentity, decodeTable } from './decode-sample';
 import { deliverMessage, sealMessage } from './envelope';
@@ -49,6 +50,16 @@ export function tauriHost(): Host | null {
     runDocument: async (document) => invokeDecoded('run_document', decodeRun, { document }),
     rowsAfterStep: async (document, step, limit) =>
       invokeDecoded('rows_after_step', decodeRows, { document, step, limit }),
+    offersAt: async (place) =>
+      invokeDecoded('offers_at', decodeOffers, { positions: place.positions, after: place.after }),
+    candidateFits: async (request) =>
+      invokeDecoded('candidate_fits', decodeFits, {
+        start: request.start,
+        argument: request.argument,
+        candidates: request.candidates,
+      }),
+    optionOffers: async (entry, chosen) =>
+      invokeDecoded('option_offers', decodeOptions, { entry, chosen }),
     openSampleWindow: async (keys) => invokeDecoded('open_sample_window', decodeTable, { keys }),
     openSampleResult: async () => invokeDecoded('open_sample_result', decodeTable),
     fetchTableBlock: async (request: BlockRequest) =>

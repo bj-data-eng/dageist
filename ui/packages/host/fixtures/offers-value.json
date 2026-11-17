@@ -1,0 +1,457 @@
+{
+  "place": {
+    "context": {
+      "outer": "select",
+      "nested": null
+    },
+    "after": {
+      "kind": "value",
+      "dtype": "Datetime(us)",
+      "shape": "many"
+    }
+  },
+  "entries": [
+    {
+      "entry": "ChainedThen.otherwise",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "this continues a condition that is at its chained then"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "ChainedThen.when",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "this continues a condition that is at its chained then"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "ChainedWhen.then",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "this continues a condition that is at its chained when"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.cum_count",
+      "verdict": {
+        "kind": "allowed",
+        "result": "UInt32",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.cum_max",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.cum_sum",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "`cum_sum` operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.dt.date",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Date",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.dt.month_start",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.dt.offset_by",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.dt.time",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Time",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.dt.total_days",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.eq",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Boolean",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.first",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.ge",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Boolean",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.gt",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Boolean",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_not_null",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Boolean",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_null",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Boolean",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.last",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.le",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Boolean",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.len",
+      "verdict": {
+        "kind": "allowed",
+        "result": "UInt32",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.lt",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Boolean",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.max",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.min",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.ne",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Boolean",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.over",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.shift",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": {
+        "parameter": "n",
+        "literal": {
+          "kind": "integer",
+          "value": 1
+        }
+      }
+    },
+    {
+      "entry": "Expr.sub",
+      "verdict": {
+        "kind": "allowed",
+        "result": null,
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.sum",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "`sum` operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Then.otherwise",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "this continues a condition that is at its then"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Then.when",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "this continues a condition that is at its then"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "When.then",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "this continues a condition that is at its when"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "polars.col",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "an expression starts here only once: a start cannot follow a value"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "polars.element",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "an expression starts here only once: a start cannot follow a value"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "polars.lit",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "an expression starts here only once: a start cannot follow a value"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "polars.when",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "`polars.when` starts an expression and follows nothing"
+        }
+      },
+      "argument": null
+    }
+  ]
+}

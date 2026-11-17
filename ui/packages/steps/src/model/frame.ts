@@ -16,24 +16,6 @@ export type Column = FieldView;
 /** The columns of a table, in order. */
 export type Frame = readonly Column[];
 
-/** The dtypes the dtype picker offers, by the name the step document reads them as. */
-export const DTYPES: readonly Dtype[] = [
-  'Boolean',
-  'Date',
-  'Float32',
-  'Float64',
-  'Int8',
-  'Int16',
-  'Int32',
-  'Int64',
-  'String',
-  'Time',
-  'UInt8',
-  'UInt16',
-  'UInt32',
-  'UInt64',
-];
-
 /** Returns `text` as a Python string literal. */
 export function quoted(text: string): string {
   return JSON.stringify(text);

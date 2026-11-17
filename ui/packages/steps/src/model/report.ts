@@ -11,6 +11,7 @@
 import type {
   CauseView,
   ErrorKind,
+  OfferPlaceView,
   PlaceView,
   ResolutionView,
   RowsView,
@@ -19,17 +20,27 @@ import type {
 } from '@dageist/host';
 import { HostError } from '@dageist/host';
 
-import type { ChainOwner, Mark, SentStep, Translation } from './document';
+import type { Mark, SentStep, Translation } from './document';
 import { placeKey, segmentWord, wrongId } from './document';
 import type { Frame } from './frame';
 import type { Outcome } from './latest';
 import { isRecord } from './shape';
 import type { Step } from './steps';
 
-/** The dtype after the start of a chain and after each of its methods; `null` where the engine gives none. */
+/**
+ * The dtype after the start of a chain and after each of its methods, and
+ * where each method stands; `null` where the engine gives none.
+ */
 export interface ChainDtypes {
   readonly source: string | null;
   readonly methods: ReadonlyArray<string | null>;
+  /**
+   * The place of each method of the chain, then the place a method added at the
+   * end would have, as the engine's walk reports them: what each follows. `null`
+   * where the engine could not say. What may stand at a place is asked of the
+   * engine at it.
+   */
+  readonly places: ReadonlyArray<OfferPlaceView | null>;
 }
 
 /** What a step of the editor is, as far as anyone knows. */
@@ -79,20 +90,31 @@ function dtypeOf(resolution: ResolutionView | undefined): string | null {
   return resolution?.kind === 'dtype' ? resolution.dtype : null;
 }
 
-/** Returns how the engine's expressions fall on the chains of the editor. */
+/**
+ * Returns how the engine's expressions fall on the chains of the editor: the dtypes it built them
+ * to, where it built them, and the places its walk reported for their links, which a step it
+ * could not build, as one with a hole, still has.
+ */
 function chainDtypes(report: StepReportView, sent: SentStep): ReadonlyMap<string, ChainDtypes> {
   const found = new Map<string, ChainDtypes>();
-  for (const expression of report.expressions) {
-    const owner: ChainOwner | undefined = sent.chains.get(
-      placeKey(expression.place.path.map(segmentWord)),
+  for (const [key, owner] of sent.chains) {
+    const expression = report.expressions.find(
+      (candidate) => placeKey(candidate.place.path.map(segmentWord)) === key,
     );
-    if (owner === undefined) continue;
+    const walked = report.walk.expressions.find(
+      (candidate) => placeKey(candidate.place.path.map(segmentWord)) === key,
+    );
+    if (expression === undefined && walked === undefined) continue;
     const { whenLinks, methodIds } = owner;
     // A chain that starts from `when` has a dtype once its `otherwise` is there.
-    const source = whenLinks === 0 ? expression.start : expression.links[whenLinks - 1];
+    const source = whenLinks === 0 ? expression?.start : expression?.links[whenLinks - 1];
+    // The walk says where each link stands, from the first after the start; the methods are
+    // those after the links of a condition, and one more place follows them.
+    const places = walked?.places.slice(whenLinks) ?? [];
     found.set(owner.chainId, {
       source: dtypeOf(source),
-      methods: methodIds.map((_id, index) => dtypeOf(expression.links[whenLinks + index])),
+      methods: methodIds.map((_id, index) => dtypeOf(expression?.links[whenLinks + index])),
+      places: Array.from({ length: methodIds.length + 1 }, (_none, index) => places[index] ?? null),
     });
   }
   return found;
@@ -202,6 +224,8 @@ export function prepareRun(
   const answeredTexts = answered === null ? [] : stepTexts(answered.document);
   let corresponds = true;
   let sentSoFar = 0;
+  // The steps the engine said are incomplete, which the steps after them wait for.
+  const incomplete = new Set<string>();
   let before = source;
   const prepared: PreparedStep[] = [];
   for (const [index, step] of steps.entries()) {
@@ -244,7 +268,10 @@ export function prepareRun(
       corresponds = corresponds && answeredTexts[sentSoFar] === found.canonical;
       const report = corresponds ? reports.get(step.id) : undefined;
       result =
-        report === undefined ? make('unknown', null) : fromReport(step, found, report, before);
+        report === undefined
+          ? make('unknown', null)
+          : fromReport(step, found, report, before, steps, incomplete);
+      if (report?.outcome.status === 'incomplete') incomplete.add(step.id);
     }
     if (found?.kind === 'sent') sentSoFar += 1;
     prepared.push(result);
@@ -259,6 +286,8 @@ function fromReport(
   sent: SentStep,
   report: StepReportView,
   before: Frame,
+  steps: readonly Step[],
+  incomplete: ReadonlySet<string>,
 ): PreparedStep {
   const base = {
     id: step.id,
@@ -292,13 +321,27 @@ function fromReport(
         wrong: found === null ? NO_WORDS : new Set([wrongId(found)]),
       };
     }
+    case 'incomplete': {
+      // The place of the hole says what the editor has not got yet, and on which word.
+      const hole = sent.holes.get(placeKey(outcome.place.path.map(segmentWord)));
+      return {
+        ...base,
+        status: 'refused',
+        after: before,
+        added: [],
+        problem: hole?.message ?? 'Something in this step is still to be picked.',
+        wrong: hole === undefined ? NO_WORDS : new Set(hole.wrong),
+      };
+    }
     case 'notRun':
       return {
         ...base,
         status: 'notRun',
         after: before,
         added: [],
-        problem: 'Not run: a step before it was refused.',
+        problem: incomplete.has(outcome.blockedBy)
+          ? waitingWords(steps, outcome.blockedBy)
+          : 'Not run: a step before it was refused.',
         wrong: NO_WORDS,
       };
     default:
@@ -332,6 +375,7 @@ export function rowsFailure(kind: ErrorKind, message: string, step: PreparedStep
       return 'There are more rows than a preview holds.';
     case 'unreadable':
       return 'The steps cannot be read yet.';
+    case 'unknownName':
     case 'failed':
       return message;
     default:

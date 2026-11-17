@@ -6,6 +6,7 @@ import catalogueFixture from '../../../host/fixtures/catalogue.json';
 import nodeFixture from '../../../host/fixtures/node-inputs.json';
 import refusedFixture from '../../../host/fixtures/step-report-refused.json';
 import reportFixture from '../../../host/fixtures/step-report.json';
+import incompleteFixture from '../../../host/fixtures/step-report-incomplete.json';
 import unreadableFixture from '../../../host/fixtures/step-report-unreadable.json';
 import { START } from '../start';
 import type { Catalogue } from './catalogue';
@@ -126,6 +127,14 @@ describe('the columns the editor shows after each step', () => {
   });
 });
 
+/** The place a link stands in, in a select, after a value of `dtype`. */
+function selectAfter(dtype: string, shape: 'one' | 'many') {
+  return {
+    context: { outer: 'select', nested: null },
+    after: { kind: 'value', dtype, shape },
+  } as const;
+}
+
 describe('the dtype the editor shows after each link of a chain', () => {
   it('is the engine’s dtype after the start and after each method', () => {
     const prepared = started();
@@ -133,10 +142,18 @@ describe('the dtype the editor shows after each link of a chain', () => {
     expect(stepOf(prepared, 'step_index').chains.get(chainIdOf('step_index'))).toEqual({
       source: 'String',
       methods: ['UInt32', 'UInt32'],
+      // Where each method stands, and where one added at the end would: after a text, then after
+      // a count, for each row, twice.
+      places: [
+        selectAfter('String', 'many'),
+        selectAfter('UInt32', 'many'),
+        selectAfter('UInt32', 'many'),
+      ],
     });
     expect(stepOf(prepared, 'resolved_day').chains.get(chainIdOf('resolved_day'))).toEqual({
       source: 'Datetime(us)',
       methods: ['Date'],
+      places: [selectAfter('Datetime(us)', 'many'), selectAfter('Date', 'many')],
     });
   });
 
@@ -146,6 +163,14 @@ describe('the dtype the editor shows after each link of a chain', () => {
     expect(stepOf(prepared, 'a_days').chains.get(chainIdOf('a_days'))).toEqual({
       source: 'Int64',
       methods: ['Int64', 'Int64'],
+      // The values of the condition are whole numbers and a number typed without a dtype, which
+      // takes theirs, so the engine knows what follows `otherwise` and says it gives one for each
+      // row, and that it still does after the two methods that follow.
+      places: [
+        selectAfter('Int64', 'many'),
+        selectAfter('Int64', 'many'),
+        selectAfter('Int64', 'many'),
+      ],
     });
   });
 
@@ -155,6 +180,8 @@ describe('the dtype the editor shows after each link of a chain', () => {
     expect(stepOf(prepared, 'holiday_count').chains.get(chainIdOf('holiday_count'))).toEqual({
       source: 'Date',
       methods: ['UInt32'],
+      // A list of dates gives many; its length is one count.
+      places: [selectAfter('Date', 'many'), selectAfter('UInt32', 'one')],
     });
   });
 
@@ -171,6 +198,17 @@ describe('the dtype the editor shows after each link of a chain', () => {
     expect(stepOf(prepared, 'pivot').chains.get(aggregate.value.id)).toEqual({
       source: null,
       methods: [null],
+      // The tables know what a group holds: the field the pivot takes its values from.
+      places: [
+        {
+          context: { outer: 'pivot_aggregate', nested: null },
+          after: { kind: 'value', dtype: 'Int64', shape: 'many' },
+        },
+        {
+          context: { outer: 'pivot_aggregate', nested: null },
+          after: { kind: 'value', dtype: 'Int64', shape: 'one' },
+        },
+      ],
     });
   });
 });
@@ -253,7 +291,7 @@ describe('a step the document cannot hold', () => {
       id: 'second',
       verb: 'with_columns',
       alias: 'second',
-      value: { kind: 'unset' },
+      value: { kind: 'literal', value: null },
       options: NO_OPTIONS,
     },
     {
@@ -269,7 +307,7 @@ describe('a step the document cannot hold', () => {
     const prepared = prepareRun(steps, translate(catalogue, steps), null, source);
 
     expect(prepared.steps.map((step) => step.status)).toEqual(['unknown', 'refused', 'notRun']);
-    expect(prepared.steps[1]?.problem).toBe('Pick a value.');
+    expect(prepared.steps[1]?.problem).toBe('The engine does not take None as a value yet.');
     expect(prepared.steps[2]?.problem).toBe('Not run: step 2 cannot be run yet.');
   });
 
@@ -324,6 +362,9 @@ describe('the words for a step that has no rows', () => {
   it('keep the message of a failure that has no kind of its own', () => {
     expect(rowsFailure('failed', 'could not collect the rows', null)).toBe(
       'could not collect the rows',
+    );
+    expect(rowsFailure('unknownName', 'the catalogue has no entry Expr.nothing', null)).toBe(
+      'the catalogue has no entry Expr.nothing',
     );
   });
 });
@@ -398,7 +439,7 @@ describe('a report of steps that have been edited since', () => {
       'valid',
       'valid',
     ]);
-    expect(stepOf(prepared, 'step_index').chains.get(chainIdOf('step_index'))).toEqual({
+    expect(stepOf(prepared, 'step_index').chains.get(chainIdOf('step_index'))).toMatchObject({
       source: 'String',
       methods: ['UInt32', 'UInt32'],
     });
@@ -457,5 +498,60 @@ describe('a report of steps that have been edited since', () => {
     );
 
     expect(prepared.steps[0]?.status).toBe('unknown');
+  });
+});
+
+describe('a step with something still to be picked', () => {
+  // A sort, a column that is the timestamp shifted by something still to be picked, and a column
+  // after it: the engine says the second is incomplete and the third was not run.
+  const steps: Step[] = [
+    { id: 'sort', verb: 'sort', options: { by: fieldKeys(['dcn']) } },
+    {
+      id: 'later',
+      verb: 'with_columns',
+      alias: 'earlier',
+      value: {
+        kind: 'chain',
+        id: 'chain-later',
+        chain: {
+          source: { kind: 'column', column: 'timestamp' },
+          methods: [
+            { id: 'method-shift', name: 'shift', argument: { kind: 'unset' }, options: NO_OPTIONS },
+          ],
+        },
+      },
+      options: NO_OPTIONS,
+    },
+    {
+      id: 'after',
+      verb: 'with_columns',
+      alias: 'days',
+      value: { kind: 'column', column: 'row_days' },
+      options: NO_OPTIONS,
+    },
+  ];
+  const translation = translate(catalogue, steps);
+  const prepared = prepareRun(
+    steps,
+    translation,
+    answeredFor(translation, decodeRun(incompleteFixture)),
+    source,
+  );
+
+  it('is said to be incomplete, with what is to be picked, on the word that is the matter', () => {
+    expect(prepared.steps.map((step) => step.status)).toEqual(['valid', 'refused', 'notRun']);
+    const later = stepOf(prepared, 'later');
+    expect(later.problem).toBe('Give shift a value or a field (rows).');
+    expect([...later.wrong]).toEqual([wrongId({ kind: 'method', methodId: 'method-shift' })]);
+  });
+
+  it('keeps the places of the chain before the hole, where the argument would stand', () => {
+    const chain = stepOf(prepared, 'later').chains.get('chain-later');
+    // The shift stands after the timestamp, for each row.
+    expect(chain?.places[0]).toEqual(selectAfter('Datetime(us)', 'many'));
+  });
+
+  it('says why the step after it was not run', () => {
+    expect(stepOf(prepared, 'after').problem).toBe('Not run: step 2 cannot be run yet.');
   });
 });

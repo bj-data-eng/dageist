@@ -14,7 +14,7 @@ use dageist_engine::document::{Document, Inputs, Resolution, Segment, Walk, Walk
 use polars::prelude::*;
 use serde_json::{Value, json};
 
-use crate::support::{call, chain, document, field, field_then, many, step};
+use crate::support::{call, chain, document, field, field_then, many, step, whole};
 
 fn source() -> DataFrame {
     df!(
@@ -37,6 +37,18 @@ fn inputs() -> Inputs {
                 .lazy(),
         )
         .expect("a first input");
+    inputs
+        .add_value("cutoff", Scalar::new(DataType::Int64, AnyValue::Int64(2)))
+        .expect("a value");
+    inputs
+        .add_value(
+            "on",
+            Scalar::new(DataType::Boolean, AnyValue::Boolean(true)),
+        )
+        .expect("a flag");
+    inputs
+        .add_list("holidays", Series::new("holidays".into(), [1_i64, 2]))
+        .expect("a list");
     inputs
 }
 
@@ -382,8 +394,10 @@ fn element_has_no_dtype_where_a_pivot_takes_values_from_several_columns() {
 }
 
 #[test]
-fn whether_a_literal_of_no_dtype_may_end_a_predicate_is_not_known() {
-    // `lit(1)` is whatever the other operand makes it: it may be a Boolean.
+fn an_untyped_whole_number_is_the_dtype_polars_gives_it_and_is_no_predicate() {
+    // `lit(1)` is an `Int32` by itself, which Polars refuses as a filter predicate when it runs.
+    let table = source().lazy();
+    assert!(table.filter(lit(1)).collect().is_err());
     let walk = walk_of(
         "LazyFrame.filter",
         json!({ "predicates": many(vec![chain(
@@ -391,13 +405,80 @@ fn whether_a_literal_of_no_dtype_may_end_a_predicate_is_not_known() {
             vec![],
         )]) }),
     );
-    assert_eq!(walk.refusal(), None);
-    let predicate = expression_at(&walk, &item("predicates", 0));
+    let refusal = walk.refusal().expect("a whole number is no predicate");
+    assert!(refusal.at_end());
     assert_eq!(
-        predicate.ending(),
-        Some(&Ending::NotKnown(Unknown::TheStartsDtype))
+        refusal.refusal().source(),
+        RefusalSource::Rule(Rule::FilterPredicateIsBoolean)
     );
-    assert!(walk.not_known().is_some());
+}
+
+#[test]
+fn an_untyped_number_is_asked_of_the_tables_as_the_dtype_polars_gives_it() {
+    let walk = walk_of(
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![
+            chain(
+                call("polars.lit", json!({ "value": { "integer": 1 } })),
+                vec![call("Expr.is_null", json!({}))],
+            ),
+            chain(
+                call("polars.lit", json!({ "value": { "float": 1.5 } })),
+                vec![call("Expr.is_null", json!({}))],
+            ),
+        ]) }),
+    );
+    assert_eq!(walk.not_known(), None);
+    let select = Context::step(Outer::Select);
+    assert_eq!(
+        expression_at(&walk, &item("exprs", 0)).places(),
+        vec![
+            at(select, after(Representative::Int32, Shape::One)),
+            at(select, after(Representative::Boolean, Shape::One)),
+        ]
+    );
+    assert_eq!(
+        expression_at(&walk, &item("exprs", 1)).places(),
+        vec![
+            at(select, after(Representative::Float64, Shape::One)),
+            at(select, after(Representative::Boolean, Shape::One)),
+        ]
+    );
+}
+
+#[test]
+fn an_untyped_number_that_ends_a_condition_takes_the_dtype_of_the_values_beside_it() {
+    // `when(f).then(a).otherwise(0)`: the number adapts to the whole numbers `a` holds, so the
+    // condition gives `Int64`, as Polars gives it.
+    let condition = chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![field("f")]) }),
+        ),
+        vec![
+            call("When.then", json!({ "statement": field("a") })),
+            call("Then.otherwise", json!({ "statement": whole(0) })),
+            call("Expr.is_null", json!({})),
+        ],
+    );
+    let adapted = source()
+        .lazy()
+        .select([when(col("f")).then(col("a")).otherwise(lit(0))])
+        .collect_schema()
+        .expect("Polars resolves it");
+    assert_eq!(adapted.get("a"), Some(&DataType::Int64));
+    let walk = walk_of(
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![condition]) }),
+    );
+    let select = Context::step(Outer::Select);
+    assert_eq!(
+        expression_at(&walk, &item("exprs", 0)).places()[2..],
+        [
+            at(select, after(Representative::Int64, Shape::Many)),
+            at(select, after(Representative::Boolean, Shape::Many)),
+        ]
+    );
 }
 
 #[test]
@@ -869,6 +950,93 @@ fn an_aggregate_that_the_first_fold_drops_stays_dropped_for_the_comparisons_afte
 }
 
 #[test]
+fn a_comparison_given_a_null_drops_the_aggregate_it_follows_after_an_earlier_fold() {
+    // `null < true`, `.last()`, `!= null`, `.is_not_null()` and `!= f` is a key
+    // Polars allows: the first comparison folds into a null, and the one that is
+    // given a null drops the aggregate before it, as the first would have, and what
+    // follows is a literal that a column is compared with. Without the comparison
+    // with a null the aggregate stays, and Polars refuses the key, as it refuses
+    // one that ends at the aggregate beside the column.
+    let rule = Some(RefusalSource::Rule(Rule::KeyIsElementwise));
+    let key = |dropped: bool, test: &str| {
+        let mut links = vec![
+            compared(
+                "Expr.lt",
+                chain(
+                    call("polars.lit", json!({ "value": { "flag": true } })),
+                    vec![],
+                ),
+            ),
+            call("Expr.last", json!({})),
+        ];
+        if dropped {
+            links.push(compared("Expr.ne", null()));
+        }
+        links.push(call(test, json!({})));
+        links.push(compared("Expr.ne", field("f")));
+        chain(
+            call("polars.lit", json!({ "value": { "flag": null } })),
+            links,
+        )
+    };
+    for test in ["Expr.is_not_null", "Expr.is_null"] {
+        assert_eq!(joined_on(key(true, test)), None, "{test}");
+        assert_eq!(joined_on(key(false, test)), rule, "{test} without the null");
+    }
+}
+
+#[test]
+fn a_column_compared_with_the_null_that_a_dropping_comparison_gives_is_left_to_a_limit() {
+    // Polars refuses `null < true`, `.last()`, `!= null`, `!= f` as not
+    // elementwise, for a column compared with the null that the fold gave. The
+    // walk allows it: the comparison given a null drops the aggregate, and a
+    // comparison with what an earlier one folded is left to the limit
+    // `a-null-comparison-in-a-key`, which excuses the difference. A later
+    // tightening of the rule turns this test, and the kept case of the limit
+    // that says the same, over.
+    let key = chain(
+        call("polars.lit", json!({ "value": { "flag": null } })),
+        vec![
+            compared(
+                "Expr.lt",
+                chain(
+                    call("polars.lit", json!({ "value": { "flag": true } })),
+                    vec![],
+                ),
+            ),
+            call("Expr.last", json!({})),
+            compared("Expr.ne", null()),
+            compared("Expr.ne", field("f")),
+        ],
+    );
+    assert_eq!(joined_on(key), None);
+}
+
+#[test]
+fn a_call_refused_without_the_dtype_of_an_argument_says_so() {
+    // `b.sub(1)` takes text and a number that is given no dtype, which the walk
+    // cannot say the dtype of: the subtraction is refused for any dtype the
+    // number might take, and the reason is Polars' for one of them. `b.sub(a)`
+    // is refused with every dtype known.
+    let select = |argument: Value| {
+        walk_of(
+            "LazyFrame.select",
+            json!({ "exprs": many(vec![field_then("b", vec![compared("Expr.sub", argument)])]) }),
+        )
+    };
+    let number = chain(
+        call("polars.lit", json!({ "value": { "integer": 1 } })),
+        vec![],
+    );
+    let blind = select(number);
+    let refusal = blind.refusal().expect("text minus a number is refused");
+    assert!(refusal.argument_unknown());
+    let known = select(field("a"));
+    let refusal = known.refusal().expect("text minus a column is refused");
+    assert!(!refusal.argument_unknown());
+}
+
+#[test]
 fn a_comparison_of_an_aggregate_with_a_null_is_no_comparison_of_a_column() {
     // `f.first() == null` is one value, and what is compared with it is a column
     // compared with a value that is not null.
@@ -1132,4 +1300,96 @@ fn an_expression_after_a_refused_one_is_walked_all_the_same() {
     let second = expression_at(step.walk(), &item("exprs", 1));
     assert_eq!(second.calls().len(), 2);
     assert!(second.calls()[1].verdict().is_some_and(|v| v.is_allowed()));
+}
+
+/// The expression argument that starts from the connected input `name` and
+/// continues with `then`.
+fn from_input(name: &str, then: Vec<Value>) -> Value {
+    chain(json!({ "input": name }), then)
+}
+
+#[test]
+fn a_chain_that_starts_from_a_connected_value_is_walked_as_a_literal_of_its_dtype() {
+    // A connected value is run as a literal of its dtype, so what is true of
+    // `lit` of a whole number is true of it: one value, and a test for a null
+    // of one value is a Boolean, one value.
+    let walk = walk_of(
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![from_input(
+            "cutoff",
+            vec![call("Expr.is_null", json!({}))],
+        )]) }),
+    );
+    assert_eq!(walk.not_known(), None);
+    assert_eq!(walk.refusal(), None);
+    let walked = expression_at(&walk, &item("exprs", 0));
+    let select = Context::step(Outer::Select);
+    assert_eq!(walked.calls()[0].follows(), Some(After::Start));
+    assert!(walked.calls()[0].verdict().is_some_and(|v| v.is_allowed()));
+    assert_eq!(
+        walked.places(),
+        vec![
+            at(select, after(Representative::Int64, Shape::One)),
+            at(select, after(Representative::Boolean, Shape::One)),
+        ]
+    );
+    assert_eq!(walked.ending(), Some(&Ending::Allowed));
+}
+
+#[test]
+fn a_connected_list_gives_many_values_of_its_dtype() {
+    let walk = walk_of(
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![from_input("holidays", vec![])]) }),
+    );
+    assert_eq!(walk.not_known(), None);
+    let walked = expression_at(&walk, &item("exprs", 0));
+    assert_eq!(
+        walked.places(),
+        vec![at(
+            Context::step(Outer::Select),
+            after(Representative::Int64, Shape::Many)
+        )]
+    );
+}
+
+#[test]
+fn a_connected_input_is_held_to_what_a_place_needs_of_the_dtype_it_gives() {
+    // A filter's predicate is a Boolean, which a rule decides from the dtype.
+    let predicate = |name: &str| {
+        walk_of(
+            "LazyFrame.filter",
+            json!({ "predicates": many(vec![from_input(name, vec![])]) }),
+        )
+    };
+    let flag = predicate("on");
+    assert_eq!(flag.refusal(), None);
+    assert_eq!(
+        expression_at(&flag, &item("predicates", 0)).ending(),
+        Some(&Ending::Allowed)
+    );
+    let number = predicate("cutoff");
+    let refusal = number.refusal().expect("a whole number is no predicate");
+    assert!(refusal.at_end());
+    assert_eq!(
+        refusal.refusal().source(),
+        RefusalSource::Rule(Rule::FilterPredicateIsBoolean)
+    );
+}
+
+#[test]
+fn an_input_that_is_not_connected_leaves_what_follows_it_not_known() {
+    let walk = walk_of(
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![from_input(
+            "missing",
+            vec![call("Expr.is_null", json!({}))],
+        )]) }),
+    );
+    assert_eq!(
+        walk.not_known(),
+        Some("step \"s\", exprs item 1: there is no connected value or list called \"missing\"")
+    );
+    let walked = expression_at(&walk, &item("exprs", 0));
+    assert_eq!(walked.places(), vec![None, None]);
 }

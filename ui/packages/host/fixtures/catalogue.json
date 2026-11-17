@@ -41,47 +41,25 @@
       "title": "Condition · when, then, otherwise"
     }
   ],
-  "dtypes": [
-    {
-      "key": "any",
-      "title": "any"
-    },
-    {
-      "key": "numeric",
-      "title": "numeric"
-    },
-    {
-      "key": "integer",
-      "title": "integer"
-    },
-    {
-      "key": "temporal",
-      "title": "temporal"
-    },
-    {
-      "key": "Datetime",
-      "title": "Datetime"
-    },
-    {
-      "key": "Date",
-      "title": "Date"
-    },
-    {
-      "key": "Time",
-      "title": "Time"
-    },
-    {
-      "key": "Duration",
-      "title": "Duration"
-    },
-    {
-      "key": "String",
-      "title": "String"
-    },
-    {
-      "key": "Boolean",
-      "title": "Boolean"
-    }
+  "listedDtypes": [
+    "Boolean",
+    "Date",
+    "Time",
+    "Null",
+    "String",
+    "Float16",
+    "Float32",
+    "Float64",
+    "Int8",
+    "Int16",
+    "Int32",
+    "Int64",
+    "Int128",
+    "UInt8",
+    "UInt16",
+    "UInt32",
+    "UInt64",
+    "UInt128"
   ],
   "entries": [
     {
@@ -91,7 +69,6 @@
       "name": "otherwise",
       "hint": "the value where no condition holds",
       "head": null,
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -99,8 +76,7 @@
           "shown": "statement",
           "label": "value when none holds",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -108,7 +84,11 @@
           "default": {
             "kind": "required"
           },
-          "python": null
+          "python": null,
+          "position": {
+            "kind": "nested",
+            "name": "condition.value"
+          }
         }
       ]
     },
@@ -119,7 +99,6 @@
       "name": "when",
       "hint": "another condition",
       "head": null,
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -127,8 +106,7 @@
           "shown": "predicates",
           "label": "conditions",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["Boolean"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -136,7 +114,11 @@
           "default": {
             "kind": "empty"
           },
-          "python": "()"
+          "python": "()",
+          "position": {
+            "kind": "nested",
+            "name": "condition.predicate"
+          }
         },
         {
           "name": "constraints",
@@ -148,8 +130,7 @@
               "kind": "column"
             },
             "value": {
-              "kind": "expression",
-              "dtypes": ["any"]
+              "kind": "expression"
             }
           },
           "shape": {
@@ -158,7 +139,8 @@
           "default": {
             "kind": "empty"
           },
-          "python": "{}"
+          "python": "{}",
+          "position": null
         }
       ]
     },
@@ -169,7 +151,6 @@
       "name": "then",
       "hint": "the value where that condition holds",
       "head": null,
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -177,8 +158,7 @@
           "shown": "statement",
           "label": "value when it holds",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -186,7 +166,11 @@
           "default": {
             "kind": "required"
           },
-          "python": null
+          "python": null,
+          "position": {
+            "kind": "nested",
+            "name": "condition.value"
+          }
         }
       ]
     },
@@ -197,7 +181,6 @@
       "name": "cum_count",
       "hint": "running count",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": [
         {
@@ -214,7 +197,8 @@
             "kind": "flag",
             "value": false
           },
-          "python": "False"
+          "python": "False",
+          "position": null
         }
       ]
     },
@@ -225,7 +209,6 @@
       "name": "cum_max",
       "hint": "running maximum",
       "head": null,
-      "accepts": ["numeric", "temporal", "String", "Boolean"],
       "lazy": true,
       "parameters": [
         {
@@ -242,7 +225,8 @@
             "kind": "flag",
             "value": false
           },
-          "python": "False"
+          "python": "False",
+          "position": null
         }
       ]
     },
@@ -253,7 +237,6 @@
       "name": "cum_sum",
       "hint": "running total",
       "head": null,
-      "accepts": ["numeric", "Boolean", "Duration"],
       "lazy": true,
       "parameters": [
         {
@@ -270,7 +253,8 @@
             "kind": "flag",
             "value": false
           },
-          "python": "False"
+          "python": "False",
+          "position": null
         }
       ]
     },
@@ -281,7 +265,6 @@
       "name": "dt.date",
       "hint": "the date part",
       "head": null,
-      "accepts": ["Datetime", "Date"],
       "lazy": true,
       "parameters": []
     },
@@ -292,7 +275,6 @@
       "name": "dt.month_start",
       "hint": "first of the month",
       "head": null,
-      "accepts": ["Datetime", "Date"],
       "lazy": true,
       "parameters": []
     },
@@ -303,7 +285,6 @@
       "name": "dt.offset_by",
       "hint": "move by a duration",
       "head": null,
-      "accepts": ["Datetime", "Date"],
       "lazy": true,
       "parameters": [
         {
@@ -311,8 +292,7 @@
           "shown": "by",
           "label": "by",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["String"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -320,7 +300,8 @@
           "default": {
             "kind": "required"
           },
-          "python": null
+          "python": null,
+          "position": null
         }
       ]
     },
@@ -331,7 +312,6 @@
       "name": "dt.time",
       "hint": "the time part",
       "head": null,
-      "accepts": ["Datetime", "Time"],
       "lazy": true,
       "parameters": []
     },
@@ -342,7 +322,6 @@
       "name": "dt.total_days",
       "hint": "whole days in a duration",
       "head": null,
-      "accepts": ["Duration"],
       "lazy": true,
       "parameters": [
         {
@@ -359,7 +338,8 @@
             "kind": "flag",
             "value": false
           },
-          "python": "False"
+          "python": "False",
+          "position": null
         }
       ]
     },
@@ -370,7 +350,6 @@
       "name": "eq",
       "hint": "equal to",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": [
         {
@@ -378,8 +357,7 @@
           "shown": "other",
           "label": "compared with",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -387,7 +365,8 @@
           "default": {
             "kind": "required"
           },
-          "python": null
+          "python": null,
+          "position": null
         }
       ]
     },
@@ -398,7 +377,6 @@
       "name": "first",
       "hint": "first value",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": [
         {
@@ -415,7 +393,8 @@
             "kind": "flag",
             "value": false
           },
-          "python": "False"
+          "python": "False",
+          "position": null
         }
       ]
     },
@@ -426,7 +405,6 @@
       "name": "ge",
       "hint": "at least",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": [
         {
@@ -434,8 +412,7 @@
           "shown": "other",
           "label": "compared with",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -443,7 +420,8 @@
           "default": {
             "kind": "required"
           },
-          "python": null
+          "python": null,
+          "position": null
         }
       ]
     },
@@ -454,7 +432,6 @@
       "name": "gt",
       "hint": "greater than",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": [
         {
@@ -462,8 +439,7 @@
           "shown": "other",
           "label": "compared with",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -471,7 +447,8 @@
           "default": {
             "kind": "required"
           },
-          "python": null
+          "python": null,
+          "position": null
         }
       ]
     },
@@ -482,7 +459,6 @@
       "name": "is_not_null",
       "hint": "has a value",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": []
     },
@@ -493,7 +469,6 @@
       "name": "is_null",
       "hint": "has no value",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": []
     },
@@ -504,7 +479,6 @@
       "name": "last",
       "hint": "last value",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": [
         {
@@ -521,7 +495,8 @@
             "kind": "flag",
             "value": false
           },
-          "python": "False"
+          "python": "False",
+          "position": null
         }
       ]
     },
@@ -532,7 +507,6 @@
       "name": "le",
       "hint": "at most",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": [
         {
@@ -540,8 +514,7 @@
           "shown": "other",
           "label": "compared with",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -549,7 +522,8 @@
           "default": {
             "kind": "required"
           },
-          "python": null
+          "python": null,
+          "position": null
         }
       ]
     },
@@ -560,7 +534,6 @@
       "name": "len",
       "hint": "number of values",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": []
     },
@@ -571,7 +544,6 @@
       "name": "lt",
       "hint": "less than",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": [
         {
@@ -579,8 +551,7 @@
           "shown": "other",
           "label": "compared with",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -588,7 +559,8 @@
           "default": {
             "kind": "required"
           },
-          "python": null
+          "python": null,
+          "position": null
         }
       ]
     },
@@ -599,7 +571,6 @@
       "name": "max",
       "hint": "highest value",
       "head": null,
-      "accepts": ["numeric", "temporal", "String", "Boolean"],
       "lazy": true,
       "parameters": []
     },
@@ -610,7 +581,6 @@
       "name": "min",
       "hint": "lowest value",
       "head": null,
-      "accepts": ["numeric", "temporal", "String", "Boolean"],
       "lazy": true,
       "parameters": []
     },
@@ -621,7 +591,6 @@
       "name": "ne",
       "hint": "not equal to",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": [
         {
@@ -629,8 +598,7 @@
           "shown": "other",
           "label": "compared with",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -638,7 +606,8 @@
           "default": {
             "kind": "required"
           },
-          "python": null
+          "python": null,
+          "position": null
         }
       ]
     },
@@ -649,7 +618,6 @@
       "name": "over",
       "hint": "within each group",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": [
         {
@@ -657,8 +625,7 @@
           "shown": "partition_by",
           "label": "group by",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -666,15 +633,18 @@
           "default": {
             "kind": "none"
           },
-          "python": "None"
+          "python": "None",
+          "position": {
+            "kind": "nested",
+            "name": "over.partition_by"
+          }
         },
         {
           "name": "more_exprs",
           "shown": "more_exprs",
           "label": "and by",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -682,15 +652,18 @@
           "default": {
             "kind": "empty"
           },
-          "python": "()"
+          "python": "()",
+          "position": {
+            "kind": "nested",
+            "name": "over.partition_by"
+          }
         },
         {
           "name": "order_by",
           "shown": "order_by",
           "label": "ordered by",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -698,7 +671,11 @@
           "default": {
             "kind": "none"
           },
-          "python": "None"
+          "python": "None",
+          "position": {
+            "kind": "nested",
+            "name": "over.order_by"
+          }
         },
         {
           "name": "descending",
@@ -714,7 +691,8 @@
             "kind": "flag",
             "value": false
           },
-          "python": "False"
+          "python": "False",
+          "position": null
         },
         {
           "name": "nulls_last",
@@ -730,7 +708,8 @@
             "kind": "flag",
             "value": false
           },
-          "python": "False"
+          "python": "False",
+          "position": null
         },
         {
           "name": "mapping_strategy",
@@ -760,7 +739,8 @@
             "kind": "text",
             "value": "group_to_rows"
           },
-          "python": "'group_to_rows'"
+          "python": "'group_to_rows'",
+          "position": null
         }
       ]
     },
@@ -771,7 +751,6 @@
       "name": "shift",
       "hint": "value n rows earlier",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": [
         {
@@ -779,8 +758,7 @@
           "shown": "n",
           "label": "rows",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["integer"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -789,15 +767,15 @@
             "kind": "integer",
             "value": 1
           },
-          "python": "1"
+          "python": "1",
+          "position": null
         },
         {
           "name": "fill_value",
           "shown": "fill_value",
           "label": "fill with",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -805,7 +783,8 @@
           "default": {
             "kind": "none"
           },
-          "python": "None"
+          "python": "None",
+          "position": null
         }
       ]
     },
@@ -816,7 +795,6 @@
       "name": "sub",
       "hint": "minus another value",
       "head": null,
-      "accepts": ["numeric", "temporal"],
       "lazy": true,
       "parameters": [
         {
@@ -824,8 +802,7 @@
           "shown": "other",
           "label": "minus",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -833,7 +810,8 @@
           "default": {
             "kind": "required"
           },
-          "python": null
+          "python": null,
+          "position": null
         }
       ]
     },
@@ -844,7 +822,6 @@
       "name": "sum",
       "hint": "total",
       "head": null,
-      "accepts": ["numeric", "Boolean", "Duration"],
       "lazy": true,
       "parameters": []
     },
@@ -855,7 +832,6 @@
       "name": "filter",
       "hint": "the rows where a condition holds",
       "head": "Filter table",
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -863,8 +839,7 @@
           "shown": "predicates",
           "label": "conditions",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["Boolean"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -872,7 +847,11 @@
           "default": {
             "kind": "empty"
           },
-          "python": "()"
+          "python": "()",
+          "position": {
+            "kind": "outer",
+            "name": "filter"
+          }
         },
         {
           "name": "constraints",
@@ -884,8 +863,7 @@
               "kind": "column"
             },
             "value": {
-              "kind": "expression",
-              "dtypes": ["any"]
+              "kind": "expression"
             }
           },
           "shape": {
@@ -894,7 +872,8 @@
           "default": {
             "kind": "empty"
           },
-          "python": "{}"
+          "python": "{}",
+          "position": null
         }
       ]
     },
@@ -905,7 +884,6 @@
       "name": "join",
       "hint": "columns from another table, by a key",
       "head": "Join table",
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -921,15 +899,15 @@
           "default": {
             "kind": "required"
           },
-          "python": null
+          "python": null,
+          "position": null
         },
         {
           "name": "on",
           "shown": "on",
           "label": "key",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -937,7 +915,11 @@
           "default": {
             "kind": "none"
           },
-          "python": "None"
+          "python": "None",
+          "position": {
+            "kind": "outer",
+            "name": "join_left"
+          }
         },
         {
           "name": "how",
@@ -983,15 +965,15 @@
             "kind": "text",
             "value": "inner"
           },
-          "python": "'inner'"
+          "python": "'inner'",
+          "position": null
         },
         {
           "name": "left_on",
           "shown": "left_on",
           "label": "left key",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -999,15 +981,18 @@
           "default": {
             "kind": "none"
           },
-          "python": "None"
+          "python": "None",
+          "position": {
+            "kind": "outer",
+            "name": "join_left"
+          }
         },
         {
           "name": "right_on",
           "shown": "right_on",
           "label": "right key",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -1015,7 +1000,11 @@
           "default": {
             "kind": "none"
           },
-          "python": "None"
+          "python": "None",
+          "position": {
+            "kind": "outer",
+            "name": "join_right"
+          }
         },
         {
           "name": "suffix",
@@ -1032,7 +1021,8 @@
             "kind": "text",
             "value": "_right"
           },
-          "python": "'_right'"
+          "python": "'_right'",
+          "position": null
         },
         {
           "name": "validate",
@@ -1066,7 +1056,8 @@
             "kind": "text",
             "value": "m:m"
           },
-          "python": "'m:m'"
+          "python": "'m:m'",
+          "position": null
         },
         {
           "name": "nulls_equal",
@@ -1082,7 +1073,8 @@
             "kind": "flag",
             "value": false
           },
-          "python": "False"
+          "python": "False",
+          "position": null
         },
         {
           "name": "coalesce",
@@ -1097,7 +1089,8 @@
           "default": {
             "kind": "none"
           },
-          "python": "None"
+          "python": "None",
+          "position": null
         },
         {
           "name": "maintain_order",
@@ -1134,7 +1127,8 @@
           "default": {
             "kind": "none"
           },
-          "python": "None"
+          "python": "None",
+          "position": null
         },
         {
           "name": "build_side",
@@ -1172,7 +1166,8 @@
             "kind": "text",
             "value": "auto"
           },
-          "python": "'auto'"
+          "python": "'auto'",
+          "position": null
         },
         {
           "name": "allow_parallel",
@@ -1188,7 +1183,8 @@
             "kind": "flag",
             "value": true
           },
-          "python": "True"
+          "python": "True",
+          "position": null
         },
         {
           "name": "force_parallel",
@@ -1204,7 +1200,8 @@
             "kind": "flag",
             "value": false
           },
-          "python": "False"
+          "python": "False",
+          "position": null
         }
       ]
     },
@@ -1215,7 +1212,6 @@
       "name": "pivot",
       "hint": "the values of a field as columns",
       "head": "Pivot table",
-      "accepts": [],
       "lazy": false,
       "parameters": [
         {
@@ -1231,7 +1227,8 @@
           "default": {
             "kind": "required"
           },
-          "python": null
+          "python": null,
+          "position": null
         },
         {
           "name": "on_columns",
@@ -1246,7 +1243,8 @@
           "default": {
             "kind": "required"
           },
-          "python": null
+          "python": null,
+          "position": null
         },
         {
           "name": "index",
@@ -1261,7 +1259,8 @@
           "default": {
             "kind": "none"
           },
-          "python": "None"
+          "python": "None",
+          "position": null
         },
         {
           "name": "values",
@@ -1276,15 +1275,15 @@
           "default": {
             "kind": "none"
           },
-          "python": "None"
+          "python": "None",
+          "position": null
         },
         {
           "name": "aggregate_function",
           "shown": "aggregate_function",
           "label": "repeats combined by",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -1292,7 +1291,11 @@
           "default": {
             "kind": "none"
           },
-          "python": "None"
+          "python": "None",
+          "position": {
+            "kind": "outer",
+            "name": "pivot_aggregate"
+          }
         },
         {
           "name": "maintain_order",
@@ -1308,7 +1311,8 @@
             "kind": "flag",
             "value": false
           },
-          "python": "False"
+          "python": "False",
+          "position": null
         },
         {
           "name": "separator",
@@ -1325,7 +1329,8 @@
             "kind": "text",
             "value": "_"
           },
-          "python": "'_'"
+          "python": "'_'",
+          "position": null
         },
         {
           "name": "column_naming",
@@ -1351,7 +1356,8 @@
             "kind": "text",
             "value": "auto"
           },
-          "python": "'auto'"
+          "python": "'auto'",
+          "position": null
         }
       ]
     },
@@ -1362,7 +1368,6 @@
       "name": "rename",
       "hint": "columns under new names",
       "head": "Rename",
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -1385,7 +1390,8 @@
           "default": {
             "kind": "required"
           },
-          "python": null
+          "python": null,
+          "position": null
         },
         {
           "name": "strict",
@@ -1401,7 +1407,8 @@
             "kind": "flag",
             "value": true
           },
-          "python": "True"
+          "python": "True",
+          "position": null
         }
       ]
     },
@@ -1412,7 +1419,6 @@
       "name": "select",
       "hint": "some of the columns",
       "head": "Select",
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -1420,8 +1426,7 @@
           "shown": "exprs",
           "label": "columns",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -1429,7 +1434,11 @@
           "default": {
             "kind": "empty"
           },
-          "python": "()"
+          "python": "()",
+          "position": {
+            "kind": "outer",
+            "name": "select"
+          }
         },
         {
           "name": "named_exprs",
@@ -1441,8 +1450,7 @@
               "kind": "column"
             },
             "value": {
-              "kind": "expression",
-              "dtypes": ["any"]
+              "kind": "expression"
             }
           },
           "shape": {
@@ -1451,7 +1459,11 @@
           "default": {
             "kind": "empty"
           },
-          "python": "{}"
+          "python": "{}",
+          "position": {
+            "kind": "outer",
+            "name": "select"
+          }
         }
       ]
     },
@@ -1462,7 +1474,6 @@
       "name": "sort",
       "hint": "the rows in the order of some fields",
       "head": "Sort table",
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -1470,8 +1481,7 @@
           "shown": "by",
           "label": "sort by",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -1479,15 +1489,18 @@
           "default": {
             "kind": "required"
           },
-          "python": null
+          "python": null,
+          "position": {
+            "kind": "outer",
+            "name": "sort"
+          }
         },
         {
           "name": "more_by",
           "shown": "more_by",
           "label": "then by",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -1495,7 +1508,11 @@
           "default": {
             "kind": "empty"
           },
-          "python": "()"
+          "python": "()",
+          "position": {
+            "kind": "outer",
+            "name": "sort"
+          }
         },
         {
           "name": "descending",
@@ -1512,7 +1529,8 @@
             "kind": "flag",
             "value": false
           },
-          "python": "False"
+          "python": "False",
+          "position": null
         },
         {
           "name": "nulls_last",
@@ -1529,7 +1547,8 @@
             "kind": "flag",
             "value": false
           },
-          "python": "False"
+          "python": "False",
+          "position": null
         },
         {
           "name": "maintain_order",
@@ -1545,7 +1564,8 @@
             "kind": "flag",
             "value": false
           },
-          "python": "False"
+          "python": "False",
+          "position": null
         },
         {
           "name": "multithreaded",
@@ -1561,7 +1581,8 @@
             "kind": "flag",
             "value": true
           },
-          "python": "True"
+          "python": "True",
+          "position": null
         }
       ]
     },
@@ -1572,7 +1593,6 @@
       "name": "with_columns",
       "hint": "a new column from a chain",
       "head": "Add column",
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -1580,8 +1600,7 @@
           "shown": "exprs",
           "label": "columns",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -1589,7 +1608,11 @@
           "default": {
             "kind": "empty"
           },
-          "python": "()"
+          "python": "()",
+          "position": {
+            "kind": "outer",
+            "name": "select"
+          }
         },
         {
           "name": "named_exprs",
@@ -1601,8 +1624,7 @@
               "kind": "column"
             },
             "value": {
-              "kind": "expression",
-              "dtypes": ["any"]
+              "kind": "expression"
             }
           },
           "shape": {
@@ -1611,7 +1633,11 @@
           "default": {
             "kind": "empty"
           },
-          "python": "{}"
+          "python": "{}",
+          "position": {
+            "kind": "outer",
+            "name": "select"
+          }
         }
       ]
     },
@@ -1622,7 +1648,6 @@
       "name": "otherwise",
       "hint": "the value where no condition holds",
       "head": null,
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -1630,8 +1655,7 @@
           "shown": "statement",
           "label": "value when none holds",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -1639,7 +1663,11 @@
           "default": {
             "kind": "required"
           },
-          "python": null
+          "python": null,
+          "position": {
+            "kind": "nested",
+            "name": "condition.value"
+          }
         }
       ]
     },
@@ -1650,7 +1678,6 @@
       "name": "when",
       "hint": "another condition",
       "head": null,
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -1658,8 +1685,7 @@
           "shown": "predicates",
           "label": "conditions",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["Boolean"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -1667,7 +1693,11 @@
           "default": {
             "kind": "empty"
           },
-          "python": "()"
+          "python": "()",
+          "position": {
+            "kind": "nested",
+            "name": "condition.predicate"
+          }
         },
         {
           "name": "constraints",
@@ -1679,8 +1709,7 @@
               "kind": "column"
             },
             "value": {
-              "kind": "expression",
-              "dtypes": ["any"]
+              "kind": "expression"
             }
           },
           "shape": {
@@ -1689,7 +1718,8 @@
           "default": {
             "kind": "empty"
           },
-          "python": "{}"
+          "python": "{}",
+          "position": null
         }
       ]
     },
@@ -1700,7 +1730,6 @@
       "name": "then",
       "hint": "the value where the condition holds",
       "head": null,
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -1708,8 +1737,7 @@
           "shown": "statement",
           "label": "value when it holds",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -1717,7 +1745,11 @@
           "default": {
             "kind": "required"
           },
-          "python": null
+          "python": null,
+          "position": {
+            "kind": "nested",
+            "name": "condition.value"
+          }
         }
       ]
     },
@@ -1728,7 +1760,6 @@
       "name": "col",
       "hint": "a column of the table",
       "head": null,
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -1744,7 +1775,8 @@
           "default": {
             "kind": "required"
           },
-          "python": null
+          "python": null,
+          "position": null
         },
         {
           "name": "more_names",
@@ -1759,7 +1791,8 @@
           "default": {
             "kind": "empty"
           },
-          "python": "()"
+          "python": "()",
+          "position": null
         }
       ]
     },
@@ -1770,7 +1803,6 @@
       "name": "element",
       "hint": "each value of the cell being combined",
       "head": null,
-      "accepts": [],
       "lazy": true,
       "parameters": []
     },
@@ -1781,7 +1813,6 @@
       "name": "lit",
       "hint": "a value written out",
       "head": null,
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -1798,7 +1829,8 @@
           "default": {
             "kind": "required"
           },
-          "python": null
+          "python": null,
+          "position": null
         },
         {
           "name": "dtype",
@@ -1813,7 +1845,8 @@
           "default": {
             "kind": "none"
           },
-          "python": "None"
+          "python": "None",
+          "position": null
         },
         {
           "name": "allow_object",
@@ -1829,7 +1862,8 @@
             "kind": "flag",
             "value": false
           },
-          "python": "False"
+          "python": "False",
+          "position": null
         }
       ]
     },
@@ -1840,7 +1874,6 @@
       "name": "when",
       "hint": "choose a value by a condition",
       "head": null,
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -1848,8 +1881,7 @@
           "shown": "predicates",
           "label": "conditions",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["Boolean"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -1857,7 +1889,11 @@
           "default": {
             "kind": "empty"
           },
-          "python": "()"
+          "python": "()",
+          "position": {
+            "kind": "nested",
+            "name": "condition.predicate"
+          }
         },
         {
           "name": "constraints",
@@ -1869,8 +1905,7 @@
               "kind": "column"
             },
             "value": {
-              "kind": "expression",
-              "dtypes": ["any"]
+              "kind": "expression"
             }
           },
           "shape": {
@@ -1879,7 +1914,8 @@
           "default": {
             "kind": "empty"
           },
-          "python": "{}"
+          "python": "{}",
+          "position": null
         }
       ]
     }

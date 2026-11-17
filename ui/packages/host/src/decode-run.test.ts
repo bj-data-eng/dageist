@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { ExpressionDtypesView, RunView, SegmentView, StepReportView } from './contract';
 import { DecodeError } from './decode';
 import { decodeRun } from './decode-run';
+import incompleteFixture from '../fixtures/step-report-incomplete.json';
 import refusedFixture from '../fixtures/step-report-refused.json';
 import reportFixture from '../fixtures/step-report.json';
 import unreadableFixture from '../fixtures/step-report-unreadable.json';
@@ -154,14 +155,39 @@ describe('the report of running the claim-timing steps', () => {
     expect(stepNamed(run, 'resolved_day').walk.refusal).toBeNull();
   });
 
-  it('says why the tables could not be asked past a point', () => {
-    expect(stepNamed(run, 'resolved_at').walk.notKnown).toBe(
-      'step "resolved_at", named_exprs entry 1 value, link 1: the dtype of an argument of Expr.shift is not known',
-    );
-    expect(stepNamed(run, 'holiday_count').walk.notKnown).toBe(
-      'step "holiday_count", named_exprs entry 1 value: a connected input starts the chain',
-    );
-    expect(stepNamed(run, 'sort').walk.notKnown).toBeNull();
+  it('asks the tables about every step of the sample, so none says it could not be asked', () => {
+    // A number typed without a dtype, as `shift(1)` and `otherwise 0` hold, is asked as the dtype
+    // Polars gives it, and a connected input as a literal of its dtype.
+    for (const step of run.status === 'run' ? run.steps : []) {
+      expect(step.walk.notKnown, step.id).toBeNull();
+    }
+  });
+
+  it('asks the tables about a chain that starts from a connected list, as a literal of its dtype', () => {
+    // `holidays` is a list of dates: many values of a date, and its length is one count.
+    const walked = stepNamed(run, 'holiday_count').walk.expressions[0];
+    expect(stepNamed(run, 'holiday_count').walk.notKnown).toBeNull();
+    expect(walked?.calls[0]).toEqual({
+      follows: { kind: 'start' },
+      verdict: { kind: 'allowed', result: 'Date', shape: 'many', ending: { kind: 'allowed' } },
+    });
+    expect(walked?.calls[1]?.follows).toEqual({ kind: 'value', dtype: 'Date', shape: 'many' });
+    expect(walked?.calls[1]?.verdict).toEqual({
+      kind: 'allowed',
+      result: 'UInt32',
+      shape: 'one',
+      ending: { kind: 'allowed' },
+    });
+    expect(walked?.places).toEqual([
+      {
+        context: { outer: 'select', nested: null },
+        after: { kind: 'value', dtype: 'Date', shape: 'many' },
+      },
+      {
+        context: { outer: 'select', nested: null },
+        after: { kind: 'value', dtype: 'UInt32', shape: 'one' },
+      },
+    ]);
   });
 });
 
@@ -211,6 +237,43 @@ describe('the report of a document with a step Polars refuses', () => {
     });
     // The expression is walked to the call that is refused and no further, so it has no end.
     expect(walk.expressions[0]?.ending).toBeNull();
+  });
+});
+
+describe('the report of a document with a step that holds something still to be picked', () => {
+  const run = decodeRun(incompleteFixture);
+  const steps = run.status === 'run' ? run.steps : [];
+
+  it('says the step is incomplete at the start of the expression that is a hole', () => {
+    expect(steps.map((step) => step.outcome.status)).toEqual(['valid', 'incomplete', 'notRun']);
+    expect(steps[1]?.outcome).toEqual({
+      status: 'incomplete',
+      place: {
+        stepIndex: 1,
+        stepId: 'later',
+        path: [
+          { kind: 'parameter', name: 'named_exprs' },
+          { kind: 'value', index: 0 },
+          { kind: 'link', index: 0 },
+          { kind: 'parameter', name: 'n' },
+          { kind: 'start' },
+        ],
+      },
+    });
+  });
+
+  it('says the next step was not run, and because of which', () => {
+    expect(steps[2]?.outcome).toEqual({ status: 'notRun', blockedBy: 'later' });
+  });
+
+  it('walks the incomplete step up to the hole: the shift stands after a timestamp', () => {
+    const value = steps[1]?.walk.expressions.find(
+      (expression) => expression.place.path.length === 2,
+    );
+    expect(value?.places[0]).toEqual({
+      context: { outer: 'select', nested: null },
+      after: { kind: 'value', dtype: 'Datetime(us)', shape: 'many' },
+    });
   });
 });
 
@@ -328,7 +391,7 @@ describe('a report that is not what the host sends', () => {
       '$.status: must be one of "run", "unreadable", not "halted"',
     );
     expect(refusal(replaced(report, ['steps', 3, 'outcome', 'status'], 'skipped')).message).toBe(
-      '$.steps[3].outcome.status: must be one of "valid", "refused", "notRun", not "skipped"',
+      '$.steps[3].outcome.status: must be one of "valid", "refused", "incomplete", "notRun", not "skipped"',
     );
   });
 

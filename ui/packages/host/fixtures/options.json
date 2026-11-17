@@ -1,0 +1,300 @@
+{
+  "options": [
+    {
+      "parameter": "how",
+      "default": "inner",
+      "words": [
+        {
+          "word": "inner",
+          "refusal": null
+        },
+        {
+          "word": "left",
+          "refusal": null
+        },
+        {
+          "word": "right",
+          "refusal": null
+        },
+        {
+          "word": "full",
+          "refusal": null
+        },
+        {
+          "word": "semi",
+          "refusal": null
+        },
+        {
+          "word": "anti",
+          "refusal": null
+        },
+        {
+          "word": "cross",
+          "refusal": null
+        }
+      ]
+    },
+    {
+      "parameter": "validate",
+      "default": "m:m",
+      "words": [
+        {
+          "word": "m:m",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "a cross join takes no join keys"
+          }
+        },
+        {
+          "word": "m:1",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "a cross join takes no join keys"
+          }
+        },
+        {
+          "word": "1:m",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "a cross join takes no join keys"
+          }
+        },
+        {
+          "word": "1:1",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "a cross join takes no join keys"
+          }
+        }
+      ]
+    },
+    {
+      "parameter": "nulls_equal",
+      "default": "false",
+      "words": [
+        {
+          "word": "true",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "a cross join takes no join keys"
+          }
+        },
+        {
+          "word": "false",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "a cross join takes no join keys"
+          }
+        }
+      ]
+    },
+    {
+      "parameter": "coalesce",
+      "default": "unset",
+      "words": [
+        {
+          "word": "true",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "a cross join takes no join keys"
+          }
+        },
+        {
+          "word": "false",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "a cross join takes no join keys"
+          }
+        }
+      ]
+    },
+    {
+      "parameter": "maintain_order",
+      "default": "unset",
+      "words": [
+        {
+          "word": "none",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "a cross join takes no join keys"
+          }
+        },
+        {
+          "word": "left",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "a cross join takes no join keys"
+          }
+        },
+        {
+          "word": "right",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "a cross join takes no join keys"
+          }
+        },
+        {
+          "word": "left_right",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "a cross join takes no join keys"
+          }
+        },
+        {
+          "word": "right_left",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "a cross join takes no join keys"
+          }
+        }
+      ]
+    },
+    {
+      "parameter": "build_side",
+      "default": "auto",
+      "words": [
+        {
+          "word": "auto",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "a cross join takes no join keys"
+          }
+        },
+        {
+          "word": "prefer_left",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "a cross join takes no join keys"
+          }
+        },
+        {
+          "word": "prefer_right",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "a cross join takes no join keys"
+          }
+        },
+        {
+          "word": "force_left",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "a cross join takes no join keys"
+          }
+        },
+        {
+          "word": "force_right",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "a cross join takes no join keys"
+          }
+        }
+      ]
+    },
+    {
+      "parameter": "allow_parallel",
+      "default": "true",
+      "words": [
+        {
+          "word": "true",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "a cross join takes no join keys"
+          }
+        },
+        {
+          "word": "false",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "a cross join takes no join keys"
+          }
+        }
+      ]
+    },
+    {
+      "parameter": "force_parallel",
+      "default": "false",
+      "words": [
+        {
+          "word": "true",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "a cross join takes no join keys"
+          }
+        },
+        {
+          "word": "false",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "schema"
+            },
+            "reason": "a cross join takes no join keys"
+          }
+        }
+      ]
+    }
+  ]
+}

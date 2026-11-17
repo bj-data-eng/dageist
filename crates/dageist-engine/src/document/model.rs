@@ -370,6 +370,10 @@ pub enum Start {
     Call(Call),
     /// A connected single value or list, by name, as a literal of its dtype.
     Input(String),
+    /// Nothing yet: the editor has not picked what the expression starts
+    /// from. A step that holds one is incomplete: it is walked up to the hole,
+    /// and not built.
+    Hole,
 }
 
 /// A chain: where it starts, then the methods and links of a condition that
@@ -418,6 +422,72 @@ impl Stage {
     }
 }
 
+impl Step {
+    /// The way to the first hole in the step, in the order the walk follows,
+    /// from the step to the start of the expression that is one: `None` when
+    /// the step holds none.
+    #[must_use]
+    pub fn first_hole(&self) -> Option<Vec<Segment>> {
+        let mut path = Vec::new();
+        hole_in_call(self.call(), &mut path).then_some(path)
+    }
+}
+
+fn hole_in_call(call: &Call, path: &mut Vec<Segment>) -> bool {
+    for given in call.arguments() {
+        path.push(Segment::Parameter(given.parameter().to_owned()));
+        if hole_in_value(given.value(), path) {
+            return true;
+        }
+        path.pop();
+    }
+    false
+}
+
+fn hole_in_value(value: &Value, path: &mut Vec<Segment>) -> bool {
+    match value {
+        Value::Expression(expression) => hole_in_expression(expression, path),
+        Value::Many(items) => items.iter().enumerate().any(|(at, item)| {
+            path.push(Segment::Item(at));
+            hole_in_value(item, path) || {
+                path.pop();
+                false
+            }
+        }),
+        Value::Pairs(pairs) => pairs.iter().enumerate().any(|(at, (key, entry))| {
+            path.push(Segment::Key(at));
+            if hole_in_value(key, path) {
+                return true;
+            }
+            path.pop();
+            path.push(Segment::Value(at));
+            hole_in_value(entry, path) || {
+                path.pop();
+                false
+            }
+        }),
+        _ => false,
+    }
+}
+
+fn hole_in_expression(expression: &Expression, path: &mut Vec<Segment>) -> bool {
+    path.push(Segment::Start);
+    match expression.start() {
+        Start::Hole => return true,
+        Start::Call(start) if hole_in_call(start, path) => return true,
+        Start::Call(_) | Start::Input(_) => {}
+    }
+    path.pop();
+    for (at, link) in expression.links().iter().enumerate() {
+        path.push(Segment::Link(at));
+        if hole_in_call(link, path) {
+            return true;
+        }
+        path.pop();
+    }
+    false
+}
+
 impl Expression {
     /// The chain that starts with `start` and continues with `links`.
     ///
@@ -428,7 +498,7 @@ impl Expression {
     /// still lacks its `then`. The place is the start or the link.
     pub fn new(start: Start, links: Vec<Call>) -> Result<Self, Refusal> {
         let mut stage = match &start {
-            Start::Input(_) => Stage::Value,
+            Start::Input(_) | Start::Hole => Stage::Value,
             Start::Call(call) => {
                 Position::Start
                     .check(call.entry())

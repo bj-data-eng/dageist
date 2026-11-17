@@ -19,11 +19,12 @@
 
 use polars::prelude::{Schema, SchemaRef};
 
+use crate::allowed::is_count;
 use crate::allowed::{
-    self, After, Chosen, ConditionState, Context, Ending, Nested, Outer, Place as OfferPlace,
-    Position as Slot, Refusal, Representative, Shape, Unknown, Verdict,
+    self, After, Chosen, ConditionState, Context, Ending, Literal, Nested, Outer,
+    Place as OfferPlace, Position as Slot, Refusal, Representative, Shape, Unknown, Verdict,
 };
-use crate::catalog::{Applies, Kind};
+use crate::catalog::{Applies, Dtypes, Entry, Kind};
 
 use super::error::{Place, Segment};
 use super::inputs::Inputs;
@@ -123,6 +124,7 @@ pub struct WalkRefusal {
     place: Place,
     refusal: Refusal,
     at_end: bool,
+    argument_unknown: bool,
 }
 
 impl WalkRefusal {
@@ -143,6 +145,14 @@ impl WalkRefusal {
     #[must_use]
     pub const fn at_end(&self) -> bool {
         self.at_end
+    }
+
+    /// Whether the call was refused without the dtype of an argument being known:
+    /// no dtype that argument might have lets the call stand, and the reason is
+    /// the one Polars gave for one of them, not for the dtype the argument has.
+    #[must_use]
+    pub const fn argument_unknown(&self) -> bool {
+        self.argument_unknown
     }
 }
 
@@ -193,6 +203,7 @@ impl Step {
         let mut walker = Walker {
             step: self.call(),
             source,
+            inputs,
             other,
             base: Place::of_step(index, Some(self.id().clone())),
             path: Vec::new(),
@@ -216,10 +227,39 @@ impl Step {
 #[derive(Clone, Copy)]
 struct Operand {
     dtype: Option<Representative>,
+    /// Whether it is a number typed without a dtype and alone, which adapts to
+    /// the operand it is used with.
+    loose: Option<Loose>,
     shape: Shape,
     /// Whether the expression was walked to its end: a refused or unwalked one
     /// has no shape either.
     known: bool,
+}
+
+/// A number typed without a dtype, which is a dyn literal: Polars gives it the
+/// dtype of the operand it is used with where it fits, and its own alone. The
+/// tables are measured with typed columns, so they cannot say what it gives
+/// beside another operand.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Loose {
+    /// A whole number, by its value.
+    Integer(i64),
+    /// A number with a fraction.
+    Float,
+}
+
+/// The class of one value of a condition, and whether it is a number typed
+/// without a dtype, which adapts to the numbers beside it.
+type Valued = (Option<Representative>, Option<Loose>);
+
+/// What surrounds a link of an expression besides the chain before it.
+#[derive(Clone, Copy)]
+struct Around {
+    /// Whether the values of the condition the link is part of are one expression.
+    branches_are_one: bool,
+    /// What the chain starts from, when that is a number typed without a dtype and the
+    /// link follows it.
+    receiver_loose: Option<Loose>,
 }
 
 /// What a chain has so far.
@@ -231,7 +271,7 @@ enum Cur {
     },
     Condition {
         state: ConditionState,
-        values: Vec<Option<Representative>>,
+        values: Vec<Valued>,
         /// Whether every predicate and value so far gives one value, which a
         /// condition of them gives too.
         single: bool,
@@ -249,6 +289,7 @@ enum Cur {
 struct Walker<'a> {
     step: &'a Call,
     source: &'a Schema,
+    inputs: &'a Inputs,
     other: Option<SchemaRef>,
     base: Place,
     path: Vec<Segment>,
@@ -297,19 +338,85 @@ fn literal_class(call: &Call) -> Option<Representative> {
         Value::String(_) => Some(Representative::String),
         Value::Flag(Some(_)) => Some(Representative::Boolean),
         Value::Flag(None) => Some(Representative::Null),
+        // A number typed without a dtype has the one Polars gives it by itself.
+        Value::Integer(number) => Literal::Integer(*number).class(),
+        Value::Float(number) => Literal::Float(*number).class(),
         _ => None,
     }
 }
 
+/// What `call` is when it is a number typed without a dtype.
+fn loose_number(call: &Call) -> Option<Loose> {
+    if call.entry().id().as_str() != "polars.lit" || call.argument("dtype").is_some() {
+        return None;
+    }
+    match call.argument("value") {
+        Some(Value::Integer(number)) => Some(Loose::Integer(*number)),
+        Some(Value::Float(_)) => Some(Loose::Float),
+        _ => None,
+    }
+}
+
+/// Whether a method takes an operand besides what it follows, which a number
+/// typed without a dtype adapts to: arithmetic, comparisons, a fill value.
+fn takes_an_operand(entry: &Entry) -> bool {
+    entry.applies() == Applies::Expression
+        && entry.parameters().iter().any(|parameter| {
+            matches!(parameter.kind(), Kind::Expression(dtypes) if dtypes != [Dtypes::Integer])
+        })
+}
+
+/// Whether the whole number `value` fits the class, as Polars adapts a number
+/// typed without a dtype to a column of it.
+fn integer_fits(value: i64, class: Representative) -> bool {
+    match class {
+        Representative::Int8 => i8::try_from(value).is_ok(),
+        Representative::Int16 => i16::try_from(value).is_ok(),
+        Representative::Int32 => i32::try_from(value).is_ok(),
+        Representative::Int64 | Representative::Int128 => true,
+        Representative::UInt8 => u8::try_from(value).is_ok(),
+        Representative::UInt16 => u16::try_from(value).is_ok(),
+        Representative::UInt32 => u32::try_from(value).is_ok(),
+        Representative::UInt64 | Representative::UInt128 => value >= 0,
+        Representative::Float16 => value.unsigned_abs() <= 65_504,
+        Representative::Float32 | Representative::Float64 => true,
+        _ => false,
+    }
+}
+
+/// Whether the class is a number with a fraction.
+const fn is_float(class: Representative) -> bool {
+    matches!(
+        class,
+        Representative::Float16 | Representative::Float32 | Representative::Float64
+    )
+}
+
 /// The class every value of a condition has, when they have the same one. A
-/// condition of values of different dtypes has the supertype, which the tables
-/// do not give.
-fn unify(values: &[Option<Representative>]) -> Option<Representative> {
-    let first = (*values.first()?)?;
-    values
+/// number typed without a dtype adapts to the values beside it that are typed,
+/// as Polars gives it: a whole number to whole numbers and numbers with a
+/// fraction it fits, and a number with a fraction only to numbers with a
+/// fraction. Among such numbers alone it has no class. A condition of values
+/// of different dtypes has the supertype, which the tables do not give.
+fn unify(values: &[Valued]) -> Option<Representative> {
+    let classes: Option<Vec<(Representative, Option<Loose>)>> = values
         .iter()
-        .all(|value| *value == Some(first))
-        .then_some(first)
+        .map(|(class, loose)| class.map(|class| (class, *loose)))
+        .collect();
+    let classes = classes?;
+    let first_strict = classes
+        .iter()
+        .find(|(_, loose)| loose.is_none())
+        .map(|(class, _)| *class);
+    // Numbers typed without a dtype alone have none to give: Polars cannot resolve them where
+    // it runs, in a sort key, for one.
+    let first = first_strict?;
+    let same = |(class, loose): &(Representative, Option<Loose>)| match loose {
+        None => *class == first,
+        Some(Loose::Integer(value)) => integer_fits(*value, first),
+        Some(Loose::Float) => is_float(first),
+    };
+    classes.iter().all(same).then_some(first)
 }
 
 impl Walker<'_> {
@@ -321,11 +428,21 @@ impl Walker<'_> {
     }
 
     fn refuse(&mut self, refusal: &Refusal, at_end: bool) {
+        self.refuse_given(refusal, at_end, false);
+    }
+
+    /// Refuses a call that was asked without the dtype of one of its arguments.
+    fn refuse_blind(&mut self, refusal: &Refusal) {
+        self.refuse_given(refusal, false, true);
+    }
+
+    fn refuse_given(&mut self, refusal: &Refusal, at_end: bool, argument_unknown: bool) {
         if self.refusal.is_none() {
             self.refusal = Some(WalkRefusal {
                 place: self.here(),
                 refusal: refusal.clone(),
                 at_end,
+                argument_unknown,
             });
         }
     }
@@ -489,6 +606,7 @@ impl Walker<'_> {
         let context = Context::from_positions(&self.slots);
         let unsaid = Operand {
             dtype: None,
+            loose: None,
             shape: Shape::Many,
             known: false,
         };
@@ -502,7 +620,7 @@ impl Walker<'_> {
                 start_arguments = self.arguments(start, values_end);
                 self.path.pop();
             }
-            Start::Input(_) => self.blind("a connected input starts the chain"),
+            Start::Input(_) | Start::Hole => {}
         }
         let Some(context) = context else {
             self.blind("no named position holds the expression");
@@ -562,12 +680,21 @@ impl Walker<'_> {
                 });
                 self.path.pop();
             }
-            Start::Input(_) => {
+            Start::Hole => {
+                // Nothing is picked, so nothing is asked of what follows.
                 calls.push(Standing::not_asked());
                 cur = Cur::Value {
                     dtype: None,
                     shape: Shape::Many,
                 };
+            }
+            Start::Input(name) => {
+                cur = Cur::Value {
+                    dtype: None,
+                    shape: Shape::Many,
+                };
+                let standing = self.input_start(name, context, &mut cur, &mut last_end);
+                calls.push(standing);
             }
         }
         // Values that are one expression make the condition that expression, and
@@ -585,17 +712,33 @@ impl Walker<'_> {
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
             let arguments = self.arguments(link, values_end);
+            // The first link follows the start, which is a number typed without a dtype when
+            // it is one.
+            let receiver_loose = match expression.start() {
+                Start::Call(start) if at == 0 => loose_number(start),
+                _ => None,
+            };
             let (next, standing) = self.link(
                 link,
                 &arguments,
                 context,
                 cur,
                 &mut last_end,
-                branches_are_one,
+                Around {
+                    branches_are_one,
+                    receiver_loose,
+                },
             );
             cur = next;
             calls.push(standing);
             self.path.pop();
+        }
+        // A condition that has no `otherwise` and holds a number typed without a dtype has no
+        // dtype to give it: Polars cannot resolve the number, and refuses where it runs.
+        if let Cur::Condition { values, .. } = &cur
+            && values.iter().any(|(_, loose)| loose.is_some())
+        {
+            last_end = Some(Ending::NotKnown(Unknown::TheResultsDtype));
         }
         let mut ending = None;
         if held.is_some() && !matches!(cur, Cur::Dead) {
@@ -642,16 +785,67 @@ impl Walker<'_> {
         match cur {
             Cur::Value { dtype, shape } => Operand {
                 dtype,
+                loose: match expression.start() {
+                    Start::Call(start) if expression.links().is_empty() => loose_number(start),
+                    _ => None,
+                },
                 shape,
                 // What was not asked has no shape that can be counted on.
                 known: dtype.is_some(),
             },
             Cur::Condition { values, .. } => Operand {
                 dtype: unify(&values),
+                loose: None,
                 shape: Shape::Many,
                 known: true,
             },
             Cur::Dead => unsaid,
+        }
+    }
+
+    /// Asks the tables about a chain that starts from the connected input
+    /// `name`, which the run makes a literal of its dtype. `cur` and `last_end`
+    /// are what the chain has afterwards, as for any other start.
+    fn input_start(
+        &mut self,
+        name: &str,
+        context: Context,
+        cur: &mut Cur,
+        last_end: &mut Option<Ending>,
+    ) -> Standing {
+        let Some(literal) = self.inputs.start_literal(name) else {
+            self.blind(format!(
+                "there is no connected value or list called {name:?}"
+            ));
+            return Standing::not_asked();
+        };
+        let Some(class) = literal.class else {
+            self.blind(format!(
+                "the dtype of the connected input {name:?} is not one the tables cover"
+            ));
+            return Standing::not_asked();
+        };
+        let verdict = allowed::offer_input(
+            &OfferPlace::new(context, After::Start),
+            class,
+            literal.shape,
+        );
+        match &verdict {
+            Verdict::Refused(refusal) => {
+                self.refuse(refusal, false);
+                *cur = Cur::Dead;
+            }
+            Verdict::Allowed(allowance) => {
+                *last_end = Some(allowance.can_end().clone());
+                *cur = Cur::Value {
+                    dtype: Some(class),
+                    shape: allowance.shape(),
+                };
+            }
+        }
+        Standing {
+            follows: Some(After::Start),
+            verdict: Some(verdict),
         }
     }
 
@@ -664,9 +858,22 @@ impl Walker<'_> {
         context: Context,
         cur: Cur,
         last_end: &mut Option<Ending>,
-        branches_are_one: bool,
+        around: Around,
     ) -> (Cur, Standing) {
+        let Around {
+            branches_are_one,
+            receiver_loose,
+        } = around;
         let entry = link.entry();
+        // A number typed without a dtype that a method takes another operand beside adapts to
+        // it, so what it follows is not known to the tables, which are measured with typed
+        // columns.
+        let cur = match cur {
+            Cur::Value { shape, .. } if receiver_loose.is_some() && takes_an_operand(entry) => {
+                Cur::Value { dtype: None, shape }
+            }
+            other => other,
+        };
         let after = match &cur {
             Cur::Dead => return (Cur::Dead, Standing::not_asked()),
             Cur::Value { dtype: None, shape } => {
@@ -692,9 +899,20 @@ impl Walker<'_> {
             },
             Cur::Condition { state, .. } => After::Condition(*state),
         };
+        // A number typed without a dtype that a method takes as an operand adapts to what it
+        // follows, so its dtype is not known to the tables, unless it counts rows.
         let given: Vec<(&str, Representative)> = arguments
             .iter()
-            .filter_map(|(name, operand)| operand.dtype.map(|dtype| (name.as_str(), dtype)))
+            .filter_map(|(name, operand)| {
+                let counts = matches!(operand.loose, Some(Loose::Integer(_)));
+                let hidden = entry.applies() == Applies::Expression
+                    && operand.loose.is_some()
+                    && !(counts && is_count(entry, name));
+                operand
+                    .dtype
+                    .filter(|_| !hidden)
+                    .map(|dtype| (name.as_str(), dtype))
+            })
             .collect();
         let words = option_words(link);
         let words: Vec<(&str, &str)> = words
@@ -725,7 +943,7 @@ impl Walker<'_> {
                 verdict: Some(verdict.clone()),
             };
             if let Verdict::Refused(refusal) = &verdict {
-                self.refuse(refusal, false);
+                self.refuse_blind(refusal);
                 return (Cur::Dead, standing);
             }
             return (
@@ -740,7 +958,10 @@ impl Walker<'_> {
             .iter()
             .find(|(name, _)| name == "statement")
             .map(|(_, operand)| *operand);
-        let statement_class = statement.and_then(|operand| operand.dtype);
+        let statement_class: Valued = (
+            statement.and_then(|operand| operand.dtype),
+            statement.and_then(|operand| operand.loose),
+        );
         // Whether the predicates and the value this link is given give one
         // value.
         let given_known = arguments
@@ -815,9 +1036,16 @@ impl Walker<'_> {
                     "Then.when" | "ChainedThen.when" => ConditionState::ChainedWhen,
                     _ => {
                         values.push(statement_class);
+                        let dtype = if known { unify(&values) } else { None };
+                        // Numbers typed without a dtype that have no typed value beside them
+                        // have none to give, and Polars cannot always resolve them where it
+                        // runs, so whether the expression may end here is not known.
+                        if dtype.is_none() && values.iter().any(|(_, loose)| loose.is_some()) {
+                            *last_end = Some(Ending::NotKnown(Unknown::TheResultsDtype));
+                        }
                         return (
                             Cur::Value {
-                                dtype: if known { unify(&values) } else { None },
+                                dtype,
                                 // Where the values are one expression the predicates
                                 // are dropped, and the values give the shape.
                                 shape: if (branches_are_one && values_single)
@@ -922,7 +1150,7 @@ fn calls_of(expression: &Expression) -> impl Iterator<Item = &Call> {
     std::iter::once(expression.start())
         .filter_map(|start| match start {
             Start::Call(call) => Some(call),
-            Start::Input(_) => None,
+            Start::Input(_) | Start::Hole => None,
         })
         .chain(expression.links())
 }
@@ -968,7 +1196,9 @@ fn is_reached_by_a_null(expression: &Expression, at: usize) -> bool {
 /// that a null reaches is a null. The first of them drops what it follows and is
 /// given where that is one value or literals alone, and the comparisons after it
 /// compare a null, so they drop only what they are given where it is one value or
-/// literals alone. A side that is more is evaluated, and its aggregate counts.
+/// literals alone, except one that is given a null, which drops what it follows
+/// too where that is one value or literals alone: what comes before the last that
+/// does is not evaluated. A side that is more is evaluated, and its aggregate counts.
 /// Where a join's key is judged elementwise a subtraction with a null drops
 /// nothing: the key `k != f.len() - null` is not elementwise.
 fn holds_an_aggregate(expression: &Expression) -> bool {
@@ -976,12 +1206,24 @@ fn holds_an_aggregate(expression: &Expression) -> bool {
         |call: &Call| is_one_value(call) || operands(call).into_iter().any(holds_an_aggregate);
     let start = match expression.start() {
         Start::Call(call) => Some(call),
-        Start::Input(_) => None,
+        Start::Input(_) | Start::Hole => None,
     };
     let links = expression.links();
     let Some(first) = (0..links.len()).find(|at| is_reached_by_a_null(expression, *at)) else {
         return start.into_iter().chain(links).any(evaluated);
     };
+    // A comparison that is given a null drops what it follows where that is one
+    // value or literals alone, as the first fold does, so what a later one drops
+    // is not evaluated either: the last of them that does is where the key is
+    // judged from.
+    let first = (first..links.len())
+        .rev()
+        .find(|at| {
+            is_a_comparison(&links[*at])
+                && operands(&links[*at]).into_iter().any(is_a_null)
+                && wholly_single(expression, *at, true)
+        })
+        .unwrap_or(first);
     // What the first comparison follows is the start and the links before it,
     // dropped as a whole where they are one value or literals alone.
     let followed = !wholly_single(expression, first, true)
@@ -1006,7 +1248,7 @@ fn reads_a_column(expression: &Expression) -> bool {
     let calls = std::iter::once(expression.start())
         .filter_map(|start| match start {
             Start::Call(call) => Some(call),
-            Start::Input(_) => None,
+            Start::Input(_) | Start::Hole => None,
         })
         .chain(expression.links());
     matches!(
@@ -1040,7 +1282,7 @@ fn starts_from_a_null(expression: &Expression) -> bool {
 fn holds_a_null_comparison(expression: &Expression) -> bool {
     let start = match expression.start() {
         Start::Call(call) => Some(call),
-        Start::Input(_) => None,
+        Start::Input(_) | Start::Hole => None,
     };
     let mut reads = matches!(
         start,

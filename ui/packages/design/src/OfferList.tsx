@@ -67,6 +67,11 @@ export interface OfferListProps {
   readonly wide: boolean;
   /** Called when a row was picked and the list is done with. */
   readonly onDone: () => void;
+  /**
+   * Called with what is typed into the search box each time it changes, for a
+   * caller whose rows depend on it, as the rows that offer what was typed do.
+   */
+  readonly onType?: ((typed: string) => void) | undefined;
 }
 
 /** Returns what tells a row from every other row of a list: its group and its id. */
@@ -93,6 +98,7 @@ export function OfferList({
   keepOpen,
   wide,
   onDone,
+  onType,
 }: OfferListProps): React.JSX.Element {
   const [typed, setTyped] = useState('');
   /** The row the keyboard is on, or `null` for the first one Enter is meant for. */
@@ -156,6 +162,7 @@ export function OfferList({
           value={typed}
           onChange={(event) => {
             setTyped(event.currentTarget.value);
+            onType?.(event.currentTarget.value);
             setMarked(null);
             setPlaces(placesOf(groups(event.currentTarget.value)));
           }}
@@ -190,6 +197,7 @@ export function OfferList({
                   type="button"
                   tabIndex={-1}
                   disabled={offer.reason !== null}
+                  title={offer.reason ?? undefined}
                   aria-pressed={offer.ticked ?? undefined}
                   className="dg-offer-pick"
                   onPointerDown={(event) => {

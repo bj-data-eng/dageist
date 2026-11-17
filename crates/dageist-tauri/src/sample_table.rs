@@ -129,6 +129,11 @@ pub enum ErrorKind {
     Limit,
     /// The text sent is not a document the engine reads.
     Unreadable,
+    /// The request names an entry or a parameter the catalogue lacks, or a way
+    /// down to an expression that starts at no position of a step. A position
+    /// or a dtype that the engine has no word for is not an argument at all, and
+    /// Tauri and the bridge refuse it as one.
+    UnknownName,
     /// Anything else: the command could not do what it was asked.
     Failed,
 }
@@ -137,12 +142,13 @@ pub enum ErrorKind {
 impl ErrorKind {
     /// Every kind, in the order the contract lists them, for the vocabulary
     /// snapshot.
-    pub(crate) const ALL: [Self; 6] = [
+    pub(crate) const ALL: [Self; 7] = [
         Self::NoSuchStep,
         Self::NotRun,
         Self::Refused,
         Self::Limit,
         Self::Unreadable,
+        Self::UnknownName,
         Self::Failed,
     ];
 }
@@ -538,7 +544,8 @@ mod tests {
             ErrorKind::NotRun => Some(ErrorKind::Refused),
             ErrorKind::Refused => Some(ErrorKind::Limit),
             ErrorKind::Limit => Some(ErrorKind::Unreadable),
-            ErrorKind::Unreadable => Some(ErrorKind::Failed),
+            ErrorKind::Unreadable => Some(ErrorKind::UnknownName),
+            ErrorKind::UnknownName => Some(ErrorKind::Failed),
             ErrorKind::Failed => None,
         }
     }

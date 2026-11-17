@@ -12,10 +12,12 @@
 
 use std::fmt;
 
+use dageist_engine::allowed::{Nested, Outer, Position};
 use dageist_engine::catalog::{
-    Applies, DefaultValue, Dtypes, Entry, Family, Kind, Laziness, Parameter, ParameterDefault,
-    Shape, ValueType, Words, english, entries,
+    Applies, DefaultValue, Entry, Family, Kind, Laziness, Parameter, ParameterDefault, Shape,
+    ValueType, Words, english, entries,
 };
+use dageist_engine::document::Dtype;
 use serde::Serialize;
 
 use crate::sample_table::ErrorView;
@@ -54,9 +56,7 @@ struct ChoiceView {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 enum KindView {
-    Expression {
-        dtypes: Vec<&'static str>,
-    },
+    Expression,
     Column,
     Value {
         #[serde(rename = "type")]
@@ -104,6 +104,28 @@ enum DefaultView {
     Other,
 }
 
+/// A position that holds an expression, as the engine's tables name it: of a
+/// step, or inside an expression.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+enum PositionView {
+    /// A position of a step.
+    Outer { name: &'static str },
+    /// A position inside an expression.
+    Nested { name: &'static str },
+}
+
+const fn position_view(position: Position) -> PositionView {
+    match position {
+        Position::Outer(outer) => PositionView::Outer {
+            name: Outer::name(outer),
+        },
+        Position::Nested(nested) => PositionView::Nested {
+            name: Nested::name(nested),
+        },
+    }
+}
+
 /// One parameter of an entry.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 struct ParameterView {
@@ -118,6 +140,9 @@ struct ParameterView {
     default: DefaultView,
     /// Polars' default as Python writes it; `None` when it must be given.
     python: Option<&'static str>,
+    /// Where the expression the parameter holds stands, when a named position
+    /// holds it. The tables of allowed combinations are asked at that place.
+    position: Option<PositionView>,
 }
 
 /// What an entry is applied to.
@@ -140,7 +165,6 @@ struct EntryView {
     name: String,
     hint: String,
     head: Option<String>,
-    accepts: Vec<&'static str>,
     lazy: bool,
     parameters: Vec<ParameterView>,
 }
@@ -154,9 +178,11 @@ struct WordsView {
 
 /// The whole catalogue with its words.
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CatalogueView {
     families: Vec<WordsView>,
-    dtypes: Vec<WordsView>,
+    /// The dtypes a document names by one word, in the order a list gives them.
+    listed_dtypes: Vec<String>,
     entries: Vec<EntryView>,
 }
 
@@ -227,10 +253,6 @@ fn shape_view(shape: Shape) -> ShapeView {
     }
 }
 
-fn dtype_keys(dtypes: &[Dtypes]) -> Vec<&'static str> {
-    dtypes.iter().map(|group| group.key()).collect()
-}
-
 fn kind_view(entry: &Entry, parameter: &Parameter, words: &Words) -> Result<KindView, MissingWord> {
     kind_of(entry, parameter, parameter.kind(), words)
 }
@@ -242,9 +264,7 @@ fn kind_of(
     words: &Words,
 ) -> Result<KindView, MissingWord> {
     Ok(match kind {
-        Kind::Expression(dtypes) => KindView::Expression {
-            dtypes: dtype_keys(dtypes),
-        },
+        Kind::Expression(_) => KindView::Expression,
         Kind::Column => KindView::Column,
         Kind::Value(value_type) => KindView::Value {
             value_type: value_type_view(value_type),
@@ -303,6 +323,7 @@ fn parameter_view(
             ParameterDefault::Required => None,
             ParameterDefault::Python(text) => Some(text),
         },
+        position: Position::of_parameter(id.as_str(), parameter.name()).map(position_view),
     })
 }
 
@@ -316,7 +337,6 @@ fn entry_view(entry: &Entry, words: &Words) -> Result<EntryView, MissingWord> {
         hint: given(words.entry_hint(id), || format!("hint of {}", id.as_str()))?,
         // Only the steps of a table's list have a head, so its absence is not a gap.
         head: words.entry_head(id).map(str::to_owned),
-        accepts: dtype_keys(entry.accepts()),
         lazy: entry.laziness() == Laziness::Lazy,
         parameters: entry
             .parameters()
@@ -340,17 +360,7 @@ fn catalogue_view(words: &Words) -> Result<CatalogueView, MissingWord> {
                 })
             })
             .collect::<Result<_, MissingWord>>()?,
-        dtypes: Dtypes::ALL
-            .iter()
-            .map(|&group| {
-                Ok(WordsView {
-                    key: group.key(),
-                    title: given(words.dtypes_name(group), || {
-                        format!("name of the dtypes {}", group.key())
-                    })?,
-                })
-            })
-            .collect::<Result<_, MissingWord>>()?,
+        listed_dtypes: Dtype::listed().iter().map(ToString::to_string).collect(),
         entries: entries()
             .iter()
             .map(|entry| entry_view(entry, words))
@@ -417,26 +427,27 @@ mod tests {
                 "name": "shift",
                 "hint": "value n rows earlier",
                 "head": null,
-                "accepts": ["any"],
                 "lazy": true,
                 "parameters": [
                     {
                         "name": "n",
                         "shown": "n",
                         "label": "rows",
-                        "kind": { "kind": "expression", "dtypes": ["integer"] },
+                        "kind": { "kind": "expression" },
                         "shape": { "shape": "one" },
                         "default": { "kind": "integer", "value": 1 },
-                        "python": "1"
+                        "python": "1",
+                        "position": null
                     },
                     {
                         "name": "fill_value",
                         "shown": "fill_value",
                         "label": "fill with",
-                        "kind": { "kind": "expression", "dtypes": ["any"] },
+                        "kind": { "kind": "expression" },
                         "shape": { "shape": "one" },
                         "default": { "kind": "none" },
-                        "python": "None"
+                        "python": "None",
+                        "position": null
                     }
                 ]
             })
@@ -458,7 +469,8 @@ mod tests {
                 "kind": { "kind": "choice", "words": words },
                 "shape": { "shape": "one" },
                 "default": { "kind": "text", "value": "inner" },
-                "python": "'inner'"
+                "python": "'inner'",
+                "position": null
             })
         );
     }
@@ -476,7 +488,8 @@ mod tests {
                 "kind": { "kind": "flag" },
                 "shape": { "shape": "perItem", "of": "by" },
                 "default": { "kind": "flag", "value": false },
-                "python": "False"
+                "python": "False",
+                "position": null
             })
         );
     }
@@ -571,14 +584,10 @@ mod tests {
         let when = entry(&view, "polars.when");
         assert_eq!(when["applies"], "condition");
         assert_eq!(when["family"], "condition");
-        assert_eq!(when["accepts"], json!([]));
         assert_eq!(when["head"], Value::Null);
         let statement = parameter(&view, "Then.otherwise", "statement");
         assert_eq!(statement["default"], json!({ "kind": "required" }));
-        assert_eq!(
-            statement["kind"],
-            json!({ "kind": "expression", "dtypes": ["any"] })
-        );
+        assert_eq!(statement["kind"], json!({ "kind": "expression" }));
         assert_eq!(entry(&view, "Then.otherwise")["applies"], "condition");
         // `polars.element()` is a function of the start family, with no parameter.
         let element = entry(&view, "polars.element");
@@ -596,8 +605,101 @@ mod tests {
             json!({
                 "kind": "pairs",
                 "key": { "kind": "column" },
-                "value": { "kind": "expression", "dtypes": ["any"] }
+                "value": { "kind": "expression" }
             })
+        );
+    }
+
+    #[test]
+    fn an_expression_parameter_that_a_named_position_holds_carries_the_position() {
+        // The position the engine's tables name for the expression a parameter holds: the
+        // positions of a step, and those inside an expression.
+        let view = view();
+        let cases = [
+            (
+                "LazyFrame.sort",
+                "by",
+                json!({ "kind": "outer", "name": "sort" }),
+            ),
+            (
+                "LazyFrame.select",
+                "exprs",
+                json!({ "kind": "outer", "name": "select" }),
+            ),
+            (
+                "LazyFrame.filter",
+                "predicates",
+                json!({ "kind": "outer", "name": "filter" }),
+            ),
+            (
+                "LazyFrame.join",
+                "left_on",
+                json!({ "kind": "outer", "name": "join_left" }),
+            ),
+            (
+                "LazyFrame.join",
+                "right_on",
+                json!({ "kind": "outer", "name": "join_right" }),
+            ),
+            (
+                "LazyFrame.pivot",
+                "aggregate_function",
+                json!({ "kind": "outer", "name": "pivot_aggregate" }),
+            ),
+            (
+                "Expr.over",
+                "partition_by",
+                json!({ "kind": "nested", "name": "over.partition_by" }),
+            ),
+            (
+                "Expr.over",
+                "order_by",
+                json!({ "kind": "nested", "name": "over.order_by" }),
+            ),
+            (
+                "polars.when",
+                "predicates",
+                json!({ "kind": "nested", "name": "condition.predicate" }),
+            ),
+            (
+                "Then.otherwise",
+                "statement",
+                json!({ "kind": "nested", "name": "condition.value" }),
+            ),
+        ];
+        for (id, name, position) in cases {
+            assert_eq!(
+                parameter(&view, id, name)["position"],
+                position,
+                "{id} {name}"
+            );
+        }
+        // An argument of a method has no position of its own, nor has a parameter that is not
+        // an expression.
+        for (id, name) in [
+            ("Expr.shift", "n"),
+            ("Expr.sub", "other"),
+            ("LazyFrame.pivot", "on"),
+            ("LazyFrame.join", "how"),
+        ] {
+            assert_eq!(
+                parameter(&view, id, name)["position"],
+                Value::Null,
+                "{id} {name}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_catalogue_lists_the_dtypes_a_document_names_by_one_word() {
+        let listed = view()["listedDtypes"].clone();
+        assert_eq!(
+            listed,
+            json!([
+                "Boolean", "Date", "Time", "Null", "String", "Float16", "Float32", "Float64",
+                "Int8", "Int16", "Int32", "Int64", "Int128", "UInt8", "UInt16", "UInt32", "UInt64",
+                "UInt128"
+            ])
         );
     }
 
@@ -626,7 +728,10 @@ mod tests {
             ]
         );
         assert_eq!(view["families"][0]["title"], "Steps · change the table");
-        assert_eq!(view["dtypes"][0], json!({ "key": "any", "title": "any" }));
+        // What an entry accepts on what it follows is the engine's to say through its offers, so
+        // neither the groups of dtypes nor what an entry accepts of them is sent.
+        assert!(view.get("dtypes").is_none());
+        assert!(entry(&view, "Expr.shift").get("accepts").is_none());
     }
 
     #[test]
