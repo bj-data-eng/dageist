@@ -196,6 +196,93 @@ fn the_commands_answer_the_views_the_application_answers() {
 }
 
 #[test]
+fn the_offers_commands_answer_the_views_the_application_answers() {
+    let folder = SampleFolder::new("offers");
+    let bridge = bridge(&folder, PORT);
+    let select = json!([{ "kind": "outer", "name": "select" }]);
+
+    let reply = call(
+        &bridge,
+        "offers_at",
+        &json!({ "positions": select, "after": { "kind": "start" } }),
+    );
+    assert_eq!(reply.status, 200);
+    assert_eq!(reply.json(), fixture("offers-start.json"));
+
+    let reply = call(
+        &bridge,
+        "offers_at",
+        &json!({
+            "positions": select,
+            "after": { "kind": "value", "dtype": "Datetime(us)", "shape": "many" }
+        }),
+    );
+    assert_eq!(reply.status, 200);
+    assert_eq!(reply.json(), fixture("offers-value.json"));
+
+    let reply = call(
+        &bridge,
+        "candidate_fits",
+        &json!({
+            "start": null,
+            "argument": {
+                "entry": "Expr.dt.offset_by",
+                "parameter": "by",
+                "place": {
+                    "positions": select,
+                    "after": { "kind": "value", "dtype": "Datetime(us)", "shape": "many" }
+                }
+            },
+            "candidates": [
+                { "kind": "field", "dtype": "String" },
+                { "kind": "field", "dtype": "Int64" },
+                { "kind": "input", "dtype": "String", "list": false },
+                { "kind": "literal", "literal": { "kind": "text", "value": "1d" } },
+                { "kind": "literal", "literal": { "kind": "integer", "value": 1 } }
+            ]
+        }),
+    );
+    assert_eq!(reply.status, 200);
+    assert_eq!(reply.json(), fixture("fits-argument.json"));
+
+    let reply = call(
+        &bridge,
+        "option_offers",
+        &json!({
+            "entry": "LazyFrame.join",
+            "chosen": [{ "parameter": "how", "word": "cross" }]
+        }),
+    );
+    assert_eq!(reply.status, 200);
+    assert_eq!(reply.json(), fixture("options.json"));
+}
+
+#[test]
+fn an_unknown_name_in_an_offers_request_is_refused_with_its_kind() {
+    let folder = SampleFolder::new("unknown-name");
+    let bridge = bridge(&folder, PORT);
+
+    let reply = call(
+        &bridge,
+        "option_offers",
+        &json!({ "entry": "Expr.nothing", "chosen": [] }),
+    );
+    assert_eq!(reply.status, 422);
+    assert_eq!(reply.json()["kind"], "unknownName");
+
+    // A position the tables do not name is not the command's arguments.
+    let reply = call(
+        &bridge,
+        "offers_at",
+        &json!({
+            "positions": [{ "kind": "outer", "name": "selects" }],
+            "after": { "kind": "start" }
+        }),
+    );
+    assert_eq!(reply.status, 400);
+}
+
+#[test]
 fn a_command_that_fails_answers_its_error_view_with_a_422() {
     let folder = SampleFolder::new("failure");
     let bridge = bridge(&folder, PORT);

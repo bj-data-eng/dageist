@@ -15,6 +15,7 @@ mod catalogue;
 mod cli;
 mod identity;
 mod node;
+mod offers;
 mod report;
 mod sample_table;
 #[cfg(test)]
@@ -35,6 +36,9 @@ fn open_application(context: tauri::Context) {
             node::node_inputs,
             node::run_document,
             node::rows_after_step,
+            offers::offers_at,
+            offers::candidate_fits,
+            offers::option_offers,
             sample_table::open_sample_window,
             sample_table::open_sample_result,
             sample_table::table_block,

@@ -453,6 +453,8 @@ export const ERROR_KINDS = [
   'limit',
   /** The text sent is not a document the engine reads. */
   'unreadable',
+  /** The request names something the engine does not have: an entry, a parameter, a dtype or a place. */
+  'unknownName',
   /** Anything else. */
   'failed',
 ] as const;

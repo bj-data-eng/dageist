@@ -20,7 +20,7 @@ use dageist_engine::document::{
     ColumnDescription, ExpressionDtypes, Outcome, Place, ReadError, Report, Resolution, RunCause,
     Segment, StepReport, Walk, WalkRefusal, WalkedExpression,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// A column and the short name of its dtype.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -139,9 +139,9 @@ fn expression_dtypes_view(expression: &ExpressionDtypes) -> ExpressionDtypesView
 }
 
 /// How many values a chain gives.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-enum ValueShapeView {
+pub(crate) enum ValueShapeView {
     One,
     Many,
 }
@@ -154,9 +154,9 @@ const fn shape_view(shape: Shape) -> ValueShapeView {
 }
 
 /// How far a condition has come: the call that was last made.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-enum ConditionStateView {
+pub(crate) enum ConditionStateView {
     When,
     Then,
     ChainedWhen,
@@ -175,7 +175,7 @@ const fn condition_state_view(state: ConditionState) -> ConditionStateView {
 /// What an expression has so far, where a call would follow it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
-enum AfterView {
+pub(crate) enum AfterView {
     /// Nothing: the call starts an expression.
     Start,
     /// A value of a dtype class, which an expression method follows.
@@ -188,7 +188,7 @@ enum AfterView {
     Condition { state: ConditionStateView },
 }
 
-const fn after_view(after: After) -> AfterView {
+pub(crate) const fn after_view(after: After) -> AfterView {
     match after {
         After::Start => AfterView::Start,
         After::Value { dtype, shape } => AfterView::Value {
@@ -204,14 +204,14 @@ const fn after_view(after: After) -> AfterView {
 /// Where an expression stands: the position of a step that holds it, and when
 /// it is inside another expression, the position in that one.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-struct ContextView {
+pub(crate) struct ContextView {
     /// The position of the step, as the tables name it.
     outer: &'static str,
     /// The position inside the expression, as the tables name it.
     nested: Option<&'static str>,
 }
 
-fn context_view(context: Context) -> ContextView {
+pub(crate) fn context_view(context: Context) -> ContextView {
     ContextView {
         outer: Outer::name(context.outer()),
         nested: context.nested().map(Nested::name),
@@ -220,12 +220,12 @@ fn context_view(context: Context) -> ContextView {
 
 /// Where a call would stand: in which context, and after what.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-struct OfferPlaceView {
+pub(crate) struct OfferPlaceView {
     context: ContextView,
     after: AfterView,
 }
 
-fn offer_place_view(place: &OfferPlace) -> OfferPlaceView {
+pub(crate) fn offer_place_view(place: &OfferPlace) -> OfferPlaceView {
     OfferPlaceView {
         context: context_view(place.context()),
         after: after_view(place.after()),
@@ -235,7 +235,7 @@ fn offer_place_view(place: &OfferPlace) -> OfferPlaceView {
 /// Where Polars refused a combination, as the tables record it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
-enum StageView {
+pub(crate) enum StageView {
     Schema,
     Rows,
     Empty,
@@ -252,7 +252,7 @@ const fn stage_view(stage: Stage) -> StageView {
 /// Who refused a call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "by", rename_all = "camelCase")]
-enum RefusalSourceView {
+pub(crate) enum RefusalSourceView {
     /// Polars, as the tables recorded it, at this stage.
     Polars { stage: StageView },
     /// A rule Polars does not hold, by the name the tables give it.
@@ -263,12 +263,12 @@ enum RefusalSourceView {
 
 /// Why a call may not stand somewhere.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-struct RefusalView {
+pub(crate) struct RefusalView {
     source: RefusalSourceView,
     reason: String,
 }
 
-fn refusal_view(refusal: &Refusal) -> RefusalView {
+pub(crate) fn refusal_view(refusal: &Refusal) -> RefusalView {
     RefusalView {
         source: match refusal.source() {
             RefusalSource::Polars(stage) => RefusalSourceView::Polars {
@@ -284,7 +284,7 @@ fn refusal_view(refusal: &Refusal) -> RefusalView {
 /// Whether an expression may end where it does.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
-enum EndingView {
+pub(crate) enum EndingView {
     Allowed,
     Refused {
         refusal: RefusalView,
@@ -310,7 +310,7 @@ fn ending_view(ending: &Ending) -> EndingView {
 /// Whether a call may stand where it does.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
-enum VerdictView {
+pub(crate) enum VerdictView {
     /// It may, and gives this.
     Allowed {
         /// The dtype the chain has after it, where the call decides it.
@@ -322,7 +322,7 @@ enum VerdictView {
     Refused { refusal: RefusalView },
 }
 
-fn verdict_view(verdict: &Verdict) -> VerdictView {
+pub(crate) fn verdict_view(verdict: &Verdict) -> VerdictView {
     match verdict {
         Verdict::Allowed(allowance) => VerdictView::Allowed {
             result: allowance.result().map(|result| result.name().to_owned()),

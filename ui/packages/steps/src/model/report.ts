@@ -332,6 +332,7 @@ export function rowsFailure(kind: ErrorKind, message: string, step: PreparedStep
       return 'There are more rows than a preview holds.';
     case 'unreadable':
       return 'The steps cannot be read yet.';
+    case 'unknownName':
     case 'failed':
       return message;
     default:

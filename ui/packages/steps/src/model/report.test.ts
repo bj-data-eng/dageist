@@ -325,6 +325,9 @@ describe('the words for a step that has no rows', () => {
     expect(rowsFailure('failed', 'could not collect the rows', null)).toBe(
       'could not collect the rows',
     );
+    expect(rowsFailure('unknownName', 'the catalogue has no entry Expr.nothing', null)).toBe(
+      'the catalogue has no entry Expr.nothing',
+    );
   });
 });
 

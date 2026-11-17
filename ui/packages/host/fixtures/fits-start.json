@@ -1,0 +1,127 @@
+{
+  "fits": [
+    {
+      "kind": "judged",
+      "dtype": "Boolean",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Boolean",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      }
+    },
+    {
+      "kind": "judged",
+      "dtype": "Int64",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Int64",
+        "shape": "many",
+        "ending": {
+          "kind": "refused",
+          "refusal": {
+            "source": {
+              "by": "rule",
+              "rule": "filter-predicate-is-boolean"
+            },
+            "reason": "a filter's predicate must be Boolean"
+          }
+        }
+      }
+    },
+    {
+      "kind": "judged",
+      "dtype": "Boolean",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Boolean",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      }
+    },
+    {
+      "kind": "judged",
+      "dtype": "Date",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Date",
+        "shape": "many",
+        "ending": {
+          "kind": "refused",
+          "refusal": {
+            "source": {
+              "by": "rule",
+              "rule": "filter-predicate-is-boolean"
+            },
+            "reason": "a filter's predicate must be Boolean"
+          }
+        }
+      }
+    },
+    {
+      "kind": "judged",
+      "dtype": "Int32",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Int32",
+        "shape": "one",
+        "ending": {
+          "kind": "refused",
+          "refusal": {
+            "source": {
+              "by": "rule",
+              "rule": "filter-predicate-is-boolean"
+            },
+            "reason": "a filter's predicate must be Boolean"
+          }
+        }
+      }
+    },
+    {
+      "kind": "judged",
+      "dtype": "Float64",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Float64",
+        "shape": "one",
+        "ending": {
+          "kind": "refused",
+          "refusal": {
+            "source": {
+              "by": "rule",
+              "rule": "filter-predicate-is-boolean"
+            },
+            "reason": "a filter's predicate must be Boolean"
+          }
+        }
+      }
+    },
+    {
+      "kind": "judged",
+      "dtype": "String",
+      "verdict": {
+        "kind": "allowed",
+        "result": "String",
+        "shape": "one",
+        "ending": {
+          "kind": "refused",
+          "refusal": {
+            "source": {
+              "by": "rule",
+              "rule": "filter-predicate-is-boolean"
+            },
+            "reason": "a filter's predicate must be Boolean"
+          }
+        }
+      }
+    },
+    {
+      "kind": "unjudged",
+      "reason": "the tables cover no class of the dtype Categorical"
+    }
+  ]
+}
