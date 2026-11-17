@@ -42,11 +42,14 @@ impl Directory {
         Self(path)
     }
 
-    /// The same directory, holding a generated sample.
-    fn with_sample(name: &str) -> Self {
-        let directory = Self::named(name);
-        generate_claims(&directory.0, SPEC).expect("the sample is generated");
-        directory
+    /// The variables for a process, after a sample is generated in the directory.
+    ///
+    /// Only the process that starts the test calls it. Generating a sample runs
+    /// Polars through the engine, so a process that did would find Polars set up
+    /// before the entry it is meant to try.
+    fn variables_with_sample(&self) -> Vec<(&'static str, String)> {
+        generate_claims(&self.0, SPEC).expect("the sample is generated");
+        self.variables()
     }
 
     fn variables(&self) -> Vec<(&'static str, String)> {
@@ -132,10 +135,10 @@ fn generating_a_sample_starts_polars() {
 
 #[test]
 fn loading_a_working_window_starts_polars() {
-    let directory = Directory::with_sample("window");
+    let directory = Directory::named("window");
     in_fresh_process(
         "loading_a_working_window_starts_polars",
-        || directory.variables(),
+        || directory.variables_with_sample(),
         || {
             Table::load_keys(&directory_given(), "dcn", KEYS).expect("the window loads");
             sql_resolves();
@@ -145,10 +148,10 @@ fn loading_a_working_window_starts_polars() {
 
 #[test]
 fn opening_a_stored_table_starts_polars() {
-    let directory = Directory::with_sample("stored");
+    let directory = Directory::named("stored");
     in_fresh_process(
         "opening_a_stored_table_starts_polars",
-        || directory.variables(),
+        || directory.variables_with_sample(),
         || {
             ParquetTable::open(&directory_given()).expect("the table opens");
             sql_resolves();
