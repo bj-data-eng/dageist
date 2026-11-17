@@ -11,6 +11,7 @@
   "stages": ["schema", "rows", "empty"],
   "conditionStates": ["when", "then", "chainedWhen", "chainedThen"],
   "valueShapes": ["one", "many"],
+  "errorKinds": ["noSuchStep", "notRun", "refused", "limit", "unreadable", "failed"],
   "applies": ["expression", "frame", "function", "condition"],
   "valueTypes": ["integer", "float", "string", "date", "any"]
 }

@@ -1,6 +1,6 @@
 /**
  * @file The catalogue the host serves, indexed for the step editor: the
- * entry of each method and verb the storyboard knows, and the words for the
+ * entry of each method and verb the editor knows, and the words for the
  * dtype groups an entry accepts.
  *
  * The catalogue owns every word the editor shows and which dtypes a method
@@ -10,7 +10,7 @@
 import type { CatalogueView, EntryView, ParameterView } from '@dageist/host';
 
 import type { Dtype } from './frame';
-import { assertNever, isNumeric, isTemporal } from './frame';
+import { assertNever } from './frame';
 
 /** The catalogue as the editor reads it. */
 export interface Catalogue {
@@ -71,22 +71,45 @@ export function argumentOf(entry: EntryView): ArgumentParameter | null {
   return { parameter: first, dtypes: first.kind.dtypes };
 }
 
+/** The engine's names of the dtypes that hold whole numbers. */
+const INTEGERS: readonly string[] = [
+  'Int8',
+  'Int16',
+  'Int32',
+  'Int64',
+  'Int128',
+  'UInt8',
+  'UInt16',
+  'UInt32',
+  'UInt64',
+];
+
+/** The engine's names of the dtypes that hold numbers with a fraction. */
+const FLOATS: readonly string[] = ['Float16', 'Float32', 'Float64'];
+
+/** The engine's names of the dtypes that hold a moment or a length of time. */
+const TEMPORAL: readonly string[] = ['Date', 'Datetime', 'Time', 'Duration'];
+
 /**
- * Reports whether `dtype` belongs to the dtype group `group`. A group is
- * every dtype, the numbers, the integers, the temporal dtypes, or one dtype
- * by its name. The sample has only integers among its numbers.
+ * Reports whether `dtype`, the engine's short name of one, belongs to the
+ * dtype group `group` the catalogue names: every dtype, the numbers, the
+ * integers, the temporal dtypes, or one dtype by its name. A dtype with a
+ * parameter, such as `Datetime(us)`, belongs by the name before it. This only
+ * sorts the fields a list offers; whether a call may stand is the engine's.
  */
 export function groupHolds(group: string, dtype: Dtype): boolean {
+  const name = dtype.split('(')[0] ?? dtype;
   switch (group) {
     case 'any':
       return true;
     case 'numeric':
+      return INTEGERS.includes(name) || FLOATS.includes(name);
     case 'integer':
-      return isNumeric(dtype);
+      return INTEGERS.includes(name);
     case 'temporal':
-      return isTemporal(dtype);
+      return TEMPORAL.includes(name);
     default:
-      return group === dtype;
+      return group === name;
   }
 }
 

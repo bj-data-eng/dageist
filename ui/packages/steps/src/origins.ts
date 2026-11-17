@@ -6,9 +6,9 @@
 
 import { createContext, useContext } from 'react';
 
+import { useNode } from './EngineProvider';
 import type { Column } from './model/frame';
-import { SOURCE_NAME } from './model/frame';
-import type { StepResult } from './model/steps';
+import type { PreparedStep } from './model/report';
 
 /**
  * The step that last made each field, by the field's name: the step's number,
@@ -17,7 +17,7 @@ import type { StepResult } from './model/steps';
 export type Origins = ReadonlyMap<string, number>;
 
 /** Returns, for each step in order, where the fields it is given come from. */
-export function originsBefore(results: readonly StepResult[]): readonly Origins[] {
+export function originsBefore(results: readonly PreparedStep[]): readonly Origins[] {
   const each: Origins[] = [];
   const made = new Map<string, number>();
   for (const [index, result] of results.entries()) {
@@ -36,10 +36,11 @@ export const OriginsContext = createContext<Origins>(new Map());
  */
 export function useFieldHint(): (column: Column | null) => string[] {
   const origins = useContext(OriginsContext);
+  const source = useNode().source.name;
   return (column) => {
     if (column === null) return [];
     const step = origins.get(column.name);
-    const from = step === undefined ? `from ${SOURCE_NAME}` : `from step ${String(step)}`;
+    const from = step === undefined ? `from ${source}` : `from step ${String(step)}`;
     return [`${column.name} · ${column.dtype} · ${from}`];
   };
 }

@@ -19,14 +19,14 @@ import type { Entry, Offer, OfferGroup } from '@dageist/design';
 import { Block, Hint, ManySlot, Piece, Slot, Word } from '@dageist/design';
 
 import { FreshContext, Line, Lines } from './Lists';
+import { useNode } from './EngineProvider';
 import { ValueSlot } from './Values';
 import { anyField, counted, fieldOffers, matches, offer, titled } from './offers';
 import { useFieldHint } from './origins';
 import { DTYPES, findColumn } from './model/frame';
 import type { Dtype, Frame } from './model/frame';
-import { INPUTS, findInput } from './model/inputs';
+import { findInput } from './model/inputs';
 import type { Options, PairSetting, SetParameter, Setting } from './model/settings';
-import type { ElementScope } from './model/source';
 import {
   UNSET,
   atDefaultOver,
@@ -58,8 +58,8 @@ export interface Surroundings {
   readonly frame: Frame;
   /** Returns the items of the parameter named `of`, for a parameter that holds one value for each. */
   readonly items: (of: string) => readonly string[];
-  /** Where `element` is meant, for an expression that is worked out for the values of one pivot cell. */
-  readonly element?: ElementScope | undefined;
+  /** Whether `element` is meant, for an expression that is worked out for the values of one pivot cell. */
+  readonly element?: boolean | undefined;
 }
 
 /** Returns how `setting` is written as a word. */
@@ -286,14 +286,15 @@ export function TableDrawing({
   value,
   onChange,
 }: DrawingProps<string | null>): React.JSX.Element {
-  const table = value === null ? null : findInput(value);
+  const node = useNode();
+  const table = value === null ? null : findInput(node, value);
   const found = table?.kind === 'table' ? table : null;
   const lines =
     found === null
       ? []
       : [
-          `${found.name}: ${String(found.frame[0]?.cells.length ?? 0)} rows`,
-          ...found.frame.map((column) => `${column.name} · ${column.dtype}`),
+          `${found.name} · table`,
+          ...found.columns.map((column) => `${column.name} · ${column.dtype}`),
         ];
   return (
     <Hint lines={lines} code>
@@ -309,17 +310,13 @@ export function TableDrawing({
         offers={(typed) => [
           counted(
             'Tables',
-            INPUTS.flatMap((input) => (input.kind === 'table' ? [input] : []))
-              .filter((input) => matches(typed, input.name, input.from))
+            node.inputs
+              .flatMap((input) => (input.kind === 'table' ? [input] : []))
+              .filter((input) => matches(typed, input.name))
               .map((input) =>
-                offer(
-                  input.name,
-                  'table',
-                  `${String(input.frame[0]?.cells.length ?? 0)} × ${String(input.frame.length)}`,
-                  () => {
-                    onChange(input.name);
-                  },
-                ),
+                offer(input.name, 'table', `${String(input.columns.length)} columns`, () => {
+                  onChange(input.name);
+                }),
               ),
           ),
         ]}
@@ -328,7 +325,7 @@ export function TableDrawing({
   );
 }
 
-/** Draws a Polars dtype, from the dtypes the storyboard knows. */
+/** Draws a Polars dtype, from the dtypes the document names. */
 export function DtypeDrawing({
   describedAs,
   names,
@@ -533,7 +530,6 @@ function OneDrawing({
           frame={around.frame}
           label={describedAs}
           lists={false}
-          expected={null}
           takes={kind.dtypes}
           within={around.element}
           openId={openId}
@@ -1048,21 +1044,18 @@ export interface OptionRowsProps {
   readonly parameters: readonly ParameterView[];
   readonly options: Options;
   readonly around: Surroundings;
-  /** The names of the parameters that are set and that the preview does not apply. */
-  readonly skipped: readonly string[];
   /** Whether each parameter stands on a line of its own beneath the owner, or all follow it on its line. */
   readonly layout: 'inline' | 'lines';
   readonly onChange: (options: Options) => void;
 }
 
-/** Draws every parameter of an owner that is set, with a word that says what the preview leaves out. */
+/** Draws every parameter of an owner that is set. */
 export function OptionRows({
   ownerId,
   entry,
   parameters,
   options,
   around,
-  skipped,
   layout,
   onChange,
 }: OptionRowsProps): React.JSX.Element | null {
@@ -1090,26 +1083,8 @@ export function OptionRows({
         ) && <span className="font-sans text-xs text-muted">same as the default</span>}
     </Row>
   ));
-  const note =
-    skipped.length === 0 ? null : (
-      <Row layout={layout}>
-        <span className="font-sans text-xs text-muted">
-          {`The preview leaves out ${skipped.join(', ')}.`}
-        </span>
-      </Row>
-    );
   if (drawn.length === 0) return null;
-  return layout === 'lines' ? (
-    <Lines>
-      {rows}
-      {note}
-    </Lines>
-  ) : (
-    <>
-      {rows}
-      {note}
-    </>
-  );
+  return layout === 'lines' ? <Lines>{rows}</Lines> : <>{rows}</>;
 }
 
 function Row({

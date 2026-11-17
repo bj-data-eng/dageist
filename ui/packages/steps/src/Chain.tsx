@@ -19,7 +19,8 @@ import { createContext, useCallback, useContext, useState } from 'react';
 import type { Look, Offer, OfferGroup, Tone } from '@dageist/design';
 import { Hint, OfferList, Piece, Popover, Seam, Slot, Word } from '@dageist/design';
 
-import { useCatalogue } from './CatalogueProvider';
+import { useCatalogue, useNode } from './EngineProvider';
+import { inputLines } from './InputsStrip';
 import { FreshContext, Line, Lines } from './Lists';
 import { OptionRows, optionOffers } from './Parameters';
 import { ConditionBlocks, ValueSlot, emptyTest } from './Values';
@@ -34,25 +35,26 @@ import {
   methodEntry,
   methodId,
 } from './model/catalogue';
+import { wrongId } from './model/document';
 import type { ArgumentRule, Method, MethodName } from './model/expr';
 import {
   acceptanceMisfit,
-  argumentMisfit,
+  argumentReason,
   argumentRule,
+  LITERAL_DTYPES,
   defaultArgument,
-  literalComparand,
   methodOptionParameters,
-  previewedMethods,
-  readComparand,
-  skippedOptions,
+  offeredMethods,
   swappedArgument,
 } from './model/expr';
 import type { Dtype, Frame } from './model/frame';
-import { findColumn } from './model/frame';
+import { assertNever, findColumn } from './model/frame';
+import { findInput } from './model/inputs';
 import { nextId } from './model/ids';
 import { NO_OPTIONS, carriedOptions } from './model/settings';
-import type { Arm, Chain, ChainCheck, ElementScope, Source, Value } from './model/source';
-import { checkChain } from './model/source';
+import type { Arm, Chain, Source, Value } from './model/source';
+import type { ChainDtypes } from './model/report';
+import { usePreparedStep } from './engine';
 
 /** How every drag-and-drop area in the editor is set up. */
 export interface DragSettings {
@@ -101,6 +103,9 @@ const PART_SENSORS = [
 
 const WHOLE_NUMBER = /^-?\d+$/;
 
+/** No word of the editor is the matter. */
+const NO_WRONG: ReadonlySet<string> = new Set();
+
 function withMethods(chain: Chain, methods: readonly Method[]): Chain {
   return { source: chain.source, methods };
 }
@@ -114,9 +119,9 @@ function withMethodMoved(chain: Chain, from: number, to: number): Chain {
 }
 
 /**
- * Lists the methods the catalogue offers and the storyboard can preview that
- * can be handed `input`, under the catalogue's families from the shortest to
- * the longest. A method that does not fit says what it needs.
+ * Lists the methods the catalogue offers that can be handed `input`, under the
+ * catalogue's families from the shortest to the longest. A method that does
+ * not fit says what it needs.
  */
 function methodOffers(
   catalogue: Catalogue,
@@ -124,7 +129,7 @@ function methodOffers(
   input: Dtype | null,
   onPick: (name: MethodName) => void,
 ): OfferGroup[] {
-  const methods = previewedMethods(catalogue);
+  const methods = offeredMethods(catalogue);
   const groups = catalogue.view.families
     .map((family) =>
       counted(
@@ -142,7 +147,7 @@ function methodOffers(
               () => {
                 onPick(name);
               },
-              { reason: input === null ? 'fix the marked part first' : (misfit?.short ?? null) },
+              { reason: misfit?.short ?? null },
             );
           }),
       ),
@@ -162,11 +167,33 @@ interface ArgumentSlotProps {
   /** What the catalogue says the method's argument is. */
   readonly rule: ArgumentRule;
   readonly frame: Frame;
-  /** The dtype the method is handed, when it is known. */
-  readonly input: Dtype | null;
-  /** Whether the chain's problem is at this method. */
+  /** Whether the engine refused the method. */
   readonly wrong: boolean;
-  readonly onCommit: (argument: string) => void;
+  readonly onCommit: (argument: Value) => void;
+}
+
+/** Returns how an argument is shown as a word. */
+function shownArgument(
+  argument: Value,
+  rule: ArgumentRule,
+): { label: string; tone: Tone; look: Look } {
+  switch (argument.kind) {
+    case 'unset':
+      return { label: rule.parameter.shown, tone: 'value', look: 'none' };
+    case 'column':
+      return { label: argument.column, tone: 'column', look: 'plain' };
+    case 'input':
+      return { label: argument.name, tone: 'input', look: 'plain' };
+    case 'chain':
+      return { label: '…', tone: 'function', look: 'plain' };
+    case 'literal':
+      if (argument.value === null) return { label: 'None', tone: 'value', look: 'none' };
+      return typeof argument.value === 'number'
+        ? { label: String(argument.value), tone: 'value', look: 'plain' }
+        : { label: argument.value, tone: 'value', look: 'quoted' };
+    default:
+      return assertNever(argument);
+  }
 }
 
 /**
@@ -179,29 +206,17 @@ function ArgumentSlot({
   method,
   rule,
   frame,
-  input,
   wrong,
   onCommit,
 }: ArgumentSlotProps): React.JSX.Element {
   const catalogue = useCatalogue();
   const fresh = useContext(FreshContext);
   const fieldHint = useFieldHint();
-  const comparand = readComparand(method.argument);
-  const column = comparand.kind === 'column' ? findColumn(frame, comparand.column) : null;
-  const rows = frame[0]?.cells.length ?? 0;
-  let shown: { label: string; tone: Tone; look: Look };
-  if (comparand.kind === 'unset') {
-    shown = { label: rule.parameter.shown, tone: 'value', look: 'none' };
-  } else if (comparand.kind === 'column') {
-    shown = { label: comparand.column, tone: 'column', look: 'plain' };
-  } else if (typeof comparand.value === 'number') {
-    shown = { label: String(comparand.value), tone: 'value', look: 'plain' };
-  } else {
-    shown = { label: comparand.value, tone: 'value', look: 'quoted' };
-  }
-  // Why a value or a field does not go with what the method is handed, or `null` when it does.
-  const reasonFor = (given: Parameters<typeof argumentMisfit>[3]): string | null =>
-    input === null ? null : (argumentMisfit(catalogue, rule, input, given, rows)?.short ?? null);
+  const argument: Value = method.argument ?? { kind: 'unset' };
+  const column = argument.kind === 'column' ? findColumn(frame, argument.column) : null;
+  const shown = shownArgument(argument, rule);
+  // Why a value or a field is not what the parameter takes, or `null` when it is.
+  const reasonFor = (dtype: Dtype): string | null => argumentReason(rule, catalogue, dtype);
   const offers = (typed: string): OfferGroup[] => {
     const written: Offer[] = [];
     const text = typed.trim();
@@ -212,9 +227,9 @@ function ArgumentSlot({
           'value',
           'a number',
           () => {
-            onCommit(literalComparand(Number(text)));
+            onCommit({ kind: 'literal', value: Number(text) });
           },
-          { id: 'number', reason: reasonFor({ kind: 'number', value: Number(text) }) },
+          { id: 'number', reason: reasonFor(LITERAL_DTYPES.number) },
         ),
       );
     }
@@ -225,9 +240,9 @@ function ArgumentSlot({
           'value',
           'String',
           () => {
-            onCommit(literalComparand(typed));
+            onCommit({ kind: 'literal', value: typed });
           },
-          { id: 'text', look: 'quoted', reason: reasonFor({ kind: 'text', value: typed }) },
+          { id: 'text', look: 'quoted', reason: reasonFor(LITERAL_DTYPES.text) },
         ),
       );
     }
@@ -236,8 +251,10 @@ function ArgumentSlot({
       counted(
         'Fields',
         fieldOffers(frame, typed, {
-          ...anyField(onCommit),
-          reasonFor: (dtype) => reasonFor({ kind: 'field', name: '', dtype }),
+          ...anyField((name) => {
+            onCommit({ kind: 'column', column: name });
+          }),
+          reasonFor,
         }),
       ),
     ];
@@ -248,7 +265,7 @@ function ArgumentSlot({
         label={shown.label}
         tone={shown.tone}
         look={shown.look}
-        wrong={wrong || comparand.kind === 'unset'}
+        wrong={wrong || argument.kind === 'unset'}
         openNow={fresh.id === method.id}
         describedAs={`${rule.shown}: ${rule.parameter.label}`}
         placeholder="Type a value, or search the fields"
@@ -258,13 +275,22 @@ function ArgumentSlot({
   );
 }
 
+/** Returns the dtype a method of `chain` is handed: what stands before the method at `index`, or the start for the first. */
+function dtypeBefore(dtypes: ChainDtypes | undefined, index: number): Dtype | null {
+  if (dtypes === undefined) return null;
+  return index === 0 ? dtypes.source : (dtypes.methods[index - 1] ?? null);
+}
+
 interface MethodLinkProps {
   /** The chain the method belongs to; it can only be dragged within it. */
   readonly chainId: string;
   readonly index: number;
   readonly method: Method;
   readonly chain: Chain;
-  readonly check: ChainCheck;
+  /** The dtypes after the chain's start and each of its methods, when the engine has reported them. */
+  readonly dtypes: ChainDtypes | undefined;
+  /** The words of the editor that are the matter, as `wrongId` names them. */
+  readonly wrong: ReadonlySet<string>;
   readonly frame: Frame;
   readonly onChange: (chain: Chain) => void;
   /** Opens the list of methods to put one after this one. */
@@ -277,7 +303,8 @@ function MethodLink({
   index,
   method,
   chain,
-  check,
+  dtypes,
+  wrong: wrongWords,
   frame,
   onChange,
   onAddAfter,
@@ -288,9 +315,9 @@ function MethodLink({
   const rule = argumentRule(catalogue, method.name);
   // What the catalogue calls the method; a method it lacks keeps its Polars name.
   const shown = entry?.name ?? method.name;
-  const input = check.dtypes[index] ?? null;
-  const output = check.dtypes[index + 1] ?? null;
-  const wrong = check.problem?.index === index;
+  const input = dtypeBefore(dtypes, index);
+  const output = dtypes?.methods[index] ?? null;
+  const wrong = wrongWords.has(wrongId({ kind: 'method', methodId: method.id }));
   const { ref, handleRef, isDragSource } = useSortable({
     id: method.id,
     index,
@@ -312,7 +339,7 @@ function MethodLink({
     replace({
       id: method.id,
       name,
-      argument: swappedArgument(catalogue, method, name, frame),
+      argument: swappedArgument(catalogue, method.argument, name, frame),
       // What is set carries over to a method that takes the same parameter.
       options: next === null ? NO_OPTIONS : carriedOptions(method.options, entry, next),
     });
@@ -371,7 +398,6 @@ function MethodLink({
             method={method}
             rule={rule}
             frame={frame}
-            input={input}
             wrong={wrong}
             onCommit={(argument) => {
               replace({ ...method, argument });
@@ -384,7 +410,6 @@ function MethodLink({
           parameters={parameters}
           options={method.options}
           around={{ frame, items: () => [] }}
-          skipped={skippedOptions(catalogue, method)}
           layout="inline"
           onChange={(options) => {
             replace({ ...method, options });
@@ -409,10 +434,8 @@ export interface ChainBlocksProps {
   /** Identifies the chain; its methods can only be dragged within it. */
   readonly chainId: string;
   readonly chain: Chain;
-  /** The frame the chain is worked out on. */
+  /** The columns the chain's fields are picked from. */
   readonly frame: Frame;
-  /** Where `element` is meant, when the chain is worked out for the values of one pivot cell. */
-  readonly element?: ElementScope | undefined;
   /** Takes the whole chain away, leaving its place for something else. */
   readonly onRemove: () => void;
   readonly onChange: (chain: Chain) => void;
@@ -427,15 +450,17 @@ export function ChainBlocks({
   chainId,
   chain,
   frame,
-  element,
   onRemove,
   onChange,
 }: ChainBlocksProps): React.JSX.Element {
   const settings = useContext(DragSettingsContext);
   const catalogue = useCatalogue();
+  const node = useNode();
   const fresh = useContext(FreshContext);
   const fieldHint = useFieldHint();
-  const check = checkChain(catalogue, chain, frame, element ?? null);
+  const prepared = usePreparedStep();
+  const dtypes = prepared?.chains.get(chainId);
+  const wrongWords = prepared?.wrong ?? NO_WRONG;
   const [insertion, setInsertion] = useState<Insertion | null>(null);
   // A chain made by carrying a field on opens its list of methods as soon as it is shown.
   const [opensMethods, setOpensMethods] = useState(() => fresh.id === `${chainId}:method`);
@@ -465,7 +490,7 @@ export function ChainBlocks({
       setInsertion({ at, anchor });
     };
   };
-  const startsWrong = check.problem?.index === -1;
+  const startsWrong = wrongWords.has(wrongId({ kind: 'start', chainId }));
   // The words of a condition come from the catalogue; one it lacks keeps its Polars name and says so.
   const word = (which: ConditionWord): { text: string; hint: string; lacking: boolean } => {
     const found = conditionEntry(catalogue, which);
@@ -482,7 +507,11 @@ export function ChainBlocks({
   // A chain is taken away by the word it starts from.
   const removeChain = { label: 'Remove this chain', onPress: onRemove };
   const column = source.kind === 'column' ? findColumn(frame, source.column) : null;
-  const unset = source.kind === 'column' && source.column === '';
+  // What the chain starts from, when that is a field or a connected input.
+  const startName =
+    source.kind === 'column' ? source.column : source.kind === 'input' ? source.name : '';
+  const unset = (source.kind === 'column' || source.kind === 'input') && startName === '';
+  const startInput = source.kind === 'input' ? findInput(node, source.name) : null;
   // The word the chain starts from, which that first list of methods opens against.
   const [start, setStart] = useState<HTMLElement | null>(null);
   const adding: Insertion | null =
@@ -508,7 +537,8 @@ export function ChainBlocks({
           index={index}
           method={method}
           chain={chain}
-          check={check}
+          dtypes={dtypes}
+          wrong={wrongWords}
           frame={frame}
           onChange={onChange}
           onAddAfter={addAt(index + 1)}
@@ -521,14 +551,7 @@ export function ChainBlocks({
     label: string,
     onValue: (next: Value) => void,
   ): React.JSX.Element => (
-    <ValueSlot
-      value={value}
-      frame={frame}
-      label={label}
-      lists={false}
-      expected={null}
-      onChange={onValue}
-    />
+    <ValueSlot value={value} frame={frame} label={label} lists={false} onChange={onValue} />
   );
   const [arm] = source.kind === 'when' ? source.arms : [];
   // The word `element` comes from the catalogue; one it lacks keeps its Polars name and says so.
@@ -568,19 +591,22 @@ export function ChainBlocks({
           {methods}
         </>
       )}
-      {source.kind === 'column' && (
+      {(source.kind === 'column' || source.kind === 'input') && (
         <>
           <Piece
             remove={removeChain}
             add={{
-              label: unset ? 'Add a method after the field' : `Add a method after ${source.column}`,
+              label: unset ? 'Add a method after the field' : `Add a method after ${startName}`,
               onPress: addAt(0),
             }}
           >
-            <Hint lines={fieldHint(column)} code={false}>
+            <Hint
+              lines={startInput === null ? fieldHint(column) : inputLines(startInput)}
+              code={false}
+            >
               <Slot
-                label={unset ? 'field' : source.column}
-                tone={unset ? 'value' : 'column'}
+                label={unset ? 'field' : startName}
+                tone={unset ? 'value' : source.kind === 'input' ? 'input' : 'column'}
                 look={unset ? 'none' : 'plain'}
                 wrong={startsWrong}
                 names
@@ -689,7 +715,7 @@ export function ChainBlocks({
           <OfferList
             placeholder="Search the methods"
             groups={(typed) =>
-              methodOffers(catalogue, typed, check.dtypes[adding.at] ?? null, (name) => {
+              methodOffers(catalogue, typed, dtypeBefore(dtypes, adding.at), (name) => {
                 insert(adding.at, name);
               })
             }

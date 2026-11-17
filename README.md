@@ -8,7 +8,7 @@ acyclic graph.
 Rust owns the application's behavior. A host-independent core holds it, a Tauri 2
 host provides the native window and IPC commands, and a React view
 renders what the host reports. The current release opens the application window
-on a step editor storyboard and a table viewer over a generated sample; the
+on a step editor that runs on the engine and a table viewer over a generated sample; the
 graph model, nodes and pipeline execution are not implemented yet.
 
 ## Start

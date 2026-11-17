@@ -6,11 +6,8 @@
  * which Polars supplies, so only a parameter that differs from its default
  * is ever written out.
  *
- * What a setting stands for in Polars' text, and whether it can be worked
- * out, needs chains, so that is in `source.ts`.
- *
- * This is storyboard code. In the real application the Rust core owns types,
- * validation and previews; nothing here is meant to survive.
+ * What a setting stands for in Polars' text needs chains, so that is in
+ * `source.ts`; what it stands for in the step document is in `document.ts`.
  */
 
 import type { EntryView, ParameterView } from '@dageist/host';
@@ -222,35 +219,9 @@ export function carriedOptions(options: Options, from: EntryView | null, to: Ent
   );
 }
 
-/** Returns whether the flag `name` is set to true. */
-export function flagIsSet(options: Options, name: string): boolean {
-  const setting = Object.hasOwn(options, name) ? options[name] : undefined;
-  return setting?.kind === 'flag' && setting.value;
-}
-
 /** Returns the setting called `name` when it is set, and `null` otherwise. */
 export function optionOf(options: Options, name: string): Setting | null {
   return (Object.hasOwn(options, name) ? options[name] : undefined) ?? null;
-}
-
-/**
- * Returns whether the flag `name` is set for `item`, for a parameter that
- * holds one flag for each item of another. One flag that is set holds for
- * every item; items that are not set are false, which is every such flag's
- * default.
- */
-export function flagFor(options: Options, name: string, item: string): boolean {
-  const setting = optionOf(options, name);
-  if (setting?.kind === 'flag') return setting.value;
-  if (setting?.kind !== 'each') return false;
-  const own = Object.hasOwn(setting.items, item) ? setting.items[item] : undefined;
-  return own?.kind === 'flag' && own.value;
-}
-
-/** Returns the word or text the parameter `name` is set to, or `null` when it is not set to one. */
-export function wordOf(options: Options, name: string): string | null {
-  const setting = optionOf(options, name);
-  return setting?.kind === 'word' || setting?.kind === 'text' ? setting.value : null;
 }
 
 /** Returns `options` without the parameters called `names`. */

@@ -11,8 +11,8 @@
  * which a browser may slow down for a window in the background, so that sign
  * can lag behind.
  *
- * This is storyboard code. In the real application the Rust core owns the
- * steps and tells every window of a change; nothing here is meant to survive.
+ * The view holds the steps until the core owns them and tells every window of
+ * a change; nothing here is meant to survive that.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';

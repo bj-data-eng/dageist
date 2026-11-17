@@ -3,12 +3,8 @@
  * the editor holds: the settings of a step or method, and the values,
  * conditions and chains they are made of. Each check goes all the way down, so
  * that what passes can be drawn and worked out without looking again.
- *
- * This is storyboard code. In the real application the Rust core owns the
- * steps and checks what it is given; nothing here is meant to survive.
  */
 
-import { isMethodName } from './expr';
 import type { Options, PairSetting, Setting } from './settings';
 import type { Arm, Chain, Condition, Source, Value } from './source';
 import { COMPARISONS } from './source';
@@ -104,6 +100,8 @@ function isSource(value: unknown): value is Source {
       return everyItem(value.arms, isArm) && isValue(value.otherwise);
     case 'element':
       return true;
+    case 'input':
+      return typeof value.name === 'string';
     default:
       return false;
   }
@@ -133,8 +131,7 @@ function isMethod(value: unknown): boolean {
     isRecord(value) &&
     typeof value.id === 'string' &&
     typeof value.name === 'string' &&
-    isMethodName(value.name) &&
-    (value.argument === null || typeof value.argument === 'string') &&
+    (value.argument === null || isValue(value.argument)) &&
     isOptions(value.options)
   );
 }

@@ -210,8 +210,24 @@ fn a_command_that_fails_answers_its_error_view_with_a_422() {
     assert_eq!(reply.header("content-type"), Some("application/json"));
     assert_eq!(
         reply.json(),
-        json!({ "message": "a preview holds at most 1000 rows" })
+        json!({ "kind": "limit", "message": "a preview holds at most 1000 rows" })
     );
+}
+
+#[test]
+fn a_step_the_document_lacks_is_refused_with_its_kind() {
+    let folder = SampleFolder::new("kind");
+    let bridge = bridge(&folder, PORT);
+
+    let reply = call(
+        &bridge,
+        "rows_after_step",
+        &json!({ "document": ClaimTiming::STEPS_JSON, "step": "nowhere", "limit": 1 }),
+    );
+
+    assert_eq!(reply.status, 422);
+    assert_eq!(reply.json()["kind"], "noSuchStep");
+    assert!(reply.message().contains("there is no step"));
 }
 
 #[test]
@@ -225,7 +241,10 @@ fn the_sample_commands_keep_the_open_table_between_requests() {
         &json!({ "offset": 0, "length": 5, "columns": [] }),
     );
     assert_eq!(before.status, 422);
-    assert_eq!(before.json(), json!({ "message": "no table is open" }));
+    assert_eq!(
+        before.json(),
+        json!({ "kind": "failed", "message": "no table is open" })
+    );
 
     let opened = call(&bridge, "open_sample_window", &json!({ "keys": 10 }));
     assert_eq!(opened.status, 200);

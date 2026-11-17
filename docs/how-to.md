@@ -38,8 +38,9 @@ stylesheet. `test` runs Vitest once over the view's data layers: the decoders
 in `ui/packages/host`, which read what the host sends and are tested against
 the [snapshots written from Rust](#refresh-the-step-report-snapshots) with
 expectations written by hand, the bridge host in the same package, against a
-stand-in for `fetch`, and later the functions that prepare data for
-display. React components have no tests. Name a file to run only its tests,
+stand-in for `fetch`, and the step editor's functions that translate steps
+into a step document, prepare the engine's report for display and schedule
+requests, against the same snapshots. React components have no tests. Name a file to run only its tests,
 as in `npm --prefix ui run test -- decode-run`.
 
 Add a development dependency with
@@ -193,9 +194,11 @@ layout does not affect it. Never edit the file by hand.
 
 After a change to the sample node, the step document or its running, the walk
 of the tables, the catalogue's laziness, or the views of what they report, the
-snapshot test fails and names the file that differs. Seven files in
+snapshot test fails and names the file that differs. Eight files in
 `ui/packages/host/fixtures/` are written by one test: `node-inputs.json` from
-`node_inputs`, `step-report.json` from running the claim-timing steps,
+`node_inputs`, `step-document.json`, the claim-timing sample's own steps as the
+engine's document, which the view's tests compare the editor's starting steps
+with, `step-report.json` from running the claim-timing steps,
 `step-report-refused.json` from a document whose second step Polars refuses and
 whose third is not run, `step-report-unreadable.json` from text that is not a
 document, `step-rows.json` from the rows after the `days_open` step,

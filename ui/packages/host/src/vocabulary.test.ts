@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   APPLIES,
   CONDITION_STATES,
+  ERROR_KINDS,
   NESTED_POSITIONS,
   OUTER_POSITIONS,
   RULE_NAMES,
@@ -12,6 +13,7 @@ import {
 } from './contract';
 import { decodeCatalogue } from './decode-catalogue';
 import { decodeRun } from './decode-run';
+import { decodeFailure } from './failure';
 import catalogueFixture from '../fixtures/catalogue.json';
 import refusedFixture from '../fixtures/step-report-refused.json';
 import reportFixture from '../fixtures/step-report.json';
@@ -104,6 +106,11 @@ describe('the words the decoders read', () => {
             word,
           ),
         ),
+    },
+    {
+      list: 'errorKinds',
+      words: ERROR_KINDS,
+      accepts: (word) => decodeFailure({ kind: word, message: 'the reason' }),
     },
     {
       list: 'applies',

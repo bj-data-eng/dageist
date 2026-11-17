@@ -1,29 +1,39 @@
 /**
- * @file The rows a step produced, with each column's exact dtype under its
- * name and the column the step added marked.
+ * @file The rows the engine gave after a step, every cell as the engine wrote
+ * it, with each column's exact dtype under its name and the columns the step
+ * added marked. The view formats no value: a cell is the text it was sent, and
+ * only a null, which has no text, is drawn as a dash.
  */
 
 import { cx } from '@dageist/design';
 
-import { formatCell } from './format';
-import type { Frame } from './model/frame';
+import type { RowsDisplay } from './model/report';
 
 /** What the preview shows. */
 export interface RowsPreviewProps {
-  readonly frame: Frame;
+  /** The rows, or why there are none; `null` while the engine has not answered. */
+  readonly display: RowsDisplay | null;
   /** The columns to mark as new: the ones the step added. */
   readonly added: readonly string[];
+  /** Whether the rows are those of the steps as they are now. */
+  readonly settled: boolean;
 }
 
-/** Draws `frame` as a table. */
-export function RowsPreview({ frame, added }: RowsPreviewProps): React.JSX.Element {
-  const rows = Array.from({ length: frame[0]?.cells.length ?? 0 }, (_unused, row) => row);
+/** Draws the rows after a step as a table, or says why there are none. */
+export function RowsPreview({ display, added, settled }: RowsPreviewProps): React.JSX.Element {
+  if (display === null) {
+    return <p className="m-0 text-xs text-muted">Waiting for the engine…</p>;
+  }
+  if (display.kind === 'message') {
+    return <p className={cx('m-0 text-xs text-wrong', !settled && 'opacity-60')}>{display.text}</p>;
+  }
+  const { columns, rows } = display;
   return (
-    <div className="overflow-x-auto">
+    <div className={cx('overflow-x-auto', !settled && 'opacity-60')}>
       <table className="w-full border-collapse text-[13px]">
         <thead>
           <tr>
-            {frame.map((column) => (
+            {columns.map((column) => (
               <th
                 key={column.name}
                 className={cx(
@@ -40,9 +50,9 @@ export function RowsPreview({ frame, added }: RowsPreviewProps): React.JSX.Eleme
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {rows.map((cells, row) => (
             <tr key={row}>
-              {frame.map((column) => (
+              {columns.map((column, at) => (
                 <td
                   key={column.name}
                   className={cx(
@@ -50,7 +60,7 @@ export function RowsPreview({ frame, added }: RowsPreviewProps): React.JSX.Eleme
                     added.includes(column.name) && 'bg-fresh',
                   )}
                 >
-                  {formatCell(column.cells[row] ?? null, column.dtype)}
+                  {cells[at] ?? '—'}
                 </td>
               ))}
             </tr>

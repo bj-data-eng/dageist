@@ -9,11 +9,11 @@
 //! `RowsView` in `ui/packages/host/src/contract.ts`.
 
 use dageist_engine::claim_timing::ClaimTiming;
-use dageist_engine::document::{Document, InputKind, StepId};
+use dageist_engine::document::{Document, InputKind, RowsError, StepId};
 use serde::Serialize;
 
 use crate::report::{FieldView, RunView};
-use crate::sample_table::ErrorView;
+use crate::sample_table::{ErrorKind, ErrorView};
 
 /// The most rows a preview may hold. A preview is what a step list shows
 /// beside its steps, so it stays a window.
@@ -117,18 +117,38 @@ pub fn run_view(document: &str) -> Result<RunView, ErrorView> {
 }
 
 /// The rows after the step `step` of `document`, at most `limit` of them.
+///
+/// A failure says which kind it is: a `limit` over what a preview holds, an
+/// `unreadable` document, a step the document does not have, a step that was
+/// `refused`, a step that was `notRun` because one before it was refused, or
+/// otherwise `failed`.
 pub fn rows_view(document: &str, step: &str, limit: usize) -> Result<RowsView, ErrorView> {
     if limit > MAX_PREVIEW_ROWS {
-        return Err(ErrorView::new(format!(
-            "a preview holds at most {MAX_PREVIEW_ROWS} rows"
-        )));
+        return Err(ErrorView::of(
+            ErrorKind::Limit,
+            format!("a preview holds at most {MAX_PREVIEW_ROWS} rows"),
+        ));
     }
-    let document =
-        Document::read(document).map_err(|error| failed("reading the document", error))?;
-    let step = StepId::new(step).map_err(|error| failed("naming the step", error))?;
-    let preview = node()?
-        .preview(&document, &step, limit)
-        .map_err(|error| failed("previewing the rows", error))?;
+    let document = Document::read(document).map_err(|error| {
+        ErrorView::of(
+            ErrorKind::Unreadable,
+            format!("reading the document: {error}"),
+        )
+    })?;
+    let step = StepId::new(step).map_err(|error| {
+        ErrorView::of(ErrorKind::NoSuchStep, format!("naming the step: {error}"))
+    })?;
+    let preview = node()?.preview(&document, &step, limit).map_err(|error| {
+        let kind = match &error {
+            RowsError::NoSuchStep(_) => ErrorKind::NoSuchStep,
+            RowsError::Refused(refusal) if refusal.place().step_id() == Some(&step) => {
+                ErrorKind::Refused
+            }
+            RowsError::Refused(_) => ErrorKind::NotRun,
+            RowsError::Polars(_) => ErrorKind::Failed,
+        };
+        ErrorView::of(kind, format!("previewing the rows: {error}"))
+    })?;
     Ok(RowsView {
         columns: FieldView::of_columns(preview.columns()),
         rows: preview.rows().to_vec(),

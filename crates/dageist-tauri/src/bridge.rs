@@ -10,7 +10,8 @@
 //! Each command is a `POST` to `/bridge/<command>` of the command's arguments
 //! as a JSON object. It answers `200` with the command's JSON, or with the bytes
 //! of an Arrow IPC stream for `table_block`, and `422` with the command's own
-//! `{ "message": string }` when the command fails. A request that is not a
+//! `{ "kind": string, "message": string }` when the command fails, the kind being
+//! one of the closed list the view decides on. A request that is not a
 //! command of the bridge is refused before any command runs: `403` for a peer or
 //! `Host` that is not the bridge's own loopback address and port, `404` for a
 //! path that names no command, `405` for another method, `415` for a body that
@@ -246,7 +247,7 @@ impl Command {
 /// A response of `status` that carries `error` as a command's error is carried.
 fn failure(status: Status, error: &ErrorView) -> Response {
     let body = serde_json::to_vec(error)
-        .unwrap_or_else(|_unwritable| br#"{"message":"refused"}"#.to_vec());
+        .unwrap_or_else(|_unwritable| br#"{"kind":"failed","message":"refused"}"#.to_vec());
     Response::new(status, JSON, body)
 }
 

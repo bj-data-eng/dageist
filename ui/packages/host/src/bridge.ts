@@ -13,6 +13,7 @@ import { decodeCatalogue } from './decode-catalogue';
 import { decodeNode, decodeRows } from './decode-node';
 import { decodeRun } from './decode-run';
 import { decodeBytes, decodeIdentity, decodeTable } from './decode-sample';
+import { hostError } from './failure';
 
 /** The path every command is under, on the page's own origin. */
 const COMMAND_PATH = '/bridge/';
@@ -32,21 +33,18 @@ export class BridgeUnavailableError extends Error {
 }
 
 /** Returns what a failed command said, or `null` when the bridge did not say anything. */
-async function readFailure(response: Response): Promise<string | null> {
+async function readFailure(response: Response): Promise<unknown> {
   // Only the bridge answers a failure with JSON of its own. The development server answers one
   // for it, as plain text, when nothing listens, and that is not the bridge speaking.
   if (response.headers.get('content-type')?.split(';')[0]?.trim() !== 'application/json') {
     return null;
   }
   try {
-    const failure: unknown = await response.json();
-    if (typeof failure === 'object' && failure !== null && 'message' in failure) {
-      return String(failure.message);
-    }
+    return await response.json();
   } catch {
     // A body that is not JSON is not what the bridge sends.
+    return null;
   }
-  return null;
 }
 
 /** Posts `command` with its arguments and gives the answer the bridge sent. */
@@ -62,9 +60,9 @@ async function post(command: string, args: Record<string, unknown>): Promise<Res
     throw new BridgeUnavailableError(command, { cause: error });
   }
   if (response.ok) return response;
-  const message = await readFailure(response);
-  if (message === null) throw new BridgeUnavailableError(command);
-  throw new Error(`${command}: ${message}`);
+  const failure = await readFailure(response);
+  if (failure === null) throw new BridgeUnavailableError(command);
+  throw hostError(command, failure);
 }
 
 /** Posts `command` and reads what it answered with `decode`, which refuses a shape the contract lacks. */

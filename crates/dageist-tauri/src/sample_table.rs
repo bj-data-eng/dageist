@@ -113,15 +113,58 @@ impl TableView {
     }
 }
 
-/// A failed command, as presented to the view.
+/// What a failed command ended in, a closed list the view decides on instead
+/// of reading the message.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ErrorKind {
+    /// The document has no step of the name asked for.
+    NoSuchStep,
+    /// A step before the one asked for was refused, so the one asked for was
+    /// not run.
+    NotRun,
+    /// The step asked for was refused.
+    Refused,
+    /// More was asked for than the window of a command holds.
+    Limit,
+    /// The text sent is not a document the engine reads.
+    Unreadable,
+    /// Anything else: the command could not do what it was asked.
+    Failed,
+}
+
+#[cfg(test)]
+impl ErrorKind {
+    /// Every kind, in the order the contract lists them, for the vocabulary
+    /// snapshot.
+    pub(crate) const ALL: [Self; 6] = [
+        Self::NoSuchStep,
+        Self::NotRun,
+        Self::Refused,
+        Self::Limit,
+        Self::Unreadable,
+        Self::Failed,
+    ];
+}
+
+/// A failed command, as presented to the view: its kind, and the message that
+/// says what went wrong in words.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ErrorView {
+    kind: ErrorKind,
     message: String,
 }
 
 impl ErrorView {
+    /// A failure of no particular kind.
     pub(crate) fn new(message: impl Into<String>) -> Self {
+        Self::of(ErrorKind::Failed, message)
+    }
+
+    /// A failure of `kind`.
+    pub(crate) fn of(kind: ErrorKind, message: impl Into<String>) -> Self {
         Self {
+            kind,
             message: message.into(),
         }
     }
@@ -224,9 +267,10 @@ pub fn sample_window_view(
     keys: u32,
 ) -> Result<TableView, ErrorView> {
     if keys > MAX_WINDOW_KEYS {
-        return Err(ErrorView::new(format!(
-            "a working window holds at most {MAX_WINDOW_KEYS} keys"
-        )));
+        return Err(ErrorView::of(
+            ErrorKind::Limit,
+            format!("a working window holds at most {MAX_WINDOW_KEYS} keys"),
+        ));
     }
     let table = open_window(gate, &sample.directory, sample.spec, keys)?;
     Ok(show(open, table))
@@ -255,9 +299,10 @@ pub fn table_block_bytes(
     columns: &[String],
 ) -> Result<Vec<u8>, ErrorView> {
     if length > MAX_BLOCK_ROWS {
-        return Err(ErrorView::new(format!(
-            "a block holds at most {MAX_BLOCK_ROWS} rows"
-        )));
+        return Err(ErrorView::of(
+            ErrorKind::Limit,
+            format!("a block holds at most {MAX_BLOCK_ROWS} rows"),
+        ));
     }
     let table = open
         .current()
@@ -319,7 +364,7 @@ mod tests {
     use tauri::webview::InvokeRequest;
     use tauri::{WebviewWindow, WebviewWindowBuilder};
 
-    use super::{OpenTable, Opened, SampleGate, open_stored, open_window};
+    use super::{ErrorKind, OpenTable, Opened, SampleGate, open_stored, open_window};
 
     const SMALL: SampleSpec = SampleSpec {
         keys: 40,
@@ -481,6 +526,34 @@ mod tests {
         }
     }
 
+    /// The kind that follows `kind` in the list the view's contract gives, or `None` after the
+    /// last. A list cannot be checked against the enum it lists, which Rust does not let a
+    /// program enumerate, so this names every variant: adding one does not compile until it has
+    /// a place here, and the test below walks the chain and expects it to be `ErrorKind::ALL`.
+    /// The walk reaches only the kinds linked from the first, so add a new kind inside or at the
+    /// end of the chain.
+    const fn next_kind(kind: ErrorKind) -> Option<ErrorKind> {
+        match kind {
+            ErrorKind::NoSuchStep => Some(ErrorKind::NotRun),
+            ErrorKind::NotRun => Some(ErrorKind::Refused),
+            ErrorKind::Refused => Some(ErrorKind::Limit),
+            ErrorKind::Limit => Some(ErrorKind::Unreadable),
+            ErrorKind::Unreadable => Some(ErrorKind::Failed),
+            ErrorKind::Failed => None,
+        }
+    }
+
+    #[test]
+    fn the_list_of_error_kinds_is_every_kind_in_order() {
+        let mut walked = vec![ErrorKind::NoSuchStep];
+        while let Some(following) = next_kind(walked[walked.len() - 1]) {
+            // More than the list has, so a chain that loops fails and does not hang.
+            assert!(walked.len() < 64, "the chain does not end");
+            walked.push(following);
+        }
+        assert_eq!(walked, ErrorKind::ALL);
+    }
+
     #[test]
     fn block_command_without_an_open_table_reports_it() {
         let response = tauri::test::get_ipc_response(
@@ -489,7 +562,10 @@ mod tests {
         );
 
         match response {
-            Err(error) => assert_eq!(error, serde_json::json!({ "message": "no table is open" })),
+            Err(error) => assert_eq!(
+                error,
+                serde_json::json!({ "kind": "failed", "message": "no table is open" })
+            ),
             Ok(body) => panic!("expected an error, got {body:?}"),
         }
     }
@@ -510,6 +586,7 @@ mod tests {
         );
 
         let error = response.expect_err("an unknown column is refused");
+        assert_eq!(error["kind"], "failed");
         let message = error["message"].as_str().expect("a message");
         assert!(
             message.starts_with("selecting block columns"),
@@ -537,7 +614,10 @@ mod tests {
         match response {
             Err(error) => assert_eq!(
                 error,
-                serde_json::json!({ "message": "a working window holds at most 50000 keys" })
+                serde_json::json!({
+                    "kind": "limit",
+                    "message": "a working window holds at most 50000 keys"
+                })
             ),
             Ok(body) => panic!("expected an error, got {body:?}"),
         }
@@ -557,7 +637,10 @@ mod tests {
         match response {
             Err(error) => assert_eq!(
                 error,
-                serde_json::json!({ "message": "a block holds at most 10000 rows" })
+                serde_json::json!({
+                    "kind": "limit",
+                    "message": "a block holds at most 10000 rows"
+                })
             ),
             Ok(body) => panic!("expected an error, got {body:?}"),
         }

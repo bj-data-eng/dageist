@@ -651,7 +651,10 @@ mod tests {
         let error = catalogue_view(&words).expect_err("the first family has no title");
         assert_eq!(
             serde_json::to_value(ErrorView::from(error)).expect("the error serializes"),
-            json!({ "message": "the language file gives no title of the family steps" })
+            json!({
+                "kind": "failed",
+                "message": "the language file gives no title of the family steps"
+            })
         );
     }
 

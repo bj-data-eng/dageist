@@ -10,12 +10,12 @@ import { useEffect } from 'react';
 import { Panel } from '@dageist/design';
 import type { Host } from '@dageist/host';
 
-import { CatalogueProvider, useCatalogue } from './CatalogueProvider';
+import { EngineProvider } from './EngineProvider';
 import { moved } from './Chain';
+import { useRun } from './engine';
 import { InputsStrip } from './InputsStrip';
 import { StepList } from './StepList';
 import { StepNavigator } from './StepNavigator';
-import { runSteps } from './model/steps';
 import { useSharedSteps } from './shared';
 
 /** What the steps window needs from the shell. */
@@ -32,16 +32,16 @@ export interface StepsWindowProps {
 /** Draws every step of the sample claims so that it can be edited, once the catalogue is there. */
 export function StepsWindow({ host, styleNonce }: StepsWindowProps): React.JSX.Element {
   return (
-    <CatalogueProvider host={host} title="Steps · Claim timing">
+    <EngineProvider host={host} title="Steps · Claim timing">
       <Editor host={host} styleNonce={styleNonce} />
-    </CatalogueProvider>
+    </EngineProvider>
   );
 }
 
 function Editor({ host, styleNonce }: StepsWindowProps): React.JSX.Element {
-  const catalogue = useCatalogue();
   const { steps, selectedId, change } = useSharedSteps(host, 'steps');
-  const results = runSteps(catalogue, steps);
+  const run = useRun(host, steps);
+  const results = run.prepared.steps;
 
   // The chosen step is brought into view, whichever window chose it.
   useEffect(() => {
@@ -80,6 +80,7 @@ function Editor({ host, styleNonce }: StepsWindowProps): React.JSX.Element {
         </nav>
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-3">
           <InputsStrip />
+          {run.failure !== null && <p className="m-0 mb-3 text-xs text-wrong">{run.failure}</p>}
           <StepList
             steps={steps}
             results={results}

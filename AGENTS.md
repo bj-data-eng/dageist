@@ -93,9 +93,9 @@ HTTP, through the same functions, without a window; no command's behavior is
 written twice. The view owns
 presentation and input only: it renders what the host reports, forwards user
 intent through IPC commands, holds no authoritative application state and
-performs no data processing. The step editor's model under
-`ui/packages/steps/src/model/` is a storyboard exception that works on fixed
-sample rows until the core provides that behavior.
+performs no data processing. The step editor writes its steps as a step
+document and shows what the engine reports of it: previews, dtypes and refusals
+are the engine's, and the view formats no value.
 
 The view is an npm workspace. The shell in `ui/apps/desktop` is the only place
 features are composed. `ui/packages/host` is the only package that knows Tauri

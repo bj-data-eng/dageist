@@ -1,5 +1,8 @@
 /**
- * @file The claim-timing steps the editor opens with while it is a storyboard.
+ * @file The claim-timing steps the editor opens with. They are the steps of
+ * the engine's claim-timing sample: translated into a document they are that
+ * sample's own, which a test checks against the document the host writes, so
+ * the editor starts from what the engine can run.
  */
 
 import { nextId } from './model/ids';
@@ -15,41 +18,47 @@ function chainValue(chain: Chain): Value {
     : { kind: 'chain', id: nextId('chain'), chain };
 }
 
+/** Returns a method that takes no argument. */
+function method(name: string): Chain['methods'][number] {
+  return { id: nextId('method'), name, argument: null, options: NO_OPTIONS };
+}
+
+/** Returns a method that takes `argument`. */
+function methodOf(name: string, argument: Value): Chain['methods'][number] {
+  return { id: nextId('method'), name, argument, options: NO_OPTIONS };
+}
+
+const column = (name: string): Value => ({ kind: 'column', column: name });
+
 /** Sort, then added columns; later ones build on columns earlier steps add. */
 export const START: readonly Step[] = [
   {
-    id: nextId('step'),
+    id: 'sort',
     verb: 'sort',
     options: { by: fieldKeys(['dcn', 'timestamp']) },
   },
   {
-    id: nextId('step'),
+    id: 'step_index',
     verb: 'with_columns',
     alias: 'step_index',
     value: chainValue({
       source: { kind: 'column', column: 'dcn' },
-      methods: [
-        { id: nextId('method'), name: 'cum_count', argument: null, options: NO_OPTIONS },
-        { id: nextId('method'), name: 'over', argument: 'dcn', options: NO_OPTIONS },
-      ],
+      methods: [method('cum_count'), methodOf('over', column('dcn'))],
     }),
     options: NO_OPTIONS,
   },
   {
-    id: nextId('step'),
+    id: 'resolved_at',
     verb: 'with_columns',
     alias: 'resolved_at',
     value: chainValue({
       source: { kind: 'column', column: 'timestamp' },
-      methods: [
-        { id: nextId('method'), name: 'shift', argument: '1', options: NO_OPTIONS },
-        { id: nextId('method'), name: 'over', argument: 'dcn', options: NO_OPTIONS },
-      ],
+      methods: [methodOf('shift', { kind: 'literal', value: 1 }), methodOf('over', column('dcn'))],
     }),
     options: NO_OPTIONS,
   },
   {
-    id: nextId('step'),
+    id: 'received_at',
     verb: 'with_columns',
     alias: 'received_at',
     value: chainValue({
@@ -59,30 +68,27 @@ export const START: readonly Step[] = [
     options: NO_OPTIONS,
   },
   {
-    id: nextId('step'),
+    id: 'resolved_day',
     verb: 'with_columns',
     alias: 'resolved_day',
     value: chainValue({
       source: { kind: 'column', column: 'resolved_at' },
-      methods: [{ id: nextId('method'), name: 'dt.date', argument: null, options: NO_OPTIONS }],
+      methods: [method('dt.date')],
     }),
     options: NO_OPTIONS,
   },
   {
-    id: nextId('step'),
+    id: 'days_open',
     verb: 'with_columns',
     alias: 'days_open',
     value: chainValue({
       source: { kind: 'column', column: 'received_at' },
-      methods: [
-        { id: nextId('method'), name: 'sub', argument: 'resolved_at', options: NO_OPTIONS },
-        { id: nextId('method'), name: 'dt.total_days', argument: null, options: NO_OPTIONS },
-      ],
+      methods: [methodOf('sub', column('resolved_at')), method('dt.total_days')],
     }),
     options: NO_OPTIONS,
   },
   {
-    id: nextId('step'),
+    id: 'a_days',
     verb: 'with_columns',
     alias: 'a_days',
     value: chainValue({
@@ -98,30 +104,28 @@ export const START: readonly Step[] = [
               comparison: '==',
               value: { kind: 'literal', value: 'Company A' },
             },
-            returns: { kind: 'column', column: 'row_days' },
+            returns: column('row_days'),
           },
         ],
         otherwise: { kind: 'literal', value: 0 },
       },
-      methods: [
-        { id: nextId('method'), name: 'cum_sum', argument: null, options: NO_OPTIONS },
-        { id: nextId('method'), name: 'over', argument: 'dcn', options: NO_OPTIONS },
-      ],
+      methods: [method('cum_sum'), methodOf('over', column('dcn'))],
     }),
     options: NO_OPTIONS,
   },
   {
-    id: nextId('step'),
+    id: 'join',
     verb: 'join',
     table: 'step_sla',
     options: {
       left_on: fieldKeys(['step_to']),
       right_on: fieldKeys(['step']),
       how: { kind: 'word', value: 'left' },
+      maintain_order: { kind: 'word', value: 'left' },
     },
   },
   {
-    id: nextId('step'),
+    id: 'sla_status',
     verb: 'with_columns',
     alias: 'sla_status',
     value: chainValue({
@@ -135,7 +139,7 @@ export const START: readonly Step[] = [
               id: nextId('test'),
               column: 'row_days',
               comparison: '<=',
-              value: { kind: 'column', column: 'sla_days' },
+              value: column('sla_days'),
             },
             returns: { kind: 'literal', value: 'within' },
           },
@@ -147,7 +151,7 @@ export const START: readonly Step[] = [
     options: NO_OPTIONS,
   },
   {
-    id: nextId('step'),
+    id: 'flag',
     verb: 'with_columns',
     alias: 'flag',
     value: chainValue({
@@ -156,12 +160,14 @@ export const START: readonly Step[] = [
         arms: [
           {
             id: nextId('arm'),
+            // The day a claim was received is the day the node is run for: a chain that ends in a comparison.
             condition: {
-              kind: 'test',
-              id: nextId('test'),
-              column: 'resolved_day',
-              comparison: 'is_in',
-              value: { kind: 'input', name: 'holidays' },
+              kind: 'chain',
+              id: nextId('chain'),
+              chain: {
+                source: { kind: 'column', column: 'received_at' },
+                methods: [method('dt.date'), methodOf('eq', { kind: 'input', name: 'as_of' })],
+              },
             },
             returns: { kind: 'literal', value: 'holiday' },
           },
@@ -196,14 +202,23 @@ export const START: readonly Step[] = [
     options: NO_OPTIONS,
   },
   {
-    id: nextId('step'),
+    id: 'holiday_count',
+    verb: 'with_columns',
+    alias: 'holiday_count',
+    value: chainValue({
+      source: { kind: 'input', name: 'holidays' },
+      methods: [method('len')],
+    }),
+    options: NO_OPTIONS,
+  },
+  {
+    id: 'pivot',
     verb: 'pivot',
     on: 'step_to',
     index: 'dcn',
     values: 'row_days',
-    columnsFrom: 'collect',
-    pinned: [],
     options: {
+      on_columns: { kind: 'word', value: 'step_names' },
       aggregate_function: expressionSetting({
         kind: 'chain',
         id: nextId('chain'),

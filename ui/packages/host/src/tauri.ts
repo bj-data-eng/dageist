@@ -10,17 +10,7 @@ import { decodeNode, decodeRows } from './decode-node';
 import { decodeRun } from './decode-run';
 import { decodeBytes, decodeIdentity, decodeTable } from './decode-sample';
 import { deliverMessage, sealMessage } from './envelope';
-
-/** Turns what a failed command rejected with into an `Error`. */
-function commandError(command: string, reason: unknown): Error {
-  let detail = String(reason);
-  if (reason instanceof Error) {
-    detail = reason.message;
-  } else if (typeof reason === 'object' && reason !== null && 'message' in reason) {
-    detail = String(reason.message);
-  }
-  return new Error(`${command}: ${detail}`, { cause: reason });
-}
+import { hostError } from './failure';
 
 /** Returns the Tauri host, or `null` when the page is open in a plain browser. */
 export function tauriHost(): Host | null {
@@ -33,7 +23,7 @@ export function tauriHost(): Host | null {
     try {
       return await core.invoke<unknown>(command, args);
     } catch (error) {
-      throw commandError(command, error);
+      throw hostError(command, error);
     }
   }
 
@@ -47,7 +37,7 @@ export function tauriHost(): Host | null {
     try {
       return decode(answer);
     } catch (error) {
-      if (error instanceof DecodeError) throw commandError(command, error);
+      if (error instanceof DecodeError) throw hostError(command, error);
       throw error;
     }
   }

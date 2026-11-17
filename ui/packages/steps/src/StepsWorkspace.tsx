@@ -11,13 +11,12 @@ import { useState } from 'react';
 import { Panel, cx } from '@dageist/design';
 import type { Host } from '@dageist/host';
 
-import { CatalogueProvider, useCatalogue } from './CatalogueProvider';
+import { EngineProvider, useNode } from './EngineProvider';
 import { moved } from './Chain';
+import { useRows, useRun } from './engine';
 import { Pipeline } from './Pipeline';
 import { RowsPreview } from './RowsPreview';
 import { StepNavigator } from './StepNavigator';
-import { SOURCE_FRAME, SOURCE_NAME } from './model/frame';
-import { runSteps } from './model/steps';
 import { useSharedSteps } from './shared';
 
 /** What the centre shows: the rows after the chosen step, or the Polars code of every step. */
@@ -59,17 +58,19 @@ export interface StepsWorkspaceProps {
 /** Draws the table of the sample claims with its steps listed beside it, once the catalogue is there. */
 export function StepsWorkspace({ host, styleNonce }: StepsWorkspaceProps): React.JSX.Element {
   return (
-    <CatalogueProvider host={host} title="Transform · Claim timing">
+    <EngineProvider host={host} title="Transform · Claim timing">
       <Transform host={host} styleNonce={styleNonce} />
-    </CatalogueProvider>
+    </EngineProvider>
   );
 }
 
 function Transform({ host, styleNonce }: StepsWorkspaceProps): React.JSX.Element {
-  const catalogue = useCatalogue();
+  const node = useNode();
   const { steps, selectedId, stepsOpen, change } = useSharedSteps(host, 'main');
   const [centre, setCentre] = useState<Centre>('rows');
-  const results = runSteps(catalogue, steps);
+  const run = useRun(host, steps);
+  const rows = useRows(host, run, selectedId);
+  const results = run.prepared.steps;
   const selectedIndex = steps.findIndex((step) => step.id === selectedId);
   const shown = results[selectedIndex];
   const openSteps = (): void => {
@@ -109,10 +110,14 @@ function Transform({ host, styleNonce }: StepsWorkspaceProps): React.JSX.Element
           </div>
           <div className="min-h-0 flex-1 overflow-auto px-4 py-3">
             {centre === 'rows' ? (
-              <RowsPreview frame={shown?.frame ?? SOURCE_FRAME} added={shown?.added ?? []} />
+              <RowsPreview
+                display={rows.display}
+                added={shown?.added ?? []}
+                settled={rows.settled && run.settled}
+              />
             ) : (
               <Pipeline
-                source={SOURCE_NAME}
+                source={node.source.name}
                 steps={steps}
                 selectedId={selectedId}
                 onSelect={(id) => {
@@ -154,6 +159,9 @@ function Transform({ host, styleNonce }: StepsWorkspaceProps): React.JSX.Element
               }}
             />
           </div>
+          {run.failure !== null && (
+            <p className="m-0 border-t border-line px-3 py-2 text-xs text-wrong">{run.failure}</p>
+          )}
           {stepsOpen && (
             <p className="m-0 border-t border-line px-3 py-2 text-xs text-muted">
               The editor is open in its own window. What is changed there shows here.

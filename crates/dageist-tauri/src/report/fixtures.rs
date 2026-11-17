@@ -28,6 +28,7 @@ pub(crate) fn vocabulary() -> serde_json::Value {
         "stages": words(&Stage::ALL.map(stage_view)),
         "conditionStates": words(&ConditionState::ALL.map(condition_state_view)),
         "valueShapes": words(&Shape::ALL.map(shape_view)),
+        "errorKinds": words(&crate::sample_table::ErrorKind::ALL),
     })
 }
 

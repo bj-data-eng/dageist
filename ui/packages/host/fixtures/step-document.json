@@ -1,0 +1,794 @@
+{
+  "version": 1,
+  "steps": [
+    {
+      "id": "sort",
+      "call": {
+        "entry": "LazyFrame.sort",
+        "arguments": {
+          "by": {
+            "many": [
+              {
+                "expression": {
+                  "start": {
+                    "entry": "polars.col",
+                    "arguments": {
+                      "name": {
+                        "columns": ["dcn"]
+                      }
+                    }
+                  },
+                  "then": []
+                }
+              },
+              {
+                "expression": {
+                  "start": {
+                    "entry": "polars.col",
+                    "arguments": {
+                      "name": {
+                        "columns": ["timestamp"]
+                      }
+                    }
+                  },
+                  "then": []
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "step_index",
+      "call": {
+        "entry": "LazyFrame.with_columns",
+        "arguments": {
+          "named_exprs": {
+            "pairs": [
+              [
+                {
+                  "columns": ["step_index"]
+                },
+                {
+                  "expression": {
+                    "start": {
+                      "entry": "polars.col",
+                      "arguments": {
+                        "name": {
+                          "columns": ["dcn"]
+                        }
+                      }
+                    },
+                    "then": [
+                      {
+                        "entry": "Expr.cum_count",
+                        "arguments": {}
+                      },
+                      {
+                        "entry": "Expr.over",
+                        "arguments": {
+                          "partition_by": {
+                            "many": [
+                              {
+                                "expression": {
+                                  "start": {
+                                    "entry": "polars.col",
+                                    "arguments": {
+                                      "name": {
+                                        "columns": ["dcn"]
+                                      }
+                                    }
+                                  },
+                                  "then": []
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "resolved_at",
+      "call": {
+        "entry": "LazyFrame.with_columns",
+        "arguments": {
+          "named_exprs": {
+            "pairs": [
+              [
+                {
+                  "columns": ["resolved_at"]
+                },
+                {
+                  "expression": {
+                    "start": {
+                      "entry": "polars.col",
+                      "arguments": {
+                        "name": {
+                          "columns": ["timestamp"]
+                        }
+                      }
+                    },
+                    "then": [
+                      {
+                        "entry": "Expr.shift",
+                        "arguments": {
+                          "n": {
+                            "expression": {
+                              "start": {
+                                "entry": "polars.lit",
+                                "arguments": {
+                                  "value": {
+                                    "integer": 1
+                                  }
+                                }
+                              },
+                              "then": []
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "entry": "Expr.over",
+                        "arguments": {
+                          "partition_by": {
+                            "many": [
+                              {
+                                "expression": {
+                                  "start": {
+                                    "entry": "polars.col",
+                                    "arguments": {
+                                      "name": {
+                                        "columns": ["dcn"]
+                                      }
+                                    }
+                                  },
+                                  "then": []
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "received_at",
+      "call": {
+        "entry": "LazyFrame.with_columns",
+        "arguments": {
+          "named_exprs": {
+            "pairs": [
+              [
+                {
+                  "columns": ["received_at"]
+                },
+                {
+                  "expression": {
+                    "start": {
+                      "entry": "polars.col",
+                      "arguments": {
+                        "name": {
+                          "columns": ["timestamp"]
+                        }
+                      }
+                    },
+                    "then": []
+                  }
+                }
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "resolved_day",
+      "call": {
+        "entry": "LazyFrame.with_columns",
+        "arguments": {
+          "named_exprs": {
+            "pairs": [
+              [
+                {
+                  "columns": ["resolved_day"]
+                },
+                {
+                  "expression": {
+                    "start": {
+                      "entry": "polars.col",
+                      "arguments": {
+                        "name": {
+                          "columns": ["resolved_at"]
+                        }
+                      }
+                    },
+                    "then": [
+                      {
+                        "entry": "Expr.dt.date",
+                        "arguments": {}
+                      }
+                    ]
+                  }
+                }
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "days_open",
+      "call": {
+        "entry": "LazyFrame.with_columns",
+        "arguments": {
+          "named_exprs": {
+            "pairs": [
+              [
+                {
+                  "columns": ["days_open"]
+                },
+                {
+                  "expression": {
+                    "start": {
+                      "entry": "polars.col",
+                      "arguments": {
+                        "name": {
+                          "columns": ["received_at"]
+                        }
+                      }
+                    },
+                    "then": [
+                      {
+                        "entry": "Expr.sub",
+                        "arguments": {
+                          "other": {
+                            "expression": {
+                              "start": {
+                                "entry": "polars.col",
+                                "arguments": {
+                                  "name": {
+                                    "columns": ["resolved_at"]
+                                  }
+                                }
+                              },
+                              "then": []
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "entry": "Expr.dt.total_days",
+                        "arguments": {}
+                      }
+                    ]
+                  }
+                }
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "a_days",
+      "call": {
+        "entry": "LazyFrame.with_columns",
+        "arguments": {
+          "named_exprs": {
+            "pairs": [
+              [
+                {
+                  "columns": ["a_days"]
+                },
+                {
+                  "expression": {
+                    "start": {
+                      "entry": "polars.when",
+                      "arguments": {
+                        "predicates": {
+                          "many": [
+                            {
+                              "expression": {
+                                "start": {
+                                  "entry": "polars.col",
+                                  "arguments": {
+                                    "name": {
+                                      "columns": ["owner"]
+                                    }
+                                  }
+                                },
+                                "then": [
+                                  {
+                                    "entry": "Expr.eq",
+                                    "arguments": {
+                                      "other": {
+                                        "expression": {
+                                          "start": {
+                                            "entry": "polars.lit",
+                                            "arguments": {
+                                              "value": {
+                                                "string": "Company A"
+                                              }
+                                            }
+                                          },
+                                          "then": []
+                                        }
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "then": [
+                      {
+                        "entry": "When.then",
+                        "arguments": {
+                          "statement": {
+                            "expression": {
+                              "start": {
+                                "entry": "polars.col",
+                                "arguments": {
+                                  "name": {
+                                    "columns": ["row_days"]
+                                  }
+                                }
+                              },
+                              "then": []
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "entry": "Then.otherwise",
+                        "arguments": {
+                          "statement": {
+                            "expression": {
+                              "start": {
+                                "entry": "polars.lit",
+                                "arguments": {
+                                  "value": {
+                                    "integer": 0
+                                  }
+                                }
+                              },
+                              "then": []
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "entry": "Expr.cum_sum",
+                        "arguments": {}
+                      },
+                      {
+                        "entry": "Expr.over",
+                        "arguments": {
+                          "partition_by": {
+                            "many": [
+                              {
+                                "expression": {
+                                  "start": {
+                                    "entry": "polars.col",
+                                    "arguments": {
+                                      "name": {
+                                        "columns": ["dcn"]
+                                      }
+                                    }
+                                  },
+                                  "then": []
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "join",
+      "call": {
+        "entry": "LazyFrame.join",
+        "arguments": {
+          "other": {
+            "table": "step_sla"
+          },
+          "left_on": {
+            "many": [
+              {
+                "expression": {
+                  "start": {
+                    "entry": "polars.col",
+                    "arguments": {
+                      "name": {
+                        "columns": ["step_to"]
+                      }
+                    }
+                  },
+                  "then": []
+                }
+              }
+            ]
+          },
+          "right_on": {
+            "many": [
+              {
+                "expression": {
+                  "start": {
+                    "entry": "polars.col",
+                    "arguments": {
+                      "name": {
+                        "columns": ["step"]
+                      }
+                    }
+                  },
+                  "then": []
+                }
+              }
+            ]
+          },
+          "how": {
+            "choice": "left"
+          },
+          "maintain_order": {
+            "choice": "left"
+          }
+        }
+      }
+    },
+    {
+      "id": "sla_status",
+      "call": {
+        "entry": "LazyFrame.with_columns",
+        "arguments": {
+          "named_exprs": {
+            "pairs": [
+              [
+                {
+                  "columns": ["sla_status"]
+                },
+                {
+                  "expression": {
+                    "start": {
+                      "entry": "polars.when",
+                      "arguments": {
+                        "predicates": {
+                          "many": [
+                            {
+                              "expression": {
+                                "start": {
+                                  "entry": "polars.col",
+                                  "arguments": {
+                                    "name": {
+                                      "columns": ["row_days"]
+                                    }
+                                  }
+                                },
+                                "then": [
+                                  {
+                                    "entry": "Expr.le",
+                                    "arguments": {
+                                      "other": {
+                                        "expression": {
+                                          "start": {
+                                            "entry": "polars.col",
+                                            "arguments": {
+                                              "name": {
+                                                "columns": ["sla_days"]
+                                              }
+                                            }
+                                          },
+                                          "then": []
+                                        }
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "then": [
+                      {
+                        "entry": "When.then",
+                        "arguments": {
+                          "statement": {
+                            "expression": {
+                              "start": {
+                                "entry": "polars.lit",
+                                "arguments": {
+                                  "value": {
+                                    "string": "within"
+                                  }
+                                }
+                              },
+                              "then": []
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "entry": "Then.otherwise",
+                        "arguments": {
+                          "statement": {
+                            "expression": {
+                              "start": {
+                                "entry": "polars.lit",
+                                "arguments": {
+                                  "value": {
+                                    "string": "late"
+                                  }
+                                }
+                              },
+                              "then": []
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "flag",
+      "call": {
+        "entry": "LazyFrame.with_columns",
+        "arguments": {
+          "named_exprs": {
+            "pairs": [
+              [
+                {
+                  "columns": ["flag"]
+                },
+                {
+                  "expression": {
+                    "start": {
+                      "entry": "polars.when",
+                      "arguments": {
+                        "predicates": {
+                          "many": [
+                            {
+                              "expression": {
+                                "start": {
+                                  "entry": "polars.col",
+                                  "arguments": {
+                                    "name": {
+                                      "columns": ["received_at"]
+                                    }
+                                  }
+                                },
+                                "then": [
+                                  {
+                                    "entry": "Expr.dt.date",
+                                    "arguments": {}
+                                  },
+                                  {
+                                    "entry": "Expr.eq",
+                                    "arguments": {
+                                      "other": {
+                                        "expression": {
+                                          "start": {
+                                            "input": "as_of"
+                                          },
+                                          "then": []
+                                        }
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "then": [
+                      {
+                        "entry": "When.then",
+                        "arguments": {
+                          "statement": {
+                            "expression": {
+                              "start": {
+                                "entry": "polars.lit",
+                                "arguments": {
+                                  "value": {
+                                    "string": "holiday"
+                                  }
+                                }
+                              },
+                              "then": []
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "entry": "Then.otherwise",
+                        "arguments": {
+                          "statement": {
+                            "expression": {
+                              "start": {
+                                "entry": "polars.when",
+                                "arguments": {
+                                  "predicates": {
+                                    "many": [
+                                      {
+                                        "expression": {
+                                          "start": {
+                                            "entry": "polars.col",
+                                            "arguments": {
+                                              "name": {
+                                                "columns": ["row_days"]
+                                              }
+                                            }
+                                          },
+                                          "then": [
+                                            {
+                                              "entry": "Expr.gt",
+                                              "arguments": {
+                                                "other": {
+                                                  "expression": {
+                                                    "start": {
+                                                      "input": "sla_cutoff"
+                                                    },
+                                                    "then": []
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          ]
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              "then": [
+                                {
+                                  "entry": "When.then",
+                                  "arguments": {
+                                    "statement": {
+                                      "expression": {
+                                        "start": {
+                                          "entry": "polars.lit",
+                                          "arguments": {
+                                            "value": {
+                                              "string": "over"
+                                            }
+                                          }
+                                        },
+                                        "then": []
+                                      }
+                                    }
+                                  }
+                                },
+                                {
+                                  "entry": "Then.otherwise",
+                                  "arguments": {
+                                    "statement": {
+                                      "expression": {
+                                        "start": {
+                                          "entry": "polars.lit",
+                                          "arguments": {
+                                            "value": {
+                                              "string": "ok"
+                                            }
+                                          }
+                                        },
+                                        "then": []
+                                      }
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "holiday_count",
+      "call": {
+        "entry": "LazyFrame.with_columns",
+        "arguments": {
+          "named_exprs": {
+            "pairs": [
+              [
+                {
+                  "columns": ["holiday_count"]
+                },
+                {
+                  "expression": {
+                    "start": {
+                      "input": "holidays"
+                    },
+                    "then": [
+                      {
+                        "entry": "Expr.len",
+                        "arguments": {}
+                      }
+                    ]
+                  }
+                }
+              ]
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "pivot",
+      "call": {
+        "entry": "LazyFrame.pivot",
+        "arguments": {
+          "on": {
+            "columns": ["step_to"]
+          },
+          "on_columns": {
+            "table": "step_names"
+          },
+          "index": {
+            "columns": ["dcn"]
+          },
+          "values": {
+            "columns": ["row_days"]
+          },
+          "aggregate_function": {
+            "expression": {
+              "start": {
+                "entry": "polars.element",
+                "arguments": {}
+              },
+              "then": [
+                {
+                  "entry": "Expr.first",
+                  "arguments": {}
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}
