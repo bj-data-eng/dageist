@@ -6,6 +6,7 @@ mod dtypes;
 mod floats;
 mod holes;
 mod inputs;
+mod join_keys;
 mod nesting;
 mod preview;
 mod reading;

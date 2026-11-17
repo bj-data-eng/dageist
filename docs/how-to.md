@@ -439,7 +439,8 @@ changes the `rules` column of the context table, so refresh the tables with it.
 A rule of how a chain ends, which is about a dtype, also says in
 `Rule::forbids_end` what it makes of a result whose dtype is not known: it does
 not refuse it, and `offer` then reports that whether the chain may end is not
-known. A rule about a whole expression, such as `key-is-elementwise`, is asked by
+known. A rule about a whole expression, or about the keys of a whole join, such as
+`key-is-elementwise` and `join-key-names-are-not-repeated`, is asked by
 the walk in `crates/dageist-engine/src/document/walk.rs`, which finds what the
 expression holds.
 

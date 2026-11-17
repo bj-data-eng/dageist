@@ -828,19 +828,22 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
                 && refusal.reason.contains("elementwise")
                 && {
                     // Another key may be why Polars refuses the join: one that
-                    // holds a running value, an aggregate or a window.
+                    // holds a running value, an aggregate or a window beside what
+                    // is not one value. A key that is wholly one value is one
+                    // Polars allows beside any other key that is elementwise.
                     let keys = keys(case, true);
                     let other_cause = |key: &Expression| {
-                        any_call(key, &|call| {
-                            is_one_value(call)
-                                || matches!(
-                                    call.entry().id().as_str(),
-                                    "Expr.over"
-                                        | "Expr.cum_sum"
-                                        | "Expr.cum_max"
-                                        | "Expr.cum_count"
-                                )
-                        })
+                        !wholly_single(key, key.links().len(), true)
+                            && any_call(key, &|call| {
+                                is_one_value(call)
+                                    || matches!(
+                                        call.entry().id().as_str(),
+                                        "Expr.over"
+                                            | "Expr.cum_sum"
+                                            | "Expr.cum_max"
+                                            | "Expr.cum_count"
+                                    )
+                            })
                     };
                     keys.iter().any(|(_, key)| holds_a_null_comparison(key))
                         && keys
@@ -1902,11 +1905,17 @@ mod tests {
             column("f"),
             vec![compared_with("Expr.gt", chain(null(), &[]))],
         );
-        // The other key holds a running value, an aggregate or a window, any of
-        // which may be why Polars refuses the join.
+        // The other key holds a running value, or an aggregate beside a column,
+        // either of which may be why Polars refuses the join.
         for other in [
             chain(column("rb"), &["Expr.cum_max"]),
-            chain(column("rb"), &["Expr.sum"]),
+            chain_of(
+                column("rb"),
+                vec![
+                    call("Expr.sum", Vec::new()),
+                    compared_with("Expr.gt", chain(column("rk"), &[])),
+                ],
+            ),
         ] {
             let case = case_of(call(
                 "LazyFrame.join",
@@ -1921,8 +1930,24 @@ mod tests {
                 vec![]
             );
         }
-        // With the other key plain it is excused.
-        let case = join(compared, chain(column("key"), &[]));
+        // With the other key plain it is excused, and so it is beside a key that is
+        // wholly one value, which Polars allows beside an elementwise key.
+        let case = join(compared.clone(), chain(column("key"), &[]));
+        assert_eq!(
+            polars_refuses(&case, Some(step_place()), Stage::Schema, reason, Vec::new()),
+            vec![Limit::ANullComparisonInAKey]
+        );
+        let case = case_of(call(
+            "LazyFrame.join",
+            vec![
+                ("other", Value::Table("other".to_owned())),
+                (
+                    "left_on",
+                    many(vec![compared, chain(column("rb"), &["Expr.sum"])]),
+                ),
+                ("right_on", many(vec![chain(column("rk"), &[]); 2])),
+            ],
+        ));
         assert_eq!(
             polars_refuses(&case, Some(step_place()), Stage::Schema, reason, Vec::new()),
             vec![Limit::ANullComparisonInAKey]

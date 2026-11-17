@@ -299,6 +299,7 @@ export const RULE_NAMES = [
   'condition-predicate-is-boolean',
   'element-only-in-pivot-aggregate',
   'filter-predicate-is-boolean',
+  'join-key-names-are-not-repeated',
   'key-is-elementwise',
 ] as const;
 

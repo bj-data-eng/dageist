@@ -12,7 +12,7 @@ use dageist_engine::document::{
 use polars::prelude::{DataType, IntoLazy};
 
 use super::case::Case;
-use super::frames::Frames;
+use super::frames::{Frames, key_column_index};
 
 /// How a reason that is the target's own comparison of a step's schema with its
 /// rows begins: it is no refusal of Polars, and shows only where the method that
@@ -233,51 +233,96 @@ fn schema_disagrees(
     ))
 }
 
-/// Whether `expression` is only the join key column the other side is
-/// matched against.
-pub fn is_bare_key(expression: &Expression) -> bool {
-    expression.links().is_empty()
-        && matches!(expression.start(), Start::Call(call)
-            if call.entry().id().as_str() == "polars.col"
-                && matches!(call.argument("name"), Some(Value::Columns(names)) if *names == ["key"]))
-}
-
-/// The expression a join key parameter holds, as a single item.
-fn key_expression<'a>(document: &'a Document, parameter: &str) -> Option<&'a Expression> {
-    match document.steps()[0].call().argument(parameter)? {
-        Value::Many(items) => match items.as_slice() {
-            [Value::Expression(expression)] => Some(expression),
+/// Which key column of [`Frames`] `expression` is, when it is only that column:
+/// the column the other side is matched against.
+fn key_column_of(expression: &Expression) -> Option<usize> {
+    if !expression.links().is_empty() {
+        return None;
+    }
+    let Start::Call(call) = expression.start() else {
+        return None;
+    };
+    if call.entry().id().as_str() != "polars.col" {
+        return None;
+    }
+    match call.argument("name") {
+        Some(Value::Columns(names)) => match names.as_slice() {
+            [name] => key_column_index(name),
             _ => None,
         },
         _ => None,
     }
 }
 
-/// The dtype the other table's `key` must have for a join to be made on the
-/// chain the case puts in a key, which is the dtype the chain has: the join
-/// of a key with another dtype is refused for that, which is no matter of the
-/// tables. It is found by building the step once, as the report says what the
-/// chain has even when the join is refused.
-fn key_dtype(case: &Case, first: &Observed) -> DataType {
-    let document = &case.document;
-    let held = ["left_on", "right_on"].into_iter().find(|parameter| {
-        key_expression(document, parameter).is_some_and(|expression| !is_bare_key(expression))
-    });
-    let Some(parameter) = held else {
-        return DataType::Int64;
-    };
-    let wanted = [Segment::Parameter(parameter.to_owned()), Segment::Item(0)];
-    first
-        .expressions
-        .iter()
-        .find(|expression| expression.place.path() == wanted)
-        .and_then(
-            |expression| match expression.links.last().unwrap_or(&expression.start) {
-                Seen::Dtype(dtype, ..) => Some(dtype.clone()),
+/// Whether `expression` is only a join key column the other side is matched
+/// against.
+pub fn is_bare_key(expression: &Expression) -> bool {
+    key_column_of(expression).is_some()
+}
+
+/// The expressions a join key parameter holds, as a list of items.
+fn key_expressions<'a>(document: &'a Document, parameter: &str) -> Vec<&'a Expression> {
+    match document.steps()[0].call().argument(parameter) {
+        Some(Value::Many(items)) => items
+            .iter()
+            .filter_map(|item| match item {
+                Value::Expression(expression) => Some(expression),
                 _ => None,
-            },
-        )
-        .unwrap_or(DataType::Int64)
+            })
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// The dtype of each key column the other side is matched against, which is the
+/// dtype the chain it is paired with has: the join of a key with another dtype is
+/// refused for that, which is no matter of the tables. It is found by building the
+/// step once, as the report says what the chain has even when the join is
+/// refused. A column that no pair makes is of whole numbers.
+fn key_dtypes(case: &Case, first: &Observed) -> Vec<DataType> {
+    let document = &case.document;
+    let mut found: Vec<Option<DataType>> = Vec::new();
+    let sides = ["left_on", "right_on"];
+    for (side, parameter) in sides.into_iter().enumerate() {
+        let held_parameter = sides[1 - side];
+        let (bare, held) = (
+            key_expressions(document, parameter),
+            key_expressions(document, held_parameter),
+        );
+        for (at, key) in bare.iter().enumerate() {
+            let (Some(column), Some(partner)) = (key_column_of(key), held.get(at)) else {
+                continue;
+            };
+            if key_column_of(partner).is_some() {
+                continue;
+            }
+            let wanted = [
+                Segment::Parameter(held_parameter.to_owned()),
+                Segment::Item(at),
+            ];
+            let dtype = first
+                .expressions
+                .iter()
+                .find(|expression| expression.place.path() == wanted)
+                .and_then(|expression| {
+                    match expression.links.last().unwrap_or(&expression.start) {
+                        Seen::Dtype(dtype, ..) => Some(dtype.clone()),
+                        _ => None,
+                    }
+                });
+            if found.len() <= column {
+                found.resize(column + 1, None);
+            }
+            found[column].get_or_insert(dtype.unwrap_or(DataType::Int64));
+        }
+    }
+    if found.is_empty() {
+        return vec![DataType::Int64];
+    }
+    found
+        .into_iter()
+        .map(|dtype| dtype.unwrap_or(DataType::Int64))
+        .collect()
 }
 
 /// How the tables a probe runs on differ from the case's.
@@ -292,8 +337,8 @@ pub struct Tables {
 }
 
 impl Tables {
-    fn of(self, case: &Case, key: &DataType) -> Frames {
-        let frames = Frames::new(case.receiver, case.argument, key);
+    fn of(self, case: &Case, keys: &[DataType]) -> Frames {
+        let frames = Frames::new(case.receiver, case.argument, keys);
         let frames = if self.other_as_left {
             frames.other_as_left()
         } else {
@@ -317,14 +362,14 @@ pub fn observe(case: &Case) -> Observed {
 }
 
 fn observe_on(case: &Case, tables: Tables) -> Observed {
-    let observed = run_on(&case.document, &tables.of(case, &DataType::Int64));
+    let observed = run_on(&case.document, &tables.of(case, &[DataType::Int64]));
     let is_join = case.document.steps()[0].call().entry().id().as_str() == "LazyFrame.join";
     if !is_join {
         return observed;
     }
-    let key = key_dtype(case, &observed);
-    if key == DataType::Int64 {
+    let keys = key_dtypes(case, &observed);
+    if keys == [DataType::Int64] {
         return observed;
     }
-    run_on(&case.document, &tables.of(case, &key))
+    run_on(&case.document, &tables.of(case, &keys))
 }

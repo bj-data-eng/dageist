@@ -51,7 +51,8 @@ const fn next_rule(rule: Rule) -> Option<Rule> {
     match rule {
         Rule::ConditionPredicateIsBoolean => Some(Rule::ElementOnlyInPivotAggregate),
         Rule::ElementOnlyInPivotAggregate => Some(Rule::FilterPredicateIsBoolean),
-        Rule::FilterPredicateIsBoolean => Some(Rule::KeyIsElementwise),
+        Rule::FilterPredicateIsBoolean => Some(Rule::JoinKeyNamesAreNotRepeated),
+        Rule::JoinKeyNamesAreNotRepeated => Some(Rule::KeyIsElementwise),
         Rule::KeyIsElementwise => Some(Rule::PivotAggregateGivesOneValue),
         Rule::PivotAggregateGivesOneValue => None,
     }

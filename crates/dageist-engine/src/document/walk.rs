@@ -10,8 +10,9 @@
 //! and, for a start, the dtype of the column or literal it reads. Every
 //! expression that a position holds is asked whether it may end there, and a
 //! join's key whether it holds an aggregate beside a column, or a column compared
-//! with a null. The options a step is
-//! given are asked of [`allowed::options`].
+//! with a null. A join's keys are also asked whether they pair the same two output
+//! names twice, which Polars refuses, and `on` is walked against both tables, as
+//! Polars reads it. The options a step is given are asked of [`allowed::options`].
 //!
 //! The tables are measured, so what they cannot say is not guessed: a chain
 //! whose dtype is not known where a method follows it is not asked from there
@@ -214,6 +215,7 @@ impl Step {
         };
         walker.arguments(self.call(), false);
         walker.step_options(self.call());
+        walker.key_names();
         Walk {
             expressions: walker.walked,
             refusal: walker.refusal,
@@ -297,6 +299,67 @@ struct Walker<'a> {
     walked: Vec<WalkedExpression>,
     refusal: Option<WalkRefusal>,
     not_known: Option<String>,
+}
+
+/// The output names of a join's keys before the first whose name is not known, in
+/// order. Polars expands each side's keys before it pairs them, so a key that may
+/// expand to several columns, or that is not picked yet, shifts every pair after
+/// it: only the keys before it pair by position. Such a key is one whose name is
+/// not known, as is an item that is no expression.
+fn known_key_names(value: &Value) -> Vec<String> {
+    let names = |items: &[&Value]| {
+        items
+            .iter()
+            .map_while(|item| match item {
+                Value::Expression(expression) => key_name(expression),
+                _ => None,
+            })
+            .collect()
+    };
+    match value {
+        Value::Many(items) => names(&items.iter().collect::<Vec<_>>()),
+        other => names(&[other]),
+    }
+}
+
+/// Whether the parameter `parameter` of `step` holds a list of keys, whose items
+/// are each a place.
+fn left_is_many(step: &Call, parameter: &str) -> bool {
+    matches!(step.argument(parameter), Some(Value::Many(_)))
+}
+
+/// The output name Polars gives a join's key: the column the expression reads
+/// first, whatever methods follow it, `literal` for a literal, and for a
+/// condition the name of the first value it gives. `None` where it is not known:
+/// a start that expands to several columns or names them by a pattern, an input,
+/// a hole. A key is never given a name by an alias, which Polars refuses in a
+/// join's key and the catalogue does not hold.
+fn key_name(key: &Expression) -> Option<String> {
+    let Start::Call(start) = key.start() else {
+        return None;
+    };
+    match start.entry().id().as_str() {
+        "polars.col" => {
+            if Walker::names_several(start) {
+                return None;
+            }
+            let Some(Value::Columns(names)) = start.argument("name") else {
+                return None;
+            };
+            let name = names.first()?;
+            (!(name.starts_with('^') && name.ends_with('$'))).then(|| name.clone())
+        }
+        "polars.lit" => Some("literal".to_owned()),
+        "polars.when" => key
+            .links()
+            .iter()
+            .find(|link| link.entry().id().as_str() == "When.then")
+            .and_then(|link| match link.argument("statement") {
+                Some(Value::Expression(value)) => key_name(value),
+                _ => None,
+            }),
+        _ => None,
+    }
 }
 
 /// The word of a flag or a choice, as the option table writes it.
@@ -466,6 +529,63 @@ impl Walker<'_> {
         }
     }
 
+    /// Asks whether a join's keys pair the same two output names twice, which
+    /// Polars refuses, at the later key that makes the pair again. Only the pairs
+    /// before the first key on either side whose name is not known are judged:
+    /// Polars pairs the keys after expanding each side, and a key that may expand
+    /// or is not picked yet shifts every pair after it.
+    fn key_names(&mut self) {
+        if self.step.entry().id().as_str() != "LazyFrame.join" {
+            return;
+        }
+        let on = self.step.argument("on");
+        let left = self.step.argument("left_on").or(on);
+        let right = self.step.argument("right_on").or(on);
+        let (Some(left), Some(right)) = (left, right) else {
+            return;
+        };
+        let left_parameter = if self.step.argument("left_on").is_some() {
+            "left_on"
+        } else {
+            "on"
+        };
+        let (left, right) = (known_key_names(left), known_key_names(right));
+        let mut paired: Vec<(&String, &String)> = Vec::new();
+        for (at, pair) in left.iter().zip(&right).enumerate() {
+            if !paired.contains(&pair) {
+                paired.push(pair);
+                continue;
+            }
+            let context = Context::step(Outer::JoinLeft);
+            let Err(refusal) = allowed::rule_forbids_a_repeated_pair_of_key_names(context) else {
+                return;
+            };
+            let mut path = vec![Segment::Parameter(left_parameter.to_owned())];
+            if left_is_many(self.step, left_parameter) {
+                path.push(Segment::Item(at));
+            }
+            let place = path.into_iter().fold(self.base.clone(), Place::then);
+            // A key already refused keeps its refusal: this one is the later reason.
+            if let Some(walked) = self
+                .walked
+                .iter_mut()
+                .find(|walked| walked.place == place && walked.context == Some(context))
+                && !matches!(walked.ending, Some(Ending::Refused(_)))
+            {
+                walked.ending = Some(Ending::Refused(refusal.clone()));
+            }
+            if self.refusal.is_none() {
+                self.refusal = Some(WalkRefusal {
+                    place,
+                    refusal,
+                    at_end: true,
+                    argument_unknown: false,
+                });
+            }
+            return;
+        }
+    }
+
     /// Walks the arguments of `call`, and gives what each expression it holds
     /// has, by the parameter that holds it. `values_end` says whether the values
     /// of a condition that `call` is a link of end the predicate: the condition
@@ -491,6 +611,19 @@ impl Walker<'_> {
                 slot.is_some().then_some(ends),
                 &mut found,
             );
+            // `on` is the keys of both tables: Polars evaluates it against the other
+            // one as well, so what the tables say of it there is asked too. Its
+            // expressions are the left's first, at the same places.
+            if slot == Some(Slot::Outer(Outer::JoinLeft)) && given.parameter() == "on" {
+                self.slots.pop();
+                self.slots.push(Slot::Outer(Outer::JoinRight));
+                self.value(
+                    given.value(),
+                    given.parameter(),
+                    Some(false),
+                    &mut Vec::new(),
+                );
+            }
             if slot.is_some() {
                 self.slots.pop();
             }
@@ -556,13 +689,45 @@ impl Walker<'_> {
         if Self::names_several(call) {
             return None;
         }
-        let against_other = self.slots.first() == Some(&Slot::Outer(Outer::JoinRight));
-        let schema = if against_other {
-            self.other.as_deref()?
+        Representative::of(self.read_against()?.get(names.first()?)?)
+    }
+
+    /// The schema of the table the expression being walked reads its columns
+    /// from: the other table's for a join's `right_on`, and for `on`, which is
+    /// read against it as well, and the table the step starts from otherwise.
+    /// `None` where it is the other table and that is not known.
+    fn read_against(&self) -> Option<&Schema> {
+        if self.slots.first() == Some(&Slot::Outer(Outer::JoinRight)) {
+            self.other.as_deref()
         } else {
-            self.source
+            Some(self.source)
+        }
+    }
+
+    /// Says the tables cannot tell what follows a column of a join's `on` that
+    /// the table it is read against does not have, which Polars refuses as not
+    /// found. `on` is read against both tables, so a column in only one of them is
+    /// a mistake the walk can see. The editor picks the columns of other positions
+    /// from the table they are read against, which the walk does not ask.
+    fn blind_to_a_missing_column(&mut self, call: &Call) {
+        let in_on = matches!(
+            self.path.first(),
+            Some(Segment::Parameter(parameter)) if parameter == "on"
+        ) && self.step.entry().id().as_str() == "LazyFrame.join";
+        if !in_on || call.entry().id().as_str() != "polars.col" || Self::names_several(call) {
+            return;
+        }
+        let Some(Value::Columns(names)) = call.argument("name") else {
+            return;
         };
-        Representative::of(schema.get(names.first()?)?)
+        let Some(name) = names.first() else {
+            return;
+        };
+        match self.read_against() {
+            Some(schema) if schema.get(name).is_some() => {}
+            Some(_) => self.blind(format!("the table has no column called {name:?}")),
+            None => self.blind("the other table's columns are not known"),
+        }
     }
 
     /// The class of what a pivot's group holds, which `element` stands for: the
@@ -637,6 +802,7 @@ impl Walker<'_> {
             Start::Call(start) => {
                 self.path.push(Segment::Start);
                 let class = self.start_class(start);
+                self.blind_to_a_missing_column(start);
                 let chosen = Chosen::default();
                 let chosen = match class {
                     Some(dtype) => chosen.giving(dtype),

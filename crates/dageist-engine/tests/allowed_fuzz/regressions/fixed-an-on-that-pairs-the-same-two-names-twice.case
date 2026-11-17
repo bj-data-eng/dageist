@@ -1,0 +1,2 @@
+{"a":"Int64","b":"Int64","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.join","arguments":{"other":{"table":"other"},"on":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["u"]}}},"then":[]}},{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["u"]}}},"then":[{"entry":"Expr.first","arguments":{}}]}}]}}}}]}

@@ -22,7 +22,7 @@ use dageist_engine::document::{Call, Document, Dtype, Expression, Start, Step, S
 use dageist_fuzz::generation::Entropy;
 
 use super::case::{Case, STEP};
-use super::frames::{ON_COLUMNS, OTHER};
+use super::frames::{ON_COLUMNS, OTHER, key_column};
 
 /// Fewest bytes of entropy a case is made from. A shorter input is discarded,
 /// for what it lacks would be read as zeros, the same choice every time.
@@ -82,17 +82,20 @@ enum Host {
     Sort,
     JoinLeft,
     JoinRight,
+    /// A join's `on`, which both tables read.
+    JoinOn,
     Pivot,
 }
 
 impl Host {
-    const ALL: [(usize, Self); 7] = [
+    const ALL: [(usize, Self); 8] = [
         (22, Self::Select),
         (8, Self::WithColumns),
         (16, Self::Filter),
         (14, Self::Sort),
         (12, Self::JoinLeft),
         (10, Self::JoinRight),
+        (8, Self::JoinOn),
         (18, Self::Pivot),
     ];
 
@@ -102,7 +105,7 @@ impl Host {
             Self::WithColumns => "LazyFrame.with_columns",
             Self::Filter => "LazyFrame.filter",
             Self::Sort => "LazyFrame.sort",
-            Self::JoinLeft | Self::JoinRight => "LazyFrame.join",
+            Self::JoinLeft | Self::JoinRight | Self::JoinOn => "LazyFrame.join",
             Self::Pivot => "LazyFrame.pivot",
         }
     }
@@ -115,15 +118,20 @@ impl Host {
             Self::Sort => "by",
             Self::JoinLeft => "left_on",
             Self::JoinRight => "right_on",
+            Self::JoinOn => "on",
             Self::Pivot => "aggregate_function",
         }
     }
 
     /// The names of the columns an expression reads here: the left table's,
-    /// the other table's for `right_on`, and none for a pivot's group.
+    /// the other table's for `right_on`, and none for a pivot's group. `on`
+    /// reads both tables, which share only `u`; a column of the left table alone
+    /// is one the other table lacks, which is Polars' to refuse, and is drawn
+    /// for the few cases that check it.
     fn columns(self) -> &'static [&'static str] {
         match self {
             Self::JoinRight => &["ra", "rb", "rf", "rk", "rg", "rh"],
+            Self::JoinOn => &["u", "u", "u", "u", "u", "u", "u", "a", "k"],
             Self::Pivot => &[],
             _ => &["a", "b", "f", "k", "g", "h"],
         }
@@ -249,30 +257,52 @@ impl Gen<'_> {
         } else {
             Goal::Anything
         };
-        let held = self.chain(&mut slots, 0, goal).expression;
+        let first = self.chain(&mut slots, 0, goal);
         let as_list = |expression: Expression| Value::Many(vec![Value::Expression(expression)]);
-        let key =
-            || as_list(Expression::new(Start::Call(column("key")), Vec::new()).expect("a column"));
+        let many = |expressions: Vec<Expression>| {
+            Value::Many(expressions.into_iter().map(Value::Expression).collect())
+        };
+        let (held, others) = match host {
+            Host::JoinLeft | Host::JoinRight | Host::JoinOn => {
+                self.join_keys(first, &mut slots, host == Host::JoinOn)
+            }
+            _ => (vec![first.expression], Vec::new()),
+        };
+        let held_one = || held[0].clone();
+        let others = || {
+            many(
+                others
+                    .iter()
+                    .map(|name| {
+                        Expression::new(Start::Call(column(name)), Vec::new()).expect("a column")
+                    })
+                    .collect(),
+            )
+        };
         let mut given: Vec<(&str, Value)> = match host {
-            Host::Select | Host::WithColumns => vec![("exprs", as_list(held))],
-            Host::Filter => vec![("predicates", as_list(held))],
-            Host::Sort => vec![("by", as_list(held))],
+            Host::Select | Host::WithColumns => vec![("exprs", many(held.clone()))],
+            Host::Filter => vec![("predicates", as_list(held_one()))],
+            Host::Sort => vec![("by", as_list(held_one()))],
             Host::JoinLeft => vec![
                 ("other", Value::Table(OTHER.to_owned())),
-                ("left_on", as_list(held)),
-                ("right_on", key()),
+                ("left_on", many(held.clone())),
+                ("right_on", others()),
             ],
             Host::JoinRight => vec![
                 ("other", Value::Table(OTHER.to_owned())),
-                ("left_on", key()),
-                ("right_on", as_list(held)),
+                ("left_on", others()),
+                ("right_on", many(held.clone())),
+            ],
+            Host::JoinOn => vec![
+                ("other", Value::Table(OTHER.to_owned())),
+                ("on", many(held.clone())),
             ],
             Host::Pivot => vec![
                 ("on", Value::Columns(vec!["h".to_owned()])),
                 ("on_columns", Value::Table(ON_COLUMNS.to_owned())),
                 ("index", Value::Columns(vec!["k".to_owned()])),
                 ("values", Value::Columns(vec!["a".to_owned()])),
-                ("aggregate_function", Value::Expression(held)),
+                ("aggregate_function", Value::Expression(held_one())),
             ],
         };
         given.extend(self.options(entry(step_id)));
@@ -282,6 +312,82 @@ impl Gen<'_> {
         )
         .expect("a step of a lazy frame");
         Document::new(vec![step]).expect("one step")
+    }
+
+    // -----------------------------------------------------------------------
+    // Join keys
+
+    /// The keys a join holds on the side under test, the `first` and sometimes a
+    /// second, and the names of the other table's columns they are paired with.
+    /// The second is made to give the first's output name often, so that the
+    /// pair of names repeats where the other side repeats its column too. A
+    /// column of the other table is shared by two keys only where the dtypes of
+    /// the keys are the same, for Polars refuses a join of different ones, which
+    /// is no matter of the tables. `on` has no other side: it pairs each key with
+    /// itself.
+    fn join_keys(
+        &mut self,
+        first: Built,
+        slots: &mut Vec<Slot>,
+        on: bool,
+    ) -> (Vec<Expression>, Vec<String>) {
+        let mut held = vec![first.expression.clone()];
+        let mut others = vec![key_column(0)];
+        if self.draw.chance(30) {
+            let (second, same_dtype) = self.sibling(&first, slots);
+            held.push(second);
+            let shared = same_dtype && self.draw.chance(70);
+            others.push(if shared { key_column(0) } else { key_column(1) });
+        }
+        (held, if on { Vec::new() } else { others })
+    }
+
+    /// A key beside `first`: a copy of it, the column it starts from taken as one
+    /// value, or its test for a null, which are named as it is; or a chain of its
+    /// own. Whether it has the dtype `first` has, where the tables say so.
+    fn sibling(&mut self, first: &Built, slots: &mut Vec<Slot>) -> (Expression, bool) {
+        let named = match first.expression.start() {
+            Start::Call(start)
+                if matches!(start.entry().id().as_str(), "polars.col" | "polars.lit") =>
+            {
+                Some(start.clone())
+            }
+            _ => None,
+        };
+        let same_class = first.class.is_some();
+        match (self.draw.below(10), named) {
+            (0..=2, _) => (first.expression.clone(), same_class),
+            (3..=5, Some(start)) if first.expression.links().is_empty() => {
+                let link = if self.draw.chance(50) {
+                    "Expr.first"
+                } else {
+                    "Expr.last"
+                };
+                let expression = Expression::new(Start::Call(start), vec![call(link, Vec::new())])
+                    .expect("a column taken as one value");
+                (expression, same_class)
+            }
+            (6, Some(start)) => {
+                let expression = Expression::new(
+                    Start::Call(start),
+                    first
+                        .expression
+                        .links()
+                        .iter()
+                        .cloned()
+                        .chain([call("Expr.is_null", Vec::new())])
+                        .collect(),
+                )
+                .expect("a test for a null");
+                (expression, first.class == Some(Representative::Boolean))
+            }
+            _ => {
+                self.budget = 6;
+                let built = self.chain(slots, 0, Goal::Anything);
+                let same = built.class.is_some() && built.class == first.class;
+                (built.expression, same)
+            }
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -811,7 +917,9 @@ impl Gen<'_> {
                 ("Expr.dt.offset_by", "by") => {
                     // The durations are text of the table's: `b`, whose rows
                     // are durations where it is text, as the tables measured it.
-                    let (literal, class) = if self.draw.chance(70) || self.host == Host::Pivot {
+                    let (literal, class) = if self.draw.chance(70)
+                        || matches!(self.host, Host::Pivot | Host::JoinOn)
+                    {
                         self.literal_loose_text()
                     } else {
                         let name = if self.host == Host::JoinRight {
@@ -875,6 +983,8 @@ impl Gen<'_> {
                     )
                 } else if self.host == Host::JoinRight {
                     column("rk")
+                } else if self.host == Host::JoinOn {
+                    column("u")
                 } else {
                     column("k")
                 };
