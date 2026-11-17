@@ -30,7 +30,8 @@ This repository owns the host-independent `dageist` core in `src/`, the
 dataframe engine, the fuzz framework and the host adapters under `crates/`,
 the React view in `ui/`, their contracts, manifests, tests, documentation and
 shared tooling. Root owns workspace wiring and the core. The Tauri host owns
-its window, webview configuration, IPC commands and the view it serves. The
+its window, webview configuration, IPC commands, the bridge that serves the
+same commands to a browser and the view it serves. The
 fuzz framework owns bounded generation, reduction, replay and failure
 evidence; the domain cases stay with their consumers.
 
@@ -60,6 +61,7 @@ and current source establishes behavior.
 | The operations the step editor offers, their parameter kinds and shown words | [crates/dageist-engine/src/catalog/](crates/dageist-engine/src/catalog/mod.rs), its language file [en.toml](crates/dageist-engine/src/catalog/en.toml) |
 | The step document's format, its reading and the running of its steps | [crates/dageist-engine/src/document/](crates/dageist-engine/src/document/mod.rs) |
 | IPC commands and their serialized views | [crates/dageist-tauri/src/](crates/dageist-tauri/src/main.rs) |
+| The command line and the bridge that serves the commands to a browser | [cli.rs](crates/dageist-tauri/src/cli.rs), [bridge.rs](crates/dageist-tauri/src/bridge.rs) |
 | The view's IPC calls, their shapes and the decoders that read what the host sends | [ui/packages/host/src/](ui/packages/host/src/contract.ts) |
 | Snapshots of what the host's commands return, which the decoders' tests read | [ui/packages/host/fixtures/](ui/packages/host/fixtures/catalogue.json) |
 | The view's packages and what each may depend on | each `package.json` under [ui/apps/](ui/apps/desktop/package.json) and [ui/packages/](ui/packages/) |
@@ -85,7 +87,10 @@ file sinks as a directed acyclic graph on a canvas. Follow the
 Rust owns application behavior: the graph model, validation, execution, state
 and every value the view displays. Put that behavior in the core or in crates the
 core depends on. The core never depends on a host. The Tauri host translates
-core contracts into IPC commands and serializable views. The view owns
+core contracts into IPC commands and serializable views. The `bridge`
+subcommand of the same binary serves those commands to a browser over local
+HTTP, through the same functions, without a window; no command's behavior is
+written twice. The view owns
 presentation and input only: it renders what the host reports, forwards user
 intent through IPC commands, holds no authoritative application state and
 performs no data processing. The step editor's model under
@@ -93,7 +98,8 @@ performs no data processing. The step editor's model under
 sample rows until the core provides that behavior.
 
 The view is an npm workspace. The shell in `ui/apps/desktop` is the only place
-features are composed. `ui/packages/host` is the only package that knows Tauri.
+features are composed. `ui/packages/host` is the only package that knows Tauri
+or the bridge's transport.
 `ui/packages/design` holds primitive components and knows no domain. Each
 feature has its own package, exports one entry file and never imports another
 feature. Follow the [view structure](docs/explanation.md#how-the-view-is-divided).
@@ -229,3 +235,8 @@ Polars', not dageist's, and do not fail the checks.
 `cargo run --offline --locked -p dageist-tauri` opens the native application
 window and runs until it is closed. It is not a finite check; do not supervise
 it as one.
+
+`cargo run --offline --locked -p dageist-tauri -- bridge` serves the host's
+commands to a browser on `127.0.0.1` and runs until it is stopped. It is a
+long-running process, not a finite check: start it for the browser preview,
+bound its lifetime when a task starts it, and stop it afterwards.

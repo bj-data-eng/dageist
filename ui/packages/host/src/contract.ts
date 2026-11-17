@@ -3,7 +3,7 @@
  * in. Features depend on this contract, never on Tauri.
  */
 
-/** Mirrors `IdentityView` in crates/dageist-tauri/src/main.rs. */
+/** Mirrors `IdentityView` in crates/dageist-tauri/src/identity.rs. */
 export interface IdentityView {
   readonly name: string;
   readonly version: string;

@@ -18,7 +18,7 @@ The repository has three layers, each depending only on the one below it.
 | Layer | Package | Owns |
 | --- | --- | --- |
 | Core | `dageist` | Application behavior, independent of any window system. |
-| Host | `dageist-tauri` | The native window, webview configuration, permissions and IPC commands. |
+| Host | `dageist-tauri` | The native window, webview configuration, permissions, IPC commands, and the bridge that serves the same commands to a browser. |
 | View | `ui/` | Rendering and input inside the host's webview; see [How The View Is Divided](#how-the-view-is-divided). |
 
 The core never depends on Tauri. The host depends on the core and translates its
@@ -53,6 +53,50 @@ As the product grows, new behavior lands in the core or in crates under
 `crates/` that the core depends on. The host gains a command only when the view
 needs to reach that behavior.
 
+## The Bridge
+
+A plain browser has no Tauri, so it has no engine to ask. The one binary,
+`dageist`, therefore has a second job besides opening the application: its
+`bridge` subcommand serves the view's commands over HTTP on `127.0.0.1`, opens no
+window and starts no Tauri. The browser preview then shows what the application
+shows, without building and opening the application.
+
+The bridge belongs to the host and adds no behavior. Every command is a plain
+function apart from its Tauri binding, and the bridge calls the same function
+with the arguments it decodes from the request, so the two cannot answer
+differently. What Tauri keeps with `manage`, the gate that lets one command at
+a time generate the sample and the table that is open, the bridge keeps for as
+long as it runs, across requests. It finds the sample in the application's own
+cache folder, so the browser and the application share one sample. It serves
+only the commands that reach the core; opening a window is the application's,
+so a browser opens a tab for it itself.
+
+Because the bridge is a web server on the developer's machine, it is built to
+be driven only by the view it was started for. It listens on the loopback
+address and refuses a peer that is not loopback. A web page on another site in
+the same browser could still send it requests, so it takes a request only if
+its `Host` names the bridge's own loopback address and port, which defeats a
+name that another site points at `127.0.0.1`, and only if the body is declared
+`application/json`, which a page on another site cannot send without a
+preflight that the bridge does not answer. It sends no cross-origin header, so
+no such page can read an answer either. Vite's development server forwards the
+bridge's path to it, so the view calls its own origin. The forwarded request
+has to carry the bridge's own `Host`, or the bridge would refuse it, so behind
+the development server the bridge's `Host` check no longer tells one page from
+another. Safety through the development server rests on two other things: the
+server's own `Host` check, which `server.allowedHosts` limits to `localhost` and
+`127.0.0.1` in [vite.config.ts](../ui/apps/desktop/vite.config.ts), as it does
+for `vite preview`, and the bridge's content-type rule, together with the
+server's `cors: false`, which answers no cross-origin request. The bridge has no
+authentication and is a development tool, not a server to expose. A later
+server that answers queries to dashboards, as
+[the exploration](https://github.com/bj-data-eng/dageist/issues/64) describes,
+would need a smaller set of commands and real access control.
+
+The view holds one host for each way it is reached. `@dageist/host` has the
+Tauri host and the bridge host beside each other, and the shell uses the
+bridge host when Tauri is absent.
+
 ## Tauri Now, Surgeist Later
 
 Tauri 2 is the interim host. The intended eventual host is
@@ -76,7 +120,7 @@ automatically yet, so they are also a review criterion.
 | Part | Package | Responsibility |
 | --- | --- | --- |
 | Shell | `@dageist/desktop` | The composition root. It decides which host the view talks to and which feature is on screen, and owns the page, the bundler configuration and the design tokens. |
-| Host bridge | `@dageist/host` | The contract of every IPC command and its implementation over Tauri. No other package knows Tauri exists. |
+| Host door | `@dageist/host` | The contract of every IPC command and its two implementations: over Tauri, and over the [bridge](#the-bridge) in a plain browser. No other package knows Tauri or the bridge's transport. |
 | Design system | `@dageist/design` | Primitive components. It knows nothing about dataframes, steps or tables. |
 | Features | `@dageist/steps`, `@dageist/table` | One package per feature, each exporting one entry component. |
 
@@ -85,15 +129,15 @@ Three rules keep this workable as the application grows:
 - **Features never import each other.** They meet only in the shell, which
   passes each one what it needs, such as the host.
 - **Features depend on the host contract, not on Tauri.** That is why the view
-  can run in a plain browser against a stand-in host while it is being worked
-  on.
+  can run in a plain browser against the [bridge](#the-bridge) while it is
+  being worked on.
 - **Rust stays the authority.** A feature holds interface state, such as what
   is selected or which menu is open. Values and validation come from the host.
   The step editor's model is a storyboard that works on fixed sample rows until
   the core provides that behavior.
 
 The view reaches Tauri through the `window.__TAURI__` global that
-`app.withGlobalTauri` injects. The host bridge declares the global's types by
+`app.withGlobalTauri` injects. The host package declares the global's types by
 hand, covering only the members it uses.
 
 What the host sends is JSON, which TypeScript can only call `unknown`, so the

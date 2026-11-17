@@ -5,6 +5,9 @@
 //! its Parquet files one block at a time. These commands hold whichever is
 //! open between calls, report its shape as a serializable view and pass
 //! blocks through as raw Arrow IPC bytes, which the view decodes itself.
+//!
+//! The commands are thin: the functions beside them answer, so that a host
+//! other than Tauri can serve the same views.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};
@@ -172,21 +175,94 @@ fn open_stored(
     ParquetTable::open(directory).map(Opened::Stored)
 }
 
-/// Returns the folder in the application cache that holds the sample. Its
-/// name carries the sample's size, so a different size gets its own folder.
-fn sample_directory<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, ErrorView> {
-    let cache = app
-        .path()
-        .app_cache_dir()
-        .map_err(|error| ErrorView::new(format!("finding the application cache: {error}")))?;
-    let columns = SampleSpec::CLAIM_COLUMNS.len() + usize::from(SAMPLE.filler_columns);
-    Ok(cache.join(format!("claims-{}-keys-{columns}-columns", SAMPLE.keys)))
+/// Where the sample table is stored and how big it is.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Sample {
+    directory: PathBuf,
+    spec: SampleSpec,
+}
+
+impl Sample {
+    /// The sample table of `spec` kept in `directory`.
+    pub const fn new(directory: PathBuf, spec: SampleSpec) -> Self {
+        Self { directory, spec }
+    }
+
+    /// The sample the application serves, kept in the folder of `cache` that its
+    /// size names, so that a different size gets its own folder.
+    pub fn in_cache(cache: &Path) -> Self {
+        let columns = SampleSpec::CLAIM_COLUMNS.len() + usize::from(SAMPLE.filler_columns);
+        let name = format!("claims-{}-keys-{columns}-columns", SAMPLE.keys);
+        Self::new(cache.join(name), SAMPLE)
+    }
+
+    /// The sample the application serves, kept in its Tauri application cache.
+    fn of_app<R: Runtime>(app: &AppHandle<R>) -> Result<Self, ErrorView> {
+        let cache = app
+            .path()
+            .app_cache_dir()
+            .map_err(|error| ErrorView::new(format!("finding the application cache: {error}")))?;
+        Ok(Self::in_cache(&cache))
+    }
 }
 
 fn show(open: &OpenTable, table: Opened) -> TableView {
     let view = table.view();
     open.replace(Arc::new(table));
     view
+}
+
+/// Opens a working window of `keys` whole keys of `sample`, held in memory,
+/// keeps it open in `open` and reports its shape. A window holds at most
+/// `MAX_WINDOW_KEYS`.
+///
+/// The first call generates the sample.
+pub fn sample_window_view(
+    gate: &SampleGate,
+    open: &OpenTable,
+    sample: &Sample,
+    keys: u32,
+) -> Result<TableView, ErrorView> {
+    if keys > MAX_WINDOW_KEYS {
+        return Err(ErrorView::new(format!(
+            "a working window holds at most {MAX_WINDOW_KEYS} keys"
+        )));
+    }
+    let table = open_window(gate, &sample.directory, sample.spec, keys)?;
+    Ok(show(open, table))
+}
+
+/// Opens the whole of `sample` where it is stored, without loading it, keeps
+/// it open in `open` and reports its shape.
+///
+/// The first call generates the sample.
+pub fn sample_result_view(
+    gate: &SampleGate,
+    open: &OpenTable,
+    sample: &Sample,
+) -> Result<TableView, ErrorView> {
+    let table = open_stored(gate, &sample.directory, sample.spec)?;
+    Ok(show(open, table))
+}
+
+/// Returns `length` rows of the table open in `open` starting at `offset`,
+/// limited to `columns`, as the bytes of an Arrow IPC stream. A block holds at
+/// most `MAX_BLOCK_ROWS` rows.
+pub fn table_block_bytes(
+    open: &OpenTable,
+    offset: usize,
+    length: usize,
+    columns: &[String],
+) -> Result<Vec<u8>, ErrorView> {
+    if length > MAX_BLOCK_ROWS {
+        return Err(ErrorView::new(format!(
+            "a block holds at most {MAX_BLOCK_ROWS} rows"
+        )));
+    }
+    let table = open
+        .current()
+        .ok_or_else(|| ErrorView::new("no table is open"))?;
+    Ok(table.block_ipc(offset, length, columns)?)
 }
 
 /// Opens a working window of `keys` whole keys of the sample table, held in
@@ -200,13 +276,7 @@ pub fn open_sample_window<R: Runtime>(
     open: State<'_, OpenTable>,
     keys: u32,
 ) -> Result<TableView, ErrorView> {
-    if keys > MAX_WINDOW_KEYS {
-        return Err(ErrorView::new(format!(
-            "a working window holds at most {MAX_WINDOW_KEYS} keys"
-        )));
-    }
-    let table = open_window(&gate, &sample_directory(&app)?, SAMPLE, keys)?;
-    Ok(show(&open, table))
+    sample_window_view(&gate, &open, &Sample::of_app(&app)?, keys)
 }
 
 /// Opens the whole sample table where it is stored, without loading it, and
@@ -219,8 +289,7 @@ pub fn open_sample_result<R: Runtime>(
     gate: State<'_, SampleGate>,
     open: State<'_, OpenTable>,
 ) -> Result<TableView, ErrorView> {
-    let table = open_stored(&gate, &sample_directory(&app)?, SAMPLE)?;
-    Ok(show(&open, table))
+    sample_result_view(&gate, &open, &Sample::of_app(&app)?)
 }
 
 /// Returns `length` rows of the open table starting at `offset`, limited to
@@ -233,15 +302,9 @@ pub fn table_block(
     length: usize,
     columns: Vec<String>,
 ) -> Result<Response, ErrorView> {
-    if length > MAX_BLOCK_ROWS {
-        return Err(ErrorView::new(format!(
-            "a block holds at most {MAX_BLOCK_ROWS} rows"
-        )));
-    }
-    let table = open
-        .current()
-        .ok_or_else(|| ErrorView::new("no table is open"))?;
-    Ok(Response::new(table.block_ipc(offset, length, &columns)?))
+    Ok(Response::new(table_block_bytes(
+        &open, offset, length, &columns,
+    )?))
 }
 
 #[cfg(test)]

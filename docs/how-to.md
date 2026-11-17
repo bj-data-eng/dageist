@@ -37,7 +37,8 @@ holds `index.html` and an `assets/` folder with the bundled script and
 stylesheet. `test` runs Vitest once over the view's data layers: the decoders
 in `ui/packages/host`, which read what the host sends and are tested against
 the [snapshots written from Rust](#refresh-the-step-report-snapshots) with
-expectations written by hand, and later the functions that prepare data for
+expectations written by hand, the bridge host in the same package, against a
+stand-in for `fetch`, and later the functions that prepare data for
 display. React components have no tests. Name a file to run only its tests,
 as in `npm --prefix ui run test -- decode-run`.
 
@@ -52,18 +53,53 @@ run `npm --prefix ui ci --offline`.
 
 ## Work On The View In A Browser
 
-Start Vite's development server and open `http://localhost:5173`:
+The view in a plain browser reaches the real engine through the bridge, a
+subcommand of the `dageist` binary that serves the host's commands over local
+HTTP. The host embeds `ui/dist/` at compile time, so a fresh checkout cannot
+build the binary until the view is built once; [check the view](#check-the-view)
+or run:
 
 ```sh
+npm --prefix ui ci --offline
+npm --prefix ui run build
+```
+
+Then start the bridge in one terminal, which builds the binary if it is missing,
+and Vite's development server in another:
+
+```sh
+cargo run --offline --locked -p dageist-tauri -- bridge
 npm --prefix ui run dev
 ```
 
-The page updates as files under `ui/` change, with no build of the application.
-Outside Tauri there is no engine, so the shell loads a stand-in host: the steps
-work as usual, and the table shows made-up rows. The stand-in opens the editor
-as a second browser tab where the application opens a window, and carries the
-messages between the two over a broadcast channel. The status badge reads
-`Browser preview made-up data`. Stop the server with Ctrl+C.
+Open `http://localhost:5173`. The status badge reads `dageist 0.1.0` once the
+page has reached the bridge, and the steps, the node's inputs and the table
+show what the application shows. The page updates as files under `ui/` change,
+with no build of the application. The bridge prints
+`dageist bridge listening on http://127.0.0.1:7878` when it is ready. The
+development server forwards the page's requests under `/bridge` to it.
+
+The first request that opens the sample table generates it into the
+application's cache folder, as the application does, and a sample the
+application generated is reused. The bridge holds the open table for as long as
+it runs, so restarting it closes the table the page had open.
+
+When the bridge is not running, the page says so and shows the command above.
+Start it and reload the page. To use another port, give both sides the same
+one:
+
+```sh
+cargo run --offline --locked -p dageist-tauri -- bridge --port 7000
+DAGEIST_BRIDGE_PORT=7000 npm --prefix ui run dev
+```
+
+The browser opens the steps editor as a second tab where the application opens
+a window, and the tabs carry their messages over a broadcast channel. Stop the
+bridge and the development server with Ctrl+C. The bridge listens on `127.0.0.1`
+only and serves only a page that reaches it through that address or
+`localhost`; see [the bridge](explanation.md#the-bridge) for why. It is run from
+`cargo run`, a debug build. A release build of the binary has no console on
+Windows, because the host sets `windows_subsystem = "windows"` for releases.
 
 ## Format The View
 
@@ -111,7 +147,7 @@ run against Tauri's mock runtime and do not open a real window.
 
 They also prove the `operation_catalogue` command's view of the catalogue,
 and that `ui/packages/host/fixtures/catalogue.json`, the copy of that view the
-view's tests decode and the browser stand-in serves, is current.
+view's tests decode and the bridge's tests compare its answers with, is current.
 
 The node commands are tested through the same IPC layer, on the claim-timing
 sample node: `node_inputs` gives the table the steps start from and each
@@ -124,6 +160,19 @@ text, a null as `null`, and rejects a limit above 1,000 rows, a step that is not
 in the document and a step that was not run. Every expected value is written by
 hand from the sample's seven rows. The tests also prove that the step report
 snapshots in `ui/packages/host/fixtures/` are current.
+
+The bridge is tested without a socket and through one on a loopback port. The
+tests send requests as bytes to the bridge's handling and read the answers
+back, for each served command, with the views compared with the snapshots in
+`ui/packages/host/fixtures/`. They prove that a request from a `Host` that is
+not the bridge's own loopback address and port, one whose body is not sent as
+`application/json`, an unknown command, a method other than `POST` and a body
+that is not the command's arguments are each refused before a command runs;
+that no answer carries a cross-origin header; that the open table is kept
+between connections; that the bridge listens on `127.0.0.1` and no other
+address; and that the cache folder it uses is the one Tauri names. The command
+line's reading of `bridge` and `--port` is tested beside it. The tests do not
+start Tauri, and they serve a small sample from a temporary folder.
 
 ### Refresh The Catalogue Snapshot
 

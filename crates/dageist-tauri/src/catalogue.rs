@@ -6,7 +6,7 @@
 //! into one serializable value. It mirrors `CatalogueView` in
 //! `ui/packages/host/src/contract.ts`.
 //!
-//! The view's tests and the browser stand-in answer from
+//! The view's decoder tests and the bridge's tests read
 //! `ui/packages/host/fixtures/catalogue.json`, a snapshot of exactly what the
 //! command returns. A test keeps the two equal.
 
@@ -358,10 +358,15 @@ fn catalogue_view(words: &Words) -> Result<CatalogueView, MissingWord> {
     })
 }
 
+/// The catalogue of operations with its English words.
+pub fn english_catalogue() -> Result<CatalogueView, ErrorView> {
+    Ok(catalogue_view(english())?)
+}
+
 /// Reports the catalogue of operations, with its English words, to the view.
 #[tauri::command]
 pub fn operation_catalogue() -> Result<CatalogueView, ErrorView> {
-    Ok(catalogue_view(english())?)
+    english_catalogue()
 }
 
 #[cfg(test)]
