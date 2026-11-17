@@ -443,8 +443,10 @@ lie at the refused call or predicate. One it does not place, as the refusal of r
 counts only when the part before the refused call, alone (for a key, as the key), is
 not refused for the same reason. So a probe is not settled by an objection to another
 call. What the target says of a schema is neither the tables' reason nor a probe's
-for these two, and is settled only by the evidence above; where that is missing it is
-a limit's (a hidden schema). Which of two failures of a probe Polars names depends
+for these two, and is settled only by the evidence above. That evidence ties the
+refusal to the mismatch by what goes with it, not by what Polars says: the mismatch,
+the refusal in the position and the control allowed there are all observed, and the
+words of the refusal are not read. Which of two failures of a probe Polars names depends
 on which of its threads gets there first, so a probe refused for another reason is
 run again, up to sixteen times, before it counts as one that is not. When Polars
 allows the probe, refuses it for another reason or at another call, or the evidence
@@ -456,8 +458,9 @@ and the normal run replays it and expects the outcome to say so.
 What a probe shows is that the tables are right about the part or the call when it
 is evaluated, and the target takes that for a part Polars skips. The part as written
 shows it, for Polars refuses what it was asked to evaluate. The probes apart from the
-case, those that match the tables' reason, do not tell a part Polars skips from one it evaluates on a value that hides the
-refusal, as a literal it broadcasts or the nulls that the sample's rows leave. The
+case, those that match the tables' reason, do not tell a part Polars skips from one
+it evaluates on a value that hides the refusal, as a literal it broadcasts or the
+nulls that the sample's rows leave. The
 limits say what Polars evaluates and accepts, so they are asked before those probes
 and after the part as written: in that order the part as written, then the limits,
 then the probes apart from the case.
