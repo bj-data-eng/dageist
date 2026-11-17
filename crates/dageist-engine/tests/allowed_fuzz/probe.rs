@@ -428,6 +428,43 @@ fn lies_at(refusal: &Refusal, at: &[Place]) -> bool {
         .is_none_or(|place| place.path().is_empty() || at.contains(place))
 }
 
+/// How often a probe is run again while Polars names another failure of it than
+/// the tables' reason.
+const ATTEMPTS: usize = 16;
+
+/// Polars refusing `probed` as the tables refused the part, if it does. A probe
+/// may fail in two ways at once, and which Polars names depends on which of its
+/// threads gets there first (the tables are measured on one thread for this), so
+/// a probe that Polars refuses for another reason is run again, up to
+/// [`ATTEMPTS`] times, before it is taken for one that is not refused as the
+/// tables' reason says. A probe that Polars allows is allowed every time.
+fn refused_as(probed: &Case, tables: Tables, refused: &Refused, at: &[Place]) -> Option<Refusal> {
+    (0..ATTEMPTS).find_map(|_| {
+        // `None` ends the search with the probe allowed, which is no refusal.
+        let refusal = observe_probe(probed, tables).refusal;
+        match refusal {
+            Some(refusal)
+                if same_reason(&refused.source, &refused.reason, &refusal.reason)
+                    && lies_at(&refusal, at) =>
+            {
+                Some(Some(refusal))
+            }
+            Some(_) => None,
+            None => Some(None),
+        }
+    })?
+}
+
+/// Whether Polars refuses `probed` for the tables' reason, at any place, in one of
+/// [`ATTEMPTS`] runs.
+fn refused_anywhere_as(probed: &Case, tables: Tables, refused: &Refused) -> bool {
+    (0..ATTEMPTS).any(|_| {
+        observe_probe(probed, tables)
+            .refusal
+            .is_some_and(|refusal| same_reason(&refused.source, &refused.reason, &refusal.reason))
+    })
+}
+
 /// Asks Polars about the part the tables refused at `refused`, alone. `None`
 /// when there is nothing to ask, Polars allows the probe, it refuses it for
 /// another reason than the tables did, or not at the refused call: a refusal at
@@ -445,18 +482,10 @@ pub fn settle(case: &Case, refused: &Refused) -> Option<Settled> {
         })
     };
     let probed = run(probe.part, probe.filter)?;
-    let refusal = observe_probe(&probed, tables_of(&found, None)).refusal?;
-    if !same_reason(&refused.source, &refused.reason, &refusal.reason)
-        || !lies_at(&refusal, &probe.at)
-    {
-        return None;
-    }
+    let refusal = refused_as(&probed, tables_of(&found, None), refused, &probe.at)?;
     if let Some(before) = probe.before {
         let alone = run(before, false)?;
-        let earlier = observe_probe(&alone, tables_of(&found, None)).refusal;
-        if earlier
-            .is_some_and(|earlier| same_reason(&refused.source, &refused.reason, &earlier.reason))
-        {
+        if refused_anywhere_as(&alone, tables_of(&found, None), refused) {
             return None;
         }
     }
@@ -543,13 +572,12 @@ pub fn settle_on_a_value(
         argument: case.argument,
         document: document_of(case, &found, part, false)?,
     };
-    let refusal = observe_probe(&probed, tables_of(&found, Some(class))).refusal?;
     let at = place_of_the_part(&found, false).then(Segment::Link(0));
-    (same_reason(&refused.source, &refused.reason, &refusal.reason) && lies_at(&refusal, &[at]))
-        .then(|| Settled {
-            probe: probed.document.write(),
-            reason: refusal.reason,
-        })
+    let refusal = refused_as(&probed, tables_of(&found, Some(class)), refused, &[at])?;
+    Some(Settled {
+        probe: probed.document.write(),
+        reason: refusal.reason,
+    })
 }
 
 /// The parameters of a join that hold its keys.
@@ -617,15 +645,14 @@ pub fn settle_as_a_key(case: &Case, refused: &Refused) -> Option<Settled> {
         argument: case.argument,
         document: join_on(case, parameter, &part)?,
     };
-    let refusal = observe_probe(&probed, Tables::default()).refusal?;
     let at = Place::of_step(0, StepId::new(STEP).ok())
         .then(Segment::Parameter(parameter.clone()))
         .then(Segment::Item(0));
-    (same_reason(&refused.source, &refused.reason, &refusal.reason) && lies_at(&refusal, &[at]))
-        .then(|| Settled {
-            probe: probed.document.write(),
-            reason: refusal.reason,
-        })
+    let refusal = refused_as(&probed, Tables::default(), refused, &[at])?;
+    Some(Settled {
+        probe: probed.document.write(),
+        reason: refusal.reason,
+    })
 }
 
 /// Asks Polars about the part the tables refused apart from what surrounds it
