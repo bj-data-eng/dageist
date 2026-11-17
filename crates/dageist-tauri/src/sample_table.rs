@@ -489,7 +489,10 @@ mod tests {
         );
 
         match response {
-            Err(error) => assert_eq!(error, serde_json::json!({ "message": "no table is open" })),
+            Err(error) => assert_eq!(
+                error,
+                serde_json::json!({ "kind": "failed", "message": "no table is open" })
+            ),
             Ok(body) => panic!("expected an error, got {body:?}"),
         }
     }
@@ -510,6 +513,7 @@ mod tests {
         );
 
         let error = response.expect_err("an unknown column is refused");
+        assert_eq!(error["kind"], "failed");
         let message = error["message"].as_str().expect("a message");
         assert!(
             message.starts_with("selecting block columns"),
@@ -537,7 +541,10 @@ mod tests {
         match response {
             Err(error) => assert_eq!(
                 error,
-                serde_json::json!({ "message": "a working window holds at most 50000 keys" })
+                serde_json::json!({
+                    "kind": "limit",
+                    "message": "a working window holds at most 50000 keys"
+                })
             ),
             Ok(body) => panic!("expected an error, got {body:?}"),
         }
@@ -557,7 +564,10 @@ mod tests {
         match response {
             Err(error) => assert_eq!(
                 error,
-                serde_json::json!({ "message": "a block holds at most 10000 rows" })
+                serde_json::json!({
+                    "kind": "limit",
+                    "message": "a block holds at most 10000 rows"
+                })
             ),
             Ok(body) => panic!("expected an error, got {body:?}"),
         }

@@ -365,35 +365,70 @@ fn a_step_is_refused_for_what_is_not_connected_or_not_allowed_where_it_stands() 
     );
 }
 
-#[test]
-fn the_rows_command_rejects_what_it_cannot_answer_with_a_message() {
-    let message = |arguments: Value| {
-        invoke("rows_after_step", arguments).expect_err("a rejection")["message"]
+/// What `rows_after_step` rejects with, as the JSON the view receives.
+fn rejection(arguments: Value) -> Value {
+    invoke("rows_after_step", arguments).expect_err("a rejection")
+}
+
+/// The kind and the message of a rejection.
+fn kind_and_message(rejection: &Value) -> (String, String) {
+    let text = |field: &str| {
+        rejection[field]
             .as_str()
-            .expect("a message")
+            .unwrap_or_else(|| panic!("no {field} in {rejection}"))
             .to_owned()
     };
-    assert_eq!(
-        message(json!({ "document": steps_text(), "step": "sort", "limit": 1_001 })),
-        "a preview holds at most 1000 rows"
-    );
+    (text("kind"), text("message"))
+}
+
+#[test]
+fn a_preview_over_the_window_is_rejected_as_a_limit() {
+    let (kind, message) = kind_and_message(&rejection(
+        json!({ "document": steps_text(), "step": "sort", "limit": 1_001 }),
+    ));
+    assert_eq!(kind, "limit");
+    assert_eq!(message, "a preview holds at most 1000 rows");
+}
+
+#[test]
+fn a_step_the_document_lacks_is_rejected_as_no_such_step() {
+    let (kind, message) = kind_and_message(&rejection(
+        json!({ "document": steps_text(), "step": "nowhere", "limit": 1 }),
+    ));
+    assert_eq!(kind, "noSuchStep");
     assert!(
-        message(json!({ "document": steps_text(), "step": "nowhere", "limit": 1 }))
-            .contains("there is no step \"nowhere\"")
+        message.contains("there is no step \"nowhere\""),
+        "{message}"
     );
-    assert!(
-        message(json!({ "document": steps_text(), "step": "", "limit": 1 }))
-            .starts_with("naming the step")
-    );
-    assert!(
-        message(json!({ "document": "[]", "step": "sort", "limit": 1 }))
-            .starts_with("reading the document")
-    );
-    // A step after a refused one has no rows.
-    assert!(
-        message(json!({ "document": refused_text(), "step": "after", "limit": 1 }))
-            .starts_with("previewing the rows")
-    );
+    // An identifier with no characters names no step either.
+    let (kind, message) = kind_and_message(&rejection(
+        json!({ "document": steps_text(), "step": "", "limit": 1 }),
+    ));
+    assert_eq!(kind, "noSuchStep");
+    assert!(message.starts_with("naming the step"), "{message}");
+}
+
+#[test]
+fn a_text_that_is_not_a_document_is_rejected_as_unreadable() {
+    let (kind, message) = kind_and_message(&rejection(
+        json!({ "document": "[]", "step": "sort", "limit": 1 }),
+    ));
+    assert_eq!(kind, "unreadable");
+    assert!(message.starts_with("reading the document"), "{message}");
+}
+
+#[test]
+fn a_refused_step_is_rejected_as_refused_and_the_step_after_it_as_not_run() {
+    let (kind, message) = kind_and_message(&rejection(
+        json!({ "document": refused_text(), "step": "total", "limit": 1 }),
+    ));
+    assert_eq!(kind, "refused");
+    assert!(message.starts_with("previewing the rows"), "{message}");
+    let (kind, message) = kind_and_message(&rejection(
+        json!({ "document": refused_text(), "step": "after", "limit": 1 }),
+    ));
+    assert_eq!(kind, "notRun");
+    assert!(message.starts_with("previewing the rows"), "{message}");
 }
 
 #[test]
