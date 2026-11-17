@@ -569,3 +569,171 @@ impl RunView {
         }
     }
 }
+
+/// The words of every closed vocabulary in a report, written out by the host
+/// from the engine's own lists of variants, for the view's tests to check its
+/// decoders against.
+#[cfg(test)]
+pub(crate) fn vocabulary() -> serde_json::Value {
+    /// Every view of a list, serialized to its word.
+    fn words<T: Serialize>(views: &[T]) -> Vec<serde_json::Value> {
+        views
+            .iter()
+            .map(|view| serde_json::to_value(view).expect("a view serializes"))
+            .collect()
+    }
+
+    use dageist_engine::allowed::Rule;
+
+    serde_json::json!({
+        "outer": Outer::ALL.map(Outer::name),
+        "nested": Nested::ALL.map(Nested::name),
+        "rules": Rule::ALL.map(Rule::name),
+        "stages": words(&Stage::ALL.map(stage_view)),
+        "conditionStates": words(&ConditionState::ALL.map(condition_state_view)),
+        "valueShapes": words(&Shape::ALL.map(shape_view)),
+    })
+}
+
+/// A run built by hand to hold every variant that no real document gives
+/// together, so that the view's decoders are tested on each of them. It is not
+/// something the engine reports; it is what the host would send if it did.
+#[cfg(test)]
+pub(crate) fn variants() -> RunView {
+    use dageist_engine::allowed::Rule;
+
+    let place = |path: Vec<SegmentView>| PlaceView {
+        step_index: Some(0),
+        step_id: Some("variants".to_owned()),
+        path,
+    };
+    let refusal = |source: RefusalSourceView| RefusalView {
+        source,
+        reason: "the reason".to_owned(),
+    };
+    let refused = |id: &str, cause: CauseView| StepReportView {
+        id: id.to_owned(),
+        lazy: true,
+        outcome: OutcomeView::Refused {
+            place: PlaceView {
+                step_index: Some(1),
+                step_id: Some(id.to_owned()),
+                path: vec![SegmentView::Start],
+            },
+            cause,
+        },
+        expressions: Vec::new(),
+        walk: WalkView {
+            expressions: Vec::new(),
+            refusal: None,
+            not_known: None,
+        },
+    };
+    let path = vec![
+        SegmentView::Parameter {
+            name: "named_exprs".to_owned(),
+        },
+        SegmentView::Key { index: 1 },
+        SegmentView::Start,
+    ];
+    let variants = StepReportView {
+        id: "variants".to_owned(),
+        lazy: false,
+        outcome: OutcomeView::Valid {
+            columns: vec![FieldView {
+                name: "a".to_owned(),
+                dtype: "Int64".to_owned(),
+            }],
+        },
+        expressions: vec![ExpressionDtypesView {
+            place: place(path.clone()),
+            start: ResolutionView::Several {
+                dtypes: vec!["Int64".to_owned(), "String".to_owned()],
+            },
+            links: vec![ResolutionView::Refused {
+                reason: "no".to_owned(),
+            }],
+        }],
+        walk: WalkView {
+            expressions: vec![WalkedExpressionView {
+                place: place(path.clone()),
+                context: Some(context_view(Context::inside(
+                    Outer::Filter,
+                    Nested::OrderBy,
+                ))),
+                calls: vec![
+                    StandingView {
+                        follows: Some(after_view(After::Condition(ConditionState::ChainedWhen))),
+                        verdict: Some(VerdictView::Refused {
+                            refusal: refusal(RefusalSourceView::Structure),
+                        }),
+                    },
+                    StandingView {
+                        follows: Some(after_view(After::Condition(ConditionState::ChainedThen))),
+                        verdict: None,
+                    },
+                ],
+                places: vec![
+                    Some(OfferPlaceView {
+                        context: context_view(Context::step(Outer::Sort)),
+                        after: after_view(After::Condition(ConditionState::ChainedThen)),
+                    }),
+                    None,
+                ],
+                ending: Some(EndingView::NotKnown {
+                    because: "the dtype is not known".to_owned(),
+                }),
+            }],
+            refusal: Some(WalkRefusalView {
+                place: place(path),
+                refusal: refusal(RefusalSourceView::Polars {
+                    stage: StageView::Empty,
+                }),
+                at_end: true,
+            }),
+            not_known: Some("why".to_owned()),
+        },
+    };
+    let mut rows_stage = refused(
+        "rows_stage",
+        CauseView::NotAllowed {
+            refusal: refusal(RefusalSourceView::Polars {
+                stage: StageView::Rows,
+            }),
+        },
+    );
+    rows_stage.lazy = false;
+    RunView::Run {
+        source: Vec::new(),
+        steps: vec![
+            variants,
+            refused(
+                "unknown_table",
+                CauseView::UnknownTable {
+                    name: "nope".to_owned(),
+                },
+            ),
+            refused(
+                "unknown_input",
+                CauseView::UnknownInput {
+                    name: "none".to_owned(),
+                },
+            ),
+            refused(
+                "build",
+                CauseView::Build {
+                    reason: "a parameter is missing".to_owned(),
+                },
+            ),
+            refused(
+                "rule",
+                CauseView::NotAllowed {
+                    refusal: refusal(RefusalSourceView::Rule {
+                        rule: Rule::ElementOnlyInPivotAggregate.name(),
+                    }),
+                },
+            ),
+            rows_stage,
+        ],
+    }
+}

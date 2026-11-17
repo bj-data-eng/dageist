@@ -364,6 +364,17 @@ pub fn operation_catalogue() -> Result<CatalogueView, ErrorView> {
     Ok(catalogue_view(english())?)
 }
 
+/// The words of the catalogue's closed vocabularies, written out from the
+/// engine's own lists of variants, for the view's tests to check its decoders
+/// against.
+#[cfg(test)]
+pub(crate) fn vocabulary() -> serde_json::Value {
+    serde_json::json!({
+        "applies": Applies::ALL.map(applies_view),
+        "valueTypes": ValueType::ALL.map(value_type_view),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::{Value, json};

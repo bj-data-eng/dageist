@@ -54,6 +54,18 @@ fn json(view: &impl serde::Serialize) -> Value {
     serde_json::to_value(view).expect("a view serializes")
 }
 
+/// The words of every closed vocabulary the views use.
+fn vocabulary() -> Value {
+    let mut words = crate::report::vocabulary();
+    let (Some(words), Value::Object(catalogue)) =
+        (words.as_object_mut(), crate::catalogue::vocabulary())
+    else {
+        panic!("a vocabulary is an object");
+    };
+    words.extend(catalogue);
+    Value::Object(words.clone())
+}
+
 fn steps_text() -> &'static str {
     ClaimTiming::STEPS_JSON
 }
@@ -300,6 +312,58 @@ fn the_rows_command_gives_cells_as_text_and_a_null_as_null() {
     assert_eq!(rows[1][position("days_open")], "1");
 }
 
+/// The cause a step is refused with, when it is the only step of the document.
+fn cause_of(step: Value) -> Value {
+    let text = json!({ "version": 1, "steps": [step] }).to_string();
+    let answer = invoke("run_document", json!({ "document": text })).expect("a report");
+    assert_eq!(
+        answer["steps"][0]["outcome"]["status"], "refused",
+        "{answer}"
+    );
+    answer["steps"][0]["outcome"]["cause"].clone()
+}
+
+#[test]
+fn a_step_is_refused_for_what_is_not_connected_or_not_allowed_where_it_stands() {
+    let column = |name: &str| {
+        json!({ "expression": { "start": {
+            "entry": "polars.col",
+            "arguments": { "name": { "columns": [name] } }
+        }, "then": [] } })
+    };
+    let join = json!({ "id": "join", "call": { "entry": "LazyFrame.join", "arguments": {
+        "other": { "table": "nope" },
+        "left_on": { "many": [column("dcn")] },
+        "right_on": { "many": [column("dcn")] },
+    } } });
+    assert_eq!(
+        cause_of(join),
+        json!({ "kind": "unknownTable", "name": "nope" })
+    );
+    let with = |start: Value| {
+        json!({ "id": "with", "call": { "entry": "LazyFrame.with_columns", "arguments": {
+            "named_exprs": { "pairs": [[
+                { "columns": ["x"] },
+                { "expression": { "start": start, "then": [] } }
+            ]] }
+        } } })
+    };
+    assert_eq!(
+        cause_of(with(json!({ "input": "nope" }))),
+        json!({ "kind": "unknownInput", "name": "nope" })
+    );
+    assert_eq!(
+        cause_of(with(json!({ "entry": "polars.element", "arguments": {} }))),
+        json!({
+            "kind": "notAllowed",
+            "refusal": {
+                "source": { "by": "rule", "rule": "element-only-in-pivot-aggregate" },
+                "reason": "`polars.element` stands only in a pivot's aggregate"
+            }
+        })
+    );
+}
+
 #[test]
 fn the_rows_command_rejects_what_it_cannot_answer_with_a_message() {
     let message = |arguments: Value| {
@@ -333,7 +397,7 @@ fn the_rows_command_rejects_what_it_cannot_answer_with_a_message() {
 
 #[test]
 fn the_snapshots_are_what_the_commands_return() {
-    let snapshots: [(&str, Value); 5] = [
+    let snapshots: [(&str, Value); 7] = [
         ("node-inputs.json", json(&node_view().expect("the node"))),
         (
             "step-report.json",
@@ -347,6 +411,11 @@ fn the_snapshots_are_what_the_commands_return() {
             "step-report-unreadable.json",
             json(&run_view(r#"{"version":2,"steps":[]}"#).expect("an answer")),
         ),
+        (
+            "step-report-variants.json",
+            json(&crate::report::variants()),
+        ),
+        ("vocabulary.json", vocabulary()),
         (
             "step-rows.json",
             json(&rows_view(steps_text(), "days_open", 7).expect("rows")),

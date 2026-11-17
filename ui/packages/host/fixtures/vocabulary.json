@@ -1,0 +1,16 @@
+{
+  "outer": ["select", "filter", "sort", "join_left", "join_right", "pivot_aggregate"],
+  "nested": ["over.partition_by", "over.order_by", "condition.predicate", "condition.value"],
+  "rules": [
+    "condition-predicate-is-boolean",
+    "element-only-in-pivot-aggregate",
+    "filter-predicate-is-boolean",
+    "key-is-elementwise",
+    "pivot-aggregate-gives-one-value"
+  ],
+  "stages": ["schema", "rows", "empty"],
+  "conditionStates": ["when", "then", "chainedWhen", "chainedThen"],
+  "valueShapes": ["one", "many"],
+  "applies": ["expression", "frame", "function", "condition"],
+  "valueTypes": ["integer", "float", "string", "date", "any"]
+}
