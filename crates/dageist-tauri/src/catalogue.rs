@@ -449,14 +449,13 @@ mod tests {
                 "name": "shift",
                 "hint": "value n rows earlier",
                 "head": null,
-                "accepts": ["any"],
                 "lazy": true,
                 "parameters": [
                     {
                         "name": "n",
                         "shown": "n",
                         "label": "rows",
-                        "kind": { "kind": "expression", "dtypes": ["integer"] },
+                        "kind": { "kind": "expression" },
                         "shape": { "shape": "one" },
                         "default": { "kind": "integer", "value": 1 },
                         "python": "1",
@@ -466,7 +465,7 @@ mod tests {
                         "name": "fill_value",
                         "shown": "fill_value",
                         "label": "fill with",
-                        "kind": { "kind": "expression", "dtypes": ["any"] },
+                        "kind": { "kind": "expression" },
                         "shape": { "shape": "one" },
                         "default": { "kind": "none" },
                         "python": "None",
@@ -607,14 +606,10 @@ mod tests {
         let when = entry(&view, "polars.when");
         assert_eq!(when["applies"], "condition");
         assert_eq!(when["family"], "condition");
-        assert_eq!(when["accepts"], json!([]));
         assert_eq!(when["head"], Value::Null);
         let statement = parameter(&view, "Then.otherwise", "statement");
         assert_eq!(statement["default"], json!({ "kind": "required" }));
-        assert_eq!(
-            statement["kind"],
-            json!({ "kind": "expression", "dtypes": ["any"] })
-        );
+        assert_eq!(statement["kind"], json!({ "kind": "expression" }));
         assert_eq!(entry(&view, "Then.otherwise")["applies"], "condition");
         // `polars.element()` is a function of the start family, with no parameter.
         let element = entry(&view, "polars.element");
@@ -632,7 +627,7 @@ mod tests {
             json!({
                 "kind": "pairs",
                 "key": { "kind": "column" },
-                "value": { "kind": "expression", "dtypes": ["any"] }
+                "value": { "kind": "expression" }
             })
         );
     }
@@ -755,7 +750,10 @@ mod tests {
             ]
         );
         assert_eq!(view["families"][0]["title"], "Steps · change the table");
-        assert_eq!(view["dtypes"][0], json!({ "key": "any", "title": "any" }));
+        // What an entry accepts on what it follows is the engine's to say through its offers, so
+        // neither the groups of dtypes nor what an entry accepts of them is sent.
+        assert!(view.get("dtypes").is_none());
+        assert!(entry(&view, "Expr.shift").get("accepts").is_none());
     }
 
     #[test]

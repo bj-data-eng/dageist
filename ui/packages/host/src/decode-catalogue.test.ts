@@ -62,7 +62,6 @@ describe('the catalogue the host sends', () => {
       'start',
       'condition',
     ]);
-    expect(decoded.dtypes[0]).toEqual({ key: 'any', title: 'any' });
   });
 
   it('is read with the parameters of an entry as Polars gives them', () => {
@@ -75,14 +74,13 @@ describe('the catalogue the host sends', () => {
       name: 'shift',
       hint: 'value n rows earlier',
       head: null,
-      accepts: ['any'],
       lazy: true,
       parameters: [
         {
           name: 'n',
           shown: 'n',
           label: 'rows',
-          kind: { kind: 'expression', dtypes: ['integer'] },
+          kind: { kind: 'expression' },
           shape: { shape: 'one' },
           default: { kind: 'integer', value: 1 },
           python: '1',
@@ -92,7 +90,7 @@ describe('the catalogue the host sends', () => {
           name: 'fill_value',
           shown: 'fill_value',
           label: 'fill with',
-          kind: { kind: 'expression', dtypes: ['any'] },
+          kind: { kind: 'expression' },
           shape: { shape: 'one' },
           default: { kind: 'none' },
           python: 'None',
@@ -157,7 +155,7 @@ describe('the catalogue the host sends', () => {
     expect(parameter('LazyFrame.with_columns', 'named_exprs')?.kind).toEqual({
       kind: 'pairs',
       key: { kind: 'column' },
-      value: { kind: 'expression', dtypes: ['any'] },
+      value: { kind: 'expression' },
     });
     // `LazyFrame.join(other, ...)` has no default, which Python writes as nothing.
     expect(parameter('LazyFrame.join', 'other')).toMatchObject({
