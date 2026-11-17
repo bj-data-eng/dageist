@@ -19,7 +19,9 @@
 //!   it, which Polars cannot fold.
 //! - [`settle_as_a_key`]: a refusal that a join's key is not elementwise is of the
 //!   position, so the part that holds the refused call is the whole key of the
-//!   same join.
+//!   same join. Where that part is one value Polars allows it, whatever it holds,
+//!   and [`settle_on_a_value_as_a_key`] asks the refused call on a column as the
+//!   key.
 //!
 //! The last two do not tell what Polars skips from what it evaluates on a value
 //! that hides the refusal, which a limit names, so the limits are asked before
@@ -687,16 +689,80 @@ pub fn settle_as_a_key(case: &Case, refused: &Refused) -> Option<Settled> {
     })
 }
 
+/// Asks Polars about the call the tables refused as not elementwise in a join's
+/// key, on a column, as the whole key. The part that holds the call may be one
+/// value, as an aggregate then a running value is, which Polars allows as a key
+/// whatever it holds; where the key is folded, Polars never meets the call as
+/// anything else. The refused call, with its arguments, on a column of the dtype
+/// that reaches it, as the key of the same join, is the call as a key that is not
+/// one value. The dtype is Polars' as well as the tables', as for
+/// [`settle_on_a_value`].
+pub fn settle_on_a_value_as_a_key(
+    case: &Case,
+    refused: &Refused,
+    predicted: &Prediction,
+    observed: &Observed,
+) -> Option<Settled> {
+    if !matches!(refused.source, Source::Polars) || !refused.reason.contains("elementwise") {
+        return None;
+    }
+    let found = find(case, &refused.place)?;
+    let Some(Segment::Parameter(parameter)) = refused.place.path().first() else {
+        return None;
+    };
+    let [Segment::Link(link)] = found.rest else {
+        return None;
+    };
+    if !KEYS.contains(&parameter.as_str()) {
+        return None;
+    }
+    let consumed = refused.place.path().len() - found.rest.len();
+    let held = refused.place.path()[..consumed]
+        .iter()
+        .cloned()
+        .fold(Place::of_step(0, StepId::new(STEP).ok()), Place::then);
+    let class = dtype_reaching(&held, *link, predicted, observed)?;
+    let name = call(
+        "polars.col",
+        vec![("name", Value::Columns(vec![STAND_IN.to_owned()]))],
+    )?;
+    let part = Expression::new(
+        Start::Call(name),
+        vec![found.expression.links().get(*link)?.clone()],
+    )
+    .ok()?;
+    let probed = Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        document: join_on(case, parameter, &part)?,
+    };
+    let at = Place::of_step(0, StepId::new(STEP).ok())
+        .then(Segment::Parameter(parameter.clone()))
+        .then(Segment::Item(0));
+    let tables = Tables {
+        other_as_left: false,
+        stand_in: Some(class),
+    };
+    let refusal = refused_as(&probed, tables, refused, &[at])?;
+    Some(Settled {
+        probe: probed.document.write(),
+        reason: refusal.reason,
+    })
+}
+
 /// Asks Polars about the part the tables refused apart from what surrounds it
 /// in the case, where the part as written is not asked: the refused call on a
-/// value of the dtype that reaches it, or a join's key by itself as the key.
+/// value of the dtype that reaches it, or a join's key by itself as the key, or
+/// the call on a value as the key.
 pub fn settle_apart(
     case: &Case,
     refused: &Refused,
     predicted: &Prediction,
     observed: &Observed,
 ) -> Option<Settled> {
-    settle_on_a_value(case, refused, predicted, observed).or_else(|| settle_as_a_key(case, refused))
+    settle_on_a_value(case, refused, predicted, observed)
+        .or_else(|| settle_as_a_key(case, refused))
+        .or_else(|| settle_on_a_value_as_a_key(case, refused, predicted, observed))
 }
 
 /// The predicate a rule refused: the whole expression at its place.
@@ -1022,17 +1088,25 @@ mod tests {
     }
 
     #[test]
-    fn a_running_value_in_an_operand_of_a_key_that_polars_folds_is_asked_as_a_key() {
+    fn a_running_value_in_an_operand_of_a_key_that_polars_folds_is_asked_on_a_column() {
         // `null >= rk.sum().cum_max()` then `- rk`: Polars folds the comparison with a
         // null into a null, so the running maximum in what it is compared with is
-        // never met as a key. The part that holds the refused call, as a key, is
-        // folded the same way: the running maximum alone is the key to ask.
+        // never met as a key. The part that holds the refused call is folded the same
+        // way, and the running maximum of one value is allowed as a key, so the call
+        // is asked on a column.
         let case = kept("stricter-a-running-value-in-a-right-key-after-a-null-literal.case");
         let refused = refusal(&case);
         assert_eq!(settle(&case, &refused), None);
-        let found = settle_as_a_key(&case, &refused).expect("a key that Polars refuses");
+        assert_eq!(settle_as_a_key(&case, &refused), None);
+        let found = settle_apart(&case, &refused, &predict(&case), &observe(&case))
+            .expect("a key that Polars refuses");
         assert!(found.reason.contains("elementwise"), "{}", found.reason);
         assert!(found.probe.contains("Expr.cum_max"), "{}", found.probe);
+        assert!(
+            found.probe.contains("\"columns\":[\"p\"]"),
+            "{}",
+            found.probe
+        );
         assert!(!found.probe.contains("polars.lit"), "{}", found.probe);
     }
 
@@ -1049,6 +1123,29 @@ mod tests {
         );
         let running = join_with_right_key(&["Expr.cum_sum"]);
         assert!(settle_as_a_key(&running, &refused_in_the_right_key(reason)).is_some());
+    }
+
+    #[test]
+    fn a_call_that_polars_allows_on_a_column_as_a_key_settles_nothing() {
+        // A right key that tests for a null is elementwise on a column too, so the
+        // refusal the tables are said to give is not shown by it.
+        let reason = "all join key expressions must be elementwise.";
+        let case = join_with_right_key(&["Expr.is_null"]);
+        let refused = refused_in_the_right_key(reason);
+        assert_eq!(
+            settle_on_a_value_as_a_key(&case, &refused, &predict(&case), &observe(&case)),
+            None
+        );
+        let running = join_with_right_key(&["Expr.cum_sum"]);
+        assert!(
+            settle_on_a_value_as_a_key(
+                &running,
+                &refused_in_the_right_key(reason),
+                &predict(&running),
+                &observe(&running)
+            )
+            .is_some()
+        );
     }
 
     #[test]

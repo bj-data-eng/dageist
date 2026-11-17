@@ -413,7 +413,9 @@ it, which Polars cannot fold as it does a literal. The dtype is Polars' as well 
 the tables', and a case where they differ is a disagreement about the dtype, found
 first. For a refusal that a join's key is not elementwise, the part that holds the
 refused call is asked as the whole key of the same join, for the refusal is of the
-position and Polars skips it where the key is folded away.
+position and Polars skips it where the key is folded away. Where that part is one
+value, as an aggregate and a running value of it are, Polars allows it as a key
+whatever it holds, so the refused call is also asked on a column as the key.
 
 When Polars refuses a probe for the reason the tables gave, the case counts as
 **refused where Polars does not evaluate the part**: the tables are stricter by
