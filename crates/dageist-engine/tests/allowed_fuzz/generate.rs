@@ -1045,3 +1045,42 @@ fn option_words(call: &Call) -> Vec<(String, String)> {
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Whether the document of `case` holds a `shift` by a whole number below
+    /// zero, which is written as a literal of the number.
+    fn shifts_back(case: &Case) -> bool {
+        let written = case.document.write();
+        written.contains("\"Expr.shift\"") && written.contains("\"integer\":-")
+    }
+
+    #[test]
+    fn the_cases_include_a_shift_back_and_a_shift_forward() {
+        // The limit for what a shift leaves null follows the direction of the
+        // shift, so the target must reach both for a campaign to check it.
+        let entropy = |offset: u64| -> Vec<u8> {
+            (0..512_u64)
+                .map(|at| {
+                    let mixed = (at + offset * 977 + 11).wrapping_mul(0x9e37_79b9_7f4a_7c15);
+                    (mixed >> 29) as u8
+                })
+                .collect()
+        };
+        let cases: Vec<Case> = (0..6000_u64)
+            .filter_map(|offset| generate(&entropy(offset)))
+            .collect();
+        let back = cases.iter().filter(|case| shifts_back(case)).count();
+        let forward = cases
+            .iter()
+            .filter(|case| {
+                let written = case.document.write();
+                written.contains("\"Expr.shift\"") && !shifts_back(case)
+            })
+            .count();
+        assert!(back > 0, "no case of {} shifts back", cases.len());
+        assert!(forward > 0, "no case of {} shifts forward", cases.len());
+    }
+}
