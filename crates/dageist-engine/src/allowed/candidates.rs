@@ -10,7 +10,7 @@
 
 use polars::prelude::{DataFrame, DataType, IntoLazy};
 
-use crate::catalog::{self, Argument, Build, DefaultValue, Entry, Kind, ParameterDefault};
+use crate::catalog::{self, Argument, Build, DefaultValue, Dtypes, Entry, Kind, ParameterDefault};
 
 use super::context::Context;
 use super::dtype::Representative;
@@ -174,7 +174,18 @@ pub fn fit(candidate: &Candidate, slot: &Slot<'_>) -> Option<Fit> {
                 verdict: found,
             });
         }
-        verdict = Some(found);
+        // A number typed without a dtype adapts to what the method follows, so what the call
+        // gives is not what the tables say of a column of the number's own dtype, unless the
+        // number counts rows.
+        verdict = Some(match (found, candidate) {
+            (Verdict::Allowed(allowance), Candidate::Literal(literal))
+                if !(matches!(literal, Literal::Integer(_))
+                    && is_count(argument.entry, argument.parameter)) =>
+            {
+                Verdict::Allowed(allowance.without_result())
+            }
+            (other, _) => other,
+        });
     }
     if let Some(context) = slot.context {
         let place = Place::new(context, After::Start);
@@ -189,6 +200,15 @@ pub fn fit(candidate: &Candidate, slot: &Slot<'_>) -> Option<Fit> {
         verdict = Some(found);
     }
     verdict.map(|verdict| Fit { dtype, verdict })
+}
+
+/// Whether the parameter `name` of `entry` counts or indexes, which a whole
+/// number is the dtype of whatever it adapts to: `shift`'s rows.
+pub(crate) fn is_count(entry: &Entry, name: &str) -> bool {
+    entry.parameters().iter().any(|parameter| {
+        parameter.name() == name
+            && matches!(parameter.kind(), Kind::Expression(dtypes) if dtypes == [Dtypes::Integer])
+    })
 }
 
 /// What an argument is given when a method is added, if its first parameter

@@ -269,6 +269,14 @@ pub struct Allowance {
 }
 
 impl Allowance {
+    /// The same allowance with no dtype for the result, where the argument that
+    /// was judged adapts to what it follows and the tables, measured with typed
+    /// columns, cannot say what the call gives.
+    pub(super) fn without_result(mut self) -> Self {
+        self.result = None;
+        self
+    }
+
     /// The dtype the chain has after the entry. `None` where it is not known
     /// from the entry: a start takes the dtype of a column or of a group, and
     /// a method that takes an argument gives a dtype the argument decides.

@@ -36,6 +36,7 @@ mod table;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use candidates::is_count;
 pub use candidates::{
     ArgumentSlot, Candidate, DefaultArgument, Fit, Literal, OptionOffer, OptionWord, Slot,
     default_argument, fit, option_offers,
