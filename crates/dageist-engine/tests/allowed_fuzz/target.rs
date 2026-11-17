@@ -15,7 +15,7 @@ use super::generate::generate;
 use super::limits::{excuses, strict};
 use super::observe::{Observed, Seen, observe};
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
-use super::probe::{Settled, settle};
+use super::probe::{Settled, settle, settle_on_a_value};
 use super::reduce::candidates;
 
 /// The named rules that are stricter than Polars by design, each with why. A
@@ -140,8 +140,16 @@ pub fn describe(case: &Case) -> String {
             )
         },
     );
+    let excused = excuses(case, &prediction, &observed);
+    // The order the case is judged in: the part as written, then the limits, then
+    // the refused call on a value.
     let probed = match (&prediction.verdict, &observed.refusal) {
-        (Verdict::Refuses(refused), None) => probe_of(case, refused),
+        (Verdict::Refuses(refused), None) => probe_of(case, refused).or_else(|| {
+            excused
+                .is_empty()
+                .then(|| probe_on_a_value(case, refused, &prediction, &observed))
+                .flatten()
+        }),
         _ => None,
     }
     .map_or_else(String::new, |settled| {
@@ -150,10 +158,7 @@ pub fn describe(case: &Case) -> String {
             settled.probe, settled.reason
         )
     });
-    let limits: Vec<&str> = excuses(case, &prediction, &observed)
-        .iter()
-        .map(|limit| limit.slug())
-        .collect();
+    let limits: Vec<&str> = excused.iter().map(|limit| limit.slug()).collect();
     format!(
         "{predicted}\n{done}{probed}\nexcused by: {}",
         if limits.is_empty() {
@@ -164,8 +169,8 @@ pub fn describe(case: &Case) -> String {
     )
 }
 
-/// What a probe of the part the tables refuse shows, unless the limits are held
-/// to everything.
+/// What a probe of the part the tables refuse, as it is written, shows, unless
+/// the limits are held to everything.
 fn probe_of(case: &Case, refused: &Refused) -> Option<Settled> {
     if strict() {
         return None;
@@ -173,10 +178,24 @@ fn probe_of(case: &Case, refused: &Refused) -> Option<Settled> {
     settle(case, refused)
 }
 
+/// What a probe of the refused call on a value of the dtype that reaches it
+/// shows, unless the limits are held to everything.
+fn probe_on_a_value(
+    case: &Case,
+    refused: &Refused,
+    prediction: &Prediction,
+    observed: &Observed,
+) -> Option<Settled> {
+    if strict() {
+        return None;
+    }
+    settle_on_a_value(case, refused, prediction, observed)
+}
+
 /// The outcome of a case where the tables refuse a part Polars does not
-/// evaluate, and the probe of the part shows the tables right.
-fn stricter(case: &Case, refused: &Refused, what: &str) -> Option<Result<CaseOutcome>> {
-    let settled = probe_of(case, refused)?;
+/// evaluate, and the probe `settled` of the part shows the tables right.
+fn stricter(settled: Option<Settled>, what: &str) -> Option<Result<CaseOutcome>> {
+    let settled = settled?;
     tally(format!("{STRICTER_WHERE_UNEVALUATED}: {what}"));
     Some(CaseOutcome::expected_rejection(
         Vec::new(),
@@ -382,13 +401,23 @@ impl CaseTarget for AllowedTarget {
             }
             Verdict::Refuses(refused) => match (refused.source.clone(), allowed_by_polars) {
                 (Source::Polars, true) => {
-                    if let Some(outcome) = stricter(case, &refused, &reason_slug(&refused.reason)) {
+                    let why = reason_slug(&refused.reason);
+                    // What Polars refuses of the part as written shows the tables
+                    // right where it skips the part; the limits then say what it
+                    // evaluates and accepts; what is left is asked of the refused
+                    // call on a value.
+                    if let Some(outcome) = stricter(probe_of(case, &refused), &why) {
                         return outcome;
                     }
                     if let Some(outcome) = excused("refused, Polars allows") {
                         return outcome;
                     }
-                    let why = reason_slug(&refused.reason);
+                    if let Some(outcome) = stricter(
+                        probe_on_a_value(case, &refused, &prediction, &observed),
+                        &why,
+                    ) {
+                        return outcome;
+                    }
                     return failure(
                         ALLOWANCE,
                         &format!("refused-but-allowed-{why}"),
@@ -407,7 +436,7 @@ impl CaseTarget for AllowedTarget {
                     else {
                         // Polars does not evaluate everything: a probe of the part
                         // says whether the rule is right where it does.
-                        if let Some(outcome) = stricter(case, &refused, rule) {
+                        if let Some(outcome) = stricter(probe_of(case, &refused), rule) {
                             return outcome;
                         }
                         return failure(
@@ -460,5 +489,37 @@ impl CaseTarget for AllowedTarget {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use dageist_engine::allowed::Representative;
+
+    use super::*;
+
+    #[test]
+    fn a_wrong_prediction_of_the_dtype_before_the_refused_call_is_a_disagreement() {
+        // A probe stands a value in for what reaches the refused call, so a
+        // wrong prediction of that dtype must not be hidden by it: it is found
+        // as a difference of the dtypes of the case itself, whatever is probed.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+            "tests/allowed_fuzz/regressions/stricter-a-window-over-the-length-of-a-literal.case",
+        );
+        let case = Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case");
+        let observed = observe(&case);
+        let right = predict(&case);
+        assert_eq!(dtype_difference(&case, &right, &observed), None);
+        let mut wrong = right.clone();
+        for traced in &mut wrong.expressions {
+            for held in &mut traced.links {
+                // The comparison gives a `Boolean`; say it gives whole numbers.
+                if *held == Some(Representative::Boolean) {
+                    *held = Some(Representative::Int64);
+                }
+            }
+        }
+        let difference = dtype_difference(&case, &wrong, &observed).expect("a difference");
+        assert!(difference.contains("Polars gives"), "{difference}");
     }
 }

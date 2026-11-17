@@ -46,12 +46,11 @@ pub enum Limit {
     /// the case are what gate it; the tables refusing is placed, inside an
     /// expression that holds an `explode`.
     AnExplodeChangesTheLengths,
-    /// A literal's length over a window is a constant to Polars, which does not
-    /// evaluate what follows a comparison of a value with it. A literal is one
-    /// value, which Polars broadcasts and casts as it does not a column: it accepts a text compared with a typed number, or a
-    /// window over a constant, where a column of the dtype is refused, and joins
-    /// it with a column of other length. The tables measure an argument as a
-    /// column of the dtype, except the values of `shift` and a pivot's group.
+    /// A literal is one value, which Polars broadcasts and casts as it does not a
+    /// column: it accepts a text compared with a typed number, or a window over a
+    /// constant, where a column of the dtype is refused, and joins it with a
+    /// column of other length. The tables measure an argument as a column of the
+    /// dtype, except the values of `shift` and a pivot's group.
     ALiteral,
     /// A pivot's aggregate is run on the values of each group, not on a
     /// column in `select`, and Polars uses other kernels for them: it takes the
@@ -79,16 +78,18 @@ pub enum Limit {
     /// place, in a case whose join key holds a comparison with a null literal at
     /// any depth.
     ANullComparisonInAKey,
-    /// A shift that fills nothing leaves nulls, and Polars does not meet a call
-    /// with a dtype that the tables refuse when they run rows where what it
-    /// follows or is given is only nulls: shifts that total the sample's three
-    /// rows or more, an aggregate that leaves one value which a shift moves away,
-    /// the first of what a shift moved and the first value of that, which is
-    /// null too, and a running sum of a comparison with a null, which Polars
-    /// gives as a column of nulls. A comparison of a list with
-    /// a `Boolean` is refused after none, one or two shifts and allowed after
-    /// three. The tables refusing, when they run rows, at a call that follows such
-    /// a chain or is given one.
+    /// The tables ran every call on columns that hold values, so what Polars does
+    /// with a call that has only nulls to meet was not measured: it does not meet
+    /// the dtype that the tables refuse when they run rows. A shift that fills
+    /// nothing leaves nulls, and the sample's three rows decide how many: shifts
+    /// that total three rows or more, an aggregate that leaves one value which a
+    /// shift moves away, the first of what a shift moved and the first value of
+    /// that, which is null too, and the last of it where the sample has its null.
+    /// A comparison of a list with a `Boolean` is refused after none, one or two
+    /// shifts and allowed after three. The tables refusing, when they run rows, at
+    /// a call that follows such a chain or is given one. Nulls that Polars folds
+    /// whatever the rows are, as those of a comparison with a null, are no matter
+    /// of the sample: a probe settles them.
     AShiftThatLeavesNulls,
     /// Whether values of different lengths combine, as the lists of two rows
     /// do not, depends on the rows, which the tables measured on one sample.
@@ -656,26 +657,11 @@ fn shift_rows(link: &Call) -> i64 {
 
 /// Whether `links`, taken from the sample, leave only nulls: shifts that move all
 /// its rows, or one value, which an aggregate leaves, shifted away, or the first
-/// row that a shift left null, the first value of rows that are all null, the
-/// last row where the sample has a null in it, or a running sum of a comparison
-/// with a null, which Polars gives as a column of nulls.
+/// row that a shift left null, the first value of rows that are all null, or the
+/// last row where the sample has a null in it.
 fn leaves_only_nulls(links: &[Call]) -> bool {
     let (mut rows, mut shifted) = (SAMPLE_ROWS, 0);
-    let mut compared_with_a_null = false;
     for link in links {
-        compared_with_a_null |= [
-            "Expr.eq", "Expr.ne", "Expr.gt", "Expr.ge", "Expr.lt", "Expr.le",
-        ]
-        .contains(&link.entry().id().as_str())
-            && operands(link).into_iter().any(|(_, operand)| {
-                operand.links().is_empty()
-                    && matches!(operand.start(), Start::Call(start)
-                        if is(start, "polars.lit")
-                            && matches!(start.argument("value"), Some(Value::Flag(None))))
-            });
-        if is(link, "Expr.cum_sum") && compared_with_a_null {
-            shifted = rows;
-        }
         shifted += shift_rows(link);
         if is(link, "Expr.first") {
             // A first takes the first row, which a shift left null; a first that
@@ -699,34 +685,6 @@ fn leaves_only_nulls(links: &[Call]) -> bool {
         }
     }
     shifted >= rows
-}
-
-/// Whether the refused call follows a comparison of a value with the length of a
-/// literal over a window, which Polars takes for a constant: it does not evaluate
-/// what follows, where the tables refuse it when they run rows. The value is one
-/// value, as an aggregate is; a sum, a window by a column and no window are
-/// evaluated.
-fn after_a_constant_window(locus: &Locus, refused: &Refused) -> bool {
-    let length_over_a_window = |operand: &Expression| {
-        starts_from_a_literal(operand)
-            && links_where(operand, &|link| is(link, "Expr.len"))
-                .first()
-                .is_some_and(|len| {
-                    links_where(operand, &|link| is(link, "Expr.over"))
-                        .first()
-                        .is_some_and(|over| over > len)
-                })
-            && wholly_single(operand, operand.links().len(), true)
-    };
-    refused.stage == Some(TableStage::Rows)
-        && locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
-            (0..at.min(chain.links().len())).any(|compared| {
-                operands(&chain.links()[compared])
-                    .into_iter()
-                    .any(|(_, operand)| length_over_a_window(operand))
-                    && wholly_single(chain, compared, true)
-            })
-        })
 }
 
 /// Whether the limit is why the tables and Polars disagree.
@@ -777,10 +735,7 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
                     .any(|(holder, reach)| {
                         matches!(reach, Reach::Operand(_)) && starts_from_a_literal(holder)
                     });
-            chain_starts
-                || operand
-                || given_to_a_literal
-                || after_a_constant_window(&locus, refused)
+            chain_starts || operand || given_to_a_literal
         }
         (Limit::AGroupAggregate, Disagreement::PolarsRefuses(refusal)) => {
             // A table with no rows has no groups, and the values of an

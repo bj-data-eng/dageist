@@ -19,6 +19,8 @@ use polars::prelude::{
 
 /// The name of the connected table a join takes.
 pub const OTHER: &str = "other";
+/// The name of the column a probe stands a value of some dtype in with.
+pub const STAND_IN: &str = "p";
 /// The name of the connected table a pivot takes its columns from.
 pub const ON_COLUMNS: &str = "on_h";
 
@@ -122,6 +124,26 @@ impl Frames {
             other_rows,
             on_columns: DataFrame::new(2, vec![Series::new("h".into(), ["x", "y"]).into()])
                 .expect("a column of two rows"),
+        }
+    }
+
+    /// The same tables with a column of the class `class` added to each, under
+    /// the name [`STAND_IN`]: a value of a dtype that a probe needs where the
+    /// case's own tables have none, which Polars cannot fold as it can a literal.
+    pub fn with_stand_in(self, class: Representative) -> Self {
+        let add = |frame: &DataFrame| {
+            frame
+                .hstack(&[column(class, STAND_IN).into()])
+                .expect("a column of three rows beside columns of three rows")
+        };
+        let rows = add(&self.rows);
+        let other_rows = add(&self.other_rows);
+        Self {
+            empty: rows.clear(),
+            other_empty: other_rows.clear(),
+            rows,
+            other_rows,
+            on_columns: self.on_columns,
         }
     }
 

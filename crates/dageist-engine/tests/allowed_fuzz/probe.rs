@@ -13,14 +13,16 @@
 //! evaluate the part; when it allows it, or refuses it for another reason, the
 //! disagreement is a finding.
 
+use dageist_engine::allowed::Representative;
 use dageist_engine::catalog;
 use dageist_engine::document::{
     Call, Document, Expression, Place, Segment, Start, Step, StepId, Value,
 };
 
 use super::case::{Case, STEP};
-use super::observe::{Refusal, observe_probe};
-use super::predict::{Refused, Source};
+use super::frames::STAND_IN;
+use super::observe::{Observed, Refusal, Seen, Tables, observe_probe};
+use super::predict::{Prediction, Refused, Source};
 
 /// What a probe found: the document it ran, and why Polars refused it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -302,6 +304,14 @@ fn same_reason(source: &Source, tables: &str, probe: &str) -> bool {
     }
 }
 
+/// The tables a probe of the part runs on.
+fn tables_of(found: &Found, stand_in: Option<Representative>) -> Tables {
+    Tables {
+        other_as_left: found.on_the_other_table,
+        stand_in,
+    }
+}
+
 /// A probe: the part to evaluate, and where in it Polars' refusal may lie.
 struct Probe {
     part: Expression,
@@ -409,7 +419,7 @@ pub fn settle(case: &Case, refused: &Refused) -> Option<Settled> {
         })
     };
     let probed = run(probe.part, probe.filter)?;
-    let refusal = observe_probe(&probed, found.on_the_other_table).refusal?;
+    let refusal = observe_probe(&probed, tables_of(&found, None)).refusal?;
     if !same_reason(&refused.source, &refused.reason, &refusal.reason)
         || !lies_at(&refusal, &probe.at)
     {
@@ -417,7 +427,7 @@ pub fn settle(case: &Case, refused: &Refused) -> Option<Settled> {
     }
     if let Some(before) = probe.before {
         let alone = run(before, false)?;
-        let earlier = observe_probe(&alone, found.on_the_other_table).refusal;
+        let earlier = observe_probe(&alone, tables_of(&found, None)).refusal;
         if earlier
             .is_some_and(|earlier| same_reason(&refused.source, &refused.reason, &earlier.reason))
         {
@@ -428,6 +438,92 @@ pub fn settle(case: &Case, refused: &Refused) -> Option<Settled> {
         probe: probed.document.write(),
         reason: refusal.reason,
     })
+}
+
+/// The class of the dtype that reaches the call at `link` of the expression at
+/// `held`, which Polars gave it when it ran the case and the tables predicted:
+/// the tables' dtype is not trusted where Polars' is not the same, for then the
+/// case is a disagreement about the dtype, not a part Polars skips.
+fn dtype_reaching(
+    held: &Place,
+    link: usize,
+    predicted: &Prediction,
+    observed: &Observed,
+) -> Option<Representative> {
+    let seen = observed
+        .expressions
+        .iter()
+        .find(|seen| seen.place == *held)?;
+    let traced = predicted
+        .expressions
+        .iter()
+        .find(|traced| traced.place == *held)?;
+    let (found, said) = match link.checked_sub(1) {
+        None => (&seen.start, traced.start),
+        Some(before) => (seen.links.get(before)?, *traced.links.get(before)?),
+    };
+    match found {
+        Seen::Dtype(_, _, Some(class)) if Some(*class) == said => Some(*class),
+        _ => None,
+    }
+}
+
+/// Asks Polars about the call the tables refused where it cannot be asked
+/// as it is written: the chain before it may give a constant, or a column of
+/// nulls, however the rows are, and Polars then does not evaluate the call. The
+/// probe selects the refused call, with its arguments as written, on a column
+/// of the dtype that Polars gave what reaches it, which is a value Polars cannot
+/// fold. The dtype is Polars' own as well as the tables': a wrong prediction of
+/// it is a disagreement of the dtypes, found before anything is probed.
+///
+/// What this shows is that the tables are right about the call, not that Polars
+/// skipped it: a call that Polars evaluates and accepts, as one that a literal
+/// broadcasts or a null that the sample's rows leave, is a limit's, which is
+/// asked first. `None` when there is nothing to ask, Polars allows the probe,
+/// or it refuses it for another reason or not at the call.
+pub fn settle_on_a_value(
+    case: &Case,
+    refused: &Refused,
+    predicted: &Prediction,
+    observed: &Observed,
+) -> Option<Settled> {
+    if !matches!(refused.source, Source::Polars) {
+        return None;
+    }
+    let found = find(case, &refused.place)?;
+    let [Segment::Link(link)] = found.rest else {
+        return None;
+    };
+    if found.in_the_aggregate {
+        return None;
+    }
+    let consumed = refused.place.path().len() - found.rest.len();
+    let held = refused.place.path()[..consumed]
+        .iter()
+        .cloned()
+        .fold(Place::of_step(0, StepId::new(STEP).ok()), Place::then);
+    let class = dtype_reaching(&held, *link, predicted, observed)?;
+    let name = call(
+        "polars.col",
+        vec![("name", Value::Columns(vec![STAND_IN.to_owned()]))],
+    )?;
+    let part = Expression::new(
+        Start::Call(name),
+        vec![found.expression.links().get(*link)?.clone()],
+    )
+    .ok()?;
+    let probed = Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        document: document_of(case, &found, part, false)?,
+    };
+    let refusal = observe_probe(&probed, tables_of(&found, Some(class))).refusal?;
+    let at = place_of_the_part(&found, false).then(Segment::Link(0));
+    (same_reason(&refused.source, &refused.reason, &refusal.reason) && lies_at(&refusal, &[at]))
+        .then(|| Settled {
+            probe: probed.document.write(),
+            reason: refusal.reason,
+        })
 }
 
 /// The predicate a rule refused: the whole expression at its place.
@@ -444,6 +540,7 @@ mod tests {
     use dageist_engine::catalog;
     use dageist_engine::document::{Place, Segment, StepId};
 
+    use super::super::observe::observe;
     use super::super::predict::{Source, Verdict, predict};
     use super::*;
 
@@ -596,7 +693,7 @@ mod tests {
             &["Expr.dt.total_days", "Expr.dt.total_days"],
         );
         let first = chain_of("Boolean", "a", &["Expr.dt.total_days"]);
-        let reason = observe_probe(&first, false)
+        let reason = observe_probe(&first, Tables::default())
             .refusal
             .expect("Polars refuses the days of a Boolean")
             .reason;
@@ -616,6 +713,96 @@ mod tests {
             "could not evaluate '<' comparison between series 'a' of dtype: Boolean and series 'b' of dtype: Date",
             "could not evaluate '>' comparison between series 'a' of dtype: Boolean and series 'b' of dtype: Date"
         ));
+    }
+
+    /// What the tables predict and Polars gives of the case, to settle it on a
+    /// value.
+    fn on_a_value(case: &Case, refused: &Refused) -> Option<Settled> {
+        settle_on_a_value(case, refused, &predict(case), &observe(case))
+    }
+
+    #[test]
+    fn a_call_after_a_part_that_polars_folds_is_refused_on_a_value_of_its_dtype() {
+        // `a.min() <= 1.len().over(order_by=[true])` then `.total_days()`: Polars
+        // does not evaluate the call as written, and the probe as written is
+        // allowed. On a `Boolean` column, which is what reaches the call, it is
+        // refused for the tables' reason.
+        let name = "stricter-a-window-over-the-length-of-a-literal.case";
+        let case = kept(name);
+        let refused = refusal(&case);
+        assert_eq!(settle(&case, &refused), None);
+        let found =
+            on_a_value(&case, &refused).expect("a probe that Polars refuses as the tables do");
+        assert!(
+            found.probe.contains("\"columns\":[\"p\"]"),
+            "{}",
+            found.probe
+        );
+        assert!(!found.probe.contains("Expr.min"), "{}", found.probe);
+        assert!(found.reason.contains("Duration"), "{}", found.reason);
+    }
+
+    #[test]
+    fn a_running_sum_of_a_comparison_with_a_null_is_refused_on_a_value_of_its_dtype() {
+        let case = kept("stricter-a-running-sum-of-a-null-comparison.case");
+        let refused = refusal(&case);
+        assert_eq!(settle(&case, &refused), None);
+        let found =
+            on_a_value(&case, &refused).expect("a probe that Polars refuses as the tables do");
+        assert!(found.reason.contains("struct"), "{}", found.reason);
+    }
+
+    #[test]
+    fn a_value_of_another_dtype_than_the_tables_predict_settles_nothing() {
+        // The probe takes the dtype that reaches the call from Polars and the
+        // tables together: where they differ it asks nothing, and the case is a
+        // disagreement about the dtype, which the target finds first.
+        let case = kept("stricter-a-window-over-the-length-of-a-literal.case");
+        let refused = refusal(&case);
+        let mut wrong = predict(&case);
+        for traced in &mut wrong.expressions {
+            for held in &mut traced.links {
+                *held = held.map(|_| Representative::Int64);
+            }
+        }
+        assert_eq!(
+            settle_on_a_value(&case, &refused, &wrong, &observe(&case)),
+            None
+        );
+        let mut unknown = predict(&case);
+        for traced in &mut unknown.expressions {
+            traced.links.iter_mut().for_each(|held| *held = None);
+        }
+        assert_eq!(
+            settle_on_a_value(&case, &refused, &unknown, &observe(&case)),
+            None
+        );
+    }
+
+    #[test]
+    fn a_value_that_polars_allows_the_call_for_settles_nothing() {
+        // `a.cum_sum()` of whole numbers is allowed, though the tables are said to
+        // refuse it, and so is the running sum of a column of whole numbers.
+        let case = cum_sum_of("Int64");
+        let refused = refused_at_the_link("`cum_sum` operation not supported for dtype `i64`");
+        assert_eq!(on_a_value(&case, &refused), None);
+    }
+
+    #[test]
+    fn a_value_that_polars_refuses_the_call_for_another_reason_settles_nothing() {
+        let case = cum_sum_of("Date");
+        let wrong = refused_at_the_link("cannot compare string with numeric type (u32)");
+        assert_eq!(on_a_value(&case, &wrong), None);
+        let right = refused_at_the_link("`cum_sum` operation not supported for dtype `date`");
+        assert!(on_a_value(&case, &right).is_some());
+    }
+
+    #[test]
+    fn a_rule_is_not_asked_of_a_value() {
+        let case = cum_sum_of("Date");
+        let mut refused = refused_at_the_link("`cum_sum` operation not supported for dtype `date`");
+        refused.source = Source::Rule("condition-predicate-is-boolean");
+        assert_eq!(on_a_value(&case, &refused), None);
     }
 
     #[test]
