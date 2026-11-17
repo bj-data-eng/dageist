@@ -34,6 +34,7 @@
 use dageist_engine::document::{Call, Expression, Place, Segment, Start, Value};
 
 use super::case::Case;
+use super::frames::Frames;
 use dageist_engine::allowed::Stage as TableStage;
 
 use super::observe::{Observed, Refusal, Stage};
@@ -87,7 +88,9 @@ pub enum Limit {
     /// nothing leaves nulls, and the sample's three rows decide how many: shifts
     /// that total three rows or more, an aggregate that leaves one value which a
     /// shift moves away, the first of what a shift moved and the first value of
-    /// that, which is null too, and the last of it where the sample has its null.
+    /// that, which is null too, and the last of it where its column holds a null in the
+    /// row the shifts leave last (the sample's `a` and `b` hold one in the middle
+    /// row, its other columns hold none).
     /// A comparison of a list with a `Boolean` is refused after none, one or two
     /// shifts and allowed after three. The tables refusing, when they run rows, at
     /// a call that follows such a chain or is given one. Nulls that Polars folds
@@ -658,11 +661,30 @@ fn shift_rows(link: &Call) -> i64 {
     }
 }
 
-/// Whether `links`, taken from the sample, leave only nulls: shifts that move all
-/// its rows, or one value, which an aggregate leaves, shifted away, or the first
-/// row that a shift left null, the first value of rows that are all null, or the
-/// last row where the sample has a null in it.
-fn leaves_only_nulls(links: &[Call]) -> bool {
+/// The name of the one column `expression` starts from, when it starts from one.
+fn starting_column(expression: &Expression) -> Option<&str> {
+    match expression.start() {
+        Start::Call(start) if is(start, "polars.col") => match start.argument("name") {
+            Some(Value::Columns(names)) => match names.as_slice() {
+                [name] => Some(name),
+                _ => None,
+            },
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Whether the first `upto` links of `expression`, taken from the sample, leave
+/// only nulls: shifts that move all its rows, or one value, which an aggregate
+/// leaves, shifted away, or the first row that a shift left null, the first value
+/// of rows that are all null, or the last row where the column the chain starts
+/// from holds a null in it (`frames` say which do: the sample's columns hold their
+/// values and a null in the middle, or none). A chain that does not start from one
+/// column of the sample is not known to hold a null anywhere.
+fn leaves_only_nulls(frames: &Frames, expression: &Expression, upto: usize) -> bool {
+    let links = &expression.links()[..upto.min(expression.links().len())];
+    let column = starting_column(expression);
     let (mut rows, mut shifted) = (SAMPLE_ROWS, 0);
     for link in links {
         shifted += shift_rows(link);
@@ -674,13 +696,19 @@ fn leaves_only_nulls(links: &[Call]) -> bool {
             let null = if skips { shifted >= rows } else { shifted >= 1 };
             (rows, shifted) = (1, i64::from(null));
         } else if is(link, "Expr.last") {
-            // The sample's last row is a value and its null is the middle one, so
-            // the last of what a shift moved is null after one shift, or after
-            // all rows are moved.
+            // The last of what a shift moved is the row that the shifts leave last
+            // from the start: null where the column holds a null in it, or after
+            // all rows are moved. After an aggregate it is the one value.
             let null = if rows == 1 {
                 shifted >= 1
             } else {
-                shifted == 1 || shifted >= rows
+                shifted >= rows
+                    || column.is_some_and(|name| {
+                        usize::try_from(rows - 1 - shifted)
+                            .ok()
+                            .and_then(|row| frames.holds_a_null_at(name, row))
+                            .unwrap_or(false)
+                    })
             };
             (rows, shifted) = (1, i64::from(null));
         } else if is_one_value(link) {
@@ -797,15 +825,18 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
         }
         (Limit::AShiftThatLeavesNulls, Disagreement::PolarsAllows(refused)) => {
             let locus = locate(case, &refused.place);
+            let frames = Frames::with_key(case.receiver, case.argument, None);
             // What the call follows, or is given, is only nulls.
             refused.stage == Some(TableStage::Rows)
-                && (locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
-                    leaves_only_nulls(&chain.links()[..at.min(chain.links().len())])
-                }) || locus.call.is_some_and(|call| {
-                    operands(call)
-                        .into_iter()
-                        .any(|(_, operand)| leaves_only_nulls(operand.links()))
-                }))
+                && (locus
+                    .chain
+                    .zip(locus.index)
+                    .is_some_and(|(chain, at)| leaves_only_nulls(&frames, chain, at))
+                    || locus.call.is_some_and(|call| {
+                        operands(call).into_iter().any(|(_, operand)| {
+                            leaves_only_nulls(&frames, operand, operand.links().len())
+                        })
+                    }))
         }
         (Limit::ASingleValueInAKey, Disagreement::PolarsAllows(refused)) => {
             // The key the tables refused is wholly one value.

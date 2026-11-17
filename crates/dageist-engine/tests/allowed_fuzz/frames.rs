@@ -127,6 +127,18 @@ impl Frames {
         }
     }
 
+    /// Whether the column `name` of the left table, or of the other, holds a null
+    /// in the row `row`; `None` for a name that is no column of either, or a row
+    /// that is none.
+    pub fn holds_a_null_at(&self, name: &str, row: usize) -> Option<bool> {
+        let column = self
+            .rows
+            .column(name)
+            .or_else(|_| self.other_rows.column(name))
+            .ok()?;
+        column.is_null().get(row)
+    }
+
     /// The same tables with a column of the class `class` added to each, under
     /// the name [`STAND_IN`]: a value of a dtype that a probe needs where the
     /// case's own tables have none, which Polars cannot fold as it can a literal.
