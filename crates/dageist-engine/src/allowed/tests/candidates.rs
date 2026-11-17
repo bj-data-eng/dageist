@@ -272,23 +272,37 @@ fn a_word_is_refused_for_the_reason_polars_gives_beside_the_options_already_chos
 }
 
 #[test]
-fn a_number_as_the_argument_of_arithmetic_leaves_the_dtype_of_what_it_gives_not_known() {
+fn a_number_that_fits_the_receiver_gives_the_dtype_polars_gives_the_call() {
     // `u8 - 1` is a `UInt8` and `f32 - 1` a `Float32`: the number adapts to the column, where the
-    // tables, measured with a column of its own dtype, would say `Int32` and `Float64`.
+    // tables, measured with a column of its own dtype, would say `Int32` and `Float64`. A number
+    // with a fraction beside whole numbers makes a `Float64`.
     let cases = [
-        (Representative::UInt8, Literal::Integer(1), DataType::UInt8),
+        (
+            Representative::UInt8,
+            Literal::Integer(1),
+            lit(1_i64),
+            DataType::UInt8,
+        ),
         (
             Representative::Float32,
             Literal::Integer(1),
+            lit(1_i64),
             DataType::Float32,
         ),
         (
             Representative::Float32,
             Literal::Float(1.5),
+            lit(1.5_f64),
             DataType::Float32,
         ),
+        (
+            Representative::Int8,
+            Literal::Float(1.5),
+            lit(1.5_f64),
+            DataType::Float64,
+        ),
     ];
-    for (receiver, literal, polars) in cases {
+    for (receiver, literal, number, polars) in cases {
         let slot = argument("Expr.sub", "other", receiver);
         let found = fit(&Candidate::Literal(literal.clone()), &slot).expect("a class");
         assert!(
@@ -300,9 +314,69 @@ fn a_number_as_the_argument_of_arithmetic_leaves_the_dtype_of_what_it_gives_not_
             .allowance()
             .and_then(|allowance| allowance.result())
             .and_then(|result| result.class());
-        assert!(
-            said.is_none() || said == Representative::of(&polars),
-            "{literal:?} after {receiver}: {said:?}, Polars gives {polars:?}"
+        let column = polars_dtype_after(receiver, |column| column - number.clone());
+        assert_eq!(column, polars, "what Polars gives");
+        assert_eq!(
+            said,
+            Representative::of(&polars),
+            "{literal:?} after {receiver}"
         );
     }
+}
+
+#[test]
+fn a_comparison_with_a_number_gives_a_boolean_whether_or_not_the_number_fits() {
+    // The result of a comparison does not depend on the dtype of its operand.
+    for (receiver, literal) in [
+        (Representative::UInt8, Literal::Integer(1)),
+        (Representative::UInt8, Literal::Integer(300)),
+        (Representative::UInt8, Literal::Float(1.5)),
+        (Representative::Int64, Literal::Integer(1)),
+    ] {
+        let slot = argument("Expr.gt", "other", receiver);
+        let found = fit(&Candidate::Literal(literal.clone()), &slot).expect("a class");
+        let said = found
+            .verdict()
+            .allowance()
+            .and_then(|allowance| allowance.result())
+            .and_then(|result| result.class());
+        assert_eq!(
+            said,
+            Some(Representative::Boolean),
+            "{literal:?} after {receiver}"
+        );
+    }
+}
+
+#[test]
+fn a_number_that_does_not_fit_the_receiver_leaves_what_arithmetic_gives_not_known() {
+    // Polars widens the column: `u8 - 300` is a `UInt16`, which is not what the tables say of
+    // either dtype the number could take.
+    let slot = argument("Expr.sub", "other", Representative::UInt8);
+    let found = fit(&Candidate::Literal(Literal::Integer(300)), &slot).expect("a class");
+    assert!(found.verdict().is_allowed(), "{found:?}");
+    let said = found
+        .verdict()
+        .allowance()
+        .and_then(|allowance| allowance.result());
+    assert!(said.is_none(), "{said:?}");
+    assert_eq!(
+        polars_dtype_after(Representative::UInt8, |column| column - lit(300_i64)),
+        DataType::UInt16
+    );
+}
+
+/// The dtype Polars gives `build` of a column of `receiver`.
+fn polars_dtype_after(
+    receiver: Representative,
+    build: impl FnOnce(polars::prelude::Expr) -> polars::prelude::Expr,
+) -> DataType {
+    use polars::prelude::{DataFrame, Field, Schema, col};
+    let schema = Schema::from_iter([Field::new("a".into(), receiver.dtype())]);
+    let schema = DataFrame::empty_with_schema(&schema)
+        .lazy()
+        .select([build(col("a"))])
+        .collect_schema()
+        .expect("Polars resolves it");
+    schema.iter().next().expect("one column").1.clone()
 }

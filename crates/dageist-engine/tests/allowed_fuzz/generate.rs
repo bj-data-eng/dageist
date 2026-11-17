@@ -487,9 +487,22 @@ impl Gen<'_> {
     fn literal_loose(&mut self) -> (Call, Option<Representative>) {
         match self.draw.below(if self.untyped_numbers { 5 } else { 3 }) {
             // A number typed without a dtype adapts to the operand it is used with, which the
-            // tables, measured with typed columns, cannot say: its class is not known.
-            3 => (call("polars.lit", vec![("value", Value::Integer(1))]), None),
-            4 => (call("polars.lit", vec![("value", Value::Float(1.5))]), None),
+            // tables, measured with typed columns, cannot say: its class is not known. The
+            // numbers are ones that fit a narrow column and ones that do not.
+            3 => {
+                let number = self.draw.pick(&[1_i64, 1, 300, -1, 70_000]);
+                (
+                    call("polars.lit", vec![("value", Value::Integer(number))]),
+                    None,
+                )
+            }
+            4 => {
+                let number = self.draw.pick(&[1.5_f64, 1.5, 1e40]);
+                (
+                    call("polars.lit", vec![("value", Value::Float(number))]),
+                    None,
+                )
+            }
             0 => (
                 call(
                     "polars.lit",
