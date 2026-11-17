@@ -909,6 +909,9 @@ impl Gen<'_> {
         let id = entry.id().as_str();
         let mut given: Vec<(&'static str, Value)> = Vec::new();
         let mut dtypes: Vec<(String, Option<Representative>)> = Vec::new();
+        // Whether a window is given `partition_by`, which Polars takes without
+        // `order_by` and `order_by` without it, and refuses neither.
+        let mut partitioned = true;
         for parameter in entry.parameters() {
             if !matches!(parameter.kind(), Kind::Expression(_)) {
                 continue;
@@ -917,9 +920,14 @@ impl Gen<'_> {
             let required = parameter.default() == ParameterDefault::Required;
             let given_it = match (id, name) {
                 (_, _) if required => true,
-                ("Expr.over", "partition_by") => true,
-                ("Expr.over", "order_by") => self.draw.chance(35),
-                ("Expr.over", "more_exprs") => self.draw.chance(6),
+                ("Expr.over", "partition_by") => {
+                    partitioned = self.draw.chance(80);
+                    partitioned
+                }
+                // A window that is not partitioned is ordered, and `*more_exprs`
+                // extends `partition_by` and means nothing without it.
+                ("Expr.over", "order_by") => !partitioned || self.draw.chance(35),
+                ("Expr.over", "more_exprs") => partitioned && self.draw.chance(6),
                 _ => self.draw.chance(30),
             };
             if !given_it {
