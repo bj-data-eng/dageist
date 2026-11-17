@@ -962,8 +962,9 @@ mod tests {
         assert!(!found.probe.contains("Expr.last"), "{}", found.probe);
     }
 
-    /// A join of `key` with the right key `rk` followed by `link`.
-    fn join_with_right_key(link: &str) -> Case {
+    /// A join of `key` with the right key `rk` followed by `links`.
+    fn join_with_right_key(links: &[&str]) -> Case {
+        let link = links.join("\",\"arguments\":{}},{\"entry\":\"");
         let text = format!(
             "{{\"a\":\"Int64\",\"b\":\"Int64\",\"revision\":1}}\n{{\"version\":1,\"steps\":[{{\"id\":\"s\",\"call\":{{\"entry\":\"LazyFrame.join\",\"arguments\":{{\"other\":{{\"table\":\"other\"}},\"left_on\":{{\"many\":[{{\"expression\":{{\"start\":{{\"entry\":\"polars.col\",\"arguments\":{{\"name\":{{\"columns\":[\"key\"]}}}}}},\"then\":[]}}}}]}},\"right_on\":{{\"many\":[{{\"expression\":{{\"start\":{{\"entry\":\"polars.col\",\"arguments\":{{\"name\":{{\"columns\":[\"rk\"]}}}}}},\"then\":[{{\"entry\":\"{link}\",\"arguments\":{{}}}}]}}}}]}}}}}}}}]}}"
         );
@@ -971,10 +972,14 @@ mod tests {
     }
 
     fn refused_in_the_right_key(reason: &str) -> Refused {
+        refused_in_the_right_key_at(0, reason)
+    }
+
+    fn refused_in_the_right_key_at(link: usize, reason: &str) -> Refused {
         let place = Place::of_step(0, Some(StepId::new("s").expect("an identifier")))
             .then(Segment::Parameter("right_on".to_owned()))
             .then(Segment::Item(0))
-            .then(Segment::Link(0));
+            .then(Segment::Link(link));
         Refused {
             source: Source::Polars,
             at: place.to_string(),
@@ -990,13 +995,28 @@ mod tests {
         // refusal the tables are said to give is not shown. A running sum is not
         // elementwise, and is refused as the tables say.
         let reason = "all join key expressions must be elementwise.";
-        let elementwise = join_with_right_key("Expr.is_null");
+        let elementwise = join_with_right_key(&["Expr.is_null"]);
         assert_eq!(
             settle_as_a_key(&elementwise, &refused_in_the_right_key(reason)),
             None
         );
-        let running = join_with_right_key("Expr.cum_sum");
+        let running = join_with_right_key(&["Expr.cum_sum"]);
         assert!(settle_as_a_key(&running, &refused_in_the_right_key(reason)).is_some());
+    }
+
+    #[test]
+    fn a_key_refused_before_the_refused_call_settles_nothing() {
+        // `rk.cum_sum().is_null()`: the running sum is not elementwise, so the key
+        // is refused as the tables say, but not at `is_null`: what comes before it is
+        // refused alone for the same reason, so the refused call is not why.
+        let reason = "all join key expressions must be elementwise.";
+        let case = join_with_right_key(&["Expr.cum_sum", "Expr.is_null"]);
+        assert_eq!(
+            settle_as_a_key(&case, &refused_in_the_right_key_at(1, reason)),
+            None
+        );
+        // At the running sum itself it is the cause.
+        assert!(settle_as_a_key(&case, &refused_in_the_right_key_at(0, reason)).is_some());
     }
 
     #[test]
