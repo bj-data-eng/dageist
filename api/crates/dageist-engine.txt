@@ -14,6 +14,8 @@ pub dageist_engine::allowed::ConditionState::ChainedThen
 pub dageist_engine::allowed::ConditionState::ChainedWhen
 pub dageist_engine::allowed::ConditionState::Then
 pub dageist_engine::allowed::ConditionState::When
+impl dageist_engine::allowed::ConditionState
+pub const dageist_engine::allowed::ConditionState::ALL: [Self; 4]
 pub enum dageist_engine::allowed::Ending
 pub dageist_engine::allowed::Ending::Allowed
 pub dageist_engine::allowed::Ending::NotKnown(dageist_engine::allowed::Unknown)
@@ -107,11 +109,14 @@ pub fn dageist_engine::allowed::Rule::fmt(&self, formatter: &mut core::fmt::Form
 pub enum dageist_engine::allowed::Shape
 pub dageist_engine::allowed::Shape::Many
 pub dageist_engine::allowed::Shape::One
+impl dageist_engine::allowed::Shape
+pub const dageist_engine::allowed::Shape::ALL: [Self; 2]
 pub enum dageist_engine::allowed::Stage
 pub dageist_engine::allowed::Stage::Empty
 pub dageist_engine::allowed::Stage::Rows
 pub dageist_engine::allowed::Stage::Schema
 impl dageist_engine::allowed::Stage
+pub const dageist_engine::allowed::Stage::ALL: [Self; 3]
 pub const fn dageist_engine::allowed::Stage::name(self) -> &'static str
 pub enum dageist_engine::allowed::Unknown
 pub dageist_engine::allowed::Unknown::TheResultsDtype
@@ -189,6 +194,8 @@ pub dageist_engine::catalog::Applies::Condition
 pub dageist_engine::catalog::Applies::Expression
 pub dageist_engine::catalog::Applies::Frame
 pub dageist_engine::catalog::Applies::Function
+impl dageist_engine::catalog::Applies
+pub const dageist_engine::catalog::Applies::ALL: [Self; 4]
 pub enum dageist_engine::catalog::Argument
 pub dageist_engine::catalog::Argument::Choice(alloc::string::String)
 pub dageist_engine::catalog::Argument::Columns(alloc::vec::Vec<alloc::string::String>)
@@ -319,6 +326,8 @@ pub dageist_engine::catalog::ValueType::Date
 pub dageist_engine::catalog::ValueType::Float
 pub dageist_engine::catalog::ValueType::Integer
 pub dageist_engine::catalog::ValueType::String
+impl dageist_engine::catalog::ValueType
+pub const dageist_engine::catalog::ValueType::ALL: [Self; 5]
 pub enum dageist_engine::catalog::WordsError
 pub dageist_engine::catalog::WordsError::Missing
 pub dageist_engine::catalog::WordsError::Missing::path: alloc::string::String
