@@ -223,6 +223,40 @@ describe('the requests the editor gives the host', () => {
     expect(calls.map((call) => call.request)).toEqual(['a', 'a']);
   });
 
+  it('ask again after a failure while the request is still the newest, and deliver what then comes', async () => {
+    const { latest, clock, calls, delivered } = setup();
+    latest.submit('a');
+    clock.advance(100);
+    calls[0]?.fail('the host was not there');
+    await settled();
+
+    // Nothing has changed, and the host may be there now.
+    clock.advance(60_000);
+    expect(calls.map((call) => call.request)).toEqual(['a', 'a']);
+    calls[1]?.answer('A');
+    await settled();
+
+    expect(delivered).toHaveLength(2);
+    expect(delivered[0]?.outcome.ok).toBe(false);
+    expect(delivered[1]).toEqual({ request: 'a', outcome: { ok: true, answer: 'A' } });
+  });
+
+  it('do not ask again after a failure once a newer request has replaced the request', async () => {
+    const { latest, clock, calls } = setup();
+    latest.submit('a');
+    clock.advance(100);
+    calls[0]?.fail('the host was not there');
+    await settled();
+    latest.submit('b');
+    clock.advance(100);
+    calls[1]?.answer('B');
+    await settled();
+
+    clock.advance(60_000);
+
+    expect(calls.map((call) => call.request)).toEqual(['a', 'b']);
+  });
+
   it('send and deliver nothing once stopped', async () => {
     const { latest, clock, calls, delivered } = setup();
     latest.submit('a');
