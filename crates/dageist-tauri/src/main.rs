@@ -8,6 +8,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod catalogue;
+mod identity;
 mod node;
 mod report;
 mod sample_table;
@@ -15,33 +16,13 @@ mod sample_table;
 mod snapshot;
 mod windows;
 
-use serde::Serialize;
-
-use sample_table::{OpenTable, SampleGate};
-
-/// Identity of the running dageist core, as presented to the view.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-struct IdentityView {
-    name: &'static str,
-    version: &'static str,
-}
-
-/// Reports the identity of the dageist core to the view.
-#[tauri::command]
-fn core_identity() -> IdentityView {
-    IdentityView {
-        name: dageist::crate_name(),
-        version: dageist::crate_version(),
-    }
-}
-
 fn main() {
     tauri::Builder::default()
-        .manage(SampleGate::default())
-        .manage(OpenTable::default())
+        .manage(sample_table::SampleGate::default())
+        .manage(sample_table::OpenTable::default())
         .on_window_event(windows::close_with_main)
         .invoke_handler(tauri::generate_handler![
-            core_identity,
+            identity::core_identity,
             catalogue::operation_catalogue,
             node::node_inputs,
             node::run_document,
@@ -53,29 +34,4 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|error| panic!("dageist failed to run: {error}"));
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{IdentityView, core_identity};
-
-    #[test]
-    fn reports_core_identity() {
-        assert_eq!(
-            core_identity(),
-            IdentityView {
-                name: "dageist",
-                version: "0.1.0",
-            }
-        );
-    }
-
-    #[test]
-    fn serializes_identity_for_the_view() {
-        let json = serde_json::to_value(core_identity()).expect("identity serializes");
-        assert_eq!(
-            json,
-            serde_json::json!({ "name": "dageist", "version": "0.1.0" })
-        );
-    }
 }
