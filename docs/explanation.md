@@ -45,6 +45,11 @@ than Python Polars and from other commits, so this is the only way for a step
 to behave in dageist as it does in Python Polars. The release's optimisation
 profile and CPU settings are not copied; they change speed, not results.
 
+Building Polars as the release is built is not all the release does: when the
+Python module loads, it also sets Polars up. [Polars Is Set Up As The Release
+Sets It Up](#polars-is-set-up-as-the-release-sets-it-up) says which parts of that
+the engine does.
+
 Either way the view asks for only the rows and columns near what is on screen,
 and the host passes them through as the raw bytes of an Arrow IPC stream. The
 view decodes those bytes and draws them; it never holds the table.
@@ -52,6 +57,75 @@ view decodes those bytes and draws them; it never holds the table.
 As the product grows, new behavior lands in the core or in crates under
 `crates/` that the core depends on. The host gains a command only when the view
 needs to reach that behavior.
+
+## Polars Is Set Up As The Release Sets It Up
+
+The Python Polars release in `vendor/polars` runs a start-up function when its
+module loads, `register_startup_deps` in
+[on_startup.rs](../vendor/polars/crates/polars-python/src/on_startup.rs). Most of
+it connects Polars to Python. Four parts do not, and without them Polars
+behaves differently in dageist than in the release:
+
+1. **Larger stacks in debug builds.** In a build with debug assertions the
+   release raises the stack sizes of the `recursive` crate, which Polars uses
+   to avoid overflowing the stack on deep plans, because stack frames get very
+   large there. dageist's debug and test builds are debug builds; a build
+   without debug assertions keeps the crate's defaults, as the release does.
+2. **The SQL resolver.** A plan written in SQL is resolved when it is collected,
+   by a resolver that must be registered. Polars registers it itself only when a
+   SQL context is built in the process, and a plan read from text or built
+   elsewhere has none.
+3. **Unknown extension types.** What Polars does with an extension type that
+   nothing registered when it reads one. It loads a generic extension type, or,
+   when the environment variable `POLARS_UNKNOWN_EXTENSION_TYPE_BEHAVIOR` is
+   `load_as_storage`, the storage type. The engine reads the same variable, with
+   the same default.
+4. **The spill-file cleaner.** When Polars' streaming engine spills data to disk
+   it hands the files to a thread that deletes them. The release starts the
+   thread when it loads, which also deletes what a process that ended abnormally
+   left behind, and waits for it to finish when the process exits.
+
+The engine does these in the release's order, once for the process. Every
+engine entry that runs Polars sets Polars up before it runs it, so nothing that
+goes through the engine finds Polars unprepared, however the engine is used.
+The set-up reads its environment variables the first time it runs.
+
+The host also holds a `PolarsSession` from its start to its end. Starting it
+sets Polars up, and dropping it waits for the cleaner to finish, which is the
+flush the release does at exit; holding it in `main` keeps the two together, so
+no caller has to remember a call at the end. That covers the program ending
+normally and a panic unwinding out of `main`. A process that is killed, ended by
+a signal, aborted or ended by `std::process::exit` runs no destructor and does
+not flush. Its spill files stay in a directory named for it under Polars' spill
+directory, and the next start of Polars deletes the directories of processes
+that no longer exist. The bridge ends this way, as it runs until it is
+stopped.
+
+The rest of the release's start-up is left out. Most of it only connects Polars
+to Python, with nothing to connect here: the registries that carry Python
+values in and out of Polars and call Python functions, the warning function
+that goes through Python's `warnings`, allowing extension types for `Object`
+columns that hold Python objects, the name and version of the Python package
+that Polars writes into Parquet files, and registering the flush with Python's
+`atexit`, which the session replaces. Two parts are not about Python and are
+left out for other reasons:
+
+- **The query abort mechanism.** The release hooks `SIGINT` and aborts the
+  running query with a panic that catchers around the Python binding's queries
+  turn into a `KeyboardInterrupt`; the same catchers turn a spill that runs out
+  of disk into an error. The engine has no catchers. Without them a spill that
+  runs out of disk panics as any panic does, and leaving the hook out leaves
+  `SIGINT` to end the process, which is how Ctrl-C stops the bridge. The
+  release's hook would take `SIGINT` over, and with no catcher it would do
+  nothing.
+- **The coloured backtrace printer** behind the `backtrace_filter` feature,
+  which the release's Makefile turns on for development builds of Python
+  Polars and the released wheels do not have.
+
+The engine's [start-up module](../crates/dageist-engine/src/startup.rs) lists
+each part with its reason. When `vendor/polars` moves to a new release, that
+module is checked against the new release's `on_startup.rs`; see
+[Move Polars To A New Release](how-to.md#move-polars-to-a-new-release).
 
 ## The Bridge
 

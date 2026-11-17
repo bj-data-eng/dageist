@@ -170,6 +170,9 @@ polars-lazy = { path = "../../vendor/polars/crates/polars-lazy", default-feature
 ] }
 # The release makes Polars' own allocator the global allocator.
 polars-ooc = { path = "../../vendor/polars/crates/polars-ooc", default-features = false, features = ["fast_alloc"] }
+# Sets the stack sizes the release sets in debug builds. The version Cargo.lock already
+# resolves for Polars, with the features Polars asks it for.
+recursive = "=0.1.1"
 # Reads the language files that give the catalogue its words, into a table; no serde derive.
 # The version Cargo.lock already resolves for the host's build tooling, so it adds no package.
 toml = { version = "=1.2.1", default-features = false, features = ["parse", "serde", "std"] }
