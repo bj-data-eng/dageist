@@ -175,20 +175,35 @@ fn open_stored(
     ParquetTable::open(directory).map(Opened::Stored)
 }
 
-/// Returns the folder in `cache` that holds the sample. Its name carries the
-/// sample's size, so a different size gets its own folder.
-pub fn sample_directory_in(cache: &Path) -> PathBuf {
-    let columns = SampleSpec::CLAIM_COLUMNS.len() + usize::from(SAMPLE.filler_columns);
-    cache.join(format!("claims-{}-keys-{columns}-columns", SAMPLE.keys))
+/// Where the sample table is stored and how big it is.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Sample {
+    directory: PathBuf,
+    spec: SampleSpec,
 }
 
-/// Returns the folder in the application cache that holds the sample.
-fn sample_directory<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, ErrorView> {
-    let cache = app
-        .path()
-        .app_cache_dir()
-        .map_err(|error| ErrorView::new(format!("finding the application cache: {error}")))?;
-    Ok(sample_directory_in(&cache))
+impl Sample {
+    /// The sample table of `spec` kept in `directory`.
+    pub const fn new(directory: PathBuf, spec: SampleSpec) -> Self {
+        Self { directory, spec }
+    }
+
+    /// The sample the application serves, kept in the folder of `cache` that its
+    /// size names, so that a different size gets its own folder.
+    pub fn in_cache(cache: &Path) -> Self {
+        let columns = SampleSpec::CLAIM_COLUMNS.len() + usize::from(SAMPLE.filler_columns);
+        let name = format!("claims-{}-keys-{columns}-columns", SAMPLE.keys);
+        Self::new(cache.join(name), SAMPLE)
+    }
+
+    /// The sample the application serves, kept in its Tauri application cache.
+    fn of_app<R: Runtime>(app: &AppHandle<R>) -> Result<Self, ErrorView> {
+        let cache = app
+            .path()
+            .app_cache_dir()
+            .map_err(|error| ErrorView::new(format!("finding the application cache: {error}")))?;
+        Ok(Self::in_cache(&cache))
+    }
 }
 
 fn show(open: &OpenTable, table: Opened) -> TableView {
@@ -197,15 +212,15 @@ fn show(open: &OpenTable, table: Opened) -> TableView {
     view
 }
 
-/// Opens a working window of `keys` whole keys of the sample table in
-/// `directory`, held in memory, keeps it open in `open` and reports its shape.
-/// A window holds at most `MAX_WINDOW_KEYS`.
+/// Opens a working window of `keys` whole keys of `sample`, held in memory,
+/// keeps it open in `open` and reports its shape. A window holds at most
+/// `MAX_WINDOW_KEYS`.
 ///
-/// The first call generates the sample into `directory`.
+/// The first call generates the sample.
 pub fn sample_window_view(
     gate: &SampleGate,
     open: &OpenTable,
-    directory: &Path,
+    sample: &Sample,
     keys: u32,
 ) -> Result<TableView, ErrorView> {
     if keys > MAX_WINDOW_KEYS {
@@ -213,20 +228,20 @@ pub fn sample_window_view(
             "a working window holds at most {MAX_WINDOW_KEYS} keys"
         )));
     }
-    let table = open_window(gate, directory, SAMPLE, keys)?;
+    let table = open_window(gate, &sample.directory, sample.spec, keys)?;
     Ok(show(open, table))
 }
 
-/// Opens the whole sample table in `directory` where it is stored, without
-/// loading it, keeps it open in `open` and reports its shape.
+/// Opens the whole of `sample` where it is stored, without loading it, keeps
+/// it open in `open` and reports its shape.
 ///
-/// The first call generates the sample into `directory`.
+/// The first call generates the sample.
 pub fn sample_result_view(
     gate: &SampleGate,
     open: &OpenTable,
-    directory: &Path,
+    sample: &Sample,
 ) -> Result<TableView, ErrorView> {
-    let table = open_stored(gate, directory, SAMPLE)?;
+    let table = open_stored(gate, &sample.directory, sample.spec)?;
     Ok(show(open, table))
 }
 
@@ -261,7 +276,7 @@ pub fn open_sample_window<R: Runtime>(
     open: State<'_, OpenTable>,
     keys: u32,
 ) -> Result<TableView, ErrorView> {
-    sample_window_view(&gate, &open, &sample_directory(&app)?, keys)
+    sample_window_view(&gate, &open, &Sample::of_app(&app)?, keys)
 }
 
 /// Opens the whole sample table where it is stored, without loading it, and
@@ -274,7 +289,7 @@ pub fn open_sample_result<R: Runtime>(
     gate: State<'_, SampleGate>,
     open: State<'_, OpenTable>,
 ) -> Result<TableView, ErrorView> {
-    sample_result_view(&gate, &open, &sample_directory(&app)?)
+    sample_result_view(&gate, &open, &Sample::of_app(&app)?)
 }
 
 /// Returns `length` rows of the open table starting at `offset`, limited to
