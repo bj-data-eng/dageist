@@ -164,9 +164,10 @@ pub(super) fn files(generated: &Generated, release: &Release) -> [(&'static str,
             "`-` for the parameter and the argument, every parameter is at its default. Otherwise",
             "the parameter is given a column `b` of the argument dtype, or, where Polars takes one",
             "value only (`shift`'s `n` and `fill_value`), the number 1 of that dtype, and the others are at",
-            "their defaults. `over` is given `partition_by` unless that is the parameter, which",
-            "`*more_exprs` extends. The columns hold three rows: a value, a null and a value. Text",
-            "is a duration in days, such as `1d`.",
+            "their defaults. `over` is given `partition_by` unless that or `order_by` is the",
+            "parameter, each of which it takes alone, and `*more_exprs` extends `partition_by`. The",
+            "columns hold three rows: a value, a null and a value. Text is a duration in days,",
+            "such as `1d`.",
         ]),
     );
     let mut contexts_format = text(&[

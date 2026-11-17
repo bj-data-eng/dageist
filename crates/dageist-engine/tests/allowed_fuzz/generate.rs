@@ -909,6 +909,9 @@ impl Gen<'_> {
         let id = entry.id().as_str();
         let mut given: Vec<(&'static str, Value)> = Vec::new();
         let mut dtypes: Vec<(String, Option<Representative>)> = Vec::new();
+        // Whether a window is given `partition_by`, which Polars takes without
+        // `order_by` and `order_by` without it, and refuses neither.
+        let mut partitioned = true;
         for parameter in entry.parameters() {
             if !matches!(parameter.kind(), Kind::Expression(_)) {
                 continue;
@@ -917,9 +920,14 @@ impl Gen<'_> {
             let required = parameter.default() == ParameterDefault::Required;
             let given_it = match (id, name) {
                 (_, _) if required => true,
-                ("Expr.over", "partition_by") => true,
-                ("Expr.over", "order_by") => self.draw.chance(35),
-                ("Expr.over", "more_exprs") => self.draw.chance(6),
+                ("Expr.over", "partition_by") => {
+                    partitioned = self.draw.chance(80);
+                    partitioned
+                }
+                // A window that is not partitioned is ordered, and `*more_exprs`
+                // extends `partition_by` and means nothing without it.
+                ("Expr.over", "order_by") => !partitioned || self.draw.chance(35),
+                ("Expr.over", "more_exprs") => partitioned && self.draw.chance(6),
                 _ => self.draw.chance(30),
             };
             if !given_it {
@@ -1097,5 +1105,78 @@ mod tests {
             .count();
         assert!(back > 0, "no case of {} shifts back", cases.len());
         assert!(forward > 0, "no case of {} shifts forward", cases.len());
+    }
+
+    /// The argument names of every `over` in `value`, one list for each.
+    fn windows(value: &serde_json::Value, found: &mut Vec<Vec<String>>) {
+        match value {
+            serde_json::Value::Object(object) => {
+                if object.get("entry").and_then(serde_json::Value::as_str) == Some("Expr.over") {
+                    found.push(
+                        object
+                            .get("arguments")
+                            .and_then(serde_json::Value::as_object)
+                            .map(|arguments| arguments.keys().cloned().collect())
+                            .unwrap_or_default(),
+                    );
+                }
+                object.values().for_each(|inner| windows(inner, found));
+            }
+            serde_json::Value::Array(items) => items.iter().for_each(|inner| windows(inner, found)),
+            _ => {}
+        }
+    }
+
+    #[test]
+    fn the_cases_include_windows_with_no_partition_by_and_none_with_nothing_to_group_or_order_by() {
+        // Polars gives a window ordered by a column and given no `partition_by` a
+        // dtype, with options or without, and refuses a window given neither, so a
+        // campaign checks the first and never draws the second.
+        let entropy = |offset: u64| -> Vec<u8> {
+            (0..512_u64)
+                .map(|at| {
+                    let mixed = (at + offset * 977 + 11).wrapping_mul(0x9e37_79b9_7f4a_7c15);
+                    (mixed >> 29) as u8
+                })
+                .collect()
+        };
+        let mut all = Vec::new();
+        for case in (0..6000_u64).filter_map(|offset| generate(&entropy(offset))) {
+            let document: serde_json::Value =
+                serde_json::from_str(case.document.write().lines().last().expect("a document"))
+                    .expect("a document is JSON");
+            windows(&document, &mut all);
+        }
+        let has = |window: &[String], name: &str| window.iter().any(|given| given == name);
+        let options = ["descending", "nulls_last", "mapping_strategy"];
+        let unpartitioned: Vec<_> = all
+            .iter()
+            .filter(|window| !has(window, "partition_by"))
+            .collect();
+        assert!(
+            unpartitioned.iter().any(|window| has(window, "order_by")
+                && !options.iter().any(|option| has(window, option))),
+            "no window is ordered without a partition or options, of {}",
+            all.len()
+        );
+        for option in options {
+            assert!(
+                unpartitioned
+                    .iter()
+                    .any(|window| has(window, "order_by") && has(window, option)),
+                "no window is ordered with {option} and without a partition, of {}",
+                all.len()
+            );
+        }
+        assert!(
+            all.iter()
+                .all(|window| has(window, "partition_by") || has(window, "order_by")),
+            "a window is given neither partition_by nor order_by"
+        );
+        assert!(
+            all.iter()
+                .all(|window| !has(window, "more_exprs") || has(window, "partition_by")),
+            "a window is given more_exprs without partition_by"
+        );
     }
 }

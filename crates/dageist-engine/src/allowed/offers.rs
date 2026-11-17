@@ -553,12 +553,14 @@ fn read_options(entry: &Entry, chosen: &[(&str, &str)]) -> OptionsGive {
     }
 }
 
-/// The expression parameters the option table was measured with, for an entry
-/// whose options mean nothing without them: a window is grouped by
-/// `partition_by`, and without it a mapping strategy changes nothing.
+/// The expression parameters of which a call has to be given one for Polars to
+/// run it, and for the option table to be read: a window is grouped by
+/// `partition_by` or ordered by `order_by`, and Polars refuses one given
+/// neither, whatever its options. The table was measured with both, and Polars
+/// gives a window the same result with either alone.
 fn measured_with(entry: &Entry) -> &'static [&'static str] {
     match entry.id().as_str() {
-        "Expr.over" => &["partition_by"],
+        "Expr.over" => &["partition_by", "order_by"],
         _ => &[],
     }
 }
@@ -714,16 +716,18 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
                 if receiver_shape == Shape::One && result != fit.result {
                     result = None;
                 }
-                // And the call has to be given what the table was measured
-                // with.
-                if measured_with(entry)
-                    .iter()
-                    .any(|parameter| !chosen.arguments.iter().any(|(name, _)| name == parameter))
-                {
-                    result = None;
-                }
                 shape = produces.shape;
             }
+        }
+        // A call that was not given what Polars needs to run it gives nothing
+        // whatever its options: Polars refuses a window given neither key.
+        let measured = measured_with(entry);
+        if !measured.is_empty()
+            && !measured
+                .iter()
+                .any(|parameter| chosen.arguments.iter().any(|(name, _)| name == parameter))
+        {
+            result = None;
         }
     }
     // What the call says of what it gives, where the tables do not.
