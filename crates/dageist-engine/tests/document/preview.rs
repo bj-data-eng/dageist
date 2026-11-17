@@ -7,7 +7,7 @@ use dageist_engine::document::{Document, Preview, RowsError, StepId};
 use serde_json::json;
 
 use crate::claims::{claims, inputs, storyboard_text};
-use crate::support::{call, document, field, field_then, named, step, whole};
+use crate::support::{call, chain, document, field, field_then, many, named, step, whole};
 
 fn preview_through(text: &str, id: &str, limit: usize) -> Result<Preview, RowsError> {
     Document::read(text).expect("a document").preview(
@@ -41,7 +41,7 @@ fn gaps() -> String {
         step(
             "sort",
             "LazyFrame.sort",
-            json!({ "by": crate::support::many(vec![field("dcn"), field("timestamp")]) }),
+            json!({ "by": many(vec![field("dcn"), field("timestamp")]) }),
         ),
         step(
             "gaps",
@@ -186,4 +186,34 @@ fn a_step_that_is_not_in_the_document_has_no_rows() {
         Err(RowsError::NoSuchStep(id)) => assert_eq!(id.as_str(), "nowhere"),
         other => panic!("not a missing step: {other:?}"),
     }
+}
+
+#[test]
+fn the_connected_holidays_are_the_third_and_the_fifth_of_march() {
+    // The list is read as it was connected: its first date and its last are
+    // the two dates, which no step of the sample otherwise shows.
+    let text = document(vec![step(
+        "holidays",
+        "LazyFrame.with_columns",
+        json!({ "named_exprs": named(vec![
+            (
+                "first_holiday",
+                chain(json!({ "input": "holidays" }), vec![call("Expr.first", json!({}))]),
+            ),
+            (
+                "last_holiday",
+                chain(json!({ "input": "holidays" }), vec![call("Expr.last", json!({}))]),
+            ),
+        ]) }),
+    )]);
+    let preview = preview_through(&text, "holidays", 1).expect("the rows");
+    let added = preview.columns().len() - 2;
+    assert_eq!(
+        columns(&preview)[added..],
+        [("first_holiday", "Date"), ("last_holiday", "Date")]
+    );
+    assert_eq!(
+        cells(&preview)[0][added..],
+        [Some("2026-03-03"), Some("2026-03-05")]
+    );
 }
