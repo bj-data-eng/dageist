@@ -406,51 +406,61 @@ probe, a document in which the part must be evaluated:
 Polars folds some of these as they are written, so that the chain alone is folded
 the same way and allowed: the length of a literal over a window is a constant, and
 a comparison with a null is a column of nulls whatever the rows are, so what follows
-is not evaluated. For a link the target also asks Polars about the refused call
-apart from what comes before it, with a probe of its own: the refused call, with its
-arguments as written, selected on a column of the dtype that Polars gave what reaches
-it, which Polars cannot fold as it does a literal. The dtype is Polars' as well as
-the tables', and a case where they differ is a disagreement about the dtype, found
-first. For a refusal that a join's key is not elementwise, the part that holds the
-refused call is asked as the whole key of the same join, for the refusal is of the
-position and Polars skips it where the key is folded away. Where that part is one
-value, as an aggregate and a running value of it are, Polars allows it as a key
-whatever it holds, so the refused call is also asked on a column as the key.
-A refusal that is the target's own comparison of a schema (the plan says one dtype and
-the rows give another) cannot be shown by the call alone, so for it the refused call
-is asked in the position the case holds it, on a column of the dtype that reaches it,
-and counts when Polars itself refuses that (a sort key of one value is dropped, and
-the call on a column as the key panics) and refuses the column alone not at all.
+is not evaluated. What is not settled by the part as written is asked apart from
+what surrounds it, after the limits, in these ways:
 
-When Polars refuses a probe for the reason the tables gave, the case counts as
-**refused where Polars does not evaluate the part**: the tables are stricter by
-design, and the tally names it and the replay shows the probe. The reasons are
-matched by what Polars objected to and the call it names (the symbol of a
-comparison, a name in backticks), without the dtypes and column names it quotes, and
-for a rule that a predicate be a `Boolean` by Polars' words for it. A refusal that
-Polars places must lie at the refused call or predicate. One it does not place, as
-the refusal of rows, counts only when the part before the refused call, alone (for a
-key, as the key), is not refused for the same reason. So a probe is not settled by an
-objection to another call. What the target says of a schema (that the schema says one
-dtype and the rows give another) is its own comparison, not an objection of Polars, so
-no probe is settled by it, as the tables' reason or as the probe's: it is a
-limit's. Which of two failures of a probe Polars names depends on which of its
-threads gets there first, so a probe refused for another reason is run again, up to
-sixteen times, before it counts as one that is not. When Polars allows the probe, or
-refuses it for another reason or at another call, the disagreement stays, for
-nothing shows the tables right. The probe is a document of the same kind as a case,
-so a kept case replays it. A kept case of
-this kind is filed as `regressions/stricter-<what it shows>.case`, and the normal
-run replays it and expects the outcome to say so.
+- for a link, the refused call, with its arguments as written, selected on a column of
+  the dtype that Polars gave what reaches it, which Polars cannot fold as it does a
+  literal. The dtype is Polars' as well as the tables', and a case where they differ is
+  a disagreement about the dtype, found first;
+- for a refusal that a join's key is not elementwise, the part that holds the refused
+  call as the whole key of the same join, for the refusal is of the position and
+  Polars skips it where the key is folded away; and, where that part is one value, as
+  an aggregate and a running value of it are, which Polars allows as a key whatever it
+  holds, the refused call on a column as the key;
+- for a refusal that is the target's own comparison of a schema (the call's plan says
+  one dtype and its rows give another), which is no refusal of Polars and which no
+  probe of the call alone can be refused for, the refused call on a column in the
+  position the case holds it. It counts only on the evidence of the mismatch,
+  together: Polars' own plan and rows for the call on that column, selected on its
+  own, differ exactly as the tables' reason says; Polars refuses the call on that
+  column in the position (a sort key of one value is dropped, and the call on a column
+  as the key panics); and the call on a column whose plan and rows agree is allowed
+  there, and so is the column alone. A refusal that the control meets too, as a
+  filter's predicate that is not a `Boolean`, or a panic that has no part in the
+  mismatch, shows nothing.
+
+The first two count when Polars refuses the probe for the reason the tables gave, and
+the case then counts as **refused where Polars does not evaluate the part**: the
+tables are stricter by design, and the tally names it. The replay and the outcome say
+what the probe showed: that the probe was refused for the tables' reason, or that the
+call's plan and rows differ as the tables say, the call is refused in the position
+and a call whose plan and rows agree is allowed. The reasons are matched by what
+Polars objected to and the call it names (the symbol of a comparison, a name in
+backticks), without the dtypes and column names it quotes, and for a rule that a
+predicate be a `Boolean` by Polars' words for it. A refusal that Polars places must
+lie at the refused call or predicate. One it does not place, as the refusal of rows,
+counts only when the part before the refused call, alone (for a key, as the key), is
+not refused for the same reason. So a probe is not settled by an objection to another
+call. What the target says of a schema is neither the tables' reason nor a probe's
+for these two, and is settled only by the evidence above; where that is missing it is
+a limit's (a hidden schema). Which of two failures of a probe Polars names depends
+on which of its threads gets there first, so a probe refused for another reason is
+run again, up to sixteen times, before it counts as one that is not. When Polars
+allows the probe, refuses it for another reason or at another call, or the evidence
+of the mismatch is missing, the disagreement stays, for nothing shows the tables
+right. The probe is a document of the same kind as a case, so a kept case replays
+it. A kept case of this kind is filed as `regressions/stricter-<what it shows>.case`,
+and the normal run replays it and expects the outcome to say so.
 
 What a probe shows is that the tables are right about the part or the call when it
 is evaluated, and the target takes that for a part Polars skips. The part as written
 shows it, for Polars refuses what it was asked to evaluate. The probes apart from the
-case do not tell a part Polars skips from one it evaluates on a value that hides the
+case, those that match the tables' reason, do not tell a part Polars skips from one it evaluates on a value that hides the
 refusal, as a literal it broadcasts or the nulls that the sample's rows leave. The
-limits say what Polars evaluates and accepts, so they are asked before those two
-probes and after the part as written: in that order the part as written, then the
-limits, then the refused call on a value or a key by itself.
+limits say what Polars evaluates and accepts, so they are asked before those probes
+and after the part as written: in that order the part as written, then the limits,
+then the probes apart from the case.
 
 The second kind is a limit, for what Polars evaluates and accepts, which no probe
 of the part shows, and for where the tables allow and Polars refuses. A limit is

@@ -375,20 +375,27 @@ Polars by hand, and decide which it is:
   The normal run replays it and expects it to check something.
 - **A part Polars does not evaluate**: the tables refuse a part, and Polars allows
   the step because it never evaluates the part. The target settles it by itself: it
-  asks Polars about the part alone, with a probe, and counts the case as refused
-  where Polars does not evaluate the part when Polars refuses the probe for the
-  tables' reason, at the refused call. The part is asked as it is written; where
-  that does not settle it, the limits are asked next, and then the refused
-  call on a column of the dtype that reaches it, or a join's key by itself as the
-  key. The replay shows the probe. Where it does not settle a case, Polars allows
-  the probe, refuses it for another reason or at another call, and the case is one
-  of the other kinds. Keep a case the probe settles as
+  asks Polars about the part with a probe, and counts the case as refused where
+  Polars does not evaluate the part when the probe shows the tables right. The part
+  is asked as it is written, and Polars refusing that for the tables' reason, at the
+  refused call, settles it. Where that does not, the limits are asked next, and then
+  the part apart from what surrounds it: the refused call on a column of the dtype
+  that reaches it; a join's key by itself as the key, and the refused call on a
+  column as the key; and, for a refusal that is the target's own comparison of a
+  call's plan with its rows (no refusal of Polars), the call on a column in the
+  position the case holds it, which counts only with the evidence that Polars' plan
+  and rows differ as the tables say, Polars refuses it there, and a call whose plan
+  and rows agree and the column alone are allowed there. The replay shows the probe
+  and what it showed. Where it does not settle a case, Polars allows the probe,
+  refuses it for another reason or at another call, or the evidence is missing, and
+  the case is one of the other kinds. Keep a case the probe settles as
   `regressions/stricter-<what it shows>.case`, which the normal run replays and
   expects to say so. Do not add a limit for it; a part Polars skips is not a limit
   of the tables, since the editor holds every part to its types. The probe is in
   `allowed_fuzz/probe.rs`; extend it where a part has no probe, with tests that
   Polars allowing the probe, refusing it for another reason, or refusing it at
-  another call, settles nothing.
+  another call settles nothing, and that a refusal that a control meets too does not
+  settle a mismatch.
 - **A case the tables say they do not cover**, where the tables allow and Polars
   refuses, or Polars evaluates a part and accepts it (a literal it broadcasts, the
   nulls that the sample's rows leave), which the probes do not show: add or

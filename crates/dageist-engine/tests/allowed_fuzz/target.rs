@@ -153,10 +153,7 @@ pub fn describe(case: &Case) -> String {
         _ => None,
     }
     .map_or_else(String::new, |settled| {
-        format!(
-            "\nprobe: Polars refuses {} for the tables' reason: {}",
-            settled.probe, settled.reason
-        )
+        format!("\nprobe: {}", settled.said())
     });
     let limits: Vec<&str> = excused.iter().map(|limit| limit.slug()).collect();
     format!(
@@ -199,10 +196,7 @@ fn stricter(settled: Option<Settled>, what: &str) -> Option<Result<CaseOutcome>>
     tally(format!("{STRICTER_WHERE_UNEVALUATED}: {what}"));
     Some(CaseOutcome::expected_rejection(
         Vec::new(),
-        one_line(&format!(
-            "{STRICTER_WHERE_UNEVALUATED}: the probe {} is refused for the tables' reason: {}",
-            settled.probe, settled.reason
-        )),
+        one_line(&format!("{STRICTER_WHERE_UNEVALUATED}: {}", settled.said())),
     ))
 }
 

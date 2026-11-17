@@ -6,34 +6,42 @@
 //! window's keys on groups. Where the tables refuse a part and Polars allows the
 //! step, the target does not model what Polars skips. It asks Polars about the
 //! part in a document where the part must be evaluated, in the order [`settle`],
-//! the limits, [`settle_apart`]:
+//! the limits, [`settle_apart`]. What a probe shows is that the tables are right
+//! about the part or the call when it is evaluated, which the target takes for a
+//! part Polars skips; it is said in [`Settled::said`] as what it was.
 //!
-//! - [`settle`]: the part as written, alone: the chain through a refused link
-//!   selected on its own, a condition with a refused predicate and literal values
-//!   selected on its own, either in the same input and, for a part of a pivot's
-//!   aggregate, in the same pivot. Polars refusing it shows the tables right for
-//!   the part it was asked to evaluate.
-//! - [`settle_on_a_value`]: Polars folds some chains as they are written, so what
-//!   follows is not evaluated in the probe either. The refused call, with its
-//!   arguments, is selected on a column of the dtype that Polars gave what reaches
-//!   it, which Polars cannot fold.
+//! [`settle`] asks about the part as written, alone: the chain through a refused
+//! link selected on its own, a condition with a refused predicate and literal
+//! values selected on its own, either in the same input and, for a part of a pivot's
+//! aggregate, in the same pivot. It settles the case when Polars refuses it for
+//! the reason the tables gave (the objection and the call it names, not the dtypes
+//! and the column names), at the refused call, and the part before the refused
+//! call alone is not refused for that reason ([`Showing::TheSameReason`]).
+//!
+//! Polars folds some chains as they are written, so what follows is not evaluated
+//! in that probe either. [`settle_apart`] asks about the refused part apart from
+//! what surrounds it, in four ways, after the limits (which say what Polars
+//! evaluates and accepts, as a literal it broadcasts or the nulls the sample's rows
+//! leave, which these cannot tell from what it skips). The first three are settled
+//! for the tables' reason as well ([`Showing::TheSameReason`]):
+//!
+//! - [`settle_on_a_value`]: the refused call, with its arguments, selected on a
+//!   column of the dtype that Polars gave what reaches it, which Polars cannot fold.
 //! - [`settle_as_a_key`]: a refusal that a join's key is not elementwise is of the
 //!   position, so the part that holds the refused call is the whole key of the
-//!   same join. Where that part is one value Polars allows it, whatever it holds,
-//!   and [`settle_on_a_value_as_a_key`] asks the refused call on a column as the
-//!   key.
+//!   same join, and what comes before the call as a key is not refused for it.
+//! - [`settle_on_a_value_as_a_key`]: a part that is one value is allowed as a key
+//!   whatever it holds, so the refused call is asked on a column as the key.
 //!
-//! - [`settle_in_the_position`]: a refusal that is the target's own comparison of a
-//!   schema is not shown by any probe of the call alone, so the refused call is
-//!   asked on a column in the position the case holds it, where Polars refuses it
-//!   if it evaluates it.
-//!
-//! The last ones do not tell what Polars skips from what it evaluates on a value
-//! that hides the refusal, which a limit names, so the limits are asked before
-//! them. When Polars refuses a probe for the reason the tables gave, at the
-//! refused call, the tables are stricter by design where Polars does not evaluate
-//! the part; when it allows it, refuses it for another reason or at another call,
-//! the disagreement is a finding.
+//! The fourth has no reason to match. [`settle_in_the_position`] is for a refusal
+//! that is the target's own comparison of a call's plan with its rows, which is no
+//! refusal of Polars and so is neither the tables' reason nor one a probe is refused
+//! for. It settles the case only when Polars' own plan and rows for the call on a
+//! column differ as the tables say, Polars refuses the call there in the position
+//! the case holds it, and a column whose plan and rows agree and the column alone
+//! are allowed there ([`Showing::TheSchemaMismatch`]). A probe settles nothing when
+//! Polars allows it, refuses it for another reason, or refuses it at another call;
+//! one that a control meets too is not the mismatch's.
 
 use dageist_engine::allowed::Representative;
 use dageist_engine::catalog;
@@ -48,11 +56,41 @@ use super::observe::{
 };
 use super::predict::{Prediction, Refused, Source};
 
-/// What a probe found: the document it ran, and why Polars refused it.
+/// What a probe showed of the refused part.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Showing {
+    /// Polars refused the probe for the reason the tables gave.
+    TheSameReason,
+    /// The tables' reason is the target's own comparison of a call's plan with its
+    /// rows. Polars' plan and rows for the call on a column differ as it says, the
+    /// call on that column is refused by Polars in the position, and a column
+    /// whose plan and rows agree is not.
+    TheSchemaMismatch,
+}
+
+/// What a probe found: the document it ran, why Polars refused it, and what that
+/// showed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settled {
     pub probe: String,
     pub reason: String,
+    pub showing: Showing,
+}
+
+impl Settled {
+    /// What the probe showed, in words, as the outcome and the replay say it.
+    pub fn said(&self) -> String {
+        match self.showing {
+            Showing::TheSameReason => format!(
+                "the probe {} is refused for the tables' reason: {}",
+                self.probe, self.reason
+            ),
+            Showing::TheSchemaMismatch => format!(
+                "the probe {} is refused by Polars ({}), where the call on a column of the dtype that reaches it has a plan and rows that differ as the tables say and one whose plan and rows agree is allowed",
+                self.probe, self.reason
+            ),
+        }
+    }
 }
 
 /// The rules that a predicate be a `Boolean`, which Polars holds as it
@@ -508,6 +546,7 @@ pub fn settle(case: &Case, refused: &Refused) -> Option<Settled> {
     Some(Settled {
         probe: probed.document.write(),
         reason: refusal.reason,
+        showing: Showing::TheSameReason,
     })
 }
 
@@ -593,6 +632,7 @@ pub fn settle_on_a_value(
     Some(Settled {
         probe: probed.document.write(),
         reason: refusal.reason,
+        showing: Showing::TheSameReason,
     })
 }
 
@@ -691,6 +731,7 @@ pub fn settle_as_a_key(case: &Case, refused: &Refused) -> Option<Settled> {
     Some(Settled {
         probe: probed.document.write(),
         reason: refusal.reason,
+        showing: Showing::TheSameReason,
     })
 }
 
@@ -752,6 +793,7 @@ pub fn settle_on_a_value_as_a_key(
     Some(Settled {
         probe: probed.document.write(),
         reason: refusal.reason,
+        showing: Showing::TheSameReason,
     })
 }
 
@@ -796,15 +838,42 @@ fn step_with(case: &Case, parameter: &str, part: &Expression) -> Option<Document
     .ok()
 }
 
+/// The classes a call is tried on as a control: whole numbers and floats, of which
+/// plan and rows agree for the calls that give them.
+const CONTROLS: [Representative; 2] = [Representative::Int64, Representative::Float64];
+
+/// Whether what was seen ties a refusal in a position to a mismatch of plan and
+/// rows: Polars' own plan and rows for the call differ as the tables say, the call
+/// is refused in the position, and neither a call whose plan and rows agree nor
+/// the column alone is. A refusal that a control meets too is not the mismatch's.
+fn ties_the_refusal_to_the_mismatch(
+    differs_as_the_tables_say: bool,
+    refused_in_the_position: bool,
+    control_is_allowed: bool,
+    column_alone_is_allowed: bool,
+) -> bool {
+    differs_as_the_tables_say
+        && refused_in_the_position
+        && control_is_allowed
+        && column_alone_is_allowed
+}
+
 /// Asks Polars about a call that the tables refuse by what the target says of a
 /// schema, a plan that says one dtype and rows that give another, in the position
 /// the case holds it, on a column. No probe of the call alone shows that
 /// comparison, which is the target's own, and Polars skips a part that is one
-/// value, as a sort key. Where Polars evaluates the call as the key on a column of
-/// the dtype that reaches it, it refuses it, as a panic: the call is then why, if
-/// the column alone as the key is allowed. Polars allowing it, or refusing only by
-/// what the target says, as a method that is the output of a step, settles
-/// nothing.
+/// value, as a sort key. What shows the refusal is the mismatch, together:
+///
+/// - Polars' plan and rows for the call on a column of the dtype that reaches it,
+///   selected on its own, differ exactly as the tables' reason says (the same dtypes);
+/// - Polars refuses the call on that column in the position, which a refusal of the
+///   target's own comparison alone does not;
+/// - the call on a column of a dtype whose plan and rows agree is allowed in the
+///   position, and so is the column alone.
+///
+/// A refusal that the control meets too, as a filter's predicate that is not a
+/// `Boolean`, or a panic that has no part in the mismatch, settles nothing, as does
+/// Polars allowing the position.
 pub fn settle_in_the_position(
     case: &Case,
     refused: &Refused,
@@ -848,26 +917,50 @@ pub fn settle_in_the_position(
             document: step_with(case, parameter, part)?,
         })
     };
-    let tables = Tables {
+    let on = |class: Representative| Tables {
         other_as_left: false,
         stand_in: Some(class),
     };
+    // Polars' own plan and rows for the call on a column, selected on its own.
+    let selected = Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        document: document_of(case, &found, part.clone(), false)?,
+    };
+    let differs_as_the_tables_say = observe_probe(&selected, on(class))
+        .refusal
+        .is_some_and(|refusal| refusal.reason == refused.reason);
+    if !differs_as_the_tables_say {
+        return None;
+    }
+    // A control: a column whose plan and rows agree for the call.
+    let control = CONTROLS
+        .into_iter()
+        .filter(|control| *control != class)
+        .find(|control| observe_probe(&selected, on(*control)).refusal.is_none())?;
     let item = Place::of_step(0, StepId::new(STEP).ok())
         .then(Segment::Parameter(parameter.clone()))
         .then(Segment::Item(0));
     let probed = probe_of(&part)?;
     let refusal = refused_by_polars(
         &probed,
-        tables,
+        on(class),
         &[item.clone(), item.then(Segment::Link(0))],
-    )?;
-    // The column alone in the position is allowed, so that the call is why.
-    if observe_probe(&probe_of(&alone)?, tables).refusal.is_some() {
-        return None;
-    }
-    Some(Settled {
+    );
+    let control_is_allowed = observe_probe(&probed, on(control)).refusal.is_none();
+    let column_alone_is_allowed = observe_probe(&probe_of(&alone)?, on(class))
+        .refusal
+        .is_none();
+    ties_the_refusal_to_the_mismatch(
+        differs_as_the_tables_say,
+        refusal.is_some(),
+        control_is_allowed,
+        column_alone_is_allowed,
+    )
+    .then(|| Settled {
         probe: probed.document.write(),
-        reason: refusal.reason,
+        reason: refusal.map_or_else(String::new, |refusal| refusal.reason),
+        showing: Showing::TheSchemaMismatch,
     })
 }
 
@@ -1340,6 +1433,7 @@ mod tests {
             found.probe
         );
         assert!(found.reason.contains("panicked"), "{}", found.reason);
+        assert_eq!(found.showing, Showing::TheSchemaMismatch);
     }
 
     #[test]
@@ -1410,6 +1504,18 @@ mod tests {
             settle_in_the_position(&case, &refused, &predict(&case), &observe(&case)),
             None
         );
+    }
+
+    #[test]
+    fn a_refusal_is_tied_to_the_mismatch_only_with_every_piece_of_evidence() {
+        // A panic or a refusal in the position that has no part in the mismatch is
+        // met by the control too, or by the column alone, or the call does not differ
+        // as the tables say: each missing piece settles nothing.
+        assert!(ties_the_refusal_to_the_mismatch(true, true, true, true));
+        assert!(!ties_the_refusal_to_the_mismatch(false, true, true, true));
+        assert!(!ties_the_refusal_to_the_mismatch(true, false, true, true));
+        assert!(!ties_the_refusal_to_the_mismatch(true, true, false, true));
+        assert!(!ties_the_refusal_to_the_mismatch(true, true, true, false));
     }
 
     #[test]
