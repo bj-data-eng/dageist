@@ -125,6 +125,269 @@ export interface CatalogueView {
   readonly entries: readonly EntryView[];
 }
 
+/** A column and the short name of its dtype, such as `Datetime(us)`. Mirrors `FieldView` in crates/dageist-tauri/src/report.rs. */
+export interface FieldView {
+  readonly name: string;
+  readonly dtype: string;
+}
+
+/** The table a node's steps start from. Mirrors `SourceView` in crates/dageist-tauri/src/node.rs. */
+export interface SourceView {
+  readonly name: string;
+  readonly columns: readonly FieldView[];
+}
+
+/** One input of a node, by the name a step document uses for it. Mirrors `InputView` in crates/dageist-tauri/src/node.rs. */
+export type InputView =
+  | { readonly kind: 'table'; readonly name: string; readonly columns: readonly FieldView[] }
+  | { readonly kind: 'value'; readonly name: string; readonly dtype: string }
+  | { readonly kind: 'list'; readonly name: string; readonly dtype: string };
+
+/** What a node is connected to. Mirrors `NodeView` in crates/dageist-tauri/src/node.rs. */
+export interface NodeView {
+  readonly source: SourceView;
+  /** Every other input, in the order of their names. */
+  readonly inputs: readonly InputView[];
+}
+
+/**
+ * The rows after a step, every cell written by the engine as text, and a null
+ * as `null`. Each row has one cell for each column. Mirrors `RowsView` in
+ * crates/dageist-tauri/src/node.rs.
+ */
+export interface RowsView {
+  readonly columns: readonly FieldView[];
+  readonly rows: ReadonlyArray<ReadonlyArray<string | null>>;
+}
+
+/** One step of the way from a step of a document to the thing inside it. */
+export type SegmentView =
+  /** The argument for a parameter, by Python's name for it. */
+  | { readonly kind: 'parameter'; readonly name: string }
+  /** An item of a list. */
+  | { readonly kind: 'item'; readonly index: number }
+  /** The key of an entry of pairs. */
+  | { readonly kind: 'key'; readonly index: number }
+  /** The value of an entry of pairs. */
+  | { readonly kind: 'value'; readonly index: number }
+  /** The start of an expression. */
+  | { readonly kind: 'start' }
+  /** A link of an expression, counted from the first after its start. */
+  | { readonly kind: 'link'; readonly index: number };
+
+/**
+ * A place in a document: a step, then the way down through its arguments.
+ * The step is absent for a place in the document outside its steps.
+ */
+export interface PlaceView {
+  /** Where the step is in the document, counted from zero. */
+  readonly stepIndex: number | null;
+  readonly stepId: string | null;
+  readonly path: readonly SegmentView[];
+}
+
+/** What an expression has, up to one of its links. */
+export type ResolutionView =
+  /** A single column of this dtype. */
+  | { readonly kind: 'dtype'; readonly dtype: string }
+  /** More than one column, with their dtypes. */
+  | { readonly kind: 'several'; readonly dtypes: readonly string[] }
+  /** A condition that still lacks its `then`. */
+  | { readonly kind: 'unfinished' }
+  /** An expression that starts from `element`, which has no dtype outside a pivot. */
+  | { readonly kind: 'noContext' }
+  /** Polars refuses the expression up to here, with this reason. */
+  | { readonly kind: 'refused'; readonly reason: string };
+
+/** The dtype of an expression at its start and after each of its links. */
+export interface ExpressionDtypesView {
+  readonly place: PlaceView;
+  readonly start: ResolutionView;
+  readonly links: readonly ResolutionView[];
+}
+
+/** How many values a chain gives: `one` as an aggregate does, or a value for every row. */
+export type ValueShapeView = 'one' | 'many';
+
+/** How far a condition has come: the call that was last made. */
+export type ConditionStateView = 'when' | 'then' | 'chainedWhen' | 'chainedThen';
+
+/** What an expression has so far, where a call would follow it. */
+export type AfterView =
+  /** Nothing: the call starts an expression. */
+  | { readonly kind: 'start' }
+  /** A value, which an expression method follows. `dtype` is the class of its dtype. */
+  | { readonly kind: 'value'; readonly dtype: string; readonly shape: ValueShapeView }
+  /** A condition that is not finished. */
+  | { readonly kind: 'condition'; readonly state: ConditionStateView };
+
+/** The position of a step that holds an expression, as the engine's tables name it. */
+export type OuterPosition =
+  | 'select'
+  | 'filter'
+  | 'sort'
+  | 'join_left'
+  | 'join_right'
+  | 'pivot_aggregate';
+
+/** A position inside an expression that holds another one, as the tables name it. */
+export type NestedPosition =
+  | 'over.partition_by'
+  | 'over.order_by'
+  | 'condition.predicate'
+  | 'condition.value';
+
+/** Where an expression stands. */
+export interface ContextView {
+  readonly outer: OuterPosition;
+  readonly nested: NestedPosition | null;
+}
+
+/** Where a call would stand: in which context, and after what. */
+export interface OfferPlaceView {
+  readonly context: ContextView;
+  readonly after: AfterView;
+}
+
+/** Where Polars refused a combination, as the tables record it. */
+export type StageView = 'schema' | 'rows' | 'empty';
+
+/** The rules the engine holds that Polars does not, by the name the tables give them. */
+export type RuleName =
+  | 'pivot-aggregate-gives-one-value'
+  | 'condition-predicate-is-boolean'
+  | 'element-only-in-pivot-aggregate'
+  | 'filter-predicate-is-boolean'
+  | 'key-is-elementwise';
+
+/** Who refused a call. */
+export type RefusalSourceView =
+  | { readonly by: 'polars'; readonly stage: StageView }
+  | { readonly by: 'rule'; readonly rule: RuleName }
+  /** The shape of an expression: a step is not part of one, a method needs a value before it. */
+  | { readonly by: 'structure' };
+
+/** Why a call may not stand somewhere: Polars' reason, or the rule's statement. */
+export interface RefusalView {
+  readonly source: RefusalSourceView;
+  readonly reason: string;
+}
+
+/** Whether an expression may end where it does. */
+export type EndingView =
+  | { readonly kind: 'allowed' }
+  | { readonly kind: 'refused'; readonly refusal: RefusalView }
+  /** The tables do not say, for this reason. */
+  | { readonly kind: 'notKnown'; readonly because: string };
+
+/** Whether a call may stand where it does. */
+export type VerdictView =
+  | {
+      readonly kind: 'allowed';
+      /** The dtype the chain has after it, where the call decides it. */
+      readonly result: string | null;
+      readonly shape: ValueShapeView;
+      readonly ending: EndingView;
+    }
+  | { readonly kind: 'refused'; readonly refusal: RefusalView };
+
+/** A call of an expression: what it follows, and whether it may stand there. Both are `null` where the tables were not asked. */
+export interface StandingView {
+  readonly follows: AfterView | null;
+  readonly verdict: VerdictView | null;
+}
+
+/** An expression of a step, as the tables of allowed combinations see it. */
+export interface WalkedExpressionView {
+  readonly place: PlaceView;
+  /** `null` where no named position holds the expression. */
+  readonly context: ContextView | null;
+  /** The start, then each link. */
+  readonly calls: readonly StandingView[];
+  /**
+   * The place of each link, and after them the place a link added at the end
+   * would have; `null` where the context or what comes before is not known.
+   */
+  readonly places: ReadonlyArray<OfferPlaceView | null>;
+  readonly ending: EndingView | null;
+}
+
+/** A refusal the tables found, and where. */
+export interface WalkRefusalView {
+  readonly place: PlaceView;
+  readonly refusal: RefusalView;
+  /** Whether the expression there may not end where it does, and not that a call may not stand. */
+  readonly atEnd: boolean;
+}
+
+/** What the tables of allowed combinations say of a step. */
+export interface WalkView {
+  readonly expressions: readonly WalkedExpressionView[];
+  readonly refusal: WalkRefusalView | null;
+  /** Why the tables could not be asked past a point, where they could not. */
+  readonly notKnown: string | null;
+}
+
+/** Why a step was refused. */
+export type CauseView =
+  /** The step names a table that is not connected. */
+  | { readonly kind: 'unknownTable'; readonly name: string }
+  /** An expression starts from an input that is not a connected value or list. */
+  | { readonly kind: 'unknownInput'; readonly name: string }
+  /** The catalogue could not build the call. */
+  | { readonly kind: 'build'; readonly reason: string }
+  /** A named rule does not let a call stand where it does. */
+  | { readonly kind: 'notAllowed'; readonly refusal: RefusalView }
+  /** Polars refused, with this reason. */
+  | { readonly kind: 'polars'; readonly reason: string };
+
+/** What running one step came to. */
+export type OutcomeView =
+  /** Polars accepts the step, and its table has these columns. */
+  | { readonly status: 'valid'; readonly columns: readonly FieldView[] }
+  /** The step was refused, here, for this reason. */
+  | { readonly status: 'refused'; readonly place: PlaceView; readonly cause: CauseView }
+  /** A step before it was refused, so it was not run. */
+  | { readonly status: 'notRun'; readonly blockedBy: string };
+
+/** What running one step reported. Mirrors `StepReportView` in crates/dageist-tauri/src/report.rs. */
+export interface StepReportView {
+  readonly id: string;
+  /** Whether the step stays in a lazy plan; a step that does not collected the data it needs when it was built. */
+  readonly lazy: boolean;
+  readonly outcome: OutcomeView;
+  /** The dtypes of every expression in the step's arguments, as far as they could be built. */
+  readonly expressions: readonly ExpressionDtypesView[];
+  readonly walk: WalkView;
+}
+
+/** Why text is not a document the engine reads. */
+export type ReadProblemView =
+  /** The text is not JSON by RFC 8259, or nests too deep. Lines and columns count from 1. */
+  | {
+      readonly kind: 'syntax';
+      readonly line: number;
+      readonly column: number;
+      readonly reason: string;
+    }
+  /** The JSON is not a document, here, for this reason. */
+  | { readonly kind: 'refused'; readonly place: PlaceView; readonly reason: string };
+
+/**
+ * What running a document came to: its steps reported one by one, or the
+ * reason it could not be read. Mirrors `RunView` in
+ * crates/dageist-tauri/src/report.rs.
+ */
+export type RunView =
+  | {
+      readonly status: 'run';
+      /** The columns of the table the steps start from. */
+      readonly source: readonly FieldView[];
+      /** One report for each step, in the document's order. */
+      readonly steps: readonly StepReportView[];
+    }
+  | { readonly status: 'unreadable'; readonly problem: ReadProblemView };
+
 /** Mirrors `ViewWindow` in crates/dageist-tauri/src/windows.rs. */
 export type WindowName = 'steps';
 
@@ -134,6 +397,20 @@ export interface Host {
   readonly coreIdentity: () => Promise<IdentityView>;
   /** Fetches the catalogue of operations the step editor offers, with its English words. */
   readonly operationCatalogue: () => Promise<CatalogueView>;
+  /** Reports what the node is connected to: the table its steps start from and every other input. */
+  readonly nodeInputs: () => Promise<NodeView>;
+  /**
+   * Runs the step document `document`, written as JSON, on the node and
+   * reports each of its steps. Text that is not a document is reported as
+   * such, not rejected.
+   */
+  readonly runDocument: (document: string) => Promise<RunView>;
+  /**
+   * Gives the rows after the step `step` of `document`, at most `limit` of
+   * them, as text. It rejects when the document cannot be read, the step is
+   * not in it or was refused, or `limit` is over what a preview may hold.
+   */
+  readonly rowsAfterStep: (document: string, step: string, limit: number) => Promise<RowsView>;
   /** Opens a working window of `keys` whole keys of the sample table, held in memory. */
   readonly openSampleWindow: (keys: number) => Promise<TableView>;
   /** Opens the whole sample table where it is stored, without loading it. */

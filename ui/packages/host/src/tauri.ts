@@ -3,7 +3,11 @@
  * view that knows Tauri exists.
  */
 
-import type { BlockRequest, CatalogueView, Host, IdentityView, TableView } from './contract';
+import type { BlockRequest, Host, IdentityView, TableView } from './contract';
+import { DecodeError } from './decode';
+import { decodeCatalogue } from './decode-catalogue';
+import { decodeNode, decodeRows } from './decode-node';
+import { decodeRun } from './decode-run';
 import { deliverMessage, sealMessage } from './envelope';
 
 /** Turns what a failed command rejected with into an `Error`. */
@@ -31,9 +35,28 @@ export function tauriHost(): Host | null {
     }
   }
 
+  /** Invokes `command` and reads what it answered with `decode`, which refuses a shape the contract lacks. */
+  async function invokeDecoded<T>(
+    command: string,
+    decode: (value: unknown) => T,
+    args?: Record<string, unknown>,
+  ): Promise<T> {
+    const answer = await invoke<unknown>(command, args);
+    try {
+      return decode(answer);
+    } catch (error) {
+      if (error instanceof DecodeError) throw commandError(command, error);
+      throw error;
+    }
+  }
+
   return {
     coreIdentity: async () => invoke<IdentityView>('core_identity'),
-    operationCatalogue: async () => invoke<CatalogueView>('operation_catalogue'),
+    operationCatalogue: async () => invokeDecoded('operation_catalogue', decodeCatalogue),
+    nodeInputs: async () => invokeDecoded('node_inputs', decodeNode),
+    runDocument: async (document) => invokeDecoded('run_document', decodeRun, { document }),
+    rowsAfterStep: async (document, step, limit) =>
+      invokeDecoded('rows_after_step', decodeRows, { document, step, limit }),
     openSampleWindow: async (keys) => invoke<TableView>('open_sample_window', { keys }),
     openSampleResult: async () => invoke<TableView>('open_sample_result'),
     fetchTableBlock: async (request: BlockRequest) =>
