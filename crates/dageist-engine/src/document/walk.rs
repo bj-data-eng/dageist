@@ -243,6 +243,16 @@ enum Loose {
 /// without a dtype, which adapts to the numbers beside it.
 type Valued = (Option<Representative>, Option<Loose>);
 
+/// What surrounds a link of an expression besides the chain before it.
+#[derive(Clone, Copy)]
+struct Around {
+    /// Whether the values of the condition the link is part of are one expression.
+    branches_are_one: bool,
+    /// What the chain starts from, when that is a number typed without a dtype and the
+    /// link follows it.
+    receiver_loose: Option<Loose>,
+}
+
 /// What a chain has so far.
 #[derive(Clone)]
 enum Cur {
@@ -695,8 +705,10 @@ impl Walker<'_> {
                 context,
                 cur,
                 &mut last_end,
-                branches_are_one,
-                receiver_loose,
+                Around {
+                    branches_are_one,
+                    receiver_loose,
+                },
             );
             cur = next;
             calls.push(standing);
@@ -827,9 +839,12 @@ impl Walker<'_> {
         context: Context,
         cur: Cur,
         last_end: &mut Option<Ending>,
-        branches_are_one: bool,
-        receiver_loose: Option<Loose>,
+        around: Around,
     ) -> (Cur, Standing) {
+        let Around {
+            branches_are_one,
+            receiver_loose,
+        } = around;
         let entry = link.entry();
         // A number typed without a dtype that a method takes another operand beside adapts to
         // it, so what it follows is not known to the tables, which are measured with typed
