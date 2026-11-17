@@ -14,7 +14,7 @@ of the Polars release in `vendor/polars`: Polars' forks of `hashbrown` and
 | Package | Path | Role |
 | --- | --- | --- |
 | `dageist` | [src/](../src/lib.rs) | Host-independent core library. |
-| `dageist-engine` | [crates/dageist-engine/](../crates/dageist-engine/Cargo.toml) | Dataframe engine on Polars, built from `vendor/polars` as the release there is built, with Polars' allocator as the global allocator: sample data, working windows, stored results, Arrow output, the [catalogue of operations](explanation.md#the-catalogue-of-operations) with its English language file, the [step document](explanation.md#the-step-document) and the running of its steps, and the [tables of allowed combinations](explanation.md#which-combinations-polars-allows) with the offers made from them. Not published. |
+| `dageist-engine` | [crates/dageist-engine/](../crates/dageist-engine/Cargo.toml) | Dataframe engine on Polars, built from `vendor/polars` as the release there is built, with Polars' allocator as the global allocator: sample data, working windows, stored results, Arrow output, the [catalogue of operations](explanation.md#the-catalogue-of-operations) with its English language file, the [step document](explanation.md#the-step-document) and the running of its steps, the claim-timing sample node the step editor opens with, and the [tables of allowed combinations](explanation.md#which-combinations-polars-allows) with the offers made from them. Not published. |
 | `dageist-fuzz` | [crates/dageist-fuzz/](../crates/dageist-fuzz/Cargo.toml) | Fuzz framework, ported from Surgeist's `surgeist-fuzz`: bounded generation, same-failure reduction, replayable failure evidence and process-isolated campaigns. A workspace member outside `default-members`; no production crate depends on it. Its controlled author fixture is a standalone workspace with its own lock file, outside the product workspace. Not published. See its [README](../crates/dageist-fuzz/README.md). |
 | `dageist-tauri` | [crates/dageist-tauri/](../crates/dageist-tauri/Cargo.toml) | Tauri 2 host; builds the `dageist` binary. Not published. |
 | `dageist-ui` | [ui/](../ui/package.json) | Private npm workspace for the React view; see [View Packages](#view-packages). |
@@ -65,6 +65,9 @@ them through the host bridge in
 | --- | --- | --- |
 | `core_identity` | None | `{ "name": string, "version": string }` from the core. |
 | `operation_catalogue` | None | The engine's catalogue of operations with its English words: `{ "families", "dtypes", "entries" }`, each entry with its identifier, family, shown name, hint, step head, accepted dtypes, laziness and parameters. The shapes are `CatalogueView` and the types beside it in [catalogue.rs](../crates/dageist-tauri/src/catalogue.rs) and [contract.ts](../ui/packages/host/src/contract.ts). |
+| `node_inputs` | None | What the sample node is connected to: `{ "source": { "name": string, "columns": Field[] }, "inputs": Input[] }`, where a `Field` is `{ "name": string, "dtype": string }` with the engine's short dtype name, such as `Datetime(us)`, and an `Input` is a `table` with its columns, or a `value` or a `list` with its dtype, by the name a step document uses for it, in the order of their names. |
+| `run_document` | `document`: a step document's JSON text | The engine's report of running the document on the sample node, as `{ "status": "run", "source", "steps" }`, with one report for each step: its `id`, whether it is `lazy`, its `outcome` (`valid` with its columns, `refused` with its place and cause, or `notRun` with the step that blocked it), the dtype of each expression at its start and after each link, and what the tables of allowed combinations say of each call. Text that is not a document is not a failed command; it is `{ "status": "unreadable", "problem" }`, with the line and column of a syntax error, or the place of a refusal. The shapes are `RunView` and the types beside it in [report.rs](../crates/dageist-tauri/src/report.rs) and [contract.ts](../ui/packages/host/src/contract.ts). |
+| `rows_after_step` | `document`; `step`: a step's identifier; `limit`: how many rows, at most 1,000 | `{ "columns": Field[], "rows": [[string or null]] }`: the rows after that step, run on the sample node's seven rows, each cell written as text by the engine and a null as `null`. |
 | `open_sample_window` | `keys`: how many whole keys to hold in memory, at most 50,000 | `{ "rows": number, "columns": [{ "name": string, "dataType": string }] }` for the working window. |
 | `open_sample_result` | None | The same shape for the whole sample, opened where it is stored without loading it. |
 | `table_block` | `offset`, `length`: the rows, at most 10,000; `columns`: the column names, each once, or an empty list for all | That block of whichever table is open, as the raw bytes of an Arrow IPC stream, not JSON. Rows past the end are left out. |
@@ -75,7 +78,14 @@ message as a Tauri event named `dageist:<topic>`, and every other window that
 listens to the topic receives it. The steps window and the main window keep
 the steps the same this way while the steps are a storyboard in the view.
 
-A table command that fails rejects with `{ "message": string }`; arguments of
+The node commands are defined in [node.rs](../crates/dageist-tauri/src/node.rs)
+over plain functions that answer without Tauri, so another host can serve the
+same views. The node is the engine's claim-timing sample until the graph
+supplies real ones, and no command keeps anything between calls: each reads the
+document it is given. The engine formats every cell and names every dtype, so
+the view formats no value, and the host has no Polars of its own.
+
+A table or node command that fails rejects with `{ "message": string }`; arguments of
 the wrong type are rejected by Tauri with its own text. The first call to
 either open command generates the sample table, about two million rows of 300
 columns and 2 GB of Parquet, into a `claims-…` folder in the application cache
@@ -112,7 +122,7 @@ Every package is private and is consumed as TypeScript source.
 | Package | Path | Role | May depend on |
 | --- | --- | --- | --- |
 | `@dageist/desktop` | [ui/apps/desktop/](../ui/apps/desktop/src/App.tsx) | The shell: picks the host, composes the features, owns the page, the bundler configuration and the design tokens. | Every package below, React, and flechette for the stand-in host |
-| `@dageist/host` | [ui/packages/host/](../ui/packages/host/src/contract.ts) | The contract of every IPC command and its implementation over Tauri. | Nothing |
+| `@dageist/host` | [ui/packages/host/](../ui/packages/host/src/contract.ts) | The contract of every IPC command, the decoders that read what the host sends, and the implementation over Tauri. | Nothing |
 | `@dageist/design` | [ui/packages/design/](../ui/packages/design/src/index.ts) | Primitive components: `Block` (a word that can be pressed), `Piece`, `Slot`, `ManySlot`, `OfferList`, `TypedBlock`, `Popover`, `Hint`, `Peek`, `ToggleButton`, `Panel`, and `blocks.css`, the styles of the words a step is written in. `Popover` is placed by Floating UI. | Floating UI, React, React DOM |
 | `@dageist/steps` | [ui/packages/steps/](../ui/packages/steps/src/StepsWorkspace.tsx) | The steps of a transform and their storyboard model: the main window's table with its list of steps, and the window the steps are edited in. | `@dageist/design`, `@dageist/host`, dnd kit, React, React DOM |
 | `@dageist/table` | [ui/packages/table/](../ui/packages/table/src/TableViewer.tsx) | The table viewer: fetches blocks as Arrow bytes and draws only those. | `@dageist/design`, `@dageist/host`, flechette, React |
@@ -123,11 +133,13 @@ Every package is private and is consumed as TypeScript source.
 | [ui/apps/desktop/vite.config.ts](../ui/apps/desktop/vite.config.ts) | Bundler settings; the bundle is written to `ui/dist/`. |
 | [ui/apps/desktop/src/styles.css](../ui/apps/desktop/src/styles.css) | Tailwind entry, the colour and font tokens, and the declarations of the two typefaces. |
 | [ui/apps/desktop/public/fonts/](../ui/apps/desktop/public/fonts/) | The typefaces the view is set in, each with the licence it comes under, copied into the bundle as they are: Inter for everything that is not code or data, and JetBrains Mono for code and data. |
-| [ui/apps/desktop/src/demo-host.ts](../ui/apps/desktop/src/demo-host.ts) | A stand-in host with made-up rows and the catalogue snapshot, loaded only when the page is open outside Tauri. |
-| [ui/apps/desktop/src/catalogue.json](../ui/apps/desktop/src/catalogue.json) | The `operation_catalogue` command's view, written by the host's snapshot test for the stand-in host to serve. Generated; [refresh it](how-to.md#refresh-the-catalogue-snapshot), never edit it. |
+| [ui/apps/desktop/src/demo-host.ts](../ui/apps/desktop/src/demo-host.ts) | A stand-in host with made-up rows and the catalogue snapshot, loaded only when the page is open outside Tauri. It answers the node commands as unavailable. |
+| [ui/packages/host/src/decode.ts](../ui/packages/host/src/decode.ts) | The readers every decoder is made of. A decoder reads what the host sent, which is `unknown`, and returns it typed or refuses it with a `DecodeError` that names the place, such as `$.steps[3].outcome.status`, and the reason. Objects are closed: a missing field, a field the contract lacks and a tag it does not name are refused. [decode-catalogue.ts](../ui/packages/host/src/decode-catalogue.ts), [decode-node.ts](../ui/packages/host/src/decode-node.ts) and [decode-run.ts](../ui/packages/host/src/decode-run.ts) read the catalogue, a node's inputs with the rows after a step, and the report of a run. |
+| [ui/packages/host/fixtures/](../ui/packages/host/fixtures/catalogue.json) | Snapshots of what the host's commands return, which the decoders' tests read and the stand-in host serves: `catalogue.json`, `node-inputs.json`, `step-report.json` (the claim-timing steps), `step-report-refused.json` (a step Polars refuses and the step after it), `step-report-unreadable.json` (text that is not a document) and `step-rows.json`. Generated by host tests; [refresh the catalogue snapshot](how-to.md#refresh-the-catalogue-snapshot) and [the step report snapshots](how-to.md#refresh-the-step-report-snapshots), never edit them. |
+| [ui/vitest.config.ts](../ui/vitest.config.ts) | Vitest settings: it runs the `*.test.ts` files under `apps/*/src` and `packages/*/src` in Node. |
 | [ui/apps/desktop/public/pieces/](../ui/apps/desktop/public/pieces/index.html) | The Pieces page: a prototype of how the step editor is drawn, in plain HTML, CSS and JavaScript, copied into the bundle as it is and shown in the Pieces tab. |
 | [ui/tsconfig.json](../ui/tsconfig.json) | Strict compiler settings for every package's `src/`; emits nothing. |
-| [ui/tsconfig.node.json](../ui/tsconfig.node.json) | Strict type checking of the Vite configuration; emits nothing. |
+| [ui/tsconfig.node.json](../ui/tsconfig.node.json) | Strict type checking of the Vite and Vitest configurations; emits nothing. |
 | [ui/.oxlintrc.json](../ui/.oxlintrc.json) | Lint rules: the `correctness` and `suspicious` categories plus the listed rules, all as errors, with type-aware, React and accessibility rules enabled. |
 | [ui/.oxfmtrc.json](../ui/.oxfmtrc.json) | Formatter settings: 100-column lines, single quotes, semicolons. |
 
@@ -139,6 +151,7 @@ Every package is private and is consumed as TypeScript source.
 | `format` | Rewrites the files in `ui/` with oxfmt. |
 | `format:check` | Reports files that oxfmt would change, without writing. |
 | `build` | Bundles the view into `ui/dist/` with Vite. |
+| `test` | Runs the view's tests once with Vitest. They cover only the data layers, the decoders in `@dageist/host` and the functions that prepare data for display, against the fixtures written from Rust, with expectations written by hand; React components are not tested. |
 
 Runtime dependencies, bundled into `ui/dist/` and pinned to exact versions in
 the package that uses them: React 19.3.1 (`react`, `react-dom`),
@@ -147,9 +160,11 @@ and drop, and [flechette](https://github.com/uwdata/flechette) 2.7.1 for
 reading Arrow data. Development dependencies, pinned in
 [ui/package.json](../ui/package.json), are Vite with its React plugin, Tailwind
 CSS with its Vite plugin, React's type declarations, TypeScript, the oxlint linter
-with its type-aware companion `oxlint-tsgolint`, the oxfmt formatter, and
-Node's type declarations (`@types/node`) for the Vite configuration.
+with its type-aware companion `oxlint-tsgolint`, the oxfmt formatter,
+Vitest 4.1.12 for the tests of the data layers, and Node's type declarations
+(`@types/node`) for the Vite configuration.
 
-The Vite configuration is TypeScript that runs in Node. It is type-checked
-against `@types/node` through [ui/tsconfig.node.json](../ui/tsconfig.node.json)
-and linted with the Node rules in [ui/.oxlintrc.json](../ui/.oxlintrc.json).
+The Vite and Vitest configurations are TypeScript that runs in Node. They are
+type-checked against `@types/node` through
+[ui/tsconfig.node.json](../ui/tsconfig.node.json) and linted with the Node rules
+in [ui/.oxlintrc.json](../ui/.oxlintrc.json).

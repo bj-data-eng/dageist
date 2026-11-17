@@ -26,14 +26,26 @@ npm --prefix ui run check
 npm --prefix ui run lint
 npm --prefix ui run format:check
 npm --prefix ui run build
+npm --prefix ui run test
 ```
 
-All four commands exit successfully. The lint prints nothing when it finds no
+All five commands exit successfully. The lint prints nothing when it finds no
 problems; it treats warnings as errors and also reports suppression comments
 that no longer suppress anything. `format:check` reports files whose formatting
 differs from the formatter's output without changing them. `ui/dist/` then
 holds `index.html` and an `assets/` folder with the bundled script and
-stylesheet.
+stylesheet. `test` runs Vitest once over the view's data layers: the decoders
+in `ui/packages/host`, which read what the host sends and are tested against
+the [snapshots written from Rust](#refresh-the-step-report-snapshots) with
+expectations written by hand, and later the functions that prepare data for
+display. React components have no tests. Name a file to run only its tests,
+as in `npm --prefix ui run test -- decode-run`.
+
+Add a development dependency with
+`npm --prefix ui install --save-dev --save-exact --legacy-peer-deps <package>`.
+Without `--legacy-peer-deps`, npm 10 stops with `Cannot read properties of null
+(reading 'edgesOut')` while it resolves Vitest's optional peers. The lock file
+the flag writes passes `npm ci`.
 
 To restore `ui/node_modules/` from the local npm cache without network access,
 run `npm --prefix ui ci --offline`.
@@ -98,14 +110,27 @@ the steps window opens it once, and that the capability names its label. They
 run against Tauri's mock runtime and do not open a real window.
 
 They also prove the `operation_catalogue` command's view of the catalogue,
-and that `ui/apps/desktop/src/catalogue.json`, the copy of that view the
-browser stand-in serves, is current.
+and that `ui/packages/host/fixtures/catalogue.json`, the copy of that view the
+view's tests decode and the browser stand-in serves, is current.
+
+The node commands are tested through the same IPC layer, on the claim-timing
+sample node: `node_inputs` gives the table the steps start from and each
+other input with its columns or dtype; `run_document` reports each step of a
+document, whether valid, refused at the link Polars names, or not run behind a
+refused one, with the dtype after each link and what the tables of allowed
+combinations say of each call, and reports text that is not a document with
+its place instead of failing; `rows_after_step` gives the rows after a step as
+text, a null as `null`, and rejects a limit above 1,000 rows, a step that is not
+in the document and a step that was not run. Every expected value is written by
+hand from the sample's seven rows. The tests also prove that the step report
+snapshots in `ui/packages/host/fixtures/` are current.
 
 ### Refresh The Catalogue Snapshot
 
 After a change to the catalogue, its language file or the view of it, the
-snapshot test fails and says how to refresh the file. Write it from the
-host's own serializer, then format it as the view's formatter expects:
+snapshot test fails and says how to refresh
+`ui/packages/host/fixtures/catalogue.json`. Write it from the host's own
+serializer, then format it as the view's formatter expects:
 
 ```sh
 DAGEIST_REFRESH_CATALOGUE=1 cargo test --offline --locked -p dageist-tauri catalogue::tests::the_snapshot_is_what_the_command_returns
@@ -114,6 +139,29 @@ npm --prefix ui run format
 
 The test compares the file with the view by value, so the formatter's
 layout does not affect it. Never edit the file by hand.
+
+### Refresh The Step Report Snapshots
+
+After a change to the sample node, the step document or its running, the walk
+of the tables, the catalogue's laziness, or the views of what they report, the
+snapshot test fails and names the file that differs. Five files in
+`ui/packages/host/fixtures/` are written by one test: `node-inputs.json` from
+`node_inputs`, `step-report.json` from running the claim-timing steps,
+`step-report-refused.json` from a document whose second step Polars refuses and
+whose third is not run, `step-report-unreadable.json` from text that is not a
+document, and `step-rows.json` from the rows after the `days_open` step. Write
+them from the host's own serializer, then format them, then run the view's
+tests, which decode them:
+
+```sh
+DAGEIST_REFRESH_STEP_REPORTS=1 cargo test --offline --locked -p dageist-tauri node::tests::the_snapshots_are_what_the_commands_return
+npm --prefix ui run format
+npm --prefix ui run test
+```
+
+The test compares the files with the views by value. Review the diff: a change
+that the decoders refuse is a change of shape the view has to follow, in the
+contract and in `ui/packages/host/src/`. Never edit the files by hand.
 
 ## Open The Sample Table
 
