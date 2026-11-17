@@ -14,8 +14,9 @@ import { useMemo } from 'react';
 import { cx } from '@dageist/design';
 
 import { dragSettingsFor } from './Chain';
-import { useCatalogue } from './CatalogueProvider';
-import type { Step, StepResult } from './model/steps';
+import { useCatalogue } from './EngineProvider';
+import type { PreparedStep } from './model/report';
+import type { Step } from './model/steps';
 import { stepDetail } from './summary';
 import { VERB_COLOURS, verbHead } from './verbs';
 
@@ -100,7 +101,7 @@ function StepName({
 export interface StepNavigatorProps {
   readonly steps: readonly Step[];
   /** What each step produced, in the same order. */
-  readonly results: readonly StepResult[];
+  readonly results: readonly PreparedStep[];
   readonly selectedId: string | null;
   /**
    * The nonce the page's content security policy accepts for injected styles,

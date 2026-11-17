@@ -1,0 +1,305 @@
+/**
+ * @file Prepares what the engine reports of a run for display, and nothing
+ * else: for each step of the editor the columns it is given and the columns
+ * it gives, which of them it added, the dtype after the start of each chain
+ * and after each method, whether the step stays lazy, and what is the matter
+ * with it, on which word. Everything here is read off the report or off what
+ * the translation noted; no rule about a dtype, a column or a value is worked
+ * out in the view.
+ */
+
+import type {
+  CauseView,
+  ErrorKind,
+  PlaceView,
+  ResolutionView,
+  RunView,
+  StepReportView,
+} from '@dageist/host';
+
+import type { ChainOwner, Mark, SentStep, Translation } from './document';
+import { placeKey, segmentWord, wrongId } from './document';
+import type { Frame } from './frame';
+import type { Step } from './steps';
+
+/** The dtype after the start of a chain and after each of its methods; `null` where the engine gives none. */
+export interface ChainDtypes {
+  readonly source: string | null;
+  readonly methods: ReadonlyArray<string | null>;
+}
+
+/** What a step of the editor is, as far as anyone knows. */
+export type StepStatus =
+  /** The engine accepts it. */
+  | 'valid'
+  /** It cannot be run: the engine refused it, or it cannot be written as a document yet. */
+  | 'refused'
+  /** A step before it cannot be run, so it was not. */
+  | 'notRun'
+  /** It is in the document, and the engine has not reported on it. */
+  | 'unknown';
+
+/** What the editor shows of one step. */
+export interface PreparedStep {
+  readonly id: string;
+  readonly status: StepStatus;
+  /** The columns the step is given. */
+  readonly before: Frame;
+  /** The columns the step gives; those it is given when it cannot be run. */
+  readonly after: Frame;
+  /** The names of the columns the step added or replaced. */
+  readonly added: readonly string[];
+  /** Whether the step stays in a lazy plan, and `null` where the engine has not said. */
+  readonly lazy: boolean | null;
+  /** What is the matter with the step, in words, or `null`. */
+  readonly problem: string | null;
+  /** The words of the editor that are the matter, as `wrongId` names them. */
+  readonly wrong: ReadonlySet<string>;
+  /** The dtypes of each chain of the step, by the chain's identifier. */
+  readonly chains: ReadonlyMap<string, ChainDtypes>;
+}
+
+/** What the editor shows of a run. */
+export interface PreparedRun {
+  /** The columns of the table the steps start from. */
+  readonly source: Frame;
+  /** One for each step of the editor, in its order. */
+  readonly steps: readonly PreparedStep[];
+}
+
+const NO_WORDS: ReadonlySet<string> = new Set();
+const NO_CHAINS: ReadonlyMap<string, ChainDtypes> = new Map();
+
+/** Returns the dtype a resolution gives, or `null` when it gives none. */
+function dtypeOf(resolution: ResolutionView | undefined): string | null {
+  return resolution?.kind === 'dtype' ? resolution.dtype : null;
+}
+
+/** Returns how the engine's expressions fall on the chains of the editor. */
+function chainDtypes(report: StepReportView, sent: SentStep): ReadonlyMap<string, ChainDtypes> {
+  const found = new Map<string, ChainDtypes>();
+  for (const expression of report.expressions) {
+    const owner: ChainOwner | undefined = sent.chains.get(
+      placeKey(expression.place.path.map(segmentWord)),
+    );
+    if (owner === undefined) continue;
+    const { whenLinks, methodIds } = owner;
+    // A chain that starts from `when` has a dtype once its `otherwise` is there.
+    const source = whenLinks === 0 ? expression.start : expression.links[whenLinks - 1];
+    found.set(owner.chainId, {
+      source: dtypeOf(source),
+      methods: methodIds.map((_id, index) => dtypeOf(expression.links[whenLinks + index])),
+    });
+  }
+  return found;
+}
+
+/** Returns the word of the editor a place of a step is, or `null` when no word is it. */
+function markAt(sent: SentStep, place: PlaceView): Mark | null {
+  const words = place.path.map(segmentWord);
+  // The longest place that stands for a word: a place deeper than one is in that word.
+  for (let length = words.length; length >= 0; length -= 1) {
+    const found = sent.marks.get(placeKey(words.slice(0, length)));
+    if (found !== undefined) return found;
+  }
+  return null;
+}
+
+/** Returns the first paragraph of `reason`, which is what Polars says before it prints its plan. */
+function firstParagraph(reason: string): string {
+  return (reason.split('\n\n')[0] ?? reason).trim();
+}
+
+/** Returns what a cause says, in words. */
+function causeWords(cause: CauseView): string {
+  switch (cause.kind) {
+    case 'unknownTable':
+      return `There is no table "${cause.name}".`;
+    case 'unknownInput':
+      return `There is no input "${cause.name}".`;
+    case 'build':
+      return firstParagraph(cause.reason);
+    case 'notAllowed':
+      return cause.refusal.reason;
+    case 'polars':
+      return firstParagraph(cause.reason);
+    default:
+      return cause satisfies never;
+  }
+}
+
+/** The columns of `after` that are not in `before`, or have another dtype there. */
+function changedColumns(before: Frame, after: Frame): string[] {
+  return after.flatMap((column) => {
+    const was = before.find((candidate) => candidate.name === column.name);
+    return was?.dtype === column.dtype ? [] : [column.name];
+  });
+}
+
+/** What is said of a step that has to wait for the step called `blockedBy`. */
+function waitingWords(steps: readonly Step[], blockedBy: string): string {
+  const at = steps.findIndex((step) => step.id === blockedBy);
+  return at < 0
+    ? 'Not run: a step before it cannot be run.'
+    : `Not run: step ${String(at + 1)} cannot be run yet.`;
+}
+
+/** Returns a step's report: what the engine said of it, found by the step's identifier. */
+function reportsById(run: RunView | null): ReadonlyMap<string, StepReportView> {
+  return run?.status === 'run'
+    ? new Map(run.steps.map((report) => [report.id, report]))
+    : new Map();
+}
+
+/**
+ * Prepares what the engine reported of the document `translation` is for
+ * `steps`, for display. `run` is `null` where the engine has not reported;
+ * `source` is the columns of the table the steps start from.
+ *
+ * A text the engine could not read is not a report of steps. The first step
+ * in the document is then the one refused, with the engine's reason, and the
+ * steps after it are not run.
+ */
+export function prepareRun(
+  steps: readonly Step[],
+  translation: Translation,
+  run: RunView | null,
+  source: Frame,
+): PreparedRun {
+  const reports = reportsById(run);
+  const unreadable = run?.status === 'unreadable' ? run.problem : null;
+  let sentSoFar = 0;
+  let before = source;
+  const prepared: PreparedStep[] = [];
+  for (const [index, step] of steps.entries()) {
+    const found = translation.steps[index];
+    const make = (
+      status: StepStatus,
+      problem: string | null,
+      rest: Partial<PreparedStep> = {},
+    ): PreparedStep => ({
+      id: step.id,
+      status,
+      before,
+      after: before,
+      added: [],
+      lazy: null,
+      problem,
+      wrong: NO_WORDS,
+      chains: NO_CHAINS,
+      ...rest,
+    });
+    let result: PreparedStep;
+    if (found === undefined) {
+      result = make('unknown', null);
+    } else if (found.kind === 'held') {
+      result = make('refused', found.problem.message, { wrong: new Set(found.problem.wrong) });
+    } else if (found.kind === 'waiting') {
+      result = make('notRun', waitingWords(steps, found.blockedBy));
+    } else if (unreadable !== null) {
+      // The reader names the step it stopped at; with no step, the first of the document.
+      const stoppedAt = unreadable.kind === 'refused' ? (unreadable.place.stepIndex ?? 0) : 0;
+      if (sentSoFar < stoppedAt) {
+        result = make('unknown', null);
+      } else if (sentSoFar === stoppedAt) {
+        result = make('refused', unreadable.reason);
+      } else {
+        result = make('notRun', 'Not run: a step before it cannot be read.');
+      }
+    } else {
+      const report = reports.get(step.id);
+      result =
+        report === undefined ? make('unknown', null) : fromReport(step, found, report, before);
+    }
+    if (found?.kind === 'sent') sentSoFar += 1;
+    prepared.push(result);
+    before = result.after;
+  }
+  return { source, steps: prepared };
+}
+
+/** Prepares one step from what the engine reported of it. */
+function fromReport(
+  step: Step,
+  sent: SentStep,
+  report: StepReportView,
+  before: Frame,
+): PreparedStep {
+  const base = {
+    id: step.id,
+    before,
+    lazy: report.lazy,
+    chains: chainDtypes(report, sent),
+  };
+  const { outcome } = report;
+  switch (outcome.status) {
+    case 'valid': {
+      const added = changedColumns(before, outcome.columns);
+      // A column the step names is its own even when it holds the dtype the old one did.
+      if (step.verb === 'with_columns' && !added.includes(step.alias)) added.push(step.alias);
+      return {
+        ...base,
+        status: 'valid',
+        after: outcome.columns,
+        added: added.filter((name) => outcome.columns.some((column) => column.name === name)),
+        problem: null,
+        wrong: NO_WORDS,
+      };
+    }
+    case 'refused': {
+      const found = markAt(sent, outcome.place);
+      return {
+        ...base,
+        status: 'refused',
+        after: before,
+        added: [],
+        problem: causeWords(outcome.cause),
+        wrong: found === null ? NO_WORDS : new Set([wrongId(found)]),
+      };
+    }
+    case 'notRun':
+      return {
+        ...base,
+        status: 'notRun',
+        after: before,
+        added: [],
+        problem: 'Not run: a step before it was refused.',
+        wrong: NO_WORDS,
+      };
+    default:
+      return outcome satisfies never;
+  }
+}
+
+/** What the rows of a step show: the rows, or why there are none. */
+export type RowsDisplay =
+  | {
+      readonly kind: 'rows';
+      readonly columns: Frame;
+      readonly rows: ReadonlyArray<ReadonlyArray<string | null>>;
+    }
+  | { readonly kind: 'message'; readonly text: string };
+
+/**
+ * Says why the engine gave no rows for a step, by the kind of the failure and
+ * never by its text, except where the text is all there is to say.
+ * `step` is what is known of the step asked for, when it is known.
+ */
+export function rowsFailure(kind: ErrorKind, message: string, step: PreparedStep | null): string {
+  switch (kind) {
+    case 'noSuchStep':
+      return 'This step is not in the document yet.';
+    case 'notRun':
+      return step?.problem ?? 'Not run: a step before it was refused.';
+    case 'refused':
+      return step?.problem ?? 'This step was refused.';
+    case 'limit':
+      return 'There are more rows than a preview holds.';
+    case 'unreadable':
+      return 'The steps cannot be read yet.';
+    case 'failed':
+      return message;
+    default:
+      return kind satisfies never;
+  }
+}

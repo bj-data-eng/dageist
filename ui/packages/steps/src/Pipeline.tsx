@@ -4,7 +4,7 @@
 
 import { cx } from '@dageist/design';
 
-import { useCatalogue } from './CatalogueProvider';
+import { useCatalogue } from './EngineProvider';
 import type { Step } from './model/steps';
 import { stepText } from './model/steps';
 

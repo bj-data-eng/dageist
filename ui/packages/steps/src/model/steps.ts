@@ -1,65 +1,31 @@
 /**
  * @file The step list in Polars' own vocabulary: `with_columns`, `filter`,
- * `sort`, `select`, `rename`, `join` and `pivot`, each working on the frame
- * the step before it produced.
- *
- * This is storyboard code. In the real application the Rust core owns types,
- * validation and previews; nothing here is meant to survive.
+ * `sort`, `select`, `rename`, `join` and `pivot`, as the editor holds them.
+ * What a step does to the table, and whether it may, is the engine's to say;
+ * `document.ts` writes the steps as the document the engine runs.
  */
 
 import type { ParameterView } from '@dageist/host';
 
-import type { Cell, Column, Frame } from './frame';
-import {
-  SOURCE_FRAME,
-  assertNever,
-  compareCells,
-  distinctValues,
-  findColumn,
-  isNumeric,
-  keysFit,
-  quoted,
-  reordered,
-} from './frame';
 import type { MethodName } from './expr';
-import { nextId } from './ids';
+import { groupHolds, verbEntry } from './catalogue';
 import type { Catalogue } from './catalogue';
-import { verbEntry } from './catalogue';
+import type { Frame } from './frame';
+import { assertNever, findColumn, quoted } from './frame';
+import { nextId } from './ids';
+import type { NamedTable } from './inputs';
 import type { Options, Setting } from './settings';
 import {
   NO_OPTIONS,
   UNSET,
-  atDefault,
-  defaultSetting,
   expressionSetting,
-  flagFor,
-  isComplete,
   itemsOf,
   optionOf,
   optionParameters,
-  pairsOf,
-  setParameters,
-  textOf,
   withoutOptions,
-  wordOf,
 } from './settings';
 import type { Chain, Condition, Value } from './source';
-import {
-  cellsOf,
-  checkChain,
-  checkValue,
-  conditionProblem,
-  conditionRows,
-  conditionText,
-  evaluateElement,
-  keyText,
-  literalText,
-  optionTexts,
-  optionsProblem,
-  settingValueText,
-  valueExprText,
-} from './source';
-import { TABLES, findTable } from './tables';
+import { conditionText, keyText, optionTexts, settingValueText, valueExprText } from './source';
 
 /** The step verbs, by their Polars names. */
 export type Verb = 'with_columns' | 'filter' | 'sort' | 'select' | 'rename' | 'join' | 'pivot';
@@ -149,20 +115,11 @@ export interface JoinStep {
 }
 
 /**
- * How a pivot finds out which columns it returns. They are the values of its
- * `on` column, so Polars can only plan the step lazily when they are given up
- * front. Otherwise the rows before it must exist first: loaded into memory
- * with a collect, or written out by a sink.
- */
-export type ColumnsFrom = 'collect' | 'sink' | 'pinned';
-
-/** Every way of finding a pivot's columns, in the order it is offered. */
-export const COLUMNS_FROM: readonly ColumnsFrom[] = ['collect', 'sink', 'pinned'];
-
-/**
- * `.pivot(on, index=…, values=…, aggregate_function=…)`: turns the values of
- * one column into columns. How the values that land in one cell are combined
- * is the expression `aggregate_function` of `options`, made of `pl.element()`.
+ * `.pivot(on, on_columns=…, index=…, values=…, aggregate_function=…)`: turns
+ * the values of one column into columns. The columns it returns are the
+ * values of a connected table, the parameter `on_columns` of `options`. How
+ * the values that land in one cell are combined is the expression
+ * `aggregate_function` of `options`, made of `pl.element()`.
  */
 export interface PivotStep {
   /** Stays with the step while it is moved or edited. */
@@ -171,9 +128,6 @@ export interface PivotStep {
   readonly on: string;
   readonly index: string;
   readonly values: string;
-  readonly columnsFrom: ColumnsFrom;
-  /** The values of `on` that become columns when the columns are pinned. */
-  readonly pinned: readonly Cell[];
   readonly options: Options;
 }
 
@@ -186,23 +140,6 @@ export type Step =
   | RenameStep
   | JoinStep
   | PivotStep;
-
-/** Where the lazy query has to stop before `step` can run, if it has to. */
-export function stepBreak(step: Step): 'collect' | 'sink' | null {
-  return step.verb === 'pivot' && step.columnsFrom !== 'pinned' ? step.columnsFrom : null;
-}
-
-/** What a step produced: its frame, or the frame it was given and why it failed. */
-export interface StepResult {
-  readonly frame: Frame;
-  readonly problem: string | null;
-  /** The columns this step added or replaced. */
-  readonly added: readonly string[];
-}
-
-function failed(frame: Frame, problem: string): StepResult {
-  return { frame, problem, added: [] };
-}
 
 /** A value that is still to be picked. */
 const NOTHING: Value = { kind: 'unset' };
@@ -239,287 +176,6 @@ function keyLabel(catalogue: Catalogue, key: Value): string {
   return key.kind === 'column' ? key.column : keyText(catalogue, key);
 }
 
-function withColumns(catalogue: Catalogue, frame: Frame, step: WithColumnsStep): StepResult {
-  const { alias, value } = step;
-  if (alias.trim() === '') return failed(frame, 'alias needs a name.');
-  const check = checkValue(catalogue, value, frame);
-  if (check.problem !== null) return failed(frame, check.problem);
-  if (check.dtype === null) return failed(frame, 'None alone has no dtype to make a column of.');
-  const column: Column = {
-    name: alias,
-    dtype: check.dtype,
-    cells: cellsOf(catalogue, value, frame),
-  };
-  const replaced = frame.some((existing) => existing.name === alias);
-  return {
-    frame: replaced
-      ? frame.map((existing) => (existing.name === alias ? column : existing))
-      : [...frame, column],
-    problem: null,
-    added: [alias],
-  };
-}
-
-function sort(catalogue: Catalogue, frame: Frame, step: SortStep): StepResult {
-  const keys: Array<{
-    readonly cells: readonly Cell[];
-    readonly descending: boolean;
-    readonly nullsLast: boolean;
-  }> = [];
-  for (const key of keysOf(step.options, 'by')) {
-    // The preview orders the rows by fields; any other key it does not work out.
-    if (key.kind !== 'column') {
-      return failed(
-        frame,
-        `The preview does not include sorting by ${keyText(catalogue, key)}, only by fields.`,
-      );
-    }
-    const column = findColumn(frame, key.column);
-    if (column === null) return failed(frame, `There is no column "${key.column}".`);
-    keys.push({
-      cells: column.cells,
-      descending: flagFor(step.options, 'descending', key.column),
-      nullsLast: flagFor(step.options, 'nulls_last', key.column),
-    });
-  }
-  if (keys.length === 0) return failed(frame, 'Pick the fields to sort by.');
-  const order = Array.from({ length: frame[0]?.cells.length ?? 0 }, (_unused, row) => row);
-  order.sort((left, right) => {
-    for (const key of keys) {
-      const first = key.cells[left] ?? null;
-      const second = key.cells[right] ?? null;
-      if (first === null || second === null) {
-        // Empty values go first, or last when the column says so, whichever way the values are ordered.
-        if (first === second) continue;
-        return (first === null) === key.nullsLast ? 1 : -1;
-      }
-      const compared = compareCells(first, second);
-      if (compared === 0) continue;
-      return key.descending ? -compared : compared;
-    }
-    return left - right;
-  });
-  return { frame: reordered(frame, order), problem: null, added: [] };
-}
-
-function select(catalogue: Catalogue, frame: Frame, step: SelectStep): StepResult {
-  const names: string[] = [];
-  for (const key of keysOf(step.options, 'exprs')) {
-    // The preview keeps fields; any other expression it does not work out.
-    if (key.kind !== 'column') {
-      return failed(
-        frame,
-        `The preview does not include selecting ${keyText(catalogue, key)}, only fields.`,
-      );
-    }
-    // Polars refuses to select one column twice.
-    if (names.includes(key.column)) return failed(frame, `"${key.column}" is selected twice.`);
-    names.push(key.column);
-  }
-  if (names.length === 0) return failed(frame, 'Pick the fields to keep.');
-  const kept: Column[] = [];
-  for (const name of names) {
-    const column = findColumn(frame, name);
-    if (column === null) return failed(frame, `There is no column "${name}".`);
-    kept.push(column);
-  }
-  return { frame: kept, problem: null, added: [] };
-}
-
-function rename(frame: Frame, step: RenameStep): StepResult {
-  const renamed = new Map<string, string>();
-  for (const { key, value } of pairsOf(step.options, 'mapping')) {
-    const from = textOf(key) ?? '';
-    const to = textOf(value) ?? '';
-    if (findColumn(frame, from) === null) return failed(frame, `There is no column "${from}".`);
-    if (to === '') return failed(frame, `"${from}" needs a new name.`);
-    renamed.set(from, to);
-  }
-  const next = frame.map((column) => ({
-    ...column,
-    name: renamed.get(column.name) ?? column.name,
-  }));
-  // Polars refuses a rename that would leave two columns with one name.
-  const taken = new Set<string>();
-  for (const column of next) {
-    if (taken.has(column.name)) {
-      return failed(frame, `The rename would leave two columns called "${column.name}".`);
-    }
-    taken.add(column.name);
-  }
-  return { frame: next, problem: null, added: [...renamed.values()] };
-}
-
-function filter(catalogue: Catalogue, frame: Frame, step: FilterStep): StepResult {
-  const problem = conditionProblem(catalogue, step.condition, frame);
-  if (problem !== null) return failed(frame, problem);
-  const kept = conditionRows(catalogue, step.condition, frame).flatMap((holds, row) =>
-    holds ? [row] : [],
-  );
-  return { frame: reordered(frame, kept), problem: null, added: [] };
-}
-
-/** How a join names a column it brings in when the frame has one of that name already. */
-const DEFAULT_SUFFIX = '_right';
-
-/** Returns the name a joined-in column gets: its own, or with `suffix` when the frame has it already. */
-function joinedName(frame: Frame, name: string, suffix: string): string {
-  return findColumn(frame, name) === null ? name : `${name}${suffix}`;
-}
-
-/**
- * Returns the name of the field `key` is, or the result that says why the
- * preview cannot work with it. `of` names the table the key is a field of.
- */
-function joinField(
-  catalogue: Catalogue,
-  frame: Frame,
-  key: Value,
-  table: Frame,
-  of: string,
-): { readonly column: Column } | StepResult {
-  if (key.kind === 'unset') return failed(frame, `Pick the fields of ${of} to match.`);
-  if (key.kind !== 'column') {
-    const checked = checkValue(catalogue, key, table);
-    if (checked.problem !== null) return failed(frame, checked.problem);
-    return failed(
-      frame,
-      `The preview does not include joining on ${keyText(catalogue, key)}, only on fields.`,
-    );
-  }
-  const column = findColumn(table, key.column);
-  return column === null ? failed(frame, `No column "${key.column}" in ${of}.`) : { column };
-}
-
-function join(catalogue: Catalogue, frame: Frame, step: JoinStep): StepResult {
-  const table = findTable(step.table);
-  if (table === null) return failed(frame, `There is no table "${step.table}".`);
-  const leftOn = keysOf(step.options, 'left_on');
-  const rightOn = keysOf(step.options, 'right_on');
-  if (leftOn.length === 0) return failed(frame, 'Pick the fields to match.');
-  if (leftOn.length !== rightOn.length) {
-    return failed(
-      frame,
-      `${String(leftOn.length)} fields of these rows are matched with ${String(rightOn.length)} of "${step.table}".`,
-    );
-  }
-  const keys: Array<{ readonly left: Column; readonly right: Column }> = [];
-  for (const [at, leftKey] of leftOn.entries()) {
-    const left = joinField(catalogue, frame, leftKey, frame, 'these rows');
-    if (!('column' in left)) return left;
-    const right = joinField(
-      catalogue,
-      frame,
-      rightOn[at] ?? NOTHING,
-      table.frame,
-      `"${step.table}"`,
-    );
-    if (!('column' in right)) return right;
-    if (!keysFit(left.column.dtype, right.column.dtype)) {
-      return failed(
-        frame,
-        `"${left.column.name}" is ${left.column.dtype}, but "${step.table}.${right.column.name}" is ${right.column.dtype}.`,
-      );
-    }
-    keys.push({ left: left.column, right: right.column });
-  }
-  // The preview keeps the rows of the joins it knows; any other kind is said not to be previewed.
-  const how = wordOf(step.options, 'how') ?? 'inner';
-  if (how !== 'left' && how !== 'inner') {
-    return failed(frame, `The preview does not include how="${how}".`);
-  }
-  const suffix = wordOf(step.options, 'suffix') ?? DEFAULT_SUFFIX;
-  // Each left row is paired with every right row whose keys all match. A left
-  // join keeps a left row with no match, paired with nulls.
-  const pairs: Array<readonly [number, number | null]> = [];
-  const rows = frame[0]?.cells.length ?? 0;
-  for (let row = 0; row < rows; row += 1) {
-    const matches = (table.frame[0]?.cells ?? []).flatMap((_cell, at) =>
-      keys.every(({ left, right }) => {
-        const key = left.cells[row] ?? null;
-        return key !== null && right.cells[at] === key;
-      })
-        ? [at]
-        : [],
-    );
-    if (matches.length === 0 && how === 'left') pairs.push([row, null]);
-    for (const match of matches) pairs.push([row, match]);
-  }
-  const kept = reordered(
-    frame,
-    pairs.map(([row]) => row),
-  );
-  // Polars keeps the left key columns, so the right table's keys are not brought in.
-  const brought: Column[] = table.frame
-    .filter((column) => !keys.some(({ right }) => right.name === column.name))
-    .map((column) => ({
-      name: joinedName(frame, column.name, suffix),
-      dtype: column.dtype,
-      cells: pairs.map(([, match]) => (match === null ? null : (column.cells[match] ?? null))),
-    }));
-  // Polars refuses a join that would leave two columns with one name.
-  const taken = new Set(frame.map((column) => column.name));
-  for (const column of brought) {
-    if (taken.has(column.name)) {
-      return failed(frame, `The join would add a second column "${column.name}".`);
-    }
-    taken.add(column.name);
-  }
-  return {
-    frame: [...kept, ...brought],
-    problem: null,
-    added: brought.map((column) => column.name),
-  };
-}
-
-function pivot(catalogue: Catalogue, frame: Frame, step: PivotStep): StepResult {
-  const on = findColumn(frame, step.on);
-  if (on === null) return failed(frame, `There is no column "${step.on}".`);
-  const index = findColumn(frame, step.index);
-  if (index === null) return failed(frame, `There is no column "${step.index}".`);
-  const values = findColumn(frame, step.values);
-  if (values === null) return failed(frame, `There is no column "${step.values}".`);
-  // Polars works each cell out as the aggregate over the values that land in it.
-  const aggregate = aggregateOf(step);
-  if (aggregate === null || aggregate.kind === 'unset') {
-    return failed(frame, 'Pick how the values that land in one cell are combined.');
-  }
-  if (aggregate.kind !== 'chain') {
-    return failed(frame, 'The values that land in one cell are combined by a chain of element.');
-  }
-  const { chain } = aggregate;
-  const check = checkChain(catalogue, chain, frame, { dtype: values.dtype });
-  if (check.problem !== null) return failed(frame, check.problem.message);
-  const dtype = check.dtypes.at(-1) ?? values.dtype;
-  const text = valueExprText(catalogue, aggregate);
-  // A cell no row lands in holds what the aggregate gives no rows.
-  const headers = step.columnsFrom === 'pinned' ? step.pinned : distinctValues(frame, step.on);
-  const keys = distinctValues(frame, step.index);
-  const pivoted: Column[] = [];
-  for (const header of headers) {
-    const cells: Cell[] = [];
-    for (const key of keys) {
-      const landing = values.cells.filter(
-        (_cell, row) => on.cells[row] === header && index.cells[row] === key,
-      );
-      const one = evaluateElement(chain, landing, frame);
-      if (one === undefined) {
-        return failed(
-          frame,
-          `The preview does not include ${text}: it does not end in a method that gives one value.`,
-        );
-      }
-      cells.push(one);
-    }
-    pivoted.push({ name: String(header), dtype, cells });
-  }
-  return {
-    frame: [{ name: index.name, dtype: index.dtype, cells: keys }, ...pivoted],
-    problem: null,
-    added: pivoted.map((column) => column.name),
-  };
-}
-
 /** The parameters each step's own structure draws, which are not offered as options. */
 const COVERED: Readonly<Record<Verb, readonly string[]>> = {
   // A column and what it holds are the step's own structure.
@@ -532,7 +188,7 @@ const COVERED: Readonly<Record<Verb, readonly string[]>> = {
   rename: ['mapping'],
   // The keys of the two tables are one list each, so `on` for a shared key is not offered.
   join: ['other', 'on', 'left_on', 'right_on'],
-  pivot: ['on', 'on_columns', 'index', 'values', 'aggregate_function'],
+  pivot: ['on', 'index', 'values', 'aggregate_function'],
 };
 
 /** Returns the parameters of the step `verb` that can be added to it as options. */
@@ -540,22 +196,6 @@ export function stepOptionParameters(catalogue: Catalogue, verb: Verb): readonly
   const entry = verbEntry(catalogue, verb);
   return entry === null ? [] : optionParameters(entry, COVERED[verb]);
 }
-
-/**
- * The parameters of each step that the step itself works out, instead of the
- * generic check of a parameter against the rows it is given.
- */
-const CHECKED_BY_STEP: Readonly<Record<Verb, readonly string[]>> = {
-  with_columns: [],
-  filter: [],
-  sort: [],
-  select: [],
-  rename: [],
-  // The right keys are fields of the other table.
-  join: ['right_on'],
-  // The aggregate is made of the values of a cell, not of the rows.
-  pivot: ['aggregate_function'],
-};
 
 /**
  * Returns the items a parameter of `step` that follows the parameter `of`
@@ -569,82 +209,11 @@ export function stepItems(catalogue: Catalogue, step: Step, of: string): readonl
   );
 }
 
-/** The parameters of each step the preview applies when they are set. */
-const PREVIEWED_OPTIONS: Readonly<Record<Verb, readonly string[]>> = {
-  with_columns: [],
-  filter: [],
-  sort: ['descending', 'nulls_last'],
-  select: [],
-  rename: [],
-  join: ['how', 'suffix'],
-  pivot: [],
-};
-
 /**
- * Returns the Polars names of the parameters `step` is set with that the
- * preview does not apply, so that the step can say so.
+ * Returns a new step of `verb` that works on `frame` as it stands, with the
+ * connected `tables` a join or a pivot can use.
  */
-export function skippedStepOptions(catalogue: Catalogue, step: Step): string[] {
-  const entry = verbEntry(catalogue, step.verb);
-  if (entry === null) return [];
-  const applied = PREVIEWED_OPTIONS[step.verb];
-  const covered = COVERED[step.verb];
-  return setParameters(entry, step.options)
-    .filter(
-      ({ parameter, setting }) =>
-        !covered.includes(parameter.name) &&
-        isComplete(setting) &&
-        !atDefault(parameter, setting) &&
-        !applied.includes(parameter.name),
-    )
-    .map(({ parameter }) => parameter.name);
-}
-
-function runStep(catalogue: Catalogue, frame: Frame, step: Step): StepResult {
-  const problem = optionsProblem(
-    catalogue,
-    verbEntry(catalogue, step.verb),
-    withoutOptions(step.options, CHECKED_BY_STEP[step.verb]),
-    frame,
-  );
-  if (problem !== null) return failed(frame, problem);
-  switch (step.verb) {
-    case 'with_columns':
-      return withColumns(catalogue, frame, step);
-    case 'sort':
-      return sort(catalogue, frame, step);
-    case 'filter':
-      return filter(catalogue, frame, step);
-    case 'select':
-      return select(catalogue, frame, step);
-    case 'rename':
-      return rename(frame, step);
-    case 'join':
-      return join(catalogue, frame, step);
-    case 'pivot':
-      return pivot(catalogue, frame, step);
-    default:
-      return assertNever(step);
-  }
-}
-
-/**
- * Works every step out in order, starting from the source frame. A step with
- * a problem passes its frame on unchanged, so later steps still show something.
- */
-export function runSteps(catalogue: Catalogue, steps: readonly Step[]): readonly StepResult[] {
-  const results: StepResult[] = [];
-  let frame = SOURCE_FRAME;
-  for (const step of steps) {
-    const result = runStep(catalogue, frame, step);
-    results.push(result);
-    frame = result.frame;
-  }
-  return results;
-}
-
-/** Returns a new step of `verb` that works on `frame` as it stands. */
-export function defaultStep(verb: Verb, frame: Frame): Step {
+export function defaultStep(verb: Verb, frame: Frame, tables: readonly NamedTable[]): Step {
   const first = frame[0]?.name ?? '';
   const id = nextId('step');
   const options = NO_OPTIONS;
@@ -685,8 +254,8 @@ export function defaultStep(verb: Verb, frame: Frame): Step {
       };
     case 'join': {
       // Start from the first lookup table and a pair of key columns whose dtypes agree.
-      const [table] = TABLES;
-      const rightOn = table?.frame[0];
+      const [table] = tables;
+      const rightOn = table?.columns[0];
       const leftOn = frame.find((column) => column.dtype === rightOn?.dtype);
       return {
         id,
@@ -702,16 +271,18 @@ export function defaultStep(verb: Verb, frame: Frame): Step {
     }
     case 'pivot': {
       const text = frame.filter((column) => column.dtype === 'String');
-      const number = frame.find((column) => isNumeric(column.dtype));
+      const number = frame.find((column) => groupHolds('numeric', column.dtype));
+      const on = (text[1] ?? text[0])?.name ?? first;
+      // The columns come from a connected table that has the field's name, or else the first.
+      const columns = tables.find((table) => findColumn(table.columns, on) !== null) ?? tables[0];
       return {
         id,
         verb,
-        on: (text[1] ?? text[0])?.name ?? first,
+        on,
         index: first,
         values: number?.name ?? first,
-        columnsFrom: 'collect',
-        pinned: [],
         options: {
+          on_columns: columns === undefined ? UNSET : { kind: 'word', value: columns.name },
           aggregate_function: expressionSetting({
             kind: 'chain',
             id: nextId('chain'),
@@ -730,44 +301,7 @@ function callText(args: readonly string[], settings: readonly string[]): string 
   return [...args, ...settings].join(', ');
 }
 
-/**
- * The parameters whose default `DataFrame.pivot`, which the Polars text calls
- * when the columns come from the data, has other than `LazyFrame.pivot`'s,
- * with the default it has: it keeps the order of its rows unless it is told
- * not to.
- */
-const EAGER_PIVOT_DEFAULTS: Readonly<Record<string, boolean>> = { maintain_order: true };
-
-/**
- * Returns the text of the parameters of a pivot that are set, as `DataFrame.pivot`
- * is called with them: each whose default there differs from `LazyFrame.pivot`'s
- * is written whenever the editor's value differs from the default there, so
- * that the code does what the editor shows.
- */
-function eagerPivotSettings(catalogue: Catalogue, step: PivotStep): string[] {
-  const entry = verbEntry(catalogue, step.verb);
-  if (entry === null) return [];
-  const own = Object.keys(EAGER_PIVOT_DEFAULTS);
-  const texts = optionTexts(
-    catalogue,
-    entry,
-    withoutOptions(step.options, [...COVERED.pivot, ...own]),
-    () => [],
-  );
-  const differing = own.flatMap((name) => {
-    const parameter = entry.parameters.find((candidate) => candidate.name === name);
-    if (parameter === undefined) return [];
-    // What the editor shows: what is set, or else what `LazyFrame.pivot` does.
-    const set = optionOf(step.options, name);
-    const shown = set !== null && isComplete(set) ? set : defaultSetting(parameter);
-    const kept = EAGER_PIVOT_DEFAULTS[name];
-    if (shown?.kind !== 'flag' || shown.value === kept) return [];
-    return [`${name}=${shown.value ? 'True' : 'False'}`];
-  });
-  return [...texts, ...differing];
-}
-
-/** Returns the Polars text of a pivot, with whatever has to come before it. */
+/** Returns the Polars text of a pivot. */
 function pivotText(catalogue: Catalogue, step: PivotStep, settings: readonly string[]): string {
   const aggregate = optionOf(step.options, 'aggregate_function');
   const entry = verbEntry(catalogue, step.verb);
@@ -779,18 +313,7 @@ function pivotText(catalogue: Catalogue, step: PivotStep, settings: readonly str
       ? []
       : [`aggregate_function=${settingValueText(catalogue, parameter, aggregate, [])}`]),
   ];
-  switch (step.columnsFrom) {
-    case 'pinned': {
-      const columns = step.pinned.map((value) => literalText(value)).join(', ');
-      return `.pivot(${quoted(step.on)}, on_columns=[${columns}], ${callText(given, settings)})`;
-    }
-    case 'collect':
-      return `.collect().pivot(${quoted(step.on)}, ${callText(given, eagerPivotSettings(catalogue, step))}).lazy()`;
-    case 'sink':
-      return `.sink_parquet("scratch.parquet"); pl.read_parquet("scratch.parquet").pivot(${quoted(step.on)}, ${callText(given, eagerPivotSettings(catalogue, step))}).lazy()`;
-    default:
-      return assertNever(step.columnsFrom);
-  }
+  return `.pivot(${quoted(step.on)}, ${callText(given, settings)})`;
 }
 
 /** Returns `texts` as the argument of a call: the one, or a list of them. */

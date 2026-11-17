@@ -12,7 +12,9 @@ import { useCallback, useContext, useState } from 'react';
 import type { Look, Offer, OfferGroup, Tone } from '@dageist/design';
 import { Hint, OfferList, Piece, Popover, Slot } from '@dageist/design';
 
-import { useCatalogue } from './CatalogueProvider';
+import { useCatalogue, useNode } from './EngineProvider';
+import { usePreparedStep } from './engine';
+import { wrongId } from './model/document';
 import { ChainBlocks } from './Chain';
 import { COMPARISON_SIGNS } from './comparisons';
 import { inputLines } from './InputsStrip';
@@ -20,20 +22,21 @@ import { FreshContext, Line, Lines } from './Lists';
 import { anyField, counted, fieldOffers, matches, offer, titled } from './offers';
 import { useFieldHint } from './origins';
 import { elementEntry, groupWords, groupsHold } from './model/catalogue';
-import type { Cell, Dtype, Frame } from './model/frame';
-import { findColumn, keysFit, literalDtype } from './model/frame';
+import { LITERAL_DTYPES } from './model/expr';
+import type { Dtype, Frame } from './model/frame';
+import { findColumn } from './model/frame';
 import { nextId } from './model/ids';
-import { INPUTS, findInput } from './model/inputs';
+import { findInput } from './model/inputs';
 import type {
+  Cell,
   ChainCondition,
   Comparison,
   Condition,
-  ElementScope,
   Group,
   Test,
   Value,
 } from './model/source';
-import { COMPARISONS, dtypesAgree } from './model/source';
+import { COMPARISONS } from './model/source';
 
 const WHOLE_NUMBER = /^-?\d+$/;
 
@@ -97,15 +100,13 @@ export interface ValueSlotProps {
   readonly label: string;
   /** Whether the slot takes a connected list, as `is_in` does, instead of a single value. */
   readonly lists: boolean;
-  /** The dtype the value is compared with, when it is compared with one. */
-  readonly expected: Dtype | null;
   /** The dtype groups the value may have, when its parameter limits them. */
   readonly takes?: readonly string[] | undefined;
   /**
    * Set when the value is worked out for the values of one pivot cell, which
    * `element` stands for: then a chain can only start from `element`.
    */
-  readonly within?: ElementScope | undefined;
+  readonly within?: boolean | undefined;
   /** The id that, when it is what was just added, opens the slot's list as soon as it is shown. */
   readonly openId?: string | undefined;
   /** Takes the value away from where it stands, when it is one of several; otherwise it can only be unset. */
@@ -124,7 +125,6 @@ export function ValueSlot({
   frame,
   label,
   lists,
-  expected,
   takes,
   within,
   openId,
@@ -132,15 +132,15 @@ export function ValueSlot({
   onChange,
 }: ValueSlotProps): React.JSX.Element {
   const catalogue = useCatalogue();
+  const node = useNode();
   const fresh = useContext(FreshContext);
   const fieldHint = useFieldHint();
-  const fits = lists ? keysFit : dtypesAgree;
-  // Why a value of `dtype` is not taken: the parameter's dtypes, or the dtype it is compared with.
+  // Why a value of `dtype` is not taken: the dtypes the catalogue says the parameter takes.
   const reasonFor = (dtype: Dtype): string | null => {
     if (takes !== undefined && !groupsHold(takes, dtype)) {
       return `needs ${groupWords(catalogue, takes)}`;
     }
-    return expected === null || fits(expected, dtype) ? null : 'a different dtype';
+    return null;
   };
   const literal = (cell: Cell): (() => void) => {
     return () => {
@@ -149,7 +149,7 @@ export function ValueSlot({
   };
 
   const offers = (typed: string): OfferGroup[] => {
-    if (within !== undefined) {
+    if (within === true) {
       // The values of a pivot cell are what is combined, so a chain starts from them.
       const start = elementEntry(catalogue);
       const name = start?.name ?? 'element';
@@ -180,9 +180,8 @@ export function ValueSlot({
         ),
       ];
     }
-    const connected = INPUTS.flatMap((input) =>
-      input.kind === (lists ? 'list' : 'value') ? [input] : [],
-    )
+    const connected = node.inputs
+      .flatMap((input) => (input.kind === (lists ? 'list' : 'value') ? [input] : []))
       .filter((input) => matches(typed, input.name))
       .map((input) =>
         offer(
@@ -218,7 +217,7 @@ export function ValueSlot({
       written.push(
         offer(text, 'value', 'a number', literal(Number(text)), {
           id: 'number',
-          reason: reasonFor(literalDtype(Number(text))),
+          reason: reasonFor(LITERAL_DTYPES.number),
         }),
       );
     }
@@ -227,7 +226,7 @@ export function ValueSlot({
         offer(typed, 'value', 'String', literal(typed), {
           id: 'text',
           look: 'quoted',
-          reason: reasonFor('String'),
+          reason: reasonFor(LITERAL_DTYPES.text),
         }),
       );
     }
@@ -254,7 +253,6 @@ export function ValueSlot({
         chainId={value.id}
         chain={value.chain}
         frame={frame}
-        element={within}
         onRemove={
           onRemove ??
           (() => {
@@ -270,7 +268,7 @@ export function ValueSlot({
 
   let shown: { label: string; tone: Tone; look: Look; wrong: boolean; lines: string[] };
   if (value.kind === 'input') {
-    const input = findInput(value.name);
+    const input = findInput(node, value.name);
     shown = {
       label: value.name === '' ? 'list' : value.name,
       tone: value.name === '' ? 'value' : 'input',
@@ -331,7 +329,7 @@ export function ValueSlot({
           names
           describedAs={label}
           placeholder={
-            within !== undefined
+            within === true
               ? 'Search the functions'
               : lists
                 ? 'Search the lists'
@@ -354,18 +352,18 @@ interface TestBlocksProps {
 /** Draws a comparison as three blocks: a field, a comparison and a value. */
 function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Element {
   const fresh = useContext(FreshContext);
+  const node = useNode();
+  const prepared = usePreparedStep();
   const fieldHint = useFieldHint();
   const column = findColumn(frame, test.column);
-  const expected = column?.dtype ?? null;
   const unset = test.column === '';
+  const wrongSign = prepared?.wrong.has(wrongId({ kind: 'test', testId: test.id })) ?? false;
 
   const compare = (comparison: Comparison): void => {
     const wasList = test.comparison === 'is_in';
     if (comparison === 'is_in' && !wasList) {
-      // Membership needs a list, so start from a connected one of the field's dtype.
-      const found = INPUTS.flatMap((input) => (input.kind === 'list' ? [input] : []));
-      const list =
-        found.find((input) => expected !== null && keysFit(expected, input.dtype)) ?? found[0];
+      // Membership needs a list, so start from the first connected one.
+      const list = node.inputs.find((input) => input.kind === 'list');
       onChange({ ...test, comparison, value: { kind: 'input', name: list?.name ?? '' } });
     } else if (comparison !== 'is_in' && wasList) {
       onChange({ ...test, comparison, value: { kind: 'unset' } });
@@ -403,6 +401,7 @@ function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Eleme
         label={COMPARISON_SIGNS[test.comparison]}
         tone="compare"
         look="compare"
+        wrong={wrongSign}
         names
         describedAs={`Comparison: ${COMPARISON_WORDS[test.comparison]}`}
         placeholder="Search the comparisons"
@@ -435,7 +434,6 @@ function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Eleme
         frame={frame}
         label={unset ? 'The value it is compared with' : `Value compared with ${test.column}`}
         lists={test.comparison === 'is_in'}
-        expected={expected}
         onChange={(value) => {
           onChange({ ...test, value });
         }}

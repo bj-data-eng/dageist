@@ -1,166 +1,42 @@
 /**
- * @file Frames, columns and cells as the step editor's storyboard model sees
- * them, plus the sample frame every step list starts from.
- *
- * This is storyboard code. In the real application the Rust core owns types,
- * validation and previews; nothing here is meant to survive.
+ * @file The columns a step is given, as the engine reports them: a name and
+ * the engine's short name of its dtype, such as `Datetime(us)`. The view
+ * holds no rows and no rules about dtypes of its own; both come from the
+ * engine.
  */
 
-/**
- * One sample value. Dates and times are kept as ISO-like text, durations as
- * whole minutes, and a Boolean as the text `true` or `false`.
- */
-export type Cell = string | number | null;
+import type { FieldView } from '@dageist/host';
 
-/** The Polars dtypes the sample uses. */
-export type Dtype =
-  | 'String'
-  | 'Int32'
-  | 'Int64'
-  | 'UInt32'
-  | 'Datetime'
-  | 'Date'
-  | 'Time'
-  | 'Duration'
-  | 'Boolean';
+/** The engine's short name of a dtype, such as `Int64` or `Datetime(us)`. */
+export type Dtype = string;
 
-/** Every dtype the sample uses, in the order they are offered. */
-export const DTYPES: readonly Dtype[] = [
-  'String',
-  'Int32',
-  'Int64',
-  'UInt32',
-  'Datetime',
-  'Date',
-  'Time',
-  'Duration',
-  'Boolean',
-];
+/** One column of a table: its name and its dtype. */
+export type Column = FieldView;
 
-/** One column of a frame. */
-export interface Column {
-  readonly name: string;
-  readonly dtype: Dtype;
-  readonly cells: readonly Cell[];
-}
-
-/** The rows at one point in the list. */
+/** The columns of a table, in order. */
 export type Frame = readonly Column[];
 
-/** The name of the table the steps start from. */
-export const SOURCE_NAME = 'claims';
-
-/** The frame the first step is given: seven claim rows, not yet in any useful order. */
-export const SOURCE_FRAME: Frame = [
-  {
-    name: 'dcn',
-    dtype: 'String',
-    cells: ['A-1002', 'A-1001', 'A-1002', 'A-1001', 'A-1002', 'A-1001', 'A-1001'],
-  },
-  {
-    name: 'timestamp',
-    dtype: 'Datetime',
-    cells: [
-      '2026-03-02 13:30',
-      '2026-03-05 07:50',
-      '2026-03-06 10:00',
-      '2026-03-02 09:15',
-      '2026-03-04 17:20',
-      '2026-03-09 11:05',
-      '2026-03-03 16:40',
-    ],
-  },
-  {
-    name: 'step_to',
-    dtype: 'String',
-    cells: ['Intake', 'Pending', 'Complete', 'Intake', 'Review', 'Complete', 'Review'],
-  },
-  {
-    name: 'owner',
-    dtype: 'String',
-    cells: [
-      'Company A',
-      'Company A',
-      'Company B',
-      'Company A',
-      'Company A',
-      'Company B',
-      'Company B',
-    ],
-  },
-  { name: 'row_days', dtype: 'Int64', cells: [0, 2, 2, 0, 2, 2, 1] },
+/** The dtypes the dtype picker offers, by the name the step document reads them as. */
+export const DTYPES: readonly Dtype[] = [
+  'Boolean',
+  'Date',
+  'Float32',
+  'Float64',
+  'Int8',
+  'Int16',
+  'Int32',
+  'Int64',
+  'String',
+  'Time',
+  'UInt8',
+  'UInt16',
+  'UInt32',
+  'UInt64',
 ];
 
 /** Returns `text` as a Python string literal. */
 export function quoted(text: string): string {
   return JSON.stringify(text);
-}
-
-/** Reports whether `dtype` holds numbers. */
-export function isNumeric(dtype: Dtype): boolean {
-  return dtype === 'Int32' || dtype === 'Int64' || dtype === 'UInt32';
-}
-
-/** Reports whether `dtype` is a date, a time or a duration. */
-export function isTemporal(dtype: Dtype): boolean {
-  return dtype === 'Datetime' || dtype === 'Date' || dtype === 'Time' || dtype === 'Duration';
-}
-
-/** The largest whole number an Int32 and a UInt32 hold. */
-const INT32_MAX = 2_147_483_647;
-const UINT32_MAX = 4_294_967_295;
-
-/** Returns the dtype a whole number written on its own has: Int32, or Int64 when Int32 cannot hold it. */
-export function literalDtype(value: number): Dtype {
-  return value >= -INT32_MAX - 1 && value <= INT32_MAX ? 'Int32' : 'Int64';
-}
-
-/**
- * Returns the dtype a column of integer `dtype` and the whole number `value`
- * meet in: the column's when it holds the number, and a wider one when it
- * does not. Returns null for a number past a UInt32 column's range, which
- * meets it in UInt64, a dtype this storyboard does not have.
- */
-export function withLiteral(dtype: Dtype, value: number): Dtype | null {
-  if (dtype === 'UInt32') {
-    if (value < 0) return 'Int64';
-    return value > UINT32_MAX ? null : dtype;
-  }
-  return dtype === 'Int32' ? literalDtype(value) : dtype;
-}
-
-/**
- * Returns the dtype Polars gives two dtypes that meet, as in a comparison or
- * the values of one `when`, or null when it gives none. Two different integer
- * dtypes meet in `Int64`, the narrowest dtype here that holds both, and a
- * Date meets a Datetime as a Datetime.
- */
-export function supertype(left: Dtype, right: Dtype): Dtype | null {
-  if (left === right) return left;
-  if (isNumeric(left) && isNumeric(right)) return 'Int64';
-  const pair = [left, right];
-  return pair.includes('Date') && pair.includes('Datetime') ? 'Datetime' : null;
-}
-
-/**
- * Reports whether Polars matches join keys, or a column against the members
- * of a list, of these two dtypes: the same dtype, or any two integer dtypes.
- */
-export function keysFit(left: Dtype, right: Dtype): boolean {
-  return left === right || (isNumeric(left) && isNumeric(right));
-}
-
-/**
- * Returns `cells` of dtype `from` as dtype `to` holds them. Only a Date
- * changes: as a Datetime it is that day's midnight.
- */
-export function castCells(
-  cells: readonly Cell[],
-  from: Dtype | null,
-  to: Dtype | null,
-): readonly Cell[] {
-  if (from !== 'Date' || to !== 'Datetime') return cells;
-  return cells.map((cell) => (typeof cell === 'string' ? `${cell} 00:00` : cell));
 }
 
 /** Fails on a value the caller's `switch` was supposed to have covered. */
@@ -171,27 +47,4 @@ export function assertNever(unexpected: never): never {
 /** Returns the column of `frame` called `name`, if there is one. */
 export function findColumn(frame: Frame, name: string): Column | null {
   return frame.find((column) => column.name === name) ?? null;
-}
-
-/** Orders two cells as Polars sorts by default: nulls first, numbers by size, anything else as text. */
-export function compareCells(left: Cell, right: Cell): number {
-  if (left === right) return 0;
-  if (left === null) return -1;
-  if (right === null) return 1;
-  if (typeof left === 'number' && typeof right === 'number') return left - right;
-  return String(left) < String(right) ? -1 : 1;
-}
-
-/** Returns `frame` with its rows in `order`; `order` holds the old row numbers. */
-export function reordered(frame: Frame, order: readonly number[]): Frame {
-  return frame.map((column) => ({
-    name: column.name,
-    dtype: column.dtype,
-    cells: order.map((row) => column.cells[row] ?? null),
-  }));
-}
-
-/** Returns the distinct values of `column` in `frame`, in first-seen order. */
-export function distinctValues(frame: Frame, column: string): readonly Cell[] {
-  return [...new Set(findColumn(frame, column)?.cells)];
 }

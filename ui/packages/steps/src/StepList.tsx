@@ -10,14 +10,16 @@ import { useMemo, useState } from 'react';
 
 import { Slot } from '@dageist/design';
 
-import { useCatalogue } from './CatalogueProvider';
+import { useCatalogue, useNode } from './EngineProvider';
+import { PreparedStepProvider } from './engine';
 import { DragSettingsContext, dragSettingsFor, moved } from './Chain';
 import type { Fresh } from './Lists';
 import { FreshContext } from './Lists';
 import { STEP_GROUP, StepRow, verbOffers } from './StepRow';
 import type { Frame } from './model/frame';
-import { SOURCE_FRAME } from './model/frame';
-import type { Step, StepResult, Verb } from './model/steps';
+import { tablesOf } from './model/inputs';
+import type { PreparedStep } from './model/report';
+import type { Step, Verb } from './model/steps';
 import { defaultStep } from './model/steps';
 import type { Origins } from './origins';
 import { OriginsContext, originsBefore } from './origins';
@@ -29,7 +31,7 @@ const NO_ORIGINS: Origins = new Map();
 export interface StepListProps {
   readonly steps: readonly Step[];
   /** What each step produced, in the same order. */
-  readonly results: readonly StepResult[];
+  readonly results: readonly PreparedStep[];
   readonly selectedId: string | null;
   /**
    * The nonce the page's content security policy accepts for injected styles,
@@ -49,17 +51,18 @@ export function StepList({
   onChange,
 }: StepListProps): React.JSX.Element {
   const catalogue = useCatalogue();
+  const node = useNode();
   // What was just added, so that its first slot opens or its name is typed straight away.
   const [freshId, setFreshId] = useState<string | null>(null);
   const fresh = useMemo((): Fresh => ({ id: freshId, mark: setFreshId }), [freshId]);
 
   const dragSettings = useMemo(() => dragSettingsFor(styleNonce), [styleNonce]);
 
-  const frameBefore = (index: number): Frame => results[index - 1]?.frame ?? SOURCE_FRAME;
+  const frameBefore = (index: number): Frame => results[index]?.before ?? node.source.columns;
   // Where each step's fields come from, for the hints that say so.
   const origins = originsBefore(results);
   const addStep = (verb: Verb, after: number): void => {
-    const added = defaultStep(verb, results[after]?.frame ?? SOURCE_FRAME);
+    const added = defaultStep(verb, results[after]?.after ?? node.source.columns, tablesOf(node));
     onChange([...steps.slice(0, after + 1), added, ...steps.slice(after + 1)], added.id);
     // What is gone to first: the field of a new filter's comparison, or the step itself.
     setFreshId(added.verb === 'filter' ? added.condition.id : added.id);
@@ -89,33 +92,35 @@ export function StepList({
                 if (result === undefined) return null;
                 return (
                   <OriginsContext.Provider key={step.id} value={origins[index] ?? NO_ORIGINS}>
-                    <StepRow
-                      step={step}
-                      index={index}
-                      frame={frameBefore(index)}
-                      result={result}
-                      selected={step.id === selectedId}
-                      onSelect={() => {
-                        if (step.id !== selectedId) onChange(steps, step.id);
-                      }}
-                      onChange={(next) => {
-                        onChange(
-                          steps.map((existing) => (existing.id === next.id ? next : existing)),
-                          selectedId,
-                        );
-                      }}
-                      onRemove={() => {
-                        // The rows shown move to the step before, or the one after the first.
-                        const beside = (steps[index - 1] ?? steps[index + 1])?.id ?? null;
-                        onChange(
-                          steps.filter((existing) => existing.id !== step.id),
-                          step.id === selectedId ? beside : selectedId,
-                        );
-                      }}
-                      onInsertAfter={(verb) => {
-                        addStep(verb, index);
-                      }}
-                    />
+                    <PreparedStepProvider value={result}>
+                      <StepRow
+                        step={step}
+                        index={index}
+                        frame={frameBefore(index)}
+                        result={result}
+                        selected={step.id === selectedId}
+                        onSelect={() => {
+                          if (step.id !== selectedId) onChange(steps, step.id);
+                        }}
+                        onChange={(next) => {
+                          onChange(
+                            steps.map((existing) => (existing.id === next.id ? next : existing)),
+                            selectedId,
+                          );
+                        }}
+                        onRemove={() => {
+                          // The rows shown move to the step before, or the one after the first.
+                          const beside = (steps[index - 1] ?? steps[index + 1])?.id ?? null;
+                          onChange(
+                            steps.filter((existing) => existing.id !== step.id),
+                            step.id === selectedId ? beside : selectedId,
+                          );
+                        }}
+                        onInsertAfter={(verb) => {
+                          addStep(verb, index);
+                        }}
+                      />
+                    </PreparedStepProvider>
                   </OriginsContext.Provider>
                 );
               })}
