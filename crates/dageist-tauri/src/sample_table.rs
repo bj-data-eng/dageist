@@ -364,7 +364,7 @@ mod tests {
     use tauri::webview::InvokeRequest;
     use tauri::{WebviewWindow, WebviewWindowBuilder};
 
-    use super::{OpenTable, Opened, SampleGate, open_stored, open_window};
+    use super::{ErrorKind, OpenTable, Opened, SampleGate, open_stored, open_window};
 
     const SMALL: SampleSpec = SampleSpec {
         keys: 40,
@@ -524,6 +524,34 @@ mod tests {
             Ok(InvokeResponseBody::Raw(bytes)) => assert_eq!(bytes, expected),
             other => panic!("expected raw bytes, got {other:?}"),
         }
+    }
+
+    /// The kind that follows `kind` in the list the view's contract gives, or `None` after the
+    /// last. A list cannot be checked against the enum it lists, which Rust does not let a
+    /// program enumerate, so this names every variant: adding one does not compile until it has
+    /// a place here, and the test below walks the chain and expects it to be `ErrorKind::ALL`.
+    /// The walk reaches only the kinds linked from the first, so add a new kind inside or at the
+    /// end of the chain.
+    const fn next_kind(kind: ErrorKind) -> Option<ErrorKind> {
+        match kind {
+            ErrorKind::NoSuchStep => Some(ErrorKind::NotRun),
+            ErrorKind::NotRun => Some(ErrorKind::Refused),
+            ErrorKind::Refused => Some(ErrorKind::Limit),
+            ErrorKind::Limit => Some(ErrorKind::Unreadable),
+            ErrorKind::Unreadable => Some(ErrorKind::Failed),
+            ErrorKind::Failed => None,
+        }
+    }
+
+    #[test]
+    fn the_list_of_error_kinds_is_every_kind_in_order() {
+        let mut walked = vec![ErrorKind::NoSuchStep];
+        while let Some(following) = next_kind(walked[walked.len() - 1]) {
+            // More than the list has, so a chain that loops fails and does not hang.
+            assert!(walked.len() < 64, "the chain does not end");
+            walked.push(following);
+        }
+        assert_eq!(walked, ErrorKind::ALL);
     }
 
     #[test]
