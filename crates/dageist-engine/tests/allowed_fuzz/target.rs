@@ -522,6 +522,28 @@ mod tests {
     }
 
     #[test]
+    fn the_outcome_of_a_schema_mismatch_probe_says_what_the_probe_showed() {
+        // The tables' reason is the target's own comparison of plan and rows, and
+        // the probe in the position is refused by Polars with a panic that says
+        // nothing of it, so the outcome says what was shown: the call's plan and
+        // rows differ as the tables say, and a call whose plan and rows agree is
+        // allowed there.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/allowed_fuzz/regressions/stricter-a-sort-key-of-one-value-whose-schema-differs.case");
+        let case = Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case");
+        let outcome = std::thread::Builder::new()
+            .stack_size(256 << 20)
+            .spawn(move || AllowedTarget::new().evaluate(&case))
+            .expect("a thread")
+            .join()
+            .expect("the case is evaluated")
+            .expect("an outcome");
+        let detail = outcome.detail().expect("a detail");
+        assert!(detail.contains("plan and rows"), "{detail}");
+        assert!(!detail.contains("for the tables' reason"), "{detail}");
+    }
+
+    #[test]
     fn a_wrong_prediction_of_the_dtype_before_the_refused_call_is_a_disagreement() {
         // A probe stands a value in for what reaches the refused call, so a
         // wrong prediction of that dtype must not be hidden by it: it is found

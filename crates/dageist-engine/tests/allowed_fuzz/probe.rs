@@ -1365,6 +1365,53 @@ mod tests {
         );
     }
 
+    /// A case that selects the chain `a` then `links` (no arguments) in the
+    /// position `entry` and `parameter` name, on columns of `receiver`.
+    fn in_a_position(entry: &str, parameter: &str, receiver: &str, links: &[&str]) -> Case {
+        let links: Vec<String> = links
+            .iter()
+            .map(|id| format!("{{\"entry\":\"{id}\",\"arguments\":{{}}}}"))
+            .collect();
+        let text = format!(
+            "{{\"a\":\"{receiver}\",\"b\":\"Int64\",\"revision\":1}}\n{{\"version\":1,\"steps\":[{{\"id\":\"s\",\"call\":{{\"entry\":\"{entry}\",\"arguments\":{{\"{parameter}\":{{\"many\":[{{\"expression\":{{\"start\":{{\"entry\":\"polars.col\",\"arguments\":{{\"name\":{{\"columns\":[\"a\"]}}}}}},\"then\":[{}]}}}}]}}}}}}}}]}}",
+            links.join(",")
+        );
+        Case::decode(text.as_bytes()).expect("a case")
+    }
+
+    fn refused_by_the_schema(parameter: &str, link: usize) -> Refused {
+        let place = Place::of_step(0, Some(StepId::new("s").expect("an identifier")))
+            .then(Segment::Parameter(parameter.to_owned()))
+            .then(Segment::Item(0))
+            .then(Segment::Link(link));
+        Refused {
+            source: Source::Polars,
+            at: place.to_string(),
+            place,
+            stage: None,
+            reason: "the schema says Int64 and the rows give UInt128".to_owned(),
+        }
+    }
+
+    #[test]
+    fn a_refusal_in_the_position_that_is_not_about_the_mismatch_settles_nothing() {
+        // A filter's predicate must be a `Boolean`, so the running sum of an
+        // unsigned 128-bit column is refused as one, as is the running sum of whole
+        // numbers: Polars refuses the position whatever the plan and the rows of the
+        // call are, and that does not show the mismatch the tables name.
+        let case = in_a_position(
+            "LazyFrame.filter",
+            "predicates",
+            "UInt128",
+            &["Expr.cum_sum"],
+        );
+        let refused = refused_by_the_schema("predicates", 0);
+        assert_eq!(
+            settle_in_the_position(&case, &refused, &predict(&case), &observe(&case)),
+            None
+        );
+    }
+
     #[test]
     fn the_catalogue_has_what_a_probe_is_made_of() {
         for id in ["LazyFrame.select", "LazyFrame.pivot", "LazyFrame.filter"] {
