@@ -33,8 +33,8 @@ export interface BlockRequest {
  * crates/dageist-tauri/src/catalogue.rs. Each kind has one drawing.
  */
 export type KindView =
-  /** A chain; `dtypes` names the dtype groups it may have. */
-  | { readonly kind: 'expression'; readonly dtypes: readonly string[] }
+  /** A chain. What may stand in it is the engine's to say through its offers. */
+  | { readonly kind: 'expression' }
   | { readonly kind: 'column' }
   /** A literal typed in; `type` is the type of literal it takes. */
   | { readonly kind: 'value'; readonly type: ValueTypeView }
@@ -128,14 +128,12 @@ export interface EntryView {
   readonly hint: string;
   /** The plain head of a step, such as "Add column"; `null` for anything but a step. */
   readonly head: string | null;
-  /** The dtype groups an expression method accepts on what it follows. */
-  readonly accepts: readonly string[];
   /** Whether it works on a lazy frame without a collect. */
   readonly lazy: boolean;
   readonly parameters: readonly ParameterView[];
 }
 
-/** A family or dtype group: its key and the words shown for it. */
+/** A family: its key and the words shown for it. */
 export interface WordsView {
   readonly key: string;
   readonly title: string;
@@ -145,8 +143,6 @@ export interface WordsView {
 export interface CatalogueView {
   /** Every family, in the order they are offered. */
   readonly families: readonly WordsView[];
-  /** Every dtype group. */
-  readonly dtypes: readonly WordsView[];
   /** The dtypes a document names by one word, in the order a list gives them. */
   readonly listedDtypes: readonly string[];
   /** Every entry, ordered by identifier. */

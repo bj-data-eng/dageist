@@ -41,48 +41,6 @@
       "title": "Condition · when, then, otherwise"
     }
   ],
-  "dtypes": [
-    {
-      "key": "any",
-      "title": "any"
-    },
-    {
-      "key": "numeric",
-      "title": "numeric"
-    },
-    {
-      "key": "integer",
-      "title": "integer"
-    },
-    {
-      "key": "temporal",
-      "title": "temporal"
-    },
-    {
-      "key": "Datetime",
-      "title": "Datetime"
-    },
-    {
-      "key": "Date",
-      "title": "Date"
-    },
-    {
-      "key": "Time",
-      "title": "Time"
-    },
-    {
-      "key": "Duration",
-      "title": "Duration"
-    },
-    {
-      "key": "String",
-      "title": "String"
-    },
-    {
-      "key": "Boolean",
-      "title": "Boolean"
-    }
-  ],
   "listedDtypes": [
     "Boolean",
     "Date",
@@ -111,7 +69,6 @@
       "name": "otherwise",
       "hint": "the value where no condition holds",
       "head": null,
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -119,8 +76,7 @@
           "shown": "statement",
           "label": "value when none holds",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -143,7 +99,6 @@
       "name": "when",
       "hint": "another condition",
       "head": null,
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -151,8 +106,7 @@
           "shown": "predicates",
           "label": "conditions",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["Boolean"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -176,8 +130,7 @@
               "kind": "column"
             },
             "value": {
-              "kind": "expression",
-              "dtypes": ["any"]
+              "kind": "expression"
             }
           },
           "shape": {
@@ -198,7 +151,6 @@
       "name": "then",
       "hint": "the value where that condition holds",
       "head": null,
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -206,8 +158,7 @@
           "shown": "statement",
           "label": "value when it holds",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -230,7 +181,6 @@
       "name": "cum_count",
       "hint": "running count",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": [
         {
@@ -259,7 +209,6 @@
       "name": "cum_max",
       "hint": "running maximum",
       "head": null,
-      "accepts": ["numeric", "temporal", "String", "Boolean"],
       "lazy": true,
       "parameters": [
         {
@@ -288,7 +237,6 @@
       "name": "cum_sum",
       "hint": "running total",
       "head": null,
-      "accepts": ["numeric", "Boolean", "Duration"],
       "lazy": true,
       "parameters": [
         {
@@ -317,7 +265,6 @@
       "name": "dt.date",
       "hint": "the date part",
       "head": null,
-      "accepts": ["Datetime", "Date"],
       "lazy": true,
       "parameters": []
     },
@@ -328,7 +275,6 @@
       "name": "dt.month_start",
       "hint": "first of the month",
       "head": null,
-      "accepts": ["Datetime", "Date"],
       "lazy": true,
       "parameters": []
     },
@@ -339,7 +285,6 @@
       "name": "dt.offset_by",
       "hint": "move by a duration",
       "head": null,
-      "accepts": ["Datetime", "Date"],
       "lazy": true,
       "parameters": [
         {
@@ -347,8 +292,7 @@
           "shown": "by",
           "label": "by",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["String"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -368,7 +312,6 @@
       "name": "dt.time",
       "hint": "the time part",
       "head": null,
-      "accepts": ["Datetime", "Time"],
       "lazy": true,
       "parameters": []
     },
@@ -379,7 +322,6 @@
       "name": "dt.total_days",
       "hint": "whole days in a duration",
       "head": null,
-      "accepts": ["Duration"],
       "lazy": true,
       "parameters": [
         {
@@ -408,7 +350,6 @@
       "name": "eq",
       "hint": "equal to",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": [
         {
@@ -416,8 +357,7 @@
           "shown": "other",
           "label": "compared with",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -437,7 +377,6 @@
       "name": "first",
       "hint": "first value",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": [
         {
@@ -466,7 +405,6 @@
       "name": "ge",
       "hint": "at least",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": [
         {
@@ -474,8 +412,7 @@
           "shown": "other",
           "label": "compared with",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -495,7 +432,6 @@
       "name": "gt",
       "hint": "greater than",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": [
         {
@@ -503,8 +439,7 @@
           "shown": "other",
           "label": "compared with",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -524,7 +459,6 @@
       "name": "is_not_null",
       "hint": "has a value",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": []
     },
@@ -535,7 +469,6 @@
       "name": "is_null",
       "hint": "has no value",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": []
     },
@@ -546,7 +479,6 @@
       "name": "last",
       "hint": "last value",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": [
         {
@@ -575,7 +507,6 @@
       "name": "le",
       "hint": "at most",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": [
         {
@@ -583,8 +514,7 @@
           "shown": "other",
           "label": "compared with",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -604,7 +534,6 @@
       "name": "len",
       "hint": "number of values",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": []
     },
@@ -615,7 +544,6 @@
       "name": "lt",
       "hint": "less than",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": [
         {
@@ -623,8 +551,7 @@
           "shown": "other",
           "label": "compared with",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -644,7 +571,6 @@
       "name": "max",
       "hint": "highest value",
       "head": null,
-      "accepts": ["numeric", "temporal", "String", "Boolean"],
       "lazy": true,
       "parameters": []
     },
@@ -655,7 +581,6 @@
       "name": "min",
       "hint": "lowest value",
       "head": null,
-      "accepts": ["numeric", "temporal", "String", "Boolean"],
       "lazy": true,
       "parameters": []
     },
@@ -666,7 +591,6 @@
       "name": "ne",
       "hint": "not equal to",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": [
         {
@@ -674,8 +598,7 @@
           "shown": "other",
           "label": "compared with",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -695,7 +618,6 @@
       "name": "over",
       "hint": "within each group",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": [
         {
@@ -703,8 +625,7 @@
           "shown": "partition_by",
           "label": "group by",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -723,8 +644,7 @@
           "shown": "more_exprs",
           "label": "and by",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -743,8 +663,7 @@
           "shown": "order_by",
           "label": "ordered by",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -832,7 +751,6 @@
       "name": "shift",
       "hint": "value n rows earlier",
       "head": null,
-      "accepts": ["any"],
       "lazy": true,
       "parameters": [
         {
@@ -840,8 +758,7 @@
           "shown": "n",
           "label": "rows",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["integer"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -858,8 +775,7 @@
           "shown": "fill_value",
           "label": "fill with",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -879,7 +795,6 @@
       "name": "sub",
       "hint": "minus another value",
       "head": null,
-      "accepts": ["numeric", "temporal"],
       "lazy": true,
       "parameters": [
         {
@@ -887,8 +802,7 @@
           "shown": "other",
           "label": "minus",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -908,7 +822,6 @@
       "name": "sum",
       "hint": "total",
       "head": null,
-      "accepts": ["numeric", "Boolean", "Duration"],
       "lazy": true,
       "parameters": []
     },
@@ -919,7 +832,6 @@
       "name": "filter",
       "hint": "the rows where a condition holds",
       "head": "Filter table",
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -927,8 +839,7 @@
           "shown": "predicates",
           "label": "conditions",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["Boolean"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -952,8 +863,7 @@
               "kind": "column"
             },
             "value": {
-              "kind": "expression",
-              "dtypes": ["any"]
+              "kind": "expression"
             }
           },
           "shape": {
@@ -974,7 +884,6 @@
       "name": "join",
       "hint": "columns from another table, by a key",
       "head": "Join table",
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -998,8 +907,7 @@
           "shown": "on",
           "label": "key",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -1065,8 +973,7 @@
           "shown": "left_on",
           "label": "left key",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -1085,8 +992,7 @@
           "shown": "right_on",
           "label": "right key",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -1306,7 +1212,6 @@
       "name": "pivot",
       "hint": "the values of a field as columns",
       "head": "Pivot table",
-      "accepts": [],
       "lazy": false,
       "parameters": [
         {
@@ -1378,8 +1283,7 @@
           "shown": "aggregate_function",
           "label": "repeats combined by",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -1464,7 +1368,6 @@
       "name": "rename",
       "hint": "columns under new names",
       "head": "Rename",
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -1516,7 +1419,6 @@
       "name": "select",
       "hint": "some of the columns",
       "head": "Select",
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -1524,8 +1426,7 @@
           "shown": "exprs",
           "label": "columns",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -1549,8 +1450,7 @@
               "kind": "column"
             },
             "value": {
-              "kind": "expression",
-              "dtypes": ["any"]
+              "kind": "expression"
             }
           },
           "shape": {
@@ -1574,7 +1474,6 @@
       "name": "sort",
       "hint": "the rows in the order of some fields",
       "head": "Sort table",
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -1582,8 +1481,7 @@
           "shown": "by",
           "label": "sort by",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -1602,8 +1500,7 @@
           "shown": "more_by",
           "label": "then by",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -1696,7 +1593,6 @@
       "name": "with_columns",
       "hint": "a new column from a chain",
       "head": "Add column",
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -1704,8 +1600,7 @@
           "shown": "exprs",
           "label": "columns",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -1729,8 +1624,7 @@
               "kind": "column"
             },
             "value": {
-              "kind": "expression",
-              "dtypes": ["any"]
+              "kind": "expression"
             }
           },
           "shape": {
@@ -1754,7 +1648,6 @@
       "name": "otherwise",
       "hint": "the value where no condition holds",
       "head": null,
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -1762,8 +1655,7 @@
           "shown": "statement",
           "label": "value when none holds",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -1786,7 +1678,6 @@
       "name": "when",
       "hint": "another condition",
       "head": null,
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -1794,8 +1685,7 @@
           "shown": "predicates",
           "label": "conditions",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["Boolean"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -1819,8 +1709,7 @@
               "kind": "column"
             },
             "value": {
-              "kind": "expression",
-              "dtypes": ["any"]
+              "kind": "expression"
             }
           },
           "shape": {
@@ -1841,7 +1730,6 @@
       "name": "then",
       "hint": "the value where the condition holds",
       "head": null,
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -1849,8 +1737,7 @@
           "shown": "statement",
           "label": "value when it holds",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["any"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "one"
@@ -1873,7 +1760,6 @@
       "name": "col",
       "hint": "a column of the table",
       "head": null,
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -1917,7 +1803,6 @@
       "name": "element",
       "hint": "each value of the cell being combined",
       "head": null,
-      "accepts": [],
       "lazy": true,
       "parameters": []
     },
@@ -1928,7 +1813,6 @@
       "name": "lit",
       "hint": "a value written out",
       "head": null,
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -1990,7 +1874,6 @@
       "name": "when",
       "hint": "choose a value by a condition",
       "head": null,
-      "accepts": [],
       "lazy": true,
       "parameters": [
         {
@@ -1998,8 +1881,7 @@
           "shown": "predicates",
           "label": "conditions",
           "kind": {
-            "kind": "expression",
-            "dtypes": ["Boolean"]
+            "kind": "expression"
           },
           "shape": {
             "shape": "many"
@@ -2023,8 +1905,7 @@
               "kind": "column"
             },
             "value": {
-              "kind": "expression",
-              "dtypes": ["any"]
+              "kind": "expression"
             }
           },
           "shape": {

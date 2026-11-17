@@ -14,8 +14,8 @@ use std::fmt;
 
 use dageist_engine::allowed::{Nested, Outer, Position};
 use dageist_engine::catalog::{
-    Applies, DefaultValue, Dtypes, Entry, Family, Kind, Laziness, Parameter, ParameterDefault,
-    Shape, ValueType, Words, english, entries,
+    Applies, DefaultValue, Entry, Family, Kind, Laziness, Parameter, ParameterDefault, Shape,
+    ValueType, Words, english, entries,
 };
 use dageist_engine::document::Dtype;
 use serde::Serialize;
@@ -56,9 +56,7 @@ struct ChoiceView {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 enum KindView {
-    Expression {
-        dtypes: Vec<&'static str>,
-    },
+    Expression,
     Column,
     Value {
         #[serde(rename = "type")]
@@ -167,7 +165,6 @@ struct EntryView {
     name: String,
     hint: String,
     head: Option<String>,
-    accepts: Vec<&'static str>,
     lazy: bool,
     parameters: Vec<ParameterView>,
 }
@@ -184,7 +181,6 @@ struct WordsView {
 #[serde(rename_all = "camelCase")]
 pub struct CatalogueView {
     families: Vec<WordsView>,
-    dtypes: Vec<WordsView>,
     /// The dtypes a document names by one word, in the order a list gives them.
     listed_dtypes: Vec<String>,
     entries: Vec<EntryView>,
@@ -257,10 +253,6 @@ fn shape_view(shape: Shape) -> ShapeView {
     }
 }
 
-fn dtype_keys(dtypes: &[Dtypes]) -> Vec<&'static str> {
-    dtypes.iter().map(|group| group.key()).collect()
-}
-
 fn kind_view(entry: &Entry, parameter: &Parameter, words: &Words) -> Result<KindView, MissingWord> {
     kind_of(entry, parameter, parameter.kind(), words)
 }
@@ -272,9 +264,7 @@ fn kind_of(
     words: &Words,
 ) -> Result<KindView, MissingWord> {
     Ok(match kind {
-        Kind::Expression(dtypes) => KindView::Expression {
-            dtypes: dtype_keys(dtypes),
-        },
+        Kind::Expression(_) => KindView::Expression,
         Kind::Column => KindView::Column,
         Kind::Value(value_type) => KindView::Value {
             value_type: value_type_view(value_type),
@@ -347,7 +337,6 @@ fn entry_view(entry: &Entry, words: &Words) -> Result<EntryView, MissingWord> {
         hint: given(words.entry_hint(id), || format!("hint of {}", id.as_str()))?,
         // Only the steps of a table's list have a head, so its absence is not a gap.
         head: words.entry_head(id).map(str::to_owned),
-        accepts: dtype_keys(entry.accepts()),
         lazy: entry.laziness() == Laziness::Lazy,
         parameters: entry
             .parameters()
@@ -367,17 +356,6 @@ fn catalogue_view(words: &Words) -> Result<CatalogueView, MissingWord> {
                     key: family.key(),
                     title: given(words.family_title(family), || {
                         format!("title of the family {}", family.key())
-                    })?,
-                })
-            })
-            .collect::<Result<_, MissingWord>>()?,
-        dtypes: Dtypes::ALL
-            .iter()
-            .map(|&group| {
-                Ok(WordsView {
-                    key: group.key(),
-                    title: given(words.dtypes_name(group), || {
-                        format!("name of the dtypes {}", group.key())
                     })?,
                 })
             })

@@ -36,13 +36,7 @@ const readChoice: Decode<ChoiceView> = readRecord(['word', 'shown'], (fields, pa
 }));
 
 const readKind: Decode<KindView> = readTagged<KindView>('kind', {
-  expression: {
-    fields: ['dtypes'],
-    read: (fields, path) => ({
-      kind: 'expression',
-      dtypes: readField(fields, path, 'dtypes', readList(readString)),
-    }),
-  },
+  expression: { fields: [], read: () => ({ kind: 'expression' }) },
   column: { fields: [], read: () => ({ kind: 'column' }) },
   value: {
     fields: ['type'],
@@ -153,7 +147,7 @@ const readParameter: Decode<ParameterView> = readRecord(
 );
 
 const readEntry: Decode<EntryView> = readRecord(
-  ['id', 'applies', 'family', 'name', 'hint', 'head', 'accepts', 'lazy', 'parameters'],
+  ['id', 'applies', 'family', 'name', 'hint', 'head', 'lazy', 'parameters'],
   (fields, path) => ({
     id: readField(fields, path, 'id', readString),
     applies: readField(fields, path, 'applies', readWord(APPLIES)),
@@ -161,7 +155,6 @@ const readEntry: Decode<EntryView> = readRecord(
     name: readField(fields, path, 'name', readString),
     hint: readField(fields, path, 'hint', readString),
     head: readField(fields, path, 'head', readNullable(readString)),
-    accepts: readField(fields, path, 'accepts', readList(readString)),
     lazy: readField(fields, path, 'lazy', readBoolean),
     parameters: readField(fields, path, 'parameters', readList(readParameter)),
   }),
@@ -173,10 +166,9 @@ const readWords: Decode<WordsView> = readRecord(['key', 'title'], (fields, path)
 }));
 
 const readCatalogue: Decode<CatalogueView> = readRecord(
-  ['families', 'dtypes', 'listedDtypes', 'entries'],
+  ['families', 'listedDtypes', 'entries'],
   (fields, path) => ({
     families: readField(fields, path, 'families', readList(readWords)),
-    dtypes: readField(fields, path, 'dtypes', readList(readWords)),
     listedDtypes: readField(fields, path, 'listedDtypes', readList(readString)),
     entries: readField(fields, path, 'entries', readList(readEntry)),
   }),
