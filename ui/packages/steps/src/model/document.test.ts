@@ -203,6 +203,27 @@ describe('what the document cannot hold', () => {
     });
   });
 
+  it('holds back a when with more than one case, which the document has no place for', () => {
+    const arm = (id: string): { id: string; condition: Condition; returns: Value } => ({
+      id,
+      condition: test(`t-${id}`, 'a', '==', { kind: 'literal', value: 1 }),
+      returns: col('b'),
+    });
+    const step = adding('x', {
+      kind: 'chain',
+      id: 'c1',
+      chain: {
+        source: { kind: 'when', arms: [arm('first'), arm('second')], otherwise: col('c') },
+        methods: [],
+      },
+    });
+
+    expect(translate(catalogue, [step]).steps[0]).toMatchObject({
+      kind: 'held',
+      problem: { cause: 'unsupported', wrong: [wrongId({ kind: 'start', chainId: 'c1' })] },
+    });
+  });
+
   it('holds back a method whose argument is still to be picked, naming the method', () => {
     const step = adding('x', {
       kind: 'chain',
