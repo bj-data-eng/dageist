@@ -387,7 +387,7 @@ fn objection(reason: &str) -> String {
 /// Whether `probe` is refused as the tables refused the part: for Polars' own
 /// reason the same objection, and for a rule that a predicate be a `Boolean`
 /// Polars' words for it.
-fn same_reason(source: &Source, tables: &str, probe: &str) -> bool {
+pub fn same_reason(source: &Source, tables: &str, probe: &str) -> bool {
     match source {
         // What the target says of a schema is no objection of Polars, so it is
         // neither the tables' reason nor one that a probe can be refused for.

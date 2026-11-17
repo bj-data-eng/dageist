@@ -13,9 +13,9 @@ use dageist_fuzz::{
 use super::case::Case;
 use super::generate::generate;
 use super::limits::{excuses, strict};
-use super::observe::{Observed, Seen, observe};
+use super::observe::{Observed, Refusal, Seen, is_the_targets_own, observe};
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
-use super::probe::{Settled, settle, settle_apart};
+use super::probe::{Settled, same_reason, settle, settle_apart};
 use super::reduce::candidates;
 
 /// The named rules that are stricter than Polars by design, each with why. A
@@ -28,6 +28,11 @@ const STRICTER_BY_DESIGN: [(&str, &str); 1] = [(
 /// What the outcome of a case says where the tables refuse a part that Polars
 /// does not evaluate, and a probe of the part shows the tables right.
 pub const STRICTER_WHERE_UNEVALUATED: &str = "stricter where Polars does not evaluate the part";
+
+/// What the outcome of a case says where the tables and Polars both refuse it, and
+/// not for the same reason: Polars never judged what the tables did, so the case is
+/// no agreement about the refusal, and is counted apart from the agreeing ones.
+pub const REFUSED_FOR_ANOTHER_REASON: &str = "refused by both, for another reason";
 
 pub const TARGET: &str = "dageist-engine::allowed-combinations";
 pub const ALLOWANCE: &str = "dageist-engine::tables-predict-allowance";
@@ -72,8 +77,9 @@ fn tally(what: impl Into<String>) {
 }
 
 /// What was tallied on this thread since the last call, one line each, and the
-/// totals of cases that agreed, that a limit excused, that a named rule was
-/// stricter in, and that were disagreements.
+/// totals of cases that agreed, that both refused for another reason than each
+/// other's, that a limit excused, that a named rule was stricter in, and that were
+/// disagreements.
 pub fn take_tally() -> Vec<String> {
     let tallied = TALLY.with(|tally| std::mem::take(&mut *tally.borrow_mut()));
     let total = |prefix: &str| -> u64 {
@@ -85,6 +91,7 @@ pub fn take_tally() -> Vec<String> {
     };
     let totals = [
         ("agreeing", total("agree:")),
+        ("refused by both, for another reason", total("both refuse")),
         ("excused by a limit", total("not covered")),
         (
             "refused where Polars does not evaluate the part",
@@ -287,6 +294,44 @@ fn dtype_difference(case: &Case, prediction: &Prediction, observed: &Observed) -
     None
 }
 
+/// How a refusal of the tables is worded when it is of where an expression may end.
+const CANNOT_END: &str = "it cannot end here: ";
+
+/// What Polars says of what a named rule is about, where it refuses the same. The
+/// rule that a pivot's aggregate give one value is not Polars': it lets a running
+/// value stand, so it has no words, and Polars refusing a case it refuses is never
+/// for it.
+fn polars_words(rule: &str) -> Option<&'static str> {
+    match rule {
+        "key-is-elementwise" => Some("elementwise"),
+        "element-only-in-pivot-aggregate" => Some("stands only in a pivot's aggregate"),
+        "join-key-names-are-not-repeated" => Some("repeated key names"),
+        _ => None,
+    }
+}
+
+/// Whether Polars refused the case for the reason the tables gave: the objection
+/// and the call it names, for the tables' own refusals, and what Polars says of
+/// what the rule is about, for a rule. What the target says of a schema is neither
+/// the tables' nor Polars' reason, and agrees only with the same words.
+fn refused_for_the_same_reason(refused: &Refused, refusal: &Refusal) -> bool {
+    let tables = refused
+        .reason
+        .strip_prefix(CANNOT_END)
+        .unwrap_or(&refused.reason);
+    if is_the_targets_own(tables) || is_the_targets_own(&refusal.reason) {
+        return tables == refusal.reason;
+    }
+    match &refused.source {
+        Source::Polars => same_reason(&refused.source, tables, &refusal.reason),
+        Source::Rule(rule) => match polars_words(rule) {
+            Some(words) => refusal.reason.contains(words),
+            None => same_reason(&refused.source, tables, &refusal.reason),
+        },
+        Source::Silent => false,
+    }
+}
+
 impl CaseTarget for AllowedTarget {
     type Case = Case;
 
@@ -459,6 +504,27 @@ impl CaseTarget for AllowedTarget {
                 }
                 (source, false) => {
                     checked.push(allowance);
+                    // Both refuse; whether for the same reason decides what the case
+                    // is evidence of: Polars judged what the tables did, or did not.
+                    if let Some(refusal) = &observed.refusal
+                        && !refused_for_the_same_reason(&refused, refusal)
+                    {
+                        tally(format!(
+                            "both refuse, for another reason: the tables {} and Polars {}",
+                            match &source {
+                                Source::Rule(rule) => format!("by the rule {rule}"),
+                                _ => reason_slug(&refused.reason),
+                            },
+                            reason_slug(&refusal.reason)
+                        ));
+                        return CaseOutcome::expected_rejection(
+                            checked,
+                            one_line(&format!(
+                                "{REFUSED_FOR_ANOTHER_REASON}: the tables say {}; Polars says {}",
+                                refused.reason, refusal.reason
+                            )),
+                        );
+                    }
                     tally(match source {
                         Source::Rule(rule) => format!("agree: refused by the rule {rule}"),
                         _ => "agree: refused".to_owned(),

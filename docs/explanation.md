@@ -701,13 +701,27 @@ wherever it refuses, which is about a third of the pivot cases (58 of the 158 of
 seed, and the same share in longer campaigns), so those pivot aggregates are checked
 little; the tally counts the pivot cases and those the rule refuses apart.
 
-The tally ends with the totals of the cases that agreed, that a limit excused, that
-were refused where Polars does not evaluate the part, that a rule stricter by design
-refused, and that disagreed. The fixed seed's 1000 cases give 888 agreeing, 12 excused
-by a limit, 7 refused where Polars does not evaluate the part, 58 refused by the rule
-that is stricter by design, and none disagreeing; 26 of those that agree are refused by
-the rule against a repeated pair of key names, and the tables could not be asked
-past a point in 54 more.
+A case that the tables and Polars both refuse is evidence of agreement about the
+refusal only where Polars refuses it for the reason the tables gave: the objection
+and the call it names, as for a probe, or, for a named rule, what Polars says of what
+the rule is about (that a predicate be a `Boolean`, that a join's key be elementwise,
+that `element` stand only in a pivot's aggregate, that a join pair no key names
+twice). A key that the tables refuse as not elementwise, which Polars refuses for a
+column the other table lacks or for the key names it pairs twice, is a case where
+Polars never judged what the tables did, and a rule that Polars does not hold has no
+reason of Polars' to be refused for. Such a case is not a disagreement: both refuse,
+and the allowance is right. It is counted apart, as refused by both for another
+reason, with what each said, and is not counted among the agreeing; its outcome is
+an expected rejection that names both reasons.
+
+The tally ends with the totals of the cases that agreed, that both refused for another
+reason, that a limit excused, that were refused where Polars does not evaluate the
+part, that a rule stricter by design refused, and that disagreed. The fixed seed's
+1000 cases give 806 agreeing, 82 refused by both for another reason, 11 excused by a
+limit, 7 refused where Polars does not evaluate the part, 58 refused by the rule that
+is stricter by design, and none disagreeing; 25 of those that agree are refused by the
+rule against a repeated pair of key names, and the tables could not be asked past a
+point in 54 more.
 
 | Limit | Excuses |
 | --- | --- |
