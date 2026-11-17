@@ -688,6 +688,141 @@ fn a_window_that_joins_after_one_value_is_not_known_to_give_a_list() {
     );
 }
 
+/// What `Expr.over` gives after a whole number at a `select` item, given the
+/// arguments `arguments` and the options `chosen`, with nothing else.
+fn given_window(arguments: &[(&str, Representative)], chosen: &[(&str, &str)]) -> Option<String> {
+    let verdict = offer(
+        entry("Expr.over"),
+        &select_after(Representative::Int64),
+        &Chosen::default()
+            .with_arguments(arguments)
+            .with_options(chosen),
+    );
+    verdict
+        .allowance()
+        .unwrap_or_else(|| panic!("a window is offered: {verdict:?}"))
+        .result()
+        .map(|result| result.name().to_owned())
+}
+
+/// What Polars gives for `a` over a window ordered by `k` and given no
+/// `partition_by`, run on its own API.
+fn polars_window_ordered_by_k(options: SortOptions, mapping: WindowMapping) -> DataType {
+    let frames = Frames::new(
+        Representative::Int64,
+        Representative::Int64,
+        &DataType::Int64,
+    );
+    let mut frame = frames.rows.clone().lazy().select([col("a")
+        .over_with_options(None::<Vec<Expr>>, Some((vec![col("k")], options)), mapping)
+        .expect("a window with an order and no partition")]);
+    frame
+        .collect_schema()
+        .expect("a schema")
+        .get("a")
+        .expect("a column")
+        .clone()
+}
+
+#[test]
+fn a_window_ordered_without_a_partition_gives_what_it_gives_with_one() {
+    // Polars gives the window the same dtype, whatever its flags and strategy,
+    // with no `partition_by` as with one: the rows are one group, and `join`
+    // gives each row the list of the group.
+    let ordered = [("order_by", Representative::Int64)];
+    let sorted = |descending, nulls_last| SortOptions {
+        descending,
+        nulls_last,
+        maintain_order: true,
+        ..SortOptions::default()
+    };
+    let cases: [(&[(&str, &str)], SortOptions, WindowMapping, &str); 7] = [
+        (
+            &[],
+            sorted(false, false),
+            WindowMapping::GroupsToRows,
+            "Int64",
+        ),
+        (
+            &[("nulls_last", "true")],
+            sorted(false, true),
+            WindowMapping::GroupsToRows,
+            "Int64",
+        ),
+        (
+            &[("descending", "true")],
+            sorted(true, false),
+            WindowMapping::GroupsToRows,
+            "Int64",
+        ),
+        (
+            &[("descending", "true"), ("nulls_last", "true")],
+            sorted(true, true),
+            WindowMapping::GroupsToRows,
+            "Int64",
+        ),
+        (
+            &[("mapping_strategy", "join")],
+            sorted(false, false),
+            WindowMapping::Join,
+            "List(Int64)",
+        ),
+        (
+            &[("mapping_strategy", "explode")],
+            sorted(false, false),
+            WindowMapping::Explode,
+            "Int64",
+        ),
+        (
+            &[("nulls_last", "true"), ("mapping_strategy", "join")],
+            sorted(false, true),
+            WindowMapping::Join,
+            "List(Int64)",
+        ),
+    ];
+    for (chosen, options, mapping, expected) in cases {
+        let polars = polars_window_ordered_by_k(options, mapping);
+        assert_eq!(
+            Representative::of(&polars).map(|class| class.to_string()),
+            Some(expected.to_owned()),
+            "Polars, {chosen:?}"
+        );
+        assert_eq!(
+            given_window(&ordered, chosen).as_deref(),
+            Some(expected),
+            "the tables, {chosen:?}"
+        );
+    }
+}
+
+#[test]
+fn a_window_with_nothing_to_group_or_order_by_is_refused_by_polars_whatever_its_options() {
+    // Only the flags and the strategy, which mean nothing without an order,
+    // are no window: Polars refuses it, so there is no dtype to carry.
+    for mapping in [
+        WindowMapping::GroupsToRows,
+        WindowMapping::Join,
+        WindowMapping::Explode,
+    ] {
+        let refused = col("a")
+            .over_with_options(None::<Vec<Expr>>, None, mapping)
+            .expect_err("Polars refuses a window with neither");
+        assert!(
+            refused
+                .to_string()
+                .contains("At least one of `partition_by`"),
+            "{refused}"
+        );
+    }
+    for chosen in [
+        &[("nulls_last", "true")][..],
+        &[("descending", "true")],
+        &[("mapping_strategy", "join")],
+    ] {
+        assert_eq!(given_window(&[], chosen), None, "{chosen:?}");
+    }
+}
+
 #[test]
 fn a_window_without_a_partition_is_not_known_to_give_a_list_for_a_joining_strategy() {
     // The option table measured a window with `partition_by`, and a window

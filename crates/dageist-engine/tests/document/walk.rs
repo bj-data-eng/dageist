@@ -197,6 +197,81 @@ fn a_window_that_joins_gives_a_list() {
     );
 }
 
+/// The place after a window `arguments` of `a` in a `select`, and what Polars
+/// gives for the same window run on its own API.
+fn after_window(arguments: Value) -> Option<OfferPlace> {
+    let walk = walk_of(
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![field_then("a", vec![call("Expr.over", arguments)])]) }),
+    );
+    let item = expression_at(&walk, &item("exprs", 0));
+    item.places()[1].clone()
+}
+
+#[test]
+fn a_window_ordered_without_a_partition_gives_the_walk_its_dtype() {
+    // Polars gives `a` over an order of `k` and no partition the dtype it gives
+    // with one: `Int64`, one for each row, and for a window that joins a list
+    // of them. The step editor offers the methods that follow it.
+    let select = Context::step(Outer::Select);
+    let ordered = || many(vec![field("k")]);
+    let cases = [
+        (json!({ "order_by": ordered() }), Representative::Int64),
+        (
+            json!({ "order_by": ordered(), "nulls_last": { "flag": true } }),
+            Representative::Int64,
+        ),
+        (
+            json!({ "order_by": ordered(), "descending": { "flag": true } }),
+            Representative::Int64,
+        ),
+        (
+            json!({
+                "order_by": ordered(),
+                "descending": { "flag": true },
+                "nulls_last": { "flag": true },
+            }),
+            Representative::Int64,
+        ),
+        (
+            json!({ "order_by": ordered(), "mapping_strategy": { "choice": "explode" } }),
+            Representative::Int64,
+        ),
+        (
+            json!({ "order_by": ordered(), "mapping_strategy": { "choice": "join" } }),
+            Representative::ListOfInteger,
+        ),
+        (
+            json!({
+                "order_by": ordered(),
+                "nulls_last": { "flag": true },
+                "mapping_strategy": { "choice": "join" },
+            }),
+            Representative::ListOfInteger,
+        ),
+    ];
+    for (arguments, dtype) in cases {
+        assert_eq!(
+            after_window(arguments.clone()),
+            at(select, after(dtype, Shape::Many)),
+            "{arguments}"
+        );
+    }
+}
+
+#[test]
+fn a_window_with_nothing_to_group_or_order_by_gives_the_walk_no_dtype() {
+    // Polars refuses a window given only flags or a strategy, so there is no
+    // dtype to know after it.
+    for arguments in [
+        json!({ "nulls_last": { "flag": true } }),
+        json!({ "descending": { "flag": true } }),
+        json!({ "mapping_strategy": { "choice": "join" } }),
+    ] {
+        assert_eq!(after_window(arguments.clone()), None, "{arguments}");
+    }
+}
+
 #[test]
 fn a_condition_follows_where_it_has_come_to_and_gives_the_dtype_of_its_values() {
     let condition = chain(
