@@ -132,7 +132,7 @@ const readValueShape: Decode<ValueShapeView> = readWord(VALUE_SHAPES);
 
 const readConditionState: Decode<ConditionStateView> = readWord(CONDITION_STATES);
 
-const readAfter: Decode<AfterView> = readTagged<AfterView>('kind', {
+export const readAfter: Decode<AfterView> = readTagged<AfterView>('kind', {
   start: { fields: [], read: () => ({ kind: 'start' }) },
   value: {
     fields: ['dtype', 'shape'],
@@ -155,7 +155,7 @@ const readOuter: Decode<OuterPosition> = readWord(OUTER_POSITIONS);
 
 const readNested: Decode<NestedPosition> = readWord(NESTED_POSITIONS);
 
-const readContext: Decode<ContextView> = readRecord(['outer', 'nested'], (fields, path) => ({
+export const readContext: Decode<ContextView> = readRecord(['outer', 'nested'], (fields, path) => ({
   outer: readField(fields, path, 'outer', readOuter),
   nested: readField(fields, path, 'nested', readNullable(readNested)),
 }));
