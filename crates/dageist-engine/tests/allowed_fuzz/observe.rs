@@ -14,6 +14,20 @@ use polars::prelude::{DataType, IntoLazy};
 use super::case::Case;
 use super::frames::Frames;
 
+/// How a reason that is the target's own comparison of a step's schema with its
+/// rows begins: it is no refusal of Polars, and shows only where the method that
+/// the schema is of is the output of the step.
+pub const SCHEMA_SAYS: &str = "the schema says";
+
+/// How the reason begins when the sample table cannot be given a schema.
+const NO_SCHEMA: &str = "the sample table has no schema";
+
+/// Whether `reason` is something the target says of a case, from its own
+/// comparison or its own tables, and not what Polars said when it refused it.
+pub fn is_the_targets_own(reason: &str) -> bool {
+    reason.starts_with(SCHEMA_SAYS) || reason.starts_with(NO_SCHEMA)
+}
+
 /// Where Polars refused a case.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Stage {
@@ -128,7 +142,7 @@ fn run_on(document: &Document, frames: &Frames) -> Observed {
                 stage: Stage::Schema,
                 at: "the table".to_owned(),
                 place: None,
-                reason: format!("the sample table has no schema: {error}"),
+                reason: format!("{NO_SCHEMA}: {error}"),
             });
             return observed;
         }
@@ -213,7 +227,7 @@ fn schema_disagrees(
             .join(", ")
     };
     Some(format!(
-        "the schema says {} and the rows give {}",
+        "{SCHEMA_SAYS} {} and the rows give {}",
         names(schema),
         names(ran)
     ))

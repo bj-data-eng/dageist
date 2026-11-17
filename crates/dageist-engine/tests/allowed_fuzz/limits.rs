@@ -37,7 +37,7 @@ use super::case::Case;
 use super::frames::Frames;
 use dageist_engine::allowed::Stage as TableStage;
 
-use super::observe::{Observed, Refusal, Stage};
+use super::observe::{Observed, Refusal, SCHEMA_SAYS, Stage};
 use super::predict::{Prediction, Refused, Source, Verdict};
 
 /// A limit of the tables, and what it says.
@@ -120,11 +120,20 @@ pub enum Limit {
     /// before the outer `over` in its chain, with the arguments of those calls.
     /// Polars refuses the rows, so there is no place and the reason gates it.
     AWindowOverAWindow,
+    /// The tables hold the schema of a method and what its rows give as one thing,
+    /// and refuse a method whose plan says another dtype than its rows give: the
+    /// target's own comparison, not a refusal of Polars, which shows only where the
+    /// method is the output of the step. Inside an expression that goes on from it
+    /// or compares it, Polars evaluates the method and the step's rows do not show
+    /// the difference. The tables refusing, with the reason that the schema says one
+    /// dtype and the rows give another, at a call that is not the last of the
+    /// step's own expression, which Polars allows.
+    AHiddenSchema,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 12] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -136,6 +145,7 @@ impl Limit {
         Self::APanic,
         Self::AWindowOverAWindow,
         Self::AJoinKeyDtype,
+        Self::AHiddenSchema,
     ];
 
     /// The name a kept case is filed under.
@@ -152,6 +162,7 @@ impl Limit {
             Self::APanic => "a-panic",
             Self::AWindowOverAWindow => "a-window-over-a-window",
             Self::AJoinKeyDtype => "a-join-key-dtype",
+            Self::AHiddenSchema => "a-hidden-schema",
         }
     }
 
@@ -187,6 +198,9 @@ impl Limit {
             }
             Self::AWindowOverAWindow => {
                 "a window over a window is run in an aggregation context, where a key that is not elementwise is refused"
+            }
+            Self::AHiddenSchema => {
+                "a method whose plan and rows differ in dtype is hidden by what goes on from it"
             }
         }
     }
@@ -863,6 +877,12 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement) -> bool {
                 && unplaced(refusal)
                 && refusal.reason.contains("datatypes of join keys")
                 && refusal.reason.contains("decimal")
+        }
+        (Limit::AHiddenSchema, Disagreement::PolarsAllows(refused)) => {
+            let locus = locate(case, &refused.place);
+            let last = locus.inside.last().map(|chain| chain.links().len());
+            refused.reason.starts_with(SCHEMA_SAYS)
+                && (locus.inside.len() > 1 || locus.index.is_some_and(|at| Some(at + 1) != last))
         }
         (Limit::AWindowOverAWindow, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
@@ -1884,6 +1904,27 @@ mod tests {
     }
 
     // ----- Places, schemas, Booleans, pivots
+
+    #[test]
+    fn a_hidden_schema_is_excused_inside_an_expression_and_not_at_its_end() {
+        let reason = "the schema says Int64 and the rows give UInt128";
+        let case = select(vec![chain(column("a"), &["Expr.cum_sum", "Expr.sum"])]);
+        assert_eq!(
+            tables_refuse(&case, link_of("exprs", 0, 0), ROWS, reason),
+            vec![Limit::AHiddenSchema]
+        );
+        // At the last link of the step's own expression it is the step's schema.
+        let last = select(vec![chain(column("a"), &["Expr.cum_sum"])]);
+        assert_eq!(
+            tables_refuse(&last, link_of("exprs", 0, 0), ROWS, reason),
+            vec![]
+        );
+        // Another reason.
+        assert_eq!(
+            tables_refuse(&case, link_of("exprs", 0, 0), ROWS, "no"),
+            vec![]
+        );
+    }
 
     #[test]
     fn a_pivot_aggregate_is_excused_by_the_kernel_reason_and_by_the_empty_table_with_one() {

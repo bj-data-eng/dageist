@@ -36,7 +36,9 @@ use dageist_engine::document::{
 
 use super::case::{Case, STEP};
 use super::frames::STAND_IN;
-use super::observe::{Observed, Refusal, Seen, Tables, is_bare_key, observe_probe};
+use super::observe::{
+    Observed, Refusal, Seen, Tables, is_bare_key, is_the_targets_own, observe_probe,
+};
 use super::predict::{Prediction, Refused, Source};
 
 /// What a probe found: the document it ran, and why Polars refused it.
@@ -321,7 +323,14 @@ fn objection(reason: &str) -> String {
 /// Polars' words for it.
 fn same_reason(source: &Source, tables: &str, probe: &str) -> bool {
     match source {
-        Source::Polars => !objection(tables).is_empty() && objection(tables) == objection(probe),
+        // What the target says of a schema is no objection of Polars, so it is
+        // neither the tables' reason nor one that a probe can be refused for.
+        Source::Polars => {
+            !is_the_targets_own(tables)
+                && !is_the_targets_own(probe)
+                && !objection(tables).is_empty()
+                && objection(tables) == objection(probe)
+        }
         Source::Rule(rule) if PREDICATE_RULES.contains(rule) => {
             let probe = probe.to_ascii_lowercase();
             probe.contains("boolean") && (probe.contains("expected") || probe.contains("must be"))

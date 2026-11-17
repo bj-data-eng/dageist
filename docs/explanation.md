@@ -422,9 +422,11 @@ matched by what Polars objected to and the call it names (the symbol of a
 comparison, a name in backticks), without the dtypes and column names it quotes, and
 for a rule that a predicate be a `Boolean` by Polars' words for it. A refusal that
 Polars places must lie at the refused call or predicate. One it does not place, as
-the refusal of rows, counts only when the part before the refused call, alone, is
-not refused for the same reason. So a probe is not settled by an objection to
-another call. Which of two failures of a probe Polars names depends on which of its
+the refusal of rows, counts only when the part before the refused call, alone (for a
+key, as the key), is not refused for the same reason. So a probe is not settled by an
+objection to another call. What the target says of a schema (that the schema says one
+dtype and the rows give another) is its own comparison, not an objection of Polars, so
+no probe is settled by it, as the tables' reason or as the probe's: it is a limit's. Which of two failures of a probe Polars names depends on which of its
 threads gets there first, so a probe refused for another reason is run again, up to
 sixteen times, before it counts as one that is not. When Polars allows the probe, or
 refuses it for another reason or at another call, the disagreement stays, for nothing shows the tables right. The probe
@@ -444,7 +446,7 @@ limits, then the refused call on a value or a key by itself.
 The second kind is a limit, for what Polars evaluates and accepts, which no probe
 of the part shows, and for where the tables allow and Polars refuses. A limit is
 never for a part Polars skips: the editor holds that to its types, and a probe
-settles it. There are eleven. Each is named in the target, counted when it excuses a
+settles it. There are twelve. Each is named in the target, counted when it excuses a
 case, and has a kept case that the normal tests replay, which only that limit
 excuses, named `uncovered-<limit>.case`, with others
 `uncovered-<limit>--<what it shows>.case`; each has a test that the same feature
@@ -493,6 +495,7 @@ that is stricter by design, and none disagreeing.
 | An overflow | A debug build of Polars panics where a release build wraps. Polars panicking so (no place). |
 | A panic | One is an internal check that failed on the plan Polars made in `select`; another place, or a combination of what was measured singly, may not reach it, or may reach another. Polars panicking where the tables allow (no place), and the tables recording a panic where Polars allows. |
 | A window over a window | A window whose receiver holds another window, in its chain before it, or in the arguments of those calls, is run in the aggregation context of the outer one, where a key that is not elementwise is refused; the tables measured one window. Polars refusing the rows with that reason (no place). A window in a key, or two windows apart, is not this. |
+| A hidden schema | The tables hold the schema of a method and what its rows give as one thing, and refuse a method whose plan says another dtype than its rows give. That is the target's own comparison, not a refusal of Polars, and it shows only where the method is the output of the step: inside an expression that goes on from it or compares it, Polars evaluates the method and the step's rows do not show the difference. The tables refusing, with the reason that the schema says one dtype and the rows give another, at a call that is not the last of the step's own expression, which Polars allows. |
 
 
 A case that the tables cannot be asked about, because the dtype of an argument or
