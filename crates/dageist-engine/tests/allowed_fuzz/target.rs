@@ -297,16 +297,21 @@ fn dtype_difference(case: &Case, prediction: &Prediction, observed: &Observed) -
 /// How a refusal of the tables is worded when it is of where an expression may end.
 const CANNOT_END: &str = "it cannot end here: ";
 
-/// What Polars says of what a named rule is about, where it refuses the same. The
-/// rule that a pivot's aggregate give one value is not Polars': it lets a running
-/// value stand, so it has no words, and Polars refusing a case it refuses is never
-/// for it.
-fn polars_words(rule: &str) -> Option<&'static str> {
+/// What Polars says of what a named rule is about, where it refuses the same: any
+/// of these words. The rule that a pivot's aggregate give one value is not Polars':
+/// it lets a running value stand, so it has no words, and Polars refusing a case it
+/// refuses is never for it.
+fn polars_words(rule: &str) -> &'static [&'static str] {
     match rule {
-        "key-is-elementwise" => Some("elementwise"),
-        "element-only-in-pivot-aggregate" => Some("stands only in a pivot's aggregate"),
-        "join-key-names-are-not-repeated" => Some("repeated key names"),
-        _ => None,
+        "key-is-elementwise" => &["elementwise"],
+        // The engine says where `element` stands only, and Polars says it is not
+        // allowed outside a pivot in its own words.
+        "element-only-in-pivot-aggregate" => &[
+            "stands only in a pivot's aggregate",
+            "is not allowed in this context",
+        ],
+        "join-key-names-are-not-repeated" => &["repeated key names"],
+        _ => &[],
     }
 }
 
@@ -325,8 +330,8 @@ fn refused_for_the_same_reason(refused: &Refused, refusal: &Refusal) -> bool {
     match &refused.source {
         Source::Polars => same_reason(&refused.source, tables, &refusal.reason),
         Source::Rule(rule) => match polars_words(rule) {
-            Some(words) => refusal.reason.contains(words),
-            None => same_reason(&refused.source, tables, &refusal.reason),
+            [] => same_reason(&refused.source, tables, &refusal.reason),
+            words => words.iter().any(|said| refusal.reason.contains(said)),
         },
         Source::Silent => false,
     }
