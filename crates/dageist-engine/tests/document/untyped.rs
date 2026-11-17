@@ -4,7 +4,7 @@
 //! expression: it says the dtype Polars gives, or that it does not know, and
 //! never another.
 
-use dageist_engine::allowed::{After, Representative};
+use dageist_engine::allowed::{After, Ending, Representative, Unknown};
 use dageist_engine::document::{Document, Inputs};
 use polars::prelude::*;
 use serde_json::{Value, json};
@@ -194,4 +194,65 @@ fn a_number_that_is_a_conditions_predicate_is_refused_as_polars_refuses_it() {
         .select([when(lit(1)).then(col("a")).otherwise(col("a"))])
         .collect();
     assert!(refused.is_err());
+}
+
+#[test]
+fn numbers_typed_without_a_dtype_alone_in_a_condition_have_none_to_give() {
+    // `when(f).then(1).otherwise(1)` is numbers Polars cannot always resolve: as a key of a sort
+    // it refuses it, as the fuzz target found. The walk does not say what it gives.
+    let item = chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![field("f")]) }),
+        ),
+        vec![
+            call("When.then", json!({ "statement": whole(1) })),
+            call("Then.otherwise", json!({ "statement": whole(2) })),
+        ],
+    );
+    assert_eq!(walked(item), None);
+}
+
+#[test]
+fn a_condition_with_no_otherwise_that_holds_a_number_is_not_known_to_end() {
+    // Polars refuses `when(f).then(1)` where it runs, as the fuzz target found, so whether the
+    // expression may end where it stands is not known, though the tables allow it.
+    let item = chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![field("f")]) }),
+        ),
+        vec![call("When.then", json!({ "statement": whole(1) }))],
+    );
+    let text = document(vec![step(
+        "s",
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![item]) }),
+    )]);
+    let read = Document::read(&text).expect("a document");
+    let walk = read.steps()[0].walk(0, source().schema(), &Inputs::new());
+    let expression = walk.expressions().last().expect("the item");
+    assert_eq!(
+        expression.ending(),
+        Some(&Ending::NotKnown(Unknown::TheResultsDtype))
+    );
+    // With a value that is typed, the tables are not contradicted: it may end.
+    let typed = chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![field("f")]) }),
+        ),
+        vec![call("When.then", json!({ "statement": field("a") }))],
+    );
+    let text = document(vec![step(
+        "s",
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![typed]) }),
+    )]);
+    let read = Document::read(&text).expect("a document");
+    let walk = read.steps()[0].walk(0, source().schema(), &Inputs::new());
+    assert_ne!(
+        walk.expressions().last().expect("the item").ending(),
+        Some(&Ending::NotKnown(Unknown::TheResultsDtype))
+    );
 }
