@@ -270,3 +270,39 @@ fn a_word_is_refused_for_the_reason_polars_gives_beside_the_options_already_chos
             .any(|word| word.word() == "inner" && word.refusal().is_none())
     );
 }
+
+#[test]
+fn a_number_as_the_argument_of_arithmetic_leaves_the_dtype_of_what_it_gives_not_known() {
+    // `u8 - 1` is a `UInt8` and `f32 - 1` a `Float32`: the number adapts to the column, where the
+    // tables, measured with a column of its own dtype, would say `Int32` and `Float64`.
+    let cases = [
+        (Representative::UInt8, Literal::Integer(1), DataType::UInt8),
+        (
+            Representative::Float32,
+            Literal::Integer(1),
+            DataType::Float32,
+        ),
+        (
+            Representative::Float32,
+            Literal::Float(1.5),
+            DataType::Float32,
+        ),
+    ];
+    for (receiver, literal, polars) in cases {
+        let slot = argument("Expr.sub", "other", receiver);
+        let found = fit(&Candidate::Literal(literal.clone()), &slot).expect("a class");
+        assert!(
+            found.verdict().is_allowed(),
+            "{literal:?} after {receiver}: {found:?}"
+        );
+        let said = found
+            .verdict()
+            .allowance()
+            .and_then(|allowance| allowance.result())
+            .and_then(|result| result.class());
+        assert!(
+            said.is_none() || said == Representative::of(&polars),
+            "{literal:?} after {receiver}: {said:?}, Polars gives {polars:?}"
+        );
+    }
+}

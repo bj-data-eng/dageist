@@ -157,6 +157,10 @@ struct Gen<'a> {
     host: Host,
     /// How many more calls may be added.
     budget: usize,
+    /// Whether a number typed without a dtype may be drawn. It is not among the values of a
+    /// condition: alone there Polars cannot resolve it where it runs, in a sort key, for one,
+    /// which the tables cannot say.
+    untyped_numbers: bool,
 }
 
 fn entry(id: &str) -> &'static Entry {
@@ -223,6 +227,7 @@ pub fn generate(bytes: &[u8]) -> Option<Case> {
         argument,
         host,
         budget: 18,
+        untyped_numbers: true,
     };
     let document = generator.document();
     Some(Case {
@@ -374,7 +379,11 @@ impl Gen<'_> {
     }
 
     fn literal_loose(&mut self) -> (Call, Option<Representative>) {
-        match self.draw.below(3) {
+        match self.draw.below(if self.untyped_numbers { 5 } else { 3 }) {
+            // A number typed without a dtype adapts to the operand it is used with, which the
+            // tables, measured with typed columns, cannot say: its class is not known.
+            3 => (call("polars.lit", vec![("value", Value::Integer(1))]), None),
+            4 => (call("polars.lit", vec![("value", Value::Float(1.5))]), None),
             0 => (
                 call(
                     "polars.lit",
@@ -604,6 +613,7 @@ impl Gen<'_> {
         let mut model: Option<(Expression, Option<Representative>)> = None;
         let mut value = |this: &mut Self, slots: &mut Vec<Slot>, values: &mut Vec<_>| {
             slots.push(Slot::Nested(allowed::Nested::ConditionValue));
+            let untyped = std::mem::replace(&mut this.untyped_numbers, false);
             let chosen = match &model {
                 None => {
                     let built = this.chain(slots, depth + 1, Goal::Anything);
@@ -626,6 +636,7 @@ impl Gen<'_> {
                     found
                 }
             };
+            this.untyped_numbers = untyped;
             slots.pop();
             values.push(chosen.1);
             Value::Expression(chosen.0)

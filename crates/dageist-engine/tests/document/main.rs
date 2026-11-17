@@ -12,5 +12,6 @@ mod reading;
 mod refusals;
 mod support;
 mod syntax;
+mod untyped;
 mod walk;
 mod writing;
