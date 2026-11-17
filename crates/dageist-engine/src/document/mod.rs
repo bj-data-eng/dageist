@@ -23,6 +23,7 @@
 //! The version of the format is [`VERSION`]. A document of any other version is
 //! refused; there is no migration before the core API reaches 1.0.
 
+mod columns;
 mod dtype;
 mod error;
 mod inputs;
@@ -35,9 +36,10 @@ mod tests;
 mod walk;
 mod write;
 
+pub use columns::ColumnDescription;
 pub use dtype::{Dtype, DtypeError};
 pub use error::{Cause, Place, Position, ReadError, Refusal, Segment};
-pub use inputs::{DuplicateInput, Inputs};
+pub use inputs::{DuplicateInput, InputDescription, InputKind, Inputs};
 pub use json::{SyntaxError, SyntaxProblem};
 pub use model::{Call, Document, EmptyStepId, Expression, Given, Start, Step, StepId, Value};
 pub use run::{
