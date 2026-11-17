@@ -4,7 +4,7 @@ import { DecodeError } from './decode';
 import { decodeNode, decodeRows } from './decode-node';
 import nodeFixture from '../fixtures/node-inputs.json';
 import rowsFixture from '../fixtures/step-rows.json';
-import { replaced, withField, without } from './tamper';
+import { replaced, withField, without } from '../test-support/tamper';
 
 // The fixtures are written from Rust by the host's snapshot test. They are read as `unknown`,
 // as the host's answer is, and the decoder is what says what they are.

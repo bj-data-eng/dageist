@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { DecodeError } from './decode';
 import { decodeCatalogue } from './decode-catalogue';
 import catalogueFixture from '../fixtures/catalogue.json';
-import { at, replaced, withField, without } from './tamper';
+import { at, replaced, withField, without } from '../test-support/tamper';
 
 // The fixture is the host's catalogue, written from Rust by its snapshot test. It is read as
 // `unknown`, as the host's answer is, and the decoder is what says what it is.

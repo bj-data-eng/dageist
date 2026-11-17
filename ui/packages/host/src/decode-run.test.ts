@@ -6,7 +6,7 @@ import { decodeRun } from './decode-run';
 import refusedFixture from '../fixtures/step-report-refused.json';
 import reportFixture from '../fixtures/step-report.json';
 import unreadableFixture from '../fixtures/step-report-unreadable.json';
-import { replaced, withField, without } from './tamper';
+import { replaced, withField, without } from '../test-support/tamper';
 
 // The fixtures are what the host's `run_document` command answers for the claim-timing steps,
 // for a document with a step Polars refuses, and for text that is not a document, written from
