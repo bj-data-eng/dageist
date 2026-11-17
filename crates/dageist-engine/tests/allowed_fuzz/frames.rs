@@ -18,6 +18,26 @@ use polars::prelude::{
     DataFrame, DataType, IntoLazy, IntoSeries, ListChunked, NamedFrom, Series, StructChunked,
 };
 
+/// The name of the column the join's `index`th key is paired with on the other
+/// side, when a case pairs a key with a bare column: `key`, then `key2`, `key3`.
+pub fn key_column(index: usize) -> String {
+    if index == 0 {
+        "key".to_owned()
+    } else {
+        format!("key{}", index + 1)
+    }
+}
+
+/// The index of the column `name` as [`key_column`] names it, if it is one.
+pub fn key_column_index(name: &str) -> Option<usize> {
+    let digits = name.strip_prefix("key")?;
+    if digits.is_empty() {
+        return Some(0);
+    }
+    let number: usize = digits.parse().ok()?;
+    (number >= 2 && key_column(number - 1) == name).then(|| number - 1)
+}
+
 /// The name of the connected table a join takes.
 pub const OTHER: &str = "other";
 /// The name of the column a probe stands a value of some dtype in with.
@@ -89,18 +109,18 @@ pub struct Frames {
 
 impl Frames {
     /// The tables with `a` of the class `receiver`, `b` of `argument`, and a
-    /// `key` column of the dtype `key`, all null.
-    pub fn new(receiver: Representative, argument: Representative, key: &DataType) -> Self {
-        Self::with_key(receiver, argument, Some(key))
+    /// column for each of the dtypes `keys`, named by [`key_column`], all null.
+    pub fn new(receiver: Representative, argument: Representative, keys: &[DataType]) -> Self {
+        Self::with_key(receiver, argument, Some(keys))
     }
 
-    /// The tables as [`Frames::new`] makes them, but with no `key` column when
-    /// `key` is `None`: its dtype is the join key's, which is known only when
-    /// the join is run, so a prediction made before that does not know it.
+    /// The tables as [`Frames::new`] makes them, but with no key columns when
+    /// `keys` is `None`: their dtypes are the join keys', which are known only
+    /// when the join is run, so a prediction made before that does not know them.
     pub fn with_key(
         receiver: Representative,
         argument: Representative,
-        key: Option<&DataType>,
+        keys: Option<&[DataType]>,
     ) -> Self {
         let side = |names: [&str; 6]| {
             let [a, b, f, k, g, h] = names;
@@ -113,7 +133,9 @@ impl Frames {
                 Series::new(h.into(), ["x", "x", "y"]).into(),
                 Series::new("u".into(), [1_i64, 2, 3]).into(),
             ];
-            columns.extend(key.map(|key| Series::full_null("key".into(), 3, key).into()));
+            for (at, key) in keys.unwrap_or_default().iter().enumerate() {
+                columns.push(Series::full_null(key_column(at).as_str().into(), 3, key).into());
+            }
             DataFrame::new(3, columns).expect("columns of three rows")
         };
         let rows = side(["a", "b", "f", "k", "g", "h"]);
