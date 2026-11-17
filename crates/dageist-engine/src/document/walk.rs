@@ -20,8 +20,8 @@
 use polars::prelude::{Schema, SchemaRef};
 
 use crate::allowed::{
-    self, After, Chosen, ConditionState, Context, Ending, Nested, Outer, Place as OfferPlace,
-    Position as Slot, Refusal, Representative, Shape, Unknown, Verdict,
+    self, After, Chosen, ConditionState, Context, Ending, Literal, Nested, Outer,
+    Place as OfferPlace, Position as Slot, Refusal, Representative, Shape, Unknown, Verdict,
 };
 use crate::catalog::{Applies, Kind};
 
@@ -217,11 +217,18 @@ impl Step {
 #[derive(Clone, Copy)]
 struct Operand {
     dtype: Option<Representative>,
+    /// Whether it is a number typed without a dtype and alone, which takes the
+    /// dtype of the numbers beside it where it stands among them.
+    loose: bool,
     shape: Shape,
     /// Whether the expression was walked to its end: a refused or unwalked one
     /// has no shape either.
     known: bool,
 }
+
+/// The class of one value of a condition, and whether it is a number typed
+/// without a dtype, which adapts to the numbers beside it.
+type Valued = (Option<Representative>, bool);
 
 /// What a chain has so far.
 #[derive(Clone)]
@@ -232,7 +239,7 @@ enum Cur {
     },
     Condition {
         state: ConditionState,
-        values: Vec<Option<Representative>>,
+        values: Vec<Valued>,
         /// Whether every predicate and value so far gives one value, which a
         /// condition of them gives too.
         single: bool,
@@ -299,19 +306,66 @@ fn literal_class(call: &Call) -> Option<Representative> {
         Value::String(_) => Some(Representative::String),
         Value::Flag(Some(_)) => Some(Representative::Boolean),
         Value::Flag(None) => Some(Representative::Null),
+        // A number typed without a dtype has the one Polars gives it by itself.
+        Value::Integer(number) => Literal::Integer(*number).class(),
+        Value::Float(number) => Literal::Float(*number).class(),
         _ => None,
     }
 }
 
+/// Whether `call` is a number typed without a dtype.
+fn is_loose_number(call: &Call) -> bool {
+    call.entry().id().as_str() == "polars.lit"
+        && call.argument("dtype").is_none()
+        && matches!(
+            call.argument("value"),
+            Some(Value::Integer(_) | Value::Float(_))
+        )
+}
+
+/// Whether the class is a whole number or a number with a fraction.
+const fn is_number(class: Representative) -> bool {
+    matches!(
+        class,
+        Representative::Int8
+            | Representative::Int16
+            | Representative::Int32
+            | Representative::Int64
+            | Representative::Int128
+            | Representative::UInt8
+            | Representative::UInt16
+            | Representative::UInt32
+            | Representative::UInt64
+            | Representative::UInt128
+            | Representative::Float16
+            | Representative::Float32
+            | Representative::Float64
+    )
+}
+
 /// The class every value of a condition has, when they have the same one. A
-/// condition of values of different dtypes has the supertype, which the tables
-/// do not give.
-fn unify(values: &[Option<Representative>]) -> Option<Representative> {
-    let first = (*values.first()?)?;
-    values
+/// number typed without a dtype takes the class of the numbers beside it, as
+/// Polars gives it; among such numbers alone it keeps its own. A condition of
+/// values of different dtypes has the supertype, which the tables do not give.
+fn unify(values: &[Valued]) -> Option<Representative> {
+    let classes: Option<Vec<(Representative, bool)>> = values
         .iter()
-        .all(|value| *value == Some(first))
-        .then_some(first)
+        .map(|(class, loose)| class.map(|class| (class, *loose)))
+        .collect();
+    let classes = classes?;
+    let strict: Vec<Representative> = classes
+        .iter()
+        .filter(|(_, loose)| !loose)
+        .map(|(class, _)| *class)
+        .collect();
+    let first = match strict.first() {
+        Some(first) => *first,
+        None => classes.first()?.0,
+    };
+    let same = |(class, loose): &(Representative, bool)| {
+        *class == first || (*loose && !strict.is_empty() && is_number(first) && is_number(*class))
+    };
+    classes.iter().all(same).then_some(first)
 }
 
 impl Walker<'_> {
@@ -491,6 +545,7 @@ impl Walker<'_> {
         let context = Context::from_positions(&self.slots);
         let unsaid = Operand {
             dtype: None,
+            loose: false,
             shape: Shape::Many,
             known: false,
         };
@@ -645,12 +700,15 @@ impl Walker<'_> {
         match cur {
             Cur::Value { dtype, shape } => Operand {
                 dtype,
+                loose: expression.links().is_empty()
+                    && matches!(expression.start(), Start::Call(start) if is_loose_number(start)),
                 shape,
                 // What was not asked has no shape that can be counted on.
                 known: dtype.is_some(),
             },
             Cur::Condition { values, .. } => Operand {
                 dtype: unify(&values),
+                loose: false,
                 shape: Shape::Many,
                 known: true,
             },
@@ -786,7 +844,10 @@ impl Walker<'_> {
             .iter()
             .find(|(name, _)| name == "statement")
             .map(|(_, operand)| *operand);
-        let statement_class = statement.and_then(|operand| operand.dtype);
+        let statement_class: Valued = (
+            statement.and_then(|operand| operand.dtype),
+            statement.is_some_and(|operand| operand.loose),
+        );
         // Whether the predicates and the value this link is given give one
         // value.
         let given_known = arguments

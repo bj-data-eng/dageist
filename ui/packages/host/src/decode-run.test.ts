@@ -154,11 +154,12 @@ describe('the report of running the claim-timing steps', () => {
     expect(stepNamed(run, 'resolved_day').walk.refusal).toBeNull();
   });
 
-  it('says why the tables could not be asked past a point', () => {
-    expect(stepNamed(run, 'resolved_at').walk.notKnown).toBe(
-      'step "resolved_at", named_exprs entry 1 value, link 1: the dtype of an argument of Expr.shift is not known',
-    );
-    expect(stepNamed(run, 'sort').walk.notKnown).toBeNull();
+  it('asks the tables about every step of the sample, so none says it could not be asked', () => {
+    // A number typed without a dtype, as `shift(1)` and `otherwise 0` hold, is asked as the dtype
+    // Polars gives it, and a connected input as a literal of its dtype.
+    for (const step of run.status === 'run' ? run.steps : []) {
+      expect(step.walk.notKnown, step.id).toBeNull();
+    }
   });
 
   it('asks the tables about a chain that starts from a connected list, as a literal of its dtype', () => {

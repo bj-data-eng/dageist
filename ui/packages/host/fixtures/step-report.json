@@ -640,7 +640,7 @@
                 },
                 "verdict": {
                   "kind": "allowed",
-                  "result": null,
+                  "result": "Int32",
                   "shape": "one",
                   "ending": {
                     "kind": "allowed"
@@ -648,7 +648,19 @@
                 }
               }
             ],
-            "places": [null],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Int32",
+                  "shape": "one"
+                }
+              }
+            ],
             "ending": null
           },
           {
@@ -763,8 +775,19 @@
                 }
               },
               {
-                "follows": null,
-                "verdict": null
+                "follows": {
+                  "kind": "value",
+                  "dtype": "Datetime(us)",
+                  "shape": "many"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Datetime(us)",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
               }
             ],
             "places": [
@@ -779,14 +802,36 @@
                   "shape": "many"
                 }
               },
-              null,
-              null
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Datetime(us)",
+                  "shape": "many"
+                }
+              },
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Datetime(us)",
+                  "shape": "many"
+                }
+              }
             ],
-            "ending": null
+            "ending": {
+              "kind": "allowed"
+            }
           }
         ],
         "refusal": null,
-        "notKnown": "step \"resolved_at\", named_exprs entry 1 value, link 1: the dtype of an argument of Expr.shift is not known"
+        "notKnown": null
       }
     },
     {
@@ -1866,7 +1911,7 @@
                 },
                 "verdict": {
                   "kind": "allowed",
-                  "result": null,
+                  "result": "Int32",
                   "shape": "one",
                   "ending": {
                     "kind": "allowed"
@@ -1874,7 +1919,19 @@
                 }
               }
             ],
-            "places": [null],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.value"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Int32",
+                  "shape": "one"
+                }
+              }
+            ],
             "ending": {
               "kind": "allowed"
             }
@@ -1996,7 +2053,7 @@
                 },
                 "verdict": {
                   "kind": "allowed",
-                  "result": null,
+                  "result": "Int64",
                   "shape": "many",
                   "ending": {
                     "kind": "allowed"
@@ -2004,12 +2061,34 @@
                 }
               },
               {
-                "follows": null,
-                "verdict": null
+                "follows": {
+                  "kind": "value",
+                  "dtype": "Int64",
+                  "shape": "many"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Int64",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
               },
               {
-                "follows": null,
-                "verdict": null
+                "follows": {
+                  "kind": "value",
+                  "dtype": "Int64",
+                  "shape": "many"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Int64",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
               }
             ],
             "places": [
@@ -2033,15 +2112,47 @@
                   "state": "then"
                 }
               },
-              null,
-              null,
-              null
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Int64",
+                  "shape": "many"
+                }
+              },
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Int64",
+                  "shape": "many"
+                }
+              },
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Int64",
+                  "shape": "many"
+                }
+              }
             ],
-            "ending": null
+            "ending": {
+              "kind": "allowed"
+            }
           }
         ],
         "refusal": null,
-        "notKnown": "step \"a_days\", named_exprs entry 1 value, link 2: the dtype of an argument of Then.otherwise is not known"
+        "notKnown": null
       }
     },
     {

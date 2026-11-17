@@ -32,8 +32,7 @@ pub enum Literal {
 impl Literal {
     /// The class of the dtype Polars gives the literal, worked out as the
     /// schema of the literal on a table with no rows: no data is read. `None`
-    /// where Polars refuses the literal or gives it a dtype that has no class,
-    /// such as a number that is not finite.
+    /// where Polars refuses the literal or gives it a dtype that has no class.
     #[must_use]
     pub fn class(&self) -> Option<Representative> {
         let literal = catalog::entry("polars.lit")?;

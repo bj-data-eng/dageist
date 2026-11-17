@@ -162,9 +162,14 @@ describe('the dtype the editor shows after each link of a chain', () => {
     expect(stepOf(prepared, 'a_days').chains.get(chainIdOf('a_days'))).toEqual({
       source: 'Int64',
       methods: ['Int64', 'Int64'],
-      // The values of the condition end in a number typed without a dtype, which the engine
-      // gives none until the method after it is chosen: no place is known after it.
-      places: [null, null, null],
+      // The values of the condition are whole numbers and a number typed without a dtype, which
+      // takes theirs, so the engine knows what follows `otherwise` and says it gives one for each
+      // row, and that it still does after the two methods that follow.
+      places: [
+        selectAfter('Int64', 'many'),
+        selectAfter('Int64', 'many'),
+        selectAfter('Int64', 'many'),
+      ],
     });
   });
 
