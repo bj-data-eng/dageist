@@ -25,7 +25,7 @@ export function RowsPreview({ display, added, settled }: RowsPreviewProps): Reac
     return <p className="m-0 text-xs text-muted">Waiting for the engine…</p>;
   }
   if (display.kind === 'message') {
-    return <p className="m-0 text-xs text-wrong">{display.text}</p>;
+    return <p className={cx('m-0 text-xs text-wrong', !settled && 'opacity-60')}>{display.text}</p>;
   }
   const { columns, rows } = display;
   return (

@@ -97,6 +97,8 @@ export interface ChainOwner {
 /** What the engine's report of a step is read with. */
 export interface SentStep {
   readonly kind: 'sent';
+  /** The step as the document holds it, as JSON text, to tell whether an edit changed it. */
+  readonly canonical: string;
   /** Which word of the editor a place of the step is, by the key of its path. */
   readonly marks: ReadonlyMap<string, Mark>;
   /** Which chain of the editor an expression of the step is, by the key of its path. */
@@ -714,9 +716,15 @@ function stepJson(catalogue: Catalogue, step: Step): { json: Json; sent: SentSte
       );
     }
     const args = stepArguments({ catalogue, notes }, step, entry);
+    const json: Json = { id: step.id, call: call(entry.id, args) };
     return {
-      json: { id: step.id, call: call(entry.id, args) },
-      sent: { kind: 'sent', marks: notes.marks, chains: notes.chains },
+      json,
+      sent: {
+        kind: 'sent',
+        canonical: JSON.stringify(json),
+        marks: notes.marks,
+        chains: notes.chains,
+      },
     };
   } catch (error) {
     if (error instanceof Held) return error;

@@ -12,7 +12,9 @@ import type { Catalogue } from './catalogue';
 import { indexCatalogue } from './catalogue';
 import { translate, wrongId } from './document';
 import { NO_OPTIONS } from './settings';
+import { fieldKeys } from './steps';
 import { HostError } from '@dageist/host';
+import type { Answered } from './report';
 import { prepareRun, rowsFailure, rowsToShow } from './report';
 import type { Step } from './steps';
 
@@ -21,9 +23,22 @@ const catalogue: Catalogue = indexCatalogue(decodeCatalogue(catalogueFixture));
 const source = decodeNode(nodeFixture).source.columns;
 const run = decodeRun(reportFixture);
 
+/** The engine's report of the document `translation` is, as the editor gets it. */
+function answeredFor(
+  translation: ReturnType<typeof translate>,
+  report: ReturnType<typeof decodeRun>,
+): Answered {
+  return { document: translation.text, run: report };
+}
+
 /** The editor's starting steps, prepared against the engine's report of them. */
 function started(): ReturnType<typeof prepareRun> {
-  return prepareRun(START, translate(catalogue, START), run, source);
+  return prepareRun(
+    START,
+    translate(catalogue, START),
+    answeredFor(translate(catalogue, START), run),
+    source,
+  );
 }
 
 /** The step of the editor called `id`, prepared. */
@@ -97,7 +112,8 @@ describe('the columns the editor shows after each step', () => {
       ],
     });
 
-    const prepared = prepareRun(steps, translate(catalogue, steps), replaced, source);
+    const translation = translate(catalogue, steps);
+    const prepared = prepareRun(steps, translation, answeredFor(translation, replaced), source);
 
     expect(prepared.steps[0]?.added).toEqual(['timestamp']);
   });
@@ -189,10 +205,11 @@ describe('a refusal', () => {
       options: NO_OPTIONS,
     },
   ];
+  const refusedTranslation = translate(catalogue, refusedSteps);
   const refused = prepareRun(
     refusedSteps,
-    translate(catalogue, refusedSteps),
-    decodeRun(refusedFixture),
+    refusedTranslation,
+    answeredFor(refusedTranslation, decodeRun(refusedFixture)),
     source,
   );
 
@@ -265,10 +282,11 @@ describe('a step the document cannot hold', () => {
 
 describe('a document the engine cannot read', () => {
   it('refuses the first step with the engine’s reason, and the steps after it are not run', () => {
+    const translation = translate(catalogue, START);
     const prepared = prepareRun(
       START,
-      translate(catalogue, START),
-      decodeRun(unreadableFixture),
+      translation,
+      answeredFor(translation, decodeRun(unreadableFixture)),
       source,
     );
 
@@ -356,5 +374,88 @@ describe('the rows shown after a step is chosen', () => {
         step,
       ),
     ).toEqual({ kind: 'message', text: 'no network' });
+  });
+});
+
+/** The starting steps with the step called `id` changed by `change`. */
+function edited(id: string, change: (step: Step) => Step): readonly Step[] {
+  return START.map((step) => (step.id === id ? change(step) : step));
+}
+
+describe('a report of steps that have been edited since', () => {
+  const answeredStart = answeredFor(translate(catalogue, START), run);
+
+  it('is shown for the steps before the edited one, with their dtypes, and not after', () => {
+    const steps = edited('resolved_day', (step) =>
+      step.verb === 'with_columns' ? { ...step, alias: 'day' } : step,
+    );
+
+    const prepared = prepareRun(steps, translate(catalogue, steps), answeredStart, source);
+
+    expect(prepared.steps.slice(0, 4).map((step) => step.status)).toEqual([
+      'valid',
+      'valid',
+      'valid',
+      'valid',
+    ]);
+    expect(stepOf(prepared, 'step_index').chains.get(chainIdOf('step_index'))).toEqual({
+      source: 'String',
+      methods: ['UInt32', 'UInt32'],
+    });
+    // From the edited step on the engine has not said, so no dtype is placed against a link.
+    expect(prepared.steps.slice(4).map((step) => step.status)).toEqual(Array(8).fill('unknown'));
+    expect(prepared.steps.slice(4).every((step) => step.chains.size === 0)).toBe(true);
+    expect(stepOf(prepared, 'resolved_day').problem).toBeNull();
+  });
+
+  it('gives the steps that wait the columns of the last step that still corresponds', () => {
+    const steps = edited('resolved_day', (step) =>
+      step.verb === 'with_columns' ? { ...step, alias: 'day' } : step,
+    );
+
+    const prepared = prepareRun(steps, translate(catalogue, steps), answeredStart, source);
+
+    expect(stepOf(prepared, 'resolved_day').before).toEqual(stepOf(prepared, 'received_at').after);
+    expect(stepOf(prepared, 'days_open').before).toEqual(stepOf(prepared, 'received_at').after);
+  });
+
+  it('does not place the dtypes of the old links on a chain that has gained a method', () => {
+    const steps = edited('resolved_day', (step) =>
+      step.verb === 'with_columns' && step.value.kind === 'chain'
+        ? {
+            ...step,
+            value: {
+              ...step.value,
+              chain: {
+                ...step.value.chain,
+                methods: [
+                  { id: 'extra', name: 'dt.time', argument: null, options: NO_OPTIONS },
+                  ...step.value.chain.methods,
+                ],
+              },
+            },
+          }
+        : step,
+    );
+
+    const prepared = prepareRun(steps, translate(catalogue, steps), answeredStart, source);
+
+    expect(stepOf(prepared, 'resolved_day').status).toBe('unknown');
+    expect(stepOf(prepared, 'resolved_day').chains.size).toBe(0);
+  });
+
+  it('is not shown, as a refusal, for a document that is not the one now', () => {
+    const steps = edited('sort', (step) =>
+      step.verb === 'sort' ? { ...step, options: { by: fieldKeys(['dcn']) } } : step,
+    );
+
+    const prepared = prepareRun(
+      steps,
+      translate(catalogue, steps),
+      answeredFor(translate(catalogue, START), decodeRun(unreadableFixture)),
+      source,
+    );
+
+    expect(prepared.steps[0]?.status).toBe('unknown');
   });
 });

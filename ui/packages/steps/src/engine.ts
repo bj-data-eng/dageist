@@ -17,7 +17,13 @@ import type { Translation } from './model/document';
 import { Latest } from './model/latest';
 import type { Outcome } from './model/latest';
 import { prepareRun, rowsFailure, rowsToShow } from './model/report';
-import type { PreparedRun, PreparedStep, RowsAnswer, RowsDisplay } from './model/report';
+import type {
+  Answered as AnsweredRun,
+  PreparedRun,
+  PreparedStep,
+  RowsAnswer,
+  RowsDisplay,
+} from './model/report';
 import type { Step } from './model/steps';
 
 /** How long an edit is held for the next one, in milliseconds. */
@@ -81,10 +87,16 @@ export function useRun(host: Host, steps: readonly Step[]): RunState {
     };
   }, [host]);
 
-  const run = answered?.outcome.ok === true ? answered.outcome.answer : null;
+  const ran = useMemo<AnsweredRun | null>(
+    () =>
+      answered?.outcome.ok === true
+        ? { document: answered.document, run: answered.outcome.answer }
+        : null,
+    [answered],
+  );
   const prepared = useMemo(
-    () => prepareRun(steps, translation, run, node.source.columns),
-    [steps, translation, run, node],
+    () => prepareRun(steps, translation, ran, node.source.columns),
+    [steps, translation, ran, node],
   );
   return {
     translation,

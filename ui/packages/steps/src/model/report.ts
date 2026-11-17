@@ -147,6 +147,13 @@ function waitingWords(steps: readonly Step[], blockedBy: string): string {
     : `Not run: step ${String(at + 1)} cannot be run yet.`;
 }
 
+/** What the engine reported, and the document it was asked about. */
+export interface Answered {
+  /** The document's JSON text. */
+  readonly document: string;
+  readonly run: RunView;
+}
+
 /** Returns a step's report: what the engine said of it, found by the step's identifier. */
 function reportsById(run: RunView | null): ReadonlyMap<string, StepReportView> {
   return run?.status === 'run'
@@ -154,10 +161,32 @@ function reportsById(run: RunView | null): ReadonlyMap<string, StepReportView> {
     : new Map();
 }
 
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Returns each step of the document `text` as the JSON text `JSON.stringify` writes it. */
+function stepTexts(text: string): readonly string[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    // A text that is not JSON has no steps to compare with.
+    return [];
+  }
+  return isRecord(parsed) && Array.isArray(parsed.steps)
+    ? parsed.steps.map((step: unknown) => JSON.stringify(step))
+    : [];
+}
+
 /**
- * Prepares what the engine reported of the document `translation` is for
- * `steps`, for display. `run` is `null` where the engine has not reported;
- * `source` is the columns of the table the steps start from.
+ * Prepares what the engine reported of the document `answered` for the editor's
+ * `steps`, for display. `translation` is the document the steps are now: a
+ * report is shown only for the steps that are still what it reported of. A step
+ * that an edit has changed, and every step after it, whose columns may differ
+ * now, is shown as waiting for the engine, with the columns the last step that
+ * still corresponds gives. `answered` is `null` where the engine has not
+ * reported; `source` is the columns of the table the steps start from.
  *
  * A text the engine could not read is not a report of steps. The first step
  * in the document is then the one refused, with the engine's reason, and the
@@ -166,11 +195,15 @@ function reportsById(run: RunView | null): ReadonlyMap<string, StepReportView> {
 export function prepareRun(
   steps: readonly Step[],
   translation: Translation,
-  run: RunView | null,
+  answered: Answered | null,
   source: Frame,
 ): PreparedRun {
+  const run = answered?.run ?? null;
   const reports = reportsById(run);
-  const unreadable = run?.status === 'unreadable' ? run.problem : null;
+  const unreadable =
+    run?.status === 'unreadable' && answered?.document === translation.text ? run.problem : null;
+  const answeredTexts = answered === null ? [] : stepTexts(answered.document);
+  let corresponds = true;
   let sentSoFar = 0;
   let before = source;
   const prepared: PreparedStep[] = [];
@@ -210,7 +243,9 @@ export function prepareRun(
         result = make('notRun', 'Not run: a step before it cannot be read.');
       }
     } else {
-      const report = reports.get(step.id);
+      // What was reported is of this step only while it and every step before it are as they were.
+      corresponds = corresponds && answeredTexts[sentSoFar] === found.canonical;
+      const report = corresponds ? reports.get(step.id) : undefined;
       result =
         report === undefined ? make('unknown', null) : fromReport(step, found, report, before);
     }
