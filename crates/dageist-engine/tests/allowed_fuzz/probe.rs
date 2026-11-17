@@ -806,6 +806,17 @@ mod tests {
     }
 
     #[test]
+    fn a_window_in_a_key_that_polars_folds_away_is_refused_alone_as_a_key() {
+        // The right key holds `ra.over(rk)` in a branch behind `.last().lt(null)`,
+        // which Polars folds into a null, so the window is never met as a key.
+        // The window alone as a join's key is not elementwise.
+        let found = settled("stricter-a-window-in-a-right-key-under-a-comparison-with-a-null.case");
+        assert!(found.reason.contains("elementwise"), "{}", found.reason);
+        assert!(found.probe.contains("LazyFrame.join"), "{}", found.probe);
+        assert!(!found.probe.contains("Expr.last"), "{}", found.probe);
+    }
+
+    #[test]
     fn the_catalogue_has_what_a_probe_is_made_of() {
         for id in ["LazyFrame.select", "LazyFrame.pivot", "LazyFrame.filter"] {
             assert!(catalog::entry(id).is_some(), "{id}");
