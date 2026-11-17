@@ -146,7 +146,6 @@ fn dtypes_of(schema: &polars::prelude::Schema) -> String {
 /// Runs `plan` on the sample tables: its schema, its rows and an empty table.
 /// It is allowed only when all three succeed.
 pub(super) fn measure(plan: Plan<'_>, frames: &Frames) -> Result<Measured, Reason> {
-    crate::startup::ensure();
     catch_unwind(AssertUnwindSafe(|| run(plan, frames))).unwrap_or_else(|payload| {
         if let Some(bug) = payload.downcast_ref::<GeneratorBug>() {
             panic!("the generator built an invalid call: {}", bug.0);

@@ -555,7 +555,6 @@ fn join(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildError
 }
 
 fn pivot(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
-    crate::startup::ensure();
     let on = cols(required_columns(arguments, "on")?);
     // The values the new columns are named for, collected from the table given.
     let on_columns = Arc::new(arguments.table("on_columns")?.collect()?);

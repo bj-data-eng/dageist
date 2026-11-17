@@ -102,11 +102,6 @@ Ritchie Vink, with some portions by NVIDIA Corporation and affiliates:
 * License: [MIT License](licenses/polars/LICENSE)
 * Homepage: [Polars](https://www.pola.rs/)
 
-This product depends on recursive 0.1.1, distributed by Orson Peters:
-
-* License: [MIT License](licenses/recursive/LICENSE)
-* Homepage: [recursive](https://github.com/orlp/recursive)
-
 This product's public API audit generator depends on public-api 0.50.0 and
 rustdoc-json 0.9.7, distributed by the contributors to cargo-public-api:
 
@@ -121,9 +116,10 @@ David Tolnay, under your choice of either license:
 * License: [MIT License](licenses/serde/LICENSE-MIT)
 * Homepage: [Serde](https://serde.rs)
 
-This product depends on serde_json 1.0.151, as do its tests and fuzz
-framework, and its public API audit generator on serde_json 1.0.150, from the
-same upstream project, under your choice of either license:
+This product's tests and fuzz framework depend on serde_json 1.0.151, and its
+public API audit generator on serde_json 1.0.150, from the same upstream
+project, under your
+choice of either license:
 
 * License: [Apache License 2.0](licenses/serde/LICENSE-APACHE)
 * License: [MIT License](licenses/serde/LICENSE-MIT)

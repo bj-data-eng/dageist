@@ -298,7 +298,6 @@ impl Document {
     ///
     /// When Polars cannot work out the schema of `source` itself.
     pub fn run(&self, inputs: &Inputs, source: LazyFrame) -> Result<Report, PolarsError> {
-        crate::startup::ensure();
         let mut frame = source;
         let mut schema = frame.clone().collect_schema()?;
         let source_schema = schema.clone();
@@ -364,7 +363,6 @@ impl Document {
         through: &StepId,
         limit: usize,
     ) -> Result<DataFrame, RowsError> {
-        crate::startup::ensure();
         let last = self
             .steps()
             .iter()

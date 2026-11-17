@@ -31,7 +31,6 @@ pub(super) fn see(
 }
 
 fn seen(rows: &DataFrame, empty: &DataFrame, plan: &dyn Fn(LazyFrame) -> LazyFrame) -> Seen {
-    crate::startup::ensure();
     let mut frame = plan(rows.clone().lazy());
     let Ok(schema) = frame.collect_schema() else {
         return Seen::Refused(Stage::Schema);

@@ -94,7 +94,6 @@ pub(super) fn step(
 }
 
 pub(super) fn schema(mut frame: LazyFrame) -> Schema {
-    crate::startup::ensure();
     (*frame.collect_schema().expect("a schema")).clone()
 }
 
@@ -112,7 +111,6 @@ pub(super) fn names(frame: LazyFrame) -> Vec<String> {
 }
 
 pub(super) fn run(frame: LazyFrame) -> DataFrame {
-    crate::startup::ensure();
     frame.collect().expect("rows")
 }
 
