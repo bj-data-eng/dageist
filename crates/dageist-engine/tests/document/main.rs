@@ -6,6 +6,7 @@ mod dtypes;
 mod floats;
 mod inputs;
 mod nesting;
+mod preview;
 mod reading;
 mod refusals;
 mod support;
