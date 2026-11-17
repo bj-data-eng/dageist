@@ -38,8 +38,9 @@ stylesheet. `test` runs Vitest once over the view's data layers: the decoders
 in `ui/packages/host`, which read what the host sends and are tested against
 the [snapshots written from Rust](#refresh-the-step-report-snapshots) with
 expectations written by hand, the bridge host in the same package, against a
-stand-in for `fetch`, and later the functions that prepare data for
-display. React components have no tests. Name a file to run only its tests,
+stand-in for `fetch`, and the step editor's functions that translate steps
+into a step document, prepare the engine's report for display and schedule
+requests, against the same snapshots. React components have no tests. Name a file to run only its tests,
 as in `npm --prefix ui run test -- decode-run`.
 
 Add a development dependency with

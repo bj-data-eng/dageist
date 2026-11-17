@@ -76,7 +76,7 @@ them through the host package in
 The windows also talk to each other without the core. The host package sends a
 message as a Tauri event named `dageist:<topic>`, and every other window that
 listens to the topic receives it. The steps window and the main window keep
-the steps the same this way while the steps are a storyboard in the view.
+the steps the same this way while the steps are held in the view.
 
 The node commands are defined in [node.rs](../crates/dageist-tauri/src/node.rs)
 over plain functions that answer without Tauri, so another host can serve the
@@ -192,7 +192,7 @@ Every package is private and is consumed as TypeScript source.
 | `@dageist/desktop` | [ui/apps/desktop/](../ui/apps/desktop/src/App.tsx) | The shell: picks the host, composes the features, owns the page, the bundler configuration and the design tokens. | Every package below and React |
 | `@dageist/host` | [ui/packages/host/](../ui/packages/host/src/contract.ts) | The contract of every IPC command, the decoders that read what the host sends, and the two hosts: over Tauri, and over the [bridge](#the-bridge) in a plain browser. | Nothing |
 | `@dageist/design` | [ui/packages/design/](../ui/packages/design/src/index.ts) | Primitive components: `Block` (a word that can be pressed), `Piece`, `Slot`, `ManySlot`, `OfferList`, `TypedBlock`, `Popover`, `Hint`, `Peek`, `ToggleButton`, `Panel`, and `blocks.css`, the styles of the words a step is written in. `Popover` is placed by Floating UI. | Floating UI, React, React DOM |
-| `@dageist/steps` | [ui/packages/steps/](../ui/packages/steps/src/StepsWorkspace.tsx) | The steps of a transform and their storyboard model: the main window's table with its list of steps, and the window the steps are edited in. | `@dageist/design`, `@dageist/host`, dnd kit, React, React DOM |
+| `@dageist/steps` | [ui/packages/steps/](../ui/packages/steps/src/StepsWorkspace.tsx) | The steps of a transform: their model and its translation into a step document, the preparation of the engine's report for display, the scheduling of runs, the main window's table with its list of steps, and the window the steps are edited in. | `@dageist/design`, `@dageist/host`, dnd kit, React, React DOM |
 | `@dageist/table` | [ui/packages/table/](../ui/packages/table/src/TableViewer.tsx) | The table viewer: fetches blocks as Arrow bytes and draws only those. | `@dageist/design`, `@dageist/host`, flechette, React |
 
 | File | Contents |

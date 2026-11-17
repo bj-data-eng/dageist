@@ -133,8 +133,9 @@ Three rules keep this workable as the application grows:
   being worked on.
 - **Rust stays the authority.** A feature holds interface state, such as what
   is selected or which menu is open. Values and validation come from the host.
-  The step editor's model is a storyboard that works on fixed sample rows until
-  the core provides that behavior.
+  The step editor holds its steps and writes them as a step document; the
+  engine runs the document and reports the columns, the dtypes and the
+  refusals, and the rows after a step as text, and the view shows them.
 
 The view reaches Tauri through the `window.__TAURI__` global that
 `app.withGlobalTauri` injects. The host package declares the global's types by
@@ -228,10 +229,27 @@ own parameters are drawn by kind too: sort's keys and their per-item
 `descending`, select's expressions, join's table, keys and `how`, a rename's
 pairs, and a pivot's aggregate, which is a chain from `pl.element()`. A new
 column's name and chain and a filter's conditions keep the lines the
-storyboard settled, which lay out an expression list one item to a line, and a
-pivot's output columns stay pinned values until the graph supplies tables.
-Previews still run on the storyboard's sample rows, and a set option a preview
-cannot apply is named under the step instead of being ignored.
+storyboard settled, which lay out an expression list one item to a line. A
+pivot takes its output columns from a connected table, its `on_columns`.
+
+The editor sends its steps to the engine as a step document and shows what the
+engine reports of them, in
+[ui/packages/steps/src/model/](../ui/packages/steps/src/model/document.ts).
+Translating the steps into a document and preparing the report for display are
+plain TypeScript with no React, tested against the snapshots the host writes.
+A step is held back from the document, with the reason, when something in it
+is still to be picked or the catalogue has no entry for it yet, such as a
+comparison with `is_in` or a condition of which any line is enough; the steps
+after it are not run, as they are not after a step the engine refuses. The
+document keeps the editor's step identifiers, so the editor's starting steps
+are the engine's claim-timing sample and translate to the same document. A
+run is asked for after a short wait for the next edit, with one request out at
+a time, and the answer to a request that a newer edit has replaced is dropped,
+so what is shown is never older than the last answer that was wanted. A refusal
+carries the place of the engine's document it is at, which the translation maps
+back to the word of the editor it marks. The view's lists still sort fields by
+the dtype groups the catalogue names; offers from the engine are a later part
+of the same work.
 
 ## The Step Document
 
@@ -598,8 +616,8 @@ a condition of one dtype, a join without `validate`.
 ## What The Step Editor Storyboard Has Settled
 
 The step editor is where the design of a transform node is being worked out.
-It runs on fixed sample rows inside the view, so none of it is application
-behavior yet. The decisions below are the ones the core is expected to carry.
+It was drawn first against fixed sample rows in the view, and now runs on the
+engine. The decisions below are the ones the core is expected to carry.
 
 - **Two windows.** The table is the centre of the main window, and the steps
   are listed down its right side, each said by its head, such as "Sort table
@@ -671,22 +689,20 @@ behavior yet. The decisions below are the ones the core is expected to carry.
   use arrives from the nodes connected to it: tables, single values and
   lists, each with a name, its dtypes and the node it comes from. Logic is
   reused by connecting several nodes to one node's output.
-- **Leaving the lazy query.** A step that cannot run lazily carries a marker,
-  and the choice is the user's: collect there, sink first in a node of its
-  own, or change the step so that it stays lazy. Pivot is the only step
-  marked so far, because its output columns depend on the data unless they
-  are pinned.
+- **Leaving the lazy query.** A step the engine cannot keep in a lazy plan
+  carries a marker, which the engine's report decides. Pivot is the only step
+  marked so far, because it collects the rows before it to build its columns.
+  Its columns are the values of a connected table.
 
 ## Current Limitations
 
 The application opens its window on two features. The steps of a transform
-are a storyboard that works on fixed sample rows in the view, offering the
-operations of the engine's catalogue; its two windows
+are edited on the engine's claim-timing sample node, offering the operations of
+the engine's catalogue; its two windows
 keep the steps the same by telling each other of every change, where the core
-will later own them. The table viewer shows a
-generated sample through the engine. The host reports a node's inputs, runs
-a step document and gives the rows after a step, and the view decodes those
-answers, but the step editor does not use them yet. The graph model, node
+will later own them. The step editor runs its steps on the engine through the
+host and shows the engine's columns, dtypes, refusals and rows. The table
+viewer shows a generated sample through the engine. The graph model, node
 types, pipeline execution and canvas interactions are not implemented yet.
 
 A third tab shows the Pieces page. It is a design prototype, not a feature:
