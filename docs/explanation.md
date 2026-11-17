@@ -243,7 +243,11 @@ hole, which the document reads as an expression that starts from nothing. The
 engine walks the step up to the hole, so it reports the places before it, and
 does not build it: the step is incomplete at the hole's place, and the steps
 after it are not run, naming it. The editor reads the place back into what is to
-be picked and the word that is the matter. A step is held back from the
+be picked and the word that is the matter. The steps after an incomplete step have no walk, so their chains have no lists of
+methods until the step before is finished. A new add-column step holds a hole, so
+its chain starts from nothing and has no methods to list until a field is picked,
+and a new pivot is held back until its three fields are picked, so its aggregate
+has no lists of methods until then. A step is held back from the
 document, with the reason, only where what is missing is not an expression to
 pick, such as an empty name, a field of a pivot or a table, or where the catalogue
 has no entry for it yet, such as a comparison with `is_in` or a condition of
@@ -364,6 +368,16 @@ itself, a whole number an `Int32` and one with a fraction a `Float64`, which `fi
 reads the same way, and among the values of a condition that are numbers it
 takes their dtype, so `when(f).then(a).otherwise(0)` gives what `a` holds.
 A hole starts an expression that nothing is asked of.
+The tables are measured with typed columns, and a number typed without a dtype is a
+dyn literal that adapts to the operand it is used with, so `u8 - 1` is a `UInt8`.
+The walk and `fit` therefore leave what a call gives not known where such a number
+is an operand of a method that takes one or the receiver of one, and know it where
+it stands alone, counts rows as `shift` does, or is a value of a condition beside
+typed values that it fits: a whole number adapts to whole numbers and numbers with a
+fraction it fits, a number with a fraction only to numbers with a fraction, and
+numbers alone have no class. A condition with no `otherwise` that holds one is not
+known to end, as Polars refuses it. The fuzz target draws such numbers, outside the
+values of a condition, so that its campaigns hold these answers to Polars.
 The runner asks the named rules beside those tables, and not the tables, for
 where an expression may start: `element` starts a chain only in a pivot's
 aggregate. A row of the context table was measured with the chain ending at one
