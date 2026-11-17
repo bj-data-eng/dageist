@@ -56,7 +56,7 @@ pub enum ReadError {
     Unsupported(&'static str),
     /// The peer was too slow to send what it began.
     TimedOut,
-    /// The connection failed, and there is nobody to tell.
+    /// The connection failed, and there is no one to tell.
     Io,
 }
 

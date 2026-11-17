@@ -400,7 +400,7 @@ pub fn serve(listener: &TcpListener, bridge: Bridge) -> io::Result<()> {
         let _ = thread::Builder::new()
             .name("bridge-connection".to_owned())
             .spawn(move || {
-                // A connection that breaks has nobody left to tell.
+                // A connection that breaks has no one left to tell.
                 let _ = serve_connection(&stream, &bridge);
             });
     }
