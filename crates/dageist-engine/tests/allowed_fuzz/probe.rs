@@ -1442,6 +1442,64 @@ mod tests {
         assert!(settle_as_a_key(&case, &refused_in_the_right_key_at(0, reason)).is_some());
     }
 
+    /// A join of `key` with the right key `rk > rk.cum_sum().<inner>`: the second
+    /// chain is an argument of the comparison.
+    fn join_with_a_chain_in_the_right_key(inner: &[&str]) -> Case {
+        let column = "{\"entry\":\"polars.col\",\"arguments\":{\"name\":{\"columns\":[\"rk\"]}}}";
+        let links: Vec<String> = std::iter::once("Expr.cum_sum")
+            .chain(inner.iter().copied())
+            .map(|id| format!("{{\"entry\":\"{id}\",\"arguments\":{{}}}}"))
+            .collect();
+        let key = format!(
+            "{{\"expression\":{{\"start\":{column},\"then\":[{{\"entry\":\"Expr.gt\",\"arguments\":{{\"other\":{{\"expression\":{{\"start\":{column},\"then\":[{}]}}}}}}}}]}}}}",
+            links.join(",")
+        );
+        let text = format!(
+            "{{\"a\":\"Int64\",\"b\":\"Int64\",\"revision\":1}}\n{{\"version\":1,\"steps\":[{{\"id\":\"s\",\"call\":{{\"entry\":\"LazyFrame.join\",\"arguments\":{{\"other\":{{\"table\":\"other\"}},\"left_on\":{{\"many\":[{{\"expression\":{{\"start\":{{\"entry\":\"polars.col\",\"arguments\":{{\"name\":{{\"columns\":[\"key\"]}}}}}},\"then\":[]}}}}]}},\"right_on\":{{\"many\":[{key}]}}}}}}}}]}}"
+        );
+        Case::decode(text.as_bytes()).expect("a case")
+    }
+
+    /// The tables refuse link `link` of the chain that the comparison of the
+    /// right key is given.
+    fn refused_in_the_argument_of_the_right_key(link: usize, reason: &str) -> Refused {
+        let place = Place::of_step(0, Some(StepId::new("s").expect("an identifier")))
+            .then(Segment::Parameter("right_on".to_owned()))
+            .then(Segment::Item(0))
+            .then(Segment::Link(0))
+            .then(Segment::Parameter("other".to_owned()))
+            .then(Segment::Link(link));
+        Refused {
+            source: Source::Polars,
+            at: place.to_string(),
+            place,
+            stage: None,
+            reason: reason.to_owned(),
+            argument_unknown: false,
+        }
+    }
+
+    #[test]
+    fn a_key_refused_before_the_refused_call_in_an_argument_settles_nothing() {
+        // `rk > rk.cum_sum().cum_max()`: the running sum is not elementwise, so the
+        // key is refused as the tables say, but the refused call is the running
+        // maximum, which follows it in the argument. The part of the argument before
+        // the refused call, `rk > rk.cum_sum()`, is refused alone for the same
+        // reason, so the refused call is not why, though the key before the
+        // comparison, `rk`, is allowed.
+        let reason = "all join key expressions must be elementwise.";
+        let case = join_with_a_chain_in_the_right_key(&["Expr.cum_max"]);
+        assert_eq!(
+            settle_as_a_key(&case, &refused_in_the_argument_of_the_right_key(1, reason)),
+            None
+        );
+        // At the running sum itself, nothing in the argument comes before it that is
+        // refused, and it is the cause.
+        assert!(
+            settle_as_a_key(&case, &refused_in_the_argument_of_the_right_key(0, reason)).is_some()
+        );
+    }
+
     #[test]
     fn a_reason_that_is_not_about_a_key_is_not_asked_of_a_key() {
         let case = kept("stricter-a-window-in-a-right-key-under-a-comparison-with-a-null.case");
