@@ -12,7 +12,8 @@ import type { Catalogue } from './catalogue';
 import { indexCatalogue } from './catalogue';
 import { translate, wrongId } from './document';
 import { NO_OPTIONS } from './settings';
-import { prepareRun, rowsFailure } from './report';
+import { HostError } from '@dageist/host';
+import { prepareRun, rowsFailure, rowsToShow } from './report';
 import type { Step } from './steps';
 
 // The report the host writes of the claim-timing steps, and what the editor shows of it.
@@ -306,5 +307,54 @@ describe('the words for a step that has no rows', () => {
     expect(rowsFailure('failed', 'could not collect the rows', null)).toBe(
       'could not collect the rows',
     );
+  });
+});
+
+describe('the rows shown after a step is chosen', () => {
+  const rows = { columns: [{ name: 'a', dtype: 'Int64' }], rows: [['1']] };
+  const step = stepOf(started(), 'sort');
+
+  it('are those the engine gave for that step', () => {
+    expect(rowsToShow({ step: 'sort', outcome: { ok: true, answer: rows } }, 'sort', step)).toEqual(
+      {
+        kind: 'rows',
+        columns: rows.columns,
+        rows: rows.rows,
+      },
+    );
+  });
+
+  it('are nothing yet when the answer is for another step, whether it holds rows or a failure', () => {
+    const failed = new HostError('rows_after_step', 'refused', 'previewing the rows: …');
+
+    expect(
+      rowsToShow({ step: 'sort', outcome: { ok: true, answer: rows } }, 'join', step),
+    ).toBeNull();
+    expect(
+      rowsToShow({ step: 'sort', outcome: { ok: false, error: failed } }, 'join', step),
+    ).toBeNull();
+    expect(rowsToShow(null, 'join', step)).toBeNull();
+  });
+
+  it('say why there are none by the kind of the failure for the step that was chosen', () => {
+    const failed = new HostError('rows_after_step', 'refused', 'previewing the rows: …');
+    const refusedStep = { ...step, status: 'refused' as const, problem: 'the reason' };
+
+    expect(
+      rowsToShow({ step: 'sort', outcome: { ok: false, error: failed } }, 'sort', refusedStep),
+    ).toEqual({
+      kind: 'message',
+      text: 'the reason',
+    });
+  });
+
+  it('keep the text of a failure that is not the host’s', () => {
+    expect(
+      rowsToShow(
+        { step: 'sort', outcome: { ok: false, error: new Error('no network') } },
+        'sort',
+        step,
+      ),
+    ).toEqual({ kind: 'message', text: 'no network' });
   });
 });

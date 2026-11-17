@@ -13,13 +13,16 @@ import type {
   ErrorKind,
   PlaceView,
   ResolutionView,
+  RowsView,
   RunView,
   StepReportView,
 } from '@dageist/host';
+import { HostError } from '@dageist/host';
 
 import type { ChainOwner, Mark, SentStep, Translation } from './document';
 import { placeKey, segmentWord, wrongId } from './document';
 import type { Frame } from './frame';
+import type { Outcome } from './latest';
 import type { Step } from './steps';
 
 /** The dtype after the start of a chain and after each of its methods; `null` where the engine gives none. */
@@ -302,4 +305,40 @@ export function rowsFailure(kind: ErrorKind, message: string, step: PreparedStep
     default:
       return kind satisfies never;
   }
+}
+
+/** What the host answered when asked for the rows after a step. */
+export interface RowsAnswer {
+  /** The step the rows were asked for. */
+  readonly step: string;
+  readonly outcome: Outcome<RowsView>;
+}
+
+/**
+ * Returns what to show of the rows after the step `selectedId`: the rows, or
+ * why there are none, and `null` while there is nothing to show yet. An answer
+ * for another step is not shown, rows or failure, so choosing a step never
+ * shows what was said of the one before it. `step` is what is known of the
+ * chosen step.
+ */
+export function rowsToShow(
+  answer: RowsAnswer | null,
+  selectedId: string,
+  step: PreparedStep | null,
+): RowsDisplay | null {
+  if (answer === null || answer.step !== selectedId) return null;
+  const { outcome } = answer;
+  if (outcome.ok) {
+    return { kind: 'rows', columns: outcome.answer.columns, rows: outcome.answer.rows };
+  }
+  const { error } = outcome;
+  return {
+    kind: 'message',
+    text:
+      error instanceof HostError
+        ? rowsFailure(error.kind, error.message, step)
+        : error instanceof Error
+          ? error.message
+          : String(error),
+  };
 }
