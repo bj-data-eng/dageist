@@ -79,6 +79,7 @@ pub struct Chosen<'a> {
     arguments: &'a [(&'a str, Representative)],
     options: &'a [(&'a str, &'a str)],
     gives: Option<Representative>,
+    many: bool,
 }
 
 impl<'a> Chosen<'a> {
@@ -107,6 +108,15 @@ impl<'a> Chosen<'a> {
     #[must_use]
     pub const fn giving(mut self, dtype: Representative) -> Self {
         self.gives = Some(dtype);
+        self
+    }
+
+    /// That the values the entry gives are many, as those of a connected list
+    /// are, and not one as a literal's is. An entry that makes a value gives
+    /// one unless told so; a method's shape is the table's.
+    #[must_use]
+    pub const fn giving_many(mut self) -> Self {
+        self.many = true;
         self
     }
 }
@@ -731,6 +741,9 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         }
         ends = cell.ends.clone();
     }
+    if chosen.many && !is_method(entry) {
+        shape = Shape::Many;
+    }
     if let After::Value {
         shape: Shape::One, ..
     } = place.after
@@ -768,6 +781,26 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         shape,
         ending,
     })
+}
+
+/// Whether a connected value, or a connected list of values, of the dtype
+/// class `dtype` may start an expression at `place`.
+///
+/// The run makes a connected input a literal of its dtype, so the tables' lines
+/// of `polars.lit` judge it, as they judge a literal given a dtype: where a
+/// literal may stand and may end, so may the input. A list gives many values,
+/// where a value gives one. A place that is not a start refuses it.
+#[must_use]
+pub fn offer_input(place: &Place, dtype: Representative, list: bool) -> Verdict {
+    let Some(literal) = catalog::entry("polars.lit") else {
+        return Verdict::Refused(Refusal::structure("the catalogue has no polars.lit"));
+    };
+    let chosen = Chosen::default().giving(dtype);
+    offer(
+        literal,
+        place,
+        &if list { chosen.giving_many() } else { chosen },
+    )
 }
 
 /// The refusal of a rule that forbids `entry` to start or continue a chain in

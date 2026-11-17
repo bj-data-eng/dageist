@@ -39,7 +39,7 @@ pub use context::{Context, Nested, Outer, Position};
 pub use dtype::{Representative, ResultDtype, dtype_name};
 pub use offers::{
     After, Allowance, Chosen, ConditionState, Ending, Offer, Place, Refusal, RefusalSource,
-    Unknown, Verdict, argument_dtypes, offer, offers, options, rule_forbids,
+    Unknown, Verdict, argument_dtypes, offer, offer_input, offers, options, rule_forbids,
     rule_forbids_a_key_known_not_elementwise,
 };
 pub use rules::Rule;

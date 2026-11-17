@@ -193,6 +193,7 @@ impl Step {
         let mut walker = Walker {
             step: self.call(),
             source,
+            inputs,
             other,
             base: Place::of_step(index, Some(self.id().clone())),
             path: Vec::new(),
@@ -249,6 +250,7 @@ enum Cur {
 struct Walker<'a> {
     step: &'a Call,
     source: &'a Schema,
+    inputs: &'a Inputs,
     other: Option<SchemaRef>,
     base: Place,
     path: Vec<Segment>,
@@ -502,7 +504,7 @@ impl Walker<'_> {
                 start_arguments = self.arguments(start, values_end);
                 self.path.pop();
             }
-            Start::Input(_) => self.blind("a connected input starts the chain"),
+            Start::Input(_) => {}
         }
         let Some(context) = context else {
             self.blind("no named position holds the expression");
@@ -562,12 +564,13 @@ impl Walker<'_> {
                 });
                 self.path.pop();
             }
-            Start::Input(_) => {
-                calls.push(Standing::not_asked());
+            Start::Input(name) => {
                 cur = Cur::Value {
                     dtype: None,
                     shape: Shape::Many,
                 };
+                let standing = self.input_start(name, context, &mut cur, &mut last_end);
+                calls.push(standing);
             }
         }
         // Values that are one expression make the condition that expression, and
@@ -652,6 +655,49 @@ impl Walker<'_> {
                 known: true,
             },
             Cur::Dead => unsaid,
+        }
+    }
+
+    /// Asks the tables about a chain that starts from the connected input
+    /// `name`, which the run makes a literal of its dtype. `cur` and `last_end`
+    /// are what the chain has afterwards, as for any other start.
+    fn input_start(
+        &mut self,
+        name: &str,
+        context: Context,
+        cur: &mut Cur,
+        last_end: &mut Option<Ending>,
+    ) -> Standing {
+        let Some(literal) = self.inputs.start_literal(name) else {
+            self.blind(format!(
+                "there is no connected value or list called {name:?}"
+            ));
+            return Standing::not_asked();
+        };
+        let Some(class) = literal.class else {
+            self.blind(format!(
+                "the dtype of the connected input {name:?} is not one the tables cover"
+            ));
+            return Standing::not_asked();
+        };
+        let verdict =
+            allowed::offer_input(&OfferPlace::new(context, After::Start), class, literal.list);
+        match &verdict {
+            Verdict::Refused(refusal) => {
+                self.refuse(refusal, false);
+                *cur = Cur::Dead;
+            }
+            Verdict::Allowed(allowance) => {
+                *last_end = Some(allowance.can_end().clone());
+                *cur = Cur::Value {
+                    dtype: Some(class),
+                    shape: allowance.shape(),
+                };
+            }
+        }
+        Standing {
+            follows: Some(After::Start),
+            verdict: Some(verdict),
         }
     }
 

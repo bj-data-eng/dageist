@@ -3324,11 +3324,39 @@
             },
             "calls": [
               {
-                "follows": null,
-                "verdict": null
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Date",
+                  "shape": "one",
+                  "ending": {
+                    "kind": "refused",
+                    "refusal": {
+                      "source": {
+                        "by": "rule",
+                        "rule": "condition-predicate-is-boolean"
+                      },
+                      "reason": "a condition's predicate must be Boolean"
+                    }
+                  }
+                }
               }
             ],
-            "places": [null],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.predicate"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Date",
+                  "shape": "one"
+                }
+              }
+            ],
             "ending": null
           },
           {
@@ -3443,9 +3471,21 @@
                   "shape": "many"
                 }
               },
-              null
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.predicate"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Boolean",
+                  "shape": "many"
+                }
+              }
             ],
-            "ending": null
+            "ending": {
+              "kind": "allowed"
+            }
           },
           {
             "place": {
@@ -3554,11 +3594,39 @@
             },
             "calls": [
               {
-                "follows": null,
-                "verdict": null
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Int64",
+                  "shape": "one",
+                  "ending": {
+                    "kind": "refused",
+                    "refusal": {
+                      "source": {
+                        "by": "rule",
+                        "rule": "condition-predicate-is-boolean"
+                      },
+                      "reason": "a condition's predicate must be Boolean"
+                    }
+                  }
+                }
               }
             ],
-            "places": [null],
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.predicate"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Int64",
+                  "shape": "one"
+                }
+              }
+            ],
             "ending": null
           },
           {
@@ -3648,9 +3716,21 @@
                   "shape": "many"
                 }
               },
-              null
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.predicate"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Boolean",
+                  "shape": "many"
+                }
+              }
             ],
-            "ending": null
+            "ending": {
+              "kind": "allowed"
+            }
           },
           {
             "place": {
@@ -3877,7 +3957,17 @@
                   "state": "then"
                 }
               },
-              null
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": "condition.value"
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "many"
+                }
+              }
             ],
             "ending": {
               "kind": "allowed"
@@ -3937,7 +4027,7 @@
                 },
                 "verdict": {
                   "kind": "allowed",
-                  "result": null,
+                  "result": "String",
                   "shape": "many",
                   "ending": {
                     "kind": "allowed"
@@ -3966,13 +4056,25 @@
                   "state": "then"
                 }
               },
-              null
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "String",
+                  "shape": "many"
+                }
+              }
             ],
-            "ending": null
+            "ending": {
+              "kind": "allowed"
+            }
           }
         ],
         "refusal": null,
-        "notKnown": "step \"flag\", named_exprs entry 1 value, the start, predicates item 1, link 2, other: a connected input starts the chain"
+        "notKnown": null
       }
     },
     {
@@ -4094,20 +4196,65 @@
             },
             "calls": [
               {
-                "follows": null,
-                "verdict": null
+                "follows": {
+                  "kind": "start"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "Date",
+                  "shape": "many",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
               },
               {
-                "follows": null,
-                "verdict": null
+                "follows": {
+                  "kind": "value",
+                  "dtype": "Date",
+                  "shape": "many"
+                },
+                "verdict": {
+                  "kind": "allowed",
+                  "result": "UInt32",
+                  "shape": "one",
+                  "ending": {
+                    "kind": "allowed"
+                  }
+                }
               }
             ],
-            "places": [null, null],
-            "ending": null
+            "places": [
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "Date",
+                  "shape": "many"
+                }
+              },
+              {
+                "context": {
+                  "outer": "select",
+                  "nested": null
+                },
+                "after": {
+                  "kind": "value",
+                  "dtype": "UInt32",
+                  "shape": "one"
+                }
+              }
+            ],
+            "ending": {
+              "kind": "allowed"
+            }
           }
         ],
         "refusal": null,
-        "notKnown": "step \"holiday_count\", named_exprs entry 1 value: a connected input starts the chain"
+        "notKnown": null
       }
     },
     {

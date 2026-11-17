@@ -158,10 +158,34 @@ describe('the report of running the claim-timing steps', () => {
     expect(stepNamed(run, 'resolved_at').walk.notKnown).toBe(
       'step "resolved_at", named_exprs entry 1 value, link 1: the dtype of an argument of Expr.shift is not known',
     );
-    expect(stepNamed(run, 'holiday_count').walk.notKnown).toBe(
-      'step "holiday_count", named_exprs entry 1 value: a connected input starts the chain',
-    );
     expect(stepNamed(run, 'sort').walk.notKnown).toBeNull();
+  });
+
+  it('asks the tables about a chain that starts from a connected list, as a literal of its dtype', () => {
+    // `holidays` is a list of dates: many values of a date, and its length is one count.
+    const walked = stepNamed(run, 'holiday_count').walk.expressions[0];
+    expect(stepNamed(run, 'holiday_count').walk.notKnown).toBeNull();
+    expect(walked?.calls[0]).toEqual({
+      follows: { kind: 'start' },
+      verdict: { kind: 'allowed', result: 'Date', shape: 'many', ending: { kind: 'allowed' } },
+    });
+    expect(walked?.calls[1]?.follows).toEqual({ kind: 'value', dtype: 'Date', shape: 'many' });
+    expect(walked?.calls[1]?.verdict).toEqual({
+      kind: 'allowed',
+      result: 'UInt32',
+      shape: 'one',
+      ending: { kind: 'allowed' },
+    });
+    expect(walked?.places).toEqual([
+      {
+        context: { outer: 'select', nested: null },
+        after: { kind: 'value', dtype: 'Date', shape: 'many' },
+      },
+      {
+        context: { outer: 'select', nested: null },
+        after: { kind: 'value', dtype: 'UInt32', shape: 'one' },
+      },
+    ]);
   });
 });
 

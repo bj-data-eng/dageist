@@ -6,7 +6,7 @@ use std::fmt;
 
 use polars::prelude::{Expr, LazyFrame, PolarsError, Scalar, Series, lit};
 
-use crate::allowed::dtype_name;
+use crate::allowed::{Representative, dtype_name};
 
 use super::columns::ColumnDescription;
 
@@ -59,6 +59,14 @@ enum Input {
     Table(Box<LazyFrame>),
     Value(Scalar),
     List(Series),
+}
+
+/// What a connected value or list is as the start of an expression: the class
+/// of its dtype, when the tables cover it, and whether it holds many values.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct StartLiteral {
+    pub(super) class: Option<Representative>,
+    pub(super) list: bool,
 }
 
 /// The inputs of a node by name: tables, single values and lists. A name
@@ -177,6 +185,20 @@ impl Inputs {
             Some(Input::Table(table)) => Some(LazyFrame::clone(table)),
             _ => None,
         }
+    }
+
+    /// What the single value or list called `name` is as the start of an
+    /// expression, or `None` when no value or list has the name.
+    pub(super) fn start_literal(&self, name: &str) -> Option<StartLiteral> {
+        let (dtype, list) = match self.inputs.get(name)? {
+            Input::Value(value) => (value.dtype(), false),
+            Input::List(values) => (values.dtype(), true),
+            Input::Table(_) => return None,
+        };
+        Some(StartLiteral {
+            class: Representative::of(dtype),
+            list,
+        })
     }
 
     /// The single value or list called `name` as an expression: a literal of
