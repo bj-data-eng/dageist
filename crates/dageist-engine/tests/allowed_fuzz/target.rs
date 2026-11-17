@@ -15,7 +15,7 @@ use super::generate::generate;
 use super::limits::{excuses, strict};
 use super::observe::{Observed, Seen, observe};
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
-use super::probe::{Settled, settle, settle_on_a_value};
+use super::probe::{Settled, settle, settle_apart};
 use super::reduce::candidates;
 
 /// The named rules that are stricter than Polars by design, each with why. A
@@ -142,12 +142,12 @@ pub fn describe(case: &Case) -> String {
     );
     let excused = excuses(case, &prediction, &observed);
     // The order the case is judged in: the part as written, then the limits, then
-    // the refused call on a value.
+    // the refused call apart from what surrounds it.
     let probed = match (&prediction.verdict, &observed.refusal) {
         (Verdict::Refuses(refused), None) => probe_of(case, refused).or_else(|| {
             excused
                 .is_empty()
-                .then(|| probe_on_a_value(case, refused, &prediction, &observed))
+                .then(|| probe_apart(case, refused, &prediction, &observed))
                 .flatten()
         }),
         _ => None,
@@ -178,9 +178,9 @@ fn probe_of(case: &Case, refused: &Refused) -> Option<Settled> {
     settle(case, refused)
 }
 
-/// What a probe of the refused call on a value of the dtype that reaches it
-/// shows, unless the limits are held to everything.
-fn probe_on_a_value(
+/// What a probe of the refused call apart from what surrounds it shows, unless
+/// the limits are held to everything.
+fn probe_apart(
     case: &Case,
     refused: &Refused,
     prediction: &Prediction,
@@ -189,7 +189,7 @@ fn probe_on_a_value(
     if strict() {
         return None;
     }
-    settle_on_a_value(case, refused, prediction, observed)
+    settle_apart(case, refused, prediction, observed)
 }
 
 /// The outcome of a case where the tables refuse a part Polars does not
@@ -405,17 +405,16 @@ impl CaseTarget for AllowedTarget {
                     // What Polars refuses of the part as written shows the tables
                     // right where it skips the part; the limits then say what it
                     // evaluates and accepts; what is left is asked of the refused
-                    // call on a value.
+                    // call apart from what surrounds it.
                     if let Some(outcome) = stricter(probe_of(case, &refused), &why) {
                         return outcome;
                     }
                     if let Some(outcome) = excused("refused, Polars allows") {
                         return outcome;
                     }
-                    if let Some(outcome) = stricter(
-                        probe_on_a_value(case, &refused, &prediction, &observed),
-                        &why,
-                    ) {
+                    if let Some(outcome) =
+                        stricter(probe_apart(case, &refused, &prediction, &observed), &why)
+                    {
                         return outcome;
                     }
                     return failure(

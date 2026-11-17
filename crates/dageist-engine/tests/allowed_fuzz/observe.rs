@@ -221,7 +221,7 @@ fn schema_disagrees(
 
 /// Whether `expression` is only the join key column the other side is
 /// matched against.
-fn is_bare_key(expression: &Expression) -> bool {
+pub fn is_bare_key(expression: &Expression) -> bool {
     expression.links().is_empty()
         && matches!(expression.start(), Start::Call(call)
             if call.entry().id().as_str() == "polars.col"

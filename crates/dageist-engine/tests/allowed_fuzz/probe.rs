@@ -21,7 +21,7 @@ use dageist_engine::document::{
 
 use super::case::{Case, STEP};
 use super::frames::STAND_IN;
-use super::observe::{Observed, Refusal, Seen, Tables, observe_probe};
+use super::observe::{Observed, Refusal, Seen, Tables, is_bare_key, observe_probe};
 use super::predict::{Prediction, Refused, Source};
 
 /// What a probe found: the document it ran, and why Polars refused it.
@@ -43,6 +43,9 @@ const PREDICATE_RULES: [&str; 2] = [
 struct Found<'a> {
     expression: &'a Expression,
     rest: &'a [Segment],
+    /// Every expression the place is inside, outermost first, and how much of
+    /// the place is consumed on entering it.
+    levels: Vec<(&'a Expression, usize)>,
     /// Whether the place is in a pivot's aggregate, where `element` stands.
     in_the_aggregate: bool,
     /// Whether the place is in a join's `right_on`, read against the other table.
@@ -67,6 +70,7 @@ fn find<'a>(case: &'a Case, place: &'a Place) -> Option<Found<'a>> {
     let step = case.document.steps()[0].call();
     let mut node = Node::Call(step);
     let mut held: Option<(&Expression, usize)> = None;
+    let mut levels: Vec<(&Expression, usize)> = Vec::new();
     for (at, segment) in path.iter().enumerate() {
         node = match (node, segment) {
             (Node::Call(call), Segment::Parameter(name)) => enter(call.argument(name)?),
@@ -84,12 +88,14 @@ fn find<'a>(case: &'a Case, place: &'a Place) -> Option<Found<'a>> {
         };
         if let Node::Expression(expression) = &node {
             held = Some((expression, at + 1));
+            levels.push((expression, at + 1));
         }
     }
     let (expression, consumed) = held?;
     Some(Found {
         expression,
         rest: &path[consumed..],
+        levels,
         in_the_aggregate: matches!(
             path.first(),
             Some(Segment::Parameter(name)) if name == "aggregate_function"
@@ -110,10 +116,10 @@ fn literal(whole: i64) -> Option<Expression> {
     Expression::new(Start::Call(lit), Vec::new()).ok()
 }
 
-/// The chain through the refused call: the start, or the links up to the one.
-fn chain_through(found: &Found) -> Option<Expression> {
-    let expression = found.expression;
-    match found.rest.first() {
+/// The chain through the call that `at` names: the start, or the links up to the
+/// one; the whole expression for none.
+fn chain_up_to(expression: &Expression, at: Option<&Segment>) -> Option<Expression> {
+    match at {
         None => Some(expression.clone()),
         Some(Segment::Start) => Expression::new(expression.start().clone(), Vec::new()).ok(),
         Some(Segment::Link(link)) => Expression::new(
@@ -123,6 +129,11 @@ fn chain_through(found: &Found) -> Option<Expression> {
         .ok(),
         Some(_) => None,
     }
+}
+
+/// The chain through the refused call.
+fn chain_through(found: &Found) -> Option<Expression> {
+    chain_up_to(found.expression, found.rest.first())
 }
 
 /// A condition with `predicate` and literal values: nothing in it but the
@@ -526,6 +537,94 @@ pub fn settle_on_a_value(
         })
 }
 
+/// The parameters of a join that hold its keys.
+const KEYS: [&str; 3] = ["on", "left_on", "right_on"];
+
+/// The join of the case with the key that `parameter` holds replaced by `part`.
+/// Another key must be the bare `key` column, so that the refusal can only be
+/// the part's.
+fn join_on(case: &Case, parameter: &str, part: &Expression) -> Option<Document> {
+    let original = case.document.steps()[0].call();
+    if original.entry().id().as_str() != "LazyFrame.join" {
+        return None;
+    }
+    let mut given: Vec<(&str, Value)> = Vec::new();
+    for argument in original.arguments() {
+        let name = argument.parameter();
+        let value = if !KEYS.contains(&name) {
+            argument.value().clone()
+        } else {
+            let Value::Many(items) = argument.value() else {
+                return None;
+            };
+            match items.as_slice() {
+                [_] if name == parameter => Value::Many(vec![Value::Expression(part.clone())]),
+                [Value::Expression(key)] if name != parameter && is_bare_key(key) => {
+                    argument.value().clone()
+                }
+                _ => return None,
+            }
+        };
+        given.push((name, value));
+    }
+    Document::new(vec![
+        Step::new(StepId::new(STEP).ok()?, call("LazyFrame.join", given)?).ok()?,
+    ])
+    .ok()
+}
+
+/// Asks Polars about the part of a join's key that the tables refused as not
+/// elementwise, standing alone as the key. The refusal is of the position, which
+/// no column or value shows, and Polars does not meet the part as a key where it
+/// folds what it is in away, as a comparison with a null: the part that holds
+/// the refused call, with the arguments as written, is the whole key of the same
+/// join. As with [`settle_on_a_value`], what this shows is that the tables are
+/// right about the part as a key.
+pub fn settle_as_a_key(case: &Case, refused: &Refused) -> Option<Settled> {
+    if !matches!(refused.source, Source::Polars) || !refused.reason.contains("elementwise") {
+        return None;
+    }
+    let found = find(case, &refused.place)?;
+    let Some(Segment::Parameter(parameter)) = refused.place.path().first() else {
+        return None;
+    };
+    if !KEYS.contains(&parameter.as_str()) {
+        return None;
+    }
+    // What holds the refused call: the expression that the place is directly in,
+    // through its call that holds the rest of the place, which is the part.
+    let part = match found.levels.as_slice() {
+        [.., (parent, entered), _] => chain_up_to(parent, refused.place.path().get(*entered))?,
+        _ => chain_through(&found)?,
+    };
+    let probed = Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        document: join_on(case, parameter, &part)?,
+    };
+    let refusal = observe_probe(&probed, Tables::default()).refusal?;
+    let at = Place::of_step(0, StepId::new(STEP).ok())
+        .then(Segment::Parameter(parameter.clone()))
+        .then(Segment::Item(0));
+    (same_reason(&refused.source, &refused.reason, &refusal.reason) && lies_at(&refusal, &[at]))
+        .then(|| Settled {
+            probe: probed.document.write(),
+            reason: refusal.reason,
+        })
+}
+
+/// Asks Polars about the part the tables refused apart from what surrounds it
+/// in the case, where the part as written is not asked: the refused call on a
+/// value of the dtype that reaches it, or a join's key by itself as the key.
+pub fn settle_apart(
+    case: &Case,
+    refused: &Refused,
+    predicted: &Prediction,
+    observed: &Observed,
+) -> Option<Settled> {
+    settle_on_a_value(case, refused, predicted, observed).or_else(|| settle_as_a_key(case, refused))
+}
+
 /// The predicate a rule refused: the whole expression at its place.
 fn found_predicate(found: &Found) -> Option<Expression> {
     found.rest.is_empty().then(|| found.expression.clone())
@@ -808,12 +907,62 @@ mod tests {
     #[test]
     fn a_window_in_a_key_that_polars_folds_away_is_refused_alone_as_a_key() {
         // The right key holds `ra.over(rk)` in a branch behind `.last().lt(null)`,
-        // which Polars folds into a null, so the window is never met as a key.
-        // The window alone as a join's key is not elementwise.
-        let found = settled("stricter-a-window-in-a-right-key-under-a-comparison-with-a-null.case");
+        // which Polars folds into a null, so the window is never met as a key. The
+        // window alone as a join's key is not elementwise.
+        let case = kept("stricter-a-window-in-a-right-key-under-a-comparison-with-a-null.case");
+        let refused = refusal(&case);
+        // The part of the key that is refused, as written, is a column: allowed.
+        assert_eq!(settle(&case, &refused), None);
+        let found = settle_as_a_key(&case, &refused).expect("a key that Polars refuses");
         assert!(found.reason.contains("elementwise"), "{}", found.reason);
         assert!(found.probe.contains("LazyFrame.join"), "{}", found.probe);
+        assert!(found.probe.contains("Expr.over"), "{}", found.probe);
         assert!(!found.probe.contains("Expr.last"), "{}", found.probe);
+    }
+
+    /// A join of `key` with the right key `rk` followed by `link`.
+    fn join_with_right_key(link: &str) -> Case {
+        let text = format!(
+            "{{\"a\":\"Int64\",\"b\":\"Int64\",\"revision\":1}}\n{{\"version\":1,\"steps\":[{{\"id\":\"s\",\"call\":{{\"entry\":\"LazyFrame.join\",\"arguments\":{{\"other\":{{\"table\":\"other\"}},\"left_on\":{{\"many\":[{{\"expression\":{{\"start\":{{\"entry\":\"polars.col\",\"arguments\":{{\"name\":{{\"columns\":[\"key\"]}}}}}},\"then\":[]}}}}]}},\"right_on\":{{\"many\":[{{\"expression\":{{\"start\":{{\"entry\":\"polars.col\",\"arguments\":{{\"name\":{{\"columns\":[\"rk\"]}}}}}},\"then\":[{{\"entry\":\"{link}\",\"arguments\":{{}}}}]}}}}]}}}}}}}}]}}"
+        );
+        Case::decode(text.as_bytes()).expect("a case")
+    }
+
+    fn refused_in_the_right_key(reason: &str) -> Refused {
+        let place = Place::of_step(0, Some(StepId::new("s").expect("an identifier")))
+            .then(Segment::Parameter("right_on".to_owned()))
+            .then(Segment::Item(0))
+            .then(Segment::Link(0));
+        Refused {
+            source: Source::Polars,
+            at: place.to_string(),
+            place,
+            stage: None,
+            reason: reason.to_owned(),
+        }
+    }
+
+    #[test]
+    fn a_key_that_polars_allows_alone_as_a_key_settles_nothing() {
+        // A right key that tests for a null is elementwise and allowed: the
+        // refusal the tables are said to give is not shown. A running sum is not
+        // elementwise, and is refused as the tables say.
+        let reason = "all join key expressions must be elementwise.";
+        let elementwise = join_with_right_key("Expr.is_null");
+        assert_eq!(
+            settle_as_a_key(&elementwise, &refused_in_the_right_key(reason)),
+            None
+        );
+        let running = join_with_right_key("Expr.cum_sum");
+        assert!(settle_as_a_key(&running, &refused_in_the_right_key(reason)).is_some());
+    }
+
+    #[test]
+    fn a_reason_that_is_not_about_a_key_is_not_asked_of_a_key() {
+        let case = kept("stricter-a-window-in-a-right-key-under-a-comparison-with-a-null.case");
+        let mut refused = refusal(&case);
+        refused.reason = "cannot compare string with numeric type (i8)".to_owned();
+        assert_eq!(settle_as_a_key(&case, &refused), None);
     }
 
     #[test]
