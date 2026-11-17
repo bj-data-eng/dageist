@@ -63,27 +63,32 @@ needs to reach that behavior.
 The Python Polars release in `vendor/polars` runs a start-up function when its
 module loads, `register_startup_deps` in
 [on_startup.rs](../vendor/polars/crates/polars-python/src/on_startup.rs). Most of
-it connects Polars to Python. Three parts do not, and without them Polars
+it connects Polars to Python. Four parts do not, and without them Polars
 behaves differently in dageist than in the release:
 
-1. **The SQL resolver.** A plan written in SQL is resolved when it is collected,
+1. **Larger stacks in debug builds.** In a build with debug assertions the
+   release raises the stack sizes of the `recursive` crate, which Polars uses
+   to avoid overflowing the stack on deep plans, because stack frames get very
+   large there. dageist's debug and test builds are debug builds; a build
+   without debug assertions keeps the crate's defaults, as the release does.
+2. **The SQL resolver.** A plan written in SQL is resolved when it is collected,
    by a resolver that must be registered. Polars registers it itself only when a
    SQL context is built in the process, and a plan read from text or built
    elsewhere has none.
-2. **Unknown extension types.** What Polars does with an extension type that
+3. **Unknown extension types.** What Polars does with an extension type that
    nothing registered when it reads one. It loads a generic extension type, or,
    when the environment variable `POLARS_UNKNOWN_EXTENSION_TYPE_BEHAVIOR` is
    `load_as_storage`, the storage type. The engine reads the same variable, with
    the same default.
-3. **The spill-file cleaner.** When Polars' streaming engine spills data to disk
+4. **The spill-file cleaner.** When Polars' streaming engine spills data to disk
    it hands the files to a thread that deletes them. The release starts the
    thread when it loads, which also deletes what a process that ended abnormally
    left behind, and waits for it to finish when the process exits.
 
-The engine does these in that order, once for the process. Every engine entry
-that runs Polars sets Polars up before it runs it, so nothing that goes through
-the engine finds Polars unprepared, however the engine is used. The set-up
-reads its environment variables the first time it runs.
+The engine does these in the release's order, once for the process. Every
+engine entry that runs Polars sets Polars up before it runs it, so nothing that
+goes through the engine finds Polars unprepared, however the engine is used.
+The set-up reads its environment variables the first time it runs.
 
 The host also holds a `PolarsSession` from its start to its end. Starting it
 sets Polars up, and dropping it waits for the cleaner to finish, which is the
@@ -96,18 +101,30 @@ directory, and the next start of Polars deletes the directories of processes
 that no longer exist. The bridge ends this way, as it runs until it is
 stopped.
 
-What the engine does not do of the release's start-up only connects Polars to
-Python: the registries that carry Python values in and out of Polars and call
-Python functions, the warning function that goes through Python's `warnings`,
-allowing extension types for `Object` columns that hold Python objects, the name
-and version of the Python package that Polars writes into Parquet files, the
-panic hook that lets a keyboard interrupt cancel a query inside the catchers
-the Python binding wraps its queries in, two aids for developing Polars (larger
-stacks in debug builds, and a backtrace printer behind a feature the release
-does not turn on), and registering the flush with Python's `atexit`. The
-engine's [start-up module](../crates/dageist-engine/src/startup.rs) lists each
-with its reason. When `vendor/polars` moves to a new release, that module is
-checked against the new release's `on_startup.rs`; see
+The rest of the release's start-up is left out. Most of it only connects Polars
+to Python, with nothing to connect here: the registries that carry Python
+values in and out of Polars and call Python functions, the warning function
+that goes through Python's `warnings`, allowing extension types for `Object`
+columns that hold Python objects, the name and version of the Python package
+that Polars writes into Parquet files, and registering the flush with Python's
+`atexit`, which the session replaces. Two parts are not about Python and are
+left out for other reasons:
+
+- **The query abort mechanism.** The release hooks `SIGINT` and aborts the
+  running query with a panic that catchers around the Python binding's queries
+  turn into a `KeyboardInterrupt`; the same catchers turn a spill that runs out
+  of disk into an error. The engine has no catchers. Without them a spill that
+  runs out of disk panics as any panic does, and leaving the hook out leaves
+  `SIGINT` to end the process, which is how Ctrl-C stops the bridge. The
+  release's hook would take `SIGINT` over, and with no catcher it would do
+  nothing.
+- **The coloured backtrace printer** behind the `backtrace_filter` feature,
+  which the release's Makefile turns on for development builds of Python
+  Polars and the released wheels do not have.
+
+The engine's [start-up module](../crates/dageist-engine/src/startup.rs) lists
+each part with its reason. When `vendor/polars` moves to a new release, that
+module is checked against the new release's `on_startup.rs`; see
 [Move Polars To A New Release](how-to.md#move-polars-to-a-new-release).
 
 ## The Bridge

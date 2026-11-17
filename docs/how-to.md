@@ -658,8 +658,9 @@ build into line with the new release:
    A part the release added that does not only connect Polars to Python is done
    in the module, in the release's order, with a test in
    [startup.rs](../crates/dageist-engine/tests/startup.rs); a part the release
-   changed, moved or removed is changed the same way; and a part left out is
-   still one that only connects Polars to Python.
+   changed, moved or removed is changed the same way; and each part left out
+   still has a reason in the module, whether it only connects Polars to Python
+   or is one of the two that do not.
 6. Build and test the engine, and [refresh the Polars audits](#refresh-the-audits-after-a-change).
 7. [Refresh the tables of allowed combinations](#refresh-the-tables-of-allowed-combinations)
    and review them: Polars decides what each combination does, so a new release
