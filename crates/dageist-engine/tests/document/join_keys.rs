@@ -7,7 +7,7 @@
 //! join that pairs the same two names twice. A name repeated on one side only is
 //! not refused.
 
-use dageist_engine::allowed::{Context, Outer, RefusalSource, Rule};
+use dageist_engine::allowed::{Context, Ending, Outer, RefusalSource, Rule};
 use dageist_engine::document::{Document, Inputs, Outcome, Report, RunCause, Segment, Walk};
 use polars::prelude::*;
 use serde_json::{Value, json};
@@ -341,4 +341,141 @@ fn on_is_walked_as_a_left_key_and_as_a_right_key() {
             Some(Context::step(Outer::JoinRight))
         ]
     );
+}
+
+/// A table of whole numbers `a`, `b` and `k`, for a join's left side.
+fn wide_left() -> DataFrame {
+    df!("a" => [1_i64, 2], "b" => [1_i64, 2], "k" => [1_i64, 2]).expect("a table")
+}
+
+/// A table of whole numbers for a join's right side.
+fn wide_right() -> DataFrame {
+    df!("p" => [1_i64, 2], "z" => [1_i64, 2], "w" => [1_i64, 2], "rk" => [1_i64, 2])
+        .expect("a table")
+}
+
+/// A `col` that names several columns, which Polars expands to a key for each.
+fn columns(names: &[&str]) -> Value {
+    chain(
+        call("polars.col", json!({ "name": { "columns": names } })),
+        vec![],
+    )
+}
+
+/// An expression that starts from what the editor has not picked yet.
+fn hole() -> Value {
+    chain(json!({ "hole": null }), vec![])
+}
+
+#[test]
+fn a_key_that_expands_to_several_shifts_the_pairs_after_it_so_none_is_judged() {
+    // Polars expands each side before it pairs the keys: `col("a", "b")` is two keys, so
+    // the pairs are (a, p), (b, z), (k, z), (k, w), and none repeats. By index the
+    // third key on each side looks like (k, z) twice.
+    for expanded in [columns(&["a", "b"]), columns(&["^[ab]$"])] {
+        let report = join_of(
+            wide_left(),
+            wide_right(),
+            keys(
+                vec![expanded, field("k"), field("k")],
+                vec![field("p"), field("z"), field("z"), field("w")],
+            ),
+        );
+        assert!(
+            matches!(outcome(&report), Outcome::Valid { .. }),
+            "Polars allows it: {:?}",
+            outcome(&report)
+        );
+        assert_eq!(refused(walk(&report)), None);
+    }
+}
+
+#[test]
+fn the_pairs_before_a_key_that_expands_are_judged() {
+    // The keys before the first that may expand pair by index, and Polars refuses the
+    // pair (k, rk) made twice whatever follows.
+    let report = join_of(
+        wide_left(),
+        wide_right(),
+        keys(
+            vec![field("k"), first("k"), columns(&["a", "b"])],
+            vec![field("rk"), first("rk"), field("p"), field("z")],
+        ),
+    );
+    assert!(polars_refuses(outcome(&report)), "{:?}", outcome(&report));
+    assert_eq!(
+        refused(walk(&report)).map(|found| found.0),
+        Some(item("left_on", 1))
+    );
+}
+
+#[test]
+fn a_key_that_is_not_picked_yet_ends_the_pairs_that_are_judged() {
+    // What the hole stands for may expand, so the pairs after it are not known; the
+    // pairs before it are.
+    let after = join_of(
+        wide_left(),
+        wide_right(),
+        keys(
+            vec![hole(), field("k"), field("k")],
+            vec![field("rk"), field("rk"), field("rk")],
+        ),
+    );
+    assert_eq!(refused(walk(&after)), None);
+    let before = join_of(
+        wide_left(),
+        wide_right(),
+        keys(
+            vec![field("k"), first("k"), hole()],
+            vec![field("rk"), first("rk"), field("rk")],
+        ),
+    );
+    assert_eq!(
+        refused(walk(&before)).map(|found| found.0),
+        Some(item("left_on", 1))
+    );
+}
+
+#[test]
+fn a_key_refused_for_another_reason_keeps_its_refusal_when_it_repeats_a_pair() {
+    // `k.sum() > a` holds an aggregate beside a column, which a join's key may not,
+    // and is named `k` as the first key is: it makes the same pair again. The key
+    // keeps the refusal that it is not elementwise, which came first.
+    let mixed = field_then(
+        "k",
+        vec![
+            call("Expr.sum", json!({})),
+            call("Expr.gt", json!({ "other": field("a") })),
+        ],
+    );
+    let report = join_of(
+        wide_left(),
+        wide_right(),
+        keys(
+            vec![field("k"), mixed.clone()],
+            vec![
+                field("rk"),
+                field_then(
+                    "rk",
+                    vec![
+                        call("Expr.sum", json!({})),
+                        call("Expr.gt", json!({ "other": field("p") })),
+                    ],
+                ),
+            ],
+        ),
+    );
+    assert!(polars_refuses(outcome(&report)), "{:?}", outcome(&report));
+    let key = walk(&report)
+        .expressions()
+        .iter()
+        .find(|expression| expression.place().path() == item("left_on", 1).as_slice())
+        .expect("the second left key is walked");
+    match key.ending() {
+        Some(Ending::Refused(refusal)) => assert_eq!(
+            refusal.source(),
+            RefusalSource::Rule(Rule::KeyIsElementwise)
+        ),
+        other => panic!("the key does not end refused: {other:?}"),
+    }
 }
