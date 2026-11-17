@@ -404,8 +404,15 @@ function chainStart(
       if (source.name === '') throw unset('Pick the input the chain starts from.', wrong);
       return { start: { input: source.name }, links: [] };
     case 'when': {
-      const [arm] = source.arms;
+      const [arm, ...further] = source.arms;
       if (arm === undefined) throw unset('Pick a condition.', wrong);
+      // A further case is a `when` after `otherwise`; the document has no place for it here.
+      if (further.length > 0) {
+        throw unsupported(
+          'The engine takes one case for a when; a further case follows otherwise.',
+          wrong,
+        );
+      }
       const start = call('polars.when', {
         predicates: predicates(
           context,
