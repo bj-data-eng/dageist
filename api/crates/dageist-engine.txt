@@ -9,6 +9,14 @@ pub dageist_engine::allowed::After::Start
 pub dageist_engine::allowed::After::Value
 pub dageist_engine::allowed::After::Value::dtype: dageist_engine::allowed::Representative
 pub dageist_engine::allowed::After::Value::shape: dageist_engine::allowed::Shape
+pub enum dageist_engine::allowed::Candidate
+pub dageist_engine::allowed::Candidate::Field(dageist_engine::allowed::Representative)
+pub dageist_engine::allowed::Candidate::Input
+pub dageist_engine::allowed::Candidate::Input::dtype: dageist_engine::allowed::Representative
+pub dageist_engine::allowed::Candidate::Input::list: bool
+pub dageist_engine::allowed::Candidate::Literal(dageist_engine::allowed::Literal)
+impl dageist_engine::allowed::Candidate
+pub fn dageist_engine::allowed::Candidate::class(&self) -> core::option::Option<dageist_engine::allowed::Representative>
 pub enum dageist_engine::allowed::ConditionState
 pub dageist_engine::allowed::ConditionState::ChainedThen
 pub dageist_engine::allowed::ConditionState::ChainedWhen
@@ -23,6 +31,12 @@ pub dageist_engine::allowed::Ending::Refused(dageist_engine::allowed::Refusal)
 impl dageist_engine::allowed::Ending
 pub const fn dageist_engine::allowed::Ending::is_allowed(&self) -> bool
 pub const fn dageist_engine::allowed::Ending::refusal(&self) -> core::option::Option<&dageist_engine::allowed::Refusal>
+pub enum dageist_engine::allowed::Literal
+pub dageist_engine::allowed::Literal::Float(f64)
+pub dageist_engine::allowed::Literal::Integer(i64)
+pub dageist_engine::allowed::Literal::String(alloc::string::String)
+impl dageist_engine::allowed::Literal
+pub fn dageist_engine::allowed::Literal::class(&self) -> core::option::Option<dageist_engine::allowed::Representative>
 pub enum dageist_engine::allowed::Nested
 pub dageist_engine::allowed::Nested::ConditionPredicate
 pub dageist_engine::allowed::Nested::ConditionValue
@@ -91,6 +105,7 @@ pub fn dageist_engine::allowed::Representative::dtype(self) -> polars_core::data
 pub fn dageist_engine::allowed::Representative::from_name(name: &str) -> core::option::Option<Self>
 pub const fn dageist_engine::allowed::Representative::name(self) -> &'static str
 pub fn dageist_engine::allowed::Representative::of(dtype: &polars_core::datatypes::dtype::DataType) -> core::option::Option<Self>
+pub fn dageist_engine::allowed::Representative::of_name(name: &str) -> core::option::Option<Self>
 impl core::fmt::Display for dageist_engine::allowed::Representative
 pub fn dageist_engine::allowed::Representative::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub enum dageist_engine::allowed::Rule
@@ -135,9 +150,13 @@ impl dageist_engine::allowed::Allowance
 pub const fn dageist_engine::allowed::Allowance::can_end(&self) -> &dageist_engine::allowed::Ending
 pub const fn dageist_engine::allowed::Allowance::result(&self) -> core::option::Option<&dageist_engine::allowed::ResultDtype>
 pub const fn dageist_engine::allowed::Allowance::shape(&self) -> dageist_engine::allowed::Shape
+pub struct dageist_engine::allowed::ArgumentSlot<'a>
+impl<'a> dageist_engine::allowed::ArgumentSlot<'a>
+pub const fn dageist_engine::allowed::ArgumentSlot<'a>::new(entry: &'static dageist_engine::catalog::Entry, parameter: &'a str, method_place: dageist_engine::allowed::Place) -> Self
 pub struct dageist_engine::allowed::Chosen<'a>
 impl<'a> dageist_engine::allowed::Chosen<'a>
 pub const fn dageist_engine::allowed::Chosen<'a>::giving(self, dtype: dageist_engine::allowed::Representative) -> Self
+pub const fn dageist_engine::allowed::Chosen<'a>::giving_many(self) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_arguments(self, arguments: &'a [(&'a str, dageist_engine::allowed::Representative)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_options(self, options: &'a [(&'a str, &'a str)]) -> Self
 pub struct dageist_engine::allowed::Context
@@ -153,10 +172,27 @@ pub const fn dageist_engine::allowed::Context::outer(&self) -> dageist_engine::a
 pub const fn dageist_engine::allowed::Context::step(outer: dageist_engine::allowed::Outer) -> Self
 impl core::fmt::Display for dageist_engine::allowed::Context
 pub fn dageist_engine::allowed::Context::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct dageist_engine::allowed::DefaultArgument
+impl dageist_engine::allowed::DefaultArgument
+pub const fn dageist_engine::allowed::DefaultArgument::literal(&self) -> &dageist_engine::allowed::Literal
+pub const fn dageist_engine::allowed::DefaultArgument::parameter(&self) -> &'static str
+pub struct dageist_engine::allowed::Fit
+impl dageist_engine::allowed::Fit
+pub const fn dageist_engine::allowed::Fit::dtype(&self) -> dageist_engine::allowed::Representative
+pub const fn dageist_engine::allowed::Fit::verdict(&self) -> &dageist_engine::allowed::Verdict
 pub struct dageist_engine::allowed::Offer
 impl dageist_engine::allowed::Offer
 pub const fn dageist_engine::allowed::Offer::entry(&self) -> &'static dageist_engine::catalog::Entry
 pub const fn dageist_engine::allowed::Offer::verdict(&self) -> &dageist_engine::allowed::Verdict
+pub struct dageist_engine::allowed::OptionOffer
+impl dageist_engine::allowed::OptionOffer
+pub fn dageist_engine::allowed::OptionOffer::default_word(&self) -> core::option::Option<&str>
+pub const fn dageist_engine::allowed::OptionOffer::parameter(&self) -> &'static str
+pub fn dageist_engine::allowed::OptionOffer::words(&self) -> &[dageist_engine::allowed::OptionWord]
+pub struct dageist_engine::allowed::OptionWord
+impl dageist_engine::allowed::OptionWord
+pub const fn dageist_engine::allowed::OptionWord::refusal(&self) -> core::option::Option<&dageist_engine::allowed::Refusal>
+pub fn dageist_engine::allowed::OptionWord::word(&self) -> &str
 pub struct dageist_engine::allowed::Place
 impl dageist_engine::allowed::Place
 pub const fn dageist_engine::allowed::Place::after(&self) -> dageist_engine::allowed::After
@@ -181,10 +217,17 @@ pub const fn dageist_engine::allowed::ResultDtype::class(&self) -> core::option:
 pub fn dageist_engine::allowed::ResultDtype::name(&self) -> &str
 impl core::fmt::Display for dageist_engine::allowed::ResultDtype
 pub fn dageist_engine::allowed::ResultDtype::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct dageist_engine::allowed::Slot<'a>
+impl<'a> dageist_engine::allowed::Slot<'a>
+pub const fn dageist_engine::allowed::Slot<'a>::new(context: core::option::Option<dageist_engine::allowed::Context>, argument: core::option::Option<dageist_engine::allowed::ArgumentSlot<'a>>) -> core::option::Option<Self>
 pub fn dageist_engine::allowed::argument_dtypes(entry: &dageist_engine::catalog::Entry, parameter: &str, receiver: dageist_engine::allowed::Representative) -> alloc::vec::Vec<(dageist_engine::allowed::Representative, dageist_engine::allowed::Outcome)>
+pub fn dageist_engine::allowed::default_argument(entry: &'static dageist_engine::catalog::Entry, place: &dageist_engine::allowed::Place) -> core::option::Option<dageist_engine::allowed::DefaultArgument>
 pub fn dageist_engine::allowed::dtype_name(dtype: &polars_core::datatypes::dtype::DataType) -> alloc::string::String
+pub fn dageist_engine::allowed::fit(candidate: &dageist_engine::allowed::Candidate, slot: &dageist_engine::allowed::Slot<'_>) -> core::option::Option<dageist_engine::allowed::Fit>
 pub fn dageist_engine::allowed::offer(entry: &'static dageist_engine::catalog::Entry, place: &dageist_engine::allowed::Place, chosen: &dageist_engine::allowed::Chosen<'_>) -> dageist_engine::allowed::Verdict
+pub fn dageist_engine::allowed::offer_input(place: &dageist_engine::allowed::Place, dtype: dageist_engine::allowed::Representative, list: bool) -> dageist_engine::allowed::Verdict
 pub fn dageist_engine::allowed::offers(place: &dageist_engine::allowed::Place) -> alloc::vec::Vec<dageist_engine::allowed::Offer>
+pub fn dageist_engine::allowed::option_offers(entry: &dageist_engine::catalog::Entry, chosen: &[(&str, &str)]) -> alloc::vec::Vec<dageist_engine::allowed::OptionOffer>
 pub fn dageist_engine::allowed::options(entry: &dageist_engine::catalog::Entry, chosen: &[(&str, &str)]) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids(entry: &dageist_engine::catalog::Entry, context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_key_known_not_elementwise(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
@@ -568,6 +611,7 @@ pub struct dageist_engine::document::Dtype(_)
 impl dageist_engine::document::Dtype
 pub const fn dageist_engine::document::Dtype::as_polars(&self) -> &polars_core::datatypes::dtype::DataType
 pub fn dageist_engine::document::Dtype::into_polars(self) -> polars_core::datatypes::dtype::DataType
+pub fn dageist_engine::document::Dtype::listed() -> alloc::vec::Vec<Self>
 pub fn dageist_engine::document::Dtype::new(dtype: polars_core::datatypes::dtype::DataType) -> core::result::Result<Self, dageist_engine::document::DtypeError>
 impl core::fmt::Display for dageist_engine::document::Dtype
 pub fn dageist_engine::document::Dtype::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
