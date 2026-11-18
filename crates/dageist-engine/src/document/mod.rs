@@ -29,6 +29,7 @@
 mod changes;
 mod columns;
 mod counts;
+mod defaults;
 mod dtype;
 mod error;
 mod inputs;
