@@ -99,6 +99,8 @@ pub enum Reason {
     NotConnected(String),
     /// Two names are the same Python name.
     SameName(String, String),
+    /// The name is also the Python name of the table the document starts from.
+    NamedLikeFrame(String),
 }
 
 impl fmt::Display for Reason {
@@ -112,6 +114,10 @@ impl fmt::Display for Reason {
             Self::SameName(first, second) => write!(
                 formatter,
                 "{first:?} and {second:?} are the same name in Python"
+            ),
+            Self::NamedLikeFrame(name) => write!(
+                formatter,
+                "{name:?} is also the name of the table the document starts from"
             ),
         }
     }
@@ -211,6 +217,7 @@ impl Document {
             frame.to_owned(),
         )];
         let mut imports = BTreeSet::new();
+        let mut declared: Vec<&str> = Vec::new();
         for (name, step_id, expects) in &uses.names {
             let (annotation, import, fits) = match (inputs.binding(name), expects) {
                 (Some(Binding::Table), Expects::Table) => ("pl.LazyFrame".to_owned(), None, true),
@@ -226,6 +233,18 @@ impl Document {
                     step: Some(step_id.clone()),
                     reason: Reason::NotConnected(name.clone()),
                 });
+            }
+            // A name a later step uses again is a parameter already.
+            if declared.contains(&name.as_str()) {
+                continue;
+            }
+            declared.push(name);
+            if identifier(name) == frame_name {
+                not_runnable.push(NotRunnable {
+                    step: None,
+                    reason: Reason::NamedLikeFrame(name.clone()),
+                });
+                continue;
             }
             imports.extend(import);
             parameters.push((identifier(name), annotation, name.clone()));
@@ -314,7 +333,8 @@ enum Expects {
 }
 
 /// The connected names a document uses, in the order it first uses them, with
-/// the step that does.
+/// the step that does and what it uses them as; a name used as another kind
+/// is noted again.
 #[derive(Default)]
 struct Uses {
     names: Vec<(String, StepId, Expects)>,
@@ -322,7 +342,11 @@ struct Uses {
 
 impl Uses {
     fn note(&mut self, step: &StepId, name: &str, expects: Expects) {
-        if !self.names.iter().any(|(seen, _, _)| seen == name) {
+        if !self
+            .names
+            .iter()
+            .any(|(seen, _, kind)| seen == name && *kind == expects)
+        {
             self.names.push((name.to_owned(), step.clone(), expects));
         }
     }

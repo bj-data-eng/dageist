@@ -510,9 +510,17 @@ fn an_input_named_like_the_table_the_document_starts_from_is_marked() {
         json!({ "other": { "table": "claims" }, "on": many(vec![field("a")]) }),
     )]);
     let source = document.source("claims", &one_table("claims"));
-    assert!(
-        !source.not_runnable().is_empty(),
-        "the module says it runs: {}",
+    let reasons: Vec<&Reason> = source
+        .not_runnable()
+        .iter()
+        .map(|problem| problem.reason())
+        .collect();
+    assert_eq!(reasons, [&Reason::NamedLikeFrame("claims".to_owned())]);
+    // The name is the function's parameter once.
+    assert_eq!(
+        source.text().matches("    claims: ").count(),
+        1,
+        "{}",
         source.text()
     );
 }
@@ -533,9 +541,18 @@ fn an_input_used_as_one_kind_by_a_step_and_as_another_by_a_later_step_is_marked(
         ),
     ]);
     let source = document.source("data", &one_table("lookup"));
-    assert!(
-        !source.not_runnable().is_empty(),
-        "the module says it runs: {}",
-        source.text()
+    let marked: Vec<(Option<&str>, &Reason)> = source
+        .not_runnable()
+        .iter()
+        .map(|problem| (problem.step().map(|id| id.as_str()), problem.reason()))
+        .collect();
+    assert_eq!(
+        marked,
+        [(Some("value"), &Reason::NotConnected("lookup".to_owned()))]
+    );
+    // It is one parameter, the lazy frame the first step takes.
+    assert_eq!(
+        source.text().matches("    lookup: pl.LazyFrame,").count(),
+        1
     );
 }
