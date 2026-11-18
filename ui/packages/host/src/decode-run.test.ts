@@ -450,3 +450,79 @@ describe('a report that is not what the host sends', () => {
     ).toBe('$.problem: is missing the field "line"');
   });
 });
+
+// A report written by hand for what no one document gives together: each way a step's rows were
+// counted, and a step that replaced a column.
+function handWrittenStep(count: unknown): unknown {
+  return {
+    id: 'add',
+    lazy: true,
+    outcome: {
+      status: 'valid',
+      columns: [
+        { name: 'owner', dtype: 'String' },
+        { name: 'slow', dtype: 'Boolean' },
+      ],
+      changes: [
+        { name: 'owner', change: 'replaced' },
+        { name: 'slow', change: 'added' },
+      ],
+    },
+    count,
+    expressions: [],
+    walk: { expressions: [], refusal: null, notKnown: null },
+  };
+}
+
+const COUNTED = {
+  kind: 'counted',
+  received: 7,
+  kept: 4,
+  first: [{ name: 'slow', values: { shown: ['true', null], more: 2 } }],
+};
+
+function runOf(count: unknown): unknown {
+  return { status: 'run', source: [], steps: [handWrittenStep(count)] };
+}
+
+describe('the columns a step changed and how its rows were counted', () => {
+  it('are read as the host sends them, each way a count can be', () => {
+    for (const count of [COUNTED, { kind: 'notCounted' }, { kind: 'failed', reason: 'no' }]) {
+      expect(stepsOf(decodeRun(runOf(count)))[0]).toEqual(handWrittenStep(count));
+    }
+  });
+
+  it('are refused for a change, a count or a value that the contract does not name', () => {
+    const changed = replaced(
+      runOf(COUNTED),
+      ['steps', 0, 'outcome', 'changes', 0, 'change'],
+      'removed',
+    );
+    expect(refusal(changed).message).toBe(
+      '$.steps[0].outcome.changes[0].change: must be one of "added", "replaced", not "removed"',
+    );
+    expect(
+      refusal(replaced(runOf(COUNTED), ['steps', 0, 'count', 'kind'], 'partial')).message,
+    ).toBe(
+      '$.steps[0].count.kind: must be one of "notCounted", "counted", "failed", not "partial"',
+    );
+    expect(refusal(replaced(runOf(COUNTED), ['steps', 0, 'count', 'kept'], 'four')).message).toBe(
+      '$.steps[0].count.kept: must be a whole number, not a string',
+    );
+    expect(refusal(replaced(runOf(COUNTED), ['steps', 0, 'count', 'received'], -1)).message).toBe(
+      '$.steps[0].count.received: must be a whole number from 0, not -1',
+    );
+    expect(
+      refusal(without(runOf(COUNTED), ['steps', 0, 'count', 'first', 0, 'values'], 'more')).message,
+    ).toBe('$.steps[0].count.first[0].values: is missing the field "more"');
+    expect(
+      refusal(withField(runOf({ kind: 'notCounted' }), ['steps', 0, 'count'], 'kept', 1)).message,
+    ).toBe('$.steps[0].count: has the field "kept", which the contract lacks');
+    expect(refusal(without(runOf(COUNTED), ['steps', 0], 'count')).message).toBe(
+      '$.steps[0]: is missing the field "count"',
+    );
+    expect(refusal(without(runOf(COUNTED), ['steps', 0, 'outcome'], 'changes')).message).toBe(
+      '$.steps[0].outcome: is missing the field "changes"',
+    );
+  });
+});

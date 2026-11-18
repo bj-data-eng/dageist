@@ -69,6 +69,77 @@ describe('the inputs of the claim-timing node', () => {
   });
 });
 
+// An answer written by hand for the shapes the claim-timing node does not give together: a value
+// that is null, a list with a null among its first values and values that follow them, and each
+// way an input comes to the node.
+const handWritten: unknown = {
+  source: {
+    name: 'claims',
+    from: { kind: 'node', name: 'Claims' },
+    columns: [{ name: 'dcn', dtype: 'String' }],
+  },
+  inputs: [
+    {
+      kind: 'value',
+      name: 'as_of',
+      from: { kind: 'parameter' },
+      dtype: 'Date',
+      value: '2026-03-02',
+    },
+    { kind: 'value', name: 'nothing', from: { kind: 'parameter' }, dtype: 'Int64', value: null },
+    {
+      kind: 'list',
+      name: 'holidays',
+      from: { kind: 'column', node: 'Calendar', column: 'date' },
+      dtype: 'Date',
+      values: { shown: ['2026-03-03', null], more: 2 },
+    },
+    {
+      kind: 'table',
+      name: 'sla',
+      from: { kind: 'node', name: 'SLA by step' },
+      columns: [{ name: 'step', dtype: 'String' }],
+    },
+  ],
+};
+
+describe('what supplies an input and the values it holds', () => {
+  it('are read as the host sends them', () => {
+    expect(decodeNode(handWritten)).toEqual(handWritten);
+  });
+
+  it('are refused when an origin, a value or the values that follow are not what the contract names', () => {
+    expect(
+      refusal(decodeNode, replaced(handWritten, ['inputs', 0, 'from', 'kind'], 'file')).message,
+    ).toBe('$.inputs[0].from.kind: must be one of "node", "column", "parameter", not "file"');
+    expect(refusal(decodeNode, without(handWritten, ['inputs', 3], 'from')).message).toBe(
+      '$.inputs[3]: is missing the field "from"',
+    );
+    expect(refusal(decodeNode, without(handWritten, ['source'], 'from')).message).toBe(
+      '$.source: is missing the field "from"',
+    );
+    expect(refusal(decodeNode, replaced(handWritten, ['inputs', 0, 'value'], 7)).message).toBe(
+      '$.inputs[0].value: must be a string, not a number',
+    );
+    expect(refusal(decodeNode, without(handWritten, ['inputs', 0], 'value')).message).toBe(
+      '$.inputs[0]: is missing the field "value"',
+    );
+    expect(
+      refusal(decodeNode, replaced(handWritten, ['inputs', 2, 'values', 'more'], -1)).message,
+    ).toBe('$.inputs[2].values.more: must be a whole number from 0, not -1');
+    expect(
+      refusal(decodeNode, replaced(handWritten, ['inputs', 2, 'values', 'shown', 0], 3)).message,
+    ).toBe('$.inputs[2].values.shown[0]: must be a string, not a number');
+    // A list has its values, and a table its columns: neither has the other's.
+    expect(refusal(decodeNode, withField(handWritten, ['inputs', 2], 'value', '1')).message).toBe(
+      '$.inputs[2]: has the field "value", which the contract lacks',
+    );
+    expect(refusal(decodeNode, withField(handWritten, ['inputs', 3], 'values', {})).message).toBe(
+      '$.inputs[3]: has the field "values", which the contract lacks',
+    );
+  });
+});
+
 describe('the rows after a step', () => {
   it('are text for each cell, and null where the value is', () => {
     const decoded = decodeRows(rows);
