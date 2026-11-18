@@ -373,3 +373,76 @@ fn the_smallest_and_largest_whole_numbers_an_i64_holds_are_read_without_overflow
         float(-9_223_372_036_854_775_808.0)
     );
 }
+
+#[test]
+fn an_amount_that_does_not_fit_in_nanoseconds_is_no_duration_whatever_the_build() {
+    // The number of each unit in an i64 of nanoseconds, worked out from the lengths of the
+    // units: a day is 24 hours, a week 7 days.
+    let ns: i64 = 1;
+    let limit = |unit_ns: i64| i64::MAX / unit_ns;
+    let hour = 3_600 * 1_000_000_000_i64;
+    let day = 24 * hour;
+    let week = 7 * day;
+    let read = |text: &str| readings(text, Typed::Duration);
+    let kept = |text: &str| Ok((Literal::String(text.to_owned()), None));
+    for (unit, per) in [
+        ("ns", ns),
+        ("us", 1_000),
+        ("ms", 1_000_000),
+        ("s", 1_000_000_000),
+    ] {
+        let largest = format!("{}{unit}", limit(per));
+        assert_eq!(read(&largest), [kept(&largest)], "{largest}");
+        let beyond = format!("{}{unit}", limit(per) as i128 + 1);
+        assert!(
+            matches!(read(&beyond).as_slice(), [Err(Unread::NotADuration(_))]),
+            "{beyond}"
+        );
+    }
+    for (unit, per) in [
+        ("m", 60 * 1_000_000_000_i64),
+        ("h", hour),
+        ("d", day),
+        ("w", week),
+    ] {
+        let largest = format!("{}{unit}", limit(per));
+        assert_eq!(read(&largest), [kept(&largest)], "{largest}");
+        let beyond = format!("{}{unit}", limit(per) + 1);
+        assert!(
+            matches!(read(&beyond).as_slice(), [Err(Unread::NotADuration(_))]),
+            "{beyond}"
+        );
+    }
+    // The amounts add up: a week and a day past the limit of days, and a sign changes nothing.
+    for text in [
+        "106751d1d",
+        "15250w106751d",
+        "-106751d1h",
+        "99999999999999w",
+        "9999999d",
+    ] {
+        assert!(
+            matches!(read(text).as_slice(), [Err(Unread::NotADuration(_))]),
+            "{text}"
+        );
+    }
+    // Months are counted, not timed: a quarter is 3 and a year 12 of them, and what an i64 of
+    // months cannot count is refused.
+    for text in [
+        "9223372036854775807mo",
+        "3074457345618258602q",
+        "768614336404564650y",
+    ] {
+        assert_eq!(read(text), [kept(text)], "{text}");
+    }
+    for text in [
+        "9223372036854775808mo",
+        "3074457345618258603q",
+        "768614336404564651y",
+    ] {
+        assert!(
+            matches!(read(text).as_slice(), [Err(Unread::NotADuration(_))]),
+            "{text}"
+        );
+    }
+}
