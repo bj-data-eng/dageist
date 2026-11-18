@@ -7,14 +7,18 @@
 //! with typed columns, so they say what a call gives only for an operand of a dtype,
 //! and this module says which dtype that is for such a number.
 
-use crate::catalog::{Applies, Dtypes, Entry, Kind, ParameterDefault};
+use crate::catalog::{Entry, ParameterDefault, Role};
 
-use super::candidates::Literal;
 use super::dtype::Representative;
+use super::literal::Literal;
 
 /// A number typed without a dtype.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) enum Loose {
+pub(crate) struct Loose(Number);
+
+/// What a number typed without a dtype is, apart from its dtype.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Number {
     /// A whole number, by its value.
     Integer(i64),
     /// A number with a fraction.
@@ -22,22 +26,28 @@ pub(crate) enum Loose {
 }
 
 impl Loose {
-    /// The number a literal is, when it is one typed without a dtype.
+    /// The number a literal is, when it is one typed without a dtype. Every
+    /// reading of one is made here.
     pub(crate) fn of(literal: &Literal) -> Option<Self> {
         match literal {
-            Literal::Integer(value) => Some(Self::Integer(*value)),
-            Literal::Float(_) => Some(Self::Float),
+            Literal::Integer(value) => Some(Self(Number::Integer(*value))),
+            Literal::Float(_) => Some(Self(Number::Float)),
             Literal::String(_) => None,
         }
+    }
+
+    /// Whether it is a whole number.
+    pub(crate) const fn is_whole(self) -> bool {
+        matches!(self.0, Number::Integer(_))
     }
 
     /// Whether the number fits `class`, as Polars adapts a number typed without a
     /// dtype to a column of it: a whole number to a whole number type it fits, and to
     /// a float, and a number with a fraction to a float.
     pub(crate) fn fits(self, class: Representative) -> bool {
-        match self {
-            Self::Integer(value) => integer_fits(value, class),
-            Self::Float => is_float(class),
+        match self.0 {
+            Number::Integer(value) => integer_fits(value, class),
+            Number::Float => is_float(class),
         }
     }
 
@@ -52,8 +62,8 @@ impl Loose {
         if self.fits(other) {
             return Some(other);
         }
-        match self {
-            Self::Float if is_integer(other) => Some(Representative::Float64),
+        match self.0 {
+            Number::Float if is_integer(other) => Some(Representative::Float64),
             _ => None,
         }
     }
@@ -108,13 +118,20 @@ pub(crate) const fn could_be_taken_by_a_number(class: Representative) -> bool {
     is_integer(class) || is_float(class) || matches!(class, Representative::Decimal)
 }
 
+/// How the parameter `name` of `entry` meets the value its method follows, as the
+/// catalogue declares it.
+fn role(entry: &Entry, name: &str) -> Option<Role> {
+    entry
+        .parameters()
+        .iter()
+        .find(|parameter| parameter.name() == name)
+        .map(crate::catalog::Parameter::role)
+}
+
 /// Whether the parameter `name` of `entry` counts or indexes, which a whole
 /// number is the dtype of whatever it adapts to: `shift`'s rows.
 pub(crate) fn is_count(entry: &Entry, name: &str) -> bool {
-    entry.parameters().iter().any(|parameter| {
-        parameter.name() == name
-            && matches!(parameter.kind(), Kind::Expression(dtypes) if dtypes == [Dtypes::Integer])
-    })
+    role(entry, name) == Some(Role::Count)
 }
 
 /// Whether Polars adapts a number typed without a dtype that is the parameter
@@ -123,19 +140,15 @@ pub(crate) fn is_count(entry: &Entry, name: &str) -> bool {
 /// takes other expressions that do not meet what it follows as an operand does: a
 /// key to group or order by, or the duration to offset a date by.
 pub(crate) fn operand_adapts(entry: &Entry, name: &str) -> bool {
-    entry.applies() == Applies::Expression
-        && match name {
-            "other" => true,
-            "fill_value" => entry.id().as_str() == "Expr.shift",
-            _ => false,
-        }
+    matches!(role(entry, name), Some(Role::Operand | Role::Filler))
 }
 
 /// Whether Polars adapts a number that the method `entry` follows to the operand
 /// `name` it is given: the other side of arithmetic and of a comparison. It does not
-/// for `shift`, whose receiver is shifted, not combined with the value.
+/// for the value `shift` fills with, which stands in for what the shift leaves
+/// missing and is not combined with the receiver.
 pub(crate) fn receiver_adapts(entry: &Entry, name: &str) -> bool {
-    entry.applies() == Applies::Expression && name == "other"
+    role(entry, name) == Some(Role::Operand)
 }
 
 /// Whether the parameter `name` of `entry` must be given.

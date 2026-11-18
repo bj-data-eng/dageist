@@ -8,56 +8,17 @@
 //! the widest: a whole number is the narrowest integer it fits, a number with a
 //! fraction is a float.
 
-use polars::prelude::{DataFrame, DataType, IntoLazy};
-
-use crate::catalog::{self, Argument, Build, DefaultValue, Entry, Kind, ParameterDefault};
+use crate::catalog::{self, DefaultValue, Entry, Kind, ParameterDefault};
 
 use super::adapt::{Loose, is_count, is_required, operand_adapts};
 use super::context::Context;
 use super::dtype::Representative;
+use super::literal::Literal;
 use super::offers::{
     After, Chosen, Place, Refusal, Verdict, default_word, offer, offer_input, options,
     same_for_any_number,
 };
 use super::table::Shape;
-
-/// A number or text typed in, as a document writes it.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Literal {
-    /// A whole number.
-    Integer(i64),
-    /// A number with a fraction, or too large for a whole number.
-    Float(f64),
-    /// Text.
-    String(String),
-}
-
-impl Literal {
-    /// The class of the dtype Polars gives the literal, worked out as the
-    /// schema of the literal on a table with no rows: no data is read. `None`
-    /// where Polars refuses the literal or gives it a dtype that has no class.
-    #[must_use]
-    pub fn class(&self) -> Option<Representative> {
-        crate::startup::ensure();
-        let literal = catalog::entry("polars.lit")?;
-        let Build::Function(build) = literal.build() else {
-            return None;
-        };
-        let value = match self {
-            Self::Integer(value) => Argument::Integer(*value),
-            Self::Float(value) => Argument::Float(*value),
-            Self::String(value) => Argument::String(value.clone()),
-        };
-        let expression = build(&literal.arguments(vec![("value", value)]).ok()?).ok()?;
-        let schema = DataFrame::empty()
-            .lazy()
-            .select([expression])
-            .collect_schema()
-            .ok()?;
-        let (_, dtype): (_, &DataType) = schema.iter().next()?;
-        Representative::of(dtype)
-    }
-}
 
 /// A value that may be given where an expression, or an argument, is picked.
 #[derive(Debug, Clone, PartialEq)]
@@ -192,8 +153,8 @@ pub fn fit(candidate: &Candidate, slot: &Slot<'_>) -> Option<Fit> {
                 verdict: found,
             });
         };
-        let counts = matches!(loose, Some(Loose::Integer(_)))
-            && is_count(argument.entry, argument.parameter);
+        let counts =
+            loose.is_some_and(Loose::is_whole) && is_count(argument.entry, argument.parameter);
         verdict = Some(Verdict::Allowed(
             if loose.is_none() || adapted.is_some() || counts {
                 allowance

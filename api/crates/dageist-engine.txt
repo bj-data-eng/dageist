@@ -361,6 +361,11 @@ pub dageist_engine::catalog::Reason::NeverOffered
 pub dageist_engine::catalog::Reason::NotYetCatalogued
 pub dageist_engine::catalog::Reason::PythonObject
 pub dageist_engine::catalog::Reason::TakesPythonFunction
+pub enum dageist_engine::catalog::Role
+pub dageist_engine::catalog::Role::Count
+pub dageist_engine::catalog::Role::Filler
+pub dageist_engine::catalog::Role::Operand
+pub dageist_engine::catalog::Role::Plain
 pub enum dageist_engine::catalog::Shape
 pub dageist_engine::catalog::Shape::Many
 pub dageist_engine::catalog::Shape::One
@@ -422,6 +427,7 @@ impl dageist_engine::catalog::Parameter
 pub const fn dageist_engine::catalog::Parameter::default(&self) -> dageist_engine::catalog::ParameterDefault
 pub const fn dageist_engine::catalog::Parameter::kind(&self) -> dageist_engine::catalog::Kind
 pub const fn dageist_engine::catalog::Parameter::name(&self) -> &'static str
+pub const fn dageist_engine::catalog::Parameter::role(&self) -> dageist_engine::catalog::Role
 pub const fn dageist_engine::catalog::Parameter::shape(&self) -> dageist_engine::catalog::Shape
 pub struct dageist_engine::catalog::Words
 impl dageist_engine::catalog::Words

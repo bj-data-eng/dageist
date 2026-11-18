@@ -403,8 +403,8 @@ fn loose_number(call: &Call) -> Option<Loose> {
         return None;
     }
     match call.argument("value") {
-        Some(Value::Integer(number)) => Some(Loose::Integer(*number)),
-        Some(Value::Float(_)) => Some(Loose::Float),
+        Some(Value::Integer(number)) => Loose::of(&Literal::Integer(*number)),
+        Some(Value::Float(number)) => Loose::of(&Literal::Float(*number)),
         _ => None,
     }
 }
@@ -1048,7 +1048,7 @@ impl Walker<'_> {
         let resolved: Vec<(&str, Option<Representative>, Option<Loose>)> = arguments
             .iter()
             .map(|(name, operand)| {
-                let counts = matches!(operand.loose, Some(Loose::Integer(_)));
+                let counts = operand.loose.is_some_and(Loose::is_whole);
                 let hidden = entry.applies() == Applies::Expression
                     && operand.loose.is_some()
                     && !(counts && is_count(entry, name));
