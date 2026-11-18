@@ -967,6 +967,7 @@ pub const dageist_engine::document::VERSION: u32
 pub struct dageist_engine::ColumnInfo
 pub dageist_engine::ColumnInfo::data_type: alloc::string::String
 pub dageist_engine::ColumnInfo::name: alloc::string::String
+pub dageist_engine::ColumnInfo::numeric: bool
 pub struct dageist_engine::EngineError
 impl dageist_engine::EngineError
 pub fn dageist_engine::EngineError::is_invalid_request(&self) -> bool
