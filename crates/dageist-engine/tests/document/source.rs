@@ -237,6 +237,75 @@ fn a_rename_is_a_dictionary_and_a_join_names_its_other_table() {
 }
 
 #[test]
+fn an_argument_given_by_name_at_its_default_is_left_out_as_python_leaves_it_out() {
+    // Python's defaults are `how="inner"`, `suffix="_right"`, `validate="m:m"`,
+    // `nulls_equal=False` and `allow_parallel=True` for `join`; `descending=False`,
+    // `nulls_last=False` and `multithreaded=True` for `sort`, a single flag standing for each
+    // key; and `strict=True` for `rename`. Calling with them is the same as leaving them out,
+    // so the one that differs is all that is written.
+    let join = step(
+        "s",
+        "LazyFrame.join",
+        json!({
+            "other": { "table": "lookup" },
+            "how": { "choice": "inner" },
+            "left_on": many(vec![field("a")]),
+            "right_on": many(vec![field("b")]),
+            "suffix": { "string": "_right" },
+            "validate": { "choice": "m:m" },
+            "nulls_equal": { "flag": false },
+            "coalesce": { "flag": true },
+            "allow_parallel": { "flag": true },
+        }),
+    );
+    assert_eq!(
+        step_source(join),
+        ".join(lookup, left_on=\"a\", right_on=\"b\", coalesce=True)"
+    );
+    let sort = step(
+        "s",
+        "LazyFrame.sort",
+        json!({
+            "by": many(vec![field("a"), field("b")]),
+            "descending": many(vec![json!({ "flag": false }), json!({ "flag": false })]),
+            "nulls_last": { "flag": false },
+            "maintain_order": { "flag": true },
+            "multithreaded": { "flag": true },
+        }),
+    );
+    assert_eq!(
+        step_source(sort),
+        ".sort(\"a\", \"b\", maintain_order=True)"
+    );
+    let rename = step(
+        "s",
+        "LazyFrame.rename",
+        json!({
+            "mapping": { "pairs": [[{ "columns": ["a"] }, { "string": "b" }]] },
+            "strict": { "flag": true },
+        }),
+    );
+    assert_eq!(step_source(rename), ".rename({\"a\": \"b\"})");
+}
+
+#[test]
+fn the_first_argument_of_a_method_is_written_though_it_is_the_default() {
+    // shift(n=1): the first parameter goes by position, so `1` is written as the document gave it.
+    let shifted = step(
+        "s",
+        "LazyFrame.with_columns",
+        json!({ "named_exprs": named(vec![(
+            "x",
+            field_then("a", vec![call("Expr.shift", json!({ "n": whole(1) }))]),
+        )]) }),
+    );
+    assert_eq!(
+        step_source(shifted),
+        ".with_columns(pl.col(\"a\").shift(pl.lit(1)).alias(\"x\"))"
+    );
+}
+
+#[test]
 fn a_condition_is_written_as_the_calls_that_build_it() {
     let when = chain(
         call(
