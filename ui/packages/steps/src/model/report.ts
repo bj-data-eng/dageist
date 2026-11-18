@@ -10,6 +10,8 @@
 
 import type {
   CauseView,
+  ColumnChangeView,
+  CountView,
   ErrorKind,
   OfferPlaceView,
   PlaceView,
@@ -26,6 +28,7 @@ import type { Frame } from './frame';
 import type { Outcome } from './latest';
 import { isRecord } from './shape';
 import type { Step } from './steps';
+import { valuesLine } from './values';
 
 /**
  * The dtype after the start of a chain and after each of its methods, and
@@ -54,6 +57,12 @@ export type StepStatus =
   /** It is in the document, and the engine has not reported on it. */
   | 'unknown';
 
+/** How many rows a step kept of those it was given, on the working window. */
+export interface RowsKept {
+  readonly received: number;
+  readonly kept: number;
+}
+
 /** What the editor shows of one step. */
 export interface PreparedStep {
   readonly id: string;
@@ -62,8 +71,12 @@ export interface PreparedStep {
   readonly before: Frame;
   /** The columns the step gives; those it is given when it cannot be run. */
   readonly after: Frame;
-  /** The names of the columns the step added or replaced. */
-  readonly added: readonly string[];
+  /** The columns the step added or replaced, as the engine reports them. */
+  readonly changes: readonly ColumnChangeView[];
+  /** How many rows the step kept of those it received, or `null` where the engine did not count them. */
+  readonly rows: RowsKept | null;
+  /** The first values of each column the step changed, by the column's name, each as one line of text. */
+  readonly first: ReadonlyMap<string, string>;
   /** Whether the step stays in a lazy plan, and `null` where the engine has not said. */
   readonly lazy: boolean | null;
   /** What is the matter with the step, in words, or `null`. */
@@ -84,6 +97,7 @@ export interface PreparedRun {
 
 const NO_WORDS: ReadonlySet<string> = new Set();
 const NO_CHAINS: ReadonlyMap<string, ChainDtypes> = new Map();
+const NO_FIRST: ReadonlyMap<string, string> = new Map();
 
 /** Returns the dtype a resolution gives, or `null` when it gives none. */
 function dtypeOf(resolution: ResolutionView | undefined): string | null {
@@ -156,12 +170,13 @@ function causeWords(cause: CauseView): string {
   }
 }
 
-/** The columns of `after` that are not in `before`, or have another dtype there. */
-function changedColumns(before: Frame, after: Frame): string[] {
-  return after.flatMap((column) => {
-    const was = before.find((candidate) => candidate.name === column.name);
-    return was?.dtype === column.dtype ? [] : [column.name];
-  });
+/** Returns how many rows a step kept, and the first values of what it changed, from how the engine counted it. */
+function countOf(count: CountView): Pick<PreparedStep, 'rows' | 'first'> {
+  if (count.kind !== 'counted') return { rows: null, first: NO_FIRST };
+  return {
+    rows: { received: count.received, kept: count.kept },
+    first: new Map(count.first.map((column) => [column.name, valuesLine(column.values)])),
+  };
 }
 
 /** What is said of a step that has to wait for the step called `blockedBy`. */
@@ -241,7 +256,9 @@ export function prepareRun(
       status,
       before,
       after: before,
-      added: [],
+      changes: [],
+      rows: null,
+      first: NO_FIRST,
       lazy: null,
       problem,
       wrong: NO_WORDS,
@@ -296,29 +313,26 @@ function fromReport(
     before,
     lazy: report.lazy,
     chains: chainDtypes(report, sent),
+    ...countOf(report.count),
   };
   const { outcome } = report;
   switch (outcome.status) {
-    case 'valid': {
-      const added = changedColumns(before, outcome.columns);
-      // A column the step names is its own even when it holds the dtype the old one did.
-      if (step.verb === 'with_columns' && !added.includes(step.alias)) added.push(step.alias);
+    case 'valid':
       return {
         ...base,
         status: 'valid',
         after: outcome.columns,
-        added: added.filter((name) => outcome.columns.some((column) => column.name === name)),
+        changes: outcome.changes,
         problem: null,
         wrong: NO_WORDS,
       };
-    }
     case 'refused': {
       const found = markAt(sent, outcome.place);
       return {
         ...base,
         status: 'refused',
         after: before,
-        added: [],
+        changes: [],
         problem: causeWords(outcome.cause),
         wrong: found === null ? NO_WORDS : new Set([wrongId(found)]),
       };
@@ -330,7 +344,7 @@ function fromReport(
         ...base,
         status: 'refused',
         after: before,
-        added: [],
+        changes: [],
         problem: hole?.message ?? 'Something in this step is still to be picked.',
         wrong: hole === undefined ? NO_WORDS : new Set(hole.wrong),
       };
@@ -340,7 +354,7 @@ function fromReport(
         ...base,
         status: 'notRun',
         after: before,
-        added: [],
+        changes: [],
         problem: incomplete.has(outcome.blockedBy)
           ? waitingWords(steps, outcome.blockedBy)
           : 'Not run: a step before it was refused.',

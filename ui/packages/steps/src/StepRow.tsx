@@ -312,16 +312,22 @@ interface OutcomeProps {
   readonly result: PreparedStep;
 }
 
-/** Draws what stands at the end of a step's row: the dtype it returns, or what it adds. */
+/** Returns the names of the columns `result` says its step added. */
+function addedBy(result: PreparedStep): string[] {
+  return result.changes.filter((change) => change.change === 'added').map((change) => change.name);
+}
+
+/** Draws what stands at the end of a step's row: the dtype it returns, what it adds, or the rows it keeps. */
 function Outcome({ step, result }: OutcomeProps): React.JSX.Element | null {
   if (result.problem !== null || result.status !== 'valid') return null;
   const dtypeOf = (name: string): string => findColumn(result.after, name)?.dtype ?? '';
+  const added = addedBy(result);
   if (step.verb === 'pivot') {
     return (
       <Peek
         describedAs="The columns the pivot returns"
         lines={[
-          result.added.join(', '),
+          added.join(', '),
           'These are the values of the connected table that give its columns.',
         ]}
         code={false}
@@ -332,25 +338,42 @@ function Outcome({ step, result }: OutcomeProps): React.JSX.Element | null {
   }
   if (step.verb === 'with_columns') {
     const dtype = findColumn(result.after, step.alias)?.dtype;
-    return dtype === undefined ? null : <span className="dg-dtype">{dtype}</span>;
+    if (dtype === undefined) return null;
+    const first = result.first.get(step.alias);
+    // The first values come from the rows the engine ran; without them the dtype is all there is.
+    if (first === undefined) return <span className="dg-dtype">{dtype}</span>;
+    return (
+      <Peek describedAs={`${step.alias} is ${dtype}: show its first values`} lines={[first]} code>
+        <span className="dg-dtype">{dtype}</span>
+      </Peek>
+    );
   }
   if (step.verb === 'join') {
-    const [only] = result.added;
+    const [only] = added;
     return (
       <Peek
-        describedAs="The columns the join adds"
-        lines={result.added.map((name) => `${name} · ${dtypeOf(name)}`)}
+        describedAs="The columns the join adds: show their first values"
+        lines={added.flatMap((name) => {
+          const first = result.first.get(name);
+          return [`${name} · ${dtypeOf(name)}`, ...(first === undefined ? [] : [first])];
+        })}
         code
       >
         <span className="text-xs text-muted">
           adds{' '}
           <span className="dg-dtype">
-            {result.added.length === 1 && only !== undefined
-              ? only
-              : `${String(result.added.length)} columns`}
+            {added.length === 1 && only !== undefined ? only : `${String(added.length)} columns`}
           </span>
         </span>
       </Peek>
+    );
+  }
+  if (step.verb === 'filter' && result.rows !== null) {
+    return (
+      <span className="text-xs text-muted">
+        keeps{' '}
+        <span className="dg-dtype">{`${String(result.rows.kept)} of ${String(result.rows.received)} rows`}</span>
+      </span>
     );
   }
   return null;

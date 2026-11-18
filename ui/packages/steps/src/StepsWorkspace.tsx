@@ -112,7 +112,7 @@ function Transform({ host, styleNonce }: StepsWorkspaceProps): React.JSX.Element
             {centre === 'rows' ? (
               <RowsPreview
                 display={rows.display}
-                added={shown?.added ?? []}
+                changes={shown?.changes ?? []}
                 settled={rows.settled && run.settled}
               />
             ) : (

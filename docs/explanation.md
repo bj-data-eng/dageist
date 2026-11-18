@@ -311,6 +311,12 @@ engine reports of them, in
 [ui/packages/steps/src/model/](../ui/packages/steps/src/model/document.ts).
 Translating the steps into a document and preparing the report for display are
 plain TypeScript with no React, tested against the snapshots the host writes.
+What the editor shows of a run it reads off the report and works out none of it:
+the columns a step added or replaced, the rows a filter keeps of those it was
+given, the first values of a column a step added, and for each connected input
+what supplies it and the value or values it holds. The view only lays the
+engine's text out as a line, with a dash for a null and an ellipsis where more
+values follow.
 Where an expression is still to be picked, a value, the field or input a chain
 starts from, a method's argument or a comparison's field, the editor writes a
 hole, which the document reads as an expression that starts from nothing. The

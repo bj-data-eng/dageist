@@ -21,7 +21,6 @@ import { comparisonEntryId, wrongId } from './model/document';
 import { ChainBlocks } from './Chain';
 import { COMPARISON_SIGNS } from './comparisons';
 import { fieldGroup, inputGroup, refusalOf, startFunctions, valueGroup } from './engineLists';
-import { inputLines } from './InputsStrip';
 import { FreshContext, Line, Lines } from './Lists';
 import { PositionsContext, useListState, usePositions } from './positions';
 import { anyField, counted, fieldOffers, matches, offer, titled } from './offers';
@@ -30,7 +29,7 @@ import type { Frame } from './model/frame';
 import { findColumn } from './model/frame';
 import { NO_POSITIONS, startRequest } from './model/place';
 import { nextId } from './model/ids';
-import { findInput } from './model/inputs';
+import { findInput, inputLines } from './model/inputs';
 import { literalValue, valueWords } from './model/literal';
 import type {
   ChainCondition,
