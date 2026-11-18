@@ -301,7 +301,8 @@ export function TableGrid({ view, fetchBlock, onReport }: TableGridProps): React
           <div ref={numbers} className="absolute inset-x-0 top-0">
             {(drawn?.sent.numbers ?? []).map((number, at) => (
               <div
-                key={number}
+                // A row number keeps its place from one block to the next, as the rows do.
+                key={at}
                 className="absolute inset-x-0 px-2.5 text-right text-muted"
                 style={{
                   top: at * ROW_HEIGHT,
