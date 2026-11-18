@@ -5,6 +5,7 @@ use std::fmt;
 
 use crate::catalog::{self, Applies, Entry, Kind, ParameterDefault};
 
+use super::adapt::could_be_taken_by_a_number;
 use super::context::Context;
 use super::dtype::{Representative, ResultDtype};
 use super::rules::Rule;
@@ -274,6 +275,14 @@ impl Allowance {
     /// columns, cannot say what the call gives.
     pub(super) fn without_result(mut self) -> Self {
         self.result = None;
+        self
+    }
+
+    /// The same allowance with the dtype and the shape a call gives for every number the
+    /// argument could be, as [`same_for_any_number`] finds them.
+    pub(super) fn with_result(mut self, result: ResultDtype, shape: Shape) -> Self {
+        self.result = Some(result);
+        self.shape = shape;
         self
     }
 
@@ -621,6 +630,41 @@ pub fn offer(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Verdi
         Ok(allowance) => Verdict::Allowed(allowance),
         Err(refusal) => Verdict::Refused(refusal),
     }
+}
+
+/// What a method gives, and whether one value, when its argument `parameter` is a number
+/// typed without a dtype that the tables cannot give a dtype, and the arguments and options
+/// `chosen` are given besides: what it gives for every dtype the number could take that the
+/// tables allow, where that is the same for them all. A comparison is a `Boolean` whatever the
+/// number is. `None` where the dtypes give different results or none allows the call.
+///
+/// The number could take any whole number or float dtype, or a `Decimal` that it adapts to, and
+/// no other: that a `Time` is subtracted from a `Time` is no word on a number.
+pub(crate) fn same_for_any_number(
+    entry: &'static Entry,
+    place: &Place,
+    chosen: &Chosen<'_>,
+    parameter: &str,
+) -> Option<(ResultDtype, Shape)> {
+    let mut found: Option<(ResultDtype, Shape)> = None;
+    for class in Representative::ALL
+        .into_iter()
+        .filter(|class| could_be_taken_by_a_number(*class))
+    {
+        let mut arguments = chosen.arguments.to_vec();
+        arguments.push((parameter, class));
+        let Verdict::Allowed(allowance) = offer(entry, place, &chosen.with_arguments(&arguments))
+        else {
+            continue;
+        };
+        let (result, shape) = (allowance.result?, allowance.shape);
+        match &found {
+            None => found = Some((result, shape)),
+            Some((first, first_shape)) if *first == result && *first_shape == shape => {}
+            Some(_) => return None,
+        }
+    }
+    found
 }
 
 fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Allowance, Refusal> {

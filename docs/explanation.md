@@ -444,14 +444,24 @@ takes their dtype, so `when(f).then(a).otherwise(0)` gives what `a` holds.
 A hole starts an expression that nothing is asked of.
 The tables are measured with typed columns, and a number typed without a dtype is a
 dyn literal that adapts to the operand it is used with, so `u8 - 1` is a `UInt8`.
-The walk and `fit` therefore leave what a call gives not known where such a number
-is an operand of a method that takes one or the receiver of one, and know it where
-it stands alone, counts rows as `shift` does, or is a value of a condition beside
-typed values that it fits: a whole number adapts to whole numbers and numbers with a
+Where such a number is an operand of arithmetic or a comparison, the value `shift`
+fills with, or the receiver of arithmetic or a comparison, the walk and `fit` read it
+as the dtype of the column beside it where it fits that dtype, as Polars does: a whole
+number fits a whole number type that holds it and any float, and a number with a
+fraction fits a float and beside whole numbers is the `Float64` it is alone. Where it
+does not fit, or the other side is no number, Polars widens the column to a dtype that
+depends on the number, as `u8 - 300` is a `UInt16`, or refuses the call, and the dtype
+of what the call gives is not known; the call still gives what the tables say it gives
+for every dtype the number could take, where that is the same for all of them, as a
+comparison always gives a `Boolean`. Where it is an operand of another method, such as a
+key to group by, what the call gives is not known. The walk and `fit` know it where it
+stands alone, counts rows as `shift` does, or is a value of a condition beside typed
+values that it fits: a whole number adapts to whole numbers and numbers with a
 fraction it fits, a number with a fraction only to numbers with a fraction, and
 numbers alone have no class. A condition with no `otherwise` that holds one is not
-known to end, as Polars refuses it. The fuzz target draws such numbers, outside the
-values of a condition, so that its campaigns hold these answers to Polars.
+known to end, as Polars refuses it. The fuzz target draws such numbers, some that fit a
+narrow column and some that do not, outside the values of a condition, so that its
+campaigns hold these answers to Polars.
 The runner asks the named rules beside those tables, and not the tables, for
 where an expression may start: `element` starts a chain only in a pivot's
 aggregate. A row of the context table was measured with the chain ending at one

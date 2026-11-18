@@ -20,12 +20,12 @@
 
 use polars::prelude::{Schema, SchemaRef};
 
-use crate::allowed::is_count;
 use crate::allowed::{
     self, After, Chosen, ConditionState, Context, Ending, Literal, Nested, Outer,
     Place as OfferPlace, Position as Slot, Refusal, Representative, Shape, Unknown, Verdict,
 };
-use crate::catalog::{Applies, Dtypes, Entry, Kind};
+use crate::allowed::{Loose, is_count, is_required, operand_adapts, receiver_adapts};
+use crate::catalog::{Applies, Entry, Kind, Role};
 
 use super::error::{Place, Segment};
 use super::inputs::Inputs;
@@ -239,18 +239,6 @@ struct Operand {
     known: bool,
 }
 
-/// A number typed without a dtype, which is a dyn literal: Polars gives it the
-/// dtype of the operand it is used with where it fits, and its own alone. The
-/// tables are measured with typed columns, so they cannot say what it gives
-/// beside another operand.
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum Loose {
-    /// A whole number, by its value.
-    Integer(i64),
-    /// A number with a fraction.
-    Float,
-}
-
 /// The class of one value of a condition, and whether it is a number typed
 /// without a dtype, which adapts to the numbers beside it.
 type Valued = (Option<Representative>, Option<Loose>);
@@ -415,8 +403,8 @@ fn loose_number(call: &Call) -> Option<Loose> {
         return None;
     }
     match call.argument("value") {
-        Some(Value::Integer(number)) => Some(Loose::Integer(*number)),
-        Some(Value::Float(_)) => Some(Loose::Float),
+        Some(Value::Integer(number)) => Loose::of(&Literal::Integer(*number)),
+        Some(Value::Float(number)) => Loose::of(&Literal::Float(*number)),
         _ => None,
     }
 }
@@ -426,34 +414,8 @@ fn loose_number(call: &Call) -> Option<Loose> {
 fn takes_an_operand(entry: &Entry) -> bool {
     entry.applies() == Applies::Expression
         && entry.parameters().iter().any(|parameter| {
-            matches!(parameter.kind(), Kind::Expression(dtypes) if dtypes != [Dtypes::Integer])
+            matches!(parameter.kind(), Kind::Expression(_)) && parameter.role() != Role::Count
         })
-}
-
-/// Whether the whole number `value` fits the class, as Polars adapts a number
-/// typed without a dtype to a column of it.
-fn integer_fits(value: i64, class: Representative) -> bool {
-    match class {
-        Representative::Int8 => i8::try_from(value).is_ok(),
-        Representative::Int16 => i16::try_from(value).is_ok(),
-        Representative::Int32 => i32::try_from(value).is_ok(),
-        Representative::Int64 | Representative::Int128 => true,
-        Representative::UInt8 => u8::try_from(value).is_ok(),
-        Representative::UInt16 => u16::try_from(value).is_ok(),
-        Representative::UInt32 => u32::try_from(value).is_ok(),
-        Representative::UInt64 | Representative::UInt128 => value >= 0,
-        Representative::Float16 => value.unsigned_abs() <= 65_504,
-        Representative::Float32 | Representative::Float64 => true,
-        _ => false,
-    }
-}
-
-/// Whether the class is a number with a fraction.
-const fn is_float(class: Representative) -> bool {
-    matches!(
-        class,
-        Representative::Float16 | Representative::Float32 | Representative::Float64
-    )
 }
 
 /// The class every value of a condition has, when they have the same one. A
@@ -477,8 +439,7 @@ fn unify(values: &[Valued]) -> Option<Representative> {
     let first = first_strict?;
     let same = |(class, loose): &(Representative, Option<Loose>)| match loose {
         None => *class == first,
-        Some(Loose::Integer(value)) => integer_fits(*value, first),
-        Some(Loose::Float) => is_float(first),
+        Some(number) => number.fits(first),
     };
     classes.iter().all(same).then_some(first)
 }
@@ -1033,13 +994,24 @@ impl Walker<'_> {
         } = around;
         let entry = link.entry();
         // A number typed without a dtype that a method takes another operand beside adapts to
-        // it, so what it follows is not known to the tables, which are measured with typed
-        // columns.
-        let cur = match cur {
-            Cur::Value { shape, .. } if receiver_loose.is_some() && takes_an_operand(entry) => {
-                Cur::Value { dtype: None, shape }
-            }
-            other => other,
+        // it, as the dtype of that operand where it fits it. Where there is no such operand the
+        // tables, measured with typed columns, cannot say what it follows.
+        let cur = match (cur, receiver_loose) {
+            (Cur::Value { shape, .. }, Some(number)) if takes_an_operand(entry) => Cur::Value {
+                dtype: arguments
+                    .iter()
+                    .filter(|(name, operand)| {
+                        receiver_adapts(entry, name) && operand.loose.is_none()
+                    })
+                    .map(|(_, operand)| operand.dtype)
+                    .collect::<Option<Vec<_>>>()
+                    .and_then(|dtypes| match dtypes.as_slice() {
+                        [dtype] => number.beside(*dtype),
+                        _ => None,
+                    }),
+                shape,
+            },
+            (other, _) => other,
         };
         let after = match &cur {
             Cur::Dead => return (Cur::Dead, Standing::not_asked()),
@@ -1067,20 +1039,52 @@ impl Walker<'_> {
             Cur::Condition { state, .. } => After::Condition(*state),
         };
         // A number typed without a dtype that a method takes as an operand adapts to what it
-        // follows, so its dtype is not known to the tables, unless it counts rows.
-        let given: Vec<(&str, Representative)> = arguments
+        // follows. Its dtype is that of what the method follows where it fits it, and otherwise
+        // not known to the tables, unless it counts rows.
+        let receiver = match &cur {
+            Cur::Value { dtype, .. } if receiver_loose.is_none() => *dtype,
+            _ => None,
+        };
+        let resolved: Vec<(&str, Option<Representative>, Option<Loose>)> = arguments
             .iter()
-            .filter_map(|(name, operand)| {
-                let counts = matches!(operand.loose, Some(Loose::Integer(_)));
+            .map(|(name, operand)| {
+                let counts = operand.loose.is_some_and(Loose::is_whole);
                 let hidden = entry.applies() == Applies::Expression
                     && operand.loose.is_some()
                     && !(counts && is_count(entry, name));
-                operand
-                    .dtype
-                    .filter(|_| !hidden)
-                    .map(|dtype| (name.as_str(), dtype))
+                let dtype = if hidden {
+                    operand
+                        .loose
+                        .zip(receiver)
+                        .filter(|_| operand_adapts(entry, name))
+                        .and_then(|(number, receiver)| number.beside(receiver))
+                } else {
+                    operand.dtype
+                };
+                (name.as_str(), dtype, operand.loose.filter(|_| hidden))
             })
             .collect();
+        let given: Vec<(&str, Representative)> = resolved
+            .iter()
+            .filter_map(|(name, dtype, _)| dtype.map(|dtype| (*name, dtype)))
+            .collect();
+        // Where every argument the tables are not told is a number given to a parameter that must
+        // be given, what the call gives may be the same whatever dtype the number takes.
+        let missing: Vec<&str> = resolved
+            .iter()
+            .filter(|(_, dtype, _)| dtype.is_none())
+            .map(|(name, _, _)| *name)
+            .collect();
+        let only_a_number = match missing.as_slice() {
+            [name] => {
+                resolved
+                    .iter()
+                    .any(|(given, _, number)| given == name && number.is_some())
+                    && operand_adapts(entry, name)
+                    && is_required(entry, name)
+            }
+            _ => false,
+        };
         let words = option_words(link);
         let words: Vec<(&str, &str)> = words
             .iter()
@@ -1113,13 +1117,22 @@ impl Walker<'_> {
                 self.refuse_blind(refusal);
                 return (Cur::Dead, standing);
             }
-            return (
-                Cur::Value {
-                    dtype: None,
-                    shape: Shape::Many,
-                },
-                standing,
-            );
+            let same = match (&verdict, missing.as_slice()) {
+                (Verdict::Allowed(_), [name]) if only_a_number => allowed::same_for_any_number(
+                    entry,
+                    &place,
+                    &Chosen::default()
+                        .with_arguments(&given)
+                        .with_options(&words),
+                    name,
+                ),
+                _ => None,
+            };
+            let (dtype, shape) = match same {
+                Some((result, shape)) => (result.class(), shape),
+                None => (None, Shape::Many),
+            };
+            return (Cur::Value { dtype, shape }, standing);
         }
         let statement = arguments
             .iter()

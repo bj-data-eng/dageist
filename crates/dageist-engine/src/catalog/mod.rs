@@ -254,6 +254,25 @@ pub enum Shape {
     PerItem(&'static str),
 }
 
+/// How an expression parameter meets the value its method follows, where Polars
+/// treats a number typed without a dtype differently for it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Role {
+    /// Nothing sets it apart: a key to group by, a duration to offset by.
+    Plain,
+    /// The other side of an operation with the value the method follows, as
+    /// arithmetic and comparisons combine two values. A number typed without a
+    /// dtype adapts to the other side, whichever side it is.
+    Operand,
+    /// What stands in for the values the method leaves missing, as the value
+    /// `shift` fills with. A number typed without a dtype adapts to the value the
+    /// method follows, but the value the method follows does not adapt to it.
+    Filler,
+    /// A count or an index of rows, as `shift`'s `n` is. A whole number there is
+    /// that dtype and adapts to nothing.
+    Count,
+}
+
 /// One parameter of an entry, named as Python names it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Parameter {
@@ -261,6 +280,7 @@ pub struct Parameter {
     kind: Kind,
     shape: Shape,
     default: ParameterDefault,
+    role: Role,
 }
 
 impl Parameter {
@@ -270,7 +290,14 @@ impl Parameter {
             kind,
             shape,
             default,
+            role: Role::Plain,
         }
+    }
+
+    /// The same parameter with the role it plays beside the value its method follows.
+    const fn with_role(mut self, role: Role) -> Self {
+        self.role = role;
+        self
     }
 
     /// Python's name for the parameter.
@@ -296,6 +323,12 @@ impl Parameter {
     #[must_use]
     pub const fn default(&self) -> ParameterDefault {
         self.default
+    }
+
+    /// How the parameter meets the value its method follows.
+    #[must_use]
+    pub const fn role(&self) -> Role {
+        self.role
     }
 }
 

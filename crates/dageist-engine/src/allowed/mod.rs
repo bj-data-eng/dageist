@@ -28,22 +28,26 @@
 //! or a column compared with a null, and [`rule_forbids_a_repeated_pair_of_key_names`]
 //! for a join's key that makes a pair of output names again.
 
+mod adapt;
 mod candidates;
 mod context;
 mod dtype;
+mod literal;
 mod offers;
 mod rules;
 mod table;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use candidates::is_count;
+pub(crate) use adapt::{Loose, is_count, is_required, operand_adapts, receiver_adapts};
 pub use candidates::{
-    ArgumentSlot, Candidate, DefaultArgument, Fit, Literal, OptionOffer, OptionWord, Slot,
-    default_argument, fit, option_offers,
+    ArgumentSlot, Candidate, DefaultArgument, Fit, OptionOffer, OptionWord, Slot, default_argument,
+    fit, option_offers,
 };
 pub use context::{Context, Nested, Outer, Position};
 pub use dtype::{Representative, ResultDtype, dtype_name};
+pub use literal::Literal;
+pub(crate) use offers::same_for_any_number;
 pub use offers::{
     After, Allowance, Chosen, ConditionState, Ending, Offer, Place, Refusal, RefusalSource,
     Unknown, Verdict, argument_dtypes, offer, offer_input, offers, options, rule_forbids,

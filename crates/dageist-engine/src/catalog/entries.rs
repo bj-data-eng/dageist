@@ -19,7 +19,7 @@ use polars::prelude::{
 
 use super::{
     Argument, Arguments, Build, BuildError, Conditional, Dtypes, Entry, EntryId, Family, Kind,
-    Laziness, Parameter, ParameterDefault, Shape, ValueType,
+    Laziness, Parameter, ParameterDefault, Role, Shape, ValueType,
 };
 
 const ANY: &[Dtypes] = &[Dtypes::Any];
@@ -84,7 +84,7 @@ const fn flag(name: &'static str, default: &'static str) -> Parameter {
 }
 
 /// The parameter every comparison, and `sub`, takes.
-const OTHER: Parameter = required("other", EXPRESSION, Shape::One);
+const OTHER: Parameter = required("other", EXPRESSION, Shape::One).with_role(Role::Operand);
 
 /// `*predicates`: conditions that must all hold, which `when` and `filter` take.
 const PREDICATES: Parameter = starred("predicates", Kind::Expression(BOOLEAN));
@@ -877,8 +877,8 @@ pub(super) const ENTRIES: &[Entry] = &[
         family: Family::Rows,
         accepts: ANY,
         parameters: &[
-            optional("n", Kind::Expression(INTEGER), Shape::One, "1"),
-            optional("fill_value", EXPRESSION, Shape::One, "None"),
+            optional("n", Kind::Expression(INTEGER), Shape::One, "1").with_role(Role::Count),
+            optional("fill_value", EXPRESSION, Shape::One, "None").with_role(Role::Filler),
         ],
         laziness: Laziness::Lazy,
         build: Build::Expression(shift),
