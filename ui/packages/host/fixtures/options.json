@@ -3,6 +3,7 @@
     {
       "parameter": "how",
       "default": "inner",
+      "starter": "left",
       "words": [
         {
           "word": "inner",
@@ -37,6 +38,7 @@
     {
       "parameter": "validate",
       "default": "m:m",
+      "starter": null,
       "words": [
         {
           "word": "m:m",
@@ -83,6 +85,7 @@
     {
       "parameter": "nulls_equal",
       "default": "false",
+      "starter": null,
       "words": [
         {
           "word": "true",
@@ -109,6 +112,7 @@
     {
       "parameter": "coalesce",
       "default": "unset",
+      "starter": null,
       "words": [
         {
           "word": "true",
@@ -135,6 +139,7 @@
     {
       "parameter": "maintain_order",
       "default": "unset",
+      "starter": null,
       "words": [
         {
           "word": "none",
@@ -191,6 +196,7 @@
     {
       "parameter": "build_side",
       "default": "auto",
+      "starter": null,
       "words": [
         {
           "word": "auto",
@@ -247,6 +253,7 @@
     {
       "parameter": "allow_parallel",
       "default": "true",
+      "starter": null,
       "words": [
         {
           "word": "true",
@@ -273,6 +280,7 @@
     {
       "parameter": "force_parallel",
       "default": "false",
+      "starter": null,
       "words": [
         {
           "word": "true",

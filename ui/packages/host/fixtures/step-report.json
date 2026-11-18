@@ -211,7 +211,8 @@
         ],
         "refusal": null,
         "notKnown": null
-      }
+      },
+      "atDefault": []
     },
     {
       "id": "step_index",
@@ -503,7 +504,8 @@
         ],
         "refusal": null,
         "notKnown": null
-      }
+      },
+      "atDefault": []
     },
     {
       "id": "resolved_at",
@@ -885,7 +887,31 @@
         ],
         "refusal": null,
         "notKnown": null
-      }
+      },
+      "atDefault": [
+        {
+          "stepIndex": 2,
+          "stepId": "resolved_at",
+          "path": [
+            {
+              "kind": "parameter",
+              "name": "named_exprs"
+            },
+            {
+              "kind": "value",
+              "index": 0
+            },
+            {
+              "kind": "link",
+              "index": 0
+            },
+            {
+              "kind": "parameter",
+              "name": "n"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "received_at",
@@ -1033,7 +1059,8 @@
         ],
         "refusal": null,
         "notKnown": null
-      }
+      },
+      "atDefault": []
     },
     {
       "id": "resolved_day",
@@ -1211,7 +1238,8 @@
         ],
         "refusal": null,
         "notKnown": null
-      }
+      },
+      "atDefault": []
     },
     {
       "id": "days_open",
@@ -1509,7 +1537,8 @@
         ],
         "refusal": null,
         "notKnown": null
-      }
+      },
+      "atDefault": []
     },
     {
       "id": "a_days",
@@ -2299,7 +2328,8 @@
         ],
         "refusal": null,
         "notKnown": null
-      }
+      },
+      "atDefault": []
     },
     {
       "id": "join",
@@ -2530,7 +2560,8 @@
         ],
         "refusal": null,
         "notKnown": null
-      }
+      },
+      "atDefault": []
     },
     {
       "id": "sla_status",
@@ -3172,7 +3203,8 @@
         ],
         "refusal": null,
         "notKnown": null
-      }
+      },
+      "atDefault": []
     },
     {
       "id": "flag",
@@ -4398,7 +4430,8 @@
         ],
         "refusal": null,
         "notKnown": null
-      }
+      },
+      "atDefault": []
     },
     {
       "id": "holiday_count",
@@ -4600,7 +4633,8 @@
         ],
         "refusal": null,
         "notKnown": null
-      }
+      },
+      "atDefault": []
     },
     {
       "id": "pivot",
@@ -4792,7 +4826,8 @@
         ],
         "refusal": null,
         "notKnown": null
-      }
+      },
+      "atDefault": []
     }
   ],
   "python": [

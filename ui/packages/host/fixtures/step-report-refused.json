@@ -139,7 +139,8 @@
         ],
         "refusal": null,
         "notKnown": null
-      }
+      },
+      "atDefault": []
     },
     {
       "id": "total",
@@ -301,7 +302,8 @@
           "atEnd": false
         },
         "notKnown": null
-      }
+      },
+      "atDefault": []
     },
     {
       "id": "after",
@@ -320,7 +322,8 @@
         "expressions": [],
         "refusal": null,
         "notKnown": null
-      }
+      },
+      "atDefault": []
     }
   ],
   "python": [

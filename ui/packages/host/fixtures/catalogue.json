@@ -84,6 +84,10 @@
           "default": {
             "kind": "required"
           },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
           "python": null,
           "position": {
             "kind": "nested",
@@ -114,6 +118,15 @@
           "default": {
             "kind": "empty"
           },
+          "defaultSetting": null,
+          "start": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
+          },
           "python": "()",
           "position": {
             "kind": "nested",
@@ -138,6 +151,11 @@
           },
           "default": {
             "kind": "empty"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "pairs",
+            "entries": []
           },
           "python": "{}",
           "position": null
@@ -165,6 +183,10 @@
           },
           "default": {
             "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
           },
           "python": null,
           "position": {
@@ -197,6 +219,14 @@
             "kind": "flag",
             "value": false
           },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
           "python": "False",
           "position": null
         }
@@ -225,6 +255,14 @@
             "kind": "flag",
             "value": false
           },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
           "python": "False",
           "position": null
         }
@@ -252,6 +290,14 @@
           "default": {
             "kind": "flag",
             "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
           },
           "python": "False",
           "position": null
@@ -300,6 +346,10 @@
           "default": {
             "kind": "required"
           },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
           "python": null,
           "position": null
         }
@@ -338,6 +388,14 @@
             "kind": "flag",
             "value": false
           },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
           "python": "False",
           "position": null
         }
@@ -364,6 +422,10 @@
           },
           "default": {
             "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
           },
           "python": null,
           "position": null
@@ -393,6 +455,14 @@
             "kind": "flag",
             "value": false
           },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
           "python": "False",
           "position": null
         }
@@ -420,6 +490,10 @@
           "default": {
             "kind": "required"
           },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
           "python": null,
           "position": null
         }
@@ -446,6 +520,10 @@
           },
           "default": {
             "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
           },
           "python": null,
           "position": null
@@ -495,6 +573,14 @@
             "kind": "flag",
             "value": false
           },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
           "python": "False",
           "position": null
         }
@@ -521,6 +607,10 @@
           },
           "default": {
             "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
           },
           "python": null,
           "position": null
@@ -558,6 +648,10 @@
           },
           "default": {
             "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
           },
           "python": null,
           "position": null
@@ -606,6 +700,10 @@
           "default": {
             "kind": "required"
           },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
           "python": null,
           "position": null
         }
@@ -633,6 +731,15 @@
           "default": {
             "kind": "none"
           },
+          "defaultSetting": null,
+          "start": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
+          },
           "python": "None",
           "position": {
             "kind": "nested",
@@ -652,6 +759,15 @@
           "default": {
             "kind": "empty"
           },
+          "defaultSetting": null,
+          "start": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
+          },
           "python": "()",
           "position": {
             "kind": "nested",
@@ -670,6 +786,15 @@
           },
           "default": {
             "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
           },
           "python": "None",
           "position": {
@@ -691,6 +816,14 @@
             "kind": "flag",
             "value": false
           },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
           "python": "False",
           "position": null
         },
@@ -707,6 +840,14 @@
           "default": {
             "kind": "flag",
             "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
           },
           "python": "False",
           "position": null
@@ -739,6 +880,14 @@
             "kind": "text",
             "value": "group_to_rows"
           },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "group_to_rows"
+          },
+          "start": {
+            "kind": "word",
+            "value": "join"
+          },
           "python": "'group_to_rows'",
           "position": null
         }
@@ -767,6 +916,13 @@
             "kind": "integer",
             "value": 1
           },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 1
+          },
+          "start": {
+            "kind": "unset"
+          },
           "python": "1",
           "position": null
         },
@@ -782,6 +938,10 @@
           },
           "default": {
             "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
           },
           "python": "None",
           "position": null
@@ -809,6 +969,10 @@
           },
           "default": {
             "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
           },
           "python": null,
           "position": null
@@ -847,6 +1011,15 @@
           "default": {
             "kind": "empty"
           },
+          "defaultSetting": null,
+          "start": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
+          },
           "python": "()",
           "position": {
             "kind": "outer",
@@ -871,6 +1044,11 @@
           },
           "default": {
             "kind": "empty"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "pairs",
+            "entries": []
           },
           "python": "{}",
           "position": null
@@ -899,6 +1077,10 @@
           "default": {
             "kind": "required"
           },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
           "python": null,
           "position": null
         },
@@ -914,6 +1096,15 @@
           },
           "default": {
             "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
           },
           "python": "None",
           "position": {
@@ -965,6 +1156,14 @@
             "kind": "text",
             "value": "inner"
           },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "inner"
+          },
+          "start": {
+            "kind": "word",
+            "value": "left"
+          },
           "python": "'inner'",
           "position": null
         },
@@ -980,6 +1179,15 @@
           },
           "default": {
             "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
           },
           "python": "None",
           "position": {
@@ -999,6 +1207,15 @@
           },
           "default": {
             "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
           },
           "python": "None",
           "position": {
@@ -1020,6 +1237,13 @@
           "default": {
             "kind": "text",
             "value": "_right"
+          },
+          "defaultSetting": {
+            "kind": "text",
+            "value": "_right"
+          },
+          "start": {
+            "kind": "unset"
           },
           "python": "'_right'",
           "position": null
@@ -1056,6 +1280,14 @@
             "kind": "text",
             "value": "m:m"
           },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "m:m"
+          },
+          "start": {
+            "kind": "word",
+            "value": "m:1"
+          },
           "python": "'m:m'",
           "position": null
         },
@@ -1073,6 +1305,14 @@
             "kind": "flag",
             "value": false
           },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
           "python": "False",
           "position": null
         },
@@ -1088,6 +1328,11 @@
           },
           "default": {
             "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "flag",
+            "value": true
           },
           "python": "None",
           "position": null
@@ -1126,6 +1371,11 @@
           },
           "default": {
             "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "word",
+            "value": "none"
           },
           "python": "None",
           "position": null
@@ -1166,6 +1416,14 @@
             "kind": "text",
             "value": "auto"
           },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "auto"
+          },
+          "start": {
+            "kind": "word",
+            "value": "prefer_left"
+          },
           "python": "'auto'",
           "position": null
         },
@@ -1183,6 +1441,14 @@
             "kind": "flag",
             "value": true
           },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": true
+          },
+          "start": {
+            "kind": "flag",
+            "value": false
+          },
           "python": "True",
           "position": null
         },
@@ -1199,6 +1465,14 @@
           "default": {
             "kind": "flag",
             "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
           },
           "python": "False",
           "position": null
@@ -1227,6 +1501,10 @@
           "default": {
             "kind": "required"
           },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
           "python": null,
           "position": null
         },
@@ -1242,6 +1520,10 @@
           },
           "default": {
             "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
           },
           "python": null,
           "position": null
@@ -1259,6 +1541,10 @@
           "default": {
             "kind": "none"
           },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
           "python": "None",
           "position": null
         },
@@ -1275,6 +1561,10 @@
           "default": {
             "kind": "none"
           },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
           "python": "None",
           "position": null
         },
@@ -1290,6 +1580,10 @@
           },
           "default": {
             "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
           },
           "python": "None",
           "position": {
@@ -1311,6 +1605,14 @@
             "kind": "flag",
             "value": false
           },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
           "python": "False",
           "position": null
         },
@@ -1328,6 +1630,13 @@
           "default": {
             "kind": "text",
             "value": "_"
+          },
+          "defaultSetting": {
+            "kind": "text",
+            "value": "_"
+          },
+          "start": {
+            "kind": "unset"
           },
           "python": "'_'",
           "position": null
@@ -1355,6 +1664,14 @@
           "default": {
             "kind": "text",
             "value": "auto"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "auto"
+          },
+          "start": {
+            "kind": "word",
+            "value": "combine"
           },
           "python": "'auto'",
           "position": null
@@ -1390,6 +1707,11 @@
           "default": {
             "kind": "required"
           },
+          "defaultSetting": null,
+          "start": {
+            "kind": "pairs",
+            "entries": []
+          },
           "python": null,
           "position": null
         },
@@ -1406,6 +1728,14 @@
           "default": {
             "kind": "flag",
             "value": true
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": true
+          },
+          "start": {
+            "kind": "flag",
+            "value": false
           },
           "python": "True",
           "position": null
@@ -1434,6 +1764,15 @@
           "default": {
             "kind": "empty"
           },
+          "defaultSetting": null,
+          "start": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
+          },
           "python": "()",
           "position": {
             "kind": "outer",
@@ -1458,6 +1797,11 @@
           },
           "default": {
             "kind": "empty"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "pairs",
+            "entries": []
           },
           "python": "{}",
           "position": {
@@ -1489,6 +1833,15 @@
           "default": {
             "kind": "required"
           },
+          "defaultSetting": null,
+          "start": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
+          },
           "python": null,
           "position": {
             "kind": "outer",
@@ -1507,6 +1860,15 @@
           },
           "default": {
             "kind": "empty"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
           },
           "python": "()",
           "position": {
@@ -1529,6 +1891,14 @@
             "kind": "flag",
             "value": false
           },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
           "python": "False",
           "position": null
         },
@@ -1547,6 +1917,14 @@
             "kind": "flag",
             "value": false
           },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
           "python": "False",
           "position": null
         },
@@ -1564,6 +1942,14 @@
             "kind": "flag",
             "value": false
           },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
           "python": "False",
           "position": null
         },
@@ -1580,6 +1966,14 @@
           "default": {
             "kind": "flag",
             "value": true
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": true
+          },
+          "start": {
+            "kind": "flag",
+            "value": false
           },
           "python": "True",
           "position": null
@@ -1608,6 +2002,15 @@
           "default": {
             "kind": "empty"
           },
+          "defaultSetting": null,
+          "start": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
+          },
           "python": "()",
           "position": {
             "kind": "outer",
@@ -1632,6 +2035,11 @@
           },
           "default": {
             "kind": "empty"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "pairs",
+            "entries": []
           },
           "python": "{}",
           "position": {
@@ -1663,6 +2071,10 @@
           "default": {
             "kind": "required"
           },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
           "python": null,
           "position": {
             "kind": "nested",
@@ -1693,6 +2105,15 @@
           "default": {
             "kind": "empty"
           },
+          "defaultSetting": null,
+          "start": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
+          },
           "python": "()",
           "position": {
             "kind": "nested",
@@ -1717,6 +2138,11 @@
           },
           "default": {
             "kind": "empty"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "pairs",
+            "entries": []
           },
           "python": "{}",
           "position": null
@@ -1744,6 +2170,10 @@
           },
           "default": {
             "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
           },
           "python": null,
           "position": {
@@ -1775,6 +2205,10 @@
           "default": {
             "kind": "required"
           },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
           "python": null,
           "position": null
         },
@@ -1790,6 +2224,15 @@
           },
           "default": {
             "kind": "empty"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
           },
           "python": "()",
           "position": null
@@ -1829,6 +2272,10 @@
           "default": {
             "kind": "required"
           },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
           "python": null,
           "position": null
         },
@@ -1844,6 +2291,10 @@
           },
           "default": {
             "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
           },
           "python": "None",
           "position": null
@@ -1861,6 +2312,14 @@
           "default": {
             "kind": "flag",
             "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
           },
           "python": "False",
           "position": null
@@ -1889,6 +2348,15 @@
           "default": {
             "kind": "empty"
           },
+          "defaultSetting": null,
+          "start": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
+          },
           "python": "()",
           "position": {
             "kind": "nested",
@@ -1913,6 +2381,11 @@
           },
           "default": {
             "kind": "empty"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "pairs",
+            "entries": []
           },
           "python": "{}",
           "position": null

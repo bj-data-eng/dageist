@@ -1,0 +1,169 @@
+{
+  "starts": [
+    {
+      "entry": "LazyFrame.filter",
+      "arguments": [
+        {
+          "parameter": "predicates",
+          "setting": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "entry": "LazyFrame.join",
+      "arguments": [
+        {
+          "parameter": "other",
+          "setting": {
+            "kind": "word",
+            "value": "step_names"
+          }
+        },
+        {
+          "parameter": "left_on",
+          "setting": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
+          }
+        },
+        {
+          "parameter": "right_on",
+          "setting": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
+          }
+        },
+        {
+          "parameter": "how",
+          "setting": {
+            "kind": "word",
+            "value": "left"
+          }
+        }
+      ]
+    },
+    {
+      "entry": "LazyFrame.pivot",
+      "arguments": [
+        {
+          "parameter": "on",
+          "setting": {
+            "kind": "unset"
+          }
+        },
+        {
+          "parameter": "on_columns",
+          "setting": {
+            "kind": "word",
+            "value": "step_names"
+          }
+        },
+        {
+          "parameter": "index",
+          "setting": {
+            "kind": "unset"
+          }
+        },
+        {
+          "parameter": "values",
+          "setting": {
+            "kind": "unset"
+          }
+        },
+        {
+          "parameter": "aggregate_function",
+          "setting": {
+            "kind": "element",
+            "method": "first"
+          }
+        }
+      ]
+    },
+    {
+      "entry": "LazyFrame.rename",
+      "arguments": [
+        {
+          "parameter": "mapping",
+          "setting": {
+            "kind": "pairs",
+            "entries": []
+          }
+        }
+      ]
+    },
+    {
+      "entry": "LazyFrame.select",
+      "arguments": [
+        {
+          "parameter": "exprs",
+          "setting": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "field",
+                "column": "dcn"
+              },
+              {
+                "kind": "field",
+                "column": "owner"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "entry": "LazyFrame.sort",
+      "arguments": [
+        {
+          "parameter": "by",
+          "setting": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "entry": "LazyFrame.with_columns",
+      "arguments": [
+        {
+          "parameter": "named_exprs",
+          "setting": {
+            "kind": "pairs",
+            "entries": [
+              {
+                "key": {
+                  "kind": "text",
+                  "value": "new_column"
+                },
+                "value": {
+                  "kind": "unset"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

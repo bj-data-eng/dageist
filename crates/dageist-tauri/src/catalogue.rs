@@ -14,8 +14,8 @@ use std::fmt;
 
 use dageist_engine::allowed::{Nested, Outer, Position};
 use dageist_engine::catalog::{
-    Applies, DefaultValue, Entry, Family, Kind, Laziness, Parameter, ParameterDefault, Shape,
-    ValueType, Words, english, entries,
+    Applies, DefaultValue, Entry, Family, Kind, Laziness, Parameter, ParameterDefault, Setting,
+    Shape, ValueType, Words, english, entries,
 };
 use dageist_engine::document::Dtype;
 use serde::Serialize;
@@ -104,6 +104,85 @@ enum DefaultView {
     Other,
 }
 
+/// What a parameter holds, in the one shape the view draws every kind of
+/// parameter from. It mirrors `SettingView` in `ui/packages/host/src/contract.ts`.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub(crate) enum SettingView {
+    /// Still to be given.
+    Unset,
+    Flag {
+        value: bool,
+    },
+    Integer {
+        value: i64,
+    },
+    Float {
+        value: f64,
+    },
+    /// Text that is typed: a string, a duration or a path.
+    Text {
+        value: String,
+    },
+    /// A name picked from a list: a choice's word, a dtype, a column or a table.
+    Word {
+        value: String,
+    },
+    /// An expression that reads this column.
+    Field {
+        column: String,
+    },
+    /// An expression that starts from `polars.element` and calls this method.
+    Element {
+        method: &'static str,
+    },
+    List {
+        items: Vec<SettingView>,
+    },
+    Pairs {
+        entries: Vec<PairView>,
+    },
+}
+
+/// One entry of pairs.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub(crate) struct PairView {
+    key: SettingView,
+    value: SettingView,
+}
+
+/// The view of a setting the engine gives.
+pub(crate) fn setting_view(setting: &Setting) -> SettingView {
+    match setting {
+        Setting::Unset => SettingView::Unset,
+        Setting::Flag(value) => SettingView::Flag { value: *value },
+        Setting::Integer(value) => SettingView::Integer { value: *value },
+        Setting::Float(value) => SettingView::Float { value: *value },
+        Setting::Text(value) => SettingView::Text {
+            value: value.clone(),
+        },
+        Setting::Word(value) => SettingView::Word {
+            value: value.clone(),
+        },
+        Setting::Field(column) => SettingView::Field {
+            column: column.clone(),
+        },
+        Setting::Element(method) => SettingView::Element { method },
+        Setting::List(items) => SettingView::List {
+            items: items.iter().map(setting_view).collect(),
+        },
+        Setting::Pairs(entries) => SettingView::Pairs {
+            entries: entries
+                .iter()
+                .map(|(key, value)| PairView {
+                    key: setting_view(key),
+                    value: setting_view(value),
+                })
+                .collect(),
+        },
+    }
+}
+
 /// A position that holds an expression, as the engine's tables name it: of a
 /// step, or inside an expression.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -128,6 +207,7 @@ const fn position_view(position: Position) -> PositionView {
 
 /// One parameter of an entry.
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct ParameterView {
     /// Python's name, which identifies the parameter.
     name: &'static str,
@@ -138,6 +218,12 @@ struct ParameterView {
     shape: ShapeView,
     /// Polars' default, read by the engine.
     default: DefaultView,
+    /// What the parameter holds when it is not given, as a setting, or `None`
+    /// where it must be given, Polars decides or the default is not a value.
+    default_setting: Option<SettingView>,
+    /// What the parameter is set to when it is first added, which differs from
+    /// its default.
+    start: SettingView,
     /// Polars' default as Python writes it; `None` when it must be given.
     python: Option<&'static str>,
     /// Where the expression the parameter holds stands, when a named position
@@ -319,6 +405,8 @@ fn parameter_view(
         kind: kind_view(entry, parameter, words)?,
         shape: shape_view(parameter.shape()),
         default: default_view(parameter.default()),
+        default_setting: parameter.default_setting().as_ref().map(setting_view),
+        start: setting_view(&parameter.start_setting()),
         python: match parameter.default() {
             ParameterDefault::Required => None,
             ParameterDefault::Python(text) => Some(text),
@@ -436,6 +524,8 @@ mod tests {
                         "kind": { "kind": "expression" },
                         "shape": { "shape": "one" },
                         "default": { "kind": "integer", "value": 1 },
+                        "defaultSetting": { "kind": "integer", "value": 1 },
+                        "start": { "kind": "unset" },
                         "python": "1",
                         "position": null
                     },
@@ -446,6 +536,8 @@ mod tests {
                         "kind": { "kind": "expression" },
                         "shape": { "shape": "one" },
                         "default": { "kind": "none" },
+                        "defaultSetting": null,
+                        "start": { "kind": "unset" },
                         "python": "None",
                         "position": null
                     }
@@ -469,6 +561,8 @@ mod tests {
                 "kind": { "kind": "choice", "words": words },
                 "shape": { "shape": "one" },
                 "default": { "kind": "text", "value": "inner" },
+                "defaultSetting": { "kind": "word", "value": "inner" },
+                "start": { "kind": "word", "value": "left" },
                 "python": "'inner'",
                 "position": null
             })
@@ -488,6 +582,8 @@ mod tests {
                 "kind": { "kind": "flag" },
                 "shape": { "shape": "perItem", "of": "by" },
                 "default": { "kind": "flag", "value": false },
+                "defaultSetting": { "kind": "flag", "value": false },
+                "start": { "kind": "flag", "value": true },
                 "python": "False",
                 "position": null
             })
