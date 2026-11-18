@@ -25,7 +25,7 @@ use crate::allowed::{
     Place as OfferPlace, Position as Slot, Refusal, Representative, Shape, Unknown, Verdict,
 };
 use crate::allowed::{Loose, is_count, is_required, operand_adapts, receiver_adapts};
-use crate::catalog::{Applies, Dtypes, Entry, Kind};
+use crate::catalog::{Applies, Entry, Kind, Role};
 
 use super::error::{Place, Segment};
 use super::inputs::Inputs;
@@ -414,7 +414,7 @@ fn loose_number(call: &Call) -> Option<Loose> {
 fn takes_an_operand(entry: &Entry) -> bool {
     entry.applies() == Applies::Expression
         && entry.parameters().iter().any(|parameter| {
-            matches!(parameter.kind(), Kind::Expression(dtypes) if dtypes != [Dtypes::Integer])
+            matches!(parameter.kind(), Kind::Expression(_)) && parameter.role() != Role::Count
         })
 }
 
