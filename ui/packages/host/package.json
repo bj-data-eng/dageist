@@ -2,11 +2,13 @@
   "name": "@dageist/host",
   "version": "0.1.0",
   "private": true,
-  "description": "The view's only door to the dageist host: IPC calls and the shapes they answer in.",
+  "description": "The view's only door to the dageist host: IPC calls and the shapes they answer in, including the Arrow of a block.",
   "license": "MIT",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
-  "dependencies": {}
+  "dependencies": {
+    "@uwdata/flechette": "2.7.1"
+  }
 }

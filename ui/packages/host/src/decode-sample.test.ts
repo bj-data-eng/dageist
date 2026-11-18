@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { DecodeError } from './decode';
-import { decodeBytes, decodeIdentity, decodeTable } from './decode-sample';
+import { decodeIdentity, decodeTable } from './decode-sample';
 import resultFixture from '../fixtures/table-result.json';
 import windowFixture from '../fixtures/table-window.json';
 import { replaced, withField, without } from '../test-support/tamper';
@@ -101,20 +101,5 @@ describe('the shape of an opened table', () => {
     expect(
       refusal(decodeTable, withField(windowFixture, ['figures'], 'closed', '1 ms')).message,
     ).toBe('$.figures: has the field "closed", which the contract lacks');
-  });
-});
-
-describe('a block of rows', () => {
-  it('is the bytes of an Arrow stream, as they arrive', () => {
-    const bytes = new Uint8Array([1, 2, 3]).buffer;
-    expect(decodeBytes(bytes)).toBe(bytes);
-  });
-
-  it('is refused when it is anything else', () => {
-    expect(refusal(decodeBytes, new Uint8Array([1])).message).toBe(
-      '$: must be the bytes of an Arrow stream',
-    );
-    expect(refusal(decodeBytes, 'bytes').problem).toBe('must be the bytes of an Arrow stream');
-    expect(refusal(decodeBytes, null).problem).toBe('must be the bytes of an Arrow stream');
   });
 });

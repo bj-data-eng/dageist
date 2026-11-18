@@ -1,16 +1,16 @@
 /**
  * @file Draws a table as a scrolling grid. Only the block of rows and columns
  * around the visible area exists in the page; scrolling past it fetches the
- * next block, which arrives as Arrow IPC bytes.
+ * next block. The host writes every cell, the number of every row and the report
+ * of every block as text, and the grid draws them as they are.
  */
 
-import type { Table } from '@uwdata/flechette';
-import { Type, tableFromIPC } from '@uwdata/flechette';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { cx } from '@dageist/design';
-import type { BlockRequest, TableView } from '@dageist/host';
+import type { BlockRequest, BlockView, TableView } from '@dageist/host';
 
+import { describeBlock } from './describe';
 import type { ScrollGeometry, ScrollPosition } from './scroll-map';
 import { anchoredTop, nextPosition } from './scroll-map';
 
@@ -37,10 +37,10 @@ interface Block {
   readonly columnEnd: number;
 }
 
-/** A fetched block and the decoded rows that fill it. */
+/** A fetched block and what the host sent of it. */
 interface Drawn {
   readonly block: Block;
-  readonly table: Table;
+  readonly sent: BlockView;
 }
 
 function clamp(value: number, low: number, high: number): number {
@@ -88,42 +88,21 @@ function scrollGeometry(scroller: HTMLElement, view: TableView): ScrollGeometry 
   return { physicalMax, virtualMax: physicalMax + hidden, page: scroller.clientHeight };
 }
 
-function isNumeric(typeId: number): boolean {
-  return typeId === Type.Int || typeId === Type.Float || typeId === Type.Decimal;
-}
-
-/** Returns the text for one value, or `null` for a missing value. */
-function formatValue(value: unknown, typeId: number): string | null {
-  if (value === null || value === undefined) return null;
-  if (value instanceof Date) {
-    const text = value.toISOString();
-    return typeId === Type.Date ? text.slice(0, 10) : `${text.slice(0, 10)} ${text.slice(11, 19)}`;
-  }
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'bigint' || typeof value === 'boolean') {
-    return String(value);
-  }
-  // Nested values, such as lists and structs. JSON has no form for BigInt.
-  return JSON.stringify(value, (_key, nested: unknown) =>
-    typeof nested === 'bigint' ? String(nested) : nested,
-  );
-}
-
-function describeSize(bytes: number): string {
-  return bytes < 1024 * 1024
-    ? `${(bytes / 1024).toFixed(1)} KB`
-    : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function BodyRows({ table }: { readonly table: Table }): React.JSX.Element {
-  const typeIds = table.schema.fields.map((field) => field.type.typeId);
-  const columns = typeIds.map((_typeId, index) => table.getChildAt<unknown>(index));
-  const rows = Array.from({ length: table.numRows }, (_unused, row) => row);
+/** Draws the rows of a block: `columns` are its cells by column, and `numeric` says which are drawn to the right. */
+function BodyRows({
+  columns,
+  numbers,
+  numeric,
+}: {
+  readonly columns: BlockView['columns'];
+  readonly numbers: readonly string[];
+  readonly numeric: readonly boolean[];
+}): React.JSX.Element {
   return (
     <>
-      {rows.map((row) => (
+      {numbers.map((number, row) => (
         <div
-          key={row}
+          key={number}
           className="absolute left-0 flex border-b border-line hover:bg-row"
           style={{
             top: row * ROW_HEIGHT,
@@ -131,16 +110,15 @@ function BodyRows({ table }: { readonly table: Table }): React.JSX.Element {
             lineHeight: `${String(ROW_HEIGHT)}px`,
           }}
         >
-          {columns.map((column, index) => {
-            const typeId = typeIds[index] ?? Type.Null;
-            const text = formatValue(column.at(row), typeId);
+          {columns.map((cells, index) => {
+            const text = cells[row] ?? null;
             return (
               <span
                 // Cells never move within a row, so their position identifies them.
                 key={index}
                 className={cx(
                   'shrink-0 overflow-hidden border-r border-line px-2.5 text-ellipsis whitespace-nowrap',
-                  isNumeric(typeId) && 'text-right',
+                  numeric[index] === true && 'text-right',
                   text === null && 'text-muted',
                 )}
                 style={{ width: COLUMN_WIDTH }}
@@ -156,17 +134,17 @@ function BodyRows({ table }: { readonly table: Table }): React.JSX.Element {
 }
 
 /** What the grid shows and how it gets its rows. */
-export interface ArrowGridProps {
+export interface TableGridProps {
   /** The table's shape. */
   readonly view: TableView;
-  /** Fetches a block of the table as Arrow IPC bytes. */
-  readonly fetchBlock: (request: BlockRequest) => Promise<ArrayBuffer>;
+  /** Fetches a block of the table. */
+  readonly fetchBlock: (request: BlockRequest) => Promise<BlockView>;
   /** Receives a one-line description of each block as it is drawn, or of a failure. */
   readonly onReport: (text: string) => void;
 }
 
 /** Draws `view` as a grid and keeps it filled as it scrolls. */
-export function ArrowGrid({ view, fetchBlock, onReport }: ArrowGridProps): React.JSX.Element {
+export function TableGrid({ view, fetchBlock, onReport }: TableGridProps): React.JSX.Element {
   const scroller = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
   const numbers = useRef<HTMLDivElement>(null);
@@ -230,20 +208,15 @@ export function ArrowGrid({ view, fetchBlock, onReport }: ArrowGridProps): React
     const load = async (block: Block): Promise<void> => {
       const names = view.columns.slice(block.columnStart, block.columnEnd).map((info) => info.name);
       const started = performance.now();
-      const bytes = await fetchBlock({
+      const sent = await fetchBlock({
         offset: block.rowStart,
         length: block.rowEnd - block.rowStart,
         columns: names,
       });
-      const table = tableFromIPC(bytes, { useDate: true });
       if (!live) return;
       fetched.current = block;
-      setDrawn({ block, table });
-      onReport(
-        `Last block: ${String(table.numRows)} rows × ${String(table.numCols)} columns` +
-          ` (${describeSize(bytes.byteLength)}), fetched and decoded in` +
-          ` ${(performance.now() - started).toFixed(1)} ms`,
-      );
+      setDrawn({ block, sent });
+      onReport(describeBlock(sent.report, performance.now() - started));
     };
 
     const refresh = async (): Promise<void> => {
@@ -281,10 +254,7 @@ export function ArrowGrid({ view, fetchBlock, onReport }: ArrowGridProps): React
 
   const block = drawn?.block ?? null;
   const headColumns = block === null ? [] : view.columns.slice(block.columnStart, block.columnEnd);
-  const rowNumbers =
-    block === null
-      ? []
-      : Array.from({ length: block.rowEnd - block.rowStart }, (_unused, at) => block.rowStart + at);
+  const numeric = view.columns.map((column) => column.numeric);
 
   return (
     <div
@@ -327,9 +297,9 @@ export function ArrowGrid({ view, fetchBlock, onReport }: ArrowGridProps): React
           style={{ width: GUTTER_WIDTH, height: rowsHeight }}
         >
           <div ref={numbers} className="absolute inset-x-0 top-0">
-            {rowNumbers.map((row, at) => (
+            {(drawn?.sent.numbers ?? []).map((number, at) => (
               <div
-                key={row}
+                key={number}
                 className="absolute inset-x-0 px-2.5 text-right text-muted"
                 style={{
                   top: at * ROW_HEIGHT,
@@ -337,7 +307,7 @@ export function ArrowGrid({ view, fetchBlock, onReport }: ArrowGridProps): React
                   lineHeight: `${String(ROW_HEIGHT)}px`,
                 }}
               >
-                {(row + 1).toLocaleString('en-US')}
+                {number}
               </div>
             ))}
           </div>
@@ -354,7 +324,13 @@ export function ArrowGrid({ view, fetchBlock, onReport }: ArrowGridProps): React
             className="absolute top-0"
             style={{ left: GUTTER_WIDTH + (block?.columnStart ?? 0) * COLUMN_WIDTH }}
           >
-            {drawn !== null && <BodyRows table={drawn.table} />}
+            {drawn !== null && (
+              <BodyRows
+                columns={drawn.sent.columns}
+                numbers={drawn.sent.numbers}
+                numeric={numeric.slice(drawn.block.columnStart, drawn.block.columnEnd)}
+              />
+            )}
           </div>
         </div>
       </div>

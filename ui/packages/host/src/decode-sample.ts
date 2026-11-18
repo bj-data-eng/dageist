@@ -4,11 +4,11 @@
  * contract.
  */
 
-import type { ColumnView, IdentityView, TableView } from './contract';
+import type { ColumnView, FiguresView, IdentityView, TableView } from './contract';
 import type { Decode } from './decode';
 import {
-  DecodeError,
   ROOT,
+  readBoolean,
   readCount,
   readField,
   readList,
@@ -21,14 +21,28 @@ const readIdentity: Decode<IdentityView> = readRecord(['name', 'version'], (fiel
   version: readField(fields, path, 'version', readString),
 }));
 
-const readColumn: Decode<ColumnView> = readRecord(['name', 'dataType'], (fields, path) => ({
-  name: readField(fields, path, 'name', readString),
-  dataType: readField(fields, path, 'dataType', readString),
-}));
+const readColumn: Decode<ColumnView> = readRecord(
+  ['name', 'dataType', 'numeric'],
+  (fields, path) => ({
+    name: readField(fields, path, 'name', readString),
+    dataType: readField(fields, path, 'dataType', readString),
+    numeric: readField(fields, path, 'numeric', readBoolean),
+  }),
+);
 
-const readTable: Decode<TableView> = readRecord(['rows', 'columns'], (fields, path) => ({
+const readFigures: Decode<FiguresView> = readRecord(
+  ['rows', 'columns', 'opened'],
+  (fields, path) => ({
+    rows: readField(fields, path, 'rows', readString),
+    columns: readField(fields, path, 'columns', readString),
+    opened: readField(fields, path, 'opened', readString),
+  }),
+);
+
+const readTable: Decode<TableView> = readRecord(['rows', 'columns', 'figures'], (fields, path) => ({
   rows: readField(fields, path, 'rows', readCount),
   columns: readField(fields, path, 'columns', readList(readColumn)),
+  figures: readField(fields, path, 'figures', readFigures),
 }));
 
 /**
@@ -42,23 +56,10 @@ export function decodeIdentity(value: unknown): IdentityView {
 
 /**
  * Reads what the host's `open_sample_window` and `open_sample_result` commands
- * sent: the shape of the table that was opened.
+ * sent: the shape of the table that was opened, with its figures as text.
  *
  * @throws {DecodeError} When it is not a table's shape, saying where and why.
  */
 export function decodeTable(value: unknown): TableView {
   return readTable(value, ROOT);
-}
-
-/**
- * Reads what the host's `table_block` command sent: the bytes of an Arrow IPC
- * stream, which the table viewer decodes itself.
- *
- * @throws {DecodeError} When it is not bytes.
- */
-export function decodeBytes(value: unknown): ArrayBuffer {
-  if (!(value instanceof ArrayBuffer)) {
-    throw new DecodeError(ROOT, 'must be the bytes of an Arrow stream');
-  }
-  return value;
 }
