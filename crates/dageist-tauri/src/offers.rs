@@ -1,11 +1,12 @@
 //! Commands that answer what the step editor may offer: which calls may stand
-//! at a place, which values fit a slot, and what an entry's options may be set
-//! to.
+//! at a place, which values fit a slot, how a text typed into a slot reads,
+//! and what an entry's options may be set to.
 //!
-//! The engine's tables of allowed combinations decide every answer; this
-//! module translates what the engine says into serializable views and the
-//! view's requests into what the engine is asked. The shapes mirror `OffersView`,
-//! `FitsView` and `OptionsView` in `ui/packages/host/src/contract.ts`.
+//! The engine's tables of allowed combinations decide every answer, and the
+//! engine reads every typed text; this module translates what the engine says
+//! into serializable views and the view's requests into what the engine is
+//! asked. The shapes mirror `OffersView`, `FitsView`, `ReadingsView` and
+//! `OptionsView` in `ui/packages/host/src/contract.ts`.
 //!
 //! A request names a place the way the engine's walk reports one: the
 //! positions that hold the expression, outermost first, and what the
@@ -15,9 +16,9 @@
 
 use dageist_engine::allowed::{
     self, After, ArgumentSlot, Candidate, ConditionState, Context, Literal, Nested, Outer, Place,
-    Position, Representative, Shape, Slot,
+    Position, Representative, Shape, Slot, Typed,
 };
-use dageist_engine::catalog::{self, Entry};
+use dageist_engine::catalog::{self, Entry, ValueType};
 use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -220,6 +221,58 @@ pub(crate) struct ChosenOptionRequest {
     word: String,
 }
 
+/// The type of literal a parameter takes, by the word the catalogue gives it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum ValueTypeRequest {
+    Integer,
+    Float,
+    String,
+    Date,
+    Any,
+}
+
+impl From<ValueTypeRequest> for ValueType {
+    fn from(value_type: ValueTypeRequest) -> Self {
+        match value_type {
+            ValueTypeRequest::Integer => Self::Integer,
+            ValueTypeRequest::Float => Self::Float,
+            ValueTypeRequest::String => Self::String,
+            ValueTypeRequest::Date => Self::Date,
+            ValueTypeRequest::Any => Self::Any,
+        }
+    }
+}
+
+/// What a text is typed into: the kinds of parameter that take a typed value,
+/// written as the catalogue writes the kind of a parameter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) enum TypedRequest {
+    /// An expression: a number or text stands in it.
+    Expression,
+    /// A literal of a type.
+    Value {
+        #[serde(rename = "type")]
+        value_type: ValueTypeRequest,
+    },
+    /// A Polars duration string.
+    Duration,
+    /// A file, folder or cloud location.
+    Path,
+}
+
+impl From<TypedRequest> for Typed {
+    fn from(typed: TypedRequest) -> Self {
+        match typed {
+            TypedRequest::Expression => Self::Expression,
+            TypedRequest::Value { value_type } => Self::Value(value_type.into()),
+            TypedRequest::Duration => Self::Duration,
+            TypedRequest::Path => Self::Path,
+        }
+    }
+}
+
 /// A number or text that a call is given.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
@@ -285,6 +338,27 @@ enum FitView {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub(crate) struct FitsView {
     fits: Vec<FitView>,
+}
+
+/// One way a typed text reads.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+enum ReadingView {
+    /// The text reads as this literal, which has this dtype where Polars gives it one, and
+    /// what the tables say of it where a slot was given.
+    Read {
+        literal: LiteralView,
+        dtype: Option<&'static str>,
+        fit: Option<FitView>,
+    },
+    /// The text is not what it was typed into, for this reason.
+    Unread { reason: String },
+}
+
+/// How a text typed into a slot reads, each way in the order the slot offers it.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub(crate) struct ReadingsView {
+    readings: Vec<ReadingView>,
 }
 
 /// One word an option may be set to, and why Polars refuses it, if it does.
@@ -367,19 +441,17 @@ fn candidate_of(request: &CandidateRequest) -> Result<Candidate, String> {
     })
 }
 
-/// What the tables say of each of `candidates` in the slot: as an expression
-/// found by following `start`, and as the argument `argument` names, when they
-/// are given.
-pub fn fits_view(
+/// The slot that an expression found by following `start` and the argument `argument` names
+/// stand in, or `None` where neither is given.
+fn slot_of(
     start: Option<&[PositionRequest]>,
     argument: Option<&ArgumentRequest>,
-    candidates: &[CandidateRequest],
-) -> Result<FitsView, ErrorView> {
+) -> Result<Option<Slot<'static>>, ErrorView> {
     let context = start.map(context_of).transpose()?;
     let place = argument
         .map(|argument| argument.place.place())
         .transpose()?;
-    let slot = match (argument, place) {
+    Ok(match (argument, place) {
         (Some(argument), Some(place)) => {
             let entry = entry_named(&argument.entry)?;
             let parameter = entry
@@ -396,8 +468,31 @@ pub fn fits_view(
             Slot::new(context, Some(ArgumentSlot::new(entry, parameter, place)))
         }
         _ => Slot::new(context, None),
+    })
+}
+
+/// What the tables say of `candidate` in `slot`.
+fn judged(candidate: &Candidate, slot: &Slot<'_>) -> FitView {
+    match allowed::fit(candidate, slot) {
+        Some(found) => FitView::Judged {
+            dtype: found.dtype().name(),
+            verdict: verdict_view(found.verdict()),
+        },
+        None => FitView::Unjudged {
+            reason: "Polars gives the literal no dtype the tables cover".to_owned(),
+        },
     }
-    .ok_or_else(|| {
+}
+
+/// What the tables say of each of `candidates` in the slot: as an expression
+/// found by following `start`, and as the argument `argument` names, when they
+/// are given.
+pub fn fits_view(
+    start: Option<&[PositionRequest]>,
+    argument: Option<&ArgumentRequest>,
+    candidates: &[CandidateRequest],
+) -> Result<FitsView, ErrorView> {
+    let slot = slot_of(start, argument)?.ok_or_else(|| {
         ErrorView::of(
             ErrorKind::UnknownName,
             "a slot is a position of an expression, an argument of a method, or both",
@@ -407,18 +502,38 @@ pub fn fits_view(
         .iter()
         .map(|request| match candidate_of(request) {
             Err(reason) => FitView::Unjudged { reason },
-            Ok(candidate) => match allowed::fit(&candidate, &slot) {
-                Some(found) => FitView::Judged {
-                    dtype: found.dtype().name(),
-                    verdict: verdict_view(found.verdict()),
-                },
-                None => FitView::Unjudged {
-                    reason: "Polars gives the literal no dtype the tables cover".to_owned(),
-                },
-            },
+            Ok(candidate) => judged(&candidate, &slot),
         })
         .collect();
     Ok(FitsView { fits })
+}
+
+/// How `text` reads typed into `typed`, each way the engine reads it, and for each that reads,
+/// what the tables say of it in the slot an expression found by following `start` and the
+/// argument `argument` name, when either is given.
+pub fn read_view(
+    text: &str,
+    typed: TypedRequest,
+    start: Option<&[PositionRequest]>,
+    argument: Option<&ArgumentRequest>,
+) -> Result<ReadingsView, ErrorView> {
+    let slot = slot_of(start, argument)?;
+    let readings = allowed::read_typed(text, typed.into())
+        .into_iter()
+        .map(|reading| match reading {
+            Ok(read) => ReadingView::Read {
+                literal: literal_view(read.literal()),
+                dtype: read.dtype().map(Representative::name),
+                fit: slot
+                    .as_ref()
+                    .map(|slot| judged(&Candidate::Literal(read.literal().clone()), slot)),
+            },
+            Err(unread) => ReadingView::Unread {
+                reason: unread.to_string(),
+            },
+        })
+        .collect();
+    Ok(ReadingsView { readings })
 }
 
 /// The flags and choices of the entry `entry`, each with its default and what
@@ -483,6 +598,18 @@ pub fn candidate_fits(
     candidates: Vec<CandidateRequest>,
 ) -> Result<FitsView, ErrorView> {
     fits_view(start.as_deref(), argument.as_ref(), &candidates)
+}
+
+/// Answers how `text` reads typed into `typed`, and where a slot is given, whether each reading
+/// fits it: an expression that starts where `start` says, the argument `argument` names, or both.
+#[tauri::command(async)]
+pub fn read_typed(
+    text: String,
+    typed: TypedRequest,
+    start: Option<Vec<PositionRequest>>,
+    argument: Option<ArgumentRequest>,
+) -> Result<ReadingsView, ErrorView> {
+    read_view(&text, typed, start.as_deref(), argument.as_ref())
 }
 
 /// Answers what the flags and choices of `entry` may be set to, beside the

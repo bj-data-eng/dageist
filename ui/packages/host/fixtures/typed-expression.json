@@ -1,0 +1,46 @@
+{
+  "readings": [
+    {
+      "kind": "read",
+      "literal": {
+        "kind": "float",
+        "value": 1.5
+      },
+      "dtype": "Float64",
+      "fit": {
+        "kind": "judged",
+        "dtype": "Float64",
+        "verdict": {
+          "kind": "refused",
+          "refusal": {
+            "source": {
+              "by": "polars",
+              "stage": "rows"
+            },
+            "reason": "invalid series dtype: expected `String`, got `f64` for series with name `b`"
+          }
+        }
+      }
+    },
+    {
+      "kind": "read",
+      "literal": {
+        "kind": "text",
+        "value": "1.5"
+      },
+      "dtype": "String",
+      "fit": {
+        "kind": "judged",
+        "dtype": "String",
+        "verdict": {
+          "kind": "allowed",
+          "result": "Datetime(us)",
+          "shape": "many",
+          "ending": {
+            "kind": "allowed"
+          }
+        }
+      }
+    }
+  ]
+}
