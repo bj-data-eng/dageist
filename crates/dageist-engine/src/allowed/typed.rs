@@ -166,6 +166,12 @@ pub fn read_typed(text: &str, typed: Typed) -> Vec<Result<Read, Unread>> {
     }
 }
 
+/// Whether the whole number `value`, either side of zero, is no larger than [`LARGEST_WHOLE_NUMBER`].
+/// The distance from zero is taken unsigned, so that the smallest `i64` is not negated.
+const fn is_exact(value: i64) -> bool {
+    value.unsigned_abs() <= LARGEST_WHOLE_NUMBER.unsigned_abs()
+}
+
 /// The number `text` is, as the document reads one, before it is given a literal.
 fn written(text: &str) -> Result<WrittenNumber, Unread> {
     read_number(text).map_err(|problem| match problem {
@@ -179,9 +185,7 @@ fn written(text: &str) -> Result<WrittenNumber, Unread> {
 /// written exactly, and otherwise a number with a fraction.
 fn number(text: &str) -> Result<Read, Unread> {
     let literal = match written(text)? {
-        WrittenNumber::Integer(value) if value.abs() <= LARGEST_WHOLE_NUMBER => {
-            Literal::Integer(value)
-        }
+        WrittenNumber::Integer(value) if is_exact(value) => Literal::Integer(value),
         WrittenNumber::Integer(value) => Literal::Float(value as f64),
         WrittenNumber::Float(value) | WrittenNumber::Large(value) => Literal::Float(value),
     };
@@ -191,7 +195,7 @@ fn number(text: &str) -> Result<Read, Unread> {
 /// The whole number `text` is, which a number with a fraction or too large is not.
 fn whole_number(text: &str) -> Result<Read, Unread> {
     match written(text)? {
-        WrittenNumber::Integer(value) if value.abs() <= LARGEST_WHOLE_NUMBER => {
+        WrittenNumber::Integer(value) if is_exact(value) => {
             Ok(Read::of_literal(Literal::Integer(value)))
         }
         WrittenNumber::Integer(_) | WrittenNumber::Large(_) => Err(Unread::TooLargeForAWholeNumber),
