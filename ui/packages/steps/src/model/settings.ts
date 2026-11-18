@@ -33,7 +33,8 @@ export type Setting =
   /** Still to be given. It stands for nothing until it is. */
   | { readonly kind: 'unset' }
   | { readonly kind: 'flag'; readonly value: boolean }
-  | { readonly kind: 'number'; readonly value: number }
+  /** A number. `float` is set for one the engine read as a number with a fraction, which stays one though it is whole. */
+  | { readonly kind: 'number'; readonly value: number; readonly float?: true }
   /** Text that was typed: a string, a duration or a path. */
   | { readonly kind: 'text'; readonly value: string }
   /** A name picked from a list: a choice's word, a dtype, a column or a table. */
@@ -42,6 +43,9 @@ export type Setting =
   | { readonly kind: 'list'; readonly items: readonly Setting[] }
   | { readonly kind: 'pairs'; readonly entries: readonly PairSetting[] }
   | { readonly kind: 'each'; readonly items: Readonly<Record<string, Setting>> };
+
+/** A setting that holds a number or text typed in. */
+export type LiteralSetting = Extract<Setting, { readonly kind: 'number' | 'text' }>;
 
 /** The parameters of a method or step that are set, by Python name. */
 export type Options = Readonly<Record<string, Setting>>;
@@ -64,8 +68,9 @@ export function defaultSetting(parameter: ParameterView): Setting | null {
     case 'flag':
       return { kind: 'flag', value: given.value };
     case 'integer':
-    case 'float':
       return { kind: 'number', value: given.value };
+    case 'float':
+      return { kind: 'number', value: given.value, float: true };
     case 'text':
       return parameter.kind.kind === 'choice'
         ? { kind: 'word', value: given.value }

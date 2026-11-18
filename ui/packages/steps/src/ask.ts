@@ -17,6 +17,8 @@ import type {
   NodeView,
   OffersView,
   PlaceRequest,
+  TypedKind,
+  TypedRequest,
 } from '@dageist/host';
 import { HostError } from '@dageist/host';
 
@@ -24,9 +26,8 @@ import { useHost } from './EngineProvider';
 import type { Outcome } from './model/latest';
 import { Latest } from './model/latest';
 import type { Frame } from './model/frame';
-import { candidateKey, prepareFits, prepareOptions } from './model/offers';
-import type { PreparedFit, PreparedOption } from './model/offers';
-import { literalOf, typedValues } from './model/literal';
+import { candidateKey, prepareFits, prepareOptions, prepareReadings } from './model/offers';
+import type { PreparedFit, PreparedOption, PreparedReading } from './model/offers';
 
 /** How long a request is held for the next one, in milliseconds. */
 const ASK_DELAY = 120;
@@ -180,38 +181,50 @@ export function listedCandidates(frame: Frame, node: NodeView): readonly Candida
   return [...found.values()];
 }
 
-/** Returns what typing `typed` writes out, as candidates: a number, and the text. */
-export function typedCandidates(typed: string): readonly CandidateRequest[] {
-  return typedValues(typed).flatMap((value) => {
-    const literal = literalOf(value);
-    return literal === null ? [] : [{ kind: 'literal', literal } satisfies CandidateRequest];
-  });
-}
-
 /** What a list asks about its candidates, and what it was told. */
 export interface CandidateFits {
   /** The fields and the connected inputs, which a list is opened with. */
   readonly listed: Asked<Fits>;
-  /** What was typed into the list, which each change of it asks again. */
-  readonly typed: Asked<Fits>;
 }
 
-/**
- * Asks which of the fields and inputs, and which of what is typed, fit
- * `slot`, while `open` and the slot is known. What is typed is asked apart
- * from the rest, so that typing leaves what the list was opened with as it is.
- */
+/** Asks which of the fields and inputs fit `slot`, while `open` and the slot is known. */
 export function useCandidateFits(
   slot: FitSlot | null,
   open: boolean,
   frame: Frame,
   node: NodeView,
-  typed: string,
 ): CandidateFits {
   const listed = useMemo(() => listedCandidates(frame, node), [frame, node]);
-  const typedAsked = useMemo(() => typedCandidates(typed), [typed]);
-  return {
-    listed: useFitsOf(open ? slot : null, listed),
-    typed: useFitsOf(open ? slot : null, typedAsked),
-  };
+  return { listed: useFitsOf(open ? slot : null, listed) };
+}
+
+/** What a text typed into a list is asked about: what it is typed into, and where it would stand. */
+export interface TypedAsk {
+  /** What is typed into the list's search box. */
+  readonly text: string;
+  /** What the list takes: an expression, or a literal of a kind. */
+  readonly typed: TypedKind;
+  /** Where the readings would be given, or `null` where it is only the text that is read. */
+  readonly slot: FitSlot | null;
+}
+
+/**
+ * Asks the engine how `ask.text` reads as what it is typed into, while it
+ * is not `null` and something is typed. The engine says which literals the
+ * text is and their dtypes, or why it is not what is wanted; nothing here
+ * works that out.
+ */
+export function useReadTyped(ask: TypedAsk | null): Asked<readonly PreparedReading[]> {
+  const request: TypedRequest | null =
+    ask === null || ask.text === ''
+      ? null
+      : {
+          text: ask.text,
+          typed: ask.typed,
+          start: ask.slot?.start ?? null,
+          argument: ask.slot?.argument ?? null,
+        };
+  return useAsk<TypedRequest, readonly PreparedReading[]>(request, async (host, asked) =>
+    prepareReadings(await host.readTyped(asked), asked.start !== null),
+  );
 }

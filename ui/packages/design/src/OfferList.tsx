@@ -103,8 +103,10 @@ export function OfferList({
   const [typed, setTyped] = useState('');
   /** The row the keyboard is on, or `null` for the first one Enter is meant for. */
   const [marked, setMarked] = useState<string | null>(null);
-  // Where each row stood when the list opened or was last searched. The rows keep those places
-  // while rows are ticked, so the row under the pointer does not move away from it.
+  // Where each row stood when the list opened or was last searched. A list that stays open
+  // keeps those places while rows are ticked, so the row under the pointer does not move away
+  // from it. A list that closes at a pick has no ticks, and shows its rows in the order it is
+  // given them, so a row that arrives later, as an answer does, takes its place among the rest.
   const [places, setPlaces] = useState(() => placesOf(groups('')));
   const search = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
@@ -118,7 +120,7 @@ export function OfferList({
       const offers = [...group.offers];
       const placeOf = (offer: Offer): number =>
         places.get(keyOf(group, offer)) ?? Number.MAX_SAFE_INTEGER;
-      offers.sort((left, right) => placeOf(left) - placeOf(right));
+      if (keepOpen) offers.sort((left, right) => placeOf(left) - placeOf(right));
       return { ...group, offers };
     });
   const pickable = shown.flatMap((group) => group.offers).filter((offer) => offer.reason === null);

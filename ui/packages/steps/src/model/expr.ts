@@ -10,6 +10,7 @@ import type { DefaultArgumentView, ParameterView } from '@dageist/host';
 
 import type { Catalogue } from './catalogue';
 import { argumentOf, methodEntry } from './catalogue';
+import { literalValue } from './literal';
 import type { Options } from './settings';
 import { optionParameters } from './settings';
 import type { Value } from './source';
@@ -77,7 +78,7 @@ export function startingArgument(
   const rule = argumentRule(catalogue, name);
   if (rule === null) return null;
   if (offered === null || offered.parameter !== rule.parameter.name) return { kind: 'unset' };
-  return { kind: 'literal', value: offered.literal.value };
+  return literalValue(offered.literal);
 }
 
 /**

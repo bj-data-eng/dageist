@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import type { CandidateRequest, FitsView, LiteralView, OfferPlaceView } from '@dageist/host';
-import { decodeCatalogue, decodeFits, decodeOffers, decodeOptions } from '@dageist/host';
+import {
+  decodeCatalogue,
+  decodeFits,
+  decodeOffers,
+  decodeOptions,
+  decodeReadings,
+} from '@dageist/host';
 
 import catalogueFixture from '../../../host/fixtures/catalogue.json';
 import fitsArgumentFixture from '../../../host/fixtures/fits-argument.json';
@@ -10,9 +16,20 @@ import offersConditionFixture from '../../../host/fixtures/offers-condition.json
 import offersStartFixture from '../../../host/fixtures/offers-start.json';
 import offersValueFixture from '../../../host/fixtures/offers-value.json';
 import optionsFixture from '../../../host/fixtures/options.json';
+import typedDateFixture from '../../../host/fixtures/typed-date.json';
+import typedExpressionFixture from '../../../host/fixtures/typed-expression.json';
+import typedUnreadFixture from '../../../host/fixtures/typed-unread.json';
+import typedWholeFixture from '../../../host/fixtures/typed-whole.json';
+import { replaced } from '../../../host/test-support/tamper';
 import { indexCatalogue } from './catalogue';
-import { candidateKey, chosenOptions, prepareFits, prepareOffers, prepareOptions } from './offers';
-import { literalOf, numberTyped, typedValues } from './literal';
+import {
+  candidateKey,
+  chosenOptions,
+  prepareFits,
+  prepareOffers,
+  prepareOptions,
+  prepareReadings,
+} from './offers';
 import { NO_POSITIONS, placeRequest, positionsOf, startRequest, within } from './place';
 
 // The catalogue and the answers the host writes from the engine, as the editor gets them.
@@ -237,23 +254,71 @@ describe('where a slot stands', () => {
   });
 });
 
-describe('a number or text typed in', () => {
-  it('is written as the document writes it, a whole number as an integer and any other as a float', () => {
-    expect(literalOf(1)).toEqual({ kind: 'integer', value: 1 });
-    expect(literalOf(1.5)).toEqual({ kind: 'float', value: 1.5 });
-    expect(literalOf(2 ** 60)).toEqual({ kind: 'float', value: 2 ** 60 });
-    expect(literalOf('x')).toEqual({ kind: 'text', value: 'x' });
-    expect(literalOf(null)).toBeNull();
+describe('how the engine read a typed text', () => {
+  // `1.5` typed into the argument of `dt.offset_by`, where the engine allows text and not a number.
+  const asArgument = decodeReadings(typedExpressionFixture);
+
+  it('gives each reading the literal and the dtype the engine gave it', () => {
+    const [number, text] = prepareReadings(asArgument, false);
+    expect(number).toMatchObject({ kind: 'read', literal: { kind: 'float', value: 1.5 } });
+    expect(number).toMatchObject({ dtype: 'Float64' });
+    expect(text).toEqual({
+      kind: 'read',
+      literal: { kind: 'text', value: '1.5' },
+      dtype: 'String',
+      reason: null,
+      ends: null,
+    });
   });
 
-  it('is a number when it is written as one, with or without a fraction', () => {
-    expect(numberTyped('12')).toBe(12);
-    expect(numberTyped(' -1.5 ')).toBe(-1.5);
-    expect(numberTyped('1.')).toBeNull();
-    expect(numberTyped('1e3')).toBeNull();
-    expect(numberTyped('abc')).toBeNull();
-    expect(typedValues('1.5')).toEqual([1.5, '1.5']);
-    expect(typedValues('hi')).toEqual(['hi']);
-    expect(typedValues('')).toEqual([]);
+  it('refuses a reading the tables refuse, with the engine’s reason', () => {
+    const [number] = prepareReadings(asArgument, false);
+    expect(number?.kind === 'read' ? number.reason : null).toContain('expected `String`');
+  });
+
+  it('says whether a chain may end at a reading only where it stands as the start of one', () => {
+    const [, text] = prepareReadings(asArgument, true);
+    expect(text).toMatchObject({ kind: 'read', ends: { kind: 'allowed' } });
+  });
+
+  it('judges nothing of a reading where no slot was asked about', () => {
+    expect(prepareReadings(decodeReadings(typedWholeFixture), true)).toEqual([
+      {
+        kind: 'read',
+        literal: { kind: 'integer', value: 12 },
+        dtype: 'Int32',
+        reason: null,
+        ends: null,
+      },
+    ]);
+  });
+
+  it('gives a date as the day the engine read, with the dtype it gave', () => {
+    expect(prepareReadings(decodeReadings(typedDateFixture), false)).toEqual([
+      {
+        kind: 'read',
+        literal: { kind: 'text', value: '2026-03-10' },
+        dtype: 'Date',
+        reason: null,
+        ends: null,
+      },
+    ]);
+  });
+
+  it('gives the first line of why a text is not what it was typed into', () => {
+    const [unread] = prepareReadings(decodeReadings(typedUnreadFixture), false);
+    expect(unread).toEqual({
+      kind: 'unread',
+      reason:
+        "unit: 'x' not supported; available units are: 'y', 'mo', 'q', 'w', 'd', 'h', 'm', 's', 'ms', 'us', 'ns'",
+    });
+    const longer = decodeReadings(
+      replaced(typedUnreadFixture, ['readings', 0, 'reason'], 'not a date\nPolars says more here'),
+    );
+    expect(prepareReadings(longer, false)).toEqual([{ kind: 'unread', reason: 'not a date' }]);
+  });
+
+  it('has nothing to say of a text that reads as nothing', () => {
+    expect(prepareReadings({ readings: [] }, false)).toEqual([]);
   });
 });

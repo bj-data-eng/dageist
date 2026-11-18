@@ -1,41 +1,73 @@
 /**
- * @file A number or text typed in, as the step document writes it, so that the
- * engine can be asked its dtype. The dtype is the engine's to decide: a whole
- * number and a number with a fraction are not the same, and neither is
- * assumed to be anything here.
+ * @file A number or text the engine read from what was typed, as the editor
+ * holds it and shows it. The engine decides what a text is and which dtype it
+ * has; what is here only carries that answer into a value of a chain or the
+ * setting of a parameter, and writes it out in words.
  */
 
 import type { LiteralView } from '@dageist/host';
 
-import type { Cell } from './source';
+import type { LiteralSetting } from './settings';
+import type { LiteralValue } from './source';
 
 /**
- * Returns what a value written out is, as the document writes it: a whole
- * number that is safe to write as one is an integer, any other number is a
- * float, and text is text. `null` is nothing, which the document cannot hold.
+ * Returns the value of a chain that holds `literal`. A number the engine
+ * read with a fraction stays one though it is whole, so that it is written as
+ * one and has the dtype the engine said it has.
  */
-export function literalOf(value: Cell): LiteralView | null {
-  if (value === null) return null;
-  if (typeof value === 'string') return { kind: 'text', value };
-  return Number.isSafeInteger(value) ? { kind: 'integer', value } : { kind: 'float', value };
+export function literalValue(literal: LiteralView): LiteralValue {
+  switch (literal.kind) {
+    case 'integer':
+    case 'text':
+      return { kind: 'literal', value: literal.value };
+    case 'float':
+      return { kind: 'literal', value: literal.value, float: true };
+    default:
+      return literal satisfies never;
+  }
 }
 
-/** Matches a number written as digits, with a fraction if it has one. */
-const NUMBER = /^-?\d+(\.\d+)?$/u;
+/** Returns the setting of a parameter that holds `literal`, which keeps a float a float as a chain's value does. */
+export function literalSetting(literal: LiteralView): LiteralSetting {
+  switch (literal.kind) {
+    case 'integer':
+      return { kind: 'number', value: literal.value };
+    case 'float':
+      return { kind: 'number', value: literal.value, float: true };
+    case 'text':
+      return { kind: 'text', value: literal.value };
+    default:
+      return literal satisfies never;
+  }
+}
 
 /**
- * Returns the number that `typed` writes out, or `null` when it is not a
- * number. Writing a number is typing, not a rule of a dtype.
+ * Returns `literal` as it is shown: text as it is, and a number as digits,
+ * a whole float with the fraction it was read with, so that it is not taken
+ * for a whole number.
  */
-export function numberTyped(typed: string): number | null {
-  const text = typed.trim();
-  if (!NUMBER.test(text)) return null;
-  const value = Number(text);
-  return Number.isFinite(value) ? value : null;
+export function literalWords(literal: LiteralView): string {
+  switch (literal.kind) {
+    case 'text':
+      return literal.value;
+    case 'integer':
+      return String(literal.value);
+    case 'float':
+      return Number.isInteger(literal.value) && Math.abs(literal.value) < 1e21
+        ? `${String(literal.value)}.0`
+        : String(literal.value);
+    default:
+      return literal satisfies never;
+  }
 }
 
-/** Returns what typing `typed` into a list can give: a number it writes out, and the text itself. */
-export function typedValues(typed: string): readonly Cell[] {
-  const number = numberTyped(typed);
-  return [...(number === null ? [] : [number]), ...(typed === '' ? [] : [typed])];
+/**
+ * Returns the number or text a chain's literal holds as it is shown, or
+ * `null` for nothing. A number the engine read with a fraction is shown with
+ * it, as `literalWords` shows it.
+ */
+export function valueWords(value: LiteralValue): string | null {
+  if (value.value === null) return null;
+  if (typeof value.value === 'string') return value.value;
+  return literalWords({ kind: value.float === true ? 'float' : 'integer', value: value.value });
 }

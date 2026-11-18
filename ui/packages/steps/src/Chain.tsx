@@ -17,10 +17,10 @@ import { isSortable, useSortable } from '@dnd-kit/react/sortable';
 import { createContext, useCallback, useContext, useState } from 'react';
 
 import type { Look, OfferGroup, Tone } from '@dageist/design';
-import type { OfferPlaceView } from '@dageist/host';
+import type { LiteralView, OfferPlaceView } from '@dageist/host';
 import { Hint, OfferList, Piece, Popover, Seam, Slot, Word } from '@dageist/design';
 
-import { useCandidateFits, useOffers, useOptions } from './ask';
+import { useCandidateFits, useOffers, useOptions, useReadTyped } from './ask';
 import type { FitSlot } from './ask';
 import { useCatalogue, useNode } from './EngineProvider';
 import { fieldGroup, inputGroup, methodGroups, startFunctions, valueGroup } from './engineLists';
@@ -56,7 +56,8 @@ import { chosenOptions } from './model/offers';
 import type { PreparedOffer } from './model/offers';
 import { placeRequest, startRequest, within } from './model/place';
 import { NO_OPTIONS, carriedOptions } from './model/settings';
-import type { Arm, Cell, Chain, Source, Value } from './model/source';
+import { literalValue, valueWords } from './model/literal';
+import type { Arm, Chain, Source, Value } from './model/source';
 import type { ChainDtypes } from './model/report';
 import { usePreparedStep } from './engine';
 
@@ -153,11 +154,15 @@ function shownArgument(
       return { label: argument.name, tone: 'input', look: 'plain' };
     case 'chain':
       return { label: '…', tone: 'function', look: 'plain' };
-    case 'literal':
-      if (argument.value === null) return { label: 'None', tone: 'value', look: 'none' };
-      return typeof argument.value === 'number'
-        ? { label: String(argument.value), tone: 'value', look: 'plain' }
-        : { label: argument.value, tone: 'value', look: 'quoted' };
+    case 'literal': {
+      const words = valueWords(argument);
+      if (words === null) return { label: 'None', tone: 'value', look: 'none' };
+      return {
+        label: words,
+        tone: 'value',
+        look: typeof argument.value === 'number' ? 'plain' : 'quoted',
+      };
+    }
     default:
       return assertNever(argument);
   }
@@ -199,16 +204,20 @@ function ArgumentSlot({
               ? null
               : { entry: entryId, parameter: rule.parameter.name, place: placeRequest(place) },
         };
-  const fits = useCandidateFits(slot, list.open, frame, node, list.typed);
+  const fits = useCandidateFits(slot, list.open, frame, node);
+  const readings = useReadTyped(
+    list.open ? { text: list.typed, typed: { kind: 'expression' }, slot } : null,
+  );
   const offers = (typed: string): OfferGroup[] => {
     const rows = {
       frame,
       node,
       typed,
       fits,
+      readings,
       inputs: ['value', 'list'] as const,
-      onLiteral: (value: Cell) => {
-        onCommit({ kind: 'literal', value });
+      onLiteral: (picked: LiteralView) => {
+        onCommit(literalValue(picked));
       },
       onInput: (name: string) => {
         onCommit({ kind: 'input', name });
@@ -515,7 +524,6 @@ export function ChainBlocks({
     startList.open,
     frame,
     node,
-    '',
   );
 
   // Each chain sorts its own methods, so a method cannot leave its chain.
@@ -635,7 +643,6 @@ export function ChainBlocks({
                     typed,
                     fits: startFits,
                     inputs: ['value', 'list'] as const,
-                    onLiteral: () => undefined,
                     onInput: (name: string) => {
                       withSource({ kind: 'input', name });
                     },

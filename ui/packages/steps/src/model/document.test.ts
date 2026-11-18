@@ -127,6 +127,13 @@ describe('a step of the editor', () => {
       value: { float: 1.5 },
     });
   });
+
+  it('writes a whole number the engine read with a fraction as a float', () => {
+    // `1.0` typed is a `Float64` to the engine, and what is written is what it said.
+    expect(startOfColumnHolding({ kind: 'literal', value: 1, float: true })).toEqual({
+      value: { float: 1 },
+    });
+  });
 });
 
 describe('what the document cannot hold', () => {

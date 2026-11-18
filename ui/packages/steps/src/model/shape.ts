@@ -19,6 +19,11 @@ function everyItem(items: unknown, holds: (item: unknown) => boolean): boolean {
   return Array.isArray(items) && items.every((item: unknown) => holds(item));
 }
 
+/** Reports whether `value` is what a number carries to say it was read as one with a fraction: nothing, or `true`. */
+function isMarkedFloat(value: unknown): boolean {
+  return value === undefined || value === true;
+}
+
 function isCell(value: unknown): boolean {
   return value === null || typeof value === 'string' || typeof value === 'number';
 }
@@ -41,7 +46,11 @@ export function isSetting(value: unknown): value is Setting {
     case 'flag':
       return typeof value.value === 'boolean';
     case 'number':
-      return typeof value.value === 'number' && Number.isFinite(value.value);
+      return (
+        typeof value.value === 'number' &&
+        Number.isFinite(value.value) &&
+        isMarkedFloat(value.float)
+      );
     case 'text':
     case 'word':
       return typeof value.value === 'string';
@@ -70,7 +79,7 @@ export function isValue(value: unknown): value is Value {
     case 'column':
       return typeof value.column === 'string';
     case 'literal':
-      return isCell(value.value);
+      return isCell(value.value) && isMarkedFloat(value.float);
     case 'chain':
       return typeof value.id === 'string' && isChain(value.chain);
     case 'input':
