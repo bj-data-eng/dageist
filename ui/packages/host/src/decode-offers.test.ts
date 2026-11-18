@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
 import { DecodeError } from './decode';
-import { decodeFits, decodeOffers, decodeOptions } from './decode-offers';
+import { decodeFits, decodeOffers, decodeOptions, decodeReadings } from './decode-offers';
 import fitsArgumentFixture from '../fixtures/fits-argument.json';
 import fitsStartFixture from '../fixtures/fits-start.json';
 import offersConditionFixture from '../fixtures/offers-condition.json';
 import offersStartFixture from '../fixtures/offers-start.json';
 import offersValueFixture from '../fixtures/offers-value.json';
 import optionsFixture from '../fixtures/options.json';
+import typedDateFixture from '../fixtures/typed-date.json';
+import typedExpressionFixture from '../fixtures/typed-expression.json';
+import typedUnreadFixture from '../fixtures/typed-unread.json';
+import typedWholeFixture from '../fixtures/typed-whole.json';
 import { replaced, withField, without } from '../test-support/tamper';
 
 // The fixtures are written from Rust by the host's snapshot test. They are read as `unknown`,
@@ -18,6 +22,10 @@ const offersCondition: unknown = offersConditionFixture;
 const fitsStart: unknown = fitsStartFixture;
 const fitsArgument: unknown = fitsArgumentFixture;
 const options: unknown = optionsFixture;
+const typedExpression: unknown = typedExpressionFixture;
+const typedWhole: unknown = typedWholeFixture;
+const typedDate: unknown = typedDateFixture;
+const typedUnread: unknown = typedUnreadFixture;
 
 /** What decoding `value` with `decode` was refused with. */
 function refusal(decode: (value: unknown) => unknown, value: unknown): DecodeError {
@@ -185,6 +193,73 @@ describe('the fits of candidates for a slot', () => {
     );
     expect(refusal(decodeFits, without(fitsStart, ['fits', 7], 'reason')).message).toBe(
       '$.fits[7]: is missing the field "reason"',
+    );
+  });
+});
+
+describe('the readings of a typed text', () => {
+  it('give each literal the text reads as, with the dtype the engine gave it', () => {
+    // `1.5` typed into the argument of `dt.offset_by`: a number with a fraction, and the text.
+    const [number, text] = decodeReadings(typedExpression).readings;
+    expect(number).toMatchObject({
+      kind: 'read',
+      literal: { kind: 'float', value: 1.5 },
+      dtype: 'Float64',
+    });
+    expect(text).toMatchObject({
+      kind: 'read',
+      literal: { kind: 'text', value: '1.5' },
+      dtype: 'String',
+    });
+  });
+
+  it('say what the tables allow of each reading in the slot that was asked about', () => {
+    // `dt.offset_by` takes a duration as text: the number is refused when Polars runs rows.
+    const [number, text] = decodeReadings(typedExpression).readings;
+    expect(number).toMatchObject({
+      fit: {
+        kind: 'judged',
+        dtype: 'Float64',
+        verdict: { kind: 'refused', refusal: { source: { by: 'polars', stage: 'rows' } } },
+      },
+    });
+    expect(text).toMatchObject({
+      fit: { kind: 'judged', dtype: 'String', verdict: { kind: 'allowed' } },
+    });
+  });
+
+  it('say nothing of the slot where none was asked about', () => {
+    expect(decodeReadings(typedWhole).readings).toEqual([
+      { kind: 'read', literal: { kind: 'integer', value: 12 }, dtype: 'Int32', fit: null },
+    ]);
+  });
+
+  it('give a date as the day Polars read, which has the dtype Date', () => {
+    // `10-03-2026` is a day, month and year; the day is carried as its ISO text.
+    expect(decodeReadings(typedDate).readings).toEqual([
+      { kind: 'read', literal: { kind: 'text', value: '2026-03-10' }, dtype: 'Date', fit: null },
+    ]);
+  });
+
+  it('give the reason a text is not what it was typed into', () => {
+    const [reading] = decodeReadings(typedUnread).readings;
+    expect(reading?.kind).toBe('unread');
+    expect(reading?.kind === 'unread' ? reading.reason : '').toContain('unit');
+  });
+
+  it('are refused with the place of what is wrong', () => {
+    expect(
+      refusal(decodeReadings, replaced(typedExpression, ['readings', 0, 'kind'], 'maybe')).message,
+    ).toBe('$.readings[0].kind: must be one of "read", "unread", not "maybe"');
+    expect(refusal(decodeReadings, without(typedWhole, ['readings', 0], 'dtype')).message).toBe(
+      '$.readings[0]: is missing the field "dtype"',
+    );
+    expect(
+      refusal(decodeReadings, replaced(typedWhole, ['readings', 0, 'literal', 'value'], 1.5))
+        .message,
+    ).toBe('$.readings[0].literal.value: must be a whole number, not 1.5');
+    expect(refusal(decodeReadings, withField(typedUnread, [], 'extra', 1)).message).toBe(
+      '$: has the field "extra", which the contract lacks',
     );
   });
 });
