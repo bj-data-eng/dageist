@@ -691,6 +691,22 @@ fn an_option_says_which_word_it_starts_with_when_it_is_added() {
     // `how` is judged against the other options and not its own word: its default is `inner`,
     // and `left` is the next word Polars lists.
     assert_eq!(starter("how"), "left");
+    // An option that cannot be added says why, with the refusal of its first other word, which
+    // Polars gives for `m:1` beside a cross join; one that can has no reason it cannot.
+    let stuck = |name: &str| {
+        answer["options"]
+            .as_array()
+            .expect("options")
+            .iter()
+            .find(|option| option["parameter"] == name)
+            .unwrap_or_else(|| panic!("no option {name}"))["stuck"]
+            .clone()
+    };
+    assert_eq!(
+        stuck("validate")["source"],
+        json!({ "by": "polars", "stage": "schema" })
+    );
+    assert!(stuck("how").is_null());
 }
 
 /// The names `texts` as the strings a request holds.
@@ -714,7 +730,15 @@ fn every_step_of_the_list_starts_with_what_the_engine_gives_it() {
     assert_eq!(
         answer,
         json!({ "starts": [
-            { "entry": "LazyFrame.filter", "arguments": [argument("predicates", unset_list())] },
+            { "entry": "LazyFrame.filter", "arguments": [argument("predicates", json!({
+                "kind": "list",
+                "items": [{
+                    "kind": "comparison",
+                    "entry": "Expr.eq",
+                    "field": { "kind": "unset" },
+                    "other": { "kind": "unset" },
+                }],
+            }))] },
             { "entry": "LazyFrame.join", "arguments": [
                 argument("other", json!({ "kind": "word", "value": "step_names" })),
                 argument("left_on", unset_list()),
