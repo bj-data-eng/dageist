@@ -12,7 +12,7 @@ use std::io::Cursor;
 use std::path::PathBuf;
 
 use dageist_engine::document::{Document, Inputs, StepId};
-use dageist_engine::{ParquetTable, Table};
+use dageist_engine::{Block, ParquetTable, Table};
 use polars::prelude::*;
 
 /// The directory a test's Parquet file is written in, removed afterwards.
@@ -192,8 +192,8 @@ fn write_table(folder: &Folder) -> DataFrame {
     frame
 }
 
-fn read_ipc(bytes: Vec<u8>) -> DataFrame {
-    IpcStreamReader::new(Cursor::new(bytes))
+fn read_ipc(block: Block) -> DataFrame {
+    IpcStreamReader::new(Cursor::new(block.into_ipc()))
         .finish()
         .expect("the bytes are an Arrow IPC stream")
 }
@@ -260,11 +260,11 @@ fn blocks(folder: &Folder) -> [(&'static str, DataFrame); 2] {
     [
         (
             "a working window",
-            read_ipc(window.block_ipc(0, 4, &[]).expect("the window's block")),
+            read_ipc(window.block(0, 4, &[]).expect("the window's block")),
         ),
         (
             "a stored result",
-            read_ipc(stored.block_ipc(0, 4, &[]).expect("the stored block")),
+            read_ipc(stored.block(0, 4, &[]).expect("the stored block")),
         ),
     ]
 }
@@ -438,7 +438,7 @@ fn a_block_of_a_selection_holds_only_the_columns_asked_for_as_text() {
     let window = Table::load_keys(&folder.path, "key", 4).expect("the window loads");
     let asked = ["datetime".to_owned(), "int8".to_owned()];
 
-    let block = read_ipc(window.block_ipc(1, 2, &asked).expect("the block"));
+    let block = read_ipc(window.block(1, 2, &asked).expect("the block"));
 
     let names: Vec<&str> = block
         .get_column_names()
@@ -475,6 +475,41 @@ fn a_column_is_numeric_where_it_holds_numbers() {
                 "{} in {served}",
                 column.name
             );
+        }
+    }
+}
+
+#[test]
+fn a_block_knows_how_many_rows_and_columns_it_holds() {
+    let folder = Folder::new("counts");
+    let written = write_table(&folder);
+    let window = Table::load_keys(&folder.path, "key", 4).expect("the window loads");
+    let stored = ParquetTable::open(&folder.path).expect("the table opens");
+    let asked = ["datetime".to_owned(), "int8".to_owned()];
+    let all = written.width();
+
+    // Each case is the rows and the columns that were asked for and the rows and columns
+    // the block holds: the table has four rows, so a block that runs past them is shorter.
+    let cases = [
+        (1, 2, &asked[..], 2, 2),
+        (2, 10, &asked[..], 2, 2),
+        (0, 4, &[][..], 4, all),
+        (4, 3, &asked[..], 0, 2),
+        (9, 3, &asked[..], 0, 2),
+    ];
+    for (offset, length, columns, rows, width) in cases {
+        for (served, block) in [
+            ("a working window", window.block(offset, length, columns)),
+            ("a stored result", stored.block(offset, length, columns)),
+        ] {
+            let block = block.expect("the block");
+            assert_eq!(block.rows(), rows, "rows of {offset}+{length} in {served}");
+            assert_eq!(
+                block.columns(),
+                width,
+                "columns of {offset}+{length} in {served}"
+            );
+            assert_eq!(read_ipc(block).height(), rows, "{served}");
         }
     }
 }

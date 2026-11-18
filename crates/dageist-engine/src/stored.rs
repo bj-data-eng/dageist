@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use polars::prelude::*;
 
-use crate::block::{ColumnInfo, check_columns, column_infos, slice_bounds, write_ipc};
+use crate::block::{Block, ColumnInfo, check_columns, column_infos, slice_bounds, write_block};
 use crate::error::EngineError;
 
 /// A table kept in Parquet files, however large.
@@ -60,8 +60,8 @@ impl ParquetTable {
     }
 
     /// Reads `length` rows starting at `offset`, limited to `columns`, and
-    /// returns them as an Arrow IPC stream of text: every cell is written as
-    /// Polars writes the value, as in a preview, and a null is a missing cell.
+    /// returns them as a [`Block`] of text: every cell is written as Polars
+    /// writes the value, as in a preview, and a null is a missing cell.
     ///
     /// Rows past the end are left out, so the result can hold fewer rows than
     /// asked for. An empty `columns` selects every column.
@@ -70,12 +70,12 @@ impl ParquetTable {
     ///
     /// Returns an error when a named column does not exist or is named twice,
     /// or when the files cannot be read.
-    pub fn block_ipc(
+    pub fn block(
         &self,
         offset: usize,
         length: usize,
         columns: &[String],
-    ) -> Result<Vec<u8>, EngineError> {
+    ) -> Result<Block, EngineError> {
         check_columns(columns, &self.columns)?;
         let (offset, length) = slice_bounds(offset, length)?;
         let reading = |source| EngineError::polars("reading the block", source);
@@ -88,7 +88,7 @@ impl ParquetTable {
                     .collect::<Vec<_>>(),
             );
         }
-        write_ipc(&frame.slice(offset, length).collect().map_err(reading)?)
+        write_block(&frame.slice(offset, length).collect().map_err(reading)?)
     }
 }
 

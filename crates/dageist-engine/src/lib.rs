@@ -30,7 +30,7 @@ mod stored;
 mod table;
 mod text;
 
-pub use block::ColumnInfo;
+pub use block::{Block, ColumnInfo};
 pub use error::EngineError;
 pub use sample::{SampleSpec, claims_generated, generate_claims};
 pub use startup::PolarsSession;

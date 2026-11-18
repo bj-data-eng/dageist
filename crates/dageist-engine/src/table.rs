@@ -4,7 +4,7 @@ use std::path::Path;
 
 use polars::prelude::*;
 
-use crate::block::{ColumnInfo, check_columns, column_infos, slice_bounds, write_ipc};
+use crate::block::{Block, ColumnInfo, check_columns, column_infos, slice_bounds, write_block};
 use crate::error::EngineError;
 
 /// Rows of a table held in memory so that blocks can be served instantly.
@@ -67,9 +67,9 @@ impl Table {
         &self.columns
     }
 
-    /// Returns `length` rows starting at `offset`, limited to `columns`, as an
-    /// Arrow IPC stream of text: every cell is written as Polars writes the value,
-    /// as in a preview, and a null is a missing cell.
+    /// Returns `length` rows starting at `offset`, limited to `columns`, as a
+    /// [`Block`] of text: every cell is written as Polars writes the value, as in
+    /// a preview, and a null is a missing cell.
     ///
     /// Rows past the end are left out, so the result can hold fewer rows than
     /// asked for. An empty `columns` selects every column.
@@ -78,12 +78,12 @@ impl Table {
     ///
     /// Returns an error when a named column does not exist or is named twice,
     /// or when the block cannot be written.
-    pub fn block_ipc(
+    pub fn block(
         &self,
         offset: usize,
         length: usize,
         columns: &[String],
-    ) -> Result<Vec<u8>, EngineError> {
+    ) -> Result<Block, EngineError> {
         check_columns(columns, &self.columns)?;
         let selected = if columns.is_empty() {
             self.frame.clone()
@@ -93,6 +93,6 @@ impl Table {
                 .map_err(|source| EngineError::polars("selecting block columns", source))?
         };
         let (offset, _) = slice_bounds(offset, length)?;
-        write_ipc(&selected.slice(offset, length))
+        write_block(&selected.slice(offset, length))
     }
 }

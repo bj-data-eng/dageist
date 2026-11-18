@@ -63,6 +63,46 @@ pub(crate) fn slice_bounds(offset: usize, length: usize) -> Result<(i64, IdxSize
     Ok((offset, IdxSize::try_from(length).unwrap_or(IdxSize::MAX)))
 }
 
+/// A block of a table: the rows asked for, limited to the columns asked for, as an
+/// Arrow IPC stream whose cells are all text.
+///
+/// It knows how many rows and columns it holds, which can be fewer rows than were
+/// asked for where the table ends.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Block {
+    ipc: Vec<u8>,
+    rows: usize,
+    columns: usize,
+}
+
+impl Block {
+    /// Returns the number of rows in the block.
+    #[must_use]
+    pub const fn rows(&self) -> usize {
+        self.rows
+    }
+
+    /// Returns the number of columns in the block.
+    #[must_use]
+    pub const fn columns(&self) -> usize {
+        self.columns
+    }
+
+    /// Returns the block as the bytes of an Arrow IPC stream. Every column is
+    /// text: each cell is written as Polars writes the value, as in a preview,
+    /// and a null is a missing cell.
+    #[must_use]
+    pub fn ipc(&self) -> &[u8] {
+        &self.ipc
+    }
+
+    /// Returns the bytes of the Arrow IPC stream, which [`Block::ipc`] describes.
+    #[must_use]
+    pub fn into_ipc(self) -> Vec<u8> {
+        self.ipc
+    }
+}
+
 /// A column of `frame` written as text: a string column as it is, any other
 /// cell by Polars' own text for the value, and a null left null.
 fn text_column(column: &Column) -> PolarsResult<Column> {
@@ -75,8 +115,8 @@ fn text_column(column: &Column) -> PolarsResult<Column> {
     Ok(Column::new(column.name().clone(), cells))
 }
 
-/// Encodes `frame` as an Arrow IPC stream of text columns.
-pub(crate) fn write_ipc(frame: &DataFrame) -> Result<Vec<u8>, EngineError> {
+/// Encodes `frame` as a block: an Arrow IPC stream of text columns.
+pub(crate) fn write_block(frame: &DataFrame) -> Result<Block, EngineError> {
     let writing = |source| EngineError::polars("writing the block", source);
     let mut text = DataFrame::new(
         frame.height(),
@@ -92,5 +132,9 @@ pub(crate) fn write_ipc(frame: &DataFrame) -> Result<Vec<u8>, EngineError> {
     IpcStreamWriter::new(&mut bytes)
         .finish(&mut text)
         .map_err(writing)?;
-    Ok(bytes)
+    Ok(Block {
+        ipc: bytes,
+        rows: text.height(),
+        columns: text.width(),
+    })
 }

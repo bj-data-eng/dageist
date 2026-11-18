@@ -65,7 +65,8 @@ fn main() -> Result<(), EngineError> {
     let mut bytes = 0;
     for round in 0..rounds {
         bytes = table
-            .block_ipc(middle + round, VISIBLE_ROWS, &visible)?
+            .block(middle + round, VISIBLE_ROWS, &visible)?
+            .ipc()
             .len();
     }
     println!(
@@ -74,10 +75,10 @@ fn main() -> Result<(), EngineError> {
     );
 
     let started = Instant::now();
-    let everything = table.block_ipc(0, table.height(), &[])?;
+    let everything = table.block(0, table.height(), &[])?;
     println!(
         "served the whole window as Arrow: {:.1} MB in {:.1?}",
-        everything.len() as f64 / 1_048_576.0,
+        everything.ipc().len() as f64 / 1_048_576.0,
         started.elapsed()
     );
 
@@ -97,7 +98,8 @@ fn main() -> Result<(), EngineError> {
         let rounds = 20;
         for round in 0..rounds {
             bytes = stored
-                .block_ipc(offset.saturating_sub(round), VISIBLE_ROWS, &visible)?
+                .block(offset.saturating_sub(round), VISIBLE_ROWS, &visible)?
+                .ipc()
                 .len();
         }
         println!(
