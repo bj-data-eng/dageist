@@ -140,9 +140,11 @@ cargo clippy --offline --locked -p dageist-tauri --all-targets --no-deps -- -F u
 
 The tests prove the `core_identity` command returns the core's identity and
 serializes it in the shape the view expects. They also prove that opening the
-sample table generates it only when it is missing, and that `table_block`
-answers through Tauri's IPC layer with raw Arrow bytes, for a working window
-and for a stored result, or with a message. They prove that asking twice for
+sample table generates it only when it is missing and reports its figures as
+text, and that `table_block` answers through Tauri's IPC layer with a
+[frame](reference.md#the-block-frame) of row numbers, a report and Arrow bytes,
+for a working window and for a stored result, or with a message. They also
+prove how a count, a size and a time are written. They prove that asking twice for
 the steps window opens it once, and that the capability names its label. They
 run against Tauri's mock runtime and do not open a real window.
 
@@ -189,6 +191,21 @@ npm --prefix ui run format
 
 The test compares the file with the view by value, so the formatter's
 layout does not affect it. Never edit the file by hand.
+
+### Refresh The Table Snapshots
+
+After a change to the views of an opened table or to the frame of a block, the
+snapshot test fails and says how to refresh the four `table-*.json` files in
+`ui/packages/host/fixtures/`. They are the shape of an opened working window and
+of a stored result, at a fixed open time, and a block of each as its frame in
+hexadecimal, at a fixed build time:
+
+```sh
+DAGEIST_REFRESH_TABLE_SNAPSHOTS=1 cargo test --offline --locked -p dageist-tauri sample_table::tests::the_snapshots_are_what_the_commands_return
+npm --prefix ui run format
+```
+
+Never edit the files by hand.
 
 ### Refresh The Step Report Snapshots
 
@@ -267,6 +284,8 @@ each block from disk as you scroll.
 
 To time the engine without the application, run
 `cargo run --release --offline --locked -p dageist-engine --example measure`.
+It serves blocks of the size the grid asks for, 140 rows by 17 columns, from a
+table in the folder you name, and generates one there only when it has none.
 
 ## Check The Fuzz Framework
 

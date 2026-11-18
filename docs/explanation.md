@@ -50,9 +50,16 @@ Python module loads, it also sets Polars up. [Polars Is Set Up As The Release
 Sets It Up](#polars-is-set-up-as-the-release-sets-it-up) says which parts of that
 the engine does.
 
-Either way the view asks for only the rows and columns near what is on screen,
-and the host passes them through as the raw bytes of an Arrow IPC stream. The
-view decodes those bytes and draws them; it never holds the table.
+Either way the view asks for only the rows and columns near what is on screen.
+The engine writes every cell of a block as the text Polars writes the value,
+the same text the step editor's previews show, with a null as a missing cell, in
+an Arrow IPC stream whose columns are all text. The host puts the number of each
+row and a report of the block in front of it, as the [frame](reference.md#the-block-frame)
+the view reads. The view draws what it reads and formats nothing, neither a
+cell nor a count, a size or a time: the one figure it writes is how long it
+waited for a block, which only it can measure. A column says whether it holds
+numbers, so that the view can align it, since the type of a value is not in the
+block. It never holds the table.
 
 As the product grows, new behavior lands in the core or in crates under
 `crates/` that the core depends on. The host gains a command only when the view
