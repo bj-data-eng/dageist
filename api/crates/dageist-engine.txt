@@ -412,6 +412,9 @@ pub dageist_engine::catalog::WordsError::WrongType::path: alloc::string::String
 impl core::error::Error for dageist_engine::catalog::WordsError
 impl core::fmt::Display for dageist_engine::catalog::WordsError
 pub fn dageist_engine::catalog::WordsError::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum dageist_engine::catalog::Writes
+pub dageist_engine::catalog::Writes::Columns
+pub dageist_engine::catalog::Writes::Nothing
 pub struct dageist_engine::catalog::Arguments
 impl dageist_engine::catalog::Arguments
 pub fn dageist_engine::catalog::Arguments::choice(&self, parameter: &'static str, words: &[&'static str], default: &'static str) -> core::result::Result<&'static str, dageist_engine::catalog::BuildError>
@@ -435,7 +438,6 @@ pub const fn dageist_engine::catalog::Entry::family(&self) -> dageist_engine::ca
 pub const fn dageist_engine::catalog::Entry::id(&self) -> dageist_engine::catalog::EntryId
 pub const fn dageist_engine::catalog::Entry::laziness(&self) -> dageist_engine::catalog::Laziness
 pub const fn dageist_engine::catalog::Entry::parameters(&self) -> &'static [dageist_engine::catalog::Parameter]
-pub fn dageist_engine::catalog::Entry::writes(&self, arguments: &dageist_engine::catalog::Arguments) -> core::result::Result<alloc::vec::Vec<polars_plan::dsl::expr::Expr>, dageist_engine::catalog::BuildError>
 impl dageist_engine::catalog::Entry
 pub fn dageist_engine::catalog::Entry::arguments<'a>(&self, given: impl core::iter::traits::collect::IntoIterator<Item = (&'a str, dageist_engine::catalog::Argument)>) -> core::result::Result<dageist_engine::catalog::Arguments, dageist_engine::catalog::BuildError>
 pub struct dageist_engine::catalog::EntryId(_)
@@ -452,6 +454,7 @@ pub const fn dageist_engine::catalog::Parameter::kind(&self) -> dageist_engine::
 pub const fn dageist_engine::catalog::Parameter::name(&self) -> &'static str
 pub const fn dageist_engine::catalog::Parameter::role(&self) -> dageist_engine::catalog::Role
 pub const fn dageist_engine::catalog::Parameter::shape(&self) -> dageist_engine::catalog::Shape
+pub const fn dageist_engine::catalog::Parameter::writes(&self) -> dageist_engine::catalog::Writes
 pub struct dageist_engine::catalog::Words
 impl dageist_engine::catalog::Words
 pub fn dageist_engine::catalog::Words::changed(&self) -> &[alloc::string::String]

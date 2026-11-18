@@ -423,3 +423,85 @@ fn a_column_a_step_gives_under_its_own_name_is_replaced_by_with_columns_and_by_s
         );
     }
 }
+
+#[test]
+fn several_columns_chosen_by_name_are_passed_on_by_neither() {
+    let report = run_on(&document(vec![step(
+        "pick",
+        "LazyFrame.with_columns",
+        json!({ "exprs": many(vec![chain(
+            call("polars.col", json!({ "name": { "columns": ["owner", "dcn"] } })),
+            vec![],
+        )]) }),
+    )]));
+    assert!(changes(&report, "pick").is_empty());
+}
+
+#[test]
+fn a_name_written_twice_is_refused_by_polars_for_both_steps_before_any_name_is_resolved() {
+    let shifted = || {
+        field_then(
+            "row_days",
+            vec![call("Expr.shift", json!({ "n": whole(1) }))],
+        )
+    };
+    for entry in ["LazyFrame.with_columns", "LazyFrame.select"] {
+        let report = run_on(&writing(entry, vec![("row_days", slow())], vec![shifted()]));
+        let Outcome::Refused(refusal) = report.steps()[0].outcome() else {
+            panic!("{entry}: not refused");
+        };
+        assert!(
+            refusal.cause().to_string().contains("duplicate"),
+            "{entry}: {refusal}"
+        );
+        assert!(matches!(report.steps()[0].rows(), StepRows::NotCounted));
+    }
+}
+
+#[test]
+fn the_first_values_of_every_step_are_the_first_rows_the_preview_gives_for_it() {
+    // The preview collects one plan up to the step; the run collects each step from the one
+    // before. They agree, including after the join, which is told to keep the order of the
+    // claims: Polars does not promise any order for a join that is not.
+    let text = storyboard_text();
+    let report = run_on(&text);
+    let steps = Document::read(&text).expect("a document");
+    for reported in report.steps() {
+        let count = counted(&report, reported.id().as_str());
+        let preview = steps
+            .preview(&inputs(), &claims(), reported.id(), 1_000)
+            .expect("the preview");
+        for column in count.first() {
+            let at = preview
+                .columns()
+                .iter()
+                .position(|candidate| candidate.name() == column.name())
+                .unwrap_or_else(|| panic!("{}: no column {}", reported.id(), column.name()));
+            let rows: Vec<Option<&str>> = preview
+                .rows()
+                .iter()
+                .map(|row| row[at].as_deref())
+                .collect();
+            let shown: Vec<Option<&str>> = column
+                .values()
+                .shown()
+                .iter()
+                .map(Option::as_deref)
+                .collect();
+            assert_eq!(
+                shown,
+                rows[..shown.len()],
+                "{} {}",
+                reported.id(),
+                column.name()
+            );
+            assert_eq!(
+                column.values().more(),
+                rows.len() - shown.len(),
+                "{} {}",
+                reported.id(),
+                column.name()
+            );
+        }
+    }
+}

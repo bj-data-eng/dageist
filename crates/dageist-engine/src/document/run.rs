@@ -524,11 +524,20 @@ fn run_step(
         Ok(schema) => Ok((frame, schema)),
         Err(error) => Err(Halt::Refused(builder.polars_refusal(error))),
     };
-    let written = if trace && result.is_ok() {
-        builder.written_names(schema)
-    } else {
-        Vec::new()
-    };
+    let mut result = result;
+    let mut written = Vec::new();
+    if trace && result.is_ok() {
+        match builder.written_names(schema) {
+            Ok(names) => written = names,
+            // The step is Polars' to refuse, as it is for any schema it cannot work out.
+            Err(error) => {
+                result = Err(Halt::Refused(StepRefusal {
+                    place: base,
+                    cause: Box::new(RunCause::Polars(error)),
+                }));
+            }
+        }
+    }
     StepRun {
         expressions: builder.traces,
         walk,
@@ -649,18 +658,21 @@ impl Builder<'_> {
     }
 
     /// The names of the columns the step writes, as Polars names the
-    /// expressions it was given against the table the step was given. None
-    /// where Polars cannot name them, which a step it built does not come to.
-    fn written_names(&self, given: &SchemaRef) -> Vec<String> {
+    /// expressions it was given against the table the step was given.
+    ///
+    /// # Errors
+    ///
+    /// When Polars cannot name them, which the step it accepted is not
+    /// expected to come to.
+    fn written_names(&self, given: &SchemaRef) -> Result<Vec<String>, PolarsError> {
         if self.written.is_empty() {
-            return Vec::new();
+            return Ok(Vec::new());
         }
         DataFrame::empty_with_schema(given)
             .lazy()
             .select(self.written.clone())
             .collect_schema()
             .map(|schema| schema.iter_names().map(ToString::to_string).collect())
-            .unwrap_or_default()
     }
 
     /// The arguments of `call`, built, and checked as the catalogue checks them.

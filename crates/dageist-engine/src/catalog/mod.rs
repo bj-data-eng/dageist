@@ -273,6 +273,21 @@ pub enum Role {
     Count,
 }
 
+/// Whether the expressions a parameter holds write columns of the table the
+/// step gives. A column an expression writes is replaced, when the table the
+/// step was given had it, even when the expression gives it the dtype it had;
+/// an expression that is a bare column reference passes the column on and
+/// writes nothing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Writes {
+    /// What the parameter holds is read, not written: a key, a condition, a
+    /// table.
+    Nothing,
+    /// Each expression the parameter holds, and each entry of pairs of a
+    /// column's name and an expression, writes the columns it names.
+    Columns,
+}
+
 /// One parameter of an entry, named as Python names it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Parameter {
@@ -281,6 +296,7 @@ pub struct Parameter {
     shape: Shape,
     default: ParameterDefault,
     role: Role,
+    writes: Writes,
 }
 
 impl Parameter {
@@ -291,7 +307,14 @@ impl Parameter {
             shape,
             default,
             role: Role::Plain,
+            writes: Writes::Nothing,
         }
+    }
+
+    /// The same parameter, whose expressions write columns.
+    const fn writing(mut self) -> Self {
+        self.writes = Writes::Columns;
+        self
     }
 
     /// The same parameter with the role it plays beside the value its method follows.
@@ -329,6 +352,12 @@ impl Parameter {
     #[must_use]
     pub const fn role(&self) -> Role {
         self.role
+    }
+
+    /// Whether the expressions the parameter holds write columns.
+    #[must_use]
+    pub const fn writes(&self) -> Writes {
+        self.writes
     }
 }
 
@@ -436,15 +465,15 @@ impl Entry {
     }
 
     /// The expressions a step writes as columns of the table it gives, each
-    /// named as it is written: a column an expression names replaces the
-    /// column of that name. `with_columns` writes the expressions it is given;
-    /// every other entry writes none, because what it gives is a selection,
-    /// a reordering, a join or a reshaping of columns it already has.
+    /// named as it is written: those of the parameters whose [`Writes`] is
+    /// [`Writes::Columns`], where a pair gives its expression the name of its
+    /// key. An expression that is a bare column reference passes the column on
+    /// and is not written.
     ///
     /// # Errors
     ///
     /// When `arguments` are not those the entry builds from.
-    pub fn writes(&self, arguments: &Arguments) -> Result<Vec<Expr>, BuildError> {
+    pub(crate) fn writes(&self, arguments: &Arguments) -> Result<Vec<Expr>, BuildError> {
         entries::writes(self, arguments)
     }
 }

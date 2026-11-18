@@ -504,11 +504,14 @@ such as `Datetime(us)`, so the view formats no value. Polars' own message is
 the reason when Polars refuses.
 A valid step also says which columns it added and which it replaced: a column
 the table before it lacked is added, and one it had is replaced when the step
-writes it, as `with_columns` does by name, or gives it another dtype.
+writes it, as `with_columns` and `select` do for an expression that is not a bare
+column, or gives it another dtype; the catalogue says which parameters write.
 Run on the working window, the report also counts for each step the rows it was
 given and the rows it kept, with the first values of each column it changed
 written as text. Each step is collected once and its table is the next step's
 input, so the window is run through the steps once and not again for every step;
+the first values are those of the rows the preview gives, except after a join that is
+not told to keep the order of its rows, which Polars does not promise;
 the window is the only table that is counted, because it is held in memory
 and bounded. A step Polars accepts but cannot collect on those rows is reported
 as failed, and the steps after it are not counted. A connected input is
