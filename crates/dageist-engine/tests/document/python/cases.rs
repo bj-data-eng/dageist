@@ -88,8 +88,148 @@ pub fn cases() -> Vec<Case> {
         text: dageist_engine::claim_timing::ClaimTiming::STEPS_JSON.to_owned(),
     }];
     cases.extend(frame_steps());
+    cases.extend(defaults_given());
     cases.extend(expressions());
     cases
+}
+
+/// Single steps that give a parameter the default Python Polars holds for it, which the source
+/// leaves out: each must run in Python Polars to what the engine gives with the argument written
+/// out. One step is made for each way a default is given: a flag for every key and one for each
+/// key, a choice's word, text, and a method's option.
+fn defaults_given() -> Vec<Case> {
+    let f = &*VARIED;
+    let sort = |name: &str, arguments: Value| one(name, f, step("s", "LazyFrame.sort", arguments));
+    let both = |value: bool| many(vec![flag(value), flag(value)]);
+    vec![
+        sort(
+            "sort_with_scalar_defaults_given",
+            json!({
+                "by": many(vec![field("group"), field("score")]),
+                "descending": flag(false),
+                "nulls_last": flag(false),
+                "maintain_order": flag(false),
+                "multithreaded": flag(true),
+            }),
+        ),
+        sort(
+            "sort_with_a_default_given_for_each_key",
+            json!({
+                "by": many(vec![field("group"), field("score")]),
+                "descending": both(false),
+                "nulls_last": both(false),
+            }),
+        ),
+        sort(
+            "sort_with_a_default_given_for_each_key_and_more_keys",
+            json!({
+                "by": many(vec![field("group")]),
+                "more_by": many(vec![field("score")]),
+                "descending": both(false),
+                "nulls_last": flag(false),
+            }),
+        ),
+        sort(
+            "sort_with_one_key_descending_and_the_other_at_its_default",
+            json!({
+                "by": many(vec![field("group"), field("score")]),
+                "descending": many(vec![flag(true), flag(false)]),
+                "nulls_last": both(false),
+            }),
+        ),
+        one(
+            "join_with_its_defaults_given_beside_the_options_that_differ",
+            f,
+            step(
+                "s",
+                "LazyFrame.join",
+                json!({
+                    "other": { "table": "lookup" },
+                    "how": choice("inner"),
+                    "left_on": many(vec![field("name")]),
+                    "right_on": many(vec![field("key")]),
+                    "suffix": { "string": "_right" },
+                    "validate": choice("m:m"),
+                    "nulls_equal": flag(false),
+                    "coalesce": flag(true),
+                    // Rows come in a fixed order, or the two results could not be compared.
+                    "maintain_order": choice("left"),
+                    "build_side": choice("auto"),
+                    "allow_parallel": flag(true),
+                    "force_parallel": flag(false),
+                }),
+            ),
+        ),
+        one(
+            "rename_with_strict_on",
+            f,
+            step(
+                "s",
+                "LazyFrame.rename",
+                json!({
+                    "mapping": { "pairs": [[columns(&["id"]), { "string": "ident" }]] },
+                    "strict": flag(true),
+                }),
+            ),
+        ),
+        one(
+            "pivot_with_the_defaults_given",
+            f,
+            step(
+                "s",
+                "LazyFrame.pivot",
+                json!({
+                    "on": columns(&["group"]),
+                    "on_columns": { "table": "groups" },
+                    "index": columns(&["id"]),
+                    "values": columns(&["score"]),
+                    "aggregate_function": chain(call("polars.element", json!({})), vec![method("Expr.first", json!({}))]),
+                    "maintain_order": flag(false),
+                    "separator": { "string": "_" },
+                    "column_naming": choice("auto"),
+                }),
+            ),
+        ),
+        one(
+            "over_with_its_options_at_their_defaults",
+            f,
+            with_columns(
+                "s",
+                vec![(
+                    "ranked",
+                    field_then(
+                        "score",
+                        vec![
+                            method("Expr.cum_sum", json!({})),
+                            method(
+                                "Expr.over",
+                                json!({
+                                    "partition_by": many(vec![field("group")]),
+                                    "descending": flag(false),
+                                    "nulls_last": flag(false),
+                                    "mapping_strategy": choice("group_to_rows"),
+                                }),
+                            ),
+                        ],
+                    ),
+                )],
+            ),
+        ),
+        one(
+            "shift_with_its_count_given_and_a_filler",
+            f,
+            with_columns(
+                "s",
+                vec![(
+                    "moved",
+                    field_then(
+                        "score",
+                        vec![method("Expr.shift", json!({ "n": whole(1) }))],
+                    ),
+                )],
+            ),
+        ),
+    ]
 }
 
 fn frame_steps() -> Vec<Case> {
