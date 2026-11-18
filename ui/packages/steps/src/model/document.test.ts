@@ -108,6 +108,23 @@ describe('a step of the editor', () => {
     expect(at(call.arguments, ['how'])).toBeUndefined();
   });
 
+  it('writes a number the engine read with a fraction as a float though it is whole', () => {
+    const options = (suffix: Options[string]): Options => ({
+      left_on: fieldKeys(['a']),
+      right_on: fieldKeys(['b']),
+      suffix,
+    });
+    const arguments_ = (suffix: Options[string]) =>
+      firstCall([{ id: 'j', verb: 'join', table: 'step_sla', options: options(suffix) }]).arguments;
+
+    // A whole number is an integer, and one the engine read as a float stays a float.
+    expect(arguments_({ kind: 'number', value: 2 })).toMatchObject({ suffix: { integer: 2 } });
+    expect(arguments_({ kind: 'number', value: 2, float: true })).toMatchObject({
+      suffix: { float: 2 },
+    });
+    expect(arguments_({ kind: 'number', value: 2.5 })).toMatchObject({ suffix: { float: 2.5 } });
+  });
+
   it('writes the setting of each key of a sort as a list in the order of the keys', () => {
     const options: Options = {
       by: fieldKeys(['dcn', 'timestamp']),
