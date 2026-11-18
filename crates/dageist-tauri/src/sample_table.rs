@@ -425,7 +425,7 @@ mod tests {
     use crate::block::frame;
     use crate::test_support::split_block;
 
-    const REFRESH: &str = "DAGEIST_REFRESH_TABLES";
+    const REFRESH: &str = "DAGEIST_REFRESH_TABLE_SNAPSHOTS";
     const REFRESH_COMMAND: &str = "cargo test --offline --locked -p dageist-tauri sample_table::tests::the_snapshots_are_what_the_commands_return";
 
     const SMALL: SampleSpec = SampleSpec {
