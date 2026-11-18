@@ -37,6 +37,7 @@ pub dageist_engine::allowed::Literal::Integer(i64)
 pub dageist_engine::allowed::Literal::String(alloc::string::String)
 impl dageist_engine::allowed::Literal
 pub fn dageist_engine::allowed::Literal::class(&self) -> core::option::Option<dageist_engine::allowed::Representative>
+pub fn dageist_engine::allowed::Literal::shown(&self) -> alloc::string::String
 pub enum dageist_engine::allowed::Nested
 pub dageist_engine::allowed::Nested::ConditionPredicate
 pub dageist_engine::allowed::Nested::ConditionValue
@@ -312,6 +313,18 @@ impl core::error::Error for dageist_engine::catalog::BuildError
 pub fn dageist_engine::catalog::BuildError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
 impl core::fmt::Display for dageist_engine::catalog::BuildError
 pub fn dageist_engine::catalog::BuildError::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum dageist_engine::catalog::Comparison
+pub dageist_engine::catalog::Comparison::AtLeast
+pub dageist_engine::catalog::Comparison::AtMost
+pub dageist_engine::catalog::Comparison::Equal
+pub dageist_engine::catalog::Comparison::Greater
+pub dageist_engine::catalog::Comparison::Less
+pub dageist_engine::catalog::Comparison::NotEqual
+impl dageist_engine::catalog::Comparison
+pub const dageist_engine::catalog::Comparison::ALL: [Self; 6]
+pub const fn dageist_engine::catalog::Comparison::entry(self) -> &'static str
+pub fn dageist_engine::catalog::Comparison::of_entry(id: &str) -> core::option::Option<Self>
+pub const fn dageist_engine::catalog::Comparison::phrase(self) -> dageist_engine::catalog::SummaryPhrase<'static>
 pub enum dageist_engine::catalog::Conditional
 pub dageist_engine::catalog::Conditional::ChainedThen(polars_plan::dsl::arity::ChainedThen)
 pub dageist_engine::catalog::Conditional::ChainedWhen(polars_plan::dsl::arity::ChainedWhen)
@@ -563,6 +576,7 @@ pub fn dageist_engine::catalog::Words::parameter_label(&self, id: dageist_engine
 pub fn dageist_engine::catalog::Words::parameter_name(&self, id: dageist_engine::catalog::EntryId, parameter: &str) -> core::option::Option<&str>
 pub fn dageist_engine::catalog::Words::parse(source: &str) -> core::result::Result<Self, dageist_engine::catalog::WordsError>
 pub fn dageist_engine::catalog::Words::say(&self, phrase: dageist_engine::catalog::SummaryPhrase<'_>) -> alloc::string::String
+pub fn dageist_engine::catalog::Words::sign(&self, comparison: dageist_engine::catalog::Comparison) -> core::option::Option<&str>
 pub fn dageist_engine::catalog::english() -> &'static dageist_engine::catalog::Words
 pub fn dageist_engine::catalog::entries() -> &'static [dageist_engine::catalog::Entry]
 pub fn dageist_engine::catalog::entry(id: &str) -> core::option::Option<&'static dageist_engine::catalog::Entry>
