@@ -415,6 +415,27 @@ fn an_argument_is_judged_by_what_the_method_takes() {
 }
 
 #[test]
+fn a_typed_literal_is_no_candidate_of_a_slot_for_the_engine_reads_what_is_typed() {
+    // A number or text typed in is asked of `read_typed`, which reads it and judges what it
+    // reads, so `candidate_fits` takes only what a list holds: fields and connected inputs.
+    for literal in [
+        json!({ "kind": "integer", "value": 1 }),
+        json!({ "kind": "float", "value": 1.5 }),
+        json!({ "kind": "text", "value": "1d" }),
+    ] {
+        let refused = invoke(
+            "candidate_fits",
+            json!({
+                "start": [{ "kind": "outer", "name": "select" }],
+                "argument": null,
+                "candidates": [{ "kind": "literal", "literal": literal }]
+            }),
+        );
+        assert!(refused.is_err(), "{literal}");
+    }
+}
+
+#[test]
 fn a_slot_that_has_no_place_and_a_name_the_catalogue_lacks_are_refused() {
     let none = invoke(
         "candidate_fits",
