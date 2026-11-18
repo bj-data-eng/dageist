@@ -570,6 +570,7 @@ function handWrittenStep(count: unknown): unknown {
     count,
     expressions: [],
     walk: { expressions: [], refusal: null, notKnown: null },
+    atDefault: [],
   };
 }
 

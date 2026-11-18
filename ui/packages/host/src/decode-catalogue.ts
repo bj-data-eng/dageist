@@ -9,8 +9,10 @@ import type {
   DefaultView,
   EntryView,
   KindView,
+  PairView,
   ParameterView,
   PositionView,
+  SettingView,
   ShapeView,
   WordsView,
 } from './contract';
@@ -115,6 +117,90 @@ const readDefault: Decode<DefaultView> = readTagged<DefaultView>('kind', {
   other: { fields: [], read: () => ({ kind: 'other' }) },
 });
 
+const readSetting: Decode<SettingView> = readTagged<SettingView>('kind', {
+  unset: { fields: [], read: () => ({ kind: 'unset' }) },
+  flag: {
+    fields: ['value'],
+    read: (fields, path) => ({
+      kind: 'flag',
+      value: readField(fields, path, 'value', readBoolean),
+    }),
+  },
+  integer: {
+    fields: ['value'],
+    read: (fields, path) => ({
+      kind: 'integer',
+      value: readField(fields, path, 'value', readInteger),
+    }),
+  },
+  float: {
+    fields: ['value'],
+    read: (fields, path) => ({
+      kind: 'float',
+      value: readField(fields, path, 'value', readNumber),
+    }),
+  },
+  text: {
+    fields: ['value'],
+    read: (fields, path) => ({
+      kind: 'text',
+      value: readField(fields, path, 'value', readString),
+    }),
+  },
+  word: {
+    fields: ['value'],
+    read: (fields, path) => ({
+      kind: 'word',
+      value: readField(fields, path, 'value', readString),
+    }),
+  },
+  field: {
+    fields: ['column'],
+    read: (fields, path) => ({
+      kind: 'field',
+      column: readField(fields, path, 'column', readString),
+    }),
+  },
+  element: {
+    fields: ['method'],
+    read: (fields, path) => ({
+      kind: 'element',
+      method: readField(fields, path, 'method', readString),
+    }),
+  },
+  list: {
+    fields: ['items'],
+    read: (fields, path) => ({
+      kind: 'list',
+      // A list's items are settings in their own right, so a setting reads itself.
+      items: readField(
+        fields,
+        path,
+        'items',
+        readList((value, at) => readSetting(value, at)),
+      ),
+    }),
+  },
+  pairs: {
+    fields: ['entries'],
+    read: (fields, path) => ({
+      kind: 'pairs',
+      entries: readField(fields, path, 'entries', readList(readPair)),
+    }),
+  },
+});
+
+/** Reads one entry of pairs, whose two sides are settings in their own right. */
+function readPair(value: unknown, path: string): PairView {
+  return readRecord(['key', 'value'], (fields, at) => ({
+    key: readField(fields, at, 'key', readSetting),
+    value: readField(fields, at, 'value', readSetting),
+  }))(value, path);
+}
+
+/** Reads a setting the engine reports, which is `unset`, a flag, a number, text, a word, an expression, a list or pairs. */
+export const readSettingView: Decode<SettingView> = (value, path) => readSetting(value, path);
+
 const readPosition: Decode<PositionView> = readTagged<PositionView>('kind', {
   outer: {
     fields: ['name'],
@@ -133,7 +219,18 @@ const readPosition: Decode<PositionView> = readTagged<PositionView>('kind', {
 });
 
 const readParameter: Decode<ParameterView> = readRecord(
-  ['name', 'shown', 'label', 'kind', 'shape', 'default', 'python', 'position'],
+  [
+    'name',
+    'shown',
+    'label',
+    'kind',
+    'shape',
+    'default',
+    'defaultSetting',
+    'start',
+    'python',
+    'position',
+  ],
   (fields, path) => ({
     name: readField(fields, path, 'name', readString),
     shown: readField(fields, path, 'shown', readString),
@@ -141,6 +238,8 @@ const readParameter: Decode<ParameterView> = readRecord(
     kind: readField(fields, path, 'kind', readKind),
     shape: readField(fields, path, 'shape', readShape),
     default: readField(fields, path, 'default', readDefault),
+    defaultSetting: readField(fields, path, 'defaultSetting', readNullable(readSetting)),
+    start: readField(fields, path, 'start', readSetting),
     python: readField(fields, path, 'python', readNullable(readString)),
     position: readField(fields, path, 'position', readNullable(readPosition)),
   }),
