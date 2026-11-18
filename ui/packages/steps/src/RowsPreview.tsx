@@ -9,6 +9,7 @@ import { cx } from '@dageist/design';
 import type { ColumnChangeView } from '@dageist/host';
 
 import type { RowsDisplay } from './model/report';
+import { NULL_DASH } from './model/values';
 
 /** What the preview shows. */
 export interface RowsPreviewProps {
@@ -61,7 +62,7 @@ export function RowsPreview({ display, changes, settled }: RowsPreviewProps): Re
                     changes.some((change) => change.name === column.name) && 'bg-fresh',
                   )}
                 >
-                  {cells[at] ?? '—'}
+                  {cells[at] ?? NULL_DASH}
                 </td>
               ))}
             </tr>

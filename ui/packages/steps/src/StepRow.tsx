@@ -544,6 +544,9 @@ export function StepRow({
           {result.problem !== null && (
             <span className="dg-line font-sans text-xs text-wrong">{result.problem}</span>
           )}
+          {result.rowsProblem !== null && (
+            <span className="dg-line font-sans text-xs text-wrong">{result.rowsProblem}</span>
+          )}
         </div>
         <span className="shrink-0 pl-3 text-xs text-muted">
           <Outcome step={step} result={result} />

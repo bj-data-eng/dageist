@@ -79,6 +79,8 @@ export interface PreparedStep {
   readonly first: ReadonlyMap<string, string>;
   /** Whether the step stays in a lazy plan, and `null` where the engine has not said. */
   readonly lazy: boolean | null;
+  /** Why the engine could not run the step on the sample rows, in words, though it accepts the step, or `null`. */
+  readonly rowsProblem: string | null;
   /** What is the matter with the step, in words, or `null`. */
   readonly problem: string | null;
   /** The words of the editor that are the matter, as `wrongId` names them. */
@@ -171,12 +173,25 @@ function causeWords(cause: CauseView): string {
 }
 
 /** Returns how many rows a step kept, and the first values of what it changed, from how the engine counted it. */
-function countOf(count: CountView): Pick<PreparedStep, 'rows' | 'first'> {
-  if (count.kind !== 'counted') return { rows: null, first: NO_FIRST };
-  return {
-    rows: { received: count.received, kept: count.kept },
-    first: new Map(count.first.map((column) => [column.name, valuesLine(column.values)])),
-  };
+function countOf(count: CountView): Pick<PreparedStep, 'rows' | 'first' | 'rowsProblem'> {
+  switch (count.kind) {
+    case 'notCounted':
+      return { rows: null, first: NO_FIRST, rowsProblem: null };
+    case 'counted':
+      return {
+        rows: { received: count.received, kept: count.kept },
+        first: new Map(count.first.map((column) => [column.name, valuesLine(column.values)])),
+        rowsProblem: null,
+      };
+    case 'failed':
+      return {
+        rows: null,
+        first: NO_FIRST,
+        rowsProblem: `Could not be run on the sample rows: ${firstParagraph(count.reason)}`,
+      };
+    default:
+      return count satisfies never;
+  }
 }
 
 /** What is said of a step that has to wait for the step called `blockedBy`. */
@@ -259,6 +274,7 @@ export function prepareRun(
       changes: [],
       rows: null,
       first: NO_FIRST,
+      rowsProblem: null,
       lazy: null,
       problem,
       wrong: NO_WORDS,
