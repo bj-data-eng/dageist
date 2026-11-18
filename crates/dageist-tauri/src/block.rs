@@ -11,6 +11,7 @@
 
 use std::time::Duration;
 
+use dageist_engine::Block;
 use serde::Serialize;
 
 use crate::figures::{count, elapsed, quantity, size};
@@ -29,21 +30,16 @@ struct Header {
     report: String,
 }
 
-/// The frame of the block `arrow`, which holds `rows` rows from the row at
-/// `offset` and `columns` columns, and which the engine took `built` to write.
-pub(crate) fn frame(
-    offset: usize,
-    rows: usize,
-    columns: usize,
-    arrow: &[u8],
-    built: Duration,
-) -> Result<Vec<u8>, ErrorView> {
+/// The frame of `block`, whose first row is the row at `offset` of the table and
+/// which the engine took `built` to write.
+pub(crate) fn frame(offset: usize, block: &Block, built: Duration) -> Result<Vec<u8>, ErrorView> {
+    let arrow = block.ipc();
     let header = Header {
-        numbers: (0..rows).map(|at| count(offset + at + 1)).collect(),
+        numbers: (0..block.rows()).map(|at| count(offset + at + 1)).collect(),
         report: format!(
             "{} × {} · {} · built in {}",
-            quantity(rows, "row", "rows"),
-            quantity(columns, "column", "columns"),
+            quantity(block.rows(), "row", "rows"),
+            quantity(block.columns(), "column", "columns"),
             size(arrow.len()),
             elapsed(built),
         ),

@@ -3,8 +3,11 @@
 //! The engine owns the table. The view can look at it two ways: as a working
 //! window of whole keys held in memory, or as the stored result, read from
 //! its Parquet files one block at a time. These commands hold whichever is
-//! open between calls, report its shape as a serializable view and pass
-//! blocks through as raw Arrow IPC bytes, which the view decodes itself.
+//! open between calls, report its shape as a serializable view and answer
+//! blocks as the raw bytes of a frame: the number of each row and a report of
+//! the block, written as text here, and then the block's Arrow IPC stream, which
+//! the view reads. The frame is in
+//! [the reference](../../../docs/reference.md#the-block-frame).
 //!
 //! The commands are thin: the functions beside them answer, so that a host
 //! other than Tauri can serve the same views.
@@ -14,7 +17,8 @@ use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 use dageist_engine::{
-    ColumnInfo, EngineError, ParquetTable, SampleSpec, Table, claims_generated, generate_claims,
+    Block, ColumnInfo, EngineError, ParquetTable, SampleSpec, Table, claims_generated,
+    generate_claims,
 };
 use serde::Serialize;
 use tauri::ipc::Response;
@@ -66,15 +70,15 @@ impl Opened {
         TableView::new(self.height(), self.columns(), opened)
     }
 
-    fn block_ipc(
+    fn block(
         &self,
         offset: usize,
         length: usize,
         columns: &[String],
-    ) -> Result<Vec<u8>, EngineError> {
+    ) -> Result<Block, EngineError> {
         match self {
-            Self::Window(table) => table.block_ipc(offset, length, columns),
-            Self::Stored(table) => table.block_ipc(offset, length, columns),
+            Self::Window(table) => table.block(offset, length, columns),
+            Self::Stored(table) => table.block(offset, length, columns),
         }
     }
 }
@@ -351,15 +355,9 @@ pub fn table_block_bytes(
         .current()
         .ok_or_else(|| ErrorView::new("no table is open"))?;
     let started = Instant::now();
-    let arrow = table.block_ipc(offset, length, columns)?;
+    let block = table.block(offset, length, columns)?;
     let built = started.elapsed();
-    let rows = length.min(table.height().saturating_sub(offset));
-    let width = if columns.is_empty() {
-        table.columns().len()
-    } else {
-        columns.len()
-    };
-    frame(offset, rows, width, &arrow, built)
+    frame(offset, &block, built)
 }
 
 /// Opens a working window of `keys` whole keys of the sample table, held in
@@ -580,7 +578,7 @@ mod tests {
         let table =
             open_window(&SampleGate::default(), &sample.path, SMALL, 10).expect("the window opens");
         let columns = ["dcn".to_owned(), "timestamp".to_owned()];
-        let expected = table.block_ipc(3, 7, &columns).expect("the engine slices");
+        let expected = table.block(3, 7, &columns).expect("the engine slices");
 
         let response = tauri::test::get_ipc_response(
             &webview(Some(table)),
@@ -593,7 +591,7 @@ mod tests {
 
         let bytes = block_of(response);
         let (header, arrow) = split_block(&bytes);
-        assert_eq!(arrow, expected);
+        assert_eq!(arrow, expected.ipc());
         // The numbers of rows 4 to 10, counting from 1.
         assert_eq!(
             header["numbers"],
@@ -609,7 +607,7 @@ mod tests {
         let table =
             open_stored(&SampleGate::default(), &sample.path, SMALL).expect("the result opens");
         let columns = ["dcn".to_owned(), "measure_002".to_owned()];
-        let expected = table.block_ipc(50, 12, &columns).expect("the engine reads");
+        let expected = table.block(50, 12, &columns).expect("the engine reads");
 
         let response = tauri::test::get_ipc_response(
             &webview(Some(table)),
@@ -622,7 +620,7 @@ mod tests {
 
         let bytes = block_of(response);
         let (header, arrow) = split_block(&bytes);
-        assert_eq!(arrow, expected);
+        assert_eq!(arrow, expected.ipc());
         let numbers: Vec<String> = (51..=62).map(|number| number.to_string()).collect();
         assert_eq!(header["numbers"], serde_json::json!(numbers));
         assert_report(&header["report"], "12 rows", "2 columns", arrow.len());
@@ -745,18 +743,10 @@ mod tests {
         columns: &[&str],
     ) -> serde_json::Value {
         let columns: Vec<String> = columns.iter().map(|name| (*name).to_owned()).collect();
-        let arrow = table
-            .block_ipc(offset, length, &columns)
+        let block = table
+            .block(offset, length, &columns)
             .expect("the engine writes the block");
-        let rows = length.min(table.height().saturating_sub(offset));
-        let frame = frame(
-            offset,
-            rows,
-            columns.len(),
-            &arrow,
-            Duration::from_micros(850),
-        )
-        .expect("the block is framed");
+        let frame = frame(offset, &block, Duration::from_micros(850)).expect("the block is framed");
         serde_json::json!({
             "request": { "offset": offset, "length": length, "columns": columns },
             "frame": hex(&frame),
