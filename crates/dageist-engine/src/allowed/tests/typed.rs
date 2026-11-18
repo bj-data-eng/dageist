@@ -324,3 +324,52 @@ fn the_words_that_say_why_a_text_is_not_read_are_those_a_person_reads() {
         assert_eq!(why.to_string(), words);
     }
 }
+
+#[test]
+fn the_smallest_and_largest_whole_numbers_an_i64_holds_are_read_without_overflowing() {
+    // 2^53 - 1 is the largest whole number read as one, on either side of zero; the numbers
+    // beyond it, up to and including the ends of an i64, read as the number with a fraction
+    // nearest to them, and a slot that takes a whole number refuses them.
+    let whole = Typed::Value(ValueType::Integer);
+    for (typed, nearest) in [
+        ("9007199254740991", None),
+        ("-9007199254740991", None),
+        ("9007199254740992", Some(9_007_199_254_740_992.0)),
+        ("-9007199254740992", Some(-9_007_199_254_740_992.0)),
+        ("9223372036854775807", Some(9_223_372_036_854_775_808.0)),
+        ("-9223372036854775807", Some(-9_223_372_036_854_775_808.0)),
+        ("-9223372036854775808", Some(-9_223_372_036_854_775_808.0)),
+    ] {
+        match nearest {
+            None => {
+                let value: i64 = typed.parse().expect("a whole number");
+                assert_eq!(
+                    readings(typed, Typed::Expression)[0],
+                    integer(value, "Int64")
+                );
+                assert_eq!(readings(typed, whole), [integer(value, "Int64")]);
+            }
+            Some(value) => {
+                assert_eq!(
+                    readings(typed, Typed::Expression)[0],
+                    float(value),
+                    "{typed}"
+                );
+                assert_eq!(
+                    readings(typed, whole),
+                    [Err(Unread::TooLargeForAWholeNumber)],
+                    "{typed}"
+                );
+                assert_eq!(
+                    readings(typed, Typed::Value(ValueType::Float)),
+                    [float(value)]
+                );
+            }
+        }
+    }
+    // One past either end of an i64 is a whole number no i64 holds, and reads the same way.
+    assert_eq!(
+        readings("-9223372036854775809", Typed::Expression)[0],
+        float(-9_223_372_036_854_775_808.0)
+    );
+}
