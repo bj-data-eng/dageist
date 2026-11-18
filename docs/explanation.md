@@ -298,8 +298,9 @@ The host serves the catalogue with its English words to the view through the
 families, hints, step heads and the words `when`, `then` and `otherwise` from
 it, and draws every parameter by its kind. A method's first expression
 parameter is written inline. Any other parameter of a method or step is an
-option: the list its name opens offers the rest by name, and an option is
-written into the engine's Polars text only when it differs from its default. A step's
+option: the list its name opens offers the rest by name. The editor writes
+every option that is set into the document; the engine decides which are at
+their default, and leaves those out of its Python source. A step's
 own parameters are drawn by kind too: sort's keys and their per-item
 `descending`, select's expressions, join's table, keys and `how`, a rename's
 pairs, and a pivot's aggregate, which is a chain from `pl.element()`. A new
@@ -372,6 +373,8 @@ and never shows what was answered for another place. Five commands answer:
 - `step_starts` says what each step of the list starts with on a table: the
   list of steps asks it while it is open, and a step is added or changed to
   with what the engine says, so it cannot be picked until the engine has said.
+  A filter starts with a comparison for equality of a field and a value still
+  to be given, which the editor draws as a test.
 
 What a parameter holds when it is not given, what it is first set to and
 whether an option is at its default are rules about Polars, so the engine
@@ -379,9 +382,13 @@ decides them and the editor applies them. The catalogue carries each
 parameter's default and its first setting, and a step report names the
 arguments of the step, and of the calls inside its expressions, that are what
 their parameter holds when it is not given, which the editor shows as "same as
-the default". The editor writes every option that is set; Python calls a method
-the same with a parameter left out or given its default, so the Python source
-leaves out a named argument that is at its default.
+the default". Python calls a method the same with a parameter left out or
+given its default, so the Python source leaves out a named argument that is at
+its default. A list for each item, such as sort's `descending`, is at its
+default only when it holds one value for each key; Polars refuses a list of
+another length, so it is written. An option that cannot be added says why, with
+the refusal of the first word it could be set to, or that there is no other
+word.
 
 The catalogue gives each expression parameter the position the tables name for
 it, so the editor says where a slot stands and the engine works out the context.
