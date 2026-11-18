@@ -103,6 +103,39 @@ describe('a block of a stored result', () => {
   });
 });
 
+describe('a block of every column', () => {
+  it('is read for no columns asked for, which the host answers with all of them', () => {
+    const { request, frame } = readBlockFixture(windowFixture);
+
+    const all = decodeBlock(frame, []);
+
+    expect(all).toEqual(decodeBlock(frame, request.columns));
+  });
+
+  it('holds the columns as the stream has them, a missing cell as null', () => {
+    const frame = frameOf(
+      { numbers: ['1', '2'], report: 'a report' },
+      textStream({ b: ['x', null], a: ['y', 'z'] }),
+    );
+
+    expect(decodeBlock(frame, []).columns).toEqual([
+      ['x', null],
+      ['y', 'z'],
+    ]);
+  });
+
+  it('is still refused when it is not text, or has other rows than the header has numbers', () => {
+    const numbers = streamOf(tableFromArrays({ a: [1, 2, 3] }));
+
+    expect(refusal(frameOf({ numbers: ['1', '2', '3'], report: 'r' }, numbers), []).path).toBe(
+      '$.arrow.columns[0]',
+    );
+    expect(
+      refusal(frameOf({ numbers: ['1'], report: 'r' }, textStream({ a: ['x', 'y'] })), []).message,
+    ).toBe('$.arrow: has 2 rows, and the header numbers 1');
+  });
+});
+
 describe('a block with a missing cell', () => {
   it('holds null where a cell is missing, and the text of the others as it is', () => {
     const frame = frameOf(
