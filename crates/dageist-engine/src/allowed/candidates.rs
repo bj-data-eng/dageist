@@ -312,6 +312,21 @@ impl OptionOffer {
     pub fn words(&self) -> &[OptionWord] {
         &self.words
     }
+
+    /// The word the option starts with when it is added: the first word, in the
+    /// order of [`words`](Self::words), that is not its default and that Polars
+    /// allows beside the options it was asked with. `None` where Polars refuses
+    /// every word but the default, so that adding the option would change nothing
+    /// it can be given.
+    #[must_use]
+    pub fn starter(&self) -> Option<&str> {
+        self.words
+            .iter()
+            .find(|word| {
+                self.default.as_deref() != Some(word.word.as_str()) && word.refusal.is_none()
+            })
+            .map(|word| word.word.as_str())
+    }
 }
 
 /// The options of `entry`, its flags and its choices, each with its default

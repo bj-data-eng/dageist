@@ -272,6 +272,58 @@ fn a_word_is_refused_for_the_reason_polars_gives_beside_the_options_already_chos
 }
 
 #[test]
+fn an_option_starts_with_the_first_word_that_differs_from_its_default_and_polars_allows() {
+    let starters = |id: &str, chosen: &[(&str, &str)]| -> Vec<(String, Option<String>)> {
+        option_offers(entry(id), chosen)
+            .iter()
+            .map(|option| {
+                (
+                    option.parameter().to_owned(),
+                    option.starter().map(str::to_owned),
+                )
+            })
+            .collect()
+    };
+    let starter = |id: &str, chosen: &[(&str, &str)], name: &str| {
+        starters(id, chosen)
+            .into_iter()
+            .find(|(parameter, _)| parameter == name)
+            .unwrap_or_else(|| panic!("{id} has the option {name}"))
+            .1
+    };
+    // A flag starts as the opposite of its default; a choice with the first of its other words.
+    // Python writes `descending=False`, `nulls_last=False` and
+    // `mapping_strategy="group_to_rows"` for `over`, and lists `join` after it.
+    assert_eq!(
+        starter("Expr.over", &[], "descending").as_deref(),
+        Some("true")
+    );
+    assert_eq!(
+        starter("Expr.over", &[], "nulls_last").as_deref(),
+        Some("true")
+    );
+    assert_eq!(
+        starter("Expr.over", &[], "mapping_strategy").as_deref(),
+        Some("join")
+    );
+    // Beside `how="inner"` a validation of `m:1` is allowed. Beside an anti join Polars refuses
+    // `m:1`, `1:m` and `1:1`, so the default `m:m` is the only word left; a cross join refuses
+    // all of them.
+    assert_eq!(
+        starter("LazyFrame.join", &[("how", "inner")], "validate").as_deref(),
+        Some("m:1")
+    );
+    assert_eq!(
+        starter("LazyFrame.join", &[("how", "anti")], "validate"),
+        None
+    );
+    assert_eq!(
+        starter("LazyFrame.join", &[("how", "cross")], "validate"),
+        None
+    );
+}
+
+#[test]
 fn a_number_that_fits_the_receiver_gives_the_dtype_polars_gives_the_call() {
     // `u8 - 1` is a `UInt8` and `f32 - 1` a `Float32`: the number adapts to the column, where the
     // tables, measured with a column of its own dtype, would say `Int32` and `Float64`. A number
