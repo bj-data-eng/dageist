@@ -27,6 +27,7 @@ describe('the inputs of the claim-timing node', () => {
     const decoded = decodeNode(node);
     expect(decoded.source).toEqual({
       name: 'claims',
+      from: { kind: 'node', name: 'Claims' },
       columns: [
         { name: 'dcn', dtype: 'String' },
         { name: 'timestamp', dtype: 'Datetime(us)' },
@@ -36,13 +37,37 @@ describe('the inputs of the claim-timing node', () => {
       ],
     });
     expect(decoded.inputs).toEqual([
-      { kind: 'value', name: 'as_of', dtype: 'Date' },
-      { kind: 'list', name: 'holidays', dtype: 'Date' },
-      { kind: 'value', name: 'sla_cutoff', dtype: 'Int64' },
-      { kind: 'table', name: 'step_names', columns: [{ name: 'step_to', dtype: 'String' }] },
+      {
+        kind: 'value',
+        name: 'as_of',
+        from: { kind: 'parameter' },
+        dtype: 'Date',
+        value: '2026-03-02',
+      },
+      {
+        kind: 'list',
+        name: 'holidays',
+        from: { kind: 'column', node: 'Holiday calendar', column: 'date' },
+        dtype: 'Date',
+        values: { shown: ['2026-03-03', '2026-03-05'], more: 0 },
+      },
+      {
+        kind: 'value',
+        name: 'sla_cutoff',
+        from: { kind: 'parameter' },
+        dtype: 'Int64',
+        value: '1',
+      },
+      {
+        kind: 'table',
+        name: 'step_names',
+        from: { kind: 'node', name: 'Step names' },
+        columns: [{ name: 'step_to', dtype: 'String' }],
+      },
       {
         kind: 'table',
         name: 'step_sla',
+        from: { kind: 'node', name: 'SLA by step' },
         columns: [
           { name: 'step', dtype: 'String' },
           { name: 'sla_days', dtype: 'Int64' },

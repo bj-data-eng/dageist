@@ -98,6 +98,12 @@ describe('the report of running the claim-timing steps', () => {
         { name: 'Pending', dtype: 'Int64' },
         { name: 'Complete', dtype: 'Int64' },
       ],
+      changes: [
+        { name: 'Intake', change: 'added' },
+        { name: 'Review', change: 'added' },
+        { name: 'Pending', change: 'added' },
+        { name: 'Complete', change: 'added' },
+      ],
     });
     const added = stepNamed(run, 'received_at').outcome;
     expect(added.status === 'valid' && added.columns.slice(5)).toEqual([
@@ -105,6 +111,29 @@ describe('the report of running the claim-timing steps', () => {
       { name: 'resolved_at', dtype: 'Datetime(us)' },
       { name: 'received_at', dtype: 'Datetime(us)' },
     ]);
+  });
+
+  it('counts the rows each step kept of those it received, and writes the first values it added', () => {
+    expect(stepNamed(run, 'sort').count).toEqual({
+      kind: 'counted',
+      received: 7,
+      kept: 7,
+      first: [],
+    });
+    expect(stepNamed(run, 'resolved_day').count).toEqual({
+      kind: 'counted',
+      received: 7,
+      kept: 7,
+      first: [
+        {
+          name: 'resolved_day',
+          values: { shown: [null, '2026-03-02', '2026-03-03', '2026-03-05'], more: 3 },
+        },
+      ],
+    });
+    // Two claims are what the seven rows make of the pivot.
+    const pivot = stepNamed(run, 'pivot').count;
+    expect(pivot.kind === 'counted' && [pivot.received, pivot.kept]).toEqual([7, 2]);
   });
 
   it('gives the dtype after each link of an expression and where the expression is', () => {

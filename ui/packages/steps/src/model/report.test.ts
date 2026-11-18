@@ -106,7 +106,12 @@ describe('the columns the editor shows after each step', () => {
         {
           id: 'timestamp',
           lazy: true,
-          outcome: { status: 'valid', columns: source },
+          outcome: {
+            status: 'valid',
+            columns: source,
+            changes: [{ name: 'timestamp', change: 'replaced' }],
+          },
+          count: { kind: 'notCounted' },
           expressions: [],
           walk: { expressions: [], refusal: null, notKnown: null },
         },
