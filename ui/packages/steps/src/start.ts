@@ -2,7 +2,8 @@
  * @file The claim-timing steps the editor opens with. They are the steps of
  * the engine's claim-timing sample: translated into a document they are that
  * sample's own, which a test checks against the document the host writes, so
- * the editor starts from what the engine can run.
+ * the editor starts from what the engine can run. The words of each number and
+ * text are the engine's, which a test checks against how the engine reads them.
  */
 
 import { nextId } from './model/ids';
@@ -53,7 +54,10 @@ export const START: readonly Step[] = [
     alias: 'resolved_at',
     value: chainValue({
       source: { kind: 'column', column: 'timestamp' },
-      methods: [methodOf('shift', { kind: 'literal', value: 1 }), methodOf('over', column('dcn'))],
+      methods: [
+        methodOf('shift', { kind: 'literal', value: 1, shown: '1' }),
+        methodOf('over', column('dcn')),
+      ],
     }),
     options: NO_OPTIONS,
   },
@@ -101,13 +105,13 @@ export const START: readonly Step[] = [
               kind: 'test',
               id: nextId('test'),
               column: 'owner',
-              comparison: '==',
-              value: { kind: 'literal', value: 'Company A' },
+              comparison: 'Expr.eq',
+              value: { kind: 'literal', value: 'Company A', shown: 'Company A' },
             },
             returns: column('row_days'),
           },
         ],
-        otherwise: { kind: 'literal', value: 0 },
+        otherwise: { kind: 'literal', value: 0, shown: '0' },
       },
       methods: [method('cum_sum'), methodOf('over', column('dcn'))],
     }),
@@ -138,13 +142,13 @@ export const START: readonly Step[] = [
               kind: 'test',
               id: nextId('test'),
               column: 'row_days',
-              comparison: '<=',
+              comparison: 'Expr.le',
               value: column('sla_days'),
             },
-            returns: { kind: 'literal', value: 'within' },
+            returns: { kind: 'literal', value: 'within', shown: 'within' },
           },
         ],
-        otherwise: { kind: 'literal', value: 'late' },
+        otherwise: { kind: 'literal', value: 'late', shown: 'late' },
       },
       methods: [],
     }),
@@ -169,7 +173,7 @@ export const START: readonly Step[] = [
                 methods: [method('dt.date'), methodOf('eq', { kind: 'input', name: 'as_of' })],
               },
             },
-            returns: { kind: 'literal', value: 'holiday' },
+            returns: { kind: 'literal', value: 'holiday', shown: 'holiday' },
           },
         ],
         otherwise: {
@@ -185,13 +189,13 @@ export const START: readonly Step[] = [
                     kind: 'test',
                     id: nextId('test'),
                     column: 'row_days',
-                    comparison: '>',
+                    comparison: 'Expr.gt',
                     value: { kind: 'input', name: 'sla_cutoff' },
                   },
-                  returns: { kind: 'literal', value: 'over' },
+                  returns: { kind: 'literal', value: 'over', shown: 'over' },
                 },
               ],
-              otherwise: { kind: 'literal', value: 'ok' },
+              otherwise: { kind: 'literal', value: 'ok', shown: 'ok' },
             },
             methods: [],
           },

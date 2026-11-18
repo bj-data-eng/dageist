@@ -20,13 +20,24 @@ export interface ColumnValue {
   readonly column: string;
 }
 
-/** The same value on every row. */
-export interface LiteralValue {
+/** No value: `None`. It has no words, and the engine has no value for it yet. */
+export interface NoLiteral {
   readonly kind: 'literal';
-  readonly value: Cell;
+  readonly value: null;
+}
+
+/** A number or text, the same on every row, with the words the engine shows it as. */
+export interface TypedLiteral {
+  readonly kind: 'literal';
+  readonly value: string | number;
   /** Set for a number the engine read as one with a fraction, which stays one though it is whole. */
   readonly float?: true;
+  /** The value as the engine words it, which the editor shows and words no value of its own. */
+  readonly shown: string;
 }
+
+/** The same value on every row. */
+export type LiteralValue = NoLiteral | TypedLiteral;
 
 /** A value worked out by a chain of its own. */
 export interface ChainValue {
@@ -50,11 +61,15 @@ export interface UnsetValue {
 /** A value a condition compares with or returns. */
 export type Value = ColumnValue | LiteralValue | ChainValue | InputValue | UnsetValue;
 
-/** The comparisons, as Polars and Python spell them. `is_in` tests membership in a list. */
-export type Comparison = '==' | '!=' | '>' | '>=' | '<' | '<=' | 'is_in';
+/**
+ * What a test compares with: the identifier of the catalogue entry that compares, such as
+ * `Expr.eq`, whose sign and meaning the engine gives, or `IS_IN`, which tests membership in a list
+ * and which the catalogue has no entry for yet.
+ */
+export type Comparison = string;
 
-/** Every comparison, in the order it is offered. */
-export const COMPARISONS: readonly Comparison[] = ['==', '!=', '>', '>=', '<', '<=', 'is_in'];
+/** The comparison that tests membership in a list. The catalogue has no entry for it yet. */
+export const IS_IN: Comparison = 'is_in';
 
 /** One test: `pl.col(column) <comparison> value`. */
 export interface Test {

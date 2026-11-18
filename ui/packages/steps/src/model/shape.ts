@@ -7,7 +7,6 @@
 
 import type { Options, PairSetting, Setting } from './settings';
 import type { Arm, Chain, Condition, Source, Value } from './source';
-import { COMPARISONS } from './source';
 
 /** Reports whether `value` is an object with named parts: not null, and not a list. */
 export function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -24,8 +23,13 @@ function isMarkedFloat(value: unknown): boolean {
   return value === undefined || value === true;
 }
 
-function isCell(value: unknown): boolean {
-  return value === null || typeof value === 'string' || typeof value === 'number';
+/** Reports whether `value` is what a number or text holds: a number or text, with the words the engine shows it as. */
+function isTyped(value: Readonly<Record<string, unknown>>): boolean {
+  return (
+    (typeof value.value === 'string' || typeof value.value === 'number') &&
+    typeof value.shown === 'string' &&
+    isMarkedFloat(value.float)
+  );
 }
 
 function isPairSetting(value: unknown): value is PairSetting {
@@ -46,12 +50,9 @@ export function isSetting(value: unknown): value is Setting {
     case 'flag':
       return typeof value.value === 'boolean';
     case 'number':
-      return (
-        typeof value.value === 'number' &&
-        Number.isFinite(value.value) &&
-        isMarkedFloat(value.float)
-      );
+      return typeof value.value === 'number' && Number.isFinite(value.value) && isTyped(value);
     case 'text':
+      return typeof value.value === 'string' && isTyped(value);
     case 'word':
       return typeof value.value === 'string';
     case 'expression':
@@ -79,7 +80,7 @@ export function isValue(value: unknown): value is Value {
     case 'column':
       return typeof value.column === 'string';
     case 'literal':
-      return isCell(value.value) && isMarkedFloat(value.float);
+      return value.value === null || isTyped(value);
     case 'chain':
       return typeof value.id === 'string' && isChain(value.chain);
     case 'input':
@@ -123,7 +124,7 @@ export function isCondition(value: unknown): value is Condition {
     case 'test':
       return (
         typeof value.column === 'string' &&
-        COMPARISONS.some((comparison) => comparison === value.comparison) &&
+        typeof value.comparison === 'string' &&
         isValue(value.value)
       );
     case 'group':

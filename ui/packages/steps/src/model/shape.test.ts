@@ -37,19 +37,20 @@ describe('the words a window sends with a number or text', () => {
   });
 });
 
-describe('the comparison a window sends another', () => {
-  const test = (comparison: unknown): unknown => ({
-    kind: 'test',
-    id: 't',
-    column: 'a',
-    comparison,
-    value: { kind: 'unset' },
-  });
+/** A test that compares with `comparison`, whatever that is. */
+const testComparing = (comparison: unknown): unknown => ({
+  kind: 'test',
+  id: 't',
+  column: 'a',
+  comparison,
+  value: { kind: 'unset' },
+});
 
+describe('the comparison a window sends another', () => {
   it('is the identifier of the entry that compares, or is_in', () => {
-    expect(isCondition(test('Expr.eq'))).toBe(true);
-    expect(isCondition(test('is_in'))).toBe(true);
-    expect(isCondition(test(1))).toBe(false);
-    expect(isCondition(test(undefined))).toBe(false);
+    expect(isCondition(testComparing('Expr.eq'))).toBe(true);
+    expect(isCondition(testComparing('is_in'))).toBe(true);
+    expect(isCondition(testComparing(1))).toBe(false);
+    expect(isCondition(testComparing(undefined))).toBe(false);
   });
 });

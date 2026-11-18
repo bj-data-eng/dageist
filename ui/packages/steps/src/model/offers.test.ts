@@ -88,7 +88,7 @@ describe('the methods the engine offers after a timestamp', () => {
   it('give the argument a method starts with, only where the engine says it fits', () => {
     expect(offerNamed('shift')?.argument).toEqual({
       parameter: 'n',
-      literal: { kind: 'integer', value: 1 },
+      literal: { kind: 'integer', value: 1, shown: '1' },
     });
     expect(offerNamed('dt.date')?.argument).toBeNull();
     expect(offerNamed('sum')?.argument).toBeNull();
@@ -231,7 +231,7 @@ describe('the options of an entry', () => {
       chosenOptions(join, {
         coalesce: { kind: 'flag', value: true },
         how: { kind: 'word', value: 'cross' },
-        suffix: { kind: 'text', value: '_r' },
+        suffix: { kind: 'text', value: '_r', shown: '_r' },
         left_on: { kind: 'list', items: [] },
       }),
     ).toEqual([

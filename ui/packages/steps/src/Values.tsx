@@ -19,7 +19,6 @@ import { useCatalogue, useNode } from './EngineProvider';
 import { usePreparedStep } from './engine';
 import { comparisonEntryId, wrongId } from './model/document';
 import { ChainBlocks } from './Chain';
-import { COMPARISON_SIGNS } from './comparisons';
 import { fieldGroup, inputGroup, refusalOf, startFunctions, valueGroup } from './engineLists';
 import { FreshContext, Line, Lines } from './Lists';
 import { PositionsContext, useListState, usePositions } from './positions';
@@ -30,7 +29,7 @@ import { findColumn } from './model/frame';
 import { NO_POSITIONS, startRequest } from './model/place';
 import { nextId } from './model/ids';
 import { findInput, inputLines } from './model/inputs';
-import { literalValue, valueWords } from './model/literal';
+import { literalValue } from './model/literal';
 import type {
   ChainCondition,
   Comparison,
@@ -40,27 +39,23 @@ import type {
   Test,
   Value,
 } from './model/source';
-import { COMPARISONS } from './model/source';
+import { IS_IN } from './model/source';
+import { comparisonOptions, signOf } from './model/catalogue';
+import type { ComparisonOption } from './model/catalogue';
 
-/** What each comparison means, for someone who reads the symbol for the first time. */
-const COMPARISON_WORDS: Readonly<Record<Comparison, string>> = {
-  '==': 'equal to',
-  '!=': 'not equal to',
-  '>': 'greater than',
-  '>=': 'at least',
-  '<': 'less than',
-  '<=': 'at most',
-  is_in: 'one of a list',
-};
+/**
+ * The comparison that tests membership in a list. The engine has no entry for it yet, so it has no
+ * sign or meaning of its own to give: it is shown as its own name until it has.
+ */
+const MEMBERSHIP: ComparisonOption = { entry: IS_IN, sign: IS_IN, hint: 'one of a list' };
 
 /** A value that is still to be picked. */
 const UNSET_VALUE: Value = { kind: 'unset' };
 
-/** Returns how a typed value is shown as a block. */
+/** Returns how a typed value is shown as a block: in the words the engine gave it, text between quotation marks the block draws. */
 function literalBlock(value: LiteralValue): { label: string; look: Look } {
-  const words = valueWords(value);
-  if (words === null) return { label: 'None', look: 'none' };
-  return { label: words, look: typeof value.value === 'number' ? 'plain' : 'quoted' };
+  if (value.value === null) return { label: 'None', look: 'none' };
+  return { label: value.shown, look: typeof value.value === 'number' ? 'plain' : 'quoted' };
 }
 
 /** Returns a comparison with nothing picked yet: a field, equal to, a value. */
@@ -345,6 +340,7 @@ interface TestBlocksProps {
 /** Draws a comparison as three blocks: a field, a comparison and a value. */
 function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Element {
   const fresh = useContext(FreshContext);
+  const catalogue = useCatalogue();
   const node = useNode();
   const prepared = usePreparedStep();
   const fieldHint = useFieldHint();
@@ -364,13 +360,16 @@ function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Eleme
         };
   const wrongSign = prepared?.wrong.has(wrongId({ kind: 'test', testId: test.id })) ?? false;
 
+  // What each comparison is written as and means is the engine's, as the catalogue lists it.
+  const comparisons: readonly ComparisonOption[] = [...comparisonOptions(catalogue), MEMBERSHIP];
+  const held = comparisons.find((option) => option.entry === test.comparison);
   const compare = (comparison: Comparison): void => {
-    const wasList = test.comparison === 'is_in';
-    if (comparison === 'is_in' && !wasList) {
+    const wasList = test.comparison === IS_IN;
+    if (comparison === IS_IN && !wasList) {
       // Membership needs a list, so start from the first connected one.
       const list = node.inputs.find((input) => input.kind === 'list');
       onChange({ ...test, comparison, value: { kind: 'input', name: list?.name ?? '' } });
-    } else if (comparison !== 'is_in' && wasList) {
+    } else if (comparison !== IS_IN && wasList) {
       onChange({ ...test, comparison, value: { kind: 'unset' } });
     } else {
       onChange({ ...test, comparison });
@@ -403,34 +402,29 @@ function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Eleme
         />
       </Hint>
       <Slot
-        label={COMPARISON_SIGNS[test.comparison]}
+        label={signOf(catalogue, test.comparison) ?? test.comparison}
         tone="compare"
         look="compare"
         wrong={wrongSign}
         names
-        describedAs={`Comparison: ${COMPARISON_WORDS[test.comparison]}`}
+        describedAs={`Comparison: ${held?.hint ?? test.comparison}`}
         placeholder="Search the comparisons"
         offers={(typed) => [
           titled(
             'Comparison',
-            COMPARISONS.filter((comparison) =>
-              matches(
-                typed,
-                comparison,
-                COMPARISON_SIGNS[comparison],
-                COMPARISON_WORDS[comparison],
+            comparisons
+              .filter((option) => matches(typed, option.entry, option.sign, option.hint))
+              .map((option) =>
+                offer(
+                  option.sign,
+                  'compare',
+                  option.hint,
+                  () => {
+                    compare(option.entry);
+                  },
+                  { id: option.entry, look: 'compare' },
+                ),
               ),
-            ).map((comparison) =>
-              offer(
-                COMPARISON_SIGNS[comparison],
-                'compare',
-                COMPARISON_WORDS[comparison],
-                () => {
-                  compare(comparison);
-                },
-                { id: comparison, look: 'compare' },
-              ),
-            ),
           ),
         ]}
       />
@@ -438,7 +432,7 @@ function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Eleme
         value={test.value}
         frame={frame}
         label={unset ? 'The value it is compared with' : `Value compared with ${test.column}`}
-        lists={test.comparison === 'is_in'}
+        lists={test.comparison === IS_IN}
         positions={positions.length === 0 ? null : positions}
         argument={argument}
         onChange={(value) => {

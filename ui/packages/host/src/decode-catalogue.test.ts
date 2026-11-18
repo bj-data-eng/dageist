@@ -83,7 +83,7 @@ describe('the catalogue the host sends', () => {
           kind: { kind: 'expression' },
           shape: { shape: 'one' },
           default: { kind: 'integer', value: 1 },
-          defaultSetting: { kind: 'integer', value: 1 },
+          defaultSetting: { kind: 'integer', value: 1, shown: '1' },
           start: { kind: 'unset' },
           python: '1',
           position: null,

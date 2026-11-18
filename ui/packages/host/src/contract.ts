@@ -127,18 +127,18 @@ export const SETTING_KINDS = [
 /**
  * What a parameter holds, in the one shape every kind of parameter is drawn from. The engine
  * decides every setting it reports: what a parameter holds when it is not given, what it is set
- * to when it is first added, and what a new step starts with. Mirrors `SettingView` in
- * crates/dageist-tauri/src/catalogue.rs.
+ * to when it is first added, and what a new step starts with. A number or text comes with the
+ * words the engine shows it as. Mirrors `SettingView` in crates/dageist-tauri/src/catalogue.rs.
  */
 export type SettingView =
   /** Still to be given. */
   | { readonly kind: 'unset' }
   | { readonly kind: 'flag'; readonly value: boolean }
-  | { readonly kind: 'integer'; readonly value: number }
+  | { readonly kind: 'integer'; readonly value: number; readonly shown: string }
   /** A number with a fraction, which stays one though it is whole. */
-  | { readonly kind: 'float'; readonly value: number }
+  | { readonly kind: 'float'; readonly value: number; readonly shown: string }
   /** Text that is typed: a string, a duration or a path. */
-  | { readonly kind: 'text'; readonly value: string }
+  | { readonly kind: 'text'; readonly value: string; readonly shown: string }
   /** A name picked from a list: a choice's word, a dtype, a column or a table. */
   | { readonly kind: 'word'; readonly value: string }
   /** An expression that reads this column. */
@@ -227,12 +227,23 @@ export interface WordsView {
   readonly title: string;
 }
 
+/**
+ * A comparison of a field with a value: the entry that makes it, such as `Expr.eq`, and its sign
+ * as the language file writes it. Mirrors `ComparisonView` in crates/dageist-tauri/src/catalogue.rs.
+ */
+export interface ComparisonView {
+  readonly entry: string;
+  readonly sign: string;
+}
+
 /** Mirrors `CatalogueView` in crates/dageist-tauri/src/catalogue.rs. */
 export interface CatalogueView {
   /** Every family, in the order they are offered. */
   readonly families: readonly WordsView[];
   /** The dtypes a document names by one word, in the order a list gives them. */
   readonly listedDtypes: readonly string[];
+  /** The comparisons a test makes, in the order they are offered. */
+  readonly comparisons: readonly ComparisonView[];
   /** Every entry, ordered by identifier. */
   readonly entries: readonly EntryView[];
 }
@@ -640,11 +651,16 @@ export interface PlaceRequest {
   readonly after: AfterView;
 }
 
-/** A number or text the engine reads from what is typed, as a step document writes it. Mirrors `LiteralView` in crates/dageist-tauri/src/offers.rs. */
+/**
+ * A number or text the engine reads from what is typed, as a step document writes it, with the
+ * words the engine shows it as: a whole number as its digits, a number with a fraction as Python
+ * writes it, and text as it is, which the view draws between quotation marks of its own. Mirrors
+ * `LiteralView` in crates/dageist-tauri/src/offers.rs.
+ */
 export type LiteralView =
-  | { readonly kind: 'integer'; readonly value: number }
-  | { readonly kind: 'float'; readonly value: number }
-  | { readonly kind: 'text'; readonly value: string };
+  | { readonly kind: 'integer'; readonly value: number; readonly shown: string }
+  | { readonly kind: 'float'; readonly value: number; readonly shown: string }
+  | { readonly kind: 'text'; readonly value: string; readonly shown: string };
 
 /**
  * A value a list holds, which may be picked for a slot: the short name of the dtype of a field or

@@ -35,6 +35,32 @@ export function methodNameOf(id: string): string | null {
   return id.startsWith('Expr.') ? id.slice('Expr.'.length) : null;
 }
 
+/** One comparison a test can make, as the engine words it. */
+export interface ComparisonOption {
+  /** The entry that compares, which a test holds. */
+  readonly entry: string;
+  /** The sign the engine writes it with, such as `≥`. */
+  readonly sign: string;
+  /** What it means, in the entry's own words, such as `at least`. */
+  readonly hint: string;
+}
+
+/**
+ * Returns the comparisons a test can make, in the order the engine lists them, each with its sign
+ * and what it means, both the engine's. A comparison whose entry the catalogue lacks is left out.
+ */
+export function comparisonOptions(catalogue: Catalogue): readonly ComparisonOption[] {
+  return catalogue.view.comparisons.flatMap(({ entry, sign }) => {
+    const found = catalogue.entries.get(entry);
+    return found === undefined ? [] : [{ entry, sign, hint: found.hint }];
+  });
+}
+
+/** Returns the sign the engine writes the comparison `entry` with, or `null` where it is none. */
+export function signOf(catalogue: Catalogue, entry: string): string | null {
+  return catalogue.view.comparisons.find((comparison) => comparison.entry === entry)?.sign ?? null;
+}
+
 /** The identifier the catalogue gives the step verb `verb`, such as `LazyFrame.filter`. */
 export function verbId(verb: string): string {
   return `LazyFrame.${verb}`;

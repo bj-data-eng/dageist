@@ -298,17 +298,6 @@ describe('a new step', () => {
     expect(() => startedStep('join', join)).toThrow(/flag/);
     // A condition is a comparison.
     expect(() => startedStep('filter', filtering({ kind: 'flag', value: true }))).toThrow(/flag/);
-    expect(() =>
-      startedStep(
-        'filter',
-        filtering({
-          kind: 'comparison',
-          entry: 'Expr.nothing',
-          field: { kind: 'unset' },
-          other: { kind: 'unset' },
-        }),
-      ),
-    ).toThrow(/Expr.nothing/);
     // A comparison is not the setting of a parameter.
     expect(() =>
       settingOf({

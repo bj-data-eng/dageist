@@ -6,6 +6,7 @@
 import type {
   CatalogueView,
   ChoiceView,
+  ComparisonView,
   DefaultView,
   EntryView,
   KindView,
@@ -127,24 +128,27 @@ const readSetting: Decode<SettingView> = readTagged<SettingView>('kind', {
     }),
   },
   integer: {
-    fields: ['value'],
+    fields: ['value', 'shown'],
     read: (fields, path) => ({
       kind: 'integer',
       value: readField(fields, path, 'value', readInteger),
+      shown: readField(fields, path, 'shown', readString),
     }),
   },
   float: {
-    fields: ['value'],
+    fields: ['value', 'shown'],
     read: (fields, path) => ({
       kind: 'float',
       value: readField(fields, path, 'value', readNumber),
+      shown: readField(fields, path, 'shown', readString),
     }),
   },
   text: {
-    fields: ['value'],
+    fields: ['value', 'shown'],
     read: (fields, path) => ({
       kind: 'text',
       value: readField(fields, path, 'value', readString),
+      shown: readField(fields, path, 'shown', readString),
     }),
   },
   word: {
@@ -274,11 +278,17 @@ const readWords: Decode<WordsView> = readRecord(['key', 'title'], (fields, path)
   title: readField(fields, path, 'title', readString),
 }));
 
+const readComparison: Decode<ComparisonView> = readRecord(['entry', 'sign'], (fields, path) => ({
+  entry: readField(fields, path, 'entry', readString),
+  sign: readField(fields, path, 'sign', readString),
+}));
+
 const readCatalogue: Decode<CatalogueView> = readRecord(
-  ['families', 'listedDtypes', 'entries'],
+  ['families', 'listedDtypes', 'comparisons', 'entries'],
   (fields, path) => ({
     families: readField(fields, path, 'families', readList(readWords)),
     listedDtypes: readField(fields, path, 'listedDtypes', readList(readString)),
+    comparisons: readField(fields, path, 'comparisons', readList(readComparison)),
     entries: readField(fields, path, 'entries', readList(readEntry)),
   }),
 );

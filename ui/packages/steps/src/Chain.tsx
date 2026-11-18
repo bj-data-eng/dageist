@@ -55,7 +55,7 @@ import { chosenOptions } from './model/offers';
 import type { PreparedOffer } from './model/offers';
 import { placeRequest, startRequest, within } from './model/place';
 import { NO_OPTIONS, carriedOptions } from './model/settings';
-import { literalValue, valueWords } from './model/literal';
+import { literalValue } from './model/literal';
 import type { Arm, Chain, Source, Value } from './model/source';
 import type { ChainDtypes } from './model/report';
 import { usePreparedStep } from './engine';
@@ -154,10 +154,10 @@ function shownArgument(
     case 'chain':
       return { label: '…', tone: 'function', look: 'plain' };
     case 'literal': {
-      const words = valueWords(argument);
-      if (words === null) return { label: 'None', tone: 'value', look: 'none' };
+      // A number or text is shown in the words the engine gave it.
+      if (argument.value === null) return { label: 'None', tone: 'value', look: 'none' };
       return {
-        label: words,
+        label: argument.shown,
         tone: 'value',
         look: typeof argument.value === 'number' ? 'plain' : 'quoted',
       };

@@ -24,6 +24,7 @@ import { assertNever } from './frame';
 import type { Options, Setting } from './settings';
 import { isComplete, optionOf, setParameters } from './settings';
 import type { Cell, Chain, Comparison, Condition, Source, Value } from './source';
+import { IS_IN } from './source';
 import type { Step } from './steps';
 import { keysOf, stepItems } from './steps';
 
@@ -204,30 +205,12 @@ function literalArgument(
   return float || !Number.isSafeInteger(value) ? { float: value } : { integer: value };
 }
 
-/** The entries of the catalogue that stand for the comparisons of a test. */
-const COMPARISON_ENTRIES: Readonly<Record<Exclude<Comparison, 'is_in'>, string>> = {
-  '==': 'Expr.eq',
-  '!=': 'Expr.ne',
-  '>': 'Expr.gt',
-  '>=': 'Expr.ge',
-  '<': 'Expr.lt',
-  '<=': 'Expr.le',
-};
-
-/** The comparisons the catalogue has entries for. */
-const COMPARISONS = ['==', '!=', '>', '>=', '<', '<='] as const;
-
-/** Returns the comparison the entry `id` stands for, or `null` where it is none of the editor's. */
-export function comparisonOfEntry(id: string): (typeof COMPARISONS)[number] | null {
-  return COMPARISONS.find((comparison) => COMPARISON_ENTRIES[comparison] === id) ?? null;
-}
-
 /**
- * Returns the identifier of the entry a comparison is written as, or `null`
- * for `is_in`, which the catalogue has no entry for yet.
+ * Returns the identifier of the entry a comparison is written as, or `null` for `IS_IN`, which the
+ * catalogue has no entry for yet. A comparison is held as the entry that compares.
  */
 export function comparisonEntryId(comparison: Comparison): string | null {
-  return comparison === 'is_in' ? null : COMPARISON_ENTRIES[comparison];
+  return comparison === IS_IN ? null : comparison;
 }
 
 /** An expression before it is written: where it starts, and the links that follow. */
@@ -416,8 +399,9 @@ function testPredicate(
   path: Path,
 ): Json {
   const wrong = [wrongId({ kind: 'test', testId: test.id })];
-  if (test.comparison === 'is_in') {
-    throw unsupported('The engine has no is_in for conditions yet.', wrong);
+  const comparison = comparisonEntryId(test.comparison);
+  if (comparison === null) {
+    throw unsupported(`The engine has no ${IS_IN} for conditions yet.`, wrong);
   }
   markPlace(context, under(path, 'start'), { kind: 'test', testId: test.id });
   markPlace(context, under(path, 'link:0'), { kind: 'test', testId: test.id });
@@ -432,7 +416,7 @@ function testPredicate(
       ? holeAt(context, path, 'Pick the field to compare.', wrong)
       : call('polars.col', { name: columnsOf(test.column) });
   return {
-    expression: expressionJson(start, [call(COMPARISON_ENTRIES[test.comparison], { other })]),
+    expression: expressionJson(start, [call(comparison, { other })]),
   };
 }
 

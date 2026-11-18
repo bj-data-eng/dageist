@@ -14,7 +14,6 @@ import type { Catalogue } from './model/catalogue';
 import { methodNameOf } from './model/catalogue';
 import type { MethodName } from './model/expr';
 import type { Frame } from './model/frame';
-import { literalWords } from './model/literal';
 import type { PreparedFamily, PreparedOffer, PreparedReading } from './model/offers';
 import { candidateKey, prepareOffers, refusalWords } from './model/offers';
 
@@ -167,7 +166,7 @@ export function readingRows(
         if (reading.kind === 'unread') return typedRow(reading.reason);
         const text = reading.literal.kind === 'text';
         return offer(
-          literalWords(reading.literal),
+          reading.literal.shown,
           'value',
           reading.dtype ?? '',
           () => {

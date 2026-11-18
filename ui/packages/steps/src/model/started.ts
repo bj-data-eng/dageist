@@ -8,7 +8,6 @@
 
 import type { ParameterView, SettingView, StepStartView, StepStartsView } from '@dageist/host';
 
-import { comparisonOfEntry } from './document';
 import { assertNever } from './frame';
 import { nextId } from './ids';
 import type { Setting } from './settings';
@@ -52,11 +51,11 @@ export function settingOf(view: SettingView): Setting {
     case 'flag':
       return { kind: 'flag', value: view.value };
     case 'integer':
-      return { kind: 'number', value: view.value };
+      return { kind: 'number', value: view.value, shown: view.shown };
     case 'float':
-      return { kind: 'number', value: view.value, float: true };
+      return { kind: 'number', value: view.value, float: true, shown: view.shown };
     case 'text':
-      return { kind: 'text', value: view.value };
+      return { kind: 'text', value: view.value, shown: view.shown };
     case 'word':
       return { kind: 'word', value: view.value };
     case 'field':
@@ -153,23 +152,18 @@ function columnOf(view: SettingView): string {
 
 /**
  * Returns the condition a filter starts with, from the comparison the engine says it starts with:
- * the field it reads and what it is compared with, as the editor draws a test.
+ * the field it reads and what it is compared with, as the editor draws a test. The comparison is
+ * the entry the engine names; its sign is the engine's to give.
  *
- * @throws {UnrepresentableSetting} When it is not a comparison the editor has a sign for.
+ * @throws {UnrepresentableSetting} When it is not a comparison.
  */
 function startedTest(view: SettingView): Condition {
   if (view.kind !== 'comparison') throw new UnrepresentableSetting('a filter', view);
-  const comparison = comparisonOfEntry(view.entry);
-  if (comparison === null) {
-    throw new Error(
-      `The engine started a filter with ${view.entry}, which the editor has no sign for.`,
-    );
-  }
   return {
     kind: 'test',
     id: nextId('test'),
     column: columnOf(view.field),
-    comparison,
+    comparison: view.entry,
     value: valueOf(view.other, 'a filter'),
   };
 }
