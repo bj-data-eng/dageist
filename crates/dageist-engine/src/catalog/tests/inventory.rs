@@ -5,7 +5,8 @@
 use std::collections::BTreeSet;
 
 use crate::catalog::{
-    Applies, Family, Kind, Parameter, ParameterDefault, Reason, Shape, entries, entry, left_out,
+    Applies, Family, Kind, Parameter, ParameterDefault, Reason, Shape, Variadic, entries, entry,
+    left_out,
 };
 
 const INVENTORY: &str = include_str!("../../../../../api/polars/python.txt");
@@ -18,6 +19,9 @@ pub(super) struct Item {
     /// The parameters Python takes only by their names: those after a bare
     /// `*` or a starred parameter, other than a double-starred one.
     pub(super) keyword_only: Vec<String>,
+    /// The parameter written `*name`, and the one written `**name`.
+    pub(super) starred: Option<String>,
+    pub(super) double_starred: Option<String>,
     pub(super) deprecated: bool,
 }
 
@@ -58,7 +62,15 @@ pub(super) fn items() -> Vec<Item> {
                     let written = split_parameters(&signature[open + 1..close]);
                     let mut by_name = false;
                     let mut keyword_only = Vec::new();
+                    let (mut starred, mut double_starred) = (None, None);
                     for parameter in &written {
+                        if let Some(name) = parameter.strip_prefix("**") {
+                            double_starred = Some(name.to_owned());
+                        } else if let Some(name) = parameter.strip_prefix('*')
+                            && !name.is_empty()
+                        {
+                            starred = Some(name.to_owned());
+                        }
                         if parameter.starts_with('*') && !parameter.starts_with("**") {
                             by_name = true;
                         } else if by_name && !parameter.starts_with("**") {
@@ -72,11 +84,15 @@ pub(super) fn items() -> Vec<Item> {
                             .filter(|parameter| parameter != "*" && parameter != "/")
                             .collect(),
                         keyword_only,
+                        starred,
+                        double_starred,
                         deprecated: signature[close + 1..].trim() == "deprecated",
                     }
                 }
                 None => Item {
                     keyword_only: Vec::new(),
+                    starred: None,
+                    double_starred: None,
                     id: signature
                         .strip_suffix(" property")
                         .expect("an item without parentheses is a property")
@@ -93,11 +109,11 @@ pub(super) fn items() -> Vec<Item> {
 /// `*name` or `**name`.
 fn written(parameter: &Parameter) -> String {
     let name = parameter.name();
-    match (parameter.default(), parameter.shape(), parameter.kind()) {
-        (ParameterDefault::Required, _, _) => name.to_owned(),
-        (ParameterDefault::Python("()"), Shape::Many, _) => format!("*{name}"),
-        (ParameterDefault::Python("{}"), Shape::One, Kind::Pairs(..)) => format!("**{name}"),
-        (ParameterDefault::Python(text), _, _) => {
+    match (parameter.default(), parameter.variadic()) {
+        (ParameterDefault::Required, _) => name.to_owned(),
+        (ParameterDefault::Python("()"), Some(Variadic::Args)) => format!("*{name}"),
+        (ParameterDefault::Python("{}"), Some(Variadic::Kwargs)) => format!("**{name}"),
+        (ParameterDefault::Python(text), _) => {
             assert!(
                 text != "()" && text != "{}",
                 "{name} has the default of a starred parameter without being one"
@@ -145,6 +161,36 @@ fn the_parameters_marked_keyword_only_are_those_python_takes_by_name() {
             marked,
             item.keyword_only,
             "the keyword-only parameters of {}",
+            entry.id().as_str()
+        );
+    }
+}
+
+#[test]
+fn the_variadic_parameters_are_those_python_writes_with_stars() {
+    let items = items();
+    for entry in entries() {
+        let item = items
+            .iter()
+            .find(|item| item.id == entry.id().as_str())
+            .unwrap_or_else(|| panic!("{} is not in the inventory", entry.id().as_str()));
+        let named = |variadic: Variadic| {
+            entry
+                .parameters()
+                .iter()
+                .find(|parameter| parameter.variadic() == Some(variadic))
+                .map(|parameter| parameter.name().to_owned())
+        };
+        assert_eq!(
+            named(Variadic::Args),
+            item.starred,
+            "the starred parameter of {}",
+            entry.id().as_str()
+        );
+        assert_eq!(
+            named(Variadic::Kwargs),
+            item.double_starred,
+            "the double-starred parameter of {}",
             entry.id().as_str()
         );
     }

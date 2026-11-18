@@ -44,7 +44,7 @@ use std::fmt::{self, Write as _};
 
 use polars::prelude::DataType;
 
-use crate::catalog::{Applies, Entry, Kind, Parameter, ParameterDefault, Shape, Writes};
+use crate::catalog::{Applies, Entry, Kind, Parameter, ParameterDefault, Variadic, Writes};
 
 use super::dtype::Dtype;
 use super::inputs::{Binding, Inputs};
@@ -644,13 +644,11 @@ fn python_name(entry: &Entry) -> String {
 }
 
 fn is_starred(parameter: &Parameter) -> bool {
-    parameter.default() == ParameterDefault::Python("()") && parameter.shape() == Shape::Many
+    parameter.variadic() == Some(Variadic::Args)
 }
 
 fn is_double_starred(parameter: &Parameter) -> bool {
-    parameter.default() == ParameterDefault::Python("{}")
-        && matches!(parameter.kind(), Kind::Pairs(..))
-        && parameter.shape() == Shape::One
+    parameter.variadic() == Some(Variadic::Kwargs)
 }
 
 /// Whether Python takes `parameter` by position: it is not one that follows a

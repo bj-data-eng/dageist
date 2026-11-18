@@ -288,6 +288,16 @@ pub enum Writes {
     Columns,
 }
 
+/// What a starred parameter of Python's signature takes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Variadic {
+    /// `*name`: any number of arguments by position.
+    Args,
+    /// `**name`: any number of arguments by name, which the entry holds as
+    /// pairs of a name and a value.
+    Kwargs,
+}
+
 /// One parameter of an entry, named as Python names it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Parameter {
@@ -298,6 +308,7 @@ pub struct Parameter {
     role: Role,
     writes: Writes,
     keyword_only: bool,
+    variadic: Option<Variadic>,
 }
 
 impl Parameter {
@@ -310,7 +321,15 @@ impl Parameter {
             role: Role::Plain,
             writes: Writes::Nothing,
             keyword_only: false,
+            variadic: None,
         }
+    }
+
+    /// The same parameter, which Python writes with the stars that make it
+    /// take any number of arguments.
+    const fn with_variadic(mut self, variadic: Variadic) -> Self {
+        self.variadic = Some(variadic);
+        self
     }
 
     /// The same parameter, which Python takes only by its name: it follows a
@@ -367,6 +386,14 @@ impl Parameter {
     #[must_use]
     pub const fn writes(&self) -> Writes {
         self.writes
+    }
+
+    /// The stars of the parameter in Python's signature, if it has any: `*name`
+    /// takes the rest of the arguments by position and `**name` the rest by
+    /// name.
+    #[must_use]
+    pub const fn variadic(&self) -> Option<Variadic> {
+        self.variadic
     }
 
     /// Whether Python takes the parameter only by its name, because it follows

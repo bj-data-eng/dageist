@@ -19,7 +19,7 @@ use polars::prelude::{
 
 use super::{
     Argument, Arguments, Build, BuildError, Conditional, Dtypes, Entry, EntryId, Family, Kind,
-    Laziness, Parameter, ParameterDefault, Role, Shape, ValueType, Writes,
+    Laziness, Parameter, ParameterDefault, Role, Shape, ValueType, Variadic, Writes,
 };
 
 const ANY: &[Dtypes] = &[Dtypes::Any];
@@ -70,12 +70,12 @@ const fn optional(name: &'static str, kind: Kind, shape: Shape, python: &'static
 
 /// `*name`: any number of arguments of `kind`.
 const fn starred(name: &'static str, kind: Kind) -> Parameter {
-    optional(name, kind, Shape::Many, "()")
+    optional(name, kind, Shape::Many, "()").with_variadic(Variadic::Args)
 }
 
 /// `**name`: entries of a new column's name and its expression.
 const fn double_starred(name: &'static str) -> Parameter {
-    optional(name, NAMED_EXPRESSIONS, Shape::One, "{}")
+    optional(name, NAMED_EXPRESSIONS, Shape::One, "{}").with_variadic(Variadic::Kwargs)
 }
 
 /// A flag with Python's default text, which may be `None` where Polars decides.
