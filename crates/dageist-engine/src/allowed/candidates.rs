@@ -110,7 +110,9 @@ impl Fit {
     /// that stands as an expression is judged as the start of one: a column as
     /// `polars.col` of its dtype, a typed literal and a connected input as a
     /// literal, and the verdict says whether the expression may end there.
-    /// Where the slot is only an argument, the verdict is the method's.
+    /// Where the slot is only an argument, the verdict is the method's. Where it
+    /// is both, the candidate is refused where either refuses it, and otherwise
+    /// the verdict is the method's.
     #[must_use]
     pub const fn verdict(&self) -> &Verdict {
         &self.verdict
@@ -186,7 +188,13 @@ pub fn fit(candidate: &Candidate, slot: &Slot<'_>) -> Option<Fit> {
             Candidate::Input { shape, .. } => offer_input(&place, dtype, *shape),
             Candidate::Literal(_) => offer_input(&place, dtype, Shape::One),
         };
-        verdict = Some(found);
+        // Either side may refuse it. Where both allow it, the verdict is the argument's: what the
+        // call it is given to gives, not what the candidate would be alone.
+        verdict = match (verdict, found) {
+            (_, refused @ Verdict::Refused(_)) => Some(refused),
+            (Some(argument), Verdict::Allowed(_)) => Some(argument),
+            (None, allowed @ Verdict::Allowed(_)) => Some(allowed),
+        };
     }
     verdict.map(|verdict| Fit { dtype, verdict })
 }
