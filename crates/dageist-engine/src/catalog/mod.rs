@@ -297,6 +297,7 @@ pub struct Parameter {
     default: ParameterDefault,
     role: Role,
     writes: Writes,
+    keyword_only: bool,
 }
 
 impl Parameter {
@@ -308,7 +309,15 @@ impl Parameter {
             default,
             role: Role::Plain,
             writes: Writes::Nothing,
+            keyword_only: false,
         }
+    }
+
+    /// The same parameter, which Python takes only by its name: it follows a
+    /// bare `*` or a starred parameter in Python's signature.
+    const fn keyword_only(mut self) -> Self {
+        self.keyword_only = true;
+        self
     }
 
     /// The same parameter, whose expressions write columns.
@@ -358,6 +367,15 @@ impl Parameter {
     #[must_use]
     pub const fn writes(&self) -> Writes {
         self.writes
+    }
+
+    /// Whether Python takes the parameter only by its name, because it follows
+    /// a bare `*` or a starred parameter in Python's signature. A starred or
+    /// double-starred parameter is not one: it takes what Python gives it
+    /// without a name.
+    #[must_use]
+    pub const fn is_keyword_only(&self) -> bool {
+        self.keyword_only
     }
 }
 

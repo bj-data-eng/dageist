@@ -15,6 +15,9 @@ pub(super) struct Item {
     pub(super) id: String,
     /// The parameters as written, `*` and `/` markers left out.
     pub(super) parameters: Vec<String>,
+    /// The parameters Python takes only by their names: those after a bare
+    /// `*` or a starred parameter, other than a double-starred one.
+    pub(super) keyword_only: Vec<String>,
     pub(super) deprecated: bool,
 }
 
@@ -52,16 +55,28 @@ pub(super) fn items() -> Vec<Item> {
             match signature.find('(') {
                 Some(open) => {
                     let close = signature.rfind(')').expect("a signature closes");
+                    let written = split_parameters(&signature[open + 1..close]);
+                    let mut by_name = false;
+                    let mut keyword_only = Vec::new();
+                    for parameter in &written {
+                        if parameter.starts_with('*') && !parameter.starts_with("**") {
+                            by_name = true;
+                        } else if by_name && !parameter.starts_with("**") {
+                            keyword_only.push(parameter.split('=').next().unwrap().to_owned());
+                        }
+                    }
                     Item {
                         id: signature[..open].to_owned(),
-                        parameters: split_parameters(&signature[open + 1..close])
+                        parameters: written
                             .into_iter()
                             .filter(|parameter| parameter != "*" && parameter != "/")
                             .collect(),
+                        keyword_only,
                         deprecated: signature[close + 1..].trim() == "deprecated",
                     }
                 }
                 None => Item {
+                    keyword_only: Vec::new(),
                     id: signature
                         .strip_suffix(" property")
                         .expect("an item without parentheses is a property")
@@ -105,6 +120,31 @@ fn every_entry_has_the_parameters_and_defaults_of_its_python_signature() {
             written,
             item.parameters,
             "parameters of {}",
+            entry.id().as_str()
+        );
+    }
+}
+
+#[test]
+fn the_parameters_marked_keyword_only_are_those_python_takes_by_name() {
+    let items = items();
+    for entry in entries() {
+        let item = items
+            .iter()
+            .find(|item| item.id == entry.id().as_str())
+            .unwrap_or_else(|| panic!("{} is not in the inventory", entry.id().as_str()));
+        let marked: Vec<&str> = entry
+            .parameters()
+            .iter()
+            .filter(|parameter| parameter.is_keyword_only())
+            .map(Parameter::name)
+            .collect();
+        // A parameter after a starred one is Python's keyword-only parameter too, though the
+        // starred parameter itself is not one.
+        assert_eq!(
+            marked,
+            item.keyword_only,
+            "the keyword-only parameters of {}",
             entry.id().as_str()
         );
     }
