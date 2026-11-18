@@ -17,6 +17,7 @@ mod condition;
 mod defaults;
 mod entries;
 mod left_out;
+mod starting;
 #[cfg(test)]
 mod tests;
 mod words;
@@ -25,6 +26,7 @@ pub use arguments::{Argument, Arguments, BuildError};
 pub use condition::Conditional;
 pub use defaults::{DefaultValue, ParameterDefault};
 pub use left_out::{LeftOut, Reason, left_out};
+pub use starting::{Setting, StepFrame, StepStart, start_step};
 pub use words::{SummaryPhrase, SummaryWord, Words, WordsError, english};
 
 use polars::prelude::{Expr, LazyFrame};
