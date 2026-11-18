@@ -2,6 +2,7 @@
 //! and running it on a small claims table.
 
 mod claims;
+mod counts;
 mod dtypes;
 mod floats;
 mod holes;

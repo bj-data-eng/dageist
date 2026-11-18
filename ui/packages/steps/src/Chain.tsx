@@ -24,7 +24,6 @@ import { useCandidateFits, useOffers, useOptions, useReadTyped } from './ask';
 import type { FitSlot } from './ask';
 import { useCatalogue, useNode } from './EngineProvider';
 import { fieldGroup, inputGroup, methodGroups, startFunctions, valueGroup } from './engineLists';
-import { inputLines } from './InputsStrip';
 import { FreshContext, Line, Lines } from './Lists';
 import { OptionRows, optionOffers } from './Parameters';
 import { useListState, usePositions } from './positions';
@@ -50,7 +49,7 @@ import {
 } from './model/expr';
 import type { Dtype, Frame } from './model/frame';
 import { assertNever, findColumn } from './model/frame';
-import { findInput } from './model/inputs';
+import { findInput, inputLines } from './model/inputs';
 import { nextId } from './model/ids';
 import { chosenOptions } from './model/offers';
 import type { PreparedOffer } from './model/offers';

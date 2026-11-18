@@ -61,6 +61,39 @@ function chainIdOf(id: string): string {
   return step.value.id;
 }
 
+/** A report of one step that names `timestamp` and the engine says changed `changes`. */
+function timestampRun(changes: ReadonlyArray<{ name: string; change: string }>): {
+  readonly steps: Step[];
+  readonly run: ReturnType<typeof decodeRun>;
+} {
+  const steps: Step[] = [
+    {
+      id: 'timestamp',
+      verb: 'with_columns',
+      alias: 'timestamp',
+      value: { kind: 'column', column: 'timestamp' },
+      options: NO_OPTIONS,
+    },
+  ];
+  return {
+    steps,
+    run: decodeRun({
+      status: 'run',
+      source,
+      steps: [
+        {
+          id: 'timestamp',
+          lazy: true,
+          outcome: { status: 'valid', columns: source, changes },
+          count: { kind: 'notCounted' },
+          expressions: [],
+          walk: { expressions: [], refusal: null, notKnown: null },
+        },
+      ],
+    }),
+  };
+}
+
 describe('the columns the editor shows after each step', () => {
   it('are the engine’s columns of the step, and the columns the step is given are the step before’s', () => {
     const prepared = started();
@@ -80,43 +113,42 @@ describe('the columns the editor shows after each step', () => {
     ]);
   });
 
-  it('say which columns a step added, which a join and a pivot do from what they give', () => {
+  it('say which columns a step added, as the engine reports them', () => {
     const prepared = started();
 
-    expect(stepOf(prepared, 'sort').added).toEqual([]);
-    expect(stepOf(prepared, 'step_index').added).toEqual(['step_index']);
-    expect(stepOf(prepared, 'join').added).toEqual(['sla_days']);
-    expect(stepOf(prepared, 'pivot').added).toEqual(['Intake', 'Review', 'Pending', 'Complete']);
+    expect(stepOf(prepared, 'sort')).toMatchObject({ changes: [] });
+    expect(stepOf(prepared, 'step_index')).toMatchObject({
+      changes: [{ name: 'step_index', change: 'added' }],
+    });
+    expect(stepOf(prepared, 'join')).toMatchObject({
+      changes: [{ name: 'sla_days', change: 'added' }],
+    });
+    expect(stepOf(prepared, 'pivot')).toMatchObject({
+      changes: ['Intake', 'Review', 'Pending', 'Complete'].map((name) => ({
+        name,
+        change: 'added',
+      })),
+    });
   });
 
-  it('count a column a step names as added even when the one it replaces has its dtype', () => {
-    const steps: Step[] = [
-      {
-        id: 'timestamp',
-        verb: 'with_columns',
-        alias: 'timestamp',
-        value: { kind: 'column', column: 'timestamp' },
-        options: NO_OPTIONS,
-      },
-    ];
-    const replaced = decodeRun({
-      status: 'run',
-      source,
-      steps: [
-        {
-          id: 'timestamp',
-          lazy: true,
-          outcome: { status: 'valid', columns: source },
-          expressions: [],
-          walk: { expressions: [], refusal: null, notKnown: null },
-        },
-      ],
-    });
-
+  it('say a column is replaced where the engine says so, with the dtype it had', () => {
+    const { steps, run: replaced } = timestampRun([{ name: 'timestamp', change: 'replaced' }]);
     const translation = translate(catalogue, steps);
+
     const prepared = prepareRun(steps, translation, answeredFor(translation, replaced), source);
 
-    expect(prepared.steps[0]?.added).toEqual(['timestamp']);
+    expect(prepared.steps[0]).toMatchObject({
+      changes: [{ name: 'timestamp', change: 'replaced' }],
+    });
+  });
+
+  it('do not add a column the step names to the changes the engine reports', () => {
+    const { steps, run: unchanged } = timestampRun([]);
+    const translation = translate(catalogue, steps);
+
+    const prepared = prepareRun(steps, translation, answeredFor(translation, unchanged), source);
+
+    expect(prepared.steps[0]).toMatchObject({ changes: [] });
   });
 
   it('say which steps stay lazy, as the engine reports it', () => {
@@ -124,6 +156,101 @@ describe('the columns the editor shows after each step', () => {
 
     expect(stepOf(prepared, 'join').lazy).toBe(true);
     expect(stepOf(prepared, 'pivot').lazy).toBe(false);
+  });
+});
+
+/** A report of two valid steps, the second of which the engine counted as `count`. */
+function counted(count: unknown): ReturnType<typeof decodeRun> {
+  return decodeRun({
+    status: 'run',
+    source,
+    steps: ['sort', 'step_index'].map((id) => ({
+      id,
+      lazy: true,
+      outcome: { status: 'valid', columns: source, changes: [] },
+      count: id === 'sort' ? { kind: 'notCounted' } : count,
+      expressions: [],
+      walk: { expressions: [], refusal: null, notKnown: null },
+    })),
+  });
+}
+
+describe('a step the engine could not run on the rows', () => {
+  it('says what Polars said, as far as the first paragraph, which is before its plan', () => {
+    const steps = START.slice(0, 2);
+    const translation = translate(catalogue, steps);
+    const reason = 'the date of text is not a date\n\nResolved plan until failure: …';
+
+    const prepared = prepareRun(
+      steps,
+      translation,
+      answeredFor(translation, counted({ kind: 'failed', reason })),
+      source,
+    );
+
+    expect(prepared.steps[1]).toMatchObject({
+      status: 'valid',
+      rowsProblem: 'Could not be run on the sample rows: the date of text is not a date',
+    });
+    // The step before it was not counted, which is not a failure.
+    expect(prepared.steps[0]).toMatchObject({ rowsProblem: null });
+  });
+
+  it('is nothing for a step that was counted or not counted, or not reported on', () => {
+    const prepared = started();
+
+    for (const step of prepared.steps) {
+      expect(step, step.id).toMatchObject({ rowsProblem: null });
+    }
+  });
+});
+
+describe('the rows each step kept and the first values it added', () => {
+  it('are how many rows the step kept of those it received, where the engine counted them', () => {
+    const prepared = started();
+
+    expect(stepOf(prepared, 'sort')).toMatchObject({ rows: { received: 7, kept: 7 } });
+    // Seven claim rows make two claims.
+    expect(stepOf(prepared, 'pivot')).toMatchObject({ rows: { received: 7, kept: 2 } });
+  });
+
+  it('are the first values of each column a step changed, as one line of the text the engine wrote', () => {
+    const prepared = started();
+
+    // A null is a dash, and a column with more values than are shown ends in an ellipsis.
+    expect(stepOf(prepared, 'step_index')).toMatchObject({
+      first: new Map([['step_index', '1, 2, 3, 4, …']]),
+    });
+    expect(stepOf(prepared, 'resolved_day')).toMatchObject({
+      first: new Map([['resolved_day', '—, 2026-03-02, 2026-03-03, 2026-03-05, …']]),
+    });
+    expect(stepOf(prepared, 'join')).toMatchObject({
+      first: new Map([['sla_days', '1, 1, 2, 3, …']]),
+    });
+    // The two rows of the pivot are all there are: no ellipsis.
+    expect(stepOf(prepared, 'pivot')).toMatchObject({
+      first: new Map([
+        ['Intake', '0, 0'],
+        ['Review', '1, 2'],
+        ['Pending', '2, —'],
+        ['Complete', '2, 2'],
+      ]),
+    });
+  });
+
+  it('are nothing for a step the engine did not count, or could not run on the rows', () => {
+    const steps = START.slice(0, 2);
+    const translation = translate(catalogue, steps);
+    for (const count of [{ kind: 'notCounted' }, { kind: 'failed', reason: 'no rows' }]) {
+      const prepared = prepareRun(
+        steps,
+        translation,
+        answeredFor(translation, counted(count)),
+        source,
+      );
+      expect(prepared.steps[0]).toMatchObject({ rows: null, first: new Map() });
+      expect(prepared.steps[1]).toMatchObject({ rows: null, first: new Map() });
+    }
   });
 });
 
@@ -447,6 +574,15 @@ describe('a report of steps that have been edited since', () => {
     expect(prepared.steps.slice(4).map((step) => step.status)).toEqual(Array(8).fill('unknown'));
     expect(prepared.steps.slice(4).every((step) => step.chains.size === 0)).toBe(true);
     expect(stepOf(prepared, 'resolved_day').problem).toBeNull();
+    // Nor are the changes, the counts or the first values of steps the engine has not reported on.
+    for (const step of prepared.steps.slice(4)) {
+      expect(step, step.id).toMatchObject({ changes: [], rows: null, first: new Map() });
+    }
+    // The steps before it keep theirs.
+    expect(stepOf(prepared, 'step_index')).toMatchObject({
+      changes: [{ name: 'step_index', change: 'added' }],
+      rows: { received: 7, kept: 7 },
+    });
   });
 
   it('gives the steps that wait the columns of the last step that still corresponds', () => {

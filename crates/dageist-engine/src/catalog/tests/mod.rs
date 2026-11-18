@@ -10,3 +10,4 @@ mod every_variant;
 mod inventory;
 mod language;
 mod roles;
+mod writes;

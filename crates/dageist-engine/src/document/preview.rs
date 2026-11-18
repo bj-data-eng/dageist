@@ -7,6 +7,7 @@ use super::columns::ColumnDescription;
 use super::inputs::Inputs;
 use super::model::{Document, StepId};
 use super::run::RowsError;
+use super::values::text_of;
 
 /// The rows after a step: its columns, and every cell as the text Polars
 /// writes it.
@@ -38,8 +39,7 @@ impl Preview {
         for index in 0..frame.height() {
             let mut cells = Vec::with_capacity(frame.width());
             for column in frame.columns() {
-                let value = column.get(index)?;
-                cells.push((!value.is_null()).then(|| value.str_value().into_owned()));
+                cells.push(text_of(&column.get(index)?));
             }
             rows.push(cells);
         }

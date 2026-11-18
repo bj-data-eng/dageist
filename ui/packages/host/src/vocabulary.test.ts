@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   APPLIES,
+  CHANGES,
   CONDITION_STATES,
   ERROR_KINDS,
   NESTED_POSITIONS,
@@ -106,6 +107,12 @@ describe('the words the decoders read', () => {
             word,
           ),
         ),
+    },
+    {
+      list: 'changes',
+      words: CHANGES,
+      accepts: (word) =>
+        decodeRun(replaced(variants, ['steps', 0, 'outcome', 'changes', 0, 'change'], word)),
     },
     {
       list: 'errorKinds',

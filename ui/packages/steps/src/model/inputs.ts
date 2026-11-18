@@ -5,9 +5,10 @@
  * dtypes. The view keeps none of it; it asks the host.
  */
 
-import type { InputView, NodeView } from '@dageist/host';
+import type { InputView, NodeView, OriginView } from '@dageist/host';
 
 import type { Frame } from './frame';
+import { NULL_DASH, valuesLine } from './values';
 
 /** A table a step can join to, by the name the step refers to it with. */
 export interface NamedTable {
@@ -30,4 +31,46 @@ export function tablesOf(node: NodeView): readonly NamedTable[] {
 /** Returns the table called `name`, if there is one. */
 export function findTable(node: NodeView, name: string): NamedTable | null {
   return tablesOf(node).find((table) => table.name === name) ?? null;
+}
+
+/** Returns the words that say what supplies an input to the node. */
+export function originWords(origin: OriginView): string {
+  switch (origin.kind) {
+    case 'node':
+      return origin.name;
+    case 'column':
+      return `${origin.node} · column "${origin.column}"`;
+    case 'parameter':
+      return 'Parameters';
+    default:
+      return origin satisfies never;
+  }
+}
+
+/** Returns the lines that describe an input: what it is, where it comes from and what it holds. */
+export function inputLines(input: InputView): string[] {
+  const from = `from ${originWords(input.from)}`;
+  switch (input.kind) {
+    case 'table':
+      return [
+        `${input.name} · table`,
+        from,
+        ...input.columns.map((column) => `${column.name} · ${column.dtype}`),
+      ];
+    case 'value':
+      return [`${input.name} · ${input.dtype}`, from, input.value ?? NULL_DASH];
+    case 'list':
+      return [`${input.name} · list of ${input.dtype}`, from, valuesLine(input.values)];
+    default:
+      return input satisfies never;
+  }
+}
+
+/** Returns the lines that describe the table the steps start from. */
+export function sourceLines(node: NodeView): string[] {
+  return [
+    `${node.source.name} · table · the steps start from its rows`,
+    `from ${originWords(node.source.from)}`,
+    ...node.source.columns.map((column) => `${column.name} · ${column.dtype}`),
+  ];
 }

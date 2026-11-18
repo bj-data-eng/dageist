@@ -149,24 +149,233 @@ fn claim_columns() -> Value {
     ])
 }
 
+fn parameter() -> Value {
+    json!({ "kind": "parameter" })
+}
+
+fn from_node(name: &str) -> Value {
+    json!({ "kind": "node", "name": name })
+}
+
 #[test]
-fn the_inputs_command_reports_the_source_and_every_input_by_name() {
+fn the_inputs_command_reports_the_source_and_every_input_by_name_with_what_supplies_it() {
     let answer = invoke("node_inputs", json!({})).expect("the inputs");
     assert_eq!(
         answer,
         json!({
-            "source": { "name": "claims", "columns": claim_columns() },
+            "source": {
+                "name": "claims",
+                "from": from_node("Claims"),
+                "columns": claim_columns()
+            },
             "inputs": [
-                { "kind": "value", "name": "as_of", "dtype": "Date" },
-                { "kind": "list", "name": "holidays", "dtype": "Date" },
-                { "kind": "value", "name": "sla_cutoff", "dtype": "Int64" },
-                { "kind": "table", "name": "step_names",
+                { "kind": "value", "name": "as_of", "from": parameter(),
+                  "dtype": "Date", "value": "2026-03-02" },
+                { "kind": "list", "name": "holidays",
+                  "from": { "kind": "column", "node": "Holiday calendar", "column": "date" },
+                  "dtype": "Date",
+                  "values": { "shown": ["2026-03-03", "2026-03-05"], "more": 0 } },
+                { "kind": "value", "name": "sla_cutoff", "from": parameter(),
+                  "dtype": "Int64", "value": "1" },
+                { "kind": "table", "name": "step_names", "from": from_node("Step names"),
                   "columns": [the_field("step_to", "String")] },
-                { "kind": "table", "name": "step_sla",
+                { "kind": "table", "name": "step_sla", "from": from_node("SLA by step"),
                   "columns": [the_field("step", "String"), the_field("sla_days", "Int64")] },
             ]
         })
     );
+}
+
+/// What a step added or replaced, as the report writes one change.
+fn change(name: &str, how: &str) -> Value {
+    json!({ "name": name, "change": how })
+}
+
+/// The first values of a column, as the report writes them.
+fn values(name: &str, shown: Value, more: usize) -> Value {
+    json!({ "name": name, "values": { "shown": shown, "more": more } })
+}
+
+/// A step that was given `received` rows, kept `kept` and has `first` values.
+fn counted(received: usize, kept: usize, first: Value) -> Value {
+    json!({ "kind": "counted", "received": received, "kept": kept, "first": first })
+}
+
+/// The claims kept where their days are over one, then a step that writes `owner` as it was
+/// and adds a column of the same test.
+fn filter_text() -> String {
+    let column = |name: &str| {
+        json!({ "expression": { "start": {
+            "entry": "polars.col",
+            "arguments": { "name": { "columns": [name] } }
+        }, "then": [] } })
+    };
+    let slow = json!({ "expression": { "start": {
+        "entry": "polars.col",
+        "arguments": { "name": { "columns": ["row_days"] } }
+    }, "then": [{ "entry": "Expr.gt", "arguments": { "other": { "expression": {
+        "start": { "entry": "polars.lit", "arguments": { "value": { "integer": 1 } } },
+        "then": []
+    } } } }] } });
+    json!({ "version": 1, "steps": [
+        { "id": "slow_only", "call": { "entry": "LazyFrame.filter", "arguments": {
+            "predicates": { "many": [slow.clone()] }
+        } } },
+        { "id": "write", "call": { "entry": "LazyFrame.with_columns", "arguments": {
+            "named_exprs": { "pairs": [
+                [{ "columns": ["owner"] }, column("owner")],
+                [{ "columns": ["slow"] }, slow],
+            ] }
+        } } }
+    ] })
+    .to_string()
+}
+
+/// A date part of text, which passes the schema and fails on rows, then a step that waits for it.
+fn failing_text() -> String {
+    json!({ "version": 1, "steps": [
+        { "id": "date", "call": { "entry": "LazyFrame.with_columns", "arguments": {
+            "named_exprs": { "pairs": [[
+                { "columns": ["day"] },
+                { "expression": { "start": {
+                    "entry": "polars.col",
+                    "arguments": { "name": { "columns": ["dcn"] } }
+                }, "then": [{ "entry": "Expr.dt.date", "arguments": {} }] } }
+            ]] }
+        } } },
+        { "id": "after", "call": { "entry": "LazyFrame.with_columns", "arguments": {
+            "named_exprs": { "pairs": [[
+                { "columns": ["days"] },
+                { "expression": { "start": {
+                    "entry": "polars.col",
+                    "arguments": { "name": { "columns": ["row_days"] } }
+                }, "then": [] } }
+            ]] }
+        } } }
+    ] })
+    .to_string()
+}
+
+#[test]
+fn the_run_command_reports_the_columns_a_step_added_or_replaced() {
+    let answer = invoke("run_document", json!({ "document": steps_text() })).expect("a report");
+    let steps = &answer["steps"];
+    // `resolved_day` is the fifth step, and adds the one column.
+    assert_eq!(
+        steps[4]["outcome"]["changes"],
+        json!([change("resolved_day", "added")])
+    );
+    // The sort and the join: nothing, then the days each step may take.
+    assert_eq!(steps[0]["outcome"]["changes"], json!([]));
+    assert_eq!(
+        steps[7]["outcome"]["changes"],
+        json!([change("sla_days", "added")])
+    );
+    // A pivot adds a column for each step name it was given, and keeps the index.
+    assert_eq!(
+        steps[11]["outcome"]["changes"],
+        json!([
+            change("Intake", "added"),
+            change("Review", "added"),
+            change("Pending", "added"),
+            change("Complete", "added"),
+        ])
+    );
+    // A column the step writes is replaced, even as the text it was.
+    let written = invoke("run_document", json!({ "document": filter_text() })).expect("a report");
+    assert_eq!(
+        written["steps"][1]["outcome"]["changes"],
+        json!([change("owner", "replaced"), change("slow", "added")])
+    );
+}
+
+#[test]
+fn the_run_command_reports_the_rows_each_step_kept_with_the_first_values_it_added() {
+    let answer = invoke("run_document", json!({ "document": steps_text() })).expect("a report");
+    let steps = &answer["steps"];
+    assert_eq!(steps[0]["count"], counted(7, 7, json!([])));
+    // After the sort A-1001 has four rows. The step before the first in a claim has none.
+    assert_eq!(
+        steps[1]["count"],
+        counted(
+            7,
+            7,
+            json!([values("step_index", json!(["1", "2", "3", "4"]), 3)])
+        )
+    );
+    assert_eq!(
+        steps[4]["count"],
+        counted(
+            7,
+            7,
+            json!([values(
+                "resolved_day",
+                json!([null, "2026-03-02", "2026-03-03", "2026-03-05"]),
+                3
+            )])
+        )
+    );
+    assert_eq!(
+        steps[7]["count"],
+        counted(
+            7,
+            7,
+            json!([values("sla_days", json!(["1", "1", "2", "3"]), 3)])
+        )
+    );
+    // Seven rows of two claims make a pivot of two rows, A-1001 first.
+    let pivot = &steps[11]["count"];
+    assert_eq!((&pivot["received"], &pivot["kept"]), (&json!(7), &json!(2)));
+    assert_eq!(pivot["first"][2], values("Pending", json!(["2", null]), 0));
+}
+
+#[test]
+fn a_filter_keeps_the_rows_that_pass_of_the_rows_it_received() {
+    let answer = invoke("run_document", json!({ "document": filter_text() })).expect("a report");
+    // Four of the seven rows have more than one day; the step after is given those four.
+    assert_eq!(answer["steps"][0]["count"], counted(7, 4, json!([])));
+    assert_eq!(
+        answer["steps"][1]["count"],
+        counted(
+            4,
+            4,
+            json!([
+                values(
+                    "owner",
+                    json!(["Company A", "Company B", "Company A", "Company B"]),
+                    0
+                ),
+                values("slow", json!(["true", "true", "true", "true"]), 0),
+            ])
+        )
+    );
+}
+
+#[test]
+fn a_step_that_is_refused_is_not_counted_and_nor_are_the_steps_after_it() {
+    let answer = invoke("run_document", json!({ "document": refused_text() })).expect("a report");
+    let steps = &answer["steps"];
+    assert_eq!(steps[0]["count"], counted(7, 7, json!([])));
+    assert_eq!(steps[1]["count"], json!({ "kind": "notCounted" }));
+    assert_eq!(steps[2]["count"], json!({ "kind": "notCounted" }));
+}
+
+#[test]
+fn a_step_polars_cannot_run_on_the_rows_fails_there_and_the_steps_after_it_are_not_counted() {
+    let answer = invoke("run_document", json!({ "document": failing_text() })).expect("a report");
+    let steps = &answer["steps"];
+    // The step is valid by its schema.
+    assert_eq!(steps[0]["outcome"]["status"], "valid");
+    assert_eq!(steps[0]["count"]["kind"], "failed");
+    assert!(
+        steps[0]["count"]["reason"]
+            .as_str()
+            .expect("a reason")
+            .contains("date"),
+        "Polars says what it could not do: {}",
+        steps[0]["count"]
+    );
+    assert_eq!(steps[1]["count"], json!({ "kind": "notCounted" }));
 }
 
 #[test]

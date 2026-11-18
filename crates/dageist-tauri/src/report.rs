@@ -17,8 +17,9 @@ use dageist_engine::allowed::{
 };
 use dageist_engine::catalog::Laziness;
 use dageist_engine::document::{
-    ColumnDescription, ExpressionDtypes, Outcome, Place, ReadError, Report, Resolution, RunCause,
-    Segment, StepReport, Walk, WalkRefusal, WalkedExpression,
+    Change, ColumnChange, ColumnDescription, ColumnValues, ExpressionDtypes, FirstValues, Outcome,
+    Place, ReadError, Report, Resolution, RunCause, Segment, StepReport, StepRows, Walk,
+    WalkRefusal, WalkedExpression,
 };
 use serde::{Deserialize, Serialize};
 
@@ -39,6 +40,103 @@ impl FieldView {
                 dtype: column.dtype().to_owned(),
             })
             .collect()
+    }
+}
+
+/// The first values of a column or a list, each as the text Polars writes it
+/// and a null as `null`, and how many more follow them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ValuesView {
+    shown: Vec<Option<String>>,
+    more: usize,
+}
+
+impl ValuesView {
+    /// The view of `values`.
+    pub fn of(values: &FirstValues) -> Self {
+        Self {
+            shown: values.shown().to_vec(),
+            more: values.more(),
+        }
+    }
+}
+
+/// How a step changed a column of the table it was given.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum ChangeView {
+    /// The table the step gives has the column and the one it was given did
+    /// not.
+    Added,
+    /// Both have the column, and the step wrote it or gave it another dtype.
+    Replaced,
+}
+
+const fn change_view(change: Change) -> ChangeView {
+    match change {
+        Change::Added => ChangeView::Added,
+        Change::Replaced => ChangeView::Replaced,
+    }
+}
+
+/// A column a step added or replaced.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub(crate) struct ColumnChangeView {
+    name: String,
+    change: ChangeView,
+}
+
+fn column_change_view(change: &ColumnChange) -> ColumnChangeView {
+    ColumnChangeView {
+        name: change.name().to_owned(),
+        change: change_view(change.change()),
+    }
+}
+
+/// The first values of one column a step changed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub(crate) struct ColumnValuesView {
+    name: String,
+    values: ValuesView,
+}
+
+fn column_values_view(column: &ColumnValues) -> ColumnValuesView {
+    ColumnValuesView {
+        name: column.name().to_owned(),
+        values: ValuesView::of(column.values()),
+    }
+}
+
+/// What running a step on the rows of the working window came to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub(crate) enum CountView {
+    /// The step was not run on rows: the run read none, or a step before it
+    /// was refused, incomplete or failed on the rows.
+    NotCounted,
+    /// The step was given `received` rows and kept `kept`.
+    Counted {
+        received: usize,
+        kept: usize,
+        /// The first values of each column the step added or replaced.
+        first: Vec<ColumnValuesView>,
+    },
+    /// Polars accepted the step and could not run it on the rows, for this
+    /// reason.
+    Failed { reason: String },
+}
+
+fn count_view(rows: &StepRows) -> CountView {
+    match rows {
+        StepRows::NotCounted => CountView::NotCounted,
+        StepRows::Counted(count) => CountView::Counted {
+            received: count.received(),
+            kept: count.kept(),
+            first: count.first().iter().map(column_values_view).collect(),
+        },
+        StepRows::Failed(error) => CountView::Failed {
+            reason: error.to_string(),
+        },
     }
 }
 
@@ -456,8 +554,12 @@ fn cause_view(cause: &RunCause) -> CauseView {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "status", rename_all = "camelCase")]
 enum OutcomeView {
-    /// Polars accepts the step, and its table has these columns.
-    Valid { columns: Vec<FieldView> },
+    /// Polars accepts the step, and its table has these columns, of which the
+    /// step added or replaced these.
+    Valid {
+        columns: Vec<FieldView>,
+        changes: Vec<ColumnChangeView>,
+    },
     /// The step was refused, here, for this reason.
     #[serde(rename_all = "camelCase")]
     Refused { place: PlaceView, cause: CauseView },
@@ -471,8 +573,9 @@ enum OutcomeView {
 
 fn outcome_view(outcome: &Outcome) -> OutcomeView {
     match outcome {
-        Outcome::Valid { schema } => OutcomeView::Valid {
+        Outcome::Valid { schema, changes } => OutcomeView::Valid {
             columns: FieldView::of_columns(&ColumnDescription::of_schema(schema)),
+            changes: changes.iter().map(column_change_view).collect(),
         },
         Outcome::Refused(refusal) => OutcomeView::Refused {
             place: place_view(refusal.place()),
@@ -495,6 +598,9 @@ pub struct StepReportView {
     /// the data it needs when it was built.
     lazy: bool,
     outcome: OutcomeView,
+    /// How many rows the step kept of those it received on the working window,
+    /// with the first values of what it changed, where the rows were run.
+    count: CountView,
     /// The dtypes of every expression in the step's arguments, as far as they
     /// could be built.
     expressions: Vec<ExpressionDtypesView>,
@@ -506,6 +612,7 @@ fn step_report_view(step: &StepReport) -> StepReportView {
         id: step.id().as_str().to_owned(),
         lazy: matches!(step.laziness(), Laziness::Lazy),
         outcome: outcome_view(step.outcome()),
+        count: count_view(step.rows()),
         expressions: step
             .expressions()
             .iter()

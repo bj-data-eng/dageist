@@ -5,9 +5,10 @@
  */
 
 import { Peek } from '@dageist/design';
-import type { InputView, NodeView } from '@dageist/host';
+import type { InputView } from '@dageist/host';
 
 import { useNode } from './EngineProvider';
+import { inputLines, sourceLines } from './model/inputs';
 
 /** Returns the short description shown beside an input's name. */
 function detail(input: InputView): string {
@@ -21,31 +22,6 @@ function detail(input: InputView): string {
     default:
       return '';
   }
-}
-
-/** Returns the lines that describe an input: what it is and what it holds. */
-export function inputLines(input: InputView): string[] {
-  switch (input.kind) {
-    case 'table':
-      return [
-        `${input.name} · table`,
-        ...input.columns.map((column) => `${column.name} · ${column.dtype}`),
-      ];
-    case 'value':
-      return [`${input.name} · ${input.dtype}`];
-    case 'list':
-      return [`${input.name} · list of ${input.dtype}`];
-    default:
-      return [];
-  }
-}
-
-/** Returns the lines that describe the table the steps start from. */
-function sourceLines(node: NodeView): string[] {
-  return [
-    `${node.source.name} · table · the steps start from its rows`,
-    ...node.source.columns.map((column) => `${column.name} · ${column.dtype}`),
-  ];
 }
 
 /** Lists the node's inputs, each with its kind and dtype. */

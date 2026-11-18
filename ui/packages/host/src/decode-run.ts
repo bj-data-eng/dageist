@@ -6,8 +6,11 @@
 import type {
   AfterView,
   CauseView,
+  ColumnChangeView,
+  ColumnValuesView,
   ConditionStateView,
   ContextView,
+  CountView,
   EndingView,
   ExpressionDtypesView,
   NestedPosition,
@@ -32,6 +35,7 @@ import type {
   WalkedExpressionView,
 } from './contract';
 import {
+  CHANGES,
   CONDITION_STATES,
   NESTED_POSITIONS,
   OUTER_POSITIONS,
@@ -52,7 +56,7 @@ import {
   readTagged,
   readWord,
 } from './decode';
-import { readFieldView } from './decode-node';
+import { readFieldView, readValues } from './decode-node';
 
 const readSegment: Decode<SegmentView> = readTagged<SegmentView>('kind', {
   parameter: {
@@ -304,12 +308,49 @@ const readCause: Decode<CauseView> = readTagged<CauseView>('kind', {
   },
 });
 
+const readColumnChange: Decode<ColumnChangeView> = readRecord(
+  ['name', 'change'],
+  (fields, path) => ({
+    name: readField(fields, path, 'name', readString),
+    change: readField(fields, path, 'change', readWord(CHANGES)),
+  }),
+);
+
+const readColumnValues: Decode<ColumnValuesView> = readRecord(
+  ['name', 'values'],
+  (fields, path) => ({
+    name: readField(fields, path, 'name', readString),
+    values: readField(fields, path, 'values', readValues),
+  }),
+);
+
+const readCountView: Decode<CountView> = readTagged<CountView>('kind', {
+  notCounted: { fields: [], read: () => ({ kind: 'notCounted' }) },
+  counted: {
+    fields: ['received', 'kept', 'first'],
+    read: (fields, path) => ({
+      kind: 'counted',
+      received: readField(fields, path, 'received', readCount),
+      kept: readField(fields, path, 'kept', readCount),
+      first: readField(fields, path, 'first', readList(readColumnValues)),
+    }),
+  },
+  failed: {
+    fields: ['reason'],
+    read: (fields, path) => ({
+      kind: 'failed',
+      reason: readField(fields, path, 'reason', readString),
+    }),
+  },
+});
+
 const readOutcome: Decode<OutcomeView> = readTagged<OutcomeView>('status', {
   valid: {
-    fields: ['columns'],
+    fields: ['columns', 'changes'],
     read: (fields, path) => ({
       status: 'valid',
       columns: readField(fields, path, 'columns', readList(readFieldView)),
+      changes: readField(fields, path, 'changes', readList(readColumnChange)),
     }),
   },
   refused: {
@@ -337,11 +378,12 @@ const readOutcome: Decode<OutcomeView> = readTagged<OutcomeView>('status', {
 });
 
 const readStepReport: Decode<StepReportView> = readRecord(
-  ['id', 'lazy', 'outcome', 'expressions', 'walk'],
+  ['id', 'lazy', 'outcome', 'count', 'expressions', 'walk'],
   (fields, path) => ({
     id: readField(fields, path, 'id', readString),
     lazy: readField(fields, path, 'lazy', readBoolean),
     outcome: readField(fields, path, 'outcome', readOutcome),
+    count: readField(fields, path, 'count', readCountView),
     expressions: readField(fields, path, 'expressions', readList(readExpressionDtypes)),
     walk: readField(fields, path, 'walk', readWalk),
   }),

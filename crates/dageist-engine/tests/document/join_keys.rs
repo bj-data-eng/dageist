@@ -39,7 +39,7 @@ fn right() -> DataFrame {
 fn inputs_of(other: DataFrame) -> Inputs {
     let mut inputs = Inputs::new();
     inputs
-        .add_table("other", other.lazy())
+        .add_table("other", "Other", other.lazy())
         .expect("a first input");
     inputs
 }

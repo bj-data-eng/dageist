@@ -205,7 +205,7 @@ fn describing_an_input_table_starts_polars() {
         || {
             let mut inputs = Inputs::new();
             inputs
-                .add_table("other", small_table().lazy())
+                .add_table("other", "Other", small_table().lazy())
                 .expect("an input");
             inputs.describe().expect("the input is described");
             sql_resolves();
@@ -235,7 +235,7 @@ fn walking_a_step_that_names_another_table_starts_polars() {
             } }]));
             let mut inputs = Inputs::new();
             inputs
-                .add_table("other", small_table().lazy())
+                .add_table("other", "Other", small_table().lazy())
                 .expect("an input");
             let step = &join.steps()[0];
             let walk = step.walk(0, small_table().schema(), &inputs);

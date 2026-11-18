@@ -71,7 +71,7 @@ fn report_of<'a>(report: &'a Report, id: &str) -> &'a StepReport {
 /// The columns of the table `id` gives, with their dtypes.
 fn schema_of(report: &Report, id: &str) -> Vec<(String, DataType)> {
     match report_of(report, id).outcome() {
-        Outcome::Valid { schema } => schema
+        Outcome::Valid { schema, .. } => schema
             .iter()
             .map(|(name, dtype)| (name.to_string(), dtype.clone()))
             .collect(),

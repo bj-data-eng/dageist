@@ -221,10 +221,10 @@ impl Frames {
             &self.other_rows
         };
         inputs
-            .add_table(OTHER, other.clone().lazy())
+            .add_table(OTHER, "Other", other.clone().lazy())
             .expect("a first input");
         inputs
-            .add_table(ON_COLUMNS, self.on_columns.clone().lazy())
+            .add_table(ON_COLUMNS, "Columns", self.on_columns.clone().lazy())
             .expect("a second input");
         inputs
     }

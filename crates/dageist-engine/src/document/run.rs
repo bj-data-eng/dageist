@@ -16,6 +16,8 @@ use polars::prelude::{
 use crate::allowed::{self, Context, Position, Refusal};
 use crate::catalog::{Argument, Arguments, Build, BuildError, Conditional, Laziness};
 
+use super::changes::ColumnChange;
+use super::counts::{Counted, StepRows};
 use super::error::{Place, Segment};
 use super::inputs::Inputs;
 use super::model::{Call, Document, Expression, Start, Step, StepId, Value};
@@ -152,6 +154,9 @@ pub enum Outcome {
     Valid {
         /// The columns and dtypes of the table the step gives.
         schema: SchemaRef,
+        /// The columns the step added or replaced, in the order of the table
+        /// it gives.
+        changes: Vec<ColumnChange>,
     },
     /// The step was refused.
     Refused(StepRefusal),
@@ -176,6 +181,7 @@ pub struct StepReport {
     expressions: Vec<ExpressionDtypes>,
     walk: Walk,
     outcome: Outcome,
+    rows: StepRows,
 }
 
 impl StepReport {
@@ -218,9 +224,17 @@ impl StepReport {
     #[must_use]
     pub const fn schema(&self) -> Option<&SchemaRef> {
         match &self.outcome {
-            Outcome::Valid { schema } => Some(schema),
+            Outcome::Valid { schema, .. } => Some(schema),
             _ => None,
         }
+    }
+
+    /// How many rows the step kept of those it received, and the first values
+    /// of what it added, where the run held rows: [`Document::run_on`]. A run
+    /// that reads no data counts none.
+    #[must_use]
+    pub const fn rows(&self) -> &StepRows {
+        &self.rows
     }
 }
 
@@ -315,16 +329,19 @@ impl Document {
                     outcome: Outcome::NotRun {
                         blocked_by: blocked_by.clone(),
                     },
+                    rows: StepRows::NotCounted,
                 });
                 continue;
             }
             let run = run_step(index, step, inputs, frame.clone(), &schema, true);
             let outcome = match run.result {
                 Ok((next, next_schema)) => {
+                    let changes = ColumnChange::between(&schema, &next_schema, &run.written);
                     frame = next;
                     schema = next_schema.clone();
                     Outcome::Valid {
                         schema: next_schema,
+                        changes,
                     }
                 }
                 Err(Halt::Refused(refusal)) => {
@@ -342,12 +359,60 @@ impl Document {
                 expressions: run.expressions,
                 walk: run.walk,
                 outcome,
+                rows: StepRows::NotCounted,
             });
         }
         Ok(Report {
             source: source_schema,
             steps,
         })
+    }
+
+    /// Runs the document as [`run`](Self::run) does, on the rows of `working`,
+    /// a table held in memory, and counts for each step the rows it was given
+    /// and the rows it gave, with the first values of the columns it added or
+    /// replaced.
+    ///
+    /// Each step is collected once, and the table it gives is the one the next
+    /// step is given, so the document is run over the window once and not
+    /// again for every step. That is bounded work because `working` is a
+    /// window held in memory, which is the only table this takes. A step is
+    /// counted only when the run accepts it and every step before it ran: a
+    /// step Polars accepts but cannot collect on these rows is
+    /// [`StepRows::Failed`], and the steps after it are not counted.
+    ///
+    /// # Errors
+    ///
+    /// When Polars cannot work out the schema of `working` itself.
+    pub fn run_on(&self, inputs: &Inputs, working: &DataFrame) -> Result<Report, PolarsError> {
+        let mut report = self.run(inputs, working.clone().lazy())?;
+        let mut frame = working.clone();
+        for (index, (step, reported)) in self.steps().iter().zip(&mut report.steps).enumerate() {
+            let Outcome::Valid { changes, .. } = &reported.outcome else {
+                break;
+            };
+            let schema = frame.schema().clone();
+            let Ok((next, _)) =
+                run_step(index, step, inputs, frame.clone().lazy(), &schema, false).result
+            else {
+                // The run built this step on the schema; it builds on the rows too.
+                break;
+            };
+            let counted = next.collect().and_then(|collected| {
+                Counted::of(frame.height(), &collected, changes).map(|count| (collected, count))
+            });
+            match counted {
+                Ok((collected, count)) => {
+                    reported.rows = StepRows::Counted(count);
+                    frame = collected;
+                }
+                Err(error) => {
+                    reported.rows = StepRows::Failed(error);
+                    break;
+                }
+            }
+        }
+        Ok(report)
     }
 
     /// The rows of the table the step `through` gives, at most `limit` of
@@ -394,6 +459,8 @@ impl Document {
 struct StepRun {
     expressions: Vec<ExpressionDtypes>,
     walk: Walk,
+    /// The names of the columns the step writes, when the run is traced.
+    written: Vec<String>,
     result: Result<(LazyFrame, SchemaRef), Halt>,
 }
 
@@ -421,6 +488,7 @@ fn run_step(
         path: Vec::new(),
         positions: Vec::new(),
         traces: Vec::new(),
+        written: Vec::new(),
     };
     // What the tables say of the step does not depend on Polars building it.
     let walk = if trace {
@@ -434,6 +502,7 @@ fn run_step(
             result: Err(Halt::Incomplete(path.into_iter().fold(base, Place::then))),
             expressions: Vec::new(),
             walk,
+            written: Vec::new(),
         };
     }
     let frame = match builder.step(step.call(), input) {
@@ -447,6 +516,7 @@ fn run_step(
                 }),
                 expressions: builder.traces,
                 walk,
+                written: Vec::new(),
             };
         }
     };
@@ -454,9 +524,24 @@ fn run_step(
         Ok(schema) => Ok((frame, schema)),
         Err(error) => Err(Halt::Refused(builder.polars_refusal(error))),
     };
+    let mut result = result;
+    let mut written = Vec::new();
+    if trace && result.is_ok() {
+        match builder.written_names(schema) {
+            Ok(names) => written = names,
+            // The step is Polars' to refuse, as it is for any schema it cannot work out.
+            Err(error) => {
+                result = Err(Halt::Refused(StepRefusal {
+                    place: base,
+                    cause: Box::new(RunCause::Polars(error)),
+                }));
+            }
+        }
+    }
     StepRun {
         expressions: builder.traces,
         walk,
+        written,
         result,
     }
 }
@@ -499,6 +584,8 @@ struct Builder<'a> {
     /// hold the expression being built, outermost first.
     positions: Vec<Position>,
     traces: Vec<ExpressionDtypes>,
+    /// The expressions the step writes as columns, named as they are written.
+    written: Vec<Expr>,
 }
 
 impl Builder<'_> {
@@ -560,9 +647,32 @@ impl Builder<'_> {
     fn step(&mut self, call: &Call, input: LazyFrame) -> Result<LazyFrame, Stop> {
         let arguments = self.arguments(call)?;
         match call.entry().build() {
-            Build::Frame(build) => self.built(build(input, &arguments)),
+            Build::Frame(build) => {
+                if self.probe.is_some() {
+                    self.written = self.built(call.entry().writes(&arguments))?;
+                }
+                self.built(build(input, &arguments))
+            }
             _ => self.misplaced(call),
         }
+    }
+
+    /// The names of the columns the step writes, as Polars names the
+    /// expressions it was given against the table the step was given.
+    ///
+    /// # Errors
+    ///
+    /// When Polars cannot name them, which the step it accepted is not
+    /// expected to come to.
+    fn written_names(&self, given: &SchemaRef) -> Result<Vec<String>, PolarsError> {
+        if self.written.is_empty() {
+            return Ok(Vec::new());
+        }
+        DataFrame::empty_with_schema(given)
+            .lazy()
+            .select(self.written.clone())
+            .collect_schema()
+            .map(|schema| schema.iter_names().map(ToString::to_string).collect())
     }
 
     /// The arguments of `call`, built, and checked as the catalogue checks them.

@@ -11,6 +11,34 @@
           {
             "name": "a",
             "dtype": "Int64"
+          },
+          {
+            "name": "b",
+            "dtype": "String"
+          }
+        ],
+        "changes": [
+          {
+            "name": "a",
+            "change": "replaced"
+          },
+          {
+            "name": "b",
+            "change": "added"
+          }
+        ]
+      },
+      "count": {
+        "kind": "counted",
+        "received": 9,
+        "kept": 6,
+        "first": [
+          {
+            "name": "b",
+            "values": {
+              "shown": ["x", null],
+              "more": 4
+            }
           }
         ]
       },
@@ -161,6 +189,9 @@
           "name": "nope"
         }
       },
+      "count": {
+        "kind": "notCounted"
+      },
       "expressions": [],
       "walk": {
         "expressions": [],
@@ -187,6 +218,9 @@
           "name": "none"
         }
       },
+      "count": {
+        "kind": "notCounted"
+      },
       "expressions": [],
       "walk": {
         "expressions": [],
@@ -212,6 +246,9 @@
           "kind": "build",
           "reason": "a parameter is missing"
         }
+      },
+      "count": {
+        "kind": "notCounted"
       },
       "expressions": [],
       "walk": {
@@ -245,6 +282,9 @@
           }
         }
       },
+      "count": {
+        "kind": "notCounted"
+      },
       "expressions": [],
       "walk": {
         "expressions": [],
@@ -276,6 +316,28 @@
             "reason": "the reason"
           }
         }
+      },
+      "count": {
+        "kind": "notCounted"
+      },
+      "expressions": [],
+      "walk": {
+        "expressions": [],
+        "refusal": null,
+        "notKnown": null
+      }
+    },
+    {
+      "id": "failed",
+      "lazy": true,
+      "outcome": {
+        "status": "valid",
+        "columns": [],
+        "changes": []
+      },
+      "count": {
+        "kind": "failed",
+        "reason": "no rows"
       },
       "expressions": [],
       "walk": {

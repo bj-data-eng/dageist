@@ -22,7 +22,7 @@ export function originsBefore(results: readonly PreparedStep[]): readonly Origin
   const made = new Map<string, number>();
   for (const [index, result] of results.entries()) {
     each.push(new Map(made));
-    for (const name of result.added) made.set(name, index + 1);
+    for (const { name } of result.changes) made.set(name, index + 1);
   }
   return each;
 }

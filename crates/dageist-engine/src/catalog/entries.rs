@@ -19,7 +19,7 @@ use polars::prelude::{
 
 use super::{
     Argument, Arguments, Build, BuildError, Conditional, Dtypes, Entry, EntryId, Family, Kind,
-    Laziness, Parameter, ParameterDefault, Role, Shape, ValueType,
+    Laziness, Parameter, ParameterDefault, Role, Shape, ValueType, Writes,
 };
 
 const ANY: &[Dtypes] = &[Dtypes::Any];
@@ -174,6 +174,31 @@ fn positional_and_named(arguments: &Arguments) -> Result<Vec<Expr>, BuildError> 
         exprs.push(expr.alias(name));
     }
     Ok(exprs)
+}
+
+/// The expressions the step `entry` writes as columns, named as they are
+/// written. See [`Entry::writes`].
+pub(super) fn writes(entry: &Entry, arguments: &Arguments) -> Result<Vec<Expr>, BuildError> {
+    let mut written = Vec::new();
+    for parameter in entry
+        .parameters()
+        .iter()
+        .filter(|parameter| parameter.writes() == Writes::Columns)
+    {
+        match parameter.kind() {
+            Kind::Expression(_) => written.extend(arguments.expressions(parameter.name())?),
+            Kind::Pairs(..) => written.extend(
+                named_expressions(arguments, parameter.name())?
+                    .into_iter()
+                    .map(|(name, expr)| expr.alias(name)),
+            ),
+            // No other kind holds an expression that is written.
+            _ => {}
+        }
+    }
+    // A bare column reference, or a selection of columns by name, gives them back as they are.
+    written.retain(|expr| !matches!(expr, Expr::Column(_) | Expr::Selector(_)));
+    Ok(written)
 }
 
 /// The conditions of `*predicates` followed by the equalities of
@@ -988,7 +1013,10 @@ pub(super) const ENTRIES: &[Entry] = &[
         id: EntryId("LazyFrame.select"),
         family: Family::Steps,
         accepts: &[],
-        parameters: &[starred("exprs", EXPRESSION), double_starred("named_exprs")],
+        parameters: &[
+            starred("exprs", EXPRESSION).writing(),
+            double_starred("named_exprs").writing(),
+        ],
         laziness: Laziness::Lazy,
         build: Build::Frame(select),
     },
@@ -1011,7 +1039,10 @@ pub(super) const ENTRIES: &[Entry] = &[
         id: EntryId("LazyFrame.with_columns"),
         family: Family::Steps,
         accepts: &[],
-        parameters: &[starred("exprs", EXPRESSION), double_starred("named_exprs")],
+        parameters: &[
+            starred("exprs", EXPRESSION).writing(),
+            double_starred("named_exprs").writing(),
+        ],
         laziness: Laziness::Lazy,
         build: Build::Frame(with_columns),
     },

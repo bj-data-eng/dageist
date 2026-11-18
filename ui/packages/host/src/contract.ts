@@ -155,17 +155,58 @@ export interface FieldView {
   readonly dtype: string;
 }
 
+/**
+ * What supplies an input to a node. Mirrors `OriginView` in
+ * crates/dageist-tauri/src/node.rs.
+ */
+export type OriginView =
+  /** The table a node gives, by the node's name. */
+  | { readonly kind: 'node'; readonly name: string }
+  /** One column of the table a node gives. */
+  | { readonly kind: 'column'; readonly node: string; readonly column: string }
+  /** A value set on the graph itself, which no node gives. */
+  | { readonly kind: 'parameter' };
+
+/**
+ * The first values of a column or a list, each written by the engine as text
+ * and a null as `null`, and how many more follow them. Mirrors `ValuesView` in
+ * crates/dageist-tauri/src/report.rs.
+ */
+export interface ValuesView {
+  readonly shown: ReadonlyArray<string | null>;
+  readonly more: number;
+}
+
 /** The table a node's steps start from. Mirrors `SourceView` in crates/dageist-tauri/src/node.rs. */
 export interface SourceView {
   readonly name: string;
+  readonly from: OriginView;
   readonly columns: readonly FieldView[];
 }
 
 /** One input of a node, by the name a step document uses for it. Mirrors `InputView` in crates/dageist-tauri/src/node.rs. */
 export type InputView =
-  | { readonly kind: 'table'; readonly name: string; readonly columns: readonly FieldView[] }
-  | { readonly kind: 'value'; readonly name: string; readonly dtype: string }
-  | { readonly kind: 'list'; readonly name: string; readonly dtype: string };
+  | {
+      readonly kind: 'table';
+      readonly name: string;
+      readonly from: OriginView;
+      readonly columns: readonly FieldView[];
+    }
+  /** A single value, as the engine writes it, or `null` where it is null. */
+  | {
+      readonly kind: 'value';
+      readonly name: string;
+      readonly from: OriginView;
+      readonly dtype: string;
+      readonly value: string | null;
+    }
+  | {
+      readonly kind: 'list';
+      readonly name: string;
+      readonly from: OriginView;
+      readonly dtype: string;
+      readonly values: ValuesView;
+    };
 
 /** What a node is connected to. Mirrors `NodeView` in crates/dageist-tauri/src/node.rs. */
 export interface NodeView {
@@ -387,10 +428,46 @@ export type CauseView =
   /** Polars refused, with this reason. */
   | { readonly kind: 'polars'; readonly reason: string };
 
+/** How a step changed a column of the table it was given, mirroring `Change` in the engine. */
+export const CHANGES = ['added', 'replaced'] as const;
+
+/** How a step changed a column: `added` where the table before it lacked the column, `replaced` where it had it and the step wrote it or gave it another dtype. */
+export type ChangeView = (typeof CHANGES)[number];
+
+/** A column a step added or replaced. */
+export interface ColumnChangeView {
+  readonly name: string;
+  readonly change: ChangeView;
+}
+
+/** The first values of one column a step changed. */
+export interface ColumnValuesView {
+  readonly name: string;
+  readonly values: ValuesView;
+}
+
+/** What running a step on the rows of the working window came to. */
+export type CountView =
+  /** The step was not run on rows: the run read none, or a step before it was refused, incomplete or failed on the rows. */
+  | { readonly kind: 'notCounted' }
+  /** The step was given `received` rows and kept `kept`, with the first values of each column it changed. */
+  | {
+      readonly kind: 'counted';
+      readonly received: number;
+      readonly kept: number;
+      readonly first: readonly ColumnValuesView[];
+    }
+  /** Polars accepted the step and could not run it on the rows, for this reason. */
+  | { readonly kind: 'failed'; readonly reason: string };
+
 /** What running one step came to. */
 export type OutcomeView =
-  /** Polars accepts the step, and its table has these columns. */
-  | { readonly status: 'valid'; readonly columns: readonly FieldView[] }
+  /** Polars accepts the step, and its table has these columns, of which the step added or replaced `changes`. */
+  | {
+      readonly status: 'valid';
+      readonly columns: readonly FieldView[];
+      readonly changes: readonly ColumnChangeView[];
+    }
   /** The step was refused, here, for this reason. */
   | { readonly status: 'refused'; readonly place: PlaceView; readonly cause: CauseView }
   /**
@@ -408,6 +485,8 @@ export interface StepReportView {
   /** Whether the step stays in a lazy plan; a step that does not collected the data it needs when it was built. */
   readonly lazy: boolean;
   readonly outcome: OutcomeView;
+  /** How many rows the step kept of those it received, and the first values of what it changed, where the engine ran the rows. */
+  readonly count: CountView;
   /** The dtypes of every expression in the step's arguments, as far as they could be built. */
   readonly expressions: readonly ExpressionDtypesView[];
   readonly walk: WalkView;

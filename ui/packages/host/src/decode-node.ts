@@ -3,7 +3,15 @@
  * rows after one of its steps. See `NodeView` and `RowsView` in the contract.
  */
 
-import type { FieldView, InputView, NodeView, RowsView, SourceView } from './contract';
+import type {
+  FieldView,
+  InputView,
+  NodeView,
+  OriginView,
+  RowsView,
+  SourceView,
+  ValuesView,
+} from './contract';
 import type { Decode } from './decode';
 import {
   DecodeError,
@@ -12,6 +20,7 @@ import {
   readList,
   readNullable,
   readRecord,
+  readCount,
   readString,
   readTagged,
 } from './decode';
@@ -22,34 +31,66 @@ export const readFieldView: Decode<FieldView> = readRecord(['name', 'dtype'], (f
   dtype: readField(fields, path, 'dtype', readString),
 }));
 
-const readSource: Decode<SourceView> = readRecord(['name', 'columns'], (fields, path) => ({
+/** Reads what supplies an input to the node. */
+export const readOrigin: Decode<OriginView> = readTagged<OriginView>('kind', {
+  node: {
+    fields: ['name'],
+    read: (fields, path) => ({
+      kind: 'node',
+      name: readField(fields, path, 'name', readString),
+    }),
+  },
+  column: {
+    fields: ['node', 'column'],
+    read: (fields, path) => ({
+      kind: 'column',
+      node: readField(fields, path, 'node', readString),
+      column: readField(fields, path, 'column', readString),
+    }),
+  },
+  parameter: { fields: [], read: () => ({ kind: 'parameter' }) },
+});
+
+/** Reads the first values of a column or a list, and how many more follow them. */
+export const readValues: Decode<ValuesView> = readRecord(['shown', 'more'], (fields, path) => ({
+  shown: readField(fields, path, 'shown', readList(readNullable(readString))),
+  more: readField(fields, path, 'more', readCount),
+}));
+
+const readSource: Decode<SourceView> = readRecord(['name', 'from', 'columns'], (fields, path) => ({
   name: readField(fields, path, 'name', readString),
+  from: readField(fields, path, 'from', readOrigin),
   columns: readField(fields, path, 'columns', readList(readFieldView)),
 }));
 
 const readInput: Decode<InputView> = readTagged<InputView>('kind', {
   table: {
-    fields: ['name', 'columns'],
+    fields: ['name', 'from', 'columns'],
     read: (fields, path) => ({
       kind: 'table',
       name: readField(fields, path, 'name', readString),
+      from: readField(fields, path, 'from', readOrigin),
       columns: readField(fields, path, 'columns', readList(readFieldView)),
     }),
   },
   value: {
-    fields: ['name', 'dtype'],
+    fields: ['name', 'from', 'dtype', 'value'],
     read: (fields, path) => ({
       kind: 'value',
       name: readField(fields, path, 'name', readString),
+      from: readField(fields, path, 'from', readOrigin),
       dtype: readField(fields, path, 'dtype', readString),
+      value: readField(fields, path, 'value', readNullable(readString)),
     }),
   },
   list: {
-    fields: ['name', 'dtype'],
+    fields: ['name', 'from', 'dtype', 'values'],
     read: (fields, path) => ({
       kind: 'list',
       name: readField(fields, path, 'name', readString),
+      from: readField(fields, path, 'from', readOrigin),
       dtype: readField(fields, path, 'dtype', readString),
+      values: readField(fields, path, 'values', readValues),
     }),
   },
 });

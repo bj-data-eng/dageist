@@ -49,7 +49,14 @@
             "name": "row_days",
             "dtype": "Int64"
           }
-        ]
+        ],
+        "changes": []
+      },
+      "count": {
+        "kind": "counted",
+        "received": 7,
+        "kept": 7,
+        "first": []
       },
       "expressions": [
         {
@@ -159,6 +166,9 @@
           "kind": "polars",
           "reason": "`sum` operation not supported for dtype `str`\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\nDF [\"dcn\", \"timestamp\", \"step_to\", \"owner\", ...]; PROJECT */5 COLUMNS\n\nThis error occurred with the following context stack:\n\t[1] 'select'\n"
         }
+      },
+      "count": {
+        "kind": "notCounted"
       },
       "expressions": [
         {
@@ -295,6 +305,9 @@
       "outcome": {
         "status": "notRun",
         "blockedBy": "total"
+      },
+      "count": {
+        "kind": "notCounted"
       },
       "expressions": [],
       "walk": {

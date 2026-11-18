@@ -9,20 +9,44 @@
 //! `RowsView` in `ui/packages/host/src/contract.ts`.
 
 use dageist_engine::claim_timing::ClaimTiming;
-use dageist_engine::document::{Document, InputKind, RowsError, StepId};
+use dageist_engine::document::{Document, InputKind, Origin, RowsError, StepId};
 use serde::Serialize;
 
-use crate::report::{FieldView, RunView};
+use crate::report::{FieldView, RunView, ValuesView};
 use crate::sample_table::{ErrorKind, ErrorView};
 
 /// The most rows a preview may hold. A preview is what a step list shows
 /// beside its steps, so it stays a window.
 const MAX_PREVIEW_ROWS: usize = 1_000;
 
+/// What supplies an input to the node.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum OriginView {
+    /// The table a node gives, by the node's name.
+    Node { name: String },
+    /// One column of the table a node gives.
+    Column { node: String, column: String },
+    /// A value set on the graph itself, which no node gives.
+    Parameter,
+}
+
+fn origin_view(origin: &Origin) -> OriginView {
+    match origin {
+        Origin::Node(name) => OriginView::Node { name: name.clone() },
+        Origin::Column { node, column } => OriginView::Column {
+            node: node.clone(),
+            column: column.clone(),
+        },
+        Origin::Parameter => OriginView::Parameter,
+    }
+}
+
 /// The table the steps start from.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SourceView {
     name: &'static str,
+    from: OriginView,
     columns: Vec<FieldView>,
 }
 
@@ -33,12 +57,24 @@ pub enum InputView {
     /// A connected table, with its columns.
     Table {
         name: String,
+        from: OriginView,
         columns: Vec<FieldView>,
     },
-    /// A connected single value.
-    Value { name: String, dtype: String },
-    /// A connected list of values of one dtype.
-    List { name: String, dtype: String },
+    /// A connected single value, as Polars writes it, or `null` where it is
+    /// null.
+    Value {
+        name: String,
+        from: OriginView,
+        dtype: String,
+        value: Option<String>,
+    },
+    /// A connected list of values of one dtype, with its first values.
+    List {
+        name: String,
+        from: OriginView,
+        dtype: String,
+        values: ValuesView,
+    },
 }
 
 /// What the node is connected to.
@@ -66,7 +102,8 @@ fn node() -> Result<ClaimTiming, ErrorView> {
 }
 
 /// What the node is connected to: the table its steps start from, and every
-/// other input with its columns or its dtype.
+/// other input with what supplies it and its columns, its value or its first
+/// values.
 pub fn node_view() -> Result<NodeView, ErrorView> {
     let node = node()?;
     let inputs = node
@@ -76,18 +113,24 @@ pub fn node_view() -> Result<NodeView, ErrorView> {
         .into_iter()
         .map(|input| {
             let name = input.name().to_owned();
+            let from = origin_view(input.origin());
             match input.kind() {
                 InputKind::Table(columns) => InputView::Table {
                     name,
+                    from,
                     columns: FieldView::of_columns(columns),
                 },
-                InputKind::Value(dtype) => InputView::Value {
+                InputKind::Value { dtype, value } => InputView::Value {
                     name,
+                    from,
                     dtype: dtype.clone(),
+                    value: value.clone(),
                 },
-                InputKind::List(dtype) => InputView::List {
+                InputKind::List { dtype, values } => InputView::List {
                     name,
+                    from,
                     dtype: dtype.clone(),
+                    values: ValuesView::of(values),
                 },
             }
         })
@@ -95,6 +138,7 @@ pub fn node_view() -> Result<NodeView, ErrorView> {
     Ok(NodeView {
         source: SourceView {
             name: ClaimTiming::SOURCE_NAME,
+            from: origin_view(node.source_origin()),
             columns: FieldView::of_columns(&node.source_columns()),
         },
         inputs,

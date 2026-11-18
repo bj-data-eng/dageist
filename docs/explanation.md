@@ -311,6 +311,12 @@ engine reports of them, in
 [ui/packages/steps/src/model/](../ui/packages/steps/src/model/document.ts).
 Translating the steps into a document and preparing the report for display are
 plain TypeScript with no React, tested against the snapshots the host writes.
+What the editor shows of a run it reads off the report and works out none of it:
+the columns a step added or replaced, the rows a filter keeps of those it was
+given, the first values of a column a step added, and for each connected input
+what supplies it and the value or values it holds. The view only lays the
+engine's text out as a line, with a dash for a null and an ellipsis where more
+values follow.
 Where an expression is still to be picked, a value, the field or input a chain
 starts from, a method's argument or a comparison's field, the editor writes a
 hole, which the document reads as an expression that starts from nothing. The
@@ -495,7 +501,22 @@ as not run. The rows of any step come from running
 it on an in-memory working window, and a preview gives them as text, every
 cell written as Polars writes it and each dtype by the engine's short name,
 such as `Datetime(us)`, so the view formats no value. Polars' own message is
-the reason when Polars refuses. Some mistakes, such as `dt.date` on a String
+the reason when Polars refuses.
+A valid step also says which columns it added and which it replaced: a column
+the table before it lacked is added, and one it had is replaced when the step
+writes it, as `with_columns` and `select` do for an expression that is not a bare
+column, or gives it another dtype; the catalogue says which parameters write.
+Run on the working window, the report also counts for each step the rows it was
+given and the rows it kept, with the first values of each column it changed
+written as text. Each step is collected once and its table is the next step's
+input, so the window is run through the steps once and not again for every step;
+the first values are those of the rows the preview gives, except after a join that is
+not told to keep the order of its rows, which Polars does not promise;
+the window is the only table that is counted, because it is held in memory
+and bounded. A step Polars accepts but cannot collect on those rows is reported
+as failed, and the steps after it are not counted. A connected input is
+reported with what supplies it, and a value or the first values of a list as
+Polars writes them. Some mistakes, such as `dt.date` on a String
 column, are only found when rows are read, not from the schema; the editor
 learns them in advance from the
 [tables of allowed combinations](#which-combinations-polars-allows).

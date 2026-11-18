@@ -1,26 +1,28 @@
 /**
  * @file The rows the engine gave after a step, every cell as the engine wrote
  * it, with each column's exact dtype under its name and the columns the step
- * added marked. The view formats no value: a cell is the text it was sent, and
+ * added or replaced marked. The view formats no value: a cell is the text it was sent, and
  * only a null, which has no text, is drawn as a dash.
  */
 
 import { cx } from '@dageist/design';
+import type { ColumnChangeView } from '@dageist/host';
 
 import type { RowsDisplay } from './model/report';
+import { NULL_DASH } from './model/values';
 
 /** What the preview shows. */
 export interface RowsPreviewProps {
   /** The rows, or why there are none; `null` while the engine has not answered. */
   readonly display: RowsDisplay | null;
-  /** The columns to mark as new: the ones the step added. */
-  readonly added: readonly string[];
+  /** The columns to mark as new: the ones the step added or replaced, as the engine reports them. */
+  readonly changes: readonly ColumnChangeView[];
   /** Whether the rows are those of the steps as they are now. */
   readonly settled: boolean;
 }
 
 /** Draws the rows after a step as a table, or says why there are none. */
-export function RowsPreview({ display, added, settled }: RowsPreviewProps): React.JSX.Element {
+export function RowsPreview({ display, changes, settled }: RowsPreviewProps): React.JSX.Element {
   if (display === null) {
     return <p className="m-0 text-xs text-muted">Waiting for the engine…</p>;
   }
@@ -38,7 +40,7 @@ export function RowsPreview({ display, added, settled }: RowsPreviewProps): Reac
                 key={column.name}
                 className={cx(
                   'border-b border-line px-2.5 py-1.5 text-left whitespace-nowrap',
-                  added.includes(column.name) && 'bg-fresh',
+                  changes.some((change) => change.name === column.name) && 'bg-fresh',
                 )}
               >
                 <span className="block text-muted">{column.name}</span>
@@ -57,10 +59,10 @@ export function RowsPreview({ display, added, settled }: RowsPreviewProps): Reac
                   key={column.name}
                   className={cx(
                     'border-b border-line px-2.5 py-1.5 whitespace-nowrap',
-                    added.includes(column.name) && 'bg-fresh',
+                    changes.some((change) => change.name === column.name) && 'bg-fresh',
                   )}
                 >
-                  {cells[at] ?? '—'}
+                  {cells[at] ?? NULL_DASH}
                 </td>
               ))}
             </tr>

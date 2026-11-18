@@ -4,6 +4,7 @@
 use serde::Serialize;
 
 use dageist_engine::allowed::{After, ConditionState, Context, Nested, Outer, Shape, Stage};
+use dageist_engine::document::Change;
 
 use super::*;
 
@@ -28,6 +29,7 @@ pub(crate) fn vocabulary() -> serde_json::Value {
         "stages": words(&Stage::ALL.map(stage_view)),
         "conditionStates": words(&ConditionState::ALL.map(condition_state_view)),
         "valueShapes": words(&Shape::ALL.map(shape_view)),
+        "changes": words(&Change::ALL.map(change_view)),
         "errorKinds": words(&crate::sample_table::ErrorKind::ALL),
     })
 }
@@ -58,6 +60,7 @@ pub(crate) fn variants() -> RunView {
             },
             cause,
         },
+        count: CountView::NotCounted,
         expressions: Vec::new(),
         walk: WalkView {
             expressions: Vec::new(),
@@ -76,9 +79,36 @@ pub(crate) fn variants() -> RunView {
         id: "variants".to_owned(),
         lazy: false,
         outcome: OutcomeView::Valid {
-            columns: vec![FieldView {
-                name: "a".to_owned(),
-                dtype: "Int64".to_owned(),
+            columns: vec![
+                FieldView {
+                    name: "a".to_owned(),
+                    dtype: "Int64".to_owned(),
+                },
+                FieldView {
+                    name: "b".to_owned(),
+                    dtype: "String".to_owned(),
+                },
+            ],
+            changes: vec![
+                ColumnChangeView {
+                    name: "a".to_owned(),
+                    change: change_view(Change::Replaced),
+                },
+                ColumnChangeView {
+                    name: "b".to_owned(),
+                    change: change_view(Change::Added),
+                },
+            ],
+        },
+        count: CountView::Counted {
+            received: 9,
+            kept: 6,
+            first: vec![ColumnValuesView {
+                name: "b".to_owned(),
+                values: ValuesView {
+                    shown: vec![Some("x".to_owned()), None],
+                    more: 4,
+                },
             }],
         },
         expressions: vec![ExpressionDtypesView {
@@ -130,6 +160,19 @@ pub(crate) fn variants() -> RunView {
             not_known: Some("why".to_owned()),
         },
     };
+    let mut failed = refused(
+        "failed",
+        CauseView::Polars {
+            reason: "the reason".to_owned(),
+        },
+    );
+    failed.outcome = OutcomeView::Valid {
+        columns: Vec::new(),
+        changes: Vec::new(),
+    };
+    failed.count = CountView::Failed {
+        reason: "no rows".to_owned(),
+    };
     let mut rows_stage = refused(
         "rows_stage",
         CauseView::NotAllowed {
@@ -170,6 +213,7 @@ pub(crate) fn variants() -> RunView {
                 },
             ),
             rows_stage,
+            failed,
         ],
     }
 }
