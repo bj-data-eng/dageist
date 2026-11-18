@@ -14,7 +14,7 @@ use polars::prelude::{
 };
 
 use crate::document::{
-    ColumnDescription, Document, Inputs, Origin, Preview, Report, RowsError, StepId,
+    ColumnDescription, Document, Inputs, ListOrigin, Origin, Preview, Report, RowsError, StepId,
 };
 use crate::error::EngineError;
 
@@ -174,7 +174,7 @@ fn inputs() -> Result<Inputs, EngineError> {
     inputs
         .add_table(
             "step_sla",
-            Origin::Node("SLA by step".to_owned()),
+            "SLA by step",
             df!(
                 "step" => ["Intake", "Review", "Pending", "Complete"],
                 "sla_days" => [1_i64, 1, 2, 3],
@@ -186,7 +186,7 @@ fn inputs() -> Result<Inputs, EngineError> {
     inputs
         .add_table(
             "step_names",
-            Origin::Node("Step names".to_owned()),
+            "Step names",
             df!("step_to" => ["Intake", "Review", "Pending", "Complete"])
                 .map_err(polars)?
                 .lazy(),
@@ -195,21 +195,16 @@ fn inputs() -> Result<Inputs, EngineError> {
     inputs
         .add_value(
             "sla_cutoff",
-            Origin::Parameter,
             Scalar::new(DataType::Int64, AnyValue::Int64(1)),
         )
         .map_err(duplicate)?;
     inputs
-        .add_value(
-            "as_of",
-            Origin::Parameter,
-            date_value("2026-03-02").map_err(polars)?,
-        )
+        .add_value("as_of", date_value("2026-03-02").map_err(polars)?)
         .map_err(duplicate)?;
     inputs
         .add_list(
             "holidays",
-            Origin::Column {
+            ListOrigin::Column {
                 node: "Holiday calendar".to_owned(),
                 column: "date".to_owned(),
             },

@@ -11,7 +11,7 @@ use dageist_engine::allowed::{
     Representative, Rule, Shape, Unknown,
 };
 use dageist_engine::document::{
-    Document, Inputs, Origin, Resolution, Segment, Walk, WalkedExpression,
+    Document, Inputs, ListOrigin, Resolution, Segment, Walk, WalkedExpression,
 };
 use polars::prelude::*;
 use serde_json::{Value, json};
@@ -34,30 +34,25 @@ fn inputs() -> Inputs {
     inputs
         .add_table(
             "other",
-            Origin::Node("Other".to_owned()),
+            "Other",
             df!("ra" => ["x", "y", "z"], "rk" => [1_i64, 2, 3])
                 .expect("the other table")
                 .lazy(),
         )
         .expect("a first input");
     inputs
-        .add_value(
-            "cutoff",
-            Origin::Parameter,
-            Scalar::new(DataType::Int64, AnyValue::Int64(2)),
-        )
+        .add_value("cutoff", Scalar::new(DataType::Int64, AnyValue::Int64(2)))
         .expect("a value");
     inputs
         .add_value(
             "on",
-            Origin::Parameter,
             Scalar::new(DataType::Boolean, AnyValue::Boolean(true)),
         )
         .expect("a flag");
     inputs
         .add_list(
             "holidays",
-            Origin::Parameter,
+            ListOrigin::Parameter,
             Series::new("holidays".into(), [1_i64, 2]),
         )
         .expect("a list");

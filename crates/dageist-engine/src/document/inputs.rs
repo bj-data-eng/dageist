@@ -40,6 +40,31 @@ pub enum Origin {
     Parameter,
 }
 
+/// What supplies a list to the node: a column of the table a node gives, or
+/// the graph itself.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ListOrigin {
+    /// One column of the table a node gives, by the node's name and the
+    /// column's.
+    Column {
+        /// The node that gives the table.
+        node: String,
+        /// The column of its table.
+        column: String,
+    },
+    /// A list set on the graph itself, which no node gives.
+    Parameter,
+}
+
+impl From<ListOrigin> for Origin {
+    fn from(origin: ListOrigin) -> Self {
+        match origin {
+            ListOrigin::Column { node, column } => Self::Column { node, column },
+            ListOrigin::Parameter => Self::Parameter,
+        }
+    }
+}
+
 /// What an input holds, as the view is told of it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputKind {
@@ -154,7 +179,7 @@ impl Inputs {
         Ok(())
     }
 
-    /// Connects a table that `origin` supplies.
+    /// Connects the table that the node called `node` gives.
     ///
     /// # Errors
     ///
@@ -162,14 +187,18 @@ impl Inputs {
     pub fn add_table(
         &mut self,
         name: impl Into<String>,
-        origin: Origin,
+        node: impl Into<String>,
         table: LazyFrame,
     ) -> Result<(), DuplicateInput> {
-        self.add(name.into(), origin, Input::Table(Box::new(table)))
+        self.add(
+            name.into(),
+            Origin::Node(node.into()),
+            Input::Table(Box::new(table)),
+        )
     }
 
-    /// Connects a single value, which has its own dtype, that `origin`
-    /// supplies.
+    /// Connects a single value, which has its own dtype. A value is set on
+    /// the graph itself, so its origin is [`Origin::Parameter`].
     ///
     /// # Errors
     ///
@@ -177,10 +206,9 @@ impl Inputs {
     pub fn add_value(
         &mut self,
         name: impl Into<String>,
-        origin: Origin,
         value: Scalar,
     ) -> Result<(), DuplicateInput> {
-        self.add(name.into(), origin, Input::Value(value))
+        self.add(name.into(), Origin::Parameter, Input::Value(value))
     }
 
     /// Connects a list of values of one dtype that `origin` supplies.
@@ -191,10 +219,10 @@ impl Inputs {
     pub fn add_list(
         &mut self,
         name: impl Into<String>,
-        origin: Origin,
+        origin: ListOrigin,
         values: Series,
     ) -> Result<(), DuplicateInput> {
-        self.add(name.into(), origin, Input::List(values))
+        self.add(name.into(), origin.into(), Input::List(values))
     }
 
     /// What each input holds and what supplies it, in the order of their

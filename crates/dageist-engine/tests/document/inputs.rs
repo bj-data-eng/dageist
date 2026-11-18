@@ -1,7 +1,7 @@
 //! The inputs a document's steps can name.
 
 use dageist_engine::document::{
-    ColumnDescription, DuplicateInput, InputDescription, InputKind, Inputs, Origin,
+    ColumnDescription, DuplicateInput, InputDescription, InputKind, Inputs, ListOrigin, Origin,
 };
 use polars::prelude::*;
 
@@ -11,25 +11,21 @@ fn a_name_belongs_to_one_input_whatever_its_kind() {
     let value = || Scalar::new(DataType::Int64, AnyValue::Int64(1));
     let list = || Series::new("a".into(), [1_i64]);
 
-    let origin = || Origin::Parameter;
-
     let mut inputs = Inputs::new();
-    inputs
-        .add_table("taken", origin(), table())
-        .expect("a table");
+    inputs.add_table("taken", "Node", table()).expect("a table");
     for result in [
-        inputs.add_table("taken", origin(), table()),
-        inputs.add_value("taken", origin(), value()),
-        inputs.add_list("taken", origin(), list()),
+        inputs.add_table("taken", "Node", table()),
+        inputs.add_value("taken", value()),
+        inputs.add_list("taken", ListOrigin::Parameter, list()),
     ] {
         assert_eq!(result, Err(DuplicateInput("taken".to_owned())));
     }
+    inputs.add_value("value", value()).expect("a value");
     inputs
-        .add_value("value", origin(), value())
-        .expect("a value");
-    inputs.add_list("list", origin(), list()).expect("a list");
+        .add_list("list", ListOrigin::Parameter, list())
+        .expect("a list");
     assert_eq!(
-        inputs.add_table("value", origin(), table()),
+        inputs.add_table("value", "Node", table()),
         Err(DuplicateInput("value".to_owned()))
     );
     assert!(
@@ -54,7 +50,7 @@ fn inputs_describe_themselves_by_name_kind_and_short_dtype() {
     inputs
         .add_table(
             "sla",
-            Origin::Node("SLA by step".to_owned()),
+            "SLA by step",
             df!("step" => ["Intake"], "days" => [1_i64])
                 .expect("a table")
                 .lazy(),
@@ -63,7 +59,7 @@ fn inputs_describe_themselves_by_name_kind_and_short_dtype() {
     inputs
         .add_table(
             "events",
-            Origin::Node("Events".to_owned()),
+            "Events",
             df!("at" => [0_i64])
                 .expect("a table")
                 .lazy()
@@ -71,16 +67,11 @@ fn inputs_describe_themselves_by_name_kind_and_short_dtype() {
         )
         .expect("a table");
     inputs
-        .add_value(
-            "cutoff",
-            Origin::Parameter,
-            Scalar::new(DataType::Int64, AnyValue::Int64(1)),
-        )
+        .add_value("cutoff", Scalar::new(DataType::Int64, AnyValue::Int64(1)))
         .expect("a value");
     inputs
         .add_value(
             "as_of",
-            Origin::Parameter,
             Scalar::new(
                 when.clone(),
                 AnyValue::Datetime(0, TimeUnit::Microseconds, None),
@@ -90,7 +81,7 @@ fn inputs_describe_themselves_by_name_kind_and_short_dtype() {
     inputs
         .add_list(
             "holidays",
-            Origin::Column {
+            ListOrigin::Column {
                 node: "Calendar".to_owned(),
                 column: "date".to_owned(),
             },
@@ -135,7 +126,7 @@ fn a_table_whose_schema_polars_cannot_work_out_is_an_error_not_a_guess() {
     inputs
         .add_table(
             "broken",
-            Origin::Parameter,
+            "Node",
             df!("a" => [1_i64])
                 .expect("a table")
                 .lazy()
@@ -168,21 +159,17 @@ fn an_input_says_what_supplies_it_to_the_node() {
     inputs
         .add_table(
             "sla",
-            Origin::Node("SLA by step".to_owned()),
+            "SLA by step",
             df!("a" => [1_i64]).expect("a table").lazy(),
         )
         .expect("a table");
     inputs
-        .add_value(
-            "cutoff",
-            Origin::Parameter,
-            Scalar::new(DataType::Int64, AnyValue::Int64(1)),
-        )
+        .add_value("cutoff", Scalar::new(DataType::Int64, AnyValue::Int64(1)))
         .expect("a value");
     inputs
         .add_list(
             "holidays",
-            Origin::Column {
+            ListOrigin::Column {
                 node: "Calendar".to_owned(),
                 column: "date".to_owned(),
             },
@@ -216,31 +203,21 @@ fn a_value_is_written_as_polars_writes_it_and_a_null_value_has_no_text() {
     inputs
         .add_value(
             "as_of",
-            Origin::Parameter,
             // 2026-03-02 is day 20,514 of the epoch.
             Scalar::new(DataType::Date, AnyValue::Date(20_514)),
         )
         .expect("a date");
     inputs
-        .add_value(
-            "cutoff",
-            Origin::Parameter,
-            Scalar::new(DataType::Int64, AnyValue::Int64(1)),
-        )
+        .add_value("cutoff", Scalar::new(DataType::Int64, AnyValue::Int64(1)))
         .expect("a whole number");
     inputs
         .add_value(
             "label",
-            Origin::Parameter,
             Scalar::new(DataType::String, AnyValue::StringOwned("late".into())),
         )
         .expect("text");
     inputs
-        .add_value(
-            "nothing",
-            Origin::Parameter,
-            Scalar::new(DataType::Int64, AnyValue::Null),
-        )
+        .add_value("nothing", Scalar::new(DataType::Int64, AnyValue::Null))
         .expect("a null");
     let described = inputs.describe().expect("described");
     let values: Vec<(&str, Option<String>)> = described
@@ -265,16 +242,16 @@ fn a_value_is_written_as_polars_writes_it_and_a_null_value_has_no_text() {
 fn a_list_gives_its_first_values_as_text_and_how_many_more_there_are() {
     let mut inputs = Inputs::new();
     inputs
-        .add_list("few", Origin::Parameter, dates(&[20_515, 20_517]))
+        .add_list("few", ListOrigin::Parameter, dates(&[20_515, 20_517]))
         .expect("a list");
     let many: Vec<i32> = (0..10).map(|day| 20_514 + day).collect();
     inputs
-        .add_list("many", Origin::Parameter, dates(&many))
+        .add_list("many", ListOrigin::Parameter, dates(&many))
         .expect("a list");
     inputs
         .add_list(
             "gaps",
-            Origin::Parameter,
+            ListOrigin::Parameter,
             Series::new("gaps".into(), [Some(1_i64), None]),
         )
         .expect("a list");

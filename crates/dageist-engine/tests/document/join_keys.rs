@@ -8,9 +8,7 @@
 //! not refused.
 
 use dageist_engine::allowed::{Context, Ending, Outer, RefusalSource, Rule};
-use dageist_engine::document::{
-    Document, Inputs, Origin, Outcome, Report, RunCause, Segment, Walk,
-};
+use dageist_engine::document::{Document, Inputs, Outcome, Report, RunCause, Segment, Walk};
 use polars::prelude::*;
 use serde_json::{Value, json};
 
@@ -41,7 +39,7 @@ fn right() -> DataFrame {
 fn inputs_of(other: DataFrame) -> Inputs {
     let mut inputs = Inputs::new();
     inputs
-        .add_table("other", Origin::Node("Other".to_owned()), other.lazy())
+        .add_table("other", "Other", other.lazy())
         .expect("a first input");
     inputs
 }

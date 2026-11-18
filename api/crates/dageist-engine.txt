@@ -544,12 +544,21 @@ pub dageist_engine::document::InputKind::Table(alloc::vec::Vec<dageist_engine::d
 pub dageist_engine::document::InputKind::Value
 pub dageist_engine::document::InputKind::Value::dtype: alloc::string::String
 pub dageist_engine::document::InputKind::Value::value: core::option::Option<alloc::string::String>
+pub enum dageist_engine::document::ListOrigin
+pub dageist_engine::document::ListOrigin::Column
+pub dageist_engine::document::ListOrigin::Column::column: alloc::string::String
+pub dageist_engine::document::ListOrigin::Column::node: alloc::string::String
+pub dageist_engine::document::ListOrigin::Parameter
+impl core::convert::From<dageist_engine::document::ListOrigin> for dageist_engine::document::Origin
+pub fn dageist_engine::document::Origin::from(origin: dageist_engine::document::ListOrigin) -> Self
 pub enum dageist_engine::document::Origin
 pub dageist_engine::document::Origin::Column
 pub dageist_engine::document::Origin::Column::column: alloc::string::String
 pub dageist_engine::document::Origin::Column::node: alloc::string::String
 pub dageist_engine::document::Origin::Node(alloc::string::String)
 pub dageist_engine::document::Origin::Parameter
+impl core::convert::From<dageist_engine::document::ListOrigin> for dageist_engine::document::Origin
+pub fn dageist_engine::document::Origin::from(origin: dageist_engine::document::ListOrigin) -> Self
 pub enum dageist_engine::document::Outcome
 pub dageist_engine::document::Outcome::Incomplete
 pub dageist_engine::document::Outcome::Incomplete::place: dageist_engine::document::Place
@@ -724,9 +733,9 @@ pub fn dageist_engine::document::InputDescription::name(&self) -> &str
 pub const fn dageist_engine::document::InputDescription::origin(&self) -> &dageist_engine::document::Origin
 pub struct dageist_engine::document::Inputs
 impl dageist_engine::document::Inputs
-pub fn dageist_engine::document::Inputs::add_list(&mut self, name: impl core::convert::Into<alloc::string::String>, origin: dageist_engine::document::Origin, values: polars_core::series::Series) -> core::result::Result<(), dageist_engine::document::DuplicateInput>
-pub fn dageist_engine::document::Inputs::add_table(&mut self, name: impl core::convert::Into<alloc::string::String>, origin: dageist_engine::document::Origin, table: polars_lazy::frame::LazyFrame) -> core::result::Result<(), dageist_engine::document::DuplicateInput>
-pub fn dageist_engine::document::Inputs::add_value(&mut self, name: impl core::convert::Into<alloc::string::String>, origin: dageist_engine::document::Origin, value: polars_core::scalar::Scalar) -> core::result::Result<(), dageist_engine::document::DuplicateInput>
+pub fn dageist_engine::document::Inputs::add_list(&mut self, name: impl core::convert::Into<alloc::string::String>, origin: dageist_engine::document::ListOrigin, values: polars_core::series::Series) -> core::result::Result<(), dageist_engine::document::DuplicateInput>
+pub fn dageist_engine::document::Inputs::add_table(&mut self, name: impl core::convert::Into<alloc::string::String>, node: impl core::convert::Into<alloc::string::String>, table: polars_lazy::frame::LazyFrame) -> core::result::Result<(), dageist_engine::document::DuplicateInput>
+pub fn dageist_engine::document::Inputs::add_value(&mut self, name: impl core::convert::Into<alloc::string::String>, value: polars_core::scalar::Scalar) -> core::result::Result<(), dageist_engine::document::DuplicateInput>
 pub fn dageist_engine::document::Inputs::describe(&self) -> core::result::Result<alloc::vec::Vec<dageist_engine::document::InputDescription>, polars_error::PolarsError>
 pub fn dageist_engine::document::Inputs::new() -> Self
 impl core::fmt::Debug for dageist_engine::document::Inputs

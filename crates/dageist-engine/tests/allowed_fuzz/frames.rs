@@ -13,7 +13,7 @@
 //! wrong table finds no column.
 
 use dageist_engine::allowed::Representative;
-use dageist_engine::document::{Inputs, Origin};
+use dageist_engine::document::Inputs;
 use polars::prelude::{
     DataFrame, DataType, IntoLazy, IntoSeries, ListChunked, NamedFrom, Series, StructChunked,
 };
@@ -221,18 +221,10 @@ impl Frames {
             &self.other_rows
         };
         inputs
-            .add_table(
-                OTHER,
-                Origin::Node("Other".to_owned()),
-                other.clone().lazy(),
-            )
+            .add_table(OTHER, "Other", other.clone().lazy())
             .expect("a first input");
         inputs
-            .add_table(
-                ON_COLUMNS,
-                Origin::Node("Columns".to_owned()),
-                self.on_columns.clone().lazy(),
-            )
+            .add_table(ON_COLUMNS, "Columns", self.on_columns.clone().lazy())
             .expect("a second input");
         inputs
     }
