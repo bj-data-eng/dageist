@@ -3,8 +3,8 @@
 //! units it lists for a duration, and Polars run on the same text.
 
 use polars::prelude::{
-    DataFrame, DataType, IntoLazy, NamedFrom, PlSmallStr, Series, StrptimeOptions, TimeUnit, col,
-    lit,
+    DataFrame, DataType, Duration, IntoLazy, NamedFrom, PlSmallStr, Series, StrptimeOptions,
+    TimeUnit, col, lit,
 };
 
 use crate::allowed::{Literal, Read, Representative, Typed, Unread, read_typed};
@@ -377,12 +377,17 @@ fn the_smallest_and_largest_whole_numbers_an_i64_holds_are_read_without_overflow
 #[test]
 fn an_amount_that_does_not_fit_in_nanoseconds_is_no_duration_whatever_the_build() {
     // The number of each unit in an i64 of nanoseconds, worked out from the lengths of the
-    // units: a day is 24 hours, a week 7 days.
+    // units. A day is 24 hours and a week 7 days where Polars gives a duration its length, and
+    // where it bounds how long one may be a day is 25 hours and a nanosecond and a week 6 days
+    // and such a day; the longer bound is the one that binds.
     let ns: i64 = 1;
     let limit = |unit_ns: i64| i64::MAX / unit_ns;
     let hour = 3_600 * 1_000_000_000_i64;
     let day = 24 * hour;
     let week = 7 * day;
+    let day_at_most = 25 * hour + 1;
+    let week_at_most = 6 * day + day_at_most;
+    assert!(day_at_most > day && week_at_most > week);
     let read = |text: &str| readings(text, Typed::Duration);
     let kept = |text: &str| Ok((Literal::String(text.to_owned()), None));
     for (unit, per) in [
@@ -402,8 +407,8 @@ fn an_amount_that_does_not_fit_in_nanoseconds_is_no_duration_whatever_the_build(
     for (unit, per) in [
         ("m", 60 * 1_000_000_000_i64),
         ("h", hour),
-        ("d", day),
-        ("w", week),
+        ("d", day_at_most),
+        ("w", week_at_most),
     ] {
         let largest = format!("{}{unit}", limit(per));
         assert_eq!(read(&largest), [kept(&largest)], "{largest}");
@@ -457,5 +462,32 @@ fn an_amount_that_does_not_fit_in_nanoseconds_is_no_duration_whatever_the_build(
             matches!(read(text).as_slice(), [Err(Unread::NotADuration(_))]),
             "{text}"
         );
+    }
+}
+
+#[test]
+fn a_duration_that_is_read_converts_to_nanoseconds_in_both_counts_without_overflowing() {
+    // What Polars does with a duration it has parsed: its length, and the longest it may be. Both
+    // are unchecked, so a build with overflow checks panics where a duration does not fit; each
+    // duration that is read here, at the limits, converts.
+    let hour = 3_600 * 1_000_000_000_i64;
+    let months = i64::MAX / (745 * hour);
+    let days = i64::MAX / (25 * hour + 1);
+    let weeks = i64::MAX / (6 * 24 * hour + 25 * hour + 1);
+    for text in [
+        format!("{months}mo"),
+        format!("{days}d"),
+        format!("{weeks}w"),
+        "3438mo29d".to_owned(),
+        "286y".to_owned(),
+        "1w1d1h1m1s1ms1us1ns".to_owned(),
+    ] {
+        assert!(
+            matches!(readings(&text, Typed::Duration).as_slice(), [Ok(_)]),
+            "{text}"
+        );
+        let parsed = Duration::try_parse(&text).expect("Polars parses it");
+        parsed.duration_ns();
+        parsed.nte_duration_ns();
     }
 }
