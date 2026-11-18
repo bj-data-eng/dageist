@@ -17,7 +17,7 @@ use tauri::{WebviewWindow, WebviewWindowBuilder};
 use super::{
     AfterRequest, ArgumentRequest, CandidateRequest, ChosenOptionRequest, PlaceRequest,
     PositionRequest, TypedRequest, ValueTypeRequest, fits_view, offers_view, options_view,
-    read_view,
+    read_view, step_starts_view,
 };
 use crate::report::{ConditionStateView, ValueShapeView};
 
@@ -34,6 +34,7 @@ fn window() -> WebviewWindow<MockRuntime> {
             super::candidate_fits,
             super::read_typed,
             super::option_offers,
+            super::step_starts,
         ])
         .build(mock_context(noop_assets()))
         .expect("the mock application builds");
@@ -667,6 +668,136 @@ fn the_options_of_a_cross_join_refuse_every_validation_with_polars_reason() {
 }
 
 #[test]
+fn an_option_says_which_word_it_starts_with_when_it_is_added() {
+    let answer = invoke(
+        "option_offers",
+        json!({
+            "entry": "LazyFrame.join",
+            "chosen": [{ "parameter": "how", "word": "cross" }]
+        }),
+    )
+    .expect("options");
+    let starter = |name: &str| {
+        answer["options"]
+            .as_array()
+            .expect("options")
+            .iter()
+            .find(|option| option["parameter"] == name)
+            .unwrap_or_else(|| panic!("no option {name}"))["starter"]
+            .clone()
+    };
+    // Polars refuses every validation but its default beside a cross join, so there is none.
+    assert!(starter("validate").is_null());
+    // `how` is judged against the other options and not its own word: its default is `inner`,
+    // and `left` is the next word Polars lists.
+    assert_eq!(starter("how"), "left");
+    // An option that cannot be added says why, with the refusal of its first other word, which
+    // Polars gives for `m:1` beside a cross join; one that can has no reason it cannot.
+    let stuck = |name: &str| {
+        answer["options"]
+            .as_array()
+            .expect("options")
+            .iter()
+            .find(|option| option["parameter"] == name)
+            .unwrap_or_else(|| panic!("no option {name}"))["stuck"]
+            .clone()
+    };
+    assert_eq!(
+        stuck("validate")["source"],
+        json!({ "by": "polars", "stage": "schema" })
+    );
+    assert!(stuck("how").is_null());
+}
+
+/// The names `texts` as the strings a request holds.
+fn names(texts: &[&str]) -> Vec<String> {
+    texts.iter().map(|text| (*text).to_owned()).collect()
+}
+
+#[test]
+fn every_step_of_the_list_starts_with_what_the_engine_gives_it() {
+    let answer = invoke(
+        "step_starts",
+        json!({ "columns": ["dcn", "owner"], "tables": ["step_names", "step_sla"] }),
+    )
+    .expect("the starts");
+    let unset = || json!({ "kind": "unset" });
+    let unset_list = || json!({ "kind": "list", "items": [{ "kind": "unset" }] });
+    let argument =
+        |parameter: &str, setting: Value| json!({ "parameter": parameter, "setting": setting });
+    // Worked out by hand: a join takes the first table and keeps the rows that have no match,
+    // a select every column in order, and a pivot takes the first table and the first value.
+    assert_eq!(
+        answer,
+        json!({ "starts": [
+            { "entry": "LazyFrame.filter", "arguments": [argument("predicates", json!({
+                "kind": "list",
+                "items": [{
+                    "kind": "comparison",
+                    "entry": "Expr.eq",
+                    "field": { "kind": "unset" },
+                    "other": { "kind": "unset" },
+                }],
+            }))] },
+            { "entry": "LazyFrame.join", "arguments": [
+                argument("other", json!({ "kind": "word", "value": "step_names" })),
+                argument("left_on", unset_list()),
+                argument("right_on", unset_list()),
+                argument("how", json!({ "kind": "word", "value": "left" })),
+            ] },
+            { "entry": "LazyFrame.pivot", "arguments": [
+                argument("on", unset()),
+                argument("on_columns", json!({ "kind": "word", "value": "step_names" })),
+                argument("index", unset()),
+                argument("values", unset()),
+                argument("aggregate_function", json!({ "kind": "element", "method": "first" })),
+            ] },
+            { "entry": "LazyFrame.rename", "arguments": [
+                argument("mapping", json!({ "kind": "pairs", "entries": [] })),
+            ] },
+            { "entry": "LazyFrame.select", "arguments": [
+                argument("exprs", json!({ "kind": "list", "items": [
+                    { "kind": "field", "column": "dcn" },
+                    { "kind": "field", "column": "owner" },
+                ] })),
+            ] },
+            { "entry": "LazyFrame.sort", "arguments": [argument("by", unset_list())] },
+            { "entry": "LazyFrame.with_columns", "arguments": [
+                argument("named_exprs", json!({ "kind": "pairs", "entries": [
+                    { "key": { "kind": "text", "value": "new_column" }, "value": unset() },
+                ] })),
+            ] },
+        ] })
+    );
+}
+
+#[test]
+fn a_join_and_a_pivot_with_no_connected_table_start_without_one() {
+    let view = json_of(&step_starts_view(&names(&["a"]), &[]));
+    let starts = view["starts"].as_array().expect("starts");
+    let argument = |entry: &str, parameter: &str| {
+        starts
+            .iter()
+            .find(|start| start["entry"] == entry)
+            .and_then(|start| {
+                start["arguments"]
+                    .as_array()?
+                    .iter()
+                    .find(|argument| argument["parameter"] == parameter)
+            })
+            .map(|argument| argument["setting"].clone())
+    };
+    assert_eq!(
+        argument("LazyFrame.join", "other"),
+        Some(json!({ "kind": "unset" }))
+    );
+    assert_eq!(
+        argument("LazyFrame.pivot", "on_columns"),
+        Some(json!({ "kind": "unset" }))
+    );
+}
+
+#[test]
 fn an_entry_that_has_no_options_has_none_and_an_unknown_one_is_refused() {
     let none = invoke(
         "option_offers",
@@ -979,6 +1110,14 @@ fn the_snapshots_are_what_the_commands_return() {
                 )
                 .expect("options"),
             ),
+        ),
+        (
+            "step-starts.json",
+            // The columns and the tables the sample node is connected to.
+            json_of(&step_starts_view(
+                &names(&["dcn", "timestamp", "step_to", "owner", "row_days"]),
+                &names(&["step_names", "step_sla"]),
+            )),
         ),
         ("offers-grid.json", grid()),
     ];

@@ -1,12 +1,13 @@
 //! Commands that answer what the step editor may offer: which calls may stand
 //! at a place, which values fit a slot, how a text typed into a slot reads,
-//! and what an entry's options may be set to.
+//! what an entry's options may be set to, and what a new step starts with.
 //!
 //! The engine's tables of allowed combinations decide every answer, and the
 //! engine reads every typed text; this module translates what the engine says
 //! into serializable views and the view's requests into what the engine is
 //! asked. The shapes mirror `OffersView`, `FitsView`, `ReadingsView` and
-//! `OptionsView` in `ui/packages/host/src/contract.ts`.
+//! `OptionsView` in `ui/packages/host/src/contract.ts`, and `StepStartsView` for
+//! the starts of new steps.
 //!
 //! A request names a place the way the engine's walk reports one: the
 //! positions that hold the expression, outermost first, and what the
@@ -18,10 +19,11 @@ use dageist_engine::allowed::{
     self, After, ArgumentSlot, Candidate, ConditionState, Context, Literal, Nested, Outer, Place,
     Position, Representative, Shape, Slot, Typed,
 };
-use dageist_engine::catalog::{self, Entry, ValueType};
+use dageist_engine::catalog::{self, Applies, Entry, StepFrame, ValueType};
 use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize};
 
+use crate::catalogue::{SettingView, setting_view};
 use crate::report::{
     ConditionStateView, OfferPlaceView, RefusalView, ValueShapeView, VerdictView, offer_place_view,
     refusal_view, verdict_view,
@@ -351,6 +353,12 @@ struct OptionView {
     parameter: &'static str,
     /// The word the option has when it is not set.
     default: Option<String>,
+    /// The word the option starts with when it is added: the first that is not
+    /// the default and that Polars allows beside the options chosen; `None`
+    /// where there is none.
+    starter: Option<String>,
+    /// Why the option cannot be added, where it has no starter.
+    stuck: Option<RefusalView>,
     words: Vec<OptionWordView>,
 }
 
@@ -358,6 +366,29 @@ struct OptionView {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub(crate) struct OptionsView {
     options: Vec<OptionView>,
+}
+
+/// One argument a new step starts with.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+struct StartArgumentView {
+    /// The parameter, by Python's name.
+    parameter: &'static str,
+    setting: SettingView,
+}
+
+/// What a new step of an entry starts with.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+struct StepStartView {
+    entry: &'static str,
+    /// The parameters the step starts with. Any other holds its default.
+    arguments: Vec<StartArgumentView>,
+}
+
+/// What every step of the list starts with when it is added to a table.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub(crate) struct StepStartsView {
+    /// One for each step, ordered by identifier.
+    starts: Vec<StepStartView>,
 }
 
 fn entry_named(id: &str) -> Result<&'static Entry, ErrorView> {
@@ -542,6 +573,8 @@ pub fn options_view(entry: &str, chosen: &[ChosenOptionRequest]) -> Result<Optio
         .map(|option| OptionView {
             parameter: option.parameter(),
             default: option.default_word().map(str::to_owned),
+            starter: option.starter().map(str::to_owned),
+            stuck: option.stuck().as_ref().map(refusal_view),
             words: option
                 .words()
                 .iter()
@@ -553,6 +586,31 @@ pub fn options_view(entry: &str, chosen: &[ChosenOptionRequest]) -> Result<Optio
         })
         .collect();
     Ok(OptionsView { options })
+}
+
+/// What each step of the list starts with when it is added to a table of
+/// `columns`, with the connected `tables` it can bring in. The engine decides
+/// every argument.
+pub fn step_starts_view(columns: &[String], tables: &[String]) -> StepStartsView {
+    let frame = StepFrame { columns, tables };
+    let starts = catalog::entries()
+        .iter()
+        .filter(|entry| entry.applies() == Applies::Frame)
+        .filter_map(|entry| {
+            catalog::start_step(entry, &frame).map(|start| StepStartView {
+                entry: entry.id().as_str(),
+                arguments: start
+                    .arguments()
+                    .iter()
+                    .map(|(parameter, setting)| StartArgumentView {
+                        parameter,
+                        setting: setting_view(setting),
+                    })
+                    .collect(),
+            })
+        })
+        .collect();
+    StepStartsView { starts }
 }
 
 /// Answers which calls may stand where an expression found by following
@@ -596,6 +654,13 @@ pub fn option_offers(
     chosen: Vec<ChosenOptionRequest>,
 ) -> Result<OptionsView, ErrorView> {
     options_view(&entry, &chosen)
+}
+
+/// Answers what each step of the list starts with when it is added to a table of `columns`,
+/// with the connected `tables` it can bring in.
+#[tauri::command(async)]
+pub fn step_starts(columns: Vec<String>, tables: Vec<String>) -> StepStartsView {
+    step_starts_view(&columns, &tables)
 }
 
 #[cfg(test)]

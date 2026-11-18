@@ -170,7 +170,41 @@
           "atEnd": true
         },
         "notKnown": "why"
-      }
+      },
+      "atDefault": [
+        {
+          "stepIndex": 0,
+          "stepId": "variants",
+          "path": [
+            {
+              "kind": "parameter",
+              "name": "descending"
+            }
+          ]
+        },
+        {
+          "stepIndex": 0,
+          "stepId": "variants",
+          "path": [
+            {
+              "kind": "parameter",
+              "name": "named_exprs"
+            },
+            {
+              "kind": "value",
+              "index": 0
+            },
+            {
+              "kind": "link",
+              "index": 1
+            },
+            {
+              "kind": "parameter",
+              "name": "mapping_strategy"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "unknown_table",
@@ -201,7 +235,8 @@
         "expressions": [],
         "refusal": null,
         "notKnown": null
-      }
+      },
+      "atDefault": []
     },
     {
       "id": "unknown_input",
@@ -232,7 +267,8 @@
         "expressions": [],
         "refusal": null,
         "notKnown": null
-      }
+      },
+      "atDefault": []
     },
     {
       "id": "build",
@@ -263,7 +299,8 @@
         "expressions": [],
         "refusal": null,
         "notKnown": null
-      }
+      },
+      "atDefault": []
     },
     {
       "id": "rule",
@@ -300,7 +337,8 @@
         "expressions": [],
         "refusal": null,
         "notKnown": null
-      }
+      },
+      "atDefault": []
     },
     {
       "id": "rows_stage",
@@ -337,7 +375,8 @@
         "expressions": [],
         "refusal": null,
         "notKnown": null
-      }
+      },
+      "atDefault": []
     },
     {
       "id": "failed",
@@ -358,7 +397,8 @@
         "expressions": [],
         "refusal": null,
         "notKnown": null
-      }
+      },
+      "atDefault": []
     }
   ],
   "python": [

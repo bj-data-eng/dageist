@@ -69,6 +69,7 @@ pub(crate) fn variants() -> RunView {
             refusal: None,
             not_known: None,
         },
+        at_default: Vec::new(),
     };
     let path = vec![
         SegmentView::Parameter {
@@ -163,6 +164,21 @@ pub(crate) fn variants() -> RunView {
             }),
             not_known: Some("why".to_owned()),
         },
+        at_default: vec![
+            place(vec![SegmentView::Parameter {
+                name: "descending".to_owned(),
+            }]),
+            place(vec![
+                SegmentView::Parameter {
+                    name: "named_exprs".to_owned(),
+                },
+                SegmentView::Value { index: 0 },
+                SegmentView::Link { index: 1 },
+                SegmentView::Parameter {
+                    name: "mapping_strategy".to_owned(),
+                },
+            ]),
+        ],
     };
     let mut failed = refused(
         "failed",

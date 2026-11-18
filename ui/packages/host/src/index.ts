@@ -47,6 +47,7 @@ export type {
   OriginView,
   OuterPosition,
   OutcomeView,
+  PairView,
   ParameterView,
   PlaceRequest,
   PlaceView,
@@ -61,12 +62,17 @@ export type {
   RuleName,
   RunView,
   SegmentView,
+  SettingView,
   ShapeView,
   SourceLineView,
   SourceView,
   StageView,
   StandingView,
+  StartArgumentView,
   StepReportView,
+  StepStartView,
+  StepStartsRequest,
+  StepStartsView,
   TableView,
   TypedKind,
   TypedRequest,
@@ -81,11 +87,17 @@ export type {
   WordsView,
 } from './contract';
 export { BRIDGE_START_COMMAND, BridgeUnavailableError, bridgeHost } from './bridge';
-export { ERROR_KINDS } from './contract';
+export { ERROR_KINDS, SETTING_KINDS } from './contract';
 export { DecodeError } from './decode';
 export { decodeCatalogue } from './decode-catalogue';
 export { decodeNode, decodeRows } from './decode-node';
-export { decodeFits, decodeOffers, decodeOptions, decodeReadings } from './decode-offers';
+export {
+  decodeFits,
+  decodeOffers,
+  decodeOptions,
+  decodeReadings,
+  decodeStepStarts,
+} from './decode-offers';
 export { decodeRun } from './decode-run';
 export { decodeBytes, decodeIdentity, decodeTable } from './decode-sample';
 export { deliverMessage, sealMessage } from './envelope';

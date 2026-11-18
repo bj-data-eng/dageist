@@ -16,7 +16,7 @@ import { NO_OPTIONS } from './settings';
 import { fieldKeys } from './steps';
 import { HostError } from '@dageist/host';
 import type { Answered } from './report';
-import { prepareRun, rowsFailure, rowsToShow } from './report';
+import { atDefaultKey, prepareRun, rowsFailure, rowsToShow } from './report';
 import type { Step } from './steps';
 
 // The report the host writes of the claim-timing steps, and what the editor shows of it.
@@ -91,6 +91,7 @@ function timestampRun(changes: ReadonlyArray<{ name: string; change: string }>):
           count: { kind: 'notCounted' },
           expressions: [],
           walk: { expressions: [], refusal: null, notKnown: null },
+          atDefault: [],
         },
       ],
     }),
@@ -177,6 +178,7 @@ function counted(count: unknown): ReturnType<typeof decodeRun> {
       count: id === 'sort' ? { kind: 'notCounted' } : count,
       expressions: [],
       walk: { expressions: [], refusal: null, notKnown: null },
+      atDefault: [],
     })),
   });
 }
@@ -744,5 +746,67 @@ describe('the source and the summary the engine wrote of the steps', () => {
     const prepared = prepareRun(held, translate(catalogue, held), null, source);
     expect(stepOf(prepared, 'nothing')).toMatchObject({ source: null, summary: null });
     expect(prepared).toMatchObject({ module: [] });
+  });
+});
+
+describe('the options of a step and of its methods that are at their default', () => {
+  it('are the arguments the engine reported at that place, by the step or the method that holds them', () => {
+    const prepared = started();
+    const shift = START.find((candidate) => candidate.id === 'resolved_at');
+    if (shift?.verb !== 'with_columns' || shift.value.kind !== 'chain') {
+      throw new Error('resolved_at holds no chain');
+    }
+    const [method] = shift.value.chain.methods;
+    if (method === undefined) throw new Error('no method');
+
+    // The sample gives `shift` its default of 1, the only argument at its default in the steps.
+    expect(stepOf(prepared, 'resolved_at').atDefault).toEqual(
+      new Set([atDefaultKey(method.id, 'n')]),
+    );
+    expect(stepOf(prepared, 'sort').atDefault).toEqual(new Set());
+  });
+
+  it('name the step itself where the place is one of its own parameters', () => {
+    const steps: Step[] = [
+      {
+        id: 'order',
+        verb: 'sort',
+        options: { by: fieldKeys(['dcn']), descending: { kind: 'flag', value: false } },
+      },
+    ];
+    // A report written by hand, as the engine writes it for a sort whose `descending` is False.
+    const reported = decodeRun({
+      status: 'run',
+      source,
+      python: [],
+      steps: [
+        {
+          id: 'order',
+          source: '.sort("dcn", descending=False)',
+          summary: 'by dcn',
+          lazy: true,
+          outcome: { status: 'valid', columns: source, changes: [] },
+          count: { kind: 'notCounted' },
+          expressions: [],
+          walk: { expressions: [], refusal: null, notKnown: null },
+          atDefault: [
+            { stepIndex: 0, stepId: 'order', path: [{ kind: 'parameter', name: 'descending' }] },
+          ],
+        },
+      ],
+    });
+    const translation = translate(catalogue, steps);
+
+    const prepared = prepareRun(steps, translation, answeredFor(translation, reported), source);
+
+    expect(stepOf(prepared, 'order').atDefault).toEqual(
+      new Set([atDefaultKey('order', 'descending')]),
+    );
+  });
+
+  it('are none for a step the engine has not reported on', () => {
+    const prepared = prepareRun(START, translate(catalogue, START), null, source);
+
+    expect(prepared.steps.every((step) => step.atDefault.size === 0)).toBe(true);
   });
 });

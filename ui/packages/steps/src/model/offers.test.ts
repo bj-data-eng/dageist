@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import type { CandidateRequest, FitsView, OfferPlaceView } from '@dageist/host';
+import type {
+  CandidateRequest,
+  FitsView,
+  OfferPlaceView,
+  OptionsView,
+  RefusalView,
+} from '@dageist/host';
 import {
   decodeCatalogue,
   decodeFits,
@@ -173,6 +179,41 @@ describe('the options of an entry', () => {
     // Beside a cross join every flag is refused: Polars takes no keys, and no option of them.
     expect(options.get('coalesce')).toMatchObject({ default: 'unset', starter: null });
     expect(options.get('coalesce')?.stuck).toContain('cross join');
+  });
+
+  it('start with the word the engine says, not one the editor picks from the words', () => {
+    // An option the engine says starts with `right`, though `left` is the first other word and
+    // Polars allows it: the editor does not choose between the words itself.
+    const stuckBecause: RefusalView = {
+      source: { by: 'structure' },
+      reason: 'the engine says why\nand more',
+    };
+    const view: OptionsView = {
+      options: [
+        {
+          parameter: 'how',
+          default: 'inner',
+          starter: 'right',
+          stuck: null,
+          words: ['inner', 'left', 'right'].map((word) => ({ word, refusal: null })),
+        },
+        {
+          parameter: 'validate',
+          default: 'm:m',
+          starter: null,
+          stuck: stuckBecause,
+          words: ['m:m', 'm:1'].map((word) => ({ word, refusal: null })),
+        },
+      ],
+    };
+
+    const prepared = prepareOptions(view);
+
+    expect(prepared.get('how')).toMatchObject({ starter: 'right', stuck: null });
+    // Where the engine says there is none, there is none, and the reason is the engine's, in its
+    // first line, though the first other word is not refused.
+    expect(prepared.get('validate')?.starter).toBeNull();
+    expect(prepared.get('validate')?.stuck).toBe('the engine says why');
   });
 
   it('cannot be added where Polars refuses every word but the default, and say why', () => {

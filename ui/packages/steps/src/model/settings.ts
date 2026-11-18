@@ -2,9 +2,9 @@
  * @file What a parameter holds once it is given: one shape for every kind of
  * parameter the catalogue has, so that one drawing covers them all. A method
  * or a step keeps the parameters that are set in an `Options` record, by the
- * parameter's Python name. A parameter that is not there is at its default,
- * which Polars supplies, so only a parameter that differs from its default
- * is ever written out.
+ * parameter's Python name. A parameter that is not there holds its default,
+ * which Polars supplies. What a default is, and whether a setting equals it,
+ * is the engine's to say.
  *
  * What a setting stands for in Polars' text needs chains, so that is in
  * `source.ts`; what it stands for in the step document is in `document.ts`.
@@ -61,43 +61,6 @@ export function expressionSetting(value: Value): Setting {
   return { kind: 'expression', value };
 }
 
-/** Returns what `parameter` holds when it is not given, as a setting, or `null` when Polars decides. */
-export function defaultSetting(parameter: ParameterView): Setting | null {
-  const { default: given } = parameter;
-  switch (given.kind) {
-    case 'flag':
-      return { kind: 'flag', value: given.value };
-    case 'integer':
-      return { kind: 'number', value: given.value };
-    case 'float':
-      return { kind: 'number', value: given.value, float: true };
-    case 'text':
-      return parameter.kind.kind === 'choice'
-        ? { kind: 'word', value: given.value }
-        : { kind: 'text', value: given.value };
-    default:
-      return null;
-  }
-}
-
-/** Returns what a parameter is set to when it is first added: something that differs from its default. */
-export function starterSetting(parameter: ParameterView): Setting {
-  const { kind, shape } = parameter;
-  if (shape.shape === 'many') return { kind: 'list', items: [UNSET] };
-  if (kind.kind === 'pairs') return { kind: 'pairs', entries: [] };
-  if (kind.kind === 'flag') {
-    const { default: given } = parameter;
-    return { kind: 'flag', value: given.kind === 'flag' ? !given.value : true };
-  }
-  if (kind.kind === 'choice') {
-    // A choice starts from the first word that is not the default one.
-    const { default: given } = parameter;
-    const other = kind.words.find((word) => given.kind !== 'text' || word.word !== given.value);
-    return other === undefined ? UNSET : { kind: 'word', value: other.word };
-  }
-  return UNSET;
-}
-
 /** Returns a pair with nothing picked yet. */
 export function emptyPair(): PairSetting {
   return { id: nextId('pair'), key: UNSET, value: UNSET };
@@ -122,55 +85,6 @@ export function isComplete(setting: Setting): boolean {
     default:
       return true;
   }
-}
-
-/** Reports whether `setting` is what `parameter` holds when it is not given. */
-export function atDefault(parameter: ParameterView, setting: Setting): boolean {
-  const { default: given } = parameter;
-  switch (setting.kind) {
-    case 'flag':
-      return given.kind === 'flag' && given.value === setting.value;
-    case 'number':
-      return (given.kind === 'integer' || given.kind === 'float') && given.value === setting.value;
-    case 'text':
-    case 'word':
-      return given.kind === 'text' && given.value === setting.value;
-    case 'expression': {
-      // Nothing, a number and text typed in are what an expression's default can be.
-      const { value } = setting;
-      if (value.kind !== 'literal') return false;
-      if (value.value === null) return given.kind === 'none';
-      return typeof value.value === 'number'
-        ? (given.kind === 'integer' || given.kind === 'float') && given.value === value.value
-        : given.kind === 'text' && given.value === value.value;
-    }
-    case 'list':
-      return given.kind === 'empty' && setting.items.length === 0;
-    case 'pairs':
-      return given.kind === 'empty' && setting.entries.length === 0;
-    case 'each':
-      return Object.values(setting.items).every((item) => atDefault(parameter, item));
-    default:
-      return false;
-  }
-}
-
-/**
- * Reports whether `setting` is what `parameter` holds when it is not given,
- * for the `items` of the parameter it follows: an item with no setting of its
- * own is at the default, and settings of items that are no longer there do
- * not count.
- */
-export function atDefaultOver(
-  parameter: ParameterView,
-  setting: Setting,
-  items: readonly string[],
-): boolean {
-  if (setting.kind !== 'each') return atDefault(parameter, setting);
-  return items.every((item) => {
-    const own = Object.hasOwn(setting.items, item) ? setting.items[item] : undefined;
-    return own === undefined || atDefault(parameter, own);
-  });
 }
 
 /** One parameter that is set, with what it is set to. */

@@ -8,19 +8,21 @@ import { DragDropProvider } from '@dnd-kit/react';
 import { isSortable } from '@dnd-kit/react/sortable';
 import { useMemo, useState } from 'react';
 
+import type { StepStartView } from '@dageist/host';
 import { Slot } from '@dageist/design';
 
 import { useCatalogue, useNode } from './EngineProvider';
 import { PreparedStepProvider } from './engine';
+import { useStepStarts } from './ask';
 import { DragSettingsContext, dragSettingsFor, moved } from './Chain';
 import type { Fresh } from './Lists';
 import { FreshContext } from './Lists';
+import { useListState } from './positions';
 import { STEP_GROUP, StepRow, verbOffers } from './StepRow';
 import type { Frame } from './model/frame';
-import { tablesOf } from './model/inputs';
 import type { PreparedStep } from './model/report';
+import { startedStep } from './model/started';
 import type { Step, Verb } from './model/steps';
-import { defaultStep } from './model/steps';
 import type { Origins } from './origins';
 import { OriginsContext, originsBefore } from './origins';
 
@@ -61,8 +63,11 @@ export function StepList({
   const frameBefore = (index: number): Frame => results[index]?.before ?? node.source.columns;
   // Where each step's fields come from, for the hints that say so.
   const origins = originsBefore(results);
-  const addStep = (verb: Verb, after: number): void => {
-    const added = defaultStep(verb, results[after]?.after ?? node.source.columns, tablesOf(node));
+  // What each step starts with at the end of the list, asked of the engine while its list is open.
+  const endList = useListState();
+  const endStarts = useStepStarts(endList.open, results.at(-1)?.after ?? node.source.columns, node);
+  const addStep = (verb: Verb, start: StepStartView, after: number): void => {
+    const added = startedStep(verb, start);
     onChange([...steps.slice(0, after + 1), added, ...steps.slice(after + 1)], added.id);
     // What is gone to first: the field of a new filter's comparison, or the step itself.
     setFreshId(added.verb === 'filter' ? added.condition.id : added.id);
@@ -116,8 +121,8 @@ export function StepList({
                             step.id === selectedId ? beside : selectedId,
                           );
                         }}
-                        onInsertAfter={(verb) => {
-                          addStep(verb, index);
+                        onInsertAfter={(verb, start) => {
+                          addStep(verb, start, index);
                         }}
                       />
                     </PreparedStepProvider>
@@ -136,10 +141,11 @@ export function StepList({
               describedAs="Add a step at the end"
               placeholder="Search the steps"
               offers={(typed) =>
-                verbOffers(catalogue, typed, (verb) => {
-                  addStep(verb, steps.length - 1);
+                verbOffers(catalogue, typed, endStarts, (verb, start) => {
+                  addStep(verb, start, steps.length - 1);
                 })
               }
+              onOpenChange={endList.onOpenChange}
             />
           </div>
         </div>

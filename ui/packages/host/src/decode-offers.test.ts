@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
 import { DecodeError } from './decode';
-import { decodeFits, decodeOffers, decodeOptions, decodeReadings } from './decode-offers';
+import {
+  decodeFits,
+  decodeOffers,
+  decodeOptions,
+  decodeReadings,
+  decodeStepStarts,
+} from './decode-offers';
 import fitsArgumentFixture from '../fixtures/fits-argument.json';
 import fitsStartFixture from '../fixtures/fits-start.json';
 import offersConditionFixture from '../fixtures/offers-condition.json';
 import offersStartFixture from '../fixtures/offers-start.json';
 import offersValueFixture from '../fixtures/offers-value.json';
 import optionsFixture from '../fixtures/options.json';
+import stepStartsFixture from '../fixtures/step-starts.json';
 import typedDateFixture from '../fixtures/typed-date.json';
 import typedExpressionFixture from '../fixtures/typed-expression.json';
 import typedUnreadFixture from '../fixtures/typed-unread.json';
@@ -22,6 +29,7 @@ const offersCondition: unknown = offersConditionFixture;
 const fitsStart: unknown = fitsStartFixture;
 const fitsArgument: unknown = fitsArgumentFixture;
 const options: unknown = optionsFixture;
+const stepStarts: unknown = stepStartsFixture;
 const typedExpression: unknown = typedExpressionFixture;
 const typedWhole: unknown = typedWholeFixture;
 const typedDate: unknown = typedDateFixture;
@@ -264,6 +272,22 @@ describe('the options of an entry', () => {
     expect(named('coalesce')?.words.map((word) => word.word)).toEqual(['true', 'false']);
   });
 
+  it('name the word an option starts with when it is added, where Polars allows another than its default', () => {
+    const decoded = decodeOptions(options).options;
+    const starter = (name: string) => decoded.find((option) => option.parameter === name)?.starter;
+    // Beside a cross join every validation but the default is refused, so there is none; `how`
+    // is judged against the others, and `left` is the first word after its default `inner`.
+    expect(starter('validate')).toBeNull();
+    expect(starter('how')).toBe('left');
+  });
+
+  it('say why an option cannot be added, with the refusal that stops it, where it has no starter', () => {
+    const decoded = decodeOptions(options).options;
+    const named = (name: string) => decoded.find((option) => option.parameter === name);
+    expect(named('validate')?.stuck?.source).toEqual({ by: 'polars', stage: 'schema' });
+    expect(named('how')?.stuck).toBeNull();
+  });
+
   it('give the reason Polars refuses a word beside the options already chosen', () => {
     // A cross join takes no join keys, so every validation is refused with Polars' reason.
     const validate = decodeOptions(options).options.find(
@@ -283,5 +307,105 @@ describe('the options of an entry', () => {
     expect(refusal(decodeOptions, withField(options, ['options', 0], 'extra', 1)).message).toBe(
       '$.options[0]: has the field "extra", which the contract lacks',
     );
+  });
+});
+
+describe('what each step starts with', () => {
+  const starts = decodeStepStarts(stepStarts).starts;
+  const startOf = (entry: string) => {
+    const found = starts.find((start) => start.entry === entry);
+    if (found === undefined) throw new Error(`no start for ${entry}`);
+    return found;
+  };
+
+  it('has one for each step of the list, ordered by identifier', () => {
+    expect(starts.map((start) => start.entry)).toEqual([
+      'LazyFrame.filter',
+      'LazyFrame.join',
+      'LazyFrame.pivot',
+      'LazyFrame.rename',
+      'LazyFrame.select',
+      'LazyFrame.sort',
+      'LazyFrame.with_columns',
+    ]);
+  });
+
+  it('gives a select every column of the table in its order, as fields', () => {
+    expect(startOf('LazyFrame.select').arguments).toEqual([
+      {
+        parameter: 'exprs',
+        setting: {
+          kind: 'list',
+          items: ['dcn', 'timestamp', 'step_to', 'owner', 'row_days'].map((column) => ({
+            kind: 'field',
+            column,
+          })),
+        },
+      },
+    ]);
+  });
+
+  it('gives a join the first connected table, keys still to be given, and the rows of the left table kept', () => {
+    expect(startOf('LazyFrame.join').arguments).toEqual([
+      { parameter: 'other', setting: { kind: 'word', value: 'step_names' } },
+      { parameter: 'left_on', setting: { kind: 'list', items: [{ kind: 'unset' }] } },
+      { parameter: 'right_on', setting: { kind: 'list', items: [{ kind: 'unset' }] } },
+      { parameter: 'how', setting: { kind: 'word', value: 'left' } },
+    ]);
+  });
+
+  it('gives a filter a comparison for equality of a field and a value still to be given', () => {
+    expect(startOf('LazyFrame.filter').arguments).toEqual([
+      {
+        parameter: 'predicates',
+        setting: {
+          kind: 'list',
+          items: [
+            {
+              kind: 'comparison',
+              entry: 'Expr.eq',
+              field: { kind: 'unset' },
+              other: { kind: 'unset' },
+            },
+          ],
+        },
+      },
+    ]);
+  });
+
+  it('gives a pivot the first connected table and the first value of each cell', () => {
+    expect(startOf('LazyFrame.pivot').arguments).toContainEqual({
+      parameter: 'aggregate_function',
+      setting: { kind: 'element', method: 'first' },
+    });
+    expect(startOf('LazyFrame.pivot').arguments).toContainEqual({
+      parameter: 'on_columns',
+      setting: { kind: 'word', value: 'step_names' },
+    });
+  });
+
+  it('gives a new column the name new_column, with what it holds still to be given', () => {
+    expect(startOf('LazyFrame.with_columns').arguments).toEqual([
+      {
+        parameter: 'named_exprs',
+        setting: {
+          kind: 'pairs',
+          entries: [{ key: { kind: 'text', value: 'new_column' }, value: { kind: 'unset' } }],
+        },
+      },
+    ]);
+  });
+
+  it('is refused with the place of what is wrong', () => {
+    expect(refusal(decodeStepStarts, replaced(stepStarts, ['starts'], {})).message).toBe(
+      '$.starts: must be a list, not an object',
+    );
+    expect(
+      refusal(decodeStepStarts, replaced(stepStarts, ['starts', 0, 'arguments', 0, 'setting'], 1))
+        .message,
+    ).toBe('$.starts[0].arguments[0].setting: must be an object, not a number');
+    expect(
+      refusal(decodeStepStarts, withField(stepStarts, ['starts', 0], 'extra', 1)).message,
+    ).toBe('$.starts[0]: has the field "extra", which the contract lacks');
   });
 });

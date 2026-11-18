@@ -312,6 +312,42 @@ impl OptionOffer {
     pub fn words(&self) -> &[OptionWord] {
         &self.words
     }
+
+    /// The word the option starts with when it is added: the first word, in the
+    /// order of [`words`](Self::words), that is not its default and that Polars
+    /// allows beside the options it was asked with. `None` where Polars refuses
+    /// every word but the default, so that adding the option would change nothing
+    /// it can be given.
+    #[must_use]
+    pub fn starter(&self) -> Option<&str> {
+        self.words
+            .iter()
+            .find(|word| {
+                self.default.as_deref() != Some(word.word.as_str()) && word.refusal.is_none()
+            })
+            .map(|word| word.word.as_str())
+    }
+
+    /// Why the option cannot be added, where it has no [`starter`](Self::starter):
+    /// the refusal Polars gives the first word that is not its default, which
+    /// is then refused beside the options it was asked with like every other, or
+    /// a refusal that there is no other word. `None` where the option can be
+    /// added.
+    #[must_use]
+    pub fn stuck(&self) -> Option<Refusal> {
+        if self.starter().is_some() {
+            return None;
+        }
+        let other = self
+            .words
+            .iter()
+            .find(|word| self.default.as_deref() != Some(word.word.as_str()));
+        Some(
+            other
+                .and_then(|word| word.refusal.clone())
+                .unwrap_or_else(|| Refusal::structure("there is nothing else to set it to")),
+        )
+    }
 }
 
 /// The options of `entry`, its flags and its choices, each with its default
@@ -352,4 +388,27 @@ pub fn option_offers(entry: &Entry, chosen: &[(&str, &str)]) -> Vec<OptionOffer>
             })
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::allowed::RefusalSource;
+
+    #[test]
+    fn a_choice_with_no_word_but_its_default_cannot_be_added_and_says_there_is_none() {
+        let offer = OptionOffer {
+            parameter: "only",
+            default: Some("a".to_owned()),
+            words: vec![OptionWord {
+                word: "a".to_owned(),
+                refusal: None,
+            }],
+        };
+
+        let stuck = offer.stuck().expect("nothing else to set it to");
+
+        assert_eq!(offer.starter(), None);
+        assert_eq!(stuck.source(), RefusalSource::Structure);
+    }
 }

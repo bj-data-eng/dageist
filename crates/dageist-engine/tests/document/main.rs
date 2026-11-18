@@ -3,6 +3,7 @@
 
 mod claims;
 mod counts;
+mod defaults;
 mod dtypes;
 mod floats;
 mod holes;

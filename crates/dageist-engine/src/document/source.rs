@@ -512,6 +512,10 @@ impl Writer<'_> {
             let Some(argument) = given(parameter) else {
                 continue;
             };
+            // Python takes a parameter left out as its default.
+            if call.is_default(parameter.name()) {
+                continue;
+            }
             if is_double_starred(parameter) {
                 if let Value::Pairs(pairs) = argument
                     && !pairs.is_empty()

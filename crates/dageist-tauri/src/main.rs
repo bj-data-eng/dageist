@@ -49,6 +49,7 @@ fn open_application(context: tauri::Context) -> i32 {
             offers::candidate_fits,
             offers::read_typed,
             offers::option_offers,
+            offers::step_starts,
             sample_table::open_sample_window,
             sample_table::open_sample_result,
             sample_table::table_block,

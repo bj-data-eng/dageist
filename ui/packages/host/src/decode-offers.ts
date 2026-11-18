@@ -17,6 +17,9 @@ import type {
   OptionsView,
   ReadingView,
   ReadingsView,
+  StartArgumentView,
+  StepStartView,
+  StepStartsView,
 } from './contract';
 import type { Decode } from './decode';
 import {
@@ -30,6 +33,7 @@ import {
   readString,
   readTagged,
 } from './decode';
+import { readSettingView } from './decode-catalogue';
 import { readOfferPlace, readRefusal, readVerdict } from './decode-run';
 
 const readLiteral: Decode<LiteralView> = readTagged<LiteralView>('kind', {
@@ -129,16 +133,35 @@ const readOptionWord: Decode<OptionWordView> = readRecord(['word', 'refusal'], (
 }));
 
 const readOption: Decode<OptionView> = readRecord(
-  ['parameter', 'default', 'words'],
+  ['parameter', 'default', 'starter', 'stuck', 'words'],
   (fields, path) => ({
     parameter: readField(fields, path, 'parameter', readString),
     default: readField(fields, path, 'default', readNullable(readString)),
+    starter: readField(fields, path, 'starter', readNullable(readString)),
+    stuck: readField(fields, path, 'stuck', readNullable(readRefusal)),
     words: readField(fields, path, 'words', readList(readOptionWord)),
   }),
 );
 
 const readOptions: Decode<OptionsView> = readRecord(['options'], (fields, path) => ({
   options: readField(fields, path, 'options', readList(readOption)),
+}));
+
+const readStartArgument: Decode<StartArgumentView> = readRecord(
+  ['parameter', 'setting'],
+  (fields, path) => ({
+    parameter: readField(fields, path, 'parameter', readString),
+    setting: readField(fields, path, 'setting', readSettingView),
+  }),
+);
+
+const readStepStart: Decode<StepStartView> = readRecord(['entry', 'arguments'], (fields, path) => ({
+  entry: readField(fields, path, 'entry', readString),
+  arguments: readField(fields, path, 'arguments', readList(readStartArgument)),
+}));
+
+const readStepStarts: Decode<StepStartsView> = readRecord(['starts'], (fields, path) => ({
+  starts: readField(fields, path, 'starts', readList(readStepStart)),
 }));
 
 /**
@@ -175,4 +198,13 @@ export function decodeReadings(value: unknown): ReadingsView {
  */
 export function decodeOptions(value: unknown): OptionsView {
   return readOptions(value, ROOT);
+}
+
+/**
+ * Reads what the host's `step_starts` command sent.
+ *
+ * @throws {DecodeError} When it is not what each step starts with, saying where and why.
+ */
+export function decodeStepStarts(value: unknown): StepStartsView {
+  return readStepStarts(value, ROOT);
 }

@@ -225,12 +225,12 @@ contract and in `ui/packages/host/src/`. Never edit the files by hand.
 
 After a change to the tables of allowed combinations, the rules, the offers or
 the views of them, `offers::tests::the_snapshots_are_what_the_commands_return`
-fails and names the file that differs. Twelve files in
+fails and names the file that differs. Thirteen files in
 `ui/packages/host/fixtures/` are written by it: `offers-start.json`,
 `offers-value.json` and `offers-condition.json` from `offers_at`,
 `fits-start.json` and `fits-argument.json` from `candidate_fits`,
 `typed-expression.json`, `typed-start-and-argument.json`, `typed-whole.json`,
-`typed-date.json` and `typed-unread.json` from `read_typed`, `options.json` from `option_offers`, and
+`typed-date.json` and `typed-unread.json` from `read_typed`, `options.json` from `option_offers`, `step-starts.json` from `step_starts`, and
 `offers-grid.json`, every call at every place of every kind, from which the view
 lists what the editor cannot offer:
 

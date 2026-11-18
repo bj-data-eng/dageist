@@ -22,7 +22,7 @@ import type { Method } from './expr';
 import { argumentRule, methodOptionParameters } from './expr';
 import { assertNever } from './frame';
 import type { Options, Setting } from './settings';
-import { atDefaultOver, isComplete, optionOf, setParameters } from './settings';
+import { isComplete, optionOf, setParameters } from './settings';
 import type { Cell, Chain, Comparison, Condition, Source, Value } from './source';
 import type { Step } from './steps';
 import { keysOf, stepItems } from './steps';
@@ -213,6 +213,14 @@ const COMPARISON_ENTRIES: Readonly<Record<Exclude<Comparison, 'is_in'>, string>>
   '<': 'Expr.lt',
   '<=': 'Expr.le',
 };
+
+/** The comparisons the catalogue has entries for. */
+const COMPARISONS = ['==', '!=', '>', '>=', '<', '<='] as const;
+
+/** Returns the comparison the entry `id` stands for, or `null` where it is none of the editor's. */
+export function comparisonOfEntry(id: string): (typeof COMPARISONS)[number] | null {
+  return COMPARISONS.find((comparison) => COMPARISON_ENTRIES[comparison] === id) ?? null;
+}
 
 /**
  * Returns the identifier of the entry a comparison is written as, or `null`
@@ -591,8 +599,9 @@ function settingArgument(
       return {
         many: items.map((item, index) => {
           const own = Object.hasOwn(setting.items, item) ? setting.items[item] : undefined;
-          const fallback =
-            parameter.default.kind === 'flag' ? { flag: parameter.default.value } : null;
+          // An item with no setting of its own holds the default the engine reports.
+          const held = parameter.defaultSetting;
+          const fallback = held?.kind === 'flag' ? { flag: held.value } : null;
           if (own === undefined) {
             if (fallback === null) {
               throw unset(`Give ${parameter.shown} a value for ${item}.`, wrong);
@@ -629,9 +638,9 @@ function numberArgument(
 }
 
 /**
- * Writes the arguments of the parameters that `options` sets: only those that
- * are given everything they need and differ from their default, which the
- * engine supplies for a parameter that is left out.
+ * Writes the arguments of the parameters that `options` sets. Whether one is
+ * what Polars does when it is not given is the engine's to say, and it says so
+ * in its report.
  */
 function optionArguments(
   context: Context,
@@ -646,7 +655,6 @@ function optionArguments(
   for (const { parameter, setting } of setParameters(entry, options)) {
     if (!allowed.some((offered) => offered.name === parameter.name)) continue;
     const each = parameter.shape.shape === 'perItem' ? items(parameter.shape.of) : [];
-    if (isComplete(setting) && atDefaultOver(parameter, setting, each)) continue;
     written[parameter.name] = settingArgument(
       context,
       parameter.kind,

@@ -379,7 +379,7 @@ const readOutcome: Decode<OutcomeView> = readTagged<OutcomeView>('status', {
 });
 
 const readStepReport: Decode<StepReportView> = readRecord(
-  ['id', 'source', 'summary', 'lazy', 'outcome', 'count', 'expressions', 'walk'],
+  ['id', 'source', 'summary', 'lazy', 'outcome', 'count', 'expressions', 'walk', 'atDefault'],
   (fields, path) => ({
     id: readField(fields, path, 'id', readString),
     source: readField(fields, path, 'source', readString),
@@ -389,6 +389,7 @@ const readStepReport: Decode<StepReportView> = readRecord(
     count: readField(fields, path, 'count', readCountView),
     expressions: readField(fields, path, 'expressions', readList(readExpressionDtypes)),
     walk: readField(fields, path, 'walk', readWalk),
+    atDefault: readField(fields, path, 'atDefault', readList(readPlace)),
   }),
 );
 

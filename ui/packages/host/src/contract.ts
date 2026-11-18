@@ -80,6 +80,58 @@ export type DefaultView =
   | { readonly kind: 'empty' }
   | { readonly kind: 'other' };
 
+/** The kinds of setting the engine reports, mirroring `Setting` in the engine's catalogue. */
+export const SETTING_KINDS = [
+  'unset',
+  'flag',
+  'integer',
+  'float',
+  'text',
+  'word',
+  'field',
+  'element',
+  'comparison',
+  'list',
+  'pairs',
+] as const;
+
+/**
+ * What a parameter holds, in the one shape every kind of parameter is drawn from. The engine
+ * decides every setting it reports: what a parameter holds when it is not given, what it is set
+ * to when it is first added, and what a new step starts with. Mirrors `SettingView` in
+ * crates/dageist-tauri/src/catalogue.rs.
+ */
+export type SettingView =
+  /** Still to be given. */
+  | { readonly kind: 'unset' }
+  | { readonly kind: 'flag'; readonly value: boolean }
+  | { readonly kind: 'integer'; readonly value: number }
+  /** A number with a fraction, which stays one though it is whole. */
+  | { readonly kind: 'float'; readonly value: number }
+  /** Text that is typed: a string, a duration or a path. */
+  | { readonly kind: 'text'; readonly value: string }
+  /** A name picked from a list: a choice's word, a dtype, a column or a table. */
+  | { readonly kind: 'word'; readonly value: string }
+  /** An expression that reads this column. */
+  | { readonly kind: 'field'; readonly column: string }
+  /** An expression that starts from `polars.element` and calls this method, named without its owner. */
+  | { readonly kind: 'element'; readonly method: string }
+  /** A comparison of a field with something else, by the entry that compares, such as `Expr.eq`. */
+  | {
+      readonly kind: 'comparison';
+      readonly entry: string;
+      readonly field: SettingView;
+      readonly other: SettingView;
+    }
+  | { readonly kind: 'list'; readonly items: readonly SettingView[] }
+  | { readonly kind: 'pairs'; readonly entries: readonly PairView[] };
+
+/** One entry of pairs. */
+export interface PairView {
+  readonly key: SettingView;
+  readonly value: SettingView;
+}
+
 /**
  * A position that holds an expression, as the engine's tables name it: of a
  * step, or inside an expression. Mirrors `PositionView` in
@@ -100,6 +152,13 @@ export interface ParameterView {
   readonly shape: ShapeView;
   /** Polars' default, read by the engine. */
   readonly default: DefaultView;
+  /**
+   * What the parameter holds when it is not given, as a setting, or `null` where it must be
+   * given, Polars decides or the default is not a value.
+   */
+  readonly defaultSetting: SettingView | null;
+  /** What the parameter is set to when it is first added, which differs from its default. */
+  readonly start: SettingView;
   /** Polars' default as Python writes it, or `null` when it must be given. */
   readonly python: string | null;
   /**
@@ -494,6 +553,12 @@ export interface StepReportView {
   /** The dtypes of every expression in the step's arguments, as far as they could be built. */
   readonly expressions: readonly ExpressionDtypesView[];
   readonly walk: WalkView;
+  /**
+   * The places of the step's arguments that are what their parameter holds when it is not given:
+   * its own, and those of the calls inside its expressions. The engine decides which, and says
+   * so whether or not the step ran.
+   */
+  readonly atDefault: readonly PlaceView[];
 }
 
 /** Why text is not a document the engine reads. */
@@ -681,12 +746,48 @@ export interface OptionView {
   readonly parameter: string;
   /** The word the option has when it is not set. */
   readonly default: string | null;
+  /**
+   * The word the option starts with when it is added: the first that is not the default and that
+   * Polars allows beside the options chosen, or `null` where there is none.
+   */
+  readonly starter: string | null;
+  /** Why the option cannot be added, where it has no starter: the refusal that stops it. */
+  readonly stuck: RefusalView | null;
   readonly words: readonly OptionWordView[];
 }
 
 /** The flags and choices of an entry. Mirrors `OptionsView` in crates/dageist-tauri/src/offers.rs. */
 export interface OptionsView {
   readonly options: readonly OptionView[];
+}
+
+/** The table a new step works on, and the tables connected to the node. */
+export interface StepStartsRequest {
+  /** The names of the columns of the table, in its order. */
+  readonly columns: readonly string[];
+  /** The names of the connected tables, in the order the first is taken from. */
+  readonly tables: readonly string[];
+}
+
+/** One argument a new step starts with. */
+export interface StartArgumentView {
+  /** The parameter, by Python's name. */
+  readonly parameter: string;
+  readonly setting: SettingView;
+}
+
+/** What a new step of an entry starts with. Mirrors `StepStartView` in crates/dageist-tauri/src/offers.rs. */
+export interface StepStartView {
+  /** The identifier the catalogue gives the entry. */
+  readonly entry: string;
+  /** The parameters the step starts with. Any other holds its default. */
+  readonly arguments: readonly StartArgumentView[];
+}
+
+/** What every step of the list starts with. Mirrors `StepStartsView` in crates/dageist-tauri/src/offers.rs. */
+export interface StepStartsView {
+  /** One for each step, ordered by identifier. */
+  readonly starts: readonly StepStartView[];
 }
 
 /**
@@ -762,6 +863,11 @@ export interface Host {
    * entry or a parameter the catalogue lacks.
    */
   readonly optionOffers: (entry: string, chosen: readonly ChosenOption[]) => Promise<OptionsView>;
+  /**
+   * Asks what each step of the list starts with when it is added to a table with the columns
+   * and the connected tables of `request`: the arguments the engine gives it.
+   */
+  readonly stepStarts: (request: StepStartsRequest) => Promise<StepStartsView>;
   /** Opens a working window of `keys` whole keys of the sample table, held in memory. */
   readonly openSampleWindow: (keys: number) => Promise<TableView>;
   /** Opens the whole sample table where it is stored, without loading it. */

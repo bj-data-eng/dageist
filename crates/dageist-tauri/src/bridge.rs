@@ -42,7 +42,7 @@ use crate::identity::identity_view;
 use crate::node::{node_view, rows_view, run_view};
 use crate::offers::{
     AfterRequest, ArgumentRequest, CandidateRequest, ChosenOptionRequest, PositionRequest,
-    TypedRequest, fits_view, offers_view, options_view, read_view,
+    TypedRequest, fits_view, offers_view, options_view, read_view, step_starts_view,
 };
 use crate::sample_table::{
     ErrorView, OpenTable, Sample, SampleGate, sample_result_view, sample_window_view,
@@ -142,6 +142,13 @@ struct OptionsArguments {
 
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
+struct StartsArguments {
+    columns: Vec<String>,
+    tables: Vec<String>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct WindowArguments {
     keys: u32,
 }
@@ -200,6 +207,7 @@ enum Command {
     CandidateFits,
     ReadTyped,
     OptionOffers,
+    StepStarts,
     OpenSampleWindow,
     OpenSampleResult,
     TableBlock,
@@ -218,6 +226,7 @@ impl Command {
             "candidate_fits" => Self::CandidateFits,
             "read_typed" => Self::ReadTyped,
             "option_offers" => Self::OptionOffers,
+            "step_starts" => Self::StepStarts,
             "open_sample_window" => Self::OpenSampleWindow,
             "open_sample_result" => Self::OpenSampleResult,
             "table_block" => Self::TableBlock,
@@ -286,6 +295,10 @@ impl Command {
             Self::OptionOffers => {
                 let OptionsArguments { entry, chosen } = arguments(body)?;
                 json(&options_view(&entry, &chosen)?)
+            }
+            Self::StepStarts => {
+                let StartsArguments { columns, tables } = arguments(body)?;
+                json(&step_starts_view(&columns, &tables))
             }
             Self::OpenSampleWindow => {
                 let WindowArguments { keys } = arguments(body)?;

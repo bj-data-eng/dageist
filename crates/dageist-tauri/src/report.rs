@@ -592,6 +592,7 @@ fn outcome_view(outcome: &Outcome) -> OutcomeView {
 
 /// What running one step reported.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StepReportView {
     id: String,
     /// The step as the Python Polars method call it stands for.
@@ -609,6 +610,9 @@ pub struct StepReportView {
     /// could be built.
     expressions: Vec<ExpressionDtypesView>,
     walk: WalkView,
+    /// The places of the step's arguments that are what their parameter holds
+    /// when it is not given, whether or not the step ran.
+    at_default: Vec<PlaceView>,
 }
 
 fn step_report_view(step: &StepReport) -> StepReportView {
@@ -625,6 +629,7 @@ fn step_report_view(step: &StepReport) -> StepReportView {
             .map(expression_dtypes_view)
             .collect(),
         walk: walk_view(step.walk()),
+        at_default: step.at_default().iter().map(place_view).collect(),
     }
 }
 

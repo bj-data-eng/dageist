@@ -11,7 +11,13 @@ import type { BlockRequest, Host } from './contract';
 import { DecodeError } from './decode';
 import { decodeCatalogue } from './decode-catalogue';
 import { decodeNode, decodeRows } from './decode-node';
-import { decodeFits, decodeOffers, decodeOptions, decodeReadings } from './decode-offers';
+import {
+  decodeFits,
+  decodeOffers,
+  decodeOptions,
+  decodeReadings,
+  decodeStepStarts,
+} from './decode-offers';
 import { decodeRun } from './decode-run';
 import { decodeBytes, decodeIdentity, decodeTable } from './decode-sample';
 import { hostError } from './failure';
@@ -114,6 +120,8 @@ export function bridgeHost(): Host {
         argument: request.argument,
       }),
     optionOffers: async (entry, chosen) => call('option_offers', decodeOptions, { entry, chosen }),
+    stepStarts: async (request) =>
+      call('step_starts', decodeStepStarts, { columns: request.columns, tables: request.tables }),
     openSampleWindow: async (keys) => call('open_sample_window', decodeTable, { keys }),
     openSampleResult: async () => call('open_sample_result', decodeTable),
     fetchTableBlock: async (request: BlockRequest) => {
