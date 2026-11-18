@@ -9,6 +9,9 @@ import typedFixture from '../fixtures/typed-expression.json';
 import reportFixture from '../fixtures/step-report.json';
 import startsFixture from '../fixtures/step-starts.json';
 import rowsFixture from '../fixtures/step-rows.json';
+import blockFixture from '../fixtures/table-block-window.json';
+import windowFixture from '../fixtures/table-window.json';
+import { readBlockFixture } from '../test-support/block-fixture';
 import { withField } from '../test-support/tamper';
 
 /** What the page sent to `fetch`: where, and with what. */
@@ -153,32 +156,36 @@ describe('the host that calls the bridge', () => {
   it('names the arguments of the rows and the sample commands as the host does', async () => {
     bridgeAnswers(() => jsonResponse(rowsFixture));
     await bridgeHost().rowsAfterStep('{}', 'days_open', 7);
-    bridgeAnswers(() => jsonResponse({ rows: 3, columns: [{ name: 'dcn', dataType: 'str' }] }));
+    bridgeAnswers(() => jsonResponse(windowFixture));
     const table = await bridgeHost().openSampleWindow(10);
 
-    expect(table).toEqual({ rows: 3, columns: [{ name: 'dcn', dataType: 'str' }] });
+    expect(table).toEqual(windowFixture);
     expect(sent[0]).toMatchObject({ path: '/bridge/open_sample_window', body: { keys: 10 } });
   });
 
-  it('asks for a block with the rows and the columns and hands over its bytes', async () => {
+  it('asks for a block with the rows and the columns and decodes the frame it is answered with', async () => {
+    const { request, frame } = readBlockFixture(blockFixture);
     bridgeAnswers(
-      () =>
-        new Response(new Uint8Array([0xff, 0xff, 0xff, 0xff]), {
-          headers: { 'Content-Type': 'application/vnd.apache.arrow.stream' },
-        }),
+      () => new Response(frame, { headers: { 'Content-Type': 'application/vnd.dageist.block' } }),
     );
 
-    const bytes = await bridgeHost().fetchTableBlock({
-      offset: 3,
-      length: 7,
-      columns: ['dcn'],
-    });
+    const block = await bridgeHost().fetchTableBlock(request);
 
-    expect(new Uint8Array(bytes)).toEqual(new Uint8Array([0xff, 0xff, 0xff, 0xff]));
+    expect(block.numbers).toEqual(['4', '5', '6', '7', '8', '9', '10']);
+    expect(block.report).toBe('7 rows × 5 columns · 1.6 KB · built in 850 µs');
+    expect(block.columns).toHaveLength(5);
     expect(sent[0]).toMatchObject({
       path: '/bridge/table_block',
-      body: { offset: 3, length: 7, columns: ['dcn'] },
+      body: { offset: 3, length: 7, columns: request.columns },
     });
+  });
+
+  it('refuses a block that is not a frame, with its place', async () => {
+    bridgeAnswers(() => new Response(new Uint8Array([0xff, 0xff, 0xff, 0xff])));
+
+    await expect(
+      bridgeHost().fetchTableBlock({ offset: 0, length: 3, columns: ['dcn'] }),
+    ).rejects.toThrow(/table_block: \$: has a header of 4294967295 bytes/u);
   });
 
   it('rejects with the message a failed command sent, under its name', async () => {

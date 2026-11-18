@@ -8,8 +8,8 @@
 //! Tauri.
 //!
 //! Each command is a `POST` to `/bridge/<command>` of the command's arguments
-//! as a JSON object. It answers `200` with the command's JSON, or with the bytes
-//! of an Arrow IPC stream for `table_block`, and `422` with the command's own
+//! as a JSON object. It answers `200` with the command's JSON, or with a block's
+//! frame for `table_block`, and `422` with the command's own
 //! `{ "kind": string, "message": string }` when the command fails, the kind being
 //! one of the closed list the view decides on. A request that is not a
 //! command of the bridge is refused before any command runs: `403` for a peer or
@@ -37,6 +37,7 @@ use std::time::{Duration, Instant};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
+use crate::block::CONTENT_TYPE;
 use crate::catalogue::english_catalogue;
 use crate::identity::identity_view;
 use crate::node::{node_view, rows_view, run_view};
@@ -54,8 +55,6 @@ use http::{ReadError, Request, Response, Status};
 const COMMAND_PATH: &str = "/bridge/";
 /// The content type the arguments of a command must be sent as.
 const JSON: &str = "application/json";
-/// The content type of the bytes of an Arrow IPC stream.
-const ARROW: &str = "application/vnd.apache.arrow.stream";
 /// How long a client may take between the bytes of a request.
 const READ_TIMEOUT: Duration = Duration::from_secs(10);
 /// How long a client may take to take a part of an answer.
@@ -178,7 +177,7 @@ impl From<ErrorView> for Failure {
 /// What a command answered with.
 enum Answer {
     Json(Vec<u8>),
-    Arrow(Vec<u8>),
+    Block(Vec<u8>),
 }
 
 /// Reads `body` as the arguments `A` of a command.
@@ -323,7 +322,7 @@ impl Command {
                     length,
                     columns,
                 } = arguments(body)?;
-                Ok(Answer::Arrow(table_block_bytes(
+                Ok(Answer::Block(table_block_bytes(
                     &session.open,
                     offset,
                     length,
@@ -409,7 +408,7 @@ impl Bridge {
         }
         match command.run(&self.session, &request.body) {
             Ok(Answer::Json(body)) => Response::new(Status::Ok, JSON, body),
-            Ok(Answer::Arrow(body)) => Response::new(Status::Ok, ARROW, body),
+            Ok(Answer::Block(body)) => Response::new(Status::Ok, CONTENT_TYPE, body),
             Err(Failure::Arguments(message)) => refusal(Status::BadRequest, &message),
             Err(Failure::Refused(error)) => failure(Status::Unprocessable, &error),
         }

@@ -3,14 +3,10 @@
 
 use polars::prelude::{AnyValue, Column, PolarsError, Series};
 
+use crate::text::text_of;
+
 /// How many values of a column or a list are written out.
 pub const FIRST_VALUES: usize = 4;
-
-/// A value as the text Polars writes it, or `None` where it is null, which no
-/// text stands for.
-pub(super) fn text_of(value: &AnyValue<'_>) -> Option<String> {
-    (!value.is_null()).then(|| value.str_value().into_owned())
-}
 
 /// The first values of a column or a list, each written as Polars writes it,
 /// and how many more there are.

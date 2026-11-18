@@ -3,7 +3,8 @@
 //! This crate owns everything that touches Polars: generating sample data,
 //! loading a working window of whole keys into memory, reading a stored table
 //! straight from its Parquet files, and handing blocks of either to a host as
-//! Arrow IPC bytes. It also owns the catalogue of Polars operations the step
+//! Arrow IPC bytes whose cells are text, written as the step editor's previews
+//! write them. It also owns the catalogue of Polars operations the step
 //! editor offers, and the step document built from it: its reader, its writer
 //! and running it, and the tables of which combinations of its entries Polars
 //! allows. It serves the claim-timing sample node the step editor opens with.
@@ -27,8 +28,9 @@ mod sample;
 mod startup;
 mod stored;
 mod table;
+mod text;
 
-pub use block::ColumnInfo;
+pub use block::{Block, ColumnInfo};
 pub use error::EngineError;
 pub use sample::{SampleSpec, claims_generated, generate_claims};
 pub use startup::PolarsSession;

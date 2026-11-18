@@ -3,21 +3,29 @@
 //! The engine owns the table. The view can look at it two ways: as a working
 //! window of whole keys held in memory, or as the stored result, read from
 //! its Parquet files one block at a time. These commands hold whichever is
-//! open between calls, report its shape as a serializable view and pass
-//! blocks through as raw Arrow IPC bytes, which the view decodes itself.
+//! open between calls, report its shape as a serializable view and answer
+//! blocks as the raw bytes of a frame: the number of each row and a report of
+//! the block, written as text here, and then the block's Arrow IPC stream, which
+//! the view reads. The frame is in
+//! [the reference](../../../docs/reference.md#the-block-frame).
 //!
 //! The commands are thin: the functions beside them answer, so that a host
 //! other than Tauri can serve the same views.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};
+use std::time::{Duration, Instant};
 
 use dageist_engine::{
-    ColumnInfo, EngineError, ParquetTable, SampleSpec, Table, claims_generated, generate_claims,
+    Block, ColumnInfo, EngineError, ParquetTable, SampleSpec, Table, claims_generated,
+    generate_claims,
 };
 use serde::Serialize;
 use tauri::ipc::Response;
 use tauri::{AppHandle, Manager, Runtime, State};
+
+use crate::block::frame;
+use crate::figures::{elapsed, quantity};
 
 /// The sample generated on first use: about two million rows of 300 columns,
 /// roughly 2 GB of Parquet.
@@ -43,22 +51,34 @@ enum Opened {
 }
 
 impl Opened {
-    fn view(&self) -> TableView {
+    fn height(&self) -> usize {
         match self {
-            Self::Window(table) => TableView::new(table.height(), table.columns()),
-            Self::Stored(table) => TableView::new(table.height(), table.columns()),
+            Self::Window(table) => table.height(),
+            Self::Stored(table) => table.height(),
         }
     }
 
-    fn block_ipc(
+    fn columns(&self) -> &[ColumnInfo] {
+        match self {
+            Self::Window(table) => table.columns(),
+            Self::Stored(table) => table.columns(),
+        }
+    }
+
+    /// The table's shape, which it took `opened` to open.
+    fn view(&self, opened: Duration) -> TableView {
+        TableView::new(self.height(), self.columns(), opened)
+    }
+
+    fn block(
         &self,
         offset: usize,
         length: usize,
         columns: &[String],
-    ) -> Result<Vec<u8>, EngineError> {
+    ) -> Result<Block, EngineError> {
         match self {
-            Self::Window(table) => table.block_ipc(offset, length, columns),
-            Self::Stored(table) => table.block_ipc(offset, length, columns),
+            Self::Window(table) => table.block(offset, length, columns),
+            Self::Stored(table) => table.block(offset, length, columns),
         }
     }
 }
@@ -88,6 +108,17 @@ impl OpenTable {
 pub struct ColumnView {
     name: String,
     data_type: String,
+    numeric: bool,
+}
+
+/// The figures of the open table, written as text for the view to show as they
+/// are.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FiguresView {
+    rows: String,
+    columns: String,
+    opened: String,
 }
 
 /// The shape of the open table, as presented to the view.
@@ -96,10 +127,11 @@ pub struct ColumnView {
 pub struct TableView {
     rows: usize,
     columns: Vec<ColumnView>,
+    figures: FiguresView,
 }
 
 impl TableView {
-    fn new(rows: usize, columns: &[ColumnInfo]) -> Self {
+    fn new(rows: usize, columns: &[ColumnInfo], opened: Duration) -> Self {
         Self {
             rows,
             columns: columns
@@ -107,8 +139,14 @@ impl TableView {
                 .map(|column| ColumnView {
                     name: column.name.clone(),
                     data_type: column.data_type.clone(),
+                    numeric: column.numeric,
                 })
                 .collect(),
+            figures: FiguresView {
+                rows: quantity(rows, "row", "rows"),
+                columns: quantity(columns.len(), "column", "columns"),
+                opened: elapsed(opened),
+            },
         }
     }
 }
@@ -255,8 +293,8 @@ impl Sample {
     }
 }
 
-fn show(open: &OpenTable, table: Opened) -> TableView {
-    let view = table.view();
+fn show(open: &OpenTable, table: Opened, opened: Duration) -> TableView {
+    let view = table.view(opened);
     open.replace(Arc::new(table));
     view
 }
@@ -272,6 +310,7 @@ pub fn sample_window_view(
     sample: &Sample,
     keys: u32,
 ) -> Result<TableView, ErrorView> {
+    let started = Instant::now();
     if keys > MAX_WINDOW_KEYS {
         return Err(ErrorView::of(
             ErrorKind::Limit,
@@ -279,7 +318,7 @@ pub fn sample_window_view(
         ));
     }
     let table = open_window(gate, &sample.directory, sample.spec, keys)?;
-    Ok(show(open, table))
+    Ok(show(open, table, started.elapsed()))
 }
 
 /// Opens the whole of `sample` where it is stored, without loading it, keeps
@@ -291,13 +330,15 @@ pub fn sample_result_view(
     open: &OpenTable,
     sample: &Sample,
 ) -> Result<TableView, ErrorView> {
+    let started = Instant::now();
     let table = open_stored(gate, &sample.directory, sample.spec)?;
-    Ok(show(open, table))
+    Ok(show(open, table, started.elapsed()))
 }
 
 /// Returns `length` rows of the table open in `open` starting at `offset`,
-/// limited to `columns`, as the bytes of an Arrow IPC stream. A block holds at
-/// most `MAX_BLOCK_ROWS` rows.
+/// limited to `columns`, as the bytes of a frame: the number of each row and a
+/// report of the block, and the block as an Arrow IPC stream of text. A block
+/// holds at most `MAX_BLOCK_ROWS` rows.
 pub fn table_block_bytes(
     open: &OpenTable,
     offset: usize,
@@ -313,7 +354,10 @@ pub fn table_block_bytes(
     let table = open
         .current()
         .ok_or_else(|| ErrorView::new("no table is open"))?;
-    Ok(table.block_ipc(offset, length, columns)?)
+    let started = Instant::now();
+    let block = table.block(offset, length, columns)?;
+    let built = started.elapsed();
+    frame(offset, &block, built)
 }
 
 /// Opens a working window of `keys` whole keys of the sample table, held in
@@ -344,7 +388,8 @@ pub fn open_sample_result<R: Runtime>(
 }
 
 /// Returns `length` rows of the open table starting at `offset`, limited to
-/// `columns`, as the raw bytes of an Arrow IPC stream. A block holds at most
+/// `columns`, as the raw bytes of a frame: the number of each row and a report of
+/// the block, and the block as an Arrow IPC stream of text. A block holds at most
 /// `MAX_BLOCK_ROWS` rows.
 #[tauri::command(async)]
 pub fn table_block(
@@ -363,6 +408,7 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
     use std::sync::Arc;
+    use std::time::Duration;
 
     use dageist_engine::SampleSpec;
     use tauri::ipc::{CallbackFn, InvokeBody, InvokeResponseBody};
@@ -370,7 +416,15 @@ mod tests {
     use tauri::webview::InvokeRequest;
     use tauri::{WebviewWindow, WebviewWindowBuilder};
 
-    use super::{ErrorKind, OpenTable, Opened, SampleGate, open_stored, open_window};
+    use super::{
+        ErrorKind, OpenTable, Opened, Sample, SampleGate, open_stored, open_window,
+        sample_result_view, sample_window_view,
+    };
+    use crate::block::frame;
+    use crate::test_support::split_block;
+
+    const REFRESH: &str = "DAGEIST_REFRESH_TABLE_SNAPSHOTS";
+    const REFRESH_COMMAND: &str = "cargo test --offline --locked -p dageist-tauri sample_table::tests::the_snapshots_are_what_the_commands_return";
 
     const SMALL: SampleSpec = SampleSpec {
         keys: 40,
@@ -397,7 +451,8 @@ mod tests {
     }
 
     fn rows_and_columns(table: &Opened) -> (u64, Vec<serde_json::Value>) {
-        let view = serde_json::to_value(table.view()).expect("the view serializes");
+        let view = serde_json::to_value(table.view(Duration::from_millis(12)))
+            .expect("the view serializes");
         (
             view["rows"].as_u64().expect("a row count"),
             view["columns"].as_array().expect("a column list").clone(),
@@ -442,7 +497,7 @@ mod tests {
         assert_eq!(columns.len(), SMALL_COLUMNS);
         assert_eq!(
             columns[0],
-            serde_json::json!({ "name": "dcn", "dataType": "str" })
+            serde_json::json!({ "name": "dcn", "dataType": "str", "numeric": false })
         );
         // Ten keys of two to eight step rows each.
         assert!((20..=80).contains(&rows), "{rows} rows for ten keys");
@@ -486,13 +541,58 @@ mod tests {
         assert_eq!(rows_and_columns(&table).1.len(), SMALL_COLUMNS);
     }
 
+    /// Checks that `text` is the size `bytes` as a block's report writes it: the bytes
+    /// themselves below a kilobyte of 1,024 bytes, and the kilobytes to one decimal below a
+    /// megabyte. The decimal may be rounded either way, so it is held to within half a tenth.
+    fn assert_size(text: &str, bytes: usize) {
+        if let Some(whole) = text.strip_suffix(" B") {
+            assert_eq!(whole.parse::<usize>().expect("a whole number"), bytes);
+            return;
+        }
+        let kilobytes: f64 = text
+            .strip_suffix(" KB")
+            .unwrap_or_else(|| panic!("{text:?} is not a size in bytes or kilobytes"))
+            .parse()
+            .expect("a number of kilobytes");
+        assert!(bytes >= 1024, "{text:?} for {bytes} bytes");
+        assert!(
+            (bytes as f64 / 1024.0 - kilobytes).abs() <= 0.05 + 1e-9,
+            "{text:?} is not {bytes} bytes to a tenth of a kilobyte"
+        );
+    }
+
+    /// Checks a block's report: its rows and columns, the size of its Arrow
+    /// bytes, and a time that ends in a unit.
+    fn assert_report(report: &serde_json::Value, rows: &str, columns: &str, arrow: usize) {
+        let report = report.as_str().expect("a report is text");
+        let counts = format!("{rows} × {columns} · ");
+        let rest = report
+            .strip_prefix(&counts)
+            .unwrap_or_else(|| panic!("{report:?} does not start with {counts:?}"));
+        let (size, time) = rest
+            .split_once(" · built in ")
+            .unwrap_or_else(|| panic!("{report:?} does not say how long it was built in"));
+        assert_size(size, arrow);
+        assert!(
+            ["µs", "ms", " s"].iter().any(|unit| time.ends_with(unit)),
+            "{time:?} is not a time"
+        );
+    }
+
+    fn block_of(response: Result<InvokeResponseBody, serde_json::Value>) -> Vec<u8> {
+        match response {
+            Ok(InvokeResponseBody::Raw(bytes)) => bytes,
+            other => panic!("expected raw bytes, got {other:?}"),
+        }
+    }
+
     #[test]
-    fn block_command_answers_with_the_raw_arrow_bytes_of_a_window() {
+    fn block_command_answers_a_window_block_with_its_row_numbers_and_arrow_bytes() {
         let sample = SampleDirectory::empty("window-block");
         let table =
             open_window(&SampleGate::default(), &sample.path, SMALL, 10).expect("the window opens");
         let columns = ["dcn".to_owned(), "timestamp".to_owned()];
-        let expected = table.block_ipc(3, 7, &columns).expect("the engine slices");
+        let expected = table.block(3, 7, &columns).expect("the engine slices");
 
         let response = tauri::test::get_ipc_response(
             &webview(Some(table)),
@@ -503,19 +603,25 @@ mod tests {
             })),
         );
 
-        match response {
-            Ok(InvokeResponseBody::Raw(bytes)) => assert_eq!(bytes, expected),
-            other => panic!("expected raw bytes, got {other:?}"),
-        }
+        let bytes = block_of(response);
+        let (header, arrow) = split_block(&bytes);
+        assert_eq!(arrow, expected.ipc());
+        // The numbers of rows 4 to 10, counting from 1.
+        assert_eq!(
+            header["numbers"],
+            serde_json::json!(["4", "5", "6", "7", "8", "9", "10"])
+        );
+        assert_report(&header["report"], "7 rows", "2 columns", arrow.len());
+        assert_eq!(header.as_object().expect("an object").len(), 2);
     }
 
     #[test]
-    fn block_command_answers_with_the_raw_arrow_bytes_of_a_stored_result() {
+    fn block_command_answers_a_stored_block_with_its_row_numbers_and_arrow_bytes() {
         let sample = SampleDirectory::empty("stored-block");
         let table =
             open_stored(&SampleGate::default(), &sample.path, SMALL).expect("the result opens");
         let columns = ["dcn".to_owned(), "measure_002".to_owned()];
-        let expected = table.block_ipc(50, 12, &columns).expect("the engine reads");
+        let expected = table.block(50, 12, &columns).expect("the engine reads");
 
         let response = tauri::test::get_ipc_response(
             &webview(Some(table)),
@@ -526,9 +632,175 @@ mod tests {
             })),
         );
 
-        match response {
-            Ok(InvokeResponseBody::Raw(bytes)) => assert_eq!(bytes, expected),
-            other => panic!("expected raw bytes, got {other:?}"),
+        let bytes = block_of(response);
+        let (header, arrow) = split_block(&bytes);
+        assert_eq!(arrow, expected.ipc());
+        let numbers: Vec<String> = (51..=62).map(|number| number.to_string()).collect();
+        assert_eq!(header["numbers"], serde_json::json!(numbers));
+        assert_report(&header["report"], "12 rows", "2 columns", arrow.len());
+    }
+
+    #[test]
+    fn block_past_the_end_is_numbered_only_as_far_as_it_has_rows() {
+        let sample = SampleDirectory::empty("numbers-end");
+        let table =
+            open_stored(&SampleGate::default(), &sample.path, SMALL).expect("the result opens");
+        let rows = rows_and_columns(&table).0;
+        let columns = ["dcn".to_owned()];
+        let webview = webview(Some(table));
+
+        let last = block_of(tauri::test::get_ipc_response(
+            &webview,
+            block_request(serde_json::json!({
+                "offset": rows - 2,
+                "length": 10,
+                "columns": columns,
+            })),
+        ));
+        let beyond = block_of(tauri::test::get_ipc_response(
+            &webview,
+            block_request(serde_json::json!({
+                "offset": rows + 5,
+                "length": 10,
+                "columns": columns,
+            })),
+        ));
+
+        assert_eq!(
+            split_block(&last).0["numbers"],
+            serde_json::json!([(rows - 1).to_string(), rows.to_string()])
+        );
+        assert_report(
+            &split_block(&last).0["report"],
+            "2 rows",
+            "1 column",
+            split_block(&last).1.len(),
+        );
+        assert_eq!(split_block(&beyond).0["numbers"], serde_json::json!([]));
+        assert_report(
+            &split_block(&beyond).0["report"],
+            "0 rows",
+            "1 column",
+            split_block(&beyond).1.len(),
+        );
+    }
+
+    #[test]
+    fn an_opened_table_reports_its_figures_as_text() {
+        let sample = SampleDirectory::empty("figures");
+        let sample = Sample::new(sample.path.clone(), SMALL);
+        let gate = SampleGate::default();
+
+        let window = sample_window_view(&gate, &OpenTable::default(), &sample, 10)
+            .expect("the window opens");
+        let stored =
+            sample_result_view(&gate, &OpenTable::default(), &sample).expect("the result opens");
+
+        for view in [window, stored] {
+            let view = serde_json::to_value(view).expect("the view serializes");
+            let rows = view["rows"].as_u64().expect("a row count");
+            // Below a thousand rows a count has no separator.
+            assert!(rows < 1000);
+            let figures = &view["figures"];
+            assert_eq!(figures["rows"], format!("{rows} rows"));
+            assert_eq!(figures["columns"], format!("{SMALL_COLUMNS} columns"));
+            let opened = figures["opened"].as_str().expect("the open time is text");
+            assert!(
+                ["µs", "ms", " s"].iter().any(|unit| opened.ends_with(unit)),
+                "{opened:?} is not a time"
+            );
+            assert_eq!(figures.as_object().expect("an object").len(), 3);
+        }
+    }
+
+    #[test]
+    fn columns_say_which_of_them_hold_numbers() {
+        let sample = SampleDirectory::empty("numeric");
+        let table =
+            open_window(&SampleGate::default(), &sample.path, SMALL, 5).expect("the window opens");
+
+        let (_, columns) = rows_and_columns(&table);
+
+        let numeric: Vec<(&str, bool)> = columns
+            .iter()
+            .map(|column| {
+                (
+                    column["dataType"].as_str().expect("a dtype"),
+                    column["numeric"].as_bool().expect("a flag"),
+                )
+            })
+            .collect();
+        assert!(numeric.contains(&("i32", true)), "{numeric:?}");
+        assert!(numeric.contains(&("f64", true)), "{numeric:?}");
+        assert!(numeric.contains(&("str", false)), "{numeric:?}");
+        assert!(numeric.contains(&("date", false)), "{numeric:?}");
+        assert!(
+            numeric
+                .iter()
+                .all(|(dtype, flag)| *flag == (*dtype == "i32" || *dtype == "f64")),
+            "{numeric:?}"
+        );
+    }
+
+    /// The bytes as lowercase hexadecimal text.
+    fn hex(bytes: &[u8]) -> String {
+        bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+    }
+
+    /// A block as the view's fixture holds it: what was asked for and the frame
+    /// answered, with the time the engine took fixed so that the frame is the same
+    /// on every run.
+    fn block_snapshot(
+        table: &Opened,
+        offset: usize,
+        length: usize,
+        columns: &[&str],
+    ) -> serde_json::Value {
+        let columns: Vec<String> = columns.iter().map(|name| (*name).to_owned()).collect();
+        let block = table
+            .block(offset, length, &columns)
+            .expect("the engine writes the block");
+        let frame = frame(offset, &block, Duration::from_micros(850)).expect("the block is framed");
+        serde_json::json!({
+            "request": { "offset": offset, "length": length, "columns": columns },
+            "frame": hex(&frame),
+        })
+    }
+
+    #[test]
+    fn the_snapshots_are_what_the_commands_return() {
+        let sample = SampleDirectory::empty("snapshots");
+        let gate = SampleGate::default();
+        let window = open_window(&gate, &sample.path, SMALL, 10).expect("the window opens");
+        let stored = open_stored(&gate, &sample.path, SMALL).expect("the result opens");
+        let opened = Duration::from_millis(12);
+        let columns = [
+            "dcn",
+            "timestamp",
+            "date_of_receipt",
+            "measure_001",
+            "measure_003",
+        ];
+        let snapshots = [
+            (
+                "table-window.json",
+                serde_json::to_value(window.view(opened)).expect("the view serializes"),
+            ),
+            (
+                "table-result.json",
+                serde_json::to_value(stored.view(opened)).expect("the view serializes"),
+            ),
+            (
+                "table-block-window.json",
+                block_snapshot(&window, 3, 7, &columns),
+            ),
+            (
+                "table-block-result.json",
+                block_snapshot(&stored, 78, 10, &columns),
+            ),
+        ];
+        for (file, returned) in &snapshots {
+            crate::snapshot::check(file, returned, REFRESH, REFRESH_COMMAND);
         }
     }
 

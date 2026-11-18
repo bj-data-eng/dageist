@@ -13,9 +13,11 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod block;
 mod bridge;
 mod catalogue;
 mod cli;
+mod figures;
 mod identity;
 mod node;
 mod offers;
@@ -23,6 +25,8 @@ mod report;
 mod sample_table;
 #[cfg(test)]
 mod snapshot;
+#[cfg(test)]
+mod test_support;
 mod windows;
 
 use std::process::ExitCode;

@@ -15,7 +15,8 @@ import {
   decodeStepStarts,
 } from './decode-offers';
 import { decodeRun } from './decode-run';
-import { decodeBytes, decodeIdentity, decodeTable } from './decode-sample';
+import { decodeBlock } from './decode-block';
+import { decodeIdentity, decodeTable } from './decode-sample';
 import { deliverMessage, sealMessage } from './envelope';
 import { hostError } from './failure';
 
@@ -81,7 +82,7 @@ export function tauriHost(): Host | null {
     openSampleWindow: async (keys) => invokeDecoded('open_sample_window', decodeTable, { keys }),
     openSampleResult: async () => invokeDecoded('open_sample_result', decodeTable),
     fetchTableBlock: async (request: BlockRequest) =>
-      invokeDecoded('table_block', decodeBytes, {
+      invokeDecoded('table_block', (answer) => decodeBlock(answer, request.columns), {
         offset: request.offset,
         length: request.length,
         columns: request.columns,

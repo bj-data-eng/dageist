@@ -73,9 +73,9 @@ them through the host package in
 | `option_offers` | `entry`: an identifier; `chosen`: options already set, `{ parameter, word }` | `{ "options": [...] }`: each flag and choice with its default word, the `starter` word it starts with when it is added (the first that is not the default and that Polars allows beside the options chosen, or null), the `stuck` refusal that says why it cannot be added where it has no starter, and every word it may be set to, with Polars' refusal beside the options chosen, or null. |
 | `step_starts` | `columns`: the names of the columns of the table a step is added to, in order; `tables`: the names of the connected tables | `{ "starts": [...] }`: for each step of the list, ordered by identifier, the `entry` and the `arguments` it starts with, each a `parameter` and its `setting` (`unset`, `flag`, `integer`, `float`, `text`, `word`, `field`, `element`, `comparison`, `list` or `pairs`). Any other parameter holds its default. The shapes are `StepStartsView` in [offers.rs](../crates/dageist-tauri/src/offers.rs) and [contract.ts](../ui/packages/host/src/contract.ts). |
 | `rows_after_step` | `document`; `step`: a step's identifier; `limit`: how many rows, at most 1,000 | `{ "columns": Field[], "rows": [[string or null]] }`: the rows after that step, run on the sample node's seven rows, each cell written as text by the engine and a null as `null`. |
-| `open_sample_window` | `keys`: how many whole keys to hold in memory, at most 50,000 | `{ "rows": number, "columns": [{ "name": string, "dataType": string }] }` for the working window. |
+| `open_sample_window` | `keys`: how many whole keys to hold in memory, at most 50,000 | `{ "rows": number, "columns": [{ "name": string, "dataType": string, "numeric": boolean }], "figures": { "rows", "columns", "opened" } }` for the working window: `numeric` says whether the column holds numbers, and `figures` has the row count (`2,552 rows`), the column count (`300 columns`) and the time the host took to open the table (`12.3 ms`) written as text. |
 | `open_sample_result` | None | The same shape for the whole sample, opened where it is stored without loading it. |
-| `table_block` | `offset`, `length`: the rows, at most 10,000; `columns`: the column names, each once, or an empty list for all | That block of whichever table is open, as the raw bytes of an Arrow IPC stream, not JSON. Rows past the end are left out. |
+| `table_block` | `offset`, `length`: the rows, at most 10,000; `columns`: the column names, each once, or an empty list for all | That block of whichever table is open, as the raw bytes of a [frame](#the-block-frame), not JSON. Rows past the end are left out. |
 | `open_view_window` | `name`: which window, `"steps"` | Nothing. Opens that window, or brings it forward when it is already open. Defined in [windows.rs](../crates/dageist-tauri/src/windows.rs). |
 
 The windows also talk to each other without the core. The host package sends a
@@ -110,6 +110,28 @@ folder and moved into place when it is complete, and within one running
 application only one command generates it at a time. Two copies of the
 application generating at once are not guarded against.
 
+## The Block Frame
+
+`table_block` answers a block as a frame, so that the view shows the number of
+each row and a report of the block without writing either. It is defined in
+[block.rs](../crates/dageist-tauri/src/block.rs) and read in
+[decode-block.ts](../ui/packages/host/src/decode-block.ts).
+
+| Part | Contents |
+| --- | --- |
+| Length | Four bytes: the length of the header, as a big-endian number. |
+| Header | UTF-8 JSON, an object of exactly `numbers` and `report`. `numbers` is the number of each row of the block, counting from 1, as text with a comma between groups of three digits, such as `1,234`; it holds a number for each row the block has, and none for rows past the end of the table. `report` is the block in a line: `140 rows × 17 columns · 38.2 KB · built in 6.2 ms`, with its rows, its columns, the size of its Arrow bytes and the time the engine took to write them. |
+| Arrow | The block as an Arrow IPC stream to the end of the frame. It has the columns asked for, in the order asked, or every column when none were asked for, and every one is text: a cell is written by Polars as the step editor's previews write it, so `2026-03-02`, `1d 7h 25m` or `[1, 2]`, and a null is a missing cell. |
+
+The figures are written in [figures.rs](../crates/dageist-tauri/src/figures.rs):
+a count with commas, a size in bytes, kilobytes or megabytes (1,024 to the
+unit, one decimal), and a time in microseconds, milliseconds or seconds (one
+decimal). They are English: commas between groups of three digits, `row` and
+`rows`, `KB` and `MB` for multiples of 1,024 bytes, and `µs`. Another language
+or number convention is not written yet. The view refuses a frame whose header is not that object, whose
+Arrow stream cannot be read, whose columns are not the ones asked for or are
+not text, or whose rows are not as many as the header has numbers.
+
 ## The Bridge
 
 `dageist bridge [--port N]` serves the commands above, offers included, except
@@ -126,7 +148,7 @@ is 7878 unless `--port` gives one; `--port 0` lets the system choose.
 | Part | Behaviour |
 | --- | --- |
 | Request | `POST /bridge/<command>`, with `Content-Type: application/json` and the command's arguments as a JSON object by their Tauri names, `{}` for a command that takes none. The arguments are `deny_unknown_fields`. Only `Content-Length` bodies up to 8 MiB are read; a request is one per connection. |
-| `200` | The command's JSON with `Content-Type: application/json`; for `table_block`, the bytes of the Arrow IPC stream with `Content-Type: application/vnd.apache.arrow.stream`. |
+| `200` | The command's JSON with `Content-Type: application/json`; for `table_block`, the bytes of the block's [frame](#the-block-frame) with `Content-Type: application/vnd.dageist.block`. |
 | `422` | The command ran and failed: `{ "message": string }`, the same view the Tauri command rejects with. |
 | `400` | The request or its body is not a request or the command's arguments: `{ "message": string }`. |
 | `403` | The `Host` header is missing, or is not `127.0.0.1` or `localhost` with the bridge's own port. |
@@ -198,10 +220,10 @@ Every package is private and is consumed as TypeScript source.
 | Package | Path | Role | May depend on |
 | --- | --- | --- | --- |
 | `@dageist/desktop` | [ui/apps/desktop/](../ui/apps/desktop/src/App.tsx) | The shell: picks the host, composes the features, owns the page, the bundler configuration and the design tokens. | Every package below and React |
-| `@dageist/host` | [ui/packages/host/](../ui/packages/host/src/contract.ts) | The contract of every IPC command, the decoders that read what the host sends, and the two hosts: over Tauri, and over the [bridge](#the-bridge) in a plain browser. | Nothing |
+| `@dageist/host` | [ui/packages/host/](../ui/packages/host/src/contract.ts) | The contract of every IPC command, the decoders that read what the host sends, a block's Arrow stream included, and the two hosts: over Tauri, and over the [bridge](#the-bridge) in a plain browser. | flechette |
 | `@dageist/design` | [ui/packages/design/](../ui/packages/design/src/index.ts) | Primitive components: `Block` (a word that can be pressed), `Piece`, `Slot`, `ManySlot`, `OfferList`, `TypedBlock`, `Popover`, `Hint`, `Peek`, `ToggleButton`, `Panel`, and `blocks.css`, the styles of the words a step is written in. `Popover` is placed by Floating UI. | Floating UI, React, React DOM |
 | `@dageist/steps` | [ui/packages/steps/](../ui/packages/steps/src/StepsWorkspace.tsx) | The steps of a transform: their model and its translation into a step document, the preparation of the engine's report for display, the scheduling of runs and of the lists' requests, the preparation of the engine's offers and the check of what it cannot offer, the main window's table with its list of steps, and the window the steps are edited in. | `@dageist/design`, `@dageist/host`, dnd kit, React, React DOM |
-| `@dageist/table` | [ui/packages/table/](../ui/packages/table/src/TableViewer.tsx) | The table viewer: fetches blocks as Arrow bytes and draws only those. | `@dageist/design`, `@dageist/host`, flechette, React |
+| `@dageist/table` | [ui/packages/table/](../ui/packages/table/src/TableViewer.tsx) | The table viewer: fetches blocks of text and draws only those, with the lines it writes under its heading. | `@dageist/design`, `@dageist/host`, React |
 
 | File | Contents |
 | --- | --- |
@@ -209,9 +231,9 @@ Every package is private and is consumed as TypeScript source.
 | [ui/apps/desktop/vite.config.ts](../ui/apps/desktop/vite.config.ts) | Bundler settings; the bundle is written to `ui/dist/`. |
 | [ui/apps/desktop/src/styles.css](../ui/apps/desktop/src/styles.css) | Tailwind entry, the colour and font tokens, and the declarations of the two typefaces. |
 | [ui/apps/desktop/public/fonts/](../ui/apps/desktop/public/fonts/) | The typefaces the view is set in, each with the licence it comes under, copied into the bundle as they are: Inter for everything that is not code or data, and JetBrains Mono for code and data. |
-| [ui/packages/host/src/decode.ts](../ui/packages/host/src/decode.ts) | The readers every decoder is made of. A decoder reads what the host sent, which is `unknown`, and returns it typed or refuses it with a `DecodeError` that names the place, such as `$.steps[3].outcome.status`, and the reason. Objects are closed: a missing field, a field the contract lacks and a tag it does not name are refused. [decode-catalogue.ts](../ui/packages/host/src/decode-catalogue.ts), [decode-node.ts](../ui/packages/host/src/decode-node.ts) and [decode-run.ts](../ui/packages/host/src/decode-run.ts) read the catalogue, a node's inputs with the rows after a step, and the report of a run, and [decode-sample.ts](../ui/packages/host/src/decode-sample.ts) the core's identity, the shape of the sample table and the bytes of a block. The closed lists of words they read are constants in [contract.ts](../ui/packages/host/src/contract.ts). |
-| [ui/packages/host/test-support/](../ui/packages/host/test-support/tamper.ts) | Test support that is not part of the package's source: copies of a fixture with one thing changed, to see what a decoder says of a value the host does not send. The compiler settings include it. |
-| [ui/packages/host/fixtures/](../ui/packages/host/fixtures/catalogue.json) | Snapshots of what the host's commands return, which the decoders' tests read, and which the bridge's tests compare the bridge's answers with: `catalogue.json`, `node-inputs.json`, `step-document.json` (the claim-timing sample's steps as the engine's document, which the editor's starting steps are tested to translate to), `step-report.json` (the claim-timing steps), `step-report-refused.json` (a step Polars refuses and the step after it), `step-report-unreadable.json` (text that is not a document), `step-rows.json`, `offers-start.json`, `offers-value.json` and `offers-condition.json` (the offers at a select's start, after a timestamp and after `then`), `fits-start.json` and `fits-argument.json` (the fits of fields and inputs for a predicate's start and for `dt.offset_by`'s argument), `typed-expression.json`, `typed-start-and-argument.json`, `typed-whole.json`, `typed-date.json` and `typed-unread.json` (how `1.5` typed into `dt.offset_by`'s argument, and into `shift`'s argument where it also starts a filter's predicate, `12` into a whole number, `10-03-2026` into a date and `1x` into a duration read), `options.json` (the options of a join beside a cross join), `step-starts.json` (what each step starts with on the sample node's columns and tables), `offers-grid.json` (every call at every place of every kind, one bit for each entry) and `step-report-variants.json` (a report the host builds by hand to hold the variants no real document gives together) and `vocabulary.json` (the words of every closed list, the failure kinds included, from the engine's own lists of variants, which the decoders' tests compare their word lists with). Generated by host tests; [refresh the catalogue snapshot](how-to.md#refresh-the-catalogue-snapshot) and [the step report snapshots](how-to.md#refresh-the-step-report-snapshots), never edit them. |
+| [ui/packages/host/src/decode.ts](../ui/packages/host/src/decode.ts) | The readers every decoder is made of. A decoder reads what the host sent, which is `unknown`, and returns it typed or refuses it with a `DecodeError` that names the place, such as `$.steps[3].outcome.status`, and the reason. Objects are closed: a missing field, a field the contract lacks and a tag it does not name are refused. [decode-catalogue.ts](../ui/packages/host/src/decode-catalogue.ts), [decode-node.ts](../ui/packages/host/src/decode-node.ts) and [decode-run.ts](../ui/packages/host/src/decode-run.ts) read the catalogue, a node's inputs with the rows after a step, and the report of a run, and [decode-sample.ts](../ui/packages/host/src/decode-sample.ts) the core's identity and the shape of the sample table, and [decode-block.ts](../ui/packages/host/src/decode-block.ts) a block's frame, refusing a header, an Arrow stream, columns or rows that are not what was asked for. The closed lists of words they read are constants in [contract.ts](../ui/packages/host/src/contract.ts). |
+| [ui/packages/host/test-support/](../ui/packages/host/test-support/tamper.ts) | Test support that is not part of the package's source: copies of a fixture with one thing changed, to see what a decoder says of a value the host does not send, and the reader of a block fixture. The compiler settings include it. |
+| [ui/packages/host/fixtures/](../ui/packages/host/fixtures/catalogue.json) | Snapshots of what the host's commands return, which the decoders' tests read, and which the bridge's tests compare the bridge's answers with: `catalogue.json`, `node-inputs.json`, `step-document.json` (the claim-timing sample's steps as the engine's document, which the editor's starting steps are tested to translate to), `step-report.json` (the claim-timing steps), `step-report-refused.json` (a step Polars refuses and the step after it), `step-report-unreadable.json` (text that is not a document), `step-rows.json`, `offers-start.json`, `offers-value.json` and `offers-condition.json` (the offers at a select's start, after a timestamp and after `then`), `fits-start.json` and `fits-argument.json` (the fits of fields and inputs for a predicate's start and for `dt.offset_by`'s argument), `typed-expression.json`, `typed-start-and-argument.json`, `typed-whole.json`, `typed-date.json` and `typed-unread.json` (how `1.5` typed into `dt.offset_by`'s argument, and into `shift`'s argument where it also starts a filter's predicate, `12` into a whole number, `10-03-2026` into a date and `1x` into a duration read), `options.json` (the options of a join beside a cross join), `step-starts.json` (what each step starts with on the sample node's columns and tables), `offers-grid.json` (every call at every place of every kind, one bit for each entry) and `step-report-variants.json` (a report the host builds by hand to hold the variants no real document gives together) and `table-window.json` and `table-result.json` (the shape of an opened working window and stored result, with its figures at a fixed open time), `table-block-window.json` and `table-block-result.json` (a request for a block and the frame the host answered, in hexadecimal, at a fixed build time) and `vocabulary.json` (the words of every closed list, the failure kinds included, from the engine's own lists of variants, which the decoders' tests compare their word lists with). Generated by host tests; [refresh the catalogue snapshot](how-to.md#refresh-the-catalogue-snapshot) and [the step report snapshots](how-to.md#refresh-the-step-report-snapshots), never edit them. |
 | [ui/vitest.config.ts](../ui/vitest.config.ts) | Vitest settings: it runs the `*.test.ts` files under `apps/*/src` and `packages/*/src` in Node. |
 | [ui/apps/desktop/public/pieces/](../ui/apps/desktop/public/pieces/index.html) | The Pieces page: a prototype of how the step editor is drawn, in plain HTML, CSS and JavaScript, copied into the bundle as it is and shown in the Pieces tab. |
 | [ui/tsconfig.json](../ui/tsconfig.json) | Strict compiler settings for every package's `src/` and `test-support/`; emits nothing. |
@@ -232,8 +254,8 @@ Every package is private and is consumed as TypeScript source.
 Runtime dependencies, bundled into `ui/dist/` and pinned to exact versions in
 the package that uses them: React 19.3.1 (`react`, `react-dom`),
 [dnd kit](https://dndkit.com) 0.5.3 (`@dnd-kit/react`, `@dnd-kit/dom`) for drag
-and drop, and [flechette](https://github.com/uwdata/flechette) 2.7.1 for
-reading Arrow data. Development dependencies, pinned in
+and drop, and [flechette](https://github.com/uwdata/flechette) 2.7.1, used by
+`@dageist/host`, for reading the Arrow stream of a block. Development dependencies, pinned in
 [ui/package.json](../ui/package.json), are Vite with its React plugin, Tailwind
 CSS with its Vite plugin, React's type declarations, TypeScript, the oxlint linter
 with its type-aware companion `oxlint-tsgolint`, the oxfmt formatter,

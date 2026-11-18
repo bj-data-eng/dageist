@@ -19,7 +19,8 @@ import {
   decodeStepStarts,
 } from './decode-offers';
 import { decodeRun } from './decode-run';
-import { decodeBytes, decodeIdentity, decodeTable } from './decode-sample';
+import { decodeBlock } from './decode-block';
+import { decodeIdentity, decodeTable } from './decode-sample';
 import { hostError } from './failure';
 
 /** The path every command is under, on the page's own origin. */
@@ -131,7 +132,7 @@ export function bridgeHost(): Host {
         columns: request.columns,
       });
       try {
-        return decodeBytes(await response.arrayBuffer());
+        return decodeBlock(await response.arrayBuffer(), request.columns);
       } catch (error) {
         if (error instanceof DecodeError) {
           throw new Error(`table_block: ${error.message}`, { cause: error });

@@ -11,6 +11,7 @@ export type {
   CandidateRequest,
   ChosenOption,
   BlockRequest,
+  BlockView,
   CatalogueView,
   CauseView,
   ChangeView,
@@ -28,6 +29,7 @@ export type {
   ErrorKind,
   EntryView,
   ExpressionDtypesView,
+  FiguresView,
   FieldView,
   FitView,
   FitsRequest,
@@ -99,7 +101,8 @@ export {
   decodeStepStarts,
 } from './decode-offers';
 export { decodeRun } from './decode-run';
-export { decodeBytes, decodeIdentity, decodeTable } from './decode-sample';
+export { decodeBlock } from './decode-block';
+export { decodeIdentity, decodeTable } from './decode-sample';
 export { deliverMessage, sealMessage } from './envelope';
 export { HostError, decodeFailure } from './failure';
 export { tauriHost } from './tauri';

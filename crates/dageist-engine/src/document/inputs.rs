@@ -9,7 +9,8 @@ use polars::prelude::{DataType, Expr, LazyFrame, PolarsError, Scalar, Series, li
 use crate::allowed::{Representative, Shape, dtype_name};
 
 use super::columns::ColumnDescription;
-use super::values::{FirstValues, text_of};
+use super::values::FirstValues;
+use crate::text::text_of;
 
 /// An input name given twice.
 #[derive(Debug, Clone, PartialEq, Eq)]

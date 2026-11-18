@@ -7,7 +7,7 @@ use super::columns::ColumnDescription;
 use super::inputs::Inputs;
 use super::model::{Document, StepId};
 use super::run::RowsError;
-use super::values::text_of;
+use crate::text::text_of;
 
 /// The rows after a step: its columns, and every cell as the text Polars
 /// writes it.

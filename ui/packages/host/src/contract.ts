@@ -12,13 +12,28 @@ export interface IdentityView {
 /** Mirrors `ColumnView` in crates/dageist-tauri/src/sample_table.rs. */
 export interface ColumnView {
   readonly name: string;
+  /** The column's type, as Polars prints it. */
   readonly dataType: string;
+  /** Whether the column holds numbers, which are drawn against the right of a cell. */
+  readonly numeric: boolean;
+}
+
+/** The figures of an opened table, written by the host to be shown as they are. Mirrors `FiguresView` in crates/dageist-tauri/src/sample_table.rs. */
+export interface FiguresView {
+  /** The row count and what it counts, such as `2,552 rows`. */
+  readonly rows: string;
+  /** The column count and what it counts, such as `300 columns`. */
+  readonly columns: string;
+  /** How long the host took to open the table, such as `12.3 ms`. */
+  readonly opened: string;
 }
 
 /** Mirrors `TableView` in crates/dageist-tauri/src/sample_table.rs. */
 export interface TableView {
+  /** The number of rows, for placing them. A person is shown `figures.rows`. */
   readonly rows: number;
   readonly columns: readonly ColumnView[];
+  readonly figures: FiguresView;
 }
 
 /** A block of rows and columns to fetch from the open table. */
@@ -26,6 +41,20 @@ export interface BlockRequest {
   readonly offset: number;
   readonly length: number;
   readonly columns: readonly string[];
+}
+
+/**
+ * A block of the open table: the cells of the columns asked for, each written
+ * by the host as text, with the numbers of the rows and a report of the block
+ * also written by it. The host sends them as the frame in crates/dageist-tauri/src/block.rs.
+ */
+export interface BlockView {
+  /** The number of each row, counting from 1, such as `1,234`. */
+  readonly numbers: readonly string[];
+  /** The block in a line, such as `7 rows × 5 columns · 1.6 KB · built in 850 µs`. */
+  readonly report: string;
+  /** The cells of each column asked for, in the order asked, a missing value as `null`. Each column has a cell for every number. */
+  readonly columns: ReadonlyArray<ReadonlyArray<string | null>>;
 }
 
 /**
@@ -872,8 +901,8 @@ export interface Host {
   readonly openSampleWindow: (keys: number) => Promise<TableView>;
   /** Opens the whole sample table where it is stored, without loading it. */
   readonly openSampleResult: () => Promise<TableView>;
-  /** Fetches a block of the open table as the bytes of an Arrow IPC stream. */
-  readonly fetchTableBlock: (request: BlockRequest) => Promise<ArrayBuffer>;
+  /** Fetches a block of the open table, its cells written as text. */
+  readonly fetchTableBlock: (request: BlockRequest) => Promise<BlockView>;
   /** Opens the window called `name`, or brings it forward when it is already open. */
   readonly openWindow: (name: WindowName) => Promise<void>;
   /**

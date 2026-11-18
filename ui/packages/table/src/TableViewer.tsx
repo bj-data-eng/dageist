@@ -12,7 +12,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Panel, ToggleButton } from '@dageist/design';
 import type { Host, TableView } from '@dageist/host';
 
-import { ArrowGrid } from './ArrowGrid';
+import { describeShape } from './describe';
+import { TableGrid } from './TableGrid';
 
 /** Whole keys held in the working window. */
 const WINDOW_KEYS = 500;
@@ -47,7 +48,7 @@ const MODE_ORDER: readonly Mode[] = ['window', 'result'];
 
 /** How opening a table ended. */
 type Outcome =
-  | { readonly status: 'open'; readonly view: TableView; readonly millis: number }
+  | { readonly status: 'open'; readonly view: TableView }
   | { readonly status: 'failed'; readonly message: string };
 
 /** The outcome of opening one mode, and what its grid last reported. */
@@ -74,14 +75,13 @@ export function TableViewer({ host }: TableViewerProps): React.JSX.Element {
 
   useEffect(() => {
     let live = true;
-    const started = performance.now();
     const settle = (outcome: Outcome): void => {
       if (live) setSettled({ mode, outcome, report: '' });
     };
     const open = async (): Promise<void> => {
       try {
         const view = await MODES[mode].open(host);
-        settle({ status: 'open', view, millis: performance.now() - started });
+        settle({ status: 'open', view });
       } catch (error) {
         settle({ status: 'failed', message: String(error) });
       }
@@ -133,10 +133,8 @@ export function TableViewer({ host }: TableViewerProps): React.JSX.Element {
       </Panel>
     );
   }
-  const { view, millis } = current.outcome;
-  const shape =
-    `${view.rows.toLocaleString('en-US')} rows × ${String(view.columns.length)} columns` +
-    ` · ${info.source} · opened in ${millis.toFixed(0)} ms`;
+  const { view } = current.outcome;
+  const shape = describeShape(view.figures, info.source);
   return (
     <Panel
       mark="▦"
@@ -144,7 +142,7 @@ export function TableViewer({ host }: TableViewerProps): React.JSX.Element {
       details={current.report === '' ? [shape] : [shape, current.report]}
       actions={modeBar}
     >
-      <ArrowGrid key={mode} view={view} fetchBlock={host.fetchTableBlock} onReport={onReport} />
+      <TableGrid key={mode} view={view} fetchBlock={host.fetchTableBlock} onReport={onReport} />
     </Panel>
   );
 }

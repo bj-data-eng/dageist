@@ -6,7 +6,7 @@ use std::fs;
 use std::io::Cursor;
 use std::path::PathBuf;
 
-use dageist_engine::{SampleSpec, Table, generate_claims};
+use dageist_engine::{Block, SampleSpec, Table, generate_claims};
 use polars::prelude::*;
 
 const KEYS: u32 = 120;
@@ -36,10 +36,29 @@ impl Drop for SampleDirectory {
     }
 }
 
-fn read_ipc(bytes: Vec<u8>) -> DataFrame {
-    IpcStreamReader::new(Cursor::new(bytes))
+fn read_ipc(block: Block) -> DataFrame {
+    IpcStreamReader::new(Cursor::new(block.into_ipc()))
         .finish()
         .expect("the bytes are an Arrow IPC stream")
+}
+
+/// `frame` as the blocks carry it: every cell written by Polars as text, a
+/// null as no text.
+fn as_text(frame: &DataFrame) -> DataFrame {
+    let columns = frame
+        .columns()
+        .iter()
+        .map(|column| {
+            let cells: Vec<Option<String>> = (0..frame.height())
+                .map(|row| {
+                    let value = column.get(row).expect("a value");
+                    (!value.is_null()).then(|| value.str_value().into_owned())
+                })
+                .collect();
+            Column::new(column.name().clone(), cells)
+        })
+        .collect();
+    DataFrame::new_infer_height(columns).expect("a frame of text")
 }
 
 #[test]
@@ -88,7 +107,7 @@ fn window_holds_every_row_of_the_first_keys_and_nothing_else() {
     let table = Table::load_keys(&sample.path, "dcn", wanted_keys).expect("the table loads");
     let window = read_ipc(
         table
-            .block_ipc(0, table.height(), &[])
+            .block(0, table.height(), &[])
             .expect("the whole window is written"),
     );
 
@@ -112,7 +131,7 @@ fn window_holds_every_row_of_the_first_keys_and_nothing_else() {
 
     assert_eq!(first_keys.len(), wanted_keys as usize);
     assert_eq!(window.height(), expected_rows);
-    assert!(window.equals(&whole.slice(0, expected_rows)));
+    assert!(window.equals_missing(&as_text(&whole.slice(0, expected_rows))));
 }
 
 #[test]
@@ -162,8 +181,8 @@ fn block_matches_the_same_rows_of_the_whole() {
         "measure_002".to_owned(),
     ];
 
-    let whole = read_ipc(table.block_ipc(0, table.height(), &columns).expect("whole"));
-    let slice = read_ipc(table.block_ipc(40, 25, &columns).expect("slice"));
+    let whole = read_ipc(table.block(0, table.height(), &columns).expect("whole"));
+    let slice = read_ipc(table.block(40, 25, &columns).expect("slice"));
 
     assert_eq!(slice.width(), 3);
     assert_eq!(slice.height(), 25);
@@ -177,7 +196,7 @@ fn block_past_the_end_is_empty() {
 
     let slice = read_ipc(
         table
-            .block_ipc(table.height() + 10, 50, &["dcn".to_owned()])
+            .block(table.height() + 10, 50, &["dcn".to_owned()])
             .expect("an empty block is still written"),
     );
 
@@ -191,7 +210,7 @@ fn unknown_column_is_an_invalid_request() {
     let table = Table::load_keys(&sample.path, "dcn", 5).expect("the table loads");
 
     let error = table
-        .block_ipc(0, 10, &["no_such_column".to_owned()])
+        .block(0, 10, &["no_such_column".to_owned()])
         .expect_err("an unknown column is refused");
 
     assert!(error.is_invalid_request());
@@ -203,7 +222,7 @@ fn column_named_twice_is_an_invalid_request() {
     let table = Table::load_keys(&sample.path, "dcn", 5).expect("the table loads");
 
     let error = table
-        .block_ipc(0, 10, &["dcn".to_owned(), "dcn".to_owned()])
+        .block(0, 10, &["dcn".to_owned(), "dcn".to_owned()])
         .expect_err("a repeated column is refused");
 
     assert!(error.is_invalid_request());

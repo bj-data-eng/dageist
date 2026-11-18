@@ -5,7 +5,7 @@ use std::fs;
 use std::io::Cursor;
 use std::path::PathBuf;
 
-use dageist_engine::{ParquetTable, SampleSpec, generate_claims};
+use dageist_engine::{Block, ParquetTable, SampleSpec, generate_claims};
 use polars::prelude::*;
 
 /// Enough keys to need a second file, so blocks can cross a file boundary.
@@ -53,10 +53,29 @@ impl Drop for StoredSample {
     }
 }
 
-fn read_ipc(bytes: Vec<u8>) -> DataFrame {
-    IpcStreamReader::new(Cursor::new(bytes))
+fn read_ipc(block: Block) -> DataFrame {
+    IpcStreamReader::new(Cursor::new(block.into_ipc()))
         .finish()
         .expect("the bytes are an Arrow IPC stream")
+}
+
+/// `frame` as the blocks carry it: every cell written by Polars as text, a
+/// null as no text.
+fn as_text(frame: &DataFrame) -> DataFrame {
+    let columns = frame
+        .columns()
+        .iter()
+        .map(|column| {
+            let cells: Vec<Option<String>> = (0..frame.height())
+                .map(|row| {
+                    let value = column.get(row).expect("a value");
+                    (!value.is_null()).then(|| value.str_value().into_owned())
+                })
+                .collect();
+            Column::new(column.name().clone(), cells)
+        })
+        .collect();
+    DataFrame::new_infer_height(columns).expect("a frame of text")
 }
 
 #[test]
@@ -83,7 +102,7 @@ fn block_across_a_file_boundary_matches_the_rows_read_whole() {
 
     let block = read_ipc(
         table
-            .block_ipc(offset, 15, &columns.map(str::to_owned))
+            .block(offset, 15, &columns.map(str::to_owned))
             .expect("the block is read"),
     );
 
@@ -93,7 +112,7 @@ fn block_across_a_file_boundary_matches_the_rows_read_whole() {
         .expect("the columns exist")
         .slice(offset as i64, 15);
     assert_eq!(block.height(), 15);
-    assert!(block.equals(&expected));
+    assert!(block.equals_missing(&as_text(&expected)));
 }
 
 #[test]
@@ -101,9 +120,9 @@ fn block_with_no_columns_named_holds_every_column() {
     let sample = StoredSample::generate("all");
     let table = ParquetTable::open(&sample.path).expect("the table opens");
 
-    let block = read_ipc(table.block_ipc(40, 25, &[]).expect("the block is read"));
+    let block = read_ipc(table.block(40, 25, &[]).expect("the block is read"));
 
-    assert!(block.equals(&sample.whole.slice(40, 25)));
+    assert!(block.equals_missing(&as_text(&sample.whole.slice(40, 25))));
 }
 
 #[test]
@@ -114,12 +133,12 @@ fn block_past_the_end_holds_only_the_rows_that_exist() {
 
     let last = read_ipc(
         table
-            .block_ipc(table.height() - 3, 50, &columns)
+            .block(table.height() - 3, 50, &columns)
             .expect("the last rows are read"),
     );
     let beyond = read_ipc(
         table
-            .block_ipc(table.height() + 10, 50, &columns)
+            .block(table.height() + 10, 50, &columns)
             .expect("an empty block is still written"),
     );
 
@@ -134,7 +153,7 @@ fn unknown_column_is_an_invalid_request() {
     let table = ParquetTable::open(&sample.path).expect("the table opens");
 
     let error = table
-        .block_ipc(0, 10, &["no_such_column".to_owned()])
+        .block(0, 10, &["no_such_column".to_owned()])
         .expect_err("an unknown column is refused");
 
     assert!(error.is_invalid_request());
@@ -146,7 +165,7 @@ fn column_named_twice_is_an_invalid_request() {
     let table = ParquetTable::open(&sample.path).expect("the table opens");
 
     let error = table
-        .block_ipc(0, 10, &["dcn".to_owned(), "dcn".to_owned()])
+        .block(0, 10, &["dcn".to_owned(), "dcn".to_owned()])
         .expect_err("a repeated column is refused");
 
     assert!(error.is_invalid_request());
