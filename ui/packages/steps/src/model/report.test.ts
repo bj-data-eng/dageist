@@ -91,6 +91,7 @@ function timestampRun(changes: ReadonlyArray<{ name: string; change: string }>):
           count: { kind: 'notCounted' },
           expressions: [],
           walk: { expressions: [], refusal: null, notKnown: null },
+          atDefault: [],
         },
       ],
     }),
@@ -177,6 +178,7 @@ function counted(count: unknown): ReturnType<typeof decodeRun> {
       count: id === 'sort' ? { kind: 'notCounted' } : count,
       expressions: [],
       walk: { expressions: [], refusal: null, notKnown: null },
+      atDefault: [],
     })),
   });
 }

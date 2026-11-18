@@ -96,6 +96,12 @@ export interface PreparedStep {
   readonly wrong: ReadonlySet<string>;
   /** The dtypes of each chain of the step, by the chain's identifier. */
   readonly chains: ReadonlyMap<string, ChainDtypes>;
+  /**
+   * The parameters of the step and of its methods that are set to what Polars holds when they
+   * are not given, as the engine says, by `atDefaultKey`. None where the engine has not
+   * reported on the step as it is.
+   */
+  readonly atDefault: ReadonlySet<string>;
 }
 
 /** What the editor shows of a run. */
@@ -112,6 +118,11 @@ export interface PreparedRun {
 }
 
 const NO_WORDS: ReadonlySet<string> = new Set();
+
+/** Returns what an option of the step or method `ownerId` named `parameter` is kept under in `atDefault`. */
+export function atDefaultKey(ownerId: string, parameter: string): string {
+  return `${ownerId}:${parameter}`;
+}
 const NO_MODULE: readonly SourceLineView[] = [];
 const NO_CHAINS: ReadonlyMap<string, ChainDtypes> = new Map();
 const NO_FIRST: ReadonlyMap<string, string> = new Map();
@@ -162,6 +173,27 @@ function markAt(sent: SentStep, place: PlaceView): Mark | null {
     if (found !== undefined) return found;
   }
   return null;
+}
+
+/**
+ * Returns which parameters of the step, and of the methods of its chains, the engine says are at
+ * their default. A place that names a parameter of a call is read as the parameter of the step
+ * where nothing comes before it, and of the method that the place before it marks.
+ */
+function atDefaultOf(report: StepReportView, sent: SentStep, step: Step): ReadonlySet<string> {
+  const keys = new Set<string>();
+  for (const place of report.atDefault) {
+    const last = place.path.at(-1);
+    if (last?.kind !== 'parameter') continue;
+    const owner = place.path.slice(0, -1);
+    if (owner.length === 0) {
+      keys.add(atDefaultKey(step.id, last.name));
+      continue;
+    }
+    const mark = sent.marks.get(placeKey(owner.map(segmentWord)));
+    if (mark?.kind === 'method') keys.add(atDefaultKey(mark.methodId, last.name));
+  }
+  return keys;
 }
 
 /** Returns the first paragraph of `reason`, which is what Polars says before it prints its plan. */
@@ -296,6 +328,7 @@ export function prepareRun(
       problem,
       wrong: NO_WORDS,
       chains: NO_CHAINS,
+      atDefault: NO_WORDS,
       ...rest,
     });
     let result: PreparedStep;
@@ -350,6 +383,7 @@ function fromReport(
     summary: report.summary,
     lazy: report.lazy,
     chains: chainDtypes(report, sent),
+    atDefault: atDefaultOf(report, sent, step),
     ...countOf(report.count),
   };
   const { outcome } = report;

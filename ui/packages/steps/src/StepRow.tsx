@@ -11,6 +11,7 @@
 import { useSortable } from '@dnd-kit/react/sortable';
 import { useCallback, useContext, useState } from 'react';
 
+import type { StepStartView } from '@dageist/host';
 import type { OfferGroup } from '@dageist/design';
 import { Hint, OfferList, Peek, Piece, Popover, Slot, TypedBlock, Word, cx } from '@dageist/design';
 
@@ -39,25 +40,49 @@ import type {
   WithColumnsStep,
 } from './model/steps';
 import type { PreparedStep } from './model/report';
-import { VERBS, defaultStep, fieldKeys, stepItems, stepOptionParameters } from './model/steps';
-import { optionOf, starterSetting, withOption } from './model/settings';
+import { VERBS, fieldKeys, stepItems, stepOptionParameters } from './model/steps';
+import { optionOf, withOption } from './model/settings';
+import type { StepStarts } from './model/started';
+import { startOf, startedStep } from './model/started';
 import { chosenOptions } from './model/offers';
 import { NO_POSITIONS, within } from './model/place';
-import { useOptions } from './ask';
+import type { Asked } from './ask';
+import { useOptions, useStepStarts } from './ask';
 import { useListState } from './positions';
 import type { Catalogue } from './model/catalogue';
 import { positionOfParameter, verbEntry, verbId } from './model/catalogue';
-import { findTable, tablesOf } from './model/inputs';
+import { findTable } from './model/inputs';
 import { VERB_COLOURS, verbHead, verbNote } from './verbs';
 
 /** The sortable group every step row belongs to. */
 export const STEP_GROUP = 'steps';
 
-/** Lists the steps that can be added or changed to, in the words of the catalogue. */
+/**
+ * Says why the step `verb` cannot be picked yet, or `null` when it can: the engine has not said
+ * what it starts with, or has none to say.
+ */
+function startReason(catalogue: Catalogue, verb: Verb, starts: Asked<StepStarts>): string | null {
+  // A verb the editor has and the catalogue lacks cannot be chosen.
+  if (verbEntry(catalogue, verb) === null) return 'not in the catalogue';
+  switch (starts.state) {
+    case 'failed':
+      return starts.reason;
+    case 'ready':
+      return starts.answer.has(verbId(verb)) ? null : 'the engine gives this step no start';
+    default:
+      return 'waiting for the engine';
+  }
+}
+
+/**
+ * Lists the steps that can be added or changed to, in the words of the catalogue. A step is
+ * picked with what the engine says it starts with, so it waits for the engine's answer.
+ */
 export function verbOffers(
   catalogue: Catalogue,
   typed: string,
-  onPick: (verb: Verb) => void,
+  starts: Asked<StepStarts>,
+  onPick: (verb: Verb, start: StepStartView) => void,
 ): OfferGroup[] {
   return [
     titled(
@@ -70,13 +95,10 @@ export function verbOffers(
           'ink',
           verbNote(catalogue, verb),
           () => {
-            onPick(verb);
+            const start = starts.state === 'ready' ? starts.answer.get(verbId(verb)) : undefined;
+            if (start !== undefined) onPick(verb, start);
           },
-          {
-            look: 'verb',
-            // A verb the editor has and the catalogue lacks cannot be chosen.
-            reason: verbEntry(catalogue, verb) === null ? 'not in the catalogue' : null,
-          },
+          { look: 'verb', reason: startReason(catalogue, verb, starts) },
         ),
       ),
     ),
@@ -156,7 +178,7 @@ function StepParameter({
   return (
     <ParameterDrawing
       parameter={parameter}
-      setting={optionOf(step.options, name) ?? starterSetting(parameter)}
+      setting={optionOf(step.options, name) ?? startOf(parameter)}
       around={{ frame, items: (of) => stepItems(step, of) }}
       keyPrefix={keyPrefix}
       onChange={(setting) => {
@@ -405,7 +427,7 @@ export interface StepRowProps {
   readonly onChange: (step: Step) => void;
   readonly onRemove: () => void;
   /** Adds a new step of the chosen verb directly after this one. */
-  readonly onInsertAfter: (verb: Verb) => void;
+  readonly onInsertAfter: (verb: Verb, start: StepStartView) => void;
 }
 
 /** Draws one step as a row that can be edited, selected, dragged and removed. */
@@ -445,6 +467,10 @@ export function StepRow({
       : null,
   );
   const node = useNode();
+  // What each step starts with, asked of the engine while the list of steps is open, to change
+  // this step into another, or to add one after it.
+  const changeStarts = useStepStarts(list.open, frame, node);
+  const addStarts = useStepStarts(adding !== null, result.after, node);
   const parameters = stepOptionParameters(catalogue, step.verb);
   return (
     <div
@@ -507,9 +533,9 @@ export function StepRow({
                           optionsAsked,
                         ),
                       ]),
-                  ...verbOffers(catalogue, typed, (verb) => {
+                  ...verbOffers(catalogue, typed, changeStarts, (verb, start) => {
                     if (verb !== step.verb) {
-                      onChange({ ...defaultStep(verb, frame, tablesOf(node)), id: step.id });
+                      onChange({ ...startedStep(verb, start), id: step.id });
                     }
                   }),
                 ]}
@@ -549,7 +575,7 @@ export function StepRow({
         <Popover anchor={adding} onDismiss={closeList}>
           <OfferList
             placeholder="Search the steps"
-            groups={(typed) => verbOffers(catalogue, typed, onInsertAfter)}
+            groups={(typed) => verbOffers(catalogue, typed, addStarts, onInsertAfter)}
             keepOpen={false}
             wide={false}
             onDone={closeList}

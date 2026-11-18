@@ -17,6 +17,7 @@ import type {
   NodeView,
   OffersView,
   PlaceRequest,
+  StepStartsRequest,
   TypedKind,
   TypedRequest,
 } from '@dageist/host';
@@ -26,7 +27,10 @@ import { useHost } from './EngineProvider';
 import type { Outcome } from './model/latest';
 import { Latest } from './model/latest';
 import type { Frame } from './model/frame';
+import { tablesOf } from './model/inputs';
 import { candidateKey, prepareFits, prepareOptions, prepareReadings } from './model/offers';
+import { startsByEntry } from './model/started';
+import type { StepStarts } from './model/started';
 import type { PreparedFit, PreparedOption, PreparedReading } from './model/offers';
 
 /** How long a request is held for the next one, in milliseconds. */
@@ -131,6 +135,20 @@ export function useOptions(ask: OptionsAsk | null): Asked<ReadonlyMap<string, Pr
     prepareOptions(await host.optionOffers(request.entry, request.chosen)),
   );
   return asked;
+}
+
+/**
+ * Asks what each step starts with when it is added to the table `frame` with the connected
+ * tables of `node`, while `open`: the engine decides every argument.
+ */
+export function useStepStarts(open: boolean, frame: Frame, node: NodeView): Asked<StepStarts> {
+  const request: StepStartsRequest | null = open
+    ? {
+        columns: frame.map((column) => column.name),
+        tables: tablesOf(node).map((table) => table.name),
+      }
+    : null;
+  return useAsk(request, async (host, asked) => startsByEntry(await host.stepStarts(asked)));
 }
 
 /** What the fits of candidates are asked about. */

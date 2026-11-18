@@ -10,19 +10,9 @@ import type { ParameterView } from '@dageist/host';
 import type { MethodName } from './expr';
 import { verbEntry } from './catalogue';
 import type { Catalogue } from './catalogue';
-import type { Frame } from './frame';
-import { assertNever } from './frame';
 import { nextId } from './ids';
-import type { NamedTable } from './inputs';
 import type { Options, Setting } from './settings';
-import {
-  NO_OPTIONS,
-  UNSET,
-  expressionSetting,
-  itemsOf,
-  optionOf,
-  optionParameters,
-} from './settings';
+import { NO_OPTIONS, expressionSetting, itemsOf, optionOf, optionParameters } from './settings';
 import type { Chain, Condition, Value } from './source';
 
 /** The step verbs, by their Polars names. */
@@ -208,87 +198,4 @@ export function stepItems(step: Step, of: string): readonly string[] {
   return keysOf(step.options, 'by').flatMap((key, index) =>
     key.kind === 'unset' ? [] : [keyLabel(key, index)],
   );
-}
-
-/**
- * Returns a new step of `verb` that works on `frame` as it stands, with the
- * connected `tables` a join or a pivot can use.
- */
-export function defaultStep(verb: Verb, frame: Frame, tables: readonly NamedTable[]): Step {
-  const id = nextId('step');
-  const options = NO_OPTIONS;
-  switch (verb) {
-    case 'with_columns':
-      return {
-        id,
-        verb,
-        alias: 'new_column',
-        // What the column holds is still to be picked.
-        value: { kind: 'unset' },
-        options,
-      };
-    case 'sort':
-      // The first key is still to be picked.
-      return { id, verb, options: { by: { kind: 'list', items: [UNSET] } } };
-    case 'select':
-      return {
-        id,
-        verb,
-        options: { exprs: fieldKeys(frame.map((column) => column.name)) },
-      };
-    case 'rename':
-      return { id, verb, options: { mapping: { kind: 'pairs', entries: [] } } };
-    case 'filter':
-      return {
-        id,
-        verb,
-        condition: {
-          // A comparison whose field and value are still to be picked.
-          kind: 'test',
-          id: nextId('test'),
-          column: '',
-          comparison: '==',
-          value: { kind: 'unset' },
-        },
-        options,
-      };
-    case 'join': {
-      // Start from the first lookup table. Which fields are its keys is still to be picked: the
-      // engine says whether the two sides fit, and it is not guessed here.
-      const [table] = tables;
-      return {
-        id,
-        verb,
-        table: table?.name ?? '',
-        options: {
-          left_on: { kind: 'list', items: [UNSET] },
-          right_on: { kind: 'list', items: [UNSET] },
-          // Rows with no match are kept, which is not what Polars does unless it is asked.
-          how: { kind: 'word', value: 'left' },
-        },
-      };
-    }
-    case 'pivot': {
-      // The three fields are still to be picked, and the columns come from the first connected
-      // table, which the step is then judged with.
-      const [columns] = tables;
-      return {
-        id,
-        verb,
-        on: '',
-        index: '',
-        values: '',
-        options: {
-          on_columns: columns === undefined ? UNSET : { kind: 'word', value: columns.name },
-          aggregate_function: expressionSetting({
-            kind: 'chain',
-            id: nextId('chain'),
-            chain: elementChain('first'),
-          }),
-        },
-      };
-    }
-    default:
-      return assertNever(verb);
-  }
 }

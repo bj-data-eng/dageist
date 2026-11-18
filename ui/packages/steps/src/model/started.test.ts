@@ -116,6 +116,18 @@ describe('what a parameter holds and is first set to', () => {
   });
 });
 
+/** The start of `entry` with the engine's table for `parameter` taken away, as it gives where none is connected. */
+const noTable = (entry: string, parameter: string): StepStartView => {
+  const start = starts.find((candidate) => candidate.entry === entry);
+  if (start === undefined) throw new Error(`no start for ${entry}`);
+  return {
+    entry,
+    arguments: start.arguments.map((argument) =>
+      argument.parameter === parameter ? { parameter, setting: { kind: 'unset' } } : argument,
+    ),
+  };
+};
+
 describe('a new step', () => {
   it('is a join on the first connected table, whose keys are still to be picked', () => {
     // The fields are not matched by their dtype: the engine says whether two keys fit, and the
@@ -164,17 +176,6 @@ describe('a new step', () => {
   });
 
   it('is a join or a pivot with no table at all when the engine gave none', () => {
-    const noTable = (entry: string, parameter: string): StepStartView => {
-      const start = starts.find((candidate) => candidate.entry === entry);
-      if (start === undefined) throw new Error(`no start for ${entry}`);
-      return {
-        entry,
-        arguments: start.arguments.map((argument) =>
-          argument.parameter === parameter ? { parameter, setting: { kind: 'unset' } } : argument,
-        ),
-      };
-    };
-
     expect(startedStep('join', noTable('LazyFrame.join', 'other'))).toMatchObject({ table: '' });
     expect(startedStep('pivot', noTable('LazyFrame.pivot', 'on_columns'))).toMatchObject({
       options: { on_columns: { kind: 'unset' } },

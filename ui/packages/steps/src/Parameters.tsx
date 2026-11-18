@@ -44,15 +44,15 @@ import { findInput } from './model/inputs';
 import type { LiteralSetting, Options, PairSetting, SetParameter, Setting } from './model/settings';
 import {
   UNSET,
-  atDefaultOver,
-  defaultSetting,
   emptyPair,
   isComplete,
   setParameters,
-  starterSetting,
   withOption,
   withoutOption,
 } from './model/settings';
+import { defaultOf, startOf } from './model/started';
+import { atDefaultKey } from './model/report';
+import { usePreparedStep } from './engine';
 
 /** Returns what a parameter is for, for assistive technology: its name, and its label when that adds to it. */
 function describe(parameter: ParameterView): string {
@@ -823,7 +823,7 @@ function EachControl({
 function EachDrawing({ parameter, setting, around, onChange }: ListProps): React.JSX.Element {
   const { kind, shape } = parameter;
   const items = shape.shape === 'perItem' ? around.items(shape.of) : [];
-  const fallback = defaultSetting(parameter);
+  const fallback = defaultOf(parameter);
   const own = setting.kind === 'each' ? setting.items : {};
   const valueFor = (item: string): Setting | null => {
     if (Object.hasOwn(own, item)) return own[item] ?? null;
@@ -1013,12 +1013,12 @@ function starting(
 ): { readonly setting: Setting | null; readonly reason: string | null } {
   const { kind } = parameter;
   if (kind.kind !== 'flag' && kind.kind !== 'choice') {
-    return { setting: starterSetting(parameter), reason: null };
+    return { setting: startOf(parameter), reason: null };
   }
   if (engine.state === 'failed') return { setting: null, reason: engine.reason };
   if (engine.state !== 'ready') return { setting: null, reason: 'waiting for the engine' };
   const option = engine.answer.get(parameter.name);
-  if (option === undefined) return { setting: starterSetting(parameter), reason: null };
+  if (option === undefined) return { setting: startOf(parameter), reason: null };
   if (option.starter === null) return { setting: null, reason: option.stuck };
   return {
     setting:
@@ -1090,6 +1090,8 @@ export function OptionRows({
   layout,
   onChange,
 }: OptionRowsProps): React.JSX.Element | null {
+  // Whether a parameter is at what Polars holds when it is not given is the engine's to say.
+  const atDefault = usePreparedStep()?.atDefault;
   if (entry === null) return null;
   const drawn: SetParameter[] = setParameters(entry, options).filter(({ parameter }) =>
     parameters.some((offered) => offered.name === parameter.name),
@@ -1106,12 +1108,9 @@ export function OptionRows({
           onChange(withOption(options, parameter.name, next));
         }}
       />
-      {isComplete(setting) &&
-        atDefaultOver(
-          parameter,
-          setting,
-          parameter.shape.shape === 'perItem' ? around.items(parameter.shape.of) : [],
-        ) && <span className="font-sans text-xs text-muted">same as the default</span>}
+      {isComplete(setting) && atDefault?.has(atDefaultKey(ownerId, parameter.name)) === true && (
+        <span className="font-sans text-xs text-muted">same as the default</span>
+      )}
     </Row>
   ));
   if (drawn.length === 0) return null;
