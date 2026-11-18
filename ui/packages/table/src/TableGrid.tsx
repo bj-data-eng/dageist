@@ -100,9 +100,11 @@ function BodyRows({
 }): React.JSX.Element {
   return (
     <>
-      {numbers.map((number, row) => (
+      {numbers.map((_number, row) => (
         <div
-          key={number}
+          // A row keeps its place from one block to the next, so React updates the cells in
+          // place and does not build the rows again; the number of a row changes with the block.
+          key={row}
           className="absolute left-0 flex border-b border-line hover:bg-row"
           style={{
             top: row * ROW_HEIGHT,
