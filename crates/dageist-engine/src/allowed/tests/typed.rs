@@ -417,7 +417,7 @@ fn an_amount_that_does_not_fit_in_nanoseconds_is_no_duration_whatever_the_build(
     for text in [
         "106751d1d",
         "15250w106751d",
-        "-106751d1h",
+        "-106751d24h",
         "99999999999999w",
         "9999999d",
     ] {

@@ -23,6 +23,8 @@
 //!   such as `1mo` or `2d12h`. A text typed into an expression that takes a
 //!   duration is a `String` literal like any other, which Polars reads when it
 //!   runs rows; only a slot that takes a duration itself reads the text as one.
+//!   An amount whose units add up to more than an `i64` of nanoseconds, or of
+//!   months, is refused in every build, for Polars adds the amounts unchecked.
 //! - **Text** as it is, with the dtype `String`, or none where the text is a
 //!   path, which is not a value of any dtype.
 //!
@@ -232,16 +234,97 @@ fn date(text: &str) -> Result<Read, Unread> {
     })
 }
 
+/// What each unit of a duration string counts in: nanoseconds, for a unit of fixed length, or
+/// months. A week is 7 days and a day 24 hours, as Polars counts them in nanoseconds.
+enum Count {
+    Nanoseconds(i64),
+    Months(i64),
+}
+
+/// How a unit of a duration string counts. `None` for a word that is no unit, which Polars refuses
+/// with its own reason.
+fn count_of(unit: &[u8]) -> Option<Count> {
+    const MICROSECOND: i64 = 1_000;
+    const MILLISECOND: i64 = 1_000 * MICROSECOND;
+    const SECOND: i64 = 1_000 * MILLISECOND;
+    const MINUTE: i64 = 60 * SECOND;
+    const HOUR: i64 = 60 * MINUTE;
+    const DAY: i64 = 24 * HOUR;
+    const WEEK: i64 = 7 * DAY;
+    Some(match unit {
+        b"ns" | b"i" => Count::Nanoseconds(1),
+        b"us" => Count::Nanoseconds(MICROSECOND),
+        b"ms" => Count::Nanoseconds(MILLISECOND),
+        b"s" => Count::Nanoseconds(SECOND),
+        b"m" => Count::Nanoseconds(MINUTE),
+        b"h" => Count::Nanoseconds(HOUR),
+        b"d" => Count::Nanoseconds(DAY),
+        b"w" => Count::Nanoseconds(WEEK),
+        b"mo" => Count::Months(1),
+        b"q" => Count::Months(3),
+        b"y" => Count::Months(12),
+        _ => return None,
+    })
+}
+
+/// Whether the amounts of the duration string `text` fit what Polars holds: the whole of them in
+/// the nanoseconds of the units of fixed length, and in the months of the others, each in an
+/// `i64`. Polars adds them up with arithmetic that is not checked, so that a build with overflow
+/// checks panics and one without wraps around, and it does not multiply days and weeks into
+/// nanoseconds until the duration is used. This is checked here, the same in every build, and
+/// only to find an amount that is too large: what is no duration for another reason is Polars'
+/// to refuse.
+fn fits_polars(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    let mut at = usize::from(matches!(bytes.first(), Some(b'-' | b'+')));
+    let (mut nanoseconds, mut months) = (0_i64, 0_i64);
+    while at < bytes.len() && bytes[at].is_ascii_digit() {
+        let mut amount = 0_i64;
+        while let Some(digit) = bytes.get(at).filter(|byte| byte.is_ascii_digit()) {
+            let Some(next) = amount
+                .checked_mul(10)
+                .and_then(|tens| tens.checked_add(i64::from(digit - b'0')))
+            else {
+                return false;
+            };
+            amount = next;
+            at += 1;
+        }
+        let unit_start = at;
+        while bytes.get(at).is_some_and(u8::is_ascii_alphabetic) {
+            at += 1;
+        }
+        let Some(count) = count_of(&bytes[unit_start..at]) else {
+            return true;
+        };
+        let counted = match count {
+            Count::Nanoseconds(per) => amount
+                .checked_mul(per)
+                .and_then(|counted| nanoseconds.checked_add(counted))
+                .map(|total| nanoseconds = total),
+            Count::Months(per) => amount
+                .checked_mul(per)
+                .and_then(|counted| months.checked_add(counted))
+                .map(|total| months = total),
+        };
+        if counted.is_none() {
+            return false;
+        }
+    }
+    true
+}
+
 /// The duration Polars reads `text` as.
 fn duration(text: &str) -> Result<Read, Unread> {
-    // Polars reads a number of a duration into an `i64` without checking it, which a build with
-    // overflow checks makes a panic where a build without them wraps around. A text that makes it
-    // is no duration to give a person.
+    const TOO_LARGE: &str = "the duration is too large for Polars to hold";
+    if !fits_polars(text) {
+        return Err(Unread::NotADuration(TOO_LARGE.to_owned()));
+    }
+    // What `fits_polars` lets through does not overflow Polars' parser; the catch is for a text
+    // that its checks do not foresee.
     match catch_unwind(AssertUnwindSafe(|| Duration::try_parse(text))) {
         Ok(Ok(_)) => Ok(Read::untyped(Literal::String(text.to_owned()))),
         Ok(Err(error)) => Err(Unread::NotADuration(error.to_string())),
-        Err(_) => Err(Unread::NotADuration(
-            "the duration is too long to be read".to_owned(),
-        )),
+        Err(_) => Err(Unread::NotADuration(TOO_LARGE.to_owned())),
     }
 }
