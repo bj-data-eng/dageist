@@ -370,3 +370,56 @@ fn a_step_polars_accepts_but_cannot_run_on_the_rows_fails_and_the_steps_after_it
     // The schema still holds: the report says it is valid.
     assert!(matches!(report.steps()[0].outcome(), Outcome::Valid { .. }));
 }
+
+/// A step of `entry` that writes the columns `named` and gives the unnamed expressions `bare`.
+fn writing(
+    entry: &str,
+    entries: Vec<(&str, serde_json::Value)>,
+    bare: Vec<serde_json::Value>,
+) -> String {
+    document(vec![step(
+        "write",
+        entry,
+        json!({ "exprs": many(bare), "named_exprs": named(entries) }),
+    )])
+}
+
+#[test]
+fn a_column_a_step_computes_is_replaced_by_with_columns_and_by_select_alike() {
+    // `row_days` shifted is a whole number again, so only what the step writes says it changed.
+    let shifted = || {
+        field_then(
+            "row_days",
+            vec![call("Expr.shift", json!({ "n": whole(1) }))],
+        )
+    };
+    for entry in ["LazyFrame.with_columns", "LazyFrame.select"] {
+        let report = run_on(&writing(entry, vec![("row_days", shifted())], vec![]));
+        assert_eq!(
+            named_changes(changes(&report, "write")),
+            [("row_days", Change::Replaced)],
+            "{entry}"
+        );
+    }
+}
+
+#[test]
+fn a_column_a_step_gives_back_as_it_is_called_is_changed_by_neither() {
+    // `col("owner")` alone passes the column on as it is; no step writes it.
+    for entry in ["LazyFrame.with_columns", "LazyFrame.select"] {
+        let report = run_on(&writing(entry, vec![], vec![field("owner")]));
+        assert!(changes(&report, "write").is_empty(), "{entry}");
+    }
+}
+
+#[test]
+fn a_column_a_step_gives_under_its_own_name_is_replaced_by_with_columns_and_by_select_alike() {
+    for entry in ["LazyFrame.with_columns", "LazyFrame.select"] {
+        let report = run_on(&writing(entry, vec![("owner", field("owner"))], vec![]));
+        assert_eq!(
+            named_changes(changes(&report, "write")),
+            [("owner", Change::Replaced)],
+            "{entry}"
+        );
+    }
+}
