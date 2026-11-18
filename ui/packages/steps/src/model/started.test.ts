@@ -16,6 +16,14 @@ const catalogue = indexCatalogue(decodeCatalogue(catalogueFixture));
 const node = decodeNode(nodeFixture);
 const starts = decodeStepStarts(startsFixture).starts;
 
+/** The entries the catalogue lists as comparisons: the ones a started filter may compare with. */
+const comparisons = new Set(catalogue.view.comparisons.map((comparison) => comparison.entry));
+
+/** A new step of `verb` from what the engine says it starts with, checked against the catalogue's comparisons. */
+function started(verb: Verb, start: StepStartView): Step {
+  return startedStep(verb, start, comparisons);
+}
+
 function startFor(verb: Verb): StepStartView {
   const found = starts.find((start) => start.entry === `LazyFrame.${verb}`);
   if (found === undefined) throw new Error(`no start for ${verb}`);
@@ -163,7 +171,7 @@ describe('a new step', () => {
   it('is a join on the first connected table, whose keys are still to be picked', () => {
     // The fields are not matched by their dtype: the engine says whether two keys fit, and the
     // step says what is missing until they are picked.
-    const step = startedStep('join', startFor('join'));
+    const step = started('join', startFor('join'));
 
     expect(step).toMatchObject({
       verb: 'join',
@@ -180,7 +188,7 @@ describe('a new step', () => {
   });
 
   it('is a pivot whose three fields are still to be picked, over the first connected table', () => {
-    const step = startedStep('pivot', startFor('pivot'));
+    const step = started('pivot', startFor('pivot'));
 
     expect(step).toMatchObject({
       verb: 'pivot',
@@ -207,14 +215,14 @@ describe('a new step', () => {
   });
 
   it('is a join or a pivot with no table at all when the engine gave none', () => {
-    expect(startedStep('join', noTable('LazyFrame.join', 'other'))).toMatchObject({ table: '' });
-    expect(startedStep('pivot', noTable('LazyFrame.pivot', 'on_columns'))).toMatchObject({
+    expect(started('join', noTable('LazyFrame.join', 'other'))).toMatchObject({ table: '' });
+    expect(started('pivot', noTable('LazyFrame.pivot', 'on_columns'))).toMatchObject({
       options: { on_columns: { kind: 'unset' } },
     });
   });
 
   it('keeps every field for a select, in the order of the rows', () => {
-    const step: Step = startedStep('select', startFor('select'));
+    const step: Step = started('select', startFor('select'));
 
     expect(step).toMatchObject({ verb: 'select' });
     expect(step.verb === 'select' ? step.options.exprs : null).toMatchObject({
@@ -227,18 +235,18 @@ describe('a new step', () => {
   });
 
   it('is a sort whose first key is still to be picked, and a rename with no pairs yet', () => {
-    expect(startedStep('sort', startFor('sort'))).toMatchObject({
+    expect(started('sort', startFor('sort'))).toMatchObject({
       verb: 'sort',
       options: { by: { kind: 'list', items: [{ kind: 'unset' }] } },
     });
-    expect(startedStep('rename', startFor('rename'))).toMatchObject({
+    expect(started('rename', startFor('rename'))).toMatchObject({
       verb: 'rename',
       options: { mapping: { kind: 'pairs', entries: [] } },
     });
   });
 
   it('is a column called new_column with what it holds still to be picked', () => {
-    expect(startedStep('with_columns', startFor('with_columns'))).toMatchObject({
+    expect(started('with_columns', startFor('with_columns'))).toMatchObject({
       verb: 'with_columns',
       alias: 'new_column',
       value: { kind: 'unset' },
@@ -247,7 +255,7 @@ describe('a new step', () => {
   });
 
   it('is a filter whose comparison, for equality, has no field or value yet', () => {
-    expect(startedStep('filter', startFor('filter'))).toMatchObject({
+    expect(started('filter', startFor('filter'))).toMatchObject({
       verb: 'filter',
       condition: { kind: 'test', column: '', comparison: 'Expr.eq', value: { kind: 'unset' } },
     });
@@ -274,7 +282,7 @@ describe('a new step', () => {
       ],
     };
 
-    expect(startedStep('filter', start)).toMatchObject({
+    expect(started('filter', start)).toMatchObject({
       condition: {
         kind: 'test',
         column: 'dcn',
@@ -291,13 +299,36 @@ describe('a new step', () => {
     };
 
     // What a new column holds is an expression; a flag is not one.
-    expect(() => startedStep('with_columns', withColumns({ kind: 'flag', value: true }))).toThrow(
+    expect(() => started('with_columns', withColumns({ kind: 'flag', value: true }))).toThrow(
       /flag/,
     );
     // A table is a name.
-    expect(() => startedStep('join', join)).toThrow(/flag/);
+    expect(() => started('join', join)).toThrow(/flag/);
     // A condition is a comparison.
-    expect(() => startedStep('filter', filtering({ kind: 'flag', value: true }))).toThrow(/flag/);
+    expect(() => started('filter', filtering({ kind: 'flag', value: true }))).toThrow(/flag/);
+    // A condition is a comparison the catalogue lists, and not any entry the engine names.
+    expect(() =>
+      started(
+        'filter',
+        filtering({
+          kind: 'comparison',
+          entry: 'Expr.nothing',
+          field: { kind: 'unset' },
+          other: { kind: 'unset' },
+        }),
+      ),
+    ).toThrow(/Expr.nothing/);
+    expect(() =>
+      started(
+        'filter',
+        filtering({
+          kind: 'comparison',
+          entry: 'Expr.shift',
+          field: { kind: 'unset' },
+          other: { kind: 'unset' },
+        }),
+      ),
+    ).toThrow(/Expr.shift/);
     // A comparison is not the setting of a parameter.
     expect(() =>
       settingOf({
@@ -310,8 +341,8 @@ describe('a new step', () => {
   });
 
   it('is a step of its own each time, with an identifier that stays with it', () => {
-    const first = startedStep('sort', startFor('sort'));
-    const second = startedStep('sort', startFor('sort'));
+    const first = started('sort', startFor('sort'));
+    const second = started('sort', startFor('sort'));
 
     expect(first.id).not.toBe(second.id);
   });
