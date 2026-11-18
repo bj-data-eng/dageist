@@ -3,7 +3,9 @@
 
 use std::collections::BTreeSet;
 
-use crate::catalog::{Applies, Dtypes, Family, Kind, Words, WordsError, english, entries};
+use crate::catalog::{
+    Applies, Dtypes, Family, Kind, SummaryWord, Words, WordsError, english, entries,
+};
 
 const ENGLISH: &str = include_str!("../en.toml");
 
@@ -307,6 +309,69 @@ fn a_language_file_with_a_fault_is_refused_with_where_it_is() {
         Words::parse("mystery = 1").unwrap_err(),
         WordsError::Unknown {
             path: "mystery".to_owned()
+        }
+    );
+}
+
+#[test]
+fn every_summary_word_has_its_template_and_a_place_is_filled() {
+    let words = english();
+    for word in SummaryWord::ALL {
+        let template = words.summary(word, &[]);
+        assert!(!template.is_empty(), "{} has no words", word.key());
+        for place in word.places() {
+            assert!(
+                template.contains(&format!("{{{place}}}")),
+                "{} lacks its place {place}",
+                word.key()
+            );
+        }
+    }
+    assert_eq!(
+        words.summary(
+            SummaryWord::JoinedOn,
+            &[("table", "step_sla"), ("fields", "a, b")]
+        ),
+        "step_sla on a, b"
+    );
+    assert_eq!(
+        words.summary(SummaryWord::Renamed, &[("from", "a"), ("to", "b")]),
+        "a → b"
+    );
+}
+
+#[test]
+fn a_language_file_with_a_summary_word_missing_or_in_the_wrong_place_is_refused() {
+    // A file with no summary table gives no words, as one with no entries gives no entry.
+    let without = ENGLISH
+        .split("\n[summary]")
+        .next()
+        .expect("the file has a summary");
+    let words = Words::parse(without).expect("a language file");
+    assert_eq!(words.summary(SummaryWord::NoFields, &[]), "");
+
+    let wrong_place = ENGLISH.replacen("{count} fields", "{number} fields", 1);
+    assert_eq!(
+        Words::parse(&wrong_place).unwrap_err(),
+        WordsError::Places {
+            path: "summary.fields".to_owned(),
+            expected: &["count"]
+        }
+    );
+
+    let unknown = ENGLISH.replacen("[summary]", "[summary]\nshout = \"x\"", 1);
+    assert_eq!(
+        Words::parse(&unknown).unwrap_err(),
+        WordsError::Unknown {
+            path: "summary.shout".to_owned()
+        }
+    );
+
+    let absent = ENGLISH.replacen("no_fields = \"no fields\"\n", "", 1);
+    assert_eq!(
+        Words::parse(&absent).unwrap_err(),
+        WordsError::Missing {
+            path: "summary.no_fields".to_owned()
         }
     );
 }

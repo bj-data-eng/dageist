@@ -25,7 +25,7 @@ pub use arguments::{Argument, Arguments, BuildError};
 pub use condition::Conditional;
 pub use defaults::{DefaultValue, ParameterDefault};
 pub use left_out::{LeftOut, Reason, left_out};
-pub use words::{Words, WordsError, english};
+pub use words::{SummaryWord, Words, WordsError, english};
 
 use polars::prelude::{Expr, LazyFrame};
 
