@@ -451,3 +451,30 @@ fn a_block_of_a_selection_holds_only_the_columns_asked_for_as_text() {
         [Some("0".to_owned()), Some("127".to_owned())]
     );
 }
+
+#[test]
+fn a_column_is_numeric_where_it_holds_numbers() {
+    let folder = Folder::new("numeric");
+    let written = write_table(&folder);
+    let numeric = [
+        "key", "int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64", "int128",
+        "uint128", "float16", "float32", "float64", "decimal",
+    ];
+    let window = Table::load_keys(&folder.path, "key", 4).expect("the window loads");
+    let stored = ParquetTable::open(&folder.path).expect("the table opens");
+
+    for (served, columns) in [
+        ("a working window", window.columns()),
+        ("a stored result", stored.columns()),
+    ] {
+        assert_eq!(columns.len(), written.width(), "{served}");
+        for column in columns {
+            assert_eq!(
+                column.numeric,
+                numeric.contains(&column.name.as_str()),
+                "{} in {served}",
+                column.name
+            );
+        }
+    }
+}

@@ -68,7 +68,8 @@ impl Table {
     }
 
     /// Returns `length` rows starting at `offset`, limited to `columns`, as an
-    /// Arrow IPC stream.
+    /// Arrow IPC stream of text: every cell is written as Polars writes the value,
+    /// as in a preview, and a null is a missing cell.
     ///
     /// Rows past the end are left out, so the result can hold fewer rows than
     /// asked for. An empty `columns` selects every column.
@@ -92,6 +93,6 @@ impl Table {
                 .map_err(|source| EngineError::polars("selecting block columns", source))?
         };
         let (offset, _) = slice_bounds(offset, length)?;
-        write_ipc(selected.slice(offset, length))
+        write_ipc(&selected.slice(offset, length))
     }
 }

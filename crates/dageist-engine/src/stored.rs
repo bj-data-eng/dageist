@@ -60,7 +60,8 @@ impl ParquetTable {
     }
 
     /// Reads `length` rows starting at `offset`, limited to `columns`, and
-    /// returns them as an Arrow IPC stream.
+    /// returns them as an Arrow IPC stream of text: every cell is written as
+    /// Polars writes the value, as in a preview, and a null is a missing cell.
     ///
     /// Rows past the end are left out, so the result can hold fewer rows than
     /// asked for. An empty `columns` selects every column.
@@ -87,7 +88,7 @@ impl ParquetTable {
                     .collect::<Vec<_>>(),
             );
         }
-        write_ipc(frame.slice(offset, length).collect().map_err(reading)?)
+        write_ipc(&frame.slice(offset, length).collect().map_err(reading)?)
     }
 }
 
