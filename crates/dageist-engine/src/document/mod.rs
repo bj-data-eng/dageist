@@ -58,7 +58,7 @@ pub use preview::Preview;
 pub use run::{
     ExpressionDtypes, Outcome, Report, Resolution, RowsError, RunCause, StepRefusal, StepReport,
 };
-pub use source::{NotRunnable, Reason, Source, SourceLine};
+pub use source::{NotRunnable, NotRunnableReason, Source, SourceLine};
 pub use values::{FIRST_VALUES, FirstValues};
 pub use walk::{Standing, Walk, WalkRefusal, WalkedExpression};
 

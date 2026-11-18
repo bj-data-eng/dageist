@@ -3,7 +3,7 @@
 //! signatures in `api/polars/python.txt`, not read from what is written.
 
 use dageist_engine::claim_timing::ClaimTiming;
-use dageist_engine::document::{Document, Inputs, ListOrigin, Reason};
+use dageist_engine::document::{Document, Inputs, ListOrigin, NotRunnableReason};
 use polars::prelude::*;
 use serde_json::{Value, json};
 
@@ -281,7 +281,10 @@ fn a_hole_is_written_as_none_and_the_module_says_it_does_not_run() {
     );
     assert!(lines.contains(&"        .with_columns(None.alias(\"x\"))"));
     assert_eq!(source.not_runnable().len(), 1);
-    assert_eq!(source.not_runnable()[0].reason(), &Reason::Unfinished);
+    assert_eq!(
+        source.not_runnable()[0].reason(),
+        &NotRunnableReason::Unfinished
+    );
     assert_eq!(
         source.not_runnable()[0].step().map(|id| id.as_str()),
         Some("s")
@@ -374,7 +377,7 @@ fn an_input_that_is_not_connected_is_marked_and_two_names_that_are_one_are_marke
             .expect("a table");
     }
     let source = document.source("data", &inputs);
-    let reasons: Vec<&Reason> = source
+    let reasons: Vec<&NotRunnableReason> = source
         .not_runnable()
         .iter()
         .map(|problem| problem.reason())
@@ -383,8 +386,8 @@ fn an_input_that_is_not_connected_is_marked_and_two_names_that_are_one_are_marke
     assert_eq!(
         reasons,
         [
-            &Reason::NotConnected("missing".to_owned()),
-            &Reason::NotConnected("look up".to_owned()),
+            &NotRunnableReason::NotConnected("missing".to_owned()),
+            &NotRunnableReason::NotConnected("look up".to_owned()),
         ]
     );
     let clash = read(vec![step(
@@ -397,7 +400,7 @@ fn an_input_that_is_not_connected_is_marked_and_two_names_that_are_one_are_marke
     )]);
     let source = clash.source("data", &inputs);
     assert!(source.not_runnable().iter().any(|problem| {
-        problem.reason() == &Reason::SameName("look up".to_owned(), "look_up".to_owned())
+        problem.reason() == &NotRunnableReason::SameName("look up".to_owned(), "look_up".to_owned())
     }));
 }
 
@@ -510,12 +513,15 @@ fn an_input_named_like_the_table_the_document_starts_from_is_marked() {
         json!({ "other": { "table": "claims" }, "on": many(vec![field("a")]) }),
     )]);
     let source = document.source("claims", &one_table("claims"));
-    let reasons: Vec<&Reason> = source
+    let reasons: Vec<&NotRunnableReason> = source
         .not_runnable()
         .iter()
         .map(|problem| problem.reason())
         .collect();
-    assert_eq!(reasons, [&Reason::NamedLikeFrame("claims".to_owned())]);
+    assert_eq!(
+        reasons,
+        [&NotRunnableReason::NamedLikeFrame("claims".to_owned())]
+    );
     // The name is the function's parameter once.
     assert_eq!(
         source.text().matches("    claims: ").count(),
@@ -541,14 +547,17 @@ fn an_input_used_as_one_kind_by_a_step_and_as_another_by_a_later_step_is_marked(
         ),
     ]);
     let source = document.source("data", &one_table("lookup"));
-    let marked: Vec<(Option<&str>, &Reason)> = source
+    let marked: Vec<(Option<&str>, &NotRunnableReason)> = source
         .not_runnable()
         .iter()
         .map(|problem| (problem.step().map(|id| id.as_str()), problem.reason()))
         .collect();
     assert_eq!(
         marked,
-        [(Some("value"), &Reason::NotConnected("lookup".to_owned()))]
+        [(
+            Some("value"),
+            &NotRunnableReason::NotConnected("lookup".to_owned())
+        )]
     );
     // It is one parameter, the lazy frame the first step takes.
     assert_eq!(

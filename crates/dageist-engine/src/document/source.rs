@@ -90,7 +90,7 @@ impl SourceLine {
 
 /// Why source cannot run as written.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Reason {
+pub enum NotRunnableReason {
     /// The step holds something that is still to be picked, written as
     /// `None`.
     Unfinished,
@@ -103,7 +103,7 @@ pub enum Reason {
     NamedLikeFrame(String),
 }
 
-impl fmt::Display for Reason {
+impl fmt::Display for NotRunnableReason {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Unfinished => formatter.write_str("something in it is still to be picked"),
@@ -127,7 +127,7 @@ impl fmt::Display for Reason {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NotRunnable {
     step: Option<StepId>,
-    reason: Reason,
+    reason: NotRunnableReason,
 }
 
 impl NotRunnable {
@@ -139,7 +139,7 @@ impl NotRunnable {
 
     /// Why.
     #[must_use]
-    pub const fn reason(&self) -> &Reason {
+    pub const fn reason(&self) -> &NotRunnableReason {
         &self.reason
     }
 }
@@ -205,7 +205,7 @@ impl Document {
             if step.first_hole().is_some() {
                 not_runnable.push(NotRunnable {
                     step: Some(step.id().clone()),
-                    reason: Reason::Unfinished,
+                    reason: NotRunnableReason::Unfinished,
                 });
             }
             uses.call(step.id(), step.call());
@@ -231,7 +231,7 @@ impl Document {
             if !fits {
                 not_runnable.push(NotRunnable {
                     step: Some(step_id.clone()),
-                    reason: Reason::NotConnected(name.clone()),
+                    reason: NotRunnableReason::NotConnected(name.clone()),
                 });
             }
             // A name a later step uses again is a parameter already.
@@ -242,7 +242,7 @@ impl Document {
             if identifier(name) == frame_name {
                 not_runnable.push(NotRunnable {
                     step: None,
-                    reason: Reason::NamedLikeFrame(name.clone()),
+                    reason: NotRunnableReason::NamedLikeFrame(name.clone()),
                 });
                 continue;
             }
@@ -256,7 +256,7 @@ impl Document {
             {
                 not_runnable.push(NotRunnable {
                     step: None,
-                    reason: Reason::SameName((*other).to_owned(), original.clone()),
+                    reason: NotRunnableReason::SameName((*other).to_owned(), original.clone()),
                 });
             }
             taken.push((name, original));
