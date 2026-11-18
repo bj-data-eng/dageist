@@ -225,12 +225,14 @@ contract and in `ui/packages/host/src/`. Never edit the files by hand.
 
 After a change to the tables of allowed combinations, the rules, the offers or
 the views of them, `offers::tests::the_snapshots_are_what_the_commands_return`
-fails and names the file that differs. Seven files in
+fails and names the file that differs. Eleven files in
 `ui/packages/host/fixtures/` are written by it: `offers-start.json`,
 `offers-value.json` and `offers-condition.json` from `offers_at`,
-`fits-start.json` and `fits-argument.json` from `candidate_fits`, `options.json`
-from `option_offers`, and `offers-grid.json`, every call at every place of every
-kind, from which the view lists what the editor cannot offer:
+`fits-start.json` and `fits-argument.json` from `candidate_fits`,
+`typed-expression.json`, `typed-whole.json`, `typed-date.json` and
+`typed-unread.json` from `read_typed`, `options.json` from `option_offers`, and
+`offers-grid.json`, every call at every place of every kind, from which the view
+lists what the editor cannot offer:
 
 ```sh
 DAGEIST_REFRESH_OFFERS=1 cargo test --offline --locked -p dageist-tauri offers::tests::the_snapshots_are_what_the_commands_return
