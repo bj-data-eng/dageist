@@ -332,7 +332,8 @@
         "parameter": "n",
         "literal": {
           "kind": "integer",
-          "value": 1
+          "value": 1,
+          "shown": "1"
         }
       }
     },

@@ -540,7 +540,7 @@ mod tests {
                         "kind": { "kind": "expression" },
                         "shape": { "shape": "one" },
                         "default": { "kind": "integer", "value": 1 },
-                        "defaultSetting": { "kind": "integer", "value": 1 },
+                        "defaultSetting": { "kind": "integer", "value": 1, "shown": "1" },
                         "start": { "kind": "unset" },
                         "python": "1",
                         "position": null
@@ -604,6 +604,33 @@ mod tests {
                 "position": null
             })
         );
+    }
+
+    #[test]
+    fn the_comparisons_a_test_makes_come_with_the_signs_of_the_language_file() {
+        // Each is an entry of the catalogue that takes what a field is compared with as `other`,
+        // in the order they are offered. The signs are written as on paper: `≠`, `≥` and `≤`
+        // each take one character, while Polars' own text keeps `!=`, `>=` and `<=`.
+        let view = view();
+        assert_eq!(
+            view["comparisons"],
+            json!([
+                { "entry": "Expr.eq", "sign": "==" },
+                { "entry": "Expr.ne", "sign": "≠" },
+                { "entry": "Expr.gt", "sign": ">" },
+                { "entry": "Expr.ge", "sign": "≥" },
+                { "entry": "Expr.lt", "sign": "<" },
+                { "entry": "Expr.le", "sign": "≤" },
+            ])
+        );
+        for comparison in view["comparisons"].as_array().expect("comparisons") {
+            let id = comparison["entry"].as_str().expect("an entry");
+            assert_eq!(
+                parameter(&view, id, "other")["kind"],
+                json!({ "kind": "expression" }),
+                "{id}"
+            );
+        }
     }
 
     #[test]
@@ -827,7 +854,7 @@ mod tests {
         );
         assert_eq!(
             setting("LazyFrame.join", "suffix", "defaultSetting"),
-            json!({ "kind": "text", "value": "_right" })
+            json!({ "kind": "text", "value": "_right", "shown": "_right" })
         );
         assert_eq!(
             setting("LazyFrame.sort", "descending", "defaultSetting"),
@@ -835,7 +862,7 @@ mod tests {
         );
         assert_eq!(
             setting("Expr.shift", "n", "defaultSetting"),
-            json!({ "kind": "integer", "value": 1 })
+            json!({ "kind": "integer", "value": 1, "shown": "1" })
         );
         // Where Polars decides, or the parameter must be given, there is none.
         assert!(setting("LazyFrame.join", "coalesce", "defaultSetting").is_null());

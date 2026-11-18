@@ -61,6 +61,32 @@
     "UInt64",
     "UInt128"
   ],
+  "comparisons": [
+    {
+      "entry": "Expr.eq",
+      "sign": "=="
+    },
+    {
+      "entry": "Expr.ne",
+      "sign": "≠"
+    },
+    {
+      "entry": "Expr.gt",
+      "sign": ">"
+    },
+    {
+      "entry": "Expr.ge",
+      "sign": "≥"
+    },
+    {
+      "entry": "Expr.lt",
+      "sign": "<"
+    },
+    {
+      "entry": "Expr.le",
+      "sign": "≤"
+    }
+  ],
   "entries": [
     {
       "id": "ChainedThen.otherwise",
@@ -918,7 +944,8 @@
           },
           "defaultSetting": {
             "kind": "integer",
-            "value": 1
+            "value": 1,
+            "shown": "1"
           },
           "start": {
             "kind": "unset"
@@ -1240,7 +1267,8 @@
           },
           "defaultSetting": {
             "kind": "text",
-            "value": "_right"
+            "value": "_right",
+            "shown": "_right"
           },
           "start": {
             "kind": "unset"
@@ -1633,7 +1661,8 @@
           },
           "defaultSetting": {
             "kind": "text",
-            "value": "_"
+            "value": "_",
+            "shown": "_"
           },
           "start": {
             "kind": "unset"

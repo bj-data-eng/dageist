@@ -1,0 +1,134 @@
+{
+  "1": {
+    "readings": [
+      {
+        "kind": "read",
+        "literal": {
+          "kind": "integer",
+          "value": 1,
+          "shown": "1"
+        },
+        "dtype": "Int32",
+        "fit": null
+      },
+      {
+        "kind": "read",
+        "literal": {
+          "kind": "text",
+          "value": "1",
+          "shown": "1"
+        },
+        "dtype": "String",
+        "fit": null
+      }
+    ]
+  },
+  "0": {
+    "readings": [
+      {
+        "kind": "read",
+        "literal": {
+          "kind": "integer",
+          "value": 0,
+          "shown": "0"
+        },
+        "dtype": "Int32",
+        "fit": null
+      },
+      {
+        "kind": "read",
+        "literal": {
+          "kind": "text",
+          "value": "0",
+          "shown": "0"
+        },
+        "dtype": "String",
+        "fit": null
+      }
+    ]
+  },
+  "Company A": {
+    "readings": [
+      {
+        "kind": "read",
+        "literal": {
+          "kind": "text",
+          "value": "Company A",
+          "shown": "Company A"
+        },
+        "dtype": "String",
+        "fit": null
+      }
+    ]
+  },
+  "within": {
+    "readings": [
+      {
+        "kind": "read",
+        "literal": {
+          "kind": "text",
+          "value": "within",
+          "shown": "within"
+        },
+        "dtype": "String",
+        "fit": null
+      }
+    ]
+  },
+  "late": {
+    "readings": [
+      {
+        "kind": "read",
+        "literal": {
+          "kind": "text",
+          "value": "late",
+          "shown": "late"
+        },
+        "dtype": "String",
+        "fit": null
+      }
+    ]
+  },
+  "holiday": {
+    "readings": [
+      {
+        "kind": "read",
+        "literal": {
+          "kind": "text",
+          "value": "holiday",
+          "shown": "holiday"
+        },
+        "dtype": "String",
+        "fit": null
+      }
+    ]
+  },
+  "over": {
+    "readings": [
+      {
+        "kind": "read",
+        "literal": {
+          "kind": "text",
+          "value": "over",
+          "shown": "over"
+        },
+        "dtype": "String",
+        "fit": null
+      }
+    ]
+  },
+  "ok": {
+    "readings": [
+      {
+        "kind": "read",
+        "literal": {
+          "kind": "text",
+          "value": "ok",
+          "shown": "ok"
+        },
+        "dtype": "String",
+        "fit": null
+      }
+    ]
+  }
+}
