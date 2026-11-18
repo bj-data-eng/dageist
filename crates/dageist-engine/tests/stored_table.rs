@@ -59,6 +59,25 @@ fn read_ipc(bytes: Vec<u8>) -> DataFrame {
         .expect("the bytes are an Arrow IPC stream")
 }
 
+/// `frame` as the blocks carry it: every cell written by Polars as text, a
+/// null as no text.
+fn as_text(frame: &DataFrame) -> DataFrame {
+    let columns = frame
+        .columns()
+        .iter()
+        .map(|column| {
+            let cells: Vec<Option<String>> = (0..frame.height())
+                .map(|row| {
+                    let value = column.get(row).expect("a value");
+                    (!value.is_null()).then(|| value.str_value().into_owned())
+                })
+                .collect();
+            Column::new(column.name().clone(), cells)
+        })
+        .collect();
+    DataFrame::new_infer_height(columns).expect("a frame of text")
+}
+
 #[test]
 fn stored_table_reports_the_rows_and_columns_of_every_file() {
     let sample = StoredSample::generate("shape");
@@ -93,7 +112,7 @@ fn block_across_a_file_boundary_matches_the_rows_read_whole() {
         .expect("the columns exist")
         .slice(offset as i64, 15);
     assert_eq!(block.height(), 15);
-    assert!(block.equals(&expected));
+    assert!(block.equals_missing(&as_text(&expected)));
 }
 
 #[test]
@@ -103,7 +122,7 @@ fn block_with_no_columns_named_holds_every_column() {
 
     let block = read_ipc(table.block_ipc(40, 25, &[]).expect("the block is read"));
 
-    assert!(block.equals(&sample.whole.slice(40, 25)));
+    assert!(block.equals_missing(&as_text(&sample.whole.slice(40, 25))));
 }
 
 #[test]

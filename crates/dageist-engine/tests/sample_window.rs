@@ -42,6 +42,25 @@ fn read_ipc(bytes: Vec<u8>) -> DataFrame {
         .expect("the bytes are an Arrow IPC stream")
 }
 
+/// `frame` as the blocks carry it: every cell written by Polars as text, a
+/// null as no text.
+fn as_text(frame: &DataFrame) -> DataFrame {
+    let columns = frame
+        .columns()
+        .iter()
+        .map(|column| {
+            let cells: Vec<Option<String>> = (0..frame.height())
+                .map(|row| {
+                    let value = column.get(row).expect("a value");
+                    (!value.is_null()).then(|| value.str_value().into_owned())
+                })
+                .collect();
+            Column::new(column.name().clone(), cells)
+        })
+        .collect();
+    DataFrame::new_infer_height(columns).expect("a frame of text")
+}
+
 #[test]
 fn generated_table_has_claim_columns_then_filler() {
     let sample = SampleDirectory::generate("columns");
@@ -112,7 +131,7 @@ fn window_holds_every_row_of_the_first_keys_and_nothing_else() {
 
     assert_eq!(first_keys.len(), wanted_keys as usize);
     assert_eq!(window.height(), expected_rows);
-    assert!(window.equals(&whole.slice(0, expected_rows)));
+    assert!(window.equals_missing(&as_text(&whole.slice(0, expected_rows))));
 }
 
 #[test]
