@@ -39,14 +39,7 @@ import type {
   WithColumnsStep,
 } from './model/steps';
 import type { PreparedStep } from './model/report';
-import {
-  VERBS,
-  defaultStep,
-  fieldKeys,
-  stepItems,
-  stepOptionParameters,
-  stepText,
-} from './model/steps';
+import { VERBS, defaultStep, fieldKeys, stepItems, stepOptionParameters } from './model/steps';
 import { optionOf, starterSetting, withOption } from './model/settings';
 import { chosenOptions } from './model/offers';
 import { NO_POSITIONS, within } from './model/place';
@@ -164,7 +157,7 @@ function StepParameter({
     <ParameterDrawing
       parameter={parameter}
       setting={optionOf(step.options, name) ?? starterSetting(parameter)}
-      around={{ frame, items: (of) => stepItems(catalogue, step, of) }}
+      around={{ frame, items: (of) => stepItems(step, of) }}
       keyPrefix={keyPrefix}
       onChange={(setting) => {
         onChange({ ...step, options: withOption(step.options, name, setting) });
@@ -490,7 +483,7 @@ export function StepRow({
             remove={{ label: `Remove ${name}`, onPress: onRemove }}
             add={{ label: `Add a step after ${name}`, onPress: setAdding }}
           >
-            <Hint lines={[stepText(catalogue, step)]} code>
+            <Hint lines={result.source === null ? [] : [result.source]} code>
               <Slot
                 label={name}
                 tone="verb"
@@ -530,7 +523,7 @@ export function StepRow({
             entry={entry}
             parameters={parameters}
             options={step.options}
-            around={{ frame, items: (of) => stepItems(catalogue, step, of) }}
+            around={{ frame, items: (of) => stepItems(step, of) }}
             layout="lines"
             onChange={(options) => {
               onChange({ ...step, options });

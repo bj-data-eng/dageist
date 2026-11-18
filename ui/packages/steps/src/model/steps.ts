@@ -11,7 +11,7 @@ import type { MethodName } from './expr';
 import { verbEntry } from './catalogue';
 import type { Catalogue } from './catalogue';
 import type { Frame } from './frame';
-import { assertNever, quoted } from './frame';
+import { assertNever } from './frame';
 import { nextId } from './ids';
 import type { NamedTable } from './inputs';
 import type { Options, Setting } from './settings';
@@ -22,10 +22,8 @@ import {
   itemsOf,
   optionOf,
   optionParameters,
-  withoutOptions,
 } from './settings';
 import type { Chain, Condition, Value } from './source';
-import { conditionText, keyText, optionTexts, settingValueText, valueExprText } from './source';
 
 /** The step verbs, by their Polars names. */
 export type Verb = 'with_columns' | 'filter' | 'sort' | 'select' | 'rename' | 'join' | 'pivot';
@@ -171,9 +169,12 @@ export function aggregateOf(step: PivotStep): Value | null {
   return setting?.kind === 'expression' ? setting.value : null;
 }
 
-/** Returns how `key` is told apart from the other keys of a list: a field by its name, anything else by its text. */
-function keyLabel(catalogue: Catalogue, key: Value): string {
-  return key.kind === 'column' ? key.column : keyText(catalogue, key);
+/**
+ * Returns how the key at `index` is told apart from the other keys of a list: a field by its
+ * name, anything else by its place, since what a key works out is the engine's to say.
+ */
+function keyLabel(key: Value, index: number): string {
+  return key.kind === 'column' ? key.column : `key ${String(index + 1)}`;
 }
 
 /** The parameters each step's own structure draws, which are not offered as options. */
@@ -200,12 +201,12 @@ export function stepOptionParameters(catalogue: Catalogue, verb: Verb): readonly
 /**
  * Returns the items a parameter of `step` that follows the parameter `of`
  * holds one value for each of: the keys of a sort that are given, each by the
- * name of its field or else its text.
+ * name of its field or else its place in the list.
  */
-export function stepItems(catalogue: Catalogue, step: Step, of: string): readonly string[] {
+export function stepItems(step: Step, of: string): readonly string[] {
   if (step.verb !== 'sort' || of !== 'by') return [];
-  return keysOf(step.options, 'by').flatMap((key) =>
-    key.kind === 'unset' ? [] : [keyLabel(catalogue, key)],
+  return keysOf(step.options, 'by').flatMap((key, index) =>
+    key.kind === 'unset' ? [] : [keyLabel(key, index)],
   );
 }
 
@@ -289,78 +290,5 @@ export function defaultStep(verb: Verb, frame: Frame, tables: readonly NamedTabl
     }
     default:
       return assertNever(verb);
-  }
-}
-
-/** Returns `args` as the arguments of a call, then the text of the parameters that are set. */
-function callText(args: readonly string[], settings: readonly string[]): string {
-  return [...args, ...settings].join(', ');
-}
-
-/** Returns the Polars text of a pivot. */
-function pivotText(catalogue: Catalogue, step: PivotStep, settings: readonly string[]): string {
-  const aggregate = optionOf(step.options, 'aggregate_function');
-  const entry = verbEntry(catalogue, step.verb);
-  const parameter = entry?.parameters.find((candidate) => candidate.name === 'aggregate_function');
-  const given = [
-    `index=${quoted(step.index)}`,
-    `values=${quoted(step.values)}`,
-    ...(aggregate === null || parameter === undefined
-      ? []
-      : [`aggregate_function=${settingValueText(catalogue, parameter, aggregate, [])}`]),
-  ];
-  return `.pivot(${quoted(step.on)}, ${callText(given, settings)})`;
-}
-
-/** Returns `texts` as the argument of a call: the one, or a list of them. */
-function listText(texts: readonly string[]): string {
-  const [only] = texts;
-  return texts.length === 1 && only !== undefined ? only : `[${texts.join(', ')}]`;
-}
-
-/** Returns the Polars method call `step` stands for. */
-export function stepText(catalogue: Catalogue, step: Step): string {
-  const entry = verbEntry(catalogue, step.verb);
-  // Only the parameters that are set and differ from their default are written,
-  // and not those the step writes itself.
-  const settings = optionTexts(
-    catalogue,
-    entry,
-    withoutOptions(step.options, COVERED[step.verb]),
-    (of) => stepItems(catalogue, step, of),
-  );
-  switch (step.verb) {
-    case 'with_columns':
-      return `.with_columns(${callText([`${valueExprText(catalogue, step.value)}.alias(${quoted(step.alias)})`], settings)})`;
-    case 'sort':
-      return `.sort(${callText(
-        keysOf(step.options, 'by').map((key) => keyText(catalogue, key)),
-        settings,
-      )})`;
-    case 'select':
-      return `.select(${callText(
-        keysOf(step.options, 'exprs').map((key) => keyText(catalogue, key)),
-        settings,
-      )})`;
-    case 'rename': {
-      const mapping = entry?.parameters.find((candidate) => candidate.name === 'mapping');
-      const setting = optionOf(step.options, 'mapping');
-      const text =
-        mapping === undefined || setting === null
-          ? '{}'
-          : settingValueText(catalogue, mapping, setting, []);
-      return `.rename(${callText([text], settings)})`;
-    }
-    case 'filter':
-      return `.filter(${callText([conditionText(catalogue, step.condition)], settings)})`;
-    case 'join': {
-      const keys = (name: string): string =>
-        listText(keysOf(step.options, name).map((key) => keyText(catalogue, key)));
-      return `.join(${callText([step.table, `left_on=${keys('left_on')}`, `right_on=${keys('right_on')}`], settings)})`;
-    }
-    case 'pivot':
-      return pivotText(catalogue, step, settings);
-    default:
-      return assertNever(step);
   }
 }

@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { Panel, cx } from '@dageist/design';
 import type { Host } from '@dageist/host';
 
-import { EngineProvider, useNode } from './EngineProvider';
+import { EngineProvider } from './EngineProvider';
 import { moved } from './Chain';
 import { useRows, useRun } from './engine';
 import { Pipeline } from './Pipeline';
@@ -65,7 +65,6 @@ export function StepsWorkspace({ host, styleNonce }: StepsWorkspaceProps): React
 }
 
 function Transform({ host, styleNonce }: StepsWorkspaceProps): React.JSX.Element {
-  const node = useNode();
   const { steps, selectedId, stepsOpen, change } = useSharedSteps(host, 'main');
   const [centre, setCentre] = useState<Centre>('rows');
   const run = useRun(host, steps);
@@ -117,8 +116,7 @@ function Transform({ host, styleNonce }: StepsWorkspaceProps): React.JSX.Element
               />
             ) : (
               <Pipeline
-                source={node.source.name}
-                steps={steps}
+                module={run.prepared.module}
                 selectedId={selectedId}
                 onSelect={(id) => {
                   change(steps, id);

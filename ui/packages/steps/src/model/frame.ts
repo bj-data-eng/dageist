@@ -16,11 +16,6 @@ export type Column = FieldView;
 /** The columns of a table, in order. */
 export type Frame = readonly Column[];
 
-/** Returns `text` as a Python string literal. */
-export function quoted(text: string): string {
-  return JSON.stringify(text);
-}
-
 /** Fails on a value the caller's `switch` was supposed to have covered. */
 export function assertNever(unexpected: never): never {
   throw new Error(`Unexpected value: ${String(unexpected)}`);

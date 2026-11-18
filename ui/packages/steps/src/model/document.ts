@@ -683,7 +683,6 @@ function keyArguments(context: Context, options: Options, name: string, missing:
 }
 
 function stepArguments(context: Context, step: Step, entry: EntryView): Record<string, Json> {
-  const { catalogue } = context;
   const own: Record<string, Json> = {};
   const options = (): Record<string, Json> =>
     optionArguments(
@@ -691,7 +690,7 @@ function stepArguments(context: Context, step: Step, entry: EntryView): Record<s
       entry,
       step.options,
       entry.parameters.filter((parameter) => !COVERED[step.verb].includes(parameter.name)),
-      (of) => stepItems(catalogue, step, of),
+      (of) => stepItems(step, of),
       [],
       [],
     );
