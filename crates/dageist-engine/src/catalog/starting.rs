@@ -14,7 +14,7 @@ use super::{Applies, DefaultValue, Entry, Kind, Parameter, Shape};
 #[derive(Debug, Clone, PartialEq)]
 pub enum Setting {
     /// Still to be given: it stands for nothing until it is.
-    Unset,
+    ToGive,
     /// True or false.
     Flag(bool),
     /// A whole number.
@@ -71,7 +71,7 @@ impl Parameter {
     #[must_use]
     pub fn start_setting(&self) -> Setting {
         if self.shape() == Shape::Many {
-            return Setting::List(vec![Setting::Unset]);
+            return Setting::List(vec![Setting::ToGive]);
         }
         match self.kind() {
             Kind::Pairs(..) => Setting::Pairs(Vec::new()),
@@ -86,9 +86,9 @@ impl Parameter {
                 words
                     .iter()
                     .find(|word| default.as_deref() != Some(**word))
-                    .map_or(Setting::Unset, |word| Setting::Word((*word).to_owned()))
+                    .map_or(Setting::ToGive, |word| Setting::Word((*word).to_owned()))
             }
-            _ => Setting::Unset,
+            _ => Setting::ToGive,
         }
     }
 }
@@ -158,14 +158,14 @@ pub fn start_step(entry: &Entry, frame: &StepFrame<'_>) -> Option<StepStart> {
         frame
             .tables
             .first()
-            .map_or(Setting::Unset, |name| Setting::Word(name.clone()))
+            .map_or(Setting::ToGive, |name| Setting::Word(name.clone()))
     };
     let arguments: Vec<(&'static str, Setting)> = match entry.id().as_str() {
         "LazyFrame.with_columns" => vec![(
             "named_exprs",
             Setting::Pairs(vec![(
                 Setting::Text("new_column".to_owned()),
-                Setting::Unset,
+                Setting::ToGive,
             )]),
         )],
         "LazyFrame.filter" => vec![start_of("predicates")?],
@@ -182,10 +182,10 @@ pub fn start_step(entry: &Entry, frame: &StepFrame<'_>) -> Option<StepStart> {
             start_of("how")?,
         ],
         "LazyFrame.pivot" => vec![
-            ("on", Setting::Unset),
+            ("on", Setting::ToGive),
             ("on_columns", first_table()),
-            ("index", Setting::Unset),
-            ("values", Setting::Unset),
+            ("index", Setting::ToGive),
+            ("values", Setting::ToGive),
             ("aggregate_function", Setting::Element(PIVOT_AGGREGATE)),
         ],
         _ => return None,

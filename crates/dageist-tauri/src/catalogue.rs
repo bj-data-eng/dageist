@@ -109,8 +109,9 @@ enum DefaultView {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub(crate) enum SettingView {
-    /// Still to be given.
-    Unset,
+    /// Still to be given. The view's own word for it is `unset`.
+    #[serde(rename = "unset")]
+    ToGive,
     Flag {
         value: bool,
     },
@@ -154,7 +155,7 @@ pub(crate) struct PairView {
 /// The view of a setting the engine gives.
 pub(crate) fn setting_view(setting: &Setting) -> SettingView {
     match setting {
-        Setting::Unset => SettingView::Unset,
+        Setting::ToGive => SettingView::ToGive,
         Setting::Flag(value) => SettingView::Flag { value: *value },
         Setting::Integer(value) => SettingView::Integer { value: *value },
         Setting::Float(value) => SettingView::Float { value: *value },

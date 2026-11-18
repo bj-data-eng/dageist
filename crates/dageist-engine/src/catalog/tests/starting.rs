@@ -77,18 +77,18 @@ fn a_parameter_that_is_added_starts_with_something_that_differs_from_its_default
         (
             "LazyFrame.join",
             "left_on",
-            Setting::List(vec![Setting::Unset]),
+            Setting::List(vec![Setting::ToGive]),
         ),
         (
             "LazyFrame.select",
             "exprs",
-            Setting::List(vec![Setting::Unset]),
+            Setting::List(vec![Setting::ToGive]),
         ),
         ("LazyFrame.rename", "mapping", Setting::Pairs(Vec::new())),
         // Anything else is still to be given.
-        ("LazyFrame.join", "suffix", Setting::Unset),
-        ("Expr.shift", "n", Setting::Unset),
-        ("LazyFrame.join", "other", Setting::Unset),
+        ("LazyFrame.join", "suffix", Setting::ToGive),
+        ("Expr.shift", "n", Setting::ToGive),
+        ("LazyFrame.join", "other", Setting::ToGive),
     ];
     for (entry_id, name, expected) in cases {
         assert_eq!(
@@ -119,7 +119,7 @@ fn started(id: &str, columns: &[&str], tables: &[&str]) -> Vec<(&'static str, Se
 }
 
 fn unset_list() -> Setting {
-    Setting::List(vec![Setting::Unset])
+    Setting::List(vec![Setting::ToGive])
 }
 
 #[test]
@@ -142,7 +142,7 @@ fn a_new_step_starts_with_what_it_cannot_be_built_without_still_to_be_given() {
             "named_exprs",
             Setting::Pairs(vec![(
                 Setting::Text("new_column".to_owned()),
-                Setting::Unset
+                Setting::ToGive
             )])
         )]
     );
@@ -183,7 +183,7 @@ fn a_new_join_takes_the_first_table_and_keeps_the_rows_that_have_no_match() {
     // With no table connected, which table is still to be given.
     assert_eq!(
         started("LazyFrame.join", &["a"], &[])[0],
-        ("other", Setting::Unset)
+        ("other", Setting::ToGive)
     );
 }
 
@@ -192,16 +192,16 @@ fn a_new_pivot_takes_the_first_table_for_its_columns_and_the_first_value_of_each
     assert_eq!(
         started("LazyFrame.pivot", &["a"], &["step_names"]),
         [
-            ("on", Setting::Unset),
+            ("on", Setting::ToGive),
             ("on_columns", word("step_names")),
-            ("index", Setting::Unset),
-            ("values", Setting::Unset),
+            ("index", Setting::ToGive),
+            ("values", Setting::ToGive),
             ("aggregate_function", Setting::Element("first")),
         ]
     );
     assert_eq!(
         started("LazyFrame.pivot", &["a"], &[])[1],
-        ("on_columns", Setting::Unset)
+        ("on_columns", Setting::ToGive)
     );
 }
 
