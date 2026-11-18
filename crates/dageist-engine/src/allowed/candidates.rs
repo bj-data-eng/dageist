@@ -112,7 +112,8 @@ impl Fit {
     /// literal, and the verdict says whether the expression may end there.
     /// Where the slot is only an argument, the verdict is the method's. Where it
     /// is both, the candidate is refused where either refuses it, and otherwise
-    /// the verdict is the method's.
+    /// the verdict has the result and the shape of the method's and, as its
+    /// ending, whether the expression the candidate starts may end there.
     #[must_use]
     pub const fn verdict(&self) -> &Verdict {
         &self.verdict
@@ -188,12 +189,16 @@ pub fn fit(candidate: &Candidate, slot: &Slot<'_>) -> Option<Fit> {
             Candidate::Input { shape, .. } => offer_input(&place, dtype, *shape),
             Candidate::Literal(_) => offer_input(&place, dtype, Shape::One),
         };
-        // Either side may refuse it. Where both allow it, the verdict is the argument's: what the
-        // call it is given to gives, not what the candidate would be alone.
+        // Either side may refuse it. Where both allow it, what the call it is given to gives, its
+        // result and its shape, is the argument's, and whether the expression the candidate
+        // starts may end there is the start's: the argument's ending says whether the result of
+        // the call may end the expression the call stands in, which is not the candidate's chain.
         verdict = match (verdict, found) {
             (_, refused @ Verdict::Refused(_)) => Some(refused),
-            (Some(argument), Verdict::Allowed(_)) => Some(argument),
-            (None, allowed @ Verdict::Allowed(_)) => Some(allowed),
+            (Some(Verdict::Allowed(argument)), Verdict::Allowed(start)) => Some(Verdict::Allowed(
+                argument.ending_as(start.can_end().clone()),
+            )),
+            (_, allowed @ Verdict::Allowed(_)) => Some(allowed),
         };
     }
     verdict.map(|verdict| Fit { dtype, verdict })

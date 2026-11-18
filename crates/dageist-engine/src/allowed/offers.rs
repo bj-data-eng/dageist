@@ -286,6 +286,13 @@ impl Allowance {
         self
     }
 
+    /// The same allowance with `ending` as whether the expression may end after the entry,
+    /// where another place than the entry's own is the one the expression ends in.
+    pub(super) fn ending_as(mut self, ending: Ending) -> Self {
+        self.ending = ending;
+        self
+    }
+
     /// The dtype the chain has after the entry. `None` where it is not known
     /// from the entry: a start takes the dtype of a column or of a group, and
     /// a method that takes an argument gives a dtype the argument decides.
