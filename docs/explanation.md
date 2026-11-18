@@ -209,7 +209,8 @@ Three rules keep this workable as the application grows:
   is selected or which menu is open. Values and validation come from the host.
   The step editor holds its steps and writes them as a step document; the
   engine runs the document and reports the columns, the dtypes and the
-  refusals, and the rows after a step as text, and the view shows them.
+  refusals, the rows after a step as text, and the Python source and the short
+  summary of each step, and the view shows them.
 
 The view reaches Tauri through the `window.__TAURI__` global that
 `app.withGlobalTauri` injects. The host package declares the global's types by
@@ -557,6 +558,28 @@ it cannot judge a start that other arguments or more links follow. Polars decide
 the rest as the step is built, and when it refuses a pivot because of a column in
 its aggregate, it refuses the step, not the expression. The contexts the tables
 are measured in also say which table a join's `right_on` is read against.
+
+A document is also written as Python Polars source, and each step as a short
+summary, by the engine; the view composes neither. `Document::source` writes a
+module with a function `run` that is given the table the document starts from
+and each connected input its steps name, typed, and gives the lazy frame the
+steps build. A step is the method call it stands for, such as
+`.sort("dcn", "timestamp")`, which is also its line of the function. What is
+written follows from the entry a call uses and the arguments it was given:
+Python's names, its order of parameters, with the first by position and a
+parameter after a bare `*` or a starred one only by its name, which the
+catalogue records, and Python's literals, so that a whole float keeps its `.0`
+and a connected value is a literal of its dtype. A table is a lazy frame, and a
+pivot's `on_columns`, which Python takes as a data frame, is collected. What
+cannot run as written, a hole, an input that is not connected, or two names
+that are one Python name, is written as the closest readable form and marked by
+a comment at the top of the module. A step's summary is what it works on, such
+as `by dcn, timestamp` or `step_sla on step_to`; its words are in the language
+file's `summary` table, and what is worked out is `…`. The report of each step
+carries both, and a run carries the module with each line naming its step, so
+the Polars tab and the hints show what the engine wrote. Whether the source
+runs in Python Polars is checked, not assumed: see
+[how to check the Python source](how-to.md#check-the-python-source).
 
 The claim-timing steps the step editor opens with, the seven claim rows they run
 on and the inputs connected to them are one sample node in the engine,

@@ -181,6 +181,10 @@ cargo test --offline --locked -p dageist-engine
 cargo clippy --offline --locked -p dageist-engine --all-targets --no-deps -- -F unsafe-code -D warnings
 ```
 
+The test that runs the Python source the engine writes in Python Polars is
+ignored by default and needs a Python environment; the
+[how-to](docs/how-to.md#check-the-python-source) says how to create it and run it.
+
 View checks from the repository root. `npm --prefix ui ci --offline` restores
 `ui/node_modules/` from the local npm cache:
 
