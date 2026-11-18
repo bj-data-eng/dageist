@@ -583,9 +583,22 @@ fn a_connected_value_whose_dtype_cannot_be_written_is_marked_not_written_without
         json!({ "named_exprs": named(vec![("x", chain(json!({ "input": "blob" }), vec![]))]) }),
     )]);
     let source = document.source("data", &inputs);
+    assert_eq!(
+        source
+            .not_runnable()
+            .iter()
+            .map(|problem| problem.reason())
+            .collect::<Vec<_>>(),
+        [&NotRunnableReason::UnwritableDtype {
+            input: "blob".to_owned(),
+            dtype: "binary".to_owned(),
+        }]
+    );
+    // It is written as Python would type it, and says so in a comment.
+    assert!(source.text().contains("pl.lit(blob)"), "{}", source.text());
     assert!(
-        !source.not_runnable().is_empty(),
-        "the module says it runs: {}",
-        source.text()
+        source
+            .text()
+            .starts_with("# Not runnable as written: step \"s\", the dtype binary")
     );
 }

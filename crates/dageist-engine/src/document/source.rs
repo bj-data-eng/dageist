@@ -42,11 +42,10 @@
 use std::collections::BTreeSet;
 use std::fmt::{self, Write as _};
 
-use polars::prelude::DataType;
+use polars::prelude::{DataType, TimeUnit};
 
 use crate::catalog::{Applies, Entry, Kind, Parameter, ParameterDefault, Variadic, Writes};
 
-use super::dtype::Dtype;
 use super::inputs::{Binding, Inputs};
 use super::model::{Call, Document, Expression, Start, Step, StepId, Value};
 
@@ -101,6 +100,14 @@ pub enum NotRunnableReason {
     SameName(String, String),
     /// The name is also the Python name of the table the document starts from.
     NamedLikeFrame(String),
+    /// The dtype of a connected value has no name in Python Polars, so the value
+    /// is written with no dtype.
+    UnwritableDtype {
+        /// The input.
+        input: String,
+        /// Its dtype, as Polars prints it.
+        dtype: String,
+    },
 }
 
 impl fmt::Display for NotRunnableReason {
@@ -118,6 +125,10 @@ impl fmt::Display for NotRunnableReason {
             Self::NamedLikeFrame(name) => write!(
                 formatter,
                 "{name:?} is also the name of the table the document starts from"
+            ),
+            Self::UnwritableDtype { input, dtype } => write!(
+                formatter,
+                "the dtype {dtype} of {input:?} has no name in Python Polars"
             ),
         }
     }
@@ -222,6 +233,15 @@ impl Document {
             let (annotation, import, fits) = match (inputs.binding(name), expects) {
                 (Some(Binding::Table), Expects::Table) => ("pl.LazyFrame".to_owned(), None, true),
                 (Some(Binding::Value(dtype)), Expects::Value) => {
+                    if dtype_python(&dtype).is_none() {
+                        not_runnable.push(NotRunnable {
+                            step: Some(step_id.clone()),
+                            reason: NotRunnableReason::UnwritableDtype {
+                                input: name.clone(),
+                                dtype: dtype.to_string(),
+                            },
+                        });
+                    }
                     let (annotation, import) = python_type(&dtype);
                     (annotation.to_owned(), import, true)
                 }
@@ -613,13 +633,10 @@ impl Writer<'_> {
             // A connected value is a literal of its dtype, and a list is a series that Polars
             // takes as one.
             Start::Input(name) => match self.inputs.binding(name) {
-                Some(Binding::Value(dtype)) => match Dtype::new(dtype) {
-                    Ok(dtype) => format!(
-                        "pl.lit({}, dtype={})",
-                        identifier(name),
-                        dtype_text(&dtype.to_string())
-                    ),
-                    Err(_) => format!("pl.lit({})", identifier(name)),
+                Some(Binding::Value(dtype)) => match dtype_python(&dtype) {
+                    Some(dtype) => format!("pl.lit({}, dtype={dtype})", identifier(name)),
+                    // The module says it is not runnable.
+                    None => format!("pl.lit({})", identifier(name)),
                 },
                 _ => format!("pl.lit({})", identifier(name)),
             },
@@ -680,7 +697,8 @@ pub(super) fn scalar(value: &Value) -> Option<String> {
         Value::Flag(Some(true)) => "True".to_owned(),
         Value::Flag(Some(false)) => "False".to_owned(),
         Value::Flag(None) => "None".to_owned(),
-        Value::Dtype(dtype) => dtype_text(&dtype.to_string()),
+        // A dtype of a document is one `dtype_python` writes.
+        Value::Dtype(dtype) => dtype_python(dtype.as_polars()).unwrap_or_default(),
         Value::Table(name) => identifier(name),
         Value::Expression(_) | Value::Pairs(_) | Value::Many(_) => return None,
     })
@@ -780,39 +798,59 @@ pub(super) fn float(number: f64) -> String {
     format!("{sign}{body}")
 }
 
-/// The dtype `text`, which a document writes as Python prints it, as Python
-/// source: each dtype's name is the attribute of `pl`, as in
-/// `pl.List(pl.Int64)`, and a name before `=` or in quotes stays as it is.
-fn dtype_text(text: &str) -> String {
-    let mut written = String::with_capacity(text.len() + 8);
-    let characters: Vec<char> = text.chars().collect();
-    let mut at = 0;
-    while at < characters.len() {
-        let character = characters[at];
-        if character == '\'' || character == '"' {
-            // A quoted text, such as a time zone, is copied up to its closing quote.
-            let close = characters[at + 1..]
-                .iter()
-                .position(|candidate| *candidate == character)
-                .map_or(characters.len() - 1, |found| at + 1 + found);
-            written.extend(&characters[at..=close]);
-            at = close + 1;
-        } else if character.is_ascii_alphabetic() || character == '_' {
-            let end = characters[at..]
-                .iter()
-                .position(|candidate| !(candidate.is_ascii_alphanumeric() || *candidate == '_'))
-                .map_or(characters.len(), |found| at + found);
-            let word: String = characters[at..end].iter().collect();
-            let is_name = characters.get(end) == Some(&'=') || word == "None";
-            if !is_name {
-                written.push_str("pl.");
-            }
-            written.push_str(&word);
-            at = end;
-        } else {
-            written.push(character);
-            at += 1;
+/// `dtype` as Python Polars source, written from its structure: each dtype is an
+/// attribute of `pl`, and a parameter is by name, as in
+/// `pl.Datetime(time_unit='us', time_zone=None)` and `pl.List(pl.Int64)`. It is
+/// `None` for a dtype Python Polars has no one name for, such as a decimal, a
+/// struct or binary.
+fn dtype_python(dtype: &DataType) -> Option<String> {
+    let simple = match dtype {
+        DataType::Boolean => "Boolean",
+        DataType::Date => "Date",
+        DataType::Time => "Time",
+        DataType::Null => "Null",
+        DataType::String => "String",
+        DataType::Float16 => "Float16",
+        DataType::Float32 => "Float32",
+        DataType::Float64 => "Float64",
+        DataType::Int8 => "Int8",
+        DataType::Int16 => "Int16",
+        DataType::Int32 => "Int32",
+        DataType::Int64 => "Int64",
+        DataType::Int128 => "Int128",
+        DataType::UInt8 => "UInt8",
+        DataType::UInt16 => "UInt16",
+        DataType::UInt32 => "UInt32",
+        DataType::UInt64 => "UInt64",
+        DataType::UInt128 => "UInt128",
+        DataType::Datetime(unit, zone) => {
+            let zone = zone.as_ref().map_or_else(
+                || "None".to_owned(),
+                |zone| {
+                    format!(
+                        "'{}'",
+                        zone.to_string().replace('\\', "\\\\").replace('\'', "\\'")
+                    )
+                },
+            );
+            return Some(format!(
+                "pl.Datetime(time_unit='{}', time_zone={zone})",
+                time_unit(*unit)
+            ));
         }
+        DataType::Duration(unit) => {
+            return Some(format!("pl.Duration(time_unit='{}')", time_unit(*unit)));
+        }
+        DataType::List(inner) => return Some(format!("pl.List({})", dtype_python(inner)?)),
+        _ => return None,
+    };
+    Some(format!("pl.{simple}"))
+}
+
+const fn time_unit(unit: TimeUnit) -> &'static str {
+    match unit {
+        TimeUnit::Nanoseconds => "ns",
+        TimeUnit::Microseconds => "us",
+        TimeUnit::Milliseconds => "ms",
     }
-    written
 }
