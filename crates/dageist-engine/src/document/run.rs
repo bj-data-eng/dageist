@@ -182,6 +182,7 @@ pub struct StepReport {
     laziness: Laziness,
     expressions: Vec<ExpressionDtypes>,
     walk: Walk,
+    at_default: Vec<Place>,
     outcome: Outcome,
     rows: StepRows,
 }
@@ -228,6 +229,14 @@ impl StepReport {
     #[must_use]
     pub const fn walk(&self) -> &Walk {
         &self.walk
+    }
+
+    /// The places of the arguments in the step that are what their parameter
+    /// holds when it is not given: see [`Step::at_default`]. Whether the step
+    /// was run does not change them.
+    #[must_use]
+    pub fn at_default(&self) -> &[Place] {
+        &self.at_default
     }
 
     /// What came of the step.
@@ -344,6 +353,7 @@ impl Document {
                     laziness,
                     expressions: Vec::new(),
                     walk: Walk::default(),
+                    at_default: step.at_default(index),
                     outcome: Outcome::NotRun {
                         blocked_by: blocked_by.clone(),
                     },
@@ -378,6 +388,7 @@ impl Document {
                 laziness,
                 expressions: run.expressions,
                 walk: run.walk,
+                at_default: step.at_default(index),
                 outcome,
                 rows: StepRows::NotCounted,
             });
