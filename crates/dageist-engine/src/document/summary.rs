@@ -2,12 +2,12 @@
 //! A list of steps shows this where there is no room for the steps
 //! themselves.
 //!
-//! The words come from a language file, as [`SummaryWord`] lists them; what
+//! The words come from a language file, as [`SummaryPhrase`] lists them; what
 //! decides which are used and what they are filled with is here. A summary
 //! names fields, tables and values as the document holds them and says `…`
 //! for anything that is worked out, so it never takes the place of the step.
 
-use crate::catalog::{SummaryWord, Words};
+use crate::catalog::{SummaryPhrase, Words};
 
 use super::model::{Expression, Start, Step, Value};
 use super::source::{field_alone, scalar};
@@ -50,18 +50,14 @@ impl Step {
             "LazyFrame.filter" => {
                 say.conditions(call.argument("predicates"), call.argument("constraints"))
             }
-            "LazyFrame.sort" => say.words.summary(
-                SummaryWord::SortedBy,
-                &[(
-                    "fields",
-                    &say.fields(
-                        &keys(&["by", "more_by"])
-                            .into_iter()
-                            .map(|key| say.key(key))
-                            .collect::<Vec<_>>(),
-                    ),
-                )],
-            ),
+            "LazyFrame.sort" => say.phrase(SummaryPhrase::SortedBy {
+                fields: &say.fields(
+                    &keys(&["by", "more_by"])
+                        .into_iter()
+                        .map(|key| say.key(key))
+                        .collect::<Vec<_>>(),
+                ),
+            }),
             "LazyFrame.rename" => say.renames(call.argument("mapping")),
             "LazyFrame.join" => {
                 let table = match call.argument("other") {
@@ -77,18 +73,17 @@ impl Step {
                     return table;
                 }
                 let fields: Vec<String> = matched.into_iter().map(|key| say.key(key)).collect();
-                say.words.summary(
-                    SummaryWord::JoinedOn,
-                    &[("table", &table), ("fields", &fields.join(", "))],
-                )
+                say.phrase(SummaryPhrase::JoinedOn {
+                    table: &table,
+                    fields: &say.listed(&fields),
+                })
             }
             "LazyFrame.pivot" => {
                 let field = match call.argument("on") {
-                    Some(Value::Columns(names)) => names.join(", "),
+                    Some(Value::Columns(names)) => say.listed(names),
                     _ => String::new(),
                 };
-                say.words
-                    .summary(SummaryWord::PivotedOn, &[("field", &field)])
+                say.phrase(SummaryPhrase::PivotedOn { field: &field })
             }
             _ => String::new(),
         }
@@ -108,19 +103,22 @@ struct Say<'a> {
 }
 
 impl Say<'_> {
-    fn word(&self, word: SummaryWord) -> String {
-        self.words.summary(word, &[])
+    fn phrase(&self, phrase: SummaryPhrase<'_>) -> String {
+        self.words.say(phrase)
+    }
+
+    /// `names` one after another, as the language file separates them.
+    fn listed(&self, names: &[String]) -> String {
+        names.join(&self.phrase(SummaryPhrase::Separator))
     }
 
     /// `names` as a short list, or how many there are when they are too many
     /// to list.
     fn fields(&self, names: &[String]) -> String {
         match names.len() {
-            0 => self.word(SummaryWord::NoFields),
-            count if count <= NAMED => names.join(", "),
-            count => self
-                .words
-                .summary(SummaryWord::Fields, &[("count", &count.to_string())]),
+            0 => self.phrase(SummaryPhrase::NoFields),
+            count if count <= NAMED => self.listed(names),
+            count => self.phrase(SummaryPhrase::Fields { count }),
         }
     }
 
@@ -131,26 +129,26 @@ impl Say<'_> {
         match value {
             Value::Expression(expression) => self.expression(expression),
             // A column's name, or text that stands for one.
-            Value::Columns(names) => names.join(", "),
-            other => scalar(other).unwrap_or_else(|| self.word(SummaryWord::Worked)),
+            Value::Columns(names) => self.listed(names),
+            other => scalar(other).unwrap_or_else(|| self.phrase(SummaryPhrase::Worked)),
         }
     }
 
     fn expression(&self, expression: &Expression) -> String {
         if !expression.links().is_empty() {
-            return self.word(SummaryWord::Worked);
+            return self.phrase(SummaryPhrase::Worked);
         }
         match expression.start() {
-            Start::Hole => self.word(SummaryWord::Value),
+            Start::Hole => self.phrase(SummaryPhrase::Value),
             Start::Input(name) => name.clone(),
             Start::Call(start) => match start.entry().id().as_str() {
                 "polars.col" => field_alone(expression)
-                    .map_or_else(|| self.word(SummaryWord::Worked), str::to_owned),
+                    .map_or_else(|| self.phrase(SummaryPhrase::Worked), str::to_owned),
                 "polars.lit" => start
                     .argument("value")
                     .and_then(scalar)
-                    .unwrap_or_else(|| self.word(SummaryWord::Worked)),
-                _ => self.word(SummaryWord::Worked),
+                    .unwrap_or_else(|| self.phrase(SummaryPhrase::Worked)),
+                _ => self.phrase(SummaryPhrase::Worked),
             },
         }
     }
@@ -164,58 +162,54 @@ impl Say<'_> {
             _ => &[],
         };
         match (predicates.as_slice(), constraints) {
-            ([], []) => self.word(SummaryWord::Condition),
+            ([], []) => self.phrase(SummaryPhrase::Condition),
             ([only], []) => self.condition(only),
-            ([], [(name, value)]) => self.compared(&self.key(name), SummaryWord::Equal, value),
-            _ => self.words.summary(
-                SummaryWord::AllOf,
-                &[("count", &(predicates.len() + constraints.len()).to_string())],
-            ),
+            ([], [(name, value)]) => self.compared(&self.key(name), SummaryPhrase::Equal, value),
+            _ => self.phrase(SummaryPhrase::AllOf {
+                count: predicates.len() + constraints.len(),
+            }),
         }
     }
 
     /// A condition: a field compared with a value, or `…` for anything else.
     fn condition(&self, condition: &Value) -> String {
         let Value::Expression(expression) = condition else {
-            return self.word(SummaryWord::Worked);
+            return self.phrase(SummaryPhrase::Worked);
         };
         let (Some(link), 1) = (expression.links().first(), expression.links().len()) else {
-            return self.word(SummaryWord::Worked);
+            return self.phrase(SummaryPhrase::Worked);
         };
         let sign = match link.entry().id().as_str() {
-            "Expr.eq" => SummaryWord::Equal,
-            "Expr.ne" => SummaryWord::NotEqual,
-            "Expr.gt" => SummaryWord::Greater,
-            "Expr.ge" => SummaryWord::AtLeast,
-            "Expr.lt" => SummaryWord::Less,
-            "Expr.le" => SummaryWord::AtMost,
-            _ => return self.word(SummaryWord::Worked),
+            "Expr.eq" => SummaryPhrase::Equal,
+            "Expr.ne" => SummaryPhrase::NotEqual,
+            "Expr.gt" => SummaryPhrase::Greater,
+            "Expr.ge" => SummaryPhrase::AtLeast,
+            "Expr.lt" => SummaryPhrase::Less,
+            "Expr.le" => SummaryPhrase::AtMost,
+            _ => return self.phrase(SummaryPhrase::Worked),
         };
         let field = match expression.start() {
-            Start::Hole => self.word(SummaryWord::Field),
+            Start::Hole => self.phrase(SummaryPhrase::Field),
             Start::Call(start) if start.entry().id().as_str() == "polars.col" => {
                 match start.argument("name") {
-                    Some(Value::Columns(names)) if names.len() == 1 => names.join(", "),
-                    _ => return self.word(SummaryWord::Worked),
+                    Some(Value::Columns(names)) if names.len() == 1 => self.listed(names),
+                    _ => return self.phrase(SummaryPhrase::Worked),
                 }
             }
-            _ => return self.word(SummaryWord::Worked),
+            _ => return self.phrase(SummaryPhrase::Worked),
         };
         match link.argument("other") {
             Some(other) => self.compared(&field, sign, other),
-            None => self.word(SummaryWord::Worked),
+            None => self.phrase(SummaryPhrase::Worked),
         }
     }
 
-    fn compared(&self, field: &str, sign: SummaryWord, value: &Value) -> String {
-        self.words.summary(
-            SummaryWord::Compared,
-            &[
-                ("field", field),
-                ("sign", &self.word(sign)),
-                ("value", &self.key(value)),
-            ],
-        )
+    fn compared(&self, field: &str, sign: SummaryPhrase<'_>, value: &Value) -> String {
+        self.phrase(SummaryPhrase::Compared {
+            field,
+            sign: &self.phrase(sign),
+            value: &self.key(value),
+        })
     }
 
     /// The renames of a mapping: each as `from → to` when there are few, and
@@ -225,28 +219,28 @@ impl Say<'_> {
             Some(Value::Pairs(pairs)) => pairs,
             _ => &[],
         };
-        let text = |value: &Value, missing: SummaryWord| match value {
-            Value::Columns(names) if names.len() == 1 => names.join(", "),
+        let text = |value: &Value, missing: SummaryPhrase<'_>| match value {
+            Value::Columns(names) if names.len() == 1 => self.listed(names),
             Value::String(text) => text.clone(),
-            _ => self.word(missing),
+            _ => self.phrase(missing),
         };
         let from: Vec<String> = pairs
             .iter()
-            .map(|(name, _)| text(name, SummaryWord::Field))
+            .map(|(name, _)| text(name, SummaryPhrase::Field))
             .collect();
         if pairs.is_empty() || pairs.len() > RENAMES_NAMED {
             return self.fields(&from);
         }
-        pairs
+        let renamed: Vec<String> = pairs
             .iter()
             .zip(&from)
             .map(|((_, to), from)| {
-                self.words.summary(
-                    SummaryWord::Renamed,
-                    &[("from", from), ("to", &text(to, SummaryWord::Name))],
-                )
+                self.phrase(SummaryPhrase::Renamed {
+                    from,
+                    to: &text(to, SummaryPhrase::Name),
+                })
             })
-            .collect::<Vec<_>>()
-            .join(", ")
+            .collect();
+        self.listed(&renamed)
     }
 }

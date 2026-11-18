@@ -255,3 +255,20 @@ fn a_name_or_a_value_that_looks_like_a_place_is_written_as_it_is() {
     );
     assert_eq!(summary(join), "{fields} on {table}");
 }
+
+#[test]
+fn the_names_of_a_list_are_separated_as_the_language_file_says() {
+    let file = include_str!("../../src/catalog/en.toml").replacen(
+        "separator = \", \"",
+        "separator = \" + \"",
+        1,
+    );
+    let words = dageist_engine::catalog::Words::parse(&file).expect("a language file");
+    let sort = Document::read(&document(vec![step(
+        "s",
+        "LazyFrame.sort",
+        json!({ "by": many(vec![field("dcn"), field("timestamp")]) }),
+    )]))
+    .expect("a document");
+    assert_eq!(sort.steps()[0].summary(&words), "by dcn + timestamp");
+}

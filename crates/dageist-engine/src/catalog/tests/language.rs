@@ -4,7 +4,7 @@
 use std::collections::BTreeSet;
 
 use crate::catalog::{
-    Applies, Dtypes, Family, Kind, SummaryWord, Words, WordsError, english, entries,
+    Applies, Dtypes, Family, Kind, SummaryPhrase, SummaryWord, Words, WordsError, english, entries,
 };
 
 const ENGLISH: &str = include_str!("../en.toml");
@@ -313,30 +313,85 @@ fn a_language_file_with_a_fault_is_refused_with_where_it_is() {
     );
 }
 
+/// One phrase for each word, with something in every place.
+fn one_phrase_of_each() -> Vec<SummaryPhrase<'static>> {
+    vec![
+        SummaryPhrase::NoFields,
+        SummaryPhrase::Fields { count: 4 },
+        SummaryPhrase::SortedBy { fields: "a" },
+        SummaryPhrase::JoinedOn {
+            table: "t",
+            fields: "a",
+        },
+        SummaryPhrase::PivotedOn { field: "a" },
+        SummaryPhrase::Renamed { from: "a", to: "b" },
+        SummaryPhrase::Compared {
+            field: "a",
+            sign: "==",
+            value: "1",
+        },
+        SummaryPhrase::Field,
+        SummaryPhrase::Name,
+        SummaryPhrase::Value,
+        SummaryPhrase::Condition,
+        SummaryPhrase::AllOf { count: 3 },
+        SummaryPhrase::Worked,
+        SummaryPhrase::Equal,
+        SummaryPhrase::NotEqual,
+        SummaryPhrase::Greater,
+        SummaryPhrase::AtLeast,
+        SummaryPhrase::Less,
+        SummaryPhrase::AtMost,
+        SummaryPhrase::Separator,
+    ]
+}
+
 #[test]
-fn every_summary_word_has_its_template_and_a_place_is_filled() {
+fn every_summary_word_has_a_phrase_that_fills_exactly_its_places() {
     let words = english();
-    for word in SummaryWord::ALL {
-        let template = words.summary(word, &[]);
-        assert!(!template.is_empty(), "{} has no words", word.key());
-        for place in word.places() {
-            assert!(
-                template.contains(&format!("{{{place}}}")),
-                "{} lacks its place {place}",
-                word.key()
-            );
-        }
+    let phrases = one_phrase_of_each();
+    let said: BTreeSet<&str> = phrases.iter().map(|phrase| phrase.word().key()).collect();
+    let listed: BTreeSet<&str> = SummaryWord::ALL.iter().map(|word| word.key()).collect();
+    assert_eq!(said, listed, "a phrase for each word");
+    for phrase in phrases {
+        let word = phrase.word();
+        let mut filled: Vec<&str> = phrase.fill().iter().map(|(place, _)| *place).collect();
+        filled.sort_unstable();
+        let mut expected = word.places().to_vec();
+        expected.sort_unstable();
+        assert_eq!(filled, expected, "the places {} is filled at", word.key());
+        let text = words.say(phrase);
+        assert!(!text.is_empty(), "{} has no words", word.key());
+        assert!(
+            !text.contains('{'),
+            "{} has a place left: {text}",
+            word.key()
+        );
     }
     assert_eq!(
-        words.summary(
-            SummaryWord::JoinedOn,
-            &[("table", "step_sla"), ("fields", "a, b")]
-        ),
+        words.say(SummaryPhrase::JoinedOn {
+            table: "step_sla",
+            fields: "a, b"
+        }),
         "step_sla on a, b"
     );
     assert_eq!(
-        words.summary(SummaryWord::Renamed, &[("from", "a"), ("to", "b")]),
+        words.say(SummaryPhrase::Renamed { from: "a", to: "b" }),
         "a → b"
+    );
+    assert_eq!(words.say(SummaryPhrase::Separator), ", ");
+}
+
+#[test]
+fn each_place_is_filled_once_whatever_it_is_filled_with() {
+    let words = english();
+    assert_eq!(
+        words.say(SummaryPhrase::Compared {
+            field: "{value}",
+            sign: "{field}",
+            value: "{sign}",
+        }),
+        "{value} {field} {sign}"
     );
 }
 
@@ -348,7 +403,7 @@ fn a_language_file_with_a_summary_word_missing_or_in_the_wrong_place_is_refused(
         .next()
         .expect("the file has a summary");
     let words = Words::parse(without).expect("a language file");
-    assert_eq!(words.summary(SummaryWord::NoFields, &[]), "");
+    assert_eq!(words.say(SummaryPhrase::NoFields), "");
 
     let wrong_place = ENGLISH.replacen("{count} fields", "{number} fields", 1);
     assert_eq!(
