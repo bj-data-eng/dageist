@@ -1,5 +1,6 @@
-//! Generates a claims table shaped like a real workload and times the steps a
-//! live preview and a stored result depend on. Run it optimised:
+//! Generates a claims table shaped like a real workload, unless the directory
+//! already holds one, and times the steps a live preview and a stored result
+//! depend on, with blocks of the size the grid asks for. Run it optimised:
 //!
 //! ```sh
 //! cargo run --release -p dageist-engine --example measure -- tmp/sample-claims
@@ -9,32 +10,39 @@ use std::env;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use dageist_engine::{EngineError, ParquetTable, SampleSpec, Table, generate_claims};
+use dageist_engine::{
+    EngineError, ParquetTable, SampleSpec, Table, claims_generated, generate_claims,
+};
 
 const KEYS: u32 = 200_000;
 const FILLER_COLUMNS: u16 = 292;
 const WINDOW_KEYS: u32 = 500;
-const VISIBLE_ROWS: usize = 60;
-const VISIBLE_COLUMNS: usize = 14;
+/// The rows and columns of a block the grid asks for: the visible area and its overscan.
+const VISIBLE_ROWS: usize = 140;
+const VISIBLE_COLUMNS: usize = 17;
 
 fn main() -> Result<(), EngineError> {
     let directory = env::args()
         .nth(1)
         .map_or_else(|| PathBuf::from("tmp/sample-claims"), PathBuf::from);
 
-    let started = Instant::now();
-    let files = generate_claims(
-        &directory,
-        SampleSpec {
-            keys: KEYS,
-            filler_columns: FILLER_COLUMNS,
-        },
-    )?;
-    println!(
-        "generated {} files in {:.1?}",
-        files.len(),
-        started.elapsed()
-    );
+    if claims_generated(&directory) {
+        println!("using the table in {}", directory.display());
+    } else {
+        let started = Instant::now();
+        let files = generate_claims(
+            &directory,
+            SampleSpec {
+                keys: KEYS,
+                filler_columns: FILLER_COLUMNS,
+            },
+        )?;
+        println!(
+            "generated {} files in {:.1?}",
+            files.len(),
+            started.elapsed()
+        );
+    }
 
     let started = Instant::now();
     let table = Table::load_keys(&directory, "dcn", WINDOW_KEYS)?;
