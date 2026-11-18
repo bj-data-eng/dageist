@@ -60,6 +60,20 @@ const testComparing = (comparison: unknown): unknown => ({
   value: { kind: 'unset' },
 });
 
+/** A chain that starts from a `when` whose test compares with `comparison`. */
+const chainOf = (comparison: unknown): unknown => ({
+  kind: 'chain',
+  id: 'c',
+  chain: {
+    source: {
+      kind: 'when',
+      arms: [{ id: 'a', condition: testComparing(comparison), returns: { kind: 'unset' } }],
+      otherwise: { kind: 'unset' },
+    },
+    methods: [],
+  },
+});
+
 describe('the comparison a window sends another', () => {
   it('is an entry the catalogue lists as a comparison, or is_in', () => {
     expect(holdsCondition(testComparing('Expr.eq'))).toBe(true);
@@ -78,18 +92,6 @@ describe('the comparison a window sends another', () => {
   });
 
   it('is checked wherever a condition stands, inside a chain too', () => {
-    const chainOf = (comparison: unknown): unknown => ({
-      kind: 'chain',
-      id: 'c',
-      chain: {
-        source: {
-          kind: 'when',
-          arms: [{ id: 'a', condition: testComparing(comparison), returns: { kind: 'unset' } }],
-          otherwise: { kind: 'unset' },
-        },
-        methods: [],
-      },
-    });
     expect(holdsValue(chainOf('Expr.gt'))).toBe(true);
     expect(holdsValue(chainOf('=='))).toBe(false);
     expect(holdsSetting({ kind: 'expression', value: chainOf('Expr.nothing') })).toBe(false);

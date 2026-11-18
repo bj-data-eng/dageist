@@ -10,18 +10,26 @@
 import type { CatalogueView, EntryView, ParameterView, PositionView } from '@dageist/host';
 
 import { assertNever } from './frame';
+import type { Comparison } from './source';
+import { IS_IN, asComparison } from './source';
 
 /** The catalogue as the editor reads it. */
 export interface Catalogue {
   readonly view: CatalogueView;
   readonly entries: ReadonlyMap<string, EntryView>;
+  /** The entries that compare, which a test may hold: those the engine lists that the catalogue has. */
+  readonly comparisons: ReadonlySet<string>;
 }
 
 /** Indexes `view` by entry identifier. */
 export function indexCatalogue(view: CatalogueView): Catalogue {
+  const entries = new Map(view.entries.map((entry) => [entry.id, entry]));
   return {
     view,
-    entries: new Map(view.entries.map((entry) => [entry.id, entry])),
+    entries,
+    comparisons: new Set(
+      view.comparisons.flatMap(({ entry }) => (entries.has(entry) ? [entry] : [])),
+    ),
   };
 }
 
@@ -37,8 +45,8 @@ export function methodNameOf(id: string): string | null {
 
 /** One comparison a test can make, as the engine words it. */
 export interface ComparisonOption {
-  /** The entry that compares, which a test holds. */
-  readonly entry: string;
+  /** The comparison a test holds. */
+  readonly entry: Comparison;
   /** The sign the engine writes it with, such as `≥`. */
   readonly sign: string;
   /** What it means, in the entry's own words, such as `at least`. */
@@ -46,19 +54,39 @@ export interface ComparisonOption {
 }
 
 /**
- * Returns the comparisons a test can make, in the order the engine lists them, each with its sign
- * and what it means, both the engine's. A comparison whose entry the catalogue lacks is left out.
+ * The comparison that tests membership in a list. The engine has no entry for it yet, so it has no
+ * sign or meaning of its own to give: it is shown as its own name until it has.
+ */
+const MEMBERSHIP: ComparisonOption = { entry: IS_IN, sign: IS_IN, hint: 'one of a list' };
+
+/**
+ * Returns the comparisons the engine lists, in the order it lists them, each with its sign and what
+ * it means, both the engine's. A comparison whose entry the catalogue lacks is left out.
  */
 export function comparisonOptions(catalogue: Catalogue): readonly ComparisonOption[] {
   return catalogue.view.comparisons.flatMap(({ entry, sign }) => {
     const found = catalogue.entries.get(entry);
-    return found === undefined ? [] : [{ entry, sign, hint: found.hint }];
+    const comparison = asComparison(entry, catalogue.comparisons);
+    return found === undefined || comparison === null
+      ? []
+      : [{ entry: comparison, sign, hint: found.hint }];
   });
 }
 
-/** Returns the sign the engine writes the comparison `entry` with, or `null` where it is none. */
-export function signOf(catalogue: Catalogue, entry: string): string | null {
-  return catalogue.view.comparisons.find((comparison) => comparison.entry === entry)?.sign ?? null;
+/** Returns the comparisons a test can be changed to: those the engine lists, then membership in a list. */
+export function comparisonChoices(catalogue: Catalogue): readonly ComparisonOption[] {
+  return [...comparisonOptions(catalogue), MEMBERSHIP];
+}
+
+/**
+ * Returns the option a test that holds `comparison` shows: its sign and what it means.
+ *
+ * @throws {Error} When the catalogue does not list it, which a test never holds.
+ */
+export function comparisonOption(catalogue: Catalogue, comparison: Comparison): ComparisonOption {
+  const found = comparisonChoices(catalogue).find((option) => option.entry === comparison);
+  if (found === undefined) throw new Error(`The catalogue lists no comparison ${comparison}.`);
+  return found;
 }
 
 /** The identifier the catalogue gives the step verb `verb`, such as `LazyFrame.filter`. */

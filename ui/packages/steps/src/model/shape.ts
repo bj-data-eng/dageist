@@ -7,6 +7,10 @@
 
 import type { Options, PairSetting, Setting } from './settings';
 import type { Arm, Chain, Condition, Source, Value } from './source';
+import { asComparison } from './source';
+
+/** The entries the catalogue lists as comparisons, which a test may hold, besides membership in a list. */
+export type Comparisons = ReadonlySet<string>;
 
 /** Reports whether `value` is an object with named parts: not null, and not a list. */
 export function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -32,17 +36,17 @@ function isTyped(value: Readonly<Record<string, unknown>>): boolean {
   );
 }
 
-function isPairSetting(value: unknown): value is PairSetting {
+function isPairSetting(value: unknown, comparisons: Comparisons): value is PairSetting {
   return (
     isRecord(value) &&
     typeof value.id === 'string' &&
-    isSetting(value.key) &&
-    isSetting(value.value)
+    isSetting(value.key, comparisons) &&
+    isSetting(value.value, comparisons)
   );
 }
 
 /** Reports whether `value` is one parameter's setting, and everything inside it is. */
-export function isSetting(value: unknown): value is Setting {
+export function isSetting(value: unknown, comparisons: Comparisons): value is Setting {
   if (!isRecord(value)) return false;
   switch (value.kind) {
     case 'unset':
@@ -56,25 +60,30 @@ export function isSetting(value: unknown): value is Setting {
     case 'word':
       return typeof value.value === 'string';
     case 'expression':
-      return isValue(value.value);
+      return isValue(value.value, comparisons);
     case 'list':
-      return everyItem(value.items, isSetting);
+      return everyItem(value.items, (item) => isSetting(item, comparisons));
     case 'pairs':
-      return everyItem(value.entries, isPairSetting);
+      return everyItem(value.entries, (entry) => isPairSetting(entry, comparisons));
     case 'each':
-      return isRecord(value.items) && Object.values(value.items).every((item) => isSetting(item));
+      return (
+        isRecord(value.items) &&
+        Object.values(value.items).every((item) => isSetting(item, comparisons))
+      );
     default:
       return false;
   }
 }
 
 /** Reports whether `value` is the parameters a step or method is set with, each of them a setting. */
-export function isOptions(value: unknown): value is Options {
-  return isRecord(value) && Object.values(value).every((setting) => isSetting(setting));
+export function isOptions(value: unknown, comparisons: Comparisons): value is Options {
+  return (
+    isRecord(value) && Object.values(value).every((setting) => isSetting(setting, comparisons))
+  );
 }
 
 /** Reports whether `value` is a value of a chain or a condition, and everything inside it is. */
-export function isValue(value: unknown): value is Value {
+export function isValue(value: unknown, comparisons: Comparisons): value is Value {
   if (!isRecord(value)) return false;
   switch (value.kind) {
     case 'column':
@@ -82,7 +91,7 @@ export function isValue(value: unknown): value is Value {
     case 'literal':
       return value.value === null || isTyped(value);
     case 'chain':
-      return typeof value.id === 'string' && isChain(value.chain);
+      return typeof value.id === 'string' && isChain(value.chain, comparisons);
     case 'input':
       return typeof value.name === 'string';
     case 'unset':
@@ -92,22 +101,25 @@ export function isValue(value: unknown): value is Value {
   }
 }
 
-function isArm(value: unknown): value is Arm {
+function isArm(value: unknown, comparisons: Comparisons): value is Arm {
   return (
     isRecord(value) &&
     typeof value.id === 'string' &&
-    isCondition(value.condition) &&
-    isValue(value.returns)
+    isCondition(value.condition, comparisons) &&
+    isValue(value.returns, comparisons)
   );
 }
 
-function isSource(value: unknown): value is Source {
+function isSource(value: unknown, comparisons: Comparisons): value is Source {
   if (!isRecord(value)) return false;
   switch (value.kind) {
     case 'column':
       return typeof value.column === 'string';
     case 'when':
-      return everyItem(value.arms, isArm) && isValue(value.otherwise);
+      return (
+        everyItem(value.arms, (arm) => isArm(arm, comparisons)) &&
+        isValue(value.otherwise, comparisons)
+      );
     case 'element':
       return true;
     case 'input':
@@ -118,35 +130,43 @@ function isSource(value: unknown): value is Source {
 }
 
 /** Reports whether `value` is a condition, and everything inside it is. */
-export function isCondition(value: unknown): value is Condition {
+export function isCondition(value: unknown, comparisons: Comparisons): value is Condition {
   if (!isRecord(value) || typeof value.id !== 'string') return false;
   switch (value.kind) {
     case 'test':
       return (
         typeof value.column === 'string' &&
         typeof value.comparison === 'string' &&
-        isValue(value.value)
+        asComparison(value.comparison, comparisons) !== null &&
+        isValue(value.value, comparisons)
       );
     case 'group':
-      return typeof value.every === 'boolean' && everyItem(value.items, isCondition);
+      return (
+        typeof value.every === 'boolean' &&
+        everyItem(value.items, (item) => isCondition(item, comparisons))
+      );
     case 'chain':
-      return isChain(value.chain);
+      return isChain(value.chain, comparisons);
     default:
       return false;
   }
 }
 
-function isMethod(value: unknown): boolean {
+function isMethod(value: unknown, comparisons: Comparisons): boolean {
   return (
     isRecord(value) &&
     typeof value.id === 'string' &&
     typeof value.name === 'string' &&
-    (value.argument === null || isValue(value.argument)) &&
-    isOptions(value.options)
+    (value.argument === null || isValue(value.argument, comparisons)) &&
+    isOptions(value.options, comparisons)
   );
 }
 
 /** Reports whether `value` is a chain, with the options of every method in it. */
-export function isChain(value: unknown): value is Chain {
-  return isRecord(value) && isSource(value.source) && everyItem(value.methods, isMethod);
+export function isChain(value: unknown, comparisons: Comparisons): value is Chain {
+  return (
+    isRecord(value) &&
+    isSource(value.source, comparisons) &&
+    everyItem(value.methods, (method) => isMethod(method, comparisons))
+  );
 }

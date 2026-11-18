@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { Panel, cx } from '@dageist/design';
 import type { Host } from '@dageist/host';
 
-import { EngineProvider } from './EngineProvider';
+import { EngineProvider, useCatalogue } from './EngineProvider';
 import { moved } from './Chain';
 import { useRows, useRun } from './engine';
 import { Pipeline } from './Pipeline';
@@ -65,7 +65,11 @@ export function StepsWorkspace({ host, styleNonce }: StepsWorkspaceProps): React
 }
 
 function Transform({ host, styleNonce }: StepsWorkspaceProps): React.JSX.Element {
-  const { steps, selectedId, stepsOpen, change } = useSharedSteps(host, 'main');
+  const { steps, selectedId, stepsOpen, change } = useSharedSteps(
+    host,
+    'main',
+    useCatalogue().comparisons,
+  );
   const [centre, setCentre] = useState<Centre>('rows');
   const run = useRun(host, steps);
   const rows = useRows(host, run, selectedId);

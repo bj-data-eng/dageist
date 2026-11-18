@@ -8,7 +8,8 @@
 
 import { nextId } from './model/ids';
 import { NO_OPTIONS, expressionSetting } from './model/settings';
-import type { Chain, Value } from './model/source';
+import type { Chain, Comparison, Value } from './model/source';
+import { asComparison } from './model/source';
 import type { Step } from './model/steps';
 import { elementChain, fieldKeys } from './model/steps';
 
@@ -30,6 +31,16 @@ function methodOf(name: string, argument: Value): Chain['methods'][number] {
 }
 
 const column = (name: string): Value => ({ kind: 'column', column: name });
+
+/** The entries the sample compares with: those of the engine's claim-timing document. */
+const SAMPLE_COMPARISONS: ReadonlySet<string> = new Set(['Expr.eq', 'Expr.le', 'Expr.gt']);
+
+/** Returns the comparison the sample makes with `entry`. */
+function comparing(entry: string): Comparison {
+  const comparison = asComparison(entry, SAMPLE_COMPARISONS);
+  if (comparison === null) throw new Error(`The sample does not compare with ${entry}.`);
+  return comparison;
+}
 
 /** Sort, then added columns; later ones build on columns earlier steps add. */
 export const START: readonly Step[] = [
@@ -105,7 +116,7 @@ export const START: readonly Step[] = [
               kind: 'test',
               id: nextId('test'),
               column: 'owner',
-              comparison: 'Expr.eq',
+              comparison: comparing('Expr.eq'),
               value: { kind: 'literal', value: 'Company A', shown: 'Company A' },
             },
             returns: column('row_days'),
@@ -142,7 +153,7 @@ export const START: readonly Step[] = [
               kind: 'test',
               id: nextId('test'),
               column: 'row_days',
-              comparison: 'Expr.le',
+              comparison: comparing('Expr.le'),
               value: column('sla_days'),
             },
             returns: { kind: 'literal', value: 'within', shown: 'within' },
@@ -189,7 +200,7 @@ export const START: readonly Step[] = [
                     kind: 'test',
                     id: nextId('test'),
                     column: 'row_days',
-                    comparison: 'Expr.gt',
+                    comparison: comparing('Expr.gt'),
                     value: { kind: 'input', name: 'sla_cutoff' },
                   },
                   returns: { kind: 'literal', value: 'over', shown: 'over' },

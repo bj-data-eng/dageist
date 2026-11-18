@@ -67,7 +67,7 @@ export function StepList({
   const endList = useListState();
   const endStarts = useStepStarts(endList.open, results.at(-1)?.after ?? node.source.columns, node);
   const addStep = (verb: Verb, start: StepStartView, after: number): void => {
-    const added = startedStep(verb, start);
+    const added = startedStep(verb, start, catalogue.comparisons);
     onChange([...steps.slice(0, after + 1), added, ...steps.slice(after + 1)], added.id);
     // What is gone to first: the field of a new filter's comparison, or the step itself.
     setFreshId(added.verb === 'filter' ? added.condition.id : added.id);

@@ -13,6 +13,7 @@ import { nextId } from './ids';
 import type { Setting } from './settings';
 import { NO_OPTIONS, UNSET, expressionSetting } from './settings';
 import type { Condition, Value } from './source';
+import { asComparison } from './source';
 import type { Options } from './settings';
 import type { Step, Verb } from './steps';
 import { elementChain } from './steps';
@@ -153,17 +154,25 @@ function columnOf(view: SettingView): string {
 /**
  * Returns the condition a filter starts with, from the comparison the engine says it starts with:
  * the field it reads and what it is compared with, as the editor draws a test. The comparison is
- * the entry the engine names; its sign is the engine's to give.
+ * the entry the engine names, which must be one the catalogue lists as a comparison; its sign is
+ * the engine's to give.
  *
  * @throws {UnrepresentableSetting} When it is not a comparison.
+ * @throws {Error} When the entry is not one the catalogue lists as a comparison.
  */
-function startedTest(view: SettingView): Condition {
+function startedTest(view: SettingView, comparisons: ReadonlySet<string>): Condition {
   if (view.kind !== 'comparison') throw new UnrepresentableSetting('a filter', view);
+  const comparison = asComparison(view.entry, comparisons);
+  if (comparison === null) {
+    throw new Error(
+      `The engine started a filter with ${view.entry}, which the catalogue does not list as a comparison.`,
+    );
+  }
   return {
     kind: 'test',
     id: nextId('test'),
     column: columnOf(view.field),
-    comparison: view.entry,
+    comparison,
     value: valueOf(view.other, 'a filter'),
   };
 }
@@ -179,8 +188,13 @@ export function startsByEntry(view: StepStartsView): StepStarts {
 /**
  * Returns a new step of `verb`, built from what the engine says its entry starts with on the
  * table it is added to. What the engine leaves to be given is still to be picked in the step.
+ * `comparisons` are the entries the catalogue lists as comparisons, which a filter may start with.
  */
-export function startedStep(verb: Verb, start: StepStartView): Step {
+export function startedStep(
+  verb: Verb,
+  start: StepStartView,
+  comparisons: ReadonlySet<string>,
+): Step {
   const id = nextId('step');
   const options = startedOptions(verb, start);
   switch (verb) {
@@ -201,7 +215,7 @@ export function startedStep(verb: Verb, start: StepStartView): Step {
       if (first === undefined) {
         throw new Error('The engine gave a filter no condition to start with.');
       }
-      return { id, verb, condition: startedTest(first), options };
+      return { id, verb, condition: startedTest(first, comparisons), options };
     }
     case 'sort':
     case 'select':

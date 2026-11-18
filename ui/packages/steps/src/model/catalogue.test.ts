@@ -3,7 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { decodeCatalogue } from '@dageist/host';
 
 import catalogueFixture from '../../../host/fixtures/catalogue.json';
-import { comparisonOptions, indexCatalogue, signOf } from './catalogue';
+import {
+  comparisonChoices,
+  comparisonOption,
+  comparisonOptions,
+  indexCatalogue,
+} from './catalogue';
+import { IS_IN, asComparison } from './source';
 
 // The catalogue as the host wrote it, with the signs of the language file.
 const catalogue = indexCatalogue(decodeCatalogue(catalogueFixture));
@@ -20,11 +26,40 @@ describe('the comparisons of a test', () => {
     ]);
   });
 
-  it('are found by the entry that compares, which is how a test holds one', () => {
-    expect(signOf(catalogue, 'Expr.ge')).toBe('≥');
-    expect(signOf(catalogue, 'Expr.ne')).toBe('≠');
-    // An entry that does not compare, and one the catalogue lacks, have no sign.
-    expect(signOf(catalogue, 'Expr.shift')).toBeNull();
-    expect(signOf(catalogue, 'Expr.nothing')).toBeNull();
+  it('are the entries the catalogue lists, which a test may hold besides membership in a list', () => {
+    expect([...catalogue.comparisons]).toEqual([
+      'Expr.eq',
+      'Expr.ne',
+      'Expr.gt',
+      'Expr.ge',
+      'Expr.lt',
+      'Expr.le',
+    ]);
+    expect(asComparison('Expr.ge', catalogue.comparisons)).toBe('Expr.ge');
+    expect(asComparison(IS_IN, catalogue.comparisons)).toBe(IS_IN);
+    // `>=` is how Python spells it, and `Expr.shift` is an entry that does not compare.
+    expect(asComparison('>=', catalogue.comparisons)).toBeNull();
+    expect(asComparison('Expr.shift', catalogue.comparisons)).toBeNull();
+    expect(asComparison('', catalogue.comparisons)).toBeNull();
+  });
+
+  it('are shown by the sign and meaning of the entry that compares, and membership by its own name', () => {
+    const ge = asComparison('Expr.ge', catalogue.comparisons);
+    if (ge === null) throw new Error('Expr.ge compares');
+    expect(comparisonOption(catalogue, ge)).toEqual({ entry: ge, sign: '≥', hint: 'at least' });
+    expect(comparisonChoices(catalogue).map((choice) => choice.sign)).toEqual([
+      '==',
+      '≠',
+      '>',
+      '≥',
+      '<',
+      '≤',
+      'is_in',
+    ]);
+    expect(comparisonOption(catalogue, IS_IN)).toEqual({
+      entry: IS_IN,
+      sign: 'is_in',
+      hint: 'one of a list',
+    });
   });
 });

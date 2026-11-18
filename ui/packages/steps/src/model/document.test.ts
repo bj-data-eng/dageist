@@ -13,6 +13,7 @@ import { placeKey, translate, wrongId } from './document';
 import type { Options } from './settings';
 import { NO_OPTIONS } from './settings';
 import type { Condition, Value } from './source';
+import { asComparison } from './source';
 import type { Step } from './steps';
 import { fieldKeys } from './steps';
 
@@ -64,13 +65,12 @@ function filtering(condition: Condition): Step {
   return { id: 'keep', verb: 'filter', condition, options: NO_OPTIONS };
 }
 
-const test = (id: string, column: string, comparison: string, value: Value): Condition => ({
-  kind: 'test',
-  id,
-  column,
-  comparison,
-  value,
-});
+/** A test of `column` that compares with the entry `comparison`, which the catalogue lists, or with membership. */
+const test = (id: string, column: string, comparison: string, value: Value): Condition => {
+  const compares = asComparison(comparison, catalogue.comparisons);
+  if (compares === null) throw new Error(`The catalogue lists no comparison ${comparison}.`);
+  return { kind: 'test', id, column, comparison: compares, value };
+};
 
 describe('the steps the editor opens with', () => {
   it('are written as the same document as the engine’s claim-timing sample', () => {

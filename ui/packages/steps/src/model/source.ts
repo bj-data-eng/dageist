@@ -61,15 +61,31 @@ export interface UnsetValue {
 /** A value a condition compares with or returns. */
 export type Value = ColumnValue | LiteralValue | ChainValue | InputValue | UnsetValue;
 
-/**
- * What a test compares with: the identifier of the catalogue entry that compares, such as
- * `Expr.eq`, whose sign and meaning the engine gives, or `IS_IN`, which tests membership in a list
- * and which the catalogue has no entry for yet.
- */
-export type Comparison = string;
+declare const COMPARISON: unique symbol;
 
-/** The comparison that tests membership in a list. The catalogue has no entry for it yet. */
-export const IS_IN: Comparison = 'is_in';
+/**
+ * What a test compares with: the identifier of an entry the catalogue lists as a comparison, such
+ * as `Expr.eq`, whose sign and meaning the engine gives, or `IS_IN`, which tests membership in a
+ * list and which the catalogue has no entry for yet. Only those are comparisons: a text is made
+ * one by `asComparison`, which checks it against what the catalogue lists.
+ */
+export type Comparison = string & { readonly [COMPARISON]: true };
+
+/**
+ * The comparison that tests membership in a list. The catalogue has no entry for it yet.
+ */
+// The text is the comparison; the assertion only marks it as the one that was checked.
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion
+export const IS_IN = 'is_in' as Comparison;
+
+/**
+ * Returns `text` as a comparison when it is `IS_IN` or one of the entries in `listed`, which are
+ * the entries the catalogue lists as comparisons, and `null` when it is not one.
+ */
+export function asComparison(text: string, listed: ReadonlySet<string>): Comparison | null {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+  return text === IS_IN || listed.has(text) ? (text as Comparison) : null;
+}
 
 /** One test: `pl.col(column) <comparison> value`. */
 export interface Test {

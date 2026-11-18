@@ -494,7 +494,9 @@ The comparisons a test makes are the catalogue's entries `Expr.eq`, `Expr.ne`,
 `Expr.gt`, `Expr.ge`, `Expr.lt` and `Expr.le`, which the engine lists in the order
 they are offered in the catalogue's `comparisons`, each with the sign the
 language file gives it, the same sign a summary is written with. A test in the
-editor holds the entry that compares. Its sign and what it means, which is the
+editor holds the entry that compares, one the catalogue lists as a comparison and
+checked as one wherever it is received, and a new test starts from the first the
+engine lists. A comparison's sign and what it means, which is the
 entry's hint, are the engine's. Membership in a list, `is_in`, has no entry yet,
 so the editor shows it as its own name.
 
@@ -1065,9 +1067,9 @@ engine. The decisions below are the ones the core is expected to carry.
   two signs side by side are never drawn as one: `==` is two equals signs.
   In a step and in the list of steps, a comparison that has a sign of its
   own is written as it: `≠`, `≥` and `≤`, each one character wide. The
-  Polars text of a step keeps `!=`, `>=` and `<=`. The signs are the
-  engine's, from the language file, so the editor and the list of steps write
-  them the same.
+  Polars text of a step writes the method, such as `.ne(`, `.ge(` and `.le(`,
+  and no operator. The signs are the engine's, from the language file, so the
+  editor and the list of steps write them the same.
 - **Conditions.** A comparison is a field, a comparison and a value. A
   condition is always a list of lines under `all of` or `any of`, even when
   it has one line, and a group is a list set in again. Nothing depends on
