@@ -250,21 +250,30 @@ impl From<TypedRequest> for Typed {
     }
 }
 
-/// A number or text that a call is given.
+/// A number or text that a call is given, with the words the engine shows it as: what the view
+/// puts in a block, since the view words no value of its own.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 enum LiteralView {
-    Integer { value: i64 },
-    Float { value: f64 },
-    Text { value: String },
+    Integer { value: i64, shown: String },
+    Float { value: f64, shown: String },
+    Text { value: String, shown: String },
 }
 
 fn literal_view(literal: &Literal) -> LiteralView {
+    let shown = literal.shown();
     match literal {
-        Literal::Integer(value) => LiteralView::Integer { value: *value },
-        Literal::Float(value) => LiteralView::Float { value: *value },
+        Literal::Integer(value) => LiteralView::Integer {
+            value: *value,
+            shown,
+        },
+        Literal::Float(value) => LiteralView::Float {
+            value: *value,
+            shown,
+        },
         Literal::String(value) => LiteralView::Text {
             value: value.clone(),
+            shown,
         },
     }
 }
