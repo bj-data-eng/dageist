@@ -426,20 +426,33 @@ fn an_amount_that_does_not_fit_in_nanoseconds_is_no_duration_whatever_the_build(
             "{text}"
         );
     }
-    // Months are counted, not timed: a quarter is 3 and a year 12 of them, and what an i64 of
-    // months cannot count is refused.
-    for text in [
-        "9223372036854775807mo",
-        "3074457345618258602q",
-        "768614336404564650y",
-    ] {
+    // Months have no length of their own: Polars counts one as 28 days where it adds a duration
+    // up, and as 31 days and an hour where it bounds one, and the whole of either must fit an
+    // i64 of nanoseconds. The larger count binds, so the most months a duration holds is an i64
+    // divided by 745 hours. A quarter is 3 months and a year 12.
+    let months = i64::MAX / (745 * hour);
+    assert_eq!(months, 3_438);
+    for text in ["3438mo", "1146q", "286y", "1mo", "0mo"] {
         assert_eq!(read(text), [kept(text)], "{text}");
     }
     for text in [
-        "9223372036854775808mo",
-        "3074457345618258603q",
-        "768614336404564651y",
+        "3439mo",
+        "1147q",
+        "287y",
+        "10000y",
+        "9223372036854775807mo",
+        "768614336404564650y",
     ] {
+        assert!(
+            matches!(read(text).as_slice(), [Err(Unread::NotADuration(_))]),
+            "{text}"
+        );
+    }
+    // The rest of the duration is added to the months in both counts. After 3438 months an i64
+    // has 2_656_036_854_775_807 nanoseconds left, which 29 days bound as 25 hours and a
+    // nanosecond each fit and 30 do not, though 30 days of 24 hours would.
+    assert_eq!(read("3438mo29d"), [kept("3438mo29d")]);
+    for text in ["3438mo30d", "3438mo5w", "3438mo740h"] {
         assert!(
             matches!(read(text).as_slice(), [Err(Unread::NotADuration(_))]),
             "{text}"
