@@ -206,6 +206,7 @@ impl dageist_engine::allowed::OptionOffer
 pub fn dageist_engine::allowed::OptionOffer::default_word(&self) -> core::option::Option<&str>
 pub const fn dageist_engine::allowed::OptionOffer::parameter(&self) -> &'static str
 pub fn dageist_engine::allowed::OptionOffer::starter(&self) -> core::option::Option<&str>
+pub fn dageist_engine::allowed::OptionOffer::stuck(&self) -> core::option::Option<dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::OptionOffer::words(&self) -> &[dageist_engine::allowed::OptionWord]
 pub struct dageist_engine::allowed::OptionWord
 impl dageist_engine::allowed::OptionWord
@@ -390,6 +391,10 @@ pub dageist_engine::catalog::Role::Filler
 pub dageist_engine::catalog::Role::Operand
 pub dageist_engine::catalog::Role::Plain
 pub enum dageist_engine::catalog::Setting
+pub dageist_engine::catalog::Setting::Comparison
+pub dageist_engine::catalog::Setting::Comparison::entry: &'static str
+pub dageist_engine::catalog::Setting::Comparison::field: alloc::boxed::Box<dageist_engine::catalog::Setting>
+pub dageist_engine::catalog::Setting::Comparison::other: alloc::boxed::Box<dageist_engine::catalog::Setting>
 pub dageist_engine::catalog::Setting::Element(&'static str)
 pub dageist_engine::catalog::Setting::Field(alloc::string::String)
 pub dageist_engine::catalog::Setting::Flag(bool)
@@ -398,7 +403,7 @@ pub dageist_engine::catalog::Setting::Integer(i64)
 pub dageist_engine::catalog::Setting::List(alloc::vec::Vec<dageist_engine::catalog::Setting>)
 pub dageist_engine::catalog::Setting::Pairs(alloc::vec::Vec<(dageist_engine::catalog::Setting, dageist_engine::catalog::Setting)>)
 pub dageist_engine::catalog::Setting::Text(alloc::string::String)
-pub dageist_engine::catalog::Setting::Unset
+pub dageist_engine::catalog::Setting::ToGive
 pub dageist_engine::catalog::Setting::Word(alloc::string::String)
 pub enum dageist_engine::catalog::Shape
 pub dageist_engine::catalog::Shape::Many
@@ -750,14 +755,14 @@ pub dageist_engine::document::Value::Pairs(alloc::vec::Vec<(dageist_engine::docu
 pub dageist_engine::document::Value::Path(alloc::string::String)
 pub dageist_engine::document::Value::String(alloc::string::String)
 pub dageist_engine::document::Value::Table(alloc::string::String)
-impl dageist_engine::document::Value
-pub fn dageist_engine::document::Value::is_default_of(&self, parameter: &dageist_engine::catalog::Parameter) -> bool
 pub struct dageist_engine::document::Call
 impl dageist_engine::document::Call
 pub fn dageist_engine::document::Call::argument(&self, parameter: &str) -> core::option::Option<&dageist_engine::document::Value>
 pub fn dageist_engine::document::Call::arguments(&self) -> &[dageist_engine::document::Given]
 pub const fn dageist_engine::document::Call::entry(&self) -> &'static dageist_engine::catalog::Entry
 pub fn dageist_engine::document::Call::new<'a>(entry: &'static dageist_engine::catalog::Entry, arguments: impl core::iter::traits::collect::IntoIterator<Item = (&'a str, dageist_engine::document::Value)>) -> core::result::Result<Self, dageist_engine::document::Refusal>
+impl dageist_engine::document::Call
+pub fn dageist_engine::document::Call::is_default(&self, parameter: &str) -> bool
 impl core::cmp::PartialEq for dageist_engine::document::Call
 pub fn dageist_engine::document::Call::eq(&self, other: &Self) -> bool
 pub struct dageist_engine::document::ColumnChange
