@@ -565,3 +565,27 @@ fn an_input_used_as_one_kind_by_a_step_and_as_another_by_a_later_step_is_marked(
         1
     );
 }
+
+#[test]
+fn a_connected_value_whose_dtype_cannot_be_written_is_marked_not_written_without_it() {
+    // Binary is not a dtype a document or the source can name, so the value would be written
+    // with no dtype, which Python types as it likes.
+    let mut inputs = Inputs::new();
+    inputs
+        .add_value(
+            "blob",
+            Scalar::new(DataType::Binary, AnyValue::BinaryOwned(vec![1, 2])),
+        )
+        .expect("a value");
+    let document = read(vec![step(
+        "s",
+        "LazyFrame.with_columns",
+        json!({ "named_exprs": named(vec![("x", chain(json!({ "input": "blob" }), vec![]))]) }),
+    )]);
+    let source = document.source("data", &inputs);
+    assert!(
+        !source.not_runnable().is_empty(),
+        "the module says it runs: {}",
+        source.text()
+    );
+}
