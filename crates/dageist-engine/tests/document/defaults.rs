@@ -8,7 +8,7 @@ use dageist_engine::document::{Document, Inputs, Place, Segment, Value};
 use polars::prelude::*;
 use serde_json::{Value as Json, json};
 
-use crate::support::{call, document, field, field_then, many, named, step, whole};
+use crate::support::{call, chain, document, field, field_then, many, named, step, whole};
 
 fn parameter(entry: &str, name: &str) -> &'static Parameter {
     catalog::entry(entry)
@@ -190,6 +190,67 @@ fn the_calls_inside_an_expression_name_theirs_at_the_place_of_their_link() {
             "named_exprs/value 0/link 1/descending"
         ]
     );
+}
+
+#[test]
+fn a_list_for_each_item_is_at_the_default_only_when_it_has_one_value_for_each_item() {
+    // `sort(by=[a, b], descending=[False])` and `descending=[]` are refused, by Python Polars as
+    // by the engine, for a list of another length than the keys: they are not the default.
+    let sort = |by: Vec<Json>, more_by: Option<Vec<Json>>, descending: Json| {
+        let mut arguments = json!({ "by": many(by), "descending": descending });
+        if let Some(more) = more_by {
+            arguments["more_by"] = many(more);
+        }
+        defaulted(vec![step("s", "LazyFrame.sort", arguments)])
+    };
+    let keys = || vec![field("a"), field("b")];
+    assert_eq!(
+        sort(keys(), None, many(vec![flag(false), flag(false)])),
+        ["descending"]
+    );
+    assert!(sort(keys(), None, many(vec![flag(false)])).is_empty());
+    assert!(sort(keys(), None, many(Vec::new())).is_empty());
+    assert!(sort(keys(), None, many(vec![flag(false); 3])).is_empty());
+    // The keys are `by` and the items of `more_by` together.
+    assert_eq!(
+        sort(
+            vec![field("a")],
+            Some(vec![field("b")]),
+            many(vec![flag(false), flag(false)])
+        ),
+        ["descending"]
+    );
+    assert!(
+        sort(
+            vec![field("a")],
+            Some(vec![field("b")]),
+            many(vec![flag(false)])
+        )
+        .is_empty()
+    );
+}
+
+#[test]
+fn a_number_is_the_default_of_an_expression_only_as_the_count_it_is_the_default_of() {
+    // `shift(n=1)` counts rows: a whole number is that count. A number with a fraction, a
+    // text and a number given to any other parameter are not what it holds by default.
+    let shifted = |n: Json| {
+        defaulted(vec![step(
+            "s",
+            "LazyFrame.with_columns",
+            json!({ "named_exprs": named(vec![(
+                "x",
+                field_then("a", vec![call("Expr.shift", json!({ "n": n }))]),
+            )]) }),
+        )])
+    };
+    let float = chain(
+        call("polars.lit", json!({ "value": { "float": 1.0 } })),
+        Vec::new(),
+    );
+    assert_eq!(shifted(whole(1)), ["named_exprs/value 0/link 0/n"]);
+    assert!(shifted(float).is_empty());
+    assert!(shifted(whole(2)).is_empty());
 }
 
 #[test]

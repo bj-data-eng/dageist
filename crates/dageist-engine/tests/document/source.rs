@@ -289,6 +289,31 @@ fn an_argument_given_by_name_at_its_default_is_left_out_as_python_leaves_it_out(
 }
 
 #[test]
+fn a_list_for_each_item_of_another_length_than_the_keys_is_written() {
+    // `descending=[False]` for two keys is not the default `False`: Python Polars refuses it, and
+    // so does the engine, so the source says what was given and does not run it as another call.
+    let sort = |descending: Value| {
+        step_source(step(
+            "s",
+            "LazyFrame.sort",
+            json!({ "by": many(vec![field("a"), field("b")]), "descending": descending }),
+        ))
+    };
+    assert_eq!(
+        sort(many(vec![json!({ "flag": false })])),
+        ".sort(\"a\", \"b\", descending=[False])"
+    );
+    assert_eq!(sort(many(Vec::new())), ".sort(\"a\", \"b\", descending=[])");
+    assert_eq!(
+        sort(many(vec![
+            json!({ "flag": false }),
+            json!({ "flag": false })
+        ])),
+        ".sort(\"a\", \"b\")"
+    );
+}
+
+#[test]
 fn the_first_argument_of_a_method_is_written_though_it_is_the_default() {
     // shift(n=1): the first parameter goes by position, so `1` is written as the document gave it.
     let shifted = step(
