@@ -236,9 +236,7 @@ fn the_offers_commands_answer_the_views_the_application_answers() {
             "candidates": [
                 { "kind": "field", "dtype": "String" },
                 { "kind": "field", "dtype": "Int64" },
-                { "kind": "input", "dtype": "String", "list": false },
-                { "kind": "literal", "literal": { "kind": "text", "value": "1d" } },
-                { "kind": "literal", "literal": { "kind": "integer", "value": 1 } }
+                { "kind": "input", "dtype": "String", "list": false }
             ]
         }),
     );

@@ -161,31 +161,8 @@ impl PlaceRequest {
     }
 }
 
-/// A number or text typed in, as a step document writes it.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) enum LiteralRequest {
-    /// A whole number.
-    Integer { value: i64 },
-    /// A number with a fraction.
-    Float { value: f64 },
-    /// Text.
-    Text { value: String },
-}
-
-impl From<LiteralRequest> for Literal {
-    fn from(literal: LiteralRequest) -> Self {
-        match literal {
-            LiteralRequest::Integer { value } => Self::Integer(value),
-            LiteralRequest::Float { value } => Self::Float(value),
-            LiteralRequest::Text { value } => Self::String(value),
-        }
-    }
-}
-
-/// A value that may be picked for a slot: the dtype of a field or an input by
-/// the short name the engine reports, or a literal typed in, whose dtype is
-/// the engine's to say.
+/// A value that a list holds, that may be picked for a slot: the dtype of a field
+/// or an input by the short name the engine reports.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) enum CandidateRequest {
@@ -193,8 +170,6 @@ pub(crate) enum CandidateRequest {
     Field { dtype: String },
     /// A connected value or list.
     Input { dtype: String, list: bool },
-    /// A number or text typed in.
-    Literal { literal: LiteralRequest },
 }
 
 /// The argument a candidate would be given: a parameter of a method that
@@ -437,7 +412,6 @@ fn candidate_of(request: &CandidateRequest) -> Result<Candidate, String> {
             dtype: class(dtype)?,
             shape: if *list { Shape::Many } else { Shape::One },
         },
-        CandidateRequest::Literal { literal } => Candidate::Literal(literal.clone().into()),
     })
 }
 

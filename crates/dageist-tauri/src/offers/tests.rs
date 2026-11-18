@@ -15,9 +15,9 @@ use tauri::webview::InvokeRequest;
 use tauri::{WebviewWindow, WebviewWindowBuilder};
 
 use super::{
-    AfterRequest, ArgumentRequest, CandidateRequest, ChosenOptionRequest, LiteralRequest,
-    PlaceRequest, PositionRequest, TypedRequest, ValueTypeRequest, fits_view, offers_view,
-    options_view, read_view,
+    AfterRequest, ArgumentRequest, CandidateRequest, ChosenOptionRequest, PlaceRequest,
+    PositionRequest, TypedRequest, ValueTypeRequest, fits_view, offers_view, options_view,
+    read_view,
 };
 use crate::report::{ConditionStateView, ValueShapeView};
 
@@ -306,7 +306,7 @@ fn judged(answer: &Value) -> Vec<(String, String, String)> {
 }
 
 #[test]
-fn a_field_an_input_and_a_literal_start_a_predicate_by_their_dtype() {
+fn a_field_and_an_input_start_a_predicate_by_their_dtype() {
     let answer = invoke(
         "candidate_fits",
         json!({
@@ -317,7 +317,6 @@ fn a_field_an_input_and_a_literal_start_a_predicate_by_their_dtype() {
                 { "kind": "field", "dtype": "Int64" },
                 { "kind": "input", "dtype": "Boolean", "list": false },
                 { "kind": "input", "dtype": "Date", "list": true },
-                { "kind": "literal", "literal": { "kind": "text", "value": "x" } },
             ]
         }),
     )
@@ -333,7 +332,6 @@ fn a_field_an_input_and_a_literal_start_a_predicate_by_their_dtype() {
             triple("Int64", "allowed", "refused"),
             triple("Boolean", "allowed", "allowed"),
             triple("Date", "allowed", "refused"),
-            triple("String", "allowed", "refused"),
         ]
     );
     assert_eq!(
@@ -343,31 +341,6 @@ fn a_field_an_input_and_a_literal_start_a_predicate_by_their_dtype() {
     // A connected value gives one value, a list many.
     assert_eq!(answer["fits"][2]["verdict"]["shape"], "one");
     assert_eq!(answer["fits"][3]["verdict"]["shape"], "many");
-}
-
-#[test]
-fn a_typed_number_has_the_dtype_polars_gives_it() {
-    let answer = invoke(
-        "candidate_fits",
-        json!({
-            "start": [{ "kind": "outer", "name": "select" }],
-            "argument": null,
-            "candidates": [
-                { "kind": "literal", "literal": { "kind": "integer", "value": 1 } },
-                { "kind": "literal", "literal": { "kind": "integer", "value": 3_000_000_000_i64 } },
-                { "kind": "literal", "literal": { "kind": "float", "value": 1.5 } },
-            ]
-        }),
-    )
-    .expect("fits");
-    let dtypes: Vec<&str> = answer["fits"]
-        .as_array()
-        .expect("fits")
-        .iter()
-        .map(|fit| fit["dtype"].as_str().expect("a dtype"))
-        .collect();
-    // A whole number is the narrowest integer it fits, and a number with a fraction a float.
-    assert_eq!(dtypes, ["Int32", "Int64", "Float64"]);
 }
 
 #[test]
@@ -387,29 +360,26 @@ fn an_argument_is_judged_by_what_the_method_takes() {
             "candidates": [
                 { "kind": "field", "dtype": "String" },
                 { "kind": "field", "dtype": "Int64" },
-                { "kind": "literal", "literal": { "kind": "text", "value": "1d" } },
-                { "kind": "literal", "literal": { "kind": "float", "value": 1.5 } },
                 { "kind": "field", "dtype": "Categorical" },
             ]
         }),
     )
     .expect("fits");
-    // `offset_by` takes a duration written as text: a number is no duration, and Polars says so
-    // when it runs rows.
+    // `offset_by` takes a duration written as text: a field of numbers is no duration, and Polars
+    // says so when it runs rows.
     let fits = answer["fits"].as_array().expect("fits");
     let kinds: Vec<&str> = fits
         .iter()
         .map(|fit| fit["verdict"]["kind"].as_str().unwrap_or("-"))
         .collect();
-    assert_eq!(kinds, ["allowed", "refused", "allowed", "refused", "-"]);
-    assert_eq!(fits[3]["dtype"], "Float64");
+    assert_eq!(kinds, ["allowed", "refused", "-"]);
     assert_eq!(
         fits[1]["verdict"]["refusal"]["source"],
         json!({ "by": "polars", "stage": "rows" })
     );
     // A dtype the tables cover no class of is not judged, and says so.
     assert_eq!(
-        fits[4],
+        fits[2],
         json!({ "kind": "unjudged", "reason": "the tables cover no class of the dtype Categorical" })
     );
 }
@@ -890,17 +860,6 @@ fn the_snapshots_are_what_the_commands_return() {
                             dtype: "Date".to_owned(),
                             list: true,
                         },
-                        CandidateRequest::Literal {
-                            literal: LiteralRequest::Integer { value: 1 },
-                        },
-                        CandidateRequest::Literal {
-                            literal: LiteralRequest::Float { value: 1.5 },
-                        },
-                        CandidateRequest::Literal {
-                            literal: LiteralRequest::Text {
-                                value: "x".to_owned(),
-                            },
-                        },
                         CandidateRequest::Field {
                             dtype: "Categorical".to_owned(),
                         },
@@ -932,14 +891,6 @@ fn the_snapshots_are_what_the_commands_return() {
                         CandidateRequest::Input {
                             dtype: "String".to_owned(),
                             list: false,
-                        },
-                        CandidateRequest::Literal {
-                            literal: LiteralRequest::Text {
-                                value: "1d".to_owned(),
-                            },
-                        },
-                        CandidateRequest::Literal {
-                            literal: LiteralRequest::Integer { value: 1 },
                         },
                     ],
                 )

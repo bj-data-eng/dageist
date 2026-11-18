@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { CandidateRequest, FitsView, LiteralView, OfferPlaceView } from '@dageist/host';
+import type { CandidateRequest, FitsView, OfferPlaceView } from '@dageist/host';
 import {
   decodeCatalogue,
   decodeFits,
@@ -121,22 +121,17 @@ describe('the calls the engine offers at the start of an expression', () => {
 
 const field = (dtype: string): CandidateRequest => ({ kind: 'field', dtype });
 const input = (dtype: string, list = false): CandidateRequest => ({ kind: 'input', dtype, list });
-const literal = (value: LiteralView): CandidateRequest => ({ kind: 'literal', literal: value });
 
 describe('the candidates that fit a slot', () => {
   it('are each given the dtype the engine gave them, and whether a chain may end at them', () => {
     // The candidates are the ones the host's snapshot of the fits of a predicate was asked about.
     const boolean = field('Boolean');
     const number = field('Int64');
-    const whole = literal({ kind: 'integer', value: 1 });
     const candidates: CandidateRequest[] = [
       boolean,
       number,
       input('Boolean'),
       input('Date', true),
-      whole,
-      literal({ kind: 'float', value: 1.5 }),
-      literal({ kind: 'text', value: 'x' }),
       field('Categorical'),
     ];
     const fits = prepareFits(candidates, decodeFits(fitsStartFixture), true);
@@ -146,28 +141,18 @@ describe('the candidates that fit a slot', () => {
     // end it.
     expect(fit(boolean)).toEqual({ dtype: 'Boolean', reason: null, ends: { kind: 'allowed' } });
     expect(fit(number)).toMatchObject({ dtype: 'Int64', reason: null, ends: { kind: 'refused' } });
-    // The engine, not the editor, says what a number is: a whole number, and one with a fraction.
-    expect(fit(whole)?.dtype).toBe('Int32');
-    expect(fit(literal({ kind: 'float', value: 1.5 }))?.dtype).toBe('Float64');
-    expect(fit(literal({ kind: 'text', value: 'x' }))?.dtype).toBe('String');
     // What the tables cover no class of is not refused: it is left to the run.
     expect(fit(field('Categorical'))).toEqual({ dtype: null, reason: null, ends: null });
   });
 
   it('are refused with the engine’s reason as the argument of a method, with no end to speak of', () => {
     const text = field('String');
-    const candidates: CandidateRequest[] = [
-      text,
-      field('Int64'),
-      input('String'),
-      literal({ kind: 'text', value: '1d' }),
-      literal({ kind: 'integer', value: 1 }),
-    ];
+    const candidates: CandidateRequest[] = [text, field('Int64'), input('String')];
     const fits = prepareFits(candidates, decodeFits(fitsArgumentFixture), false);
     const reasons = candidates.map((candidate) => fits.get(candidateKey(candidate))?.reason);
 
-    // `offset_by` takes text: a whole number is no duration.
-    expect(reasons.map((reason) => reason === null)).toEqual([true, false, true, true, false]);
+    // `offset_by` takes text: a field of whole numbers is no duration.
+    expect(reasons.map((reason) => reason === null)).toEqual([true, false, true]);
     expect(reasons[1]).toContain('expected `String`');
     expect(fits.get(candidateKey(text))?.ends).toBeNull();
   });

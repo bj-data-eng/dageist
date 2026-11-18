@@ -136,21 +136,11 @@ describe('the offers at a place', () => {
 describe('the fits of candidates for a slot', () => {
   it('say the dtype the engine gave each candidate and whether it fits', () => {
     const fits = decodeFits(fitsStart).fits;
-    expect(fits).toHaveLength(8);
+    expect(fits).toHaveLength(5);
     // Candidates are asked about in the order they were sent: a Boolean field, a whole number
-    // field, a Boolean value, a list of dates, a whole number typed, a number with a fraction,
-    // text, and a dtype the tables cover no class of.
+    // field, a Boolean value, a list of dates, and a dtype the tables cover no class of.
     const dtypes = fits.map((fit) => (fit.kind === 'judged' ? fit.dtype : null));
-    expect(dtypes).toEqual([
-      'Boolean',
-      'Int64',
-      'Boolean',
-      'Date',
-      'Int32',
-      'Float64',
-      'String',
-      null,
-    ]);
+    expect(dtypes).toEqual(['Boolean', 'Int64', 'Boolean', 'Date', null]);
   });
 
   it('say whether a candidate may end where it stands', () => {
@@ -172,7 +162,7 @@ describe('the fits of candidates for a slot', () => {
   });
 
   it('say that a candidate the tables cover no class of is not judged', () => {
-    expect(decodeFits(fitsStart).fits[7]).toEqual({
+    expect(decodeFits(fitsStart).fits[4]).toEqual({
       kind: 'unjudged',
       reason: 'the tables cover no class of the dtype Categorical',
     });
@@ -182,17 +172,17 @@ describe('the fits of candidates for a slot', () => {
     const kinds = decodeFits(fitsArgument).fits.map((fit) =>
       fit.kind === 'judged' ? fit.verdict.kind : fit.kind,
     );
-    // `dt.offset_by` takes a duration as text: a field of text, a connected text and typed text
-    // fit; a whole number field and a whole number typed do not.
-    expect(kinds).toEqual(['allowed', 'refused', 'allowed', 'allowed', 'refused']);
+    // `dt.offset_by` takes a duration as text: a field of text and a connected text fit; a whole
+    // number field does not.
+    expect(kinds).toEqual(['allowed', 'refused', 'allowed']);
   });
 
   it('are refused with the place of what is wrong', () => {
     expect(refusal(decodeFits, replaced(fitsStart, ['fits', 0, 'kind'], 'maybe')).message).toBe(
       '$.fits[0].kind: must be one of "judged", "unjudged", not "maybe"',
     );
-    expect(refusal(decodeFits, without(fitsStart, ['fits', 7], 'reason')).message).toBe(
-      '$.fits[7]: is missing the field "reason"',
+    expect(refusal(decodeFits, without(fitsStart, ['fits', 4], 'reason')).message).toBe(
+      '$.fits[4]: is missing the field "reason"',
     );
   });
 });

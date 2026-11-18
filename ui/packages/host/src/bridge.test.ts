@@ -85,7 +85,7 @@ describe('the host that calls the bridge', () => {
     const request = {
       start: null,
       argument: { entry: 'Expr.dt.offset_by', parameter: 'by', place },
-      candidates: [{ kind: 'literal', literal: { kind: 'text', value: '1d' } }],
+      candidates: [{ kind: 'field', dtype: 'String' }],
     } as const;
     const fits = await bridgeHost().candidateFits(request);
     const fitsSent = [...sent];
@@ -94,7 +94,7 @@ describe('the host that calls the bridge', () => {
     const found = await bridgeHost().optionOffers('LazyFrame.join', chosen);
 
     expect(offers.entries).toHaveLength(35);
-    expect(fits.fits).toHaveLength(5);
+    expect(fits.fits).toHaveLength(3);
     expect(found.options.length).toBeGreaterThan(0);
     expect(fitsSent[0]).toMatchObject({
       path: '/bridge/candidate_fits',

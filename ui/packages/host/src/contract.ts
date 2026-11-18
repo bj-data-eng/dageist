@@ -451,20 +451,19 @@ export interface PlaceRequest {
   readonly after: AfterView;
 }
 
-/** A number or text typed in, as a step document writes it. Mirrors `LiteralView` in crates/dageist-tauri/src/offers.rs. */
+/** A number or text the engine reads from what is typed, as a step document writes it. Mirrors `LiteralView` in crates/dageist-tauri/src/offers.rs. */
 export type LiteralView =
   | { readonly kind: 'integer'; readonly value: number }
   | { readonly kind: 'float'; readonly value: number }
   | { readonly kind: 'text'; readonly value: string };
 
 /**
- * A value that may be picked for a slot: the short name of the dtype of a
- * field or an input, or a literal typed in, whose dtype the engine decides.
+ * A value a list holds, which may be picked for a slot: the short name of the dtype of a field or
+ * an input. What is typed is read by the engine instead, which `readTyped` asks.
  */
 export type CandidateRequest =
   | { readonly kind: 'field'; readonly dtype: string }
-  | { readonly kind: 'input'; readonly dtype: string; readonly list: boolean }
-  | { readonly kind: 'literal'; readonly literal: LiteralView };
+  | { readonly kind: 'input'; readonly dtype: string; readonly list: boolean };
 
 /** The argument a candidate would be given: a parameter of a method that stands at a place. */
 export interface ArgumentRequest {
