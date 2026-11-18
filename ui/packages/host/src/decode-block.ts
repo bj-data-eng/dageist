@@ -67,7 +67,10 @@ function parseHeader(bytes: Uint8Array): Header {
   return readHeader(parsed, HEADER);
 }
 
-/** Reads the Arrow stream `bytes` as a table of text, the columns being `names`. */
+/**
+ * Reads the Arrow stream `bytes` as a table of text. The columns are `names`, or are whatever
+ * the stream has when `names` is empty, which is how all of them are asked for.
+ */
 function parseTable(bytes: Uint8Array, names: readonly string[]): Table {
   let table: Table;
   try {
@@ -76,7 +79,8 @@ function parseTable(bytes: Uint8Array, names: readonly string[]): Table {
     throw new DecodeError(ARROW, `is not an Arrow stream (${reasonOf(error)})`);
   }
   const fields = table.schema.fields;
-  if (fields.length !== names.length) {
+  const asked = names.length > 0;
+  if (asked && fields.length !== names.length) {
     throw new DecodeError(
       ARROW,
       `has ${String(fields.length)} columns, not the ${String(names.length)} asked for`,
@@ -84,7 +88,7 @@ function parseTable(bytes: Uint8Array, names: readonly string[]): Table {
   }
   fields.forEach((field, index) => {
     const place = itemPath(fieldPath(ARROW, 'columns'), index);
-    if (field.name !== names[index]) {
+    if (asked && field.name !== names[index]) {
       throw new DecodeError(
         place,
         `is the column ${JSON.stringify(field.name)}, not ${JSON.stringify(names[index])} as asked for`,
@@ -100,16 +104,15 @@ function parseTable(bytes: Uint8Array, names: readonly string[]): Table {
   return table;
 }
 
-/** Reads the cell at `place` as text, or `null` for a missing value. */
-function readCell(value: unknown, place: string): string | null {
-  if (value === null) return null;
-  if (typeof value !== 'string') throw new DecodeError(place, 'must be text or missing');
-  return value;
+/** Refuses the cell at `row` of the column `name`, which is `value` and not text or missing. */
+function refuseCell(name: string, row: number, value: unknown): never {
+  const place = itemPath(fieldPath(fieldPath(ARROW, 'columns'), name), row);
+  throw new DecodeError(place, `must be text or missing, not ${typeof value}`);
 }
 
 /**
  * Reads what the host's `table_block` command sent, when the columns `names`
- * were asked for.
+ * were asked for, or every column when `names` is empty.
  *
  * @throws {DecodeError} When it is not a frame of a block of those columns:
  * its header is not the header's shape, its Arrow stream cannot be read, has
@@ -142,12 +145,13 @@ export function decodeBlock(value: unknown, names: readonly string[]): BlockView
       `has ${String(table.numRows)} rows, and the header numbers ${String(header.numbers.length)}`,
     );
   }
-  const columns = names.map((name, index) => {
+  const columns = table.schema.fields.map((field, index) => {
     const cells = table.getChildAt<unknown>(index);
-    const place = fieldPath(fieldPath(ARROW, 'columns'), name);
-    return Array.from({ length: table.numRows }, (_unused, row) =>
-      readCell(cells?.at(row), itemPath(place, row)),
-    );
+    // The place of a cell is only written when one is refused, not for each of the cells.
+    return Array.from({ length: table.numRows }, (_unused, row) => {
+      const cell = cells?.at(row);
+      return cell === null || typeof cell === 'string' ? cell : refuseCell(field.name, row, cell);
+    });
   });
   return { numbers: header.numbers, report: header.report, columns };
 }
