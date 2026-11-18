@@ -170,9 +170,9 @@ function settingOfKind(kind: string): unknown {
   const held: Readonly<Record<string, unknown>> = {
     unset: none,
     flag: { kind: 'flag', value: true },
-    integer: { kind: 'integer', value: 1 },
-    float: { kind: 'float', value: 1.5 },
-    text: { kind: 'text', value: 'text' },
+    integer: { kind: 'integer', value: 1, shown: '1' },
+    float: { kind: 'float', value: 1.5, shown: '1.5' },
+    text: { kind: 'text', value: 'text', shown: 'text' },
     word: { kind: 'word', value: 'word' },
     field: { kind: 'field', column: 'column' },
     element: { kind: 'element', method: 'first' },

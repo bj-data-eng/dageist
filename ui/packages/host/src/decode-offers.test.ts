@@ -107,7 +107,7 @@ describe('the offers at a place', () => {
     const entries = decodeOffers(offersValue).entries;
     expect(entries.find((entry) => entry.entry === 'Expr.shift')?.argument).toEqual({
       parameter: 'n',
-      literal: { kind: 'integer', value: 1 },
+      literal: { kind: 'integer', value: 1, shown: '1' },
     });
     expect(entries.find((entry) => entry.entry === 'Expr.dt.date')?.argument).toBeNull();
   });
@@ -129,6 +129,10 @@ describe('the offers at a place', () => {
     ).toBe(
       `$.entries[${String(at)}].argument.literal.kind: must be one of "integer", "float", "text", not "big"`,
     );
+    expect(
+      refusal(decodeOffers, without(offersValue, ['entries', at, 'argument', 'literal'], 'shown'))
+        .message,
+    ).toBe(`$.entries[${String(at)}].argument.literal: is missing the field "shown"`);
     expect(refusal(decodeOffers, without(offersValue, ['entries', at], 'verdict')).message).toBe(
       `$.entries[${String(at)}]: is missing the field "verdict"`,
     );
@@ -201,12 +205,12 @@ describe('the readings of a typed text', () => {
     const [number, text] = decodeReadings(typedExpression).readings;
     expect(number).toMatchObject({
       kind: 'read',
-      literal: { kind: 'float', value: 1.5 },
+      literal: { kind: 'float', value: 1.5, shown: '1.5' },
       dtype: 'Float64',
     });
     expect(text).toMatchObject({
       kind: 'read',
-      literal: { kind: 'text', value: '1.5' },
+      literal: { kind: 'text', value: '1.5', shown: '1.5' },
       dtype: 'String',
     });
   });
@@ -228,14 +232,24 @@ describe('the readings of a typed text', () => {
 
   it('say nothing of the slot where none was asked about', () => {
     expect(decodeReadings(typedWhole).readings).toEqual([
-      { kind: 'read', literal: { kind: 'integer', value: 12 }, dtype: 'Int32', fit: null },
+      {
+        kind: 'read',
+        literal: { kind: 'integer', value: 12, shown: '12' },
+        dtype: 'Int32',
+        fit: null,
+      },
     ]);
   });
 
   it('give a date as the day Polars read, which has the dtype Date', () => {
     // `10-03-2026` is a day, month and year; the day is carried as its ISO text.
     expect(decodeReadings(typedDate).readings).toEqual([
-      { kind: 'read', literal: { kind: 'text', value: '2026-03-10' }, dtype: 'Date', fit: null },
+      {
+        kind: 'read',
+        literal: { kind: 'text', value: '2026-03-10', shown: '2026-03-10' },
+        dtype: 'Date',
+        fit: null,
+      },
     ]);
   });
 
@@ -390,7 +404,12 @@ describe('what each step starts with', () => {
         parameter: 'named_exprs',
         setting: {
           kind: 'pairs',
-          entries: [{ key: { kind: 'text', value: 'new_column' }, value: { kind: 'unset' } }],
+          entries: [
+            {
+              key: { kind: 'text', value: 'new_column', shown: 'new_column' },
+              value: { kind: 'unset' },
+            },
+          ],
         },
       },
     ]);

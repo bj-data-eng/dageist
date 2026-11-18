@@ -34,14 +34,24 @@ describe('a setting the engine reports', () => {
   it('is read as the setting of the parameter that holds it', () => {
     expect(settingOf({ kind: 'unset' })).toEqual({ kind: 'unset' });
     expect(settingOf({ kind: 'flag', value: true })).toEqual({ kind: 'flag', value: true });
-    expect(settingOf({ kind: 'integer', value: 3 })).toEqual({ kind: 'number', value: 3 });
+    // A number or text comes with the words the engine shows it as.
+    expect(settingOf({ kind: 'integer', value: 3, shown: '3' })).toEqual({
+      kind: 'number',
+      value: 3,
+      shown: '3',
+    });
     // A number the engine read with a fraction stays one though it is whole.
-    expect(settingOf({ kind: 'float', value: 2 })).toEqual({
+    expect(settingOf({ kind: 'float', value: 2, shown: '2.0' })).toEqual({
       kind: 'number',
       value: 2,
       float: true,
+      shown: '2.0',
     });
-    expect(settingOf({ kind: 'text', value: '_x' })).toEqual({ kind: 'text', value: '_x' });
+    expect(settingOf({ kind: 'text', value: '_x', shown: '_x' })).toEqual({
+      kind: 'text',
+      value: '_x',
+      shown: '_x',
+    });
     expect(settingOf({ kind: 'word', value: 'left' })).toEqual({ kind: 'word', value: 'left' });
     expect(settingOf({ kind: 'field', column: 'dcn' })).toEqual({
       kind: 'expression',
@@ -57,15 +67,15 @@ describe('a setting the engine reports', () => {
     const pairs = settingOf({
       kind: 'pairs',
       entries: [
-        { key: { kind: 'text', value: 'a' }, value: { kind: 'unset' } },
-        { key: { kind: 'text', value: 'b' }, value: { kind: 'unset' } },
+        { key: { kind: 'text', value: 'a', shown: 'a' }, value: { kind: 'unset' } },
+        { key: { kind: 'text', value: 'b', shown: 'b' }, value: { kind: 'unset' } },
       ],
     });
 
     if (pairs.kind !== 'pairs') throw new Error('not pairs');
     expect(pairs.entries.map((entry) => [entry.key, entry.value])).toEqual([
-      [{ kind: 'text', value: 'a' }, { kind: 'unset' }],
-      [{ kind: 'text', value: 'b' }, { kind: 'unset' }],
+      [{ kind: 'text', value: 'a', shown: 'a' }, { kind: 'unset' }],
+      [{ kind: 'text', value: 'b', shown: 'b' }, { kind: 'unset' }],
     ]);
     expect(new Set(pairs.entries.map((entry) => entry.id)).size).toBe(2);
   });
@@ -96,6 +106,7 @@ describe('what a parameter holds and is first set to', () => {
     expect(defaultOf(parameterOf('LazyFrame.join', 'suffix'))).toEqual({
       kind: 'text',
       value: '_right',
+      shown: '_right',
     });
     // Where Polars decides, or the parameter must be given, it holds nothing.
     expect(defaultOf(parameterOf('LazyFrame.join', 'coalesce'))).toBeNull();
@@ -136,7 +147,7 @@ const withColumns = (setting: SettingView): StepStartView => ({
       parameter: 'named_exprs',
       setting: {
         kind: 'pairs',
-        entries: [{ key: { kind: 'text', value: 'x' }, value: setting }],
+        entries: [{ key: { kind: 'text', value: 'x', shown: 'x' }, value: setting }],
       },
     },
   ],
@@ -238,7 +249,7 @@ describe('a new step', () => {
   it('is a filter whose comparison, for equality, has no field or value yet', () => {
     expect(startedStep('filter', startFor('filter'))).toMatchObject({
       verb: 'filter',
-      condition: { kind: 'test', column: '', comparison: '==', value: { kind: 'unset' } },
+      condition: { kind: 'test', column: '', comparison: 'Expr.eq', value: { kind: 'unset' } },
     });
   });
 
@@ -267,7 +278,7 @@ describe('a new step', () => {
       condition: {
         kind: 'test',
         column: 'dcn',
-        comparison: '>',
+        comparison: 'Expr.gt',
         value: { kind: 'column', column: 'owner' },
       },
     });

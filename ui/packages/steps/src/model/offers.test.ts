@@ -287,11 +287,14 @@ describe('how the engine read a typed text', () => {
 
   it('gives each reading the literal and the dtype the engine gave it', () => {
     const [number, text] = prepareReadings(asArgument, false);
-    expect(number).toMatchObject({ kind: 'read', literal: { kind: 'float', value: 1.5 } });
+    expect(number).toMatchObject({
+      kind: 'read',
+      literal: { kind: 'float', value: 1.5, shown: '1.5' },
+    });
     expect(number).toMatchObject({ dtype: 'Float64' });
     expect(text).toEqual({
       kind: 'read',
-      literal: { kind: 'text', value: '1.5' },
+      literal: { kind: 'text', value: '1.5', shown: '1.5' },
       dtype: 'String',
       reason: null,
       ends: null,
@@ -327,7 +330,7 @@ describe('how the engine read a typed text', () => {
     expect(prepareReadings(decodeReadings(typedWholeFixture), true)).toEqual([
       {
         kind: 'read',
-        literal: { kind: 'integer', value: 12 },
+        literal: { kind: 'integer', value: 12, shown: '12' },
         dtype: 'Int32',
         reason: null,
         ends: null,
@@ -339,7 +342,7 @@ describe('how the engine read a typed text', () => {
     expect(prepareReadings(decodeReadings(typedDateFixture), false)).toEqual([
       {
         kind: 'read',
-        literal: { kind: 'text', value: '2026-03-10' },
+        literal: { kind: 'text', value: '2026-03-10', shown: '2026-03-10' },
         dtype: 'Date',
         reason: null,
         ends: null,

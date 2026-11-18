@@ -238,6 +238,32 @@ describe('the catalogue the host sends', () => {
   });
 });
 
+describe('the comparisons of a test', () => {
+  it('are the entries that compare, with the signs of the language file, in the order they are offered', () => {
+    // The signs are written as on paper: `≠`, `≥` and `≤` take one character each.
+    expect(decodeCatalogue(catalogue).comparisons).toEqual([
+      { entry: 'Expr.eq', sign: '==' },
+      { entry: 'Expr.ne', sign: '≠' },
+      { entry: 'Expr.gt', sign: '>' },
+      { entry: 'Expr.ge', sign: '≥' },
+      { entry: 'Expr.lt', sign: '<' },
+      { entry: 'Expr.le', sign: '≤' },
+    ]);
+  });
+
+  it('are refused with the place of what is wrong', () => {
+    expect(refusal(without(catalogue, [], 'comparisons')).message).toBe(
+      '$: is missing the field "comparisons"',
+    );
+    expect(refusal(without(catalogue, ['comparisons', 1], 'sign')).message).toBe(
+      '$.comparisons[1]: is missing the field "sign"',
+    );
+    expect(refusal(replaced(catalogue, ['comparisons', 0, 'sign'], 1)).message).toBe(
+      '$.comparisons[0].sign: must be a string, not a number',
+    );
+  });
+});
+
 describe('the default and the first setting of a parameter', () => {
   const decoded = decodeCatalogue(catalogue);
   const parameterOf = (id: string, name: string) => {
@@ -256,8 +282,13 @@ describe('the default and the first setting of a parameter', () => {
     expect(parameterOf('LazyFrame.join', 'suffix').defaultSetting).toEqual({
       kind: 'text',
       value: '_right',
+      shown: '_right',
     });
-    expect(parameterOf('Expr.shift', 'n').defaultSetting).toEqual({ kind: 'integer', value: 1 });
+    expect(parameterOf('Expr.shift', 'n').defaultSetting).toEqual({
+      kind: 'integer',
+      value: 1,
+      shown: '1',
+    });
     expect(parameterOf('LazyFrame.join', 'coalesce').defaultSetting).toBeNull();
     expect(parameterOf('LazyFrame.sort', 'descending').start).toEqual({
       kind: 'flag',
@@ -282,6 +313,10 @@ describe('the default and the first setting of a parameter', () => {
     expect(
       refusal(replaced(catalogue, [...how, 'start'], { kind: 'flag', value: 'yes' })).message,
     ).toBe(`${here}.start.value: must be a boolean, not a string`);
+    // A number or text the engine reports comes with the words it is shown as.
+    expect(
+      refusal(replaced(catalogue, [...how, 'start'], { kind: 'integer', value: 1 })).message,
+    ).toBe(`${here}.start: is missing the field "shown"`);
     expect(refusal(without(catalogue, how, 'defaultSetting')).message).toBe(
       `${here}: is missing the field "defaultSetting"`,
     );
