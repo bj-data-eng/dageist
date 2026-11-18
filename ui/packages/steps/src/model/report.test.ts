@@ -691,3 +691,52 @@ describe('a step with something still to be picked', () => {
     expect(stepOf(prepared, 'after').problem).toBe('Not run: step 2 cannot be run yet.');
   });
 });
+
+describe('the source and the summary the engine wrote of the steps', () => {
+  it('are shown for each step the report is of, and the module for the document it is of', () => {
+    const prepared = started();
+    expect(stepOf(prepared, 'sort')).toMatchObject({
+      source: '.sort("dcn", "timestamp")',
+      summary: 'by dcn, timestamp',
+    });
+    expect(stepOf(prepared, 'join')).toMatchObject({ summary: 'step_sla on step_to' });
+    expect(prepared).toMatchObject({
+      module: expect.arrayContaining([
+        { text: '        .sort("dcn", "timestamp")', step: 'sort' },
+      ]) as unknown,
+    });
+  });
+
+  it('are not shown for a step an edit has changed, nor for the steps after it, until the engine answers', () => {
+    const changedSteps: Step[] = START.map((step) =>
+      step.id === 'step_index' && step.verb === 'with_columns'
+        ? { ...step, alias: 'renamed_index' }
+        : step,
+    );
+    const prepared = prepareRun(
+      changedSteps,
+      translate(catalogue, changedSteps),
+      answeredFor(translate(catalogue, START), run),
+      source,
+    );
+    expect(stepOf(prepared, 'sort')).toMatchObject({ summary: 'by dcn, timestamp' });
+    expect(stepOf(prepared, 'step_index')).toMatchObject({ source: null, summary: null });
+    expect(stepOf(prepared, 'resolved_at')).toMatchObject({ source: null, summary: null });
+    expect(prepared).toMatchObject({ module: [] });
+  });
+
+  it('are not shown for a step that cannot be written as a document yet', () => {
+    const held: Step[] = [
+      {
+        id: 'nothing',
+        verb: 'with_columns',
+        alias: '',
+        value: { kind: 'unset' },
+        options: NO_OPTIONS,
+      },
+    ];
+    const prepared = prepareRun(held, translate(catalogue, held), null, source);
+    expect(stepOf(prepared, 'nothing')).toMatchObject({ source: null, summary: null });
+    expect(prepared).toMatchObject({ module: [] });
+  });
+});
