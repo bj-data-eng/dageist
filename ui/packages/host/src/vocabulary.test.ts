@@ -8,6 +8,7 @@ import {
   NESTED_POSITIONS,
   OUTER_POSITIONS,
   RULE_NAMES,
+  SETTING_KINDS,
   STAGES,
   VALUE_SHAPES,
   VALUE_TYPES,
@@ -125,6 +126,18 @@ describe('the words the decoders read', () => {
       accepts: (word) => decodeCatalogue(replaced(catalogue, ['entries', 0, 'applies'], word)),
     },
     {
+      list: 'settings',
+      words: SETTING_KINDS,
+      accepts: (word) =>
+        decodeCatalogue(
+          replaced(
+            catalogue,
+            ['entries', shiftIndex(), 'parameters', 0, 'start'],
+            settingOfKind(word),
+          ),
+        ),
+    },
+    {
       list: 'valueTypes',
       words: VALUE_TYPES,
       accepts: (word) =>
@@ -150,6 +163,27 @@ describe('the words the decoders read', () => {
     });
   }
 });
+
+/** A setting of the kind `kind`, with what that kind holds. */
+function settingOfKind(kind: string): unknown {
+  const none = { kind: 'unset' };
+  const held: Readonly<Record<string, unknown>> = {
+    unset: none,
+    flag: { kind: 'flag', value: true },
+    integer: { kind: 'integer', value: 1 },
+    float: { kind: 'float', value: 1.5 },
+    text: { kind: 'text', value: 'text' },
+    word: { kind: 'word', value: 'word' },
+    field: { kind: 'field', column: 'column' },
+    element: { kind: 'element', method: 'first' },
+    comparison: { kind: 'comparison', entry: 'Expr.eq', field: none, other: none },
+    list: { kind: 'list', items: [none] },
+    pairs: { kind: 'pairs', entries: [{ key: none, value: none }] },
+  };
+  const found = held[kind];
+  if (found === undefined) throw new Error(`no setting of the kind ${kind}`);
+  return found;
+}
 
 /** Where `Expr.shift`, an entry with parameters, is among the entries. */
 function shiftIndex(): number {

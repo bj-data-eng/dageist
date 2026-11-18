@@ -178,18 +178,21 @@ describe('the options of an entry', () => {
   it('start with the word the engine says, not one the editor picks from the words', () => {
     // An option the engine says starts with `right`, though `left` is the first other word and
     // Polars allows it: the editor does not choose between the words itself.
+    const stuckBecause = { source: { by: 'structure' }, reason: 'the engine says why\nand more' };
     const view: OptionsView = {
       options: [
         {
           parameter: 'how',
           default: 'inner',
           starter: 'right',
+          stuck: null,
           words: ['inner', 'left', 'right'].map((word) => ({ word, refusal: null })),
         },
         {
           parameter: 'validate',
           default: 'm:m',
           starter: null,
+          stuck: stuckBecause,
           words: ['m:m', 'm:1'].map((word) => ({ word, refusal: null })),
         },
       ],
@@ -198,8 +201,10 @@ describe('the options of an entry', () => {
     const prepared = prepareOptions(view);
 
     expect(prepared.get('how')).toMatchObject({ starter: 'right', stuck: null });
-    // Where the engine says there is none, there is none.
+    // Where the engine says there is none, there is none, and the reason is the engine's, in its
+    // first line, though the first other word is not refused.
     expect(prepared.get('validate')?.starter).toBeNull();
+    expect(prepared.get('validate')?.stuck).toBe('the engine says why');
   });
 
   it('cannot be added where Polars refuses every word but the default, and say why', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { StepStartView } from '@dageist/host';
+import type { SettingView, StepStartView } from '@dageist/host';
 import { decodeCatalogue, decodeNode, decodeStepStarts } from '@dageist/host';
 
 import catalogueFixture from '../../../host/fixtures/catalogue.json';
@@ -215,11 +215,94 @@ describe('a new step', () => {
     });
   });
 
-  it('is a filter whose comparison has no field or value yet', () => {
+  it('is a filter whose comparison, for equality, has no field or value yet', () => {
     expect(startedStep('filter', startFor('filter'))).toMatchObject({
       verb: 'filter',
       condition: { kind: 'test', column: '', comparison: '==', value: { kind: 'unset' } },
     });
+  });
+
+  it('is a filter that compares as the engine says, with the field and value it gives', () => {
+    const start: StepStartView = {
+      entry: 'LazyFrame.filter',
+      arguments: [
+        {
+          parameter: 'predicates',
+          setting: {
+            kind: 'list',
+            items: [
+              {
+                kind: 'comparison',
+                entry: 'Expr.gt',
+                field: { kind: 'field', column: 'dcn' },
+                other: { kind: 'field', column: 'owner' },
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    expect(startedStep('filter', start)).toMatchObject({
+      condition: {
+        kind: 'test',
+        column: 'dcn',
+        comparison: '>',
+        value: { kind: 'column', column: 'owner' },
+      },
+    });
+  });
+
+  it('is refused where the engine says something the editor cannot hold, and not made into a hole', () => {
+    const withColumns = (setting: SettingView): StepStartView => ({
+      entry: 'LazyFrame.with_columns',
+      arguments: [
+        {
+          parameter: 'named_exprs',
+          setting: {
+            kind: 'pairs',
+            entries: [{ key: { kind: 'text', value: 'x' }, value: setting }],
+          },
+        },
+      ],
+    });
+    const filtering = (setting: SettingView): StepStartView => ({
+      entry: 'LazyFrame.filter',
+      arguments: [{ parameter: 'predicates', setting: { kind: 'list', items: [setting] } }],
+    });
+    const join: StepStartView = {
+      entry: 'LazyFrame.join',
+      arguments: [{ parameter: 'other', setting: { kind: 'flag', value: true } }],
+    };
+
+    // What a new column holds is an expression; a flag is not one.
+    expect(() => startedStep('with_columns', withColumns({ kind: 'flag', value: true }))).toThrow(
+      /flag/,
+    );
+    // A table is a name.
+    expect(() => startedStep('join', join)).toThrow(/flag/);
+    // A condition is a comparison.
+    expect(() => startedStep('filter', filtering({ kind: 'flag', value: true }))).toThrow(/flag/);
+    expect(() =>
+      startedStep(
+        'filter',
+        filtering({
+          kind: 'comparison',
+          entry: 'Expr.nothing',
+          field: { kind: 'unset' },
+          other: { kind: 'unset' },
+        }),
+      ),
+    ).toThrow(/Expr.nothing/);
+    // A comparison is not the setting of a parameter.
+    expect(() =>
+      settingOf({
+        kind: 'comparison',
+        entry: 'Expr.eq',
+        field: { kind: 'unset' },
+        other: { kind: 'unset' },
+      }),
+    ).toThrow(/comparison/);
   });
 
   it('is a step of its own each time, with an identifier that stays with it', () => {

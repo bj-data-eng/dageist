@@ -281,6 +281,13 @@ describe('the options of an entry', () => {
     expect(starter('how')).toBe('left');
   });
 
+  it('say why an option cannot be added, with the refusal that stops it, where it has no starter', () => {
+    const decoded = decodeOptions(options).options;
+    const named = (name: string) => decoded.find((option) => option.parameter === name);
+    expect(named('validate')?.stuck?.source).toEqual({ by: 'polars', stage: 'schema' });
+    expect(named('how')?.stuck).toBeNull();
+  });
+
   it('give the reason Polars refuses a word beside the options already chosen', () => {
     // A cross join takes no join keys, so every validation is refused with Polars' reason.
     const validate = decodeOptions(options).options.find(
@@ -344,6 +351,25 @@ describe('what each step starts with', () => {
       { parameter: 'left_on', setting: { kind: 'list', items: [{ kind: 'unset' }] } },
       { parameter: 'right_on', setting: { kind: 'list', items: [{ kind: 'unset' }] } },
       { parameter: 'how', setting: { kind: 'word', value: 'left' } },
+    ]);
+  });
+
+  it('gives a filter a comparison for equality of a field and a value still to be given', () => {
+    expect(startOf('LazyFrame.filter').arguments).toEqual([
+      {
+        parameter: 'predicates',
+        setting: {
+          kind: 'list',
+          items: [
+            {
+              kind: 'comparison',
+              entry: 'Expr.eq',
+              field: { kind: 'unset' },
+              other: { kind: 'unset' },
+            },
+          ],
+        },
+      },
     ]);
   });
 
