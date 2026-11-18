@@ -513,7 +513,7 @@ impl Writer<'_> {
                 continue;
             };
             // Python takes a parameter left out as its default.
-            if argument.is_default_of(parameter) {
+            if call.is_default(parameter.name()) {
                 continue;
             }
             if is_double_starred(parameter) {

@@ -3,21 +3,11 @@
 //! nulls_last=False, maintain_order=False, multithreaded=True)`, `join(how="inner")`,
 //! `Expr.shift(n=1)`, `Expr.over(descending=False, mapping_strategy="group_to_rows")`.
 
-use dageist_engine::catalog::{self, Parameter};
-use dageist_engine::document::{Document, Inputs, Place, Segment, Value};
+use dageist_engine::document::{Document, Inputs, Place, Segment};
 use polars::prelude::*;
 use serde_json::{Value as Json, json};
 
 use crate::support::{call, chain, document, field, field_then, many, named, step, whole};
-
-fn parameter(entry: &str, name: &str) -> &'static Parameter {
-    catalog::entry(entry)
-        .expect("an entry")
-        .parameters()
-        .iter()
-        .find(|parameter| parameter.name() == name)
-        .expect("a parameter")
-}
 
 fn read(steps: Vec<Json>) -> Document {
     Document::read(&document(steps)).expect("a document")
@@ -51,79 +41,98 @@ fn flag(value: bool) -> Json {
     json!({ "flag": value })
 }
 
+/// Whether the argument `arguments` gives the parameter `parameter` of the step `entry` is what
+/// the parameter holds when it is not given.
+fn is_default(entry: &str, arguments: Json, parameter: &str) -> bool {
+    read(vec![step("s", entry, arguments)]).steps()[0]
+        .call()
+        .is_default(parameter)
+}
+
+/// A join of `other` on `a` and `b`, with `extra` given besides.
+fn join_with(extra: Json) -> Json {
+    let mut arguments = json!({
+        "other": { "table": "lookup" },
+        "left_on": many(vec![field("a")]),
+        "right_on": many(vec![field("b")]),
+    });
+    for (name, value) in extra.as_object().expect("an object") {
+        arguments[name] = value.clone();
+    }
+    arguments
+}
+
 #[test]
 fn a_flag_a_choice_and_text_are_at_the_default_when_they_equal_it() {
-    let flag_default = parameter("LazyFrame.sort", "multithreaded");
-    assert!(Value::Flag(Some(true)).is_default_of(flag_default));
-    assert!(!Value::Flag(Some(false)).is_default_of(flag_default));
+    let join =
+        |extra: Json, parameter: &str| is_default("LazyFrame.join", join_with(extra), parameter);
+    assert!(join(
+        json!({ "allow_parallel": flag(true) }),
+        "allow_parallel"
+    ));
+    assert!(!join(
+        json!({ "allow_parallel": flag(false) }),
+        "allow_parallel"
+    ));
     // Polars decides where the default is `None`, which a flag left unset is.
-    let decided = parameter("LazyFrame.join", "coalesce");
-    assert!(Value::Flag(None).is_default_of(decided));
-    assert!(!Value::Flag(Some(true)).is_default_of(decided));
-    assert!(!Value::Flag(None).is_default_of(flag_default));
-    let how = parameter("LazyFrame.join", "how");
-    assert!(Value::Choice("inner".to_owned()).is_default_of(how));
-    assert!(!Value::Choice("left".to_owned()).is_default_of(how));
-    let suffix = parameter("LazyFrame.join", "suffix");
-    assert!(Value::String("_right".to_owned()).is_default_of(suffix));
-    assert!(!Value::String("_x".to_owned()).is_default_of(suffix));
-}
-
-#[test]
-fn a_number_is_at_the_default_whether_it_has_a_fraction_or_not() {
-    let n = parameter("Expr.shift", "n");
-    assert!(Value::Integer(1).is_default_of(n));
-    assert!(Value::Float(1.0).is_default_of(n));
-    assert!(!Value::Integer(2).is_default_of(n));
-    assert!(!Value::Float(1.5).is_default_of(n));
-}
-
-#[test]
-fn an_expression_is_at_the_default_only_when_it_is_the_number_alone() {
-    let n = parameter("Expr.shift", "n");
-    let expression = |argument: Json| {
-        let document = read(vec![step(
-            "s",
-            "LazyFrame.with_columns",
-            json!({ "named_exprs": named(vec![("x", argument)]) }),
-        )]);
-        let step = &document.steps()[0];
-        let Some(Value::Pairs(pairs)) = step.call().argument("named_exprs") else {
-            panic!("the pairs of the step");
-        };
-        pairs[0].1.clone()
-    };
-    assert!(expression(whole(1)).is_default_of(n));
-    assert!(!expression(whole(2)).is_default_of(n));
-    assert!(!expression(field("a")).is_default_of(n));
-    assert!(!expression(field_then("a", vec![call("Expr.sum", json!({}))])).is_default_of(n));
+    assert!(join(json!({ "coalesce": { "flag": null } }), "coalesce"));
+    assert!(!join(json!({ "coalesce": flag(true) }), "coalesce"));
+    assert!(!join(
+        json!({ "nulls_equal": { "flag": null } }),
+        "nulls_equal"
+    ));
+    assert!(join(json!({ "how": { "choice": "inner" } }), "how"));
+    assert!(!join(json!({ "how": { "choice": "left" } }), "how"));
+    assert!(join(json!({ "suffix": { "string": "_right" } }), "suffix"));
+    assert!(!join(json!({ "suffix": { "string": "_x" } }), "suffix"));
+    // A parameter that was not given is not given its default.
+    assert!(!join(json!({}), "how"));
+    assert!(!join(json!({}), "nothing"));
 }
 
 #[test]
 fn a_list_and_pairs_are_at_the_default_when_they_are_empty_and_the_default_is_empty() {
     // `select(*exprs)` and `with_columns(**named_exprs)` default to nothing.
-    assert!(Value::Many(Vec::new()).is_default_of(parameter("LazyFrame.select", "exprs")));
-    assert!(
-        !Value::Many(vec![Value::Integer(1)]).is_default_of(parameter("LazyFrame.select", "exprs"))
-    );
-    assert!(
-        Value::Pairs(Vec::new()).is_default_of(parameter("LazyFrame.with_columns", "named_exprs"))
-    );
+    assert!(is_default(
+        "LazyFrame.select",
+        json!({ "exprs": many(Vec::new()) }),
+        "exprs"
+    ));
+    assert!(!is_default(
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![field("a")]) }),
+        "exprs"
+    ));
+    assert!(is_default(
+        "LazyFrame.with_columns",
+        json!({ "named_exprs": { "pairs": [] } }),
+        "named_exprs"
+    ));
     // `rename(mapping)` has none, so an empty mapping is not what it holds without one, and
-    // neither is a list of keys that `join` leaves to `None`.
-    assert!(!Value::Pairs(Vec::new()).is_default_of(parameter("LazyFrame.rename", "mapping")));
-    assert!(!Value::Many(Vec::new()).is_default_of(parameter("LazyFrame.join", "left_on")));
+    // neither is an empty list of keys that `join` leaves to `None`.
+    assert!(!is_default(
+        "LazyFrame.rename",
+        json!({ "mapping": { "pairs": [] } }),
+        "mapping"
+    ));
+    assert!(!is_default(
+        "LazyFrame.join",
+        join_with(json!({ "left_on": many(Vec::new()) })),
+        "left_on"
+    ));
 }
 
 #[test]
-fn a_value_for_each_item_is_at_the_default_when_every_item_is() {
-    let descending = parameter("LazyFrame.sort", "descending");
-    let each = |flags: &[bool]| Value::Many(flags.iter().map(|f| Value::Flag(Some(*f))).collect());
-    assert!(each(&[false, false]).is_default_of(descending));
-    assert!(!each(&[false, true]).is_default_of(descending));
-    // A single flag stands for every item.
-    assert!(Value::Flag(Some(false)).is_default_of(descending));
-    assert!(!Value::Flag(Some(true)).is_default_of(descending));
+fn a_single_flag_for_every_key_is_at_the_default_when_it_equals_it() {
+    let sort = |descending: Json| {
+        is_default(
+            "LazyFrame.sort",
+            json!({ "by": many(vec![field("a")]), "descending": descending }),
+            "descending",
+        )
+    };
+    assert!(sort(flag(false)));
+    assert!(!sort(flag(true)));
 }
 
 #[test]

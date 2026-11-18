@@ -5,38 +5,75 @@
 //! does not. Whether it is one is a rule about Polars' defaults, which the
 //! engine holds: the step editor shows it, and the source does not write it.
 
-use crate::catalog::{DefaultValue, Parameter, Shape};
+use crate::catalog::{DefaultValue, Role, Shape, Variadic};
 
 use super::error::{Place, Segment};
 use super::model::{Call, Expression, Start, Step, Value};
 
-impl Value {
-    /// Whether the argument is what `parameter` holds when it is not given.
+impl Call {
+    /// Whether the argument given for `parameter` is what the parameter holds
+    /// when it is not given. A parameter that was not given is not one.
     ///
-    /// A flag, a number, text, a choice's word, a duration and a path are
-    /// when they equal the default, and a flag that leaves the choice to Polars
-    /// is when the default is `None`; a number is one whether it was written
-    /// with a fraction or without. An expression is when it is the number or
-    /// text alone, as `polars.lit` makes it. A list or pairs are when they are
-    /// empty where the default is the empty `*` or `**` parameter. The list a
-    /// parameter that holds one value for each item of another holds is when
-    /// every value is. Nothing else is: a column, a dtype and a table never
-    /// are, and a hole is not given yet.
+    /// A flag, a number, text, a choice's word, a duration and a path are when
+    /// they equal the default, and a flag that leaves the choice to Polars is
+    /// when the default is `None`; a number is one whether it was written with
+    /// a fraction or without. An expression is when the parameter counts rows,
+    /// as `shift`'s `n` does, its default is a whole number and the expression
+    /// is that whole number alone, as `polars.lit` makes it. A list or pairs are
+    /// when they are empty where the default is the empty `*` or `**`
+    /// parameter. The list a parameter that holds one value for each item of
+    /// another holds is when it has one value for each of those items and every
+    /// value is; a list of another length is refused by Polars and is never the
+    /// default. Nothing else is: a column, a dtype and a table never are, and a
+    /// hole is not given yet.
     #[must_use]
-    pub fn is_default_of(&self, parameter: &Parameter) -> bool {
-        let default = parameter.default().value();
-        match (self, parameter.shape()) {
-            (Self::Many(items), Shape::PerItem(_)) => {
-                items.iter().all(|item| item.equals(&default))
+    pub fn is_default(&self, parameter: &str) -> bool {
+        let Some(found) = self
+            .entry()
+            .parameters()
+            .iter()
+            .find(|candidate| candidate.name() == parameter)
+        else {
+            return false;
+        };
+        let Some(value) = self.argument(parameter) else {
+            return false;
+        };
+        let default = found.default().value();
+        match (value, found.shape()) {
+            (Value::Many(items), Shape::PerItem(of)) => {
+                items.len() == self.key_count(of)
+                    && items.iter().all(|item| item.equals(&default, Role::Plain))
             }
-            (Self::Many(items), _) => items.is_empty() && default == DefaultValue::Empty,
-            (Self::Pairs(pairs), _) => pairs.is_empty() && default == DefaultValue::Empty,
-            (value, _) => value.equals(&default),
+            (Value::Many(items), _) => items.is_empty() && default == DefaultValue::Empty,
+            (Value::Pairs(pairs), _) => pairs.is_empty() && default == DefaultValue::Empty,
+            (value, _) => value.equals(&default, found.role()),
         }
     }
 
-    /// Whether one value is the default `default`.
-    fn equals(&self, default: &DefaultValue) -> bool {
+    /// How many items the parameter `of` holds, with the starred parameter
+    /// that follows it in Python's signature, as `sort`'s `by` and `more_by`
+    /// are the keys the flags for each key are given for.
+    fn key_count(&self, of: &str) -> usize {
+        let parameters = self.entry().parameters();
+        let items = |name: &str| match self.argument(name) {
+            Some(Value::Many(items)) => items.len(),
+            Some(_) => 1,
+            None => 0,
+        };
+        let following = parameters
+            .iter()
+            .position(|parameter| parameter.name() == of)
+            .and_then(|at| parameters.get(at + 1))
+            .filter(|next| next.variadic() == Some(Variadic::Args));
+        items(of) + following.map_or(0, |next| items(next.name()))
+    }
+}
+
+impl Value {
+    /// Whether one value is the default `default` of a parameter that plays
+    /// `role`.
+    fn equals(&self, default: &DefaultValue, role: Role) -> bool {
         match (self, default) {
             (Self::Flag(Some(value)), DefaultValue::Flag(default)) => value == default,
             (Self::Flag(None), DefaultValue::Unset) => true,
@@ -55,8 +92,9 @@ impl Value {
                 | Self::Path(value),
                 DefaultValue::Text(default),
             ) => value == default,
-            (Self::Expression(expression), default) => {
-                alone_in(expression).is_some_and(|literal| literal.equals(default))
+            (Self::Expression(expression), DefaultValue::Integer(default)) => {
+                role == Role::Count
+                    && matches!(alone_in(expression), Some(Self::Integer(value)) if value == default)
             }
             _ => false,
         }
@@ -75,17 +113,12 @@ fn alone_in(expression: &Expression) -> Option<&Value> {
     if call.entry().id().as_str() != "polars.lit" || call.arguments().len() != 1 {
         return None;
     }
-    call.argument("value").filter(|value| {
-        matches!(
-            value,
-            Value::Integer(_) | Value::Float(_) | Value::String(_)
-        )
-    })
+    call.argument("value")
 }
 
 impl Step {
     /// The places of the arguments in the step that are what their parameter
-    /// holds when it is not given: see [`Value::is_default_of`]. They are the
+    /// holds when it is not given: see [`Call::is_default`]. They are the
     /// step's own arguments, and those of the calls inside the expressions it
     /// holds, in the order the step is read. `index` is where the step is in
     /// its document.
@@ -100,18 +133,10 @@ impl Step {
 
 fn in_call(call: &Call, at: &Place, found: &mut Vec<Place>) {
     for given in call.arguments() {
-        let Some(parameter) = call
-            .entry()
-            .parameters()
-            .iter()
-            .find(|parameter| parameter.name() == given.parameter())
-        else {
-            continue;
-        };
         let place = at
             .clone()
             .then(Segment::Parameter(given.parameter().to_owned()));
-        if given.value().is_default_of(parameter) {
+        if call.is_default(given.parameter()) {
             found.push(place.clone());
         }
         in_value(given.value(), &place, found);

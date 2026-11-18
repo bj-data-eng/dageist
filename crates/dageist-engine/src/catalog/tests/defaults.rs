@@ -1,7 +1,7 @@
 //! A default read as a value, against Python's own literal syntax and against
 //! every default the inventory writes.
 
-use crate::catalog::{DefaultValue, Kind, ParameterDefault, entries};
+use crate::catalog::{DefaultValue, Kind, ParameterDefault, Role, entries};
 
 use super::inventory::items;
 
@@ -216,4 +216,39 @@ fn every_default_of_the_inventory_that_python_writes_as_a_literal_is_read() {
         }
     }
     assert!(defaults > 500, "the inventory writes {defaults} defaults");
+}
+
+#[test]
+fn only_the_count_of_shift_is_an_expression_with_a_default_that_is_a_value() {
+    // The document judges an expression to be at its default only for a parameter that counts
+    // rows and has a whole number for its default (`Role::Count`), which is `shift(n=1)` alone.
+    // Another expression parameter that gets one has to be looked at there first.
+    let mut found: Vec<(&str, &str, Role, DefaultValue)> = entries()
+        .iter()
+        .flat_map(|entry| {
+            entry
+                .parameters()
+                .iter()
+                .filter(|parameter| matches!(parameter.kind(), Kind::Expression(_)))
+                .map(move |parameter| {
+                    (
+                        entry.id().as_str(),
+                        parameter.name(),
+                        parameter.role(),
+                        parameter.default().value(),
+                    )
+                })
+        })
+        .filter(|(_, _, _, default)| {
+            !matches!(
+                default,
+                DefaultValue::Unset | DefaultValue::Required | DefaultValue::Empty
+            )
+        })
+        .collect();
+    found.sort_by_key(|(entry, parameter, _, _)| (*entry, *parameter));
+    assert_eq!(
+        found,
+        [("Expr.shift", "n", Role::Count, DefaultValue::Integer(1))]
+    );
 }
