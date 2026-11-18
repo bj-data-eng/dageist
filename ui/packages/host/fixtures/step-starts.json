@@ -120,7 +120,19 @@
               },
               {
                 "kind": "field",
+                "column": "timestamp"
+              },
+              {
+                "kind": "field",
+                "column": "step_to"
+              },
+              {
+                "kind": "field",
                 "column": "owner"
+              },
+              {
+                "kind": "field",
+                "column": "row_days"
               }
             ]
           }

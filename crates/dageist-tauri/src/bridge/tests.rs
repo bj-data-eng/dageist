@@ -299,7 +299,10 @@ fn the_offers_commands_answer_the_views_the_application_answers() {
     let reply = call(
         &bridge,
         "step_starts",
-        &json!({ "columns": ["dcn", "owner"], "tables": ["step_names", "step_sla"] }),
+        &json!({
+            "columns": ["dcn", "timestamp", "step_to", "owner", "row_days"],
+            "tables": ["step_names", "step_sla"]
+        }),
     );
     assert_eq!(reply.status, 200);
     assert_eq!(reply.json(), fixture("step-starts.json"));

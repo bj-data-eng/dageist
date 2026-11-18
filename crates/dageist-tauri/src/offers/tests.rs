@@ -1089,8 +1089,9 @@ fn the_snapshots_are_what_the_commands_return() {
         ),
         (
             "step-starts.json",
+            // The columns and the tables the sample node is connected to.
             json_of(&step_starts_view(
-                &names(&["dcn", "owner"]),
+                &names(&["dcn", "timestamp", "step_to", "owner", "row_days"]),
                 &names(&["step_names", "step_sla"]),
             )),
         ),
