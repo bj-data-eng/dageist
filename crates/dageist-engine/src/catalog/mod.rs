@@ -434,6 +434,19 @@ impl Entry {
     pub const fn build(&self) -> Build {
         self.build
     }
+
+    /// The expressions a step writes as columns of the table it gives, each
+    /// named as it is written: a column an expression names replaces the
+    /// column of that name. `with_columns` writes the expressions it is given;
+    /// every other entry writes none, because what it gives is a selection,
+    /// a reordering, a join or a reshaping of columns it already has.
+    ///
+    /// # Errors
+    ///
+    /// When `arguments` are not those the entry builds from.
+    pub fn writes(&self, arguments: &Arguments) -> Result<Vec<Expr>, BuildError> {
+        entries::writes(self, arguments)
+    }
 }
 
 /// Every entry of the catalogue, ordered by identifier.

@@ -13,7 +13,9 @@ use polars::prelude::{
     df, lit,
 };
 
-use crate::document::{ColumnDescription, Document, Inputs, Preview, Report, RowsError, StepId};
+use crate::document::{
+    ColumnDescription, Document, Inputs, Origin, Preview, Report, RowsError, StepId,
+};
 use crate::error::EngineError;
 
 /// The seven claim rows, in no useful order, as text. Two claims, `A-1001` and
@@ -33,6 +35,7 @@ const TIMESTAMPS: [&str; 7] = [
 #[derive(Debug)]
 pub struct ClaimTiming {
     source: DataFrame,
+    source_origin: Origin,
     inputs: Inputs,
     steps: Document,
 }
@@ -56,6 +59,7 @@ impl ClaimTiming {
         crate::startup::ensure();
         Ok(Self {
             source: source().map_err(|error| EngineError::polars("building the claims", error))?,
+            source_origin: Origin::Node("Claims".to_owned()),
             inputs: inputs()?,
             steps: Document::read(Self::STEPS_JSON).map_err(|error| {
                 EngineError::request("reading the sample steps", error.to_string())
@@ -76,6 +80,12 @@ impl ClaimTiming {
         ColumnDescription::of_schema(self.source.schema())
     }
 
+    /// What supplies [`source`](Self::source) to the node.
+    #[must_use]
+    pub const fn source_origin(&self) -> &Origin {
+        &self.source_origin
+    }
+
     /// What else is connected to the node: the table of the days each step may
     /// take, the table of step names a pivot gives its columns from, a cutoff
     /// and an as-of date, and a list of holidays.
@@ -91,13 +101,14 @@ impl ClaimTiming {
     }
 
     /// Runs `document` on the node: its first step on [`source`](Self::source),
-    /// with [`inputs`](Self::inputs) connected. It is [`Document::run`].
+    /// with [`inputs`](Self::inputs) connected, counting the rows each step
+    /// keeps. It is [`Document::run_on`].
     ///
     /// # Errors
     ///
     /// When Polars cannot work out the schema of the source.
     pub fn run(&self, document: &Document) -> PolarsResult<Report> {
-        document.run(&self.inputs, self.source.clone().lazy())
+        document.run_on(&self.inputs, &self.source)
     }
 
     /// The rows after the step `through` of `document`, at most `limit`, as
@@ -163,6 +174,7 @@ fn inputs() -> Result<Inputs, EngineError> {
     inputs
         .add_table(
             "step_sla",
+            Origin::Node("SLA by step".to_owned()),
             df!(
                 "step" => ["Intake", "Review", "Pending", "Complete"],
                 "sla_days" => [1_i64, 1, 2, 3],
@@ -174,6 +186,7 @@ fn inputs() -> Result<Inputs, EngineError> {
     inputs
         .add_table(
             "step_names",
+            Origin::Node("Step names".to_owned()),
             df!("step_to" => ["Intake", "Review", "Pending", "Complete"])
                 .map_err(polars)?
                 .lazy(),
@@ -182,15 +195,24 @@ fn inputs() -> Result<Inputs, EngineError> {
     inputs
         .add_value(
             "sla_cutoff",
+            Origin::Parameter,
             Scalar::new(DataType::Int64, AnyValue::Int64(1)),
         )
         .map_err(duplicate)?;
     inputs
-        .add_value("as_of", date_value("2026-03-02").map_err(polars)?)
+        .add_value(
+            "as_of",
+            Origin::Parameter,
+            date_value("2026-03-02").map_err(polars)?,
+        )
         .map_err(duplicate)?;
     inputs
         .add_list(
             "holidays",
+            Origin::Column {
+                node: "Holiday calendar".to_owned(),
+                column: "date".to_owned(),
+            },
             dates(&["2026-03-03", "2026-03-05"])
                 .and_then(|frame| {
                     frame

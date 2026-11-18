@@ -9,6 +9,7 @@ use polars::prelude::{Expr, LazyFrame, PolarsError, Scalar, Series, lit};
 use crate::allowed::{Representative, Shape, dtype_name};
 
 use super::columns::ColumnDescription;
+use super::values::{FirstValues, text_of};
 
 /// An input name given twice.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,21 +23,49 @@ impl fmt::Display for DuplicateInput {
 
 impl std::error::Error for DuplicateInput {}
 
+/// Where an input comes from in the graph: what supplies it to the node.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Origin {
+    /// The table a node gives, by the node's name.
+    Node(String),
+    /// One column of the table a node gives, by the node's name and the
+    /// column's.
+    Column {
+        /// The node that gives the table.
+        node: String,
+        /// The column of its table.
+        column: String,
+    },
+    /// A value set on the graph itself, which no node gives.
+    Parameter,
+}
+
 /// What an input holds, as the view is told of it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputKind {
     /// A table, with the columns it has.
     Table(Vec<ColumnDescription>),
-    /// A single value, with the short name of its dtype.
-    Value(String),
-    /// A list of values, with the short name of their dtype.
-    List(String),
+    /// A single value.
+    Value {
+        /// The short name of its dtype.
+        dtype: String,
+        /// The value as Polars writes it, or `None` where it is null.
+        value: Option<String>,
+    },
+    /// A list of values.
+    List {
+        /// The short name of their dtype.
+        dtype: String,
+        /// The first of the values as Polars writes them.
+        values: FirstValues,
+    },
 }
 
-/// An input of a node: its name and what it holds.
+/// An input of a node: its name, where it comes from and what it holds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InputDescription {
     name: String,
+    origin: Origin,
     kind: InputKind,
 }
 
@@ -45,6 +74,12 @@ impl InputDescription {
     #[must_use]
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// What supplies the input to the node.
+    #[must_use]
+    pub const fn origin(&self) -> &Origin {
+        &self.origin
     }
 
     /// What the input holds.
@@ -59,6 +94,13 @@ enum Input {
     Table(Box<LazyFrame>),
     Value(Scalar),
     List(Series),
+}
+
+/// An input and what supplies it.
+#[derive(Clone)]
+struct Connected {
+    origin: Origin,
+    input: Input,
 }
 
 /// What a connected value or list is as the start of an expression: the class
@@ -77,16 +119,16 @@ pub(super) struct StartLiteral {
 /// from `{ "input": name }` starts with, as a literal of its dtype.
 #[derive(Clone, Default)]
 pub struct Inputs {
-    inputs: BTreeMap<String, Input>,
+    inputs: BTreeMap<String, Connected>,
 }
 
 impl fmt::Debug for Inputs {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut shown = formatter.debug_map();
-        for (name, input) in &self.inputs {
+        for (name, connected) in &self.inputs {
             shown.entry(
                 name,
-                &match input {
+                &match connected.input {
                     Input::Table(_) => "table",
                     Input::Value(_) => "value",
                     Input::List(_) => "list",
@@ -104,15 +146,15 @@ impl Inputs {
         Self::default()
     }
 
-    fn add(&mut self, name: String, input: Input) -> Result<(), DuplicateInput> {
+    fn add(&mut self, name: String, origin: Origin, input: Input) -> Result<(), DuplicateInput> {
         if self.inputs.contains_key(&name) {
             return Err(DuplicateInput(name));
         }
-        self.inputs.insert(name, input);
+        self.inputs.insert(name, Connected { origin, input });
         Ok(())
     }
 
-    /// Connects a table.
+    /// Connects a table that `origin` supplies.
     ///
     /// # Errors
     ///
@@ -120,12 +162,14 @@ impl Inputs {
     pub fn add_table(
         &mut self,
         name: impl Into<String>,
+        origin: Origin,
         table: LazyFrame,
     ) -> Result<(), DuplicateInput> {
-        self.add(name.into(), Input::Table(Box::new(table)))
+        self.add(name.into(), origin, Input::Table(Box::new(table)))
     }
 
-    /// Connects a single value, which has its own dtype.
+    /// Connects a single value, which has its own dtype, that `origin`
+    /// supplies.
     ///
     /// # Errors
     ///
@@ -133,12 +177,13 @@ impl Inputs {
     pub fn add_value(
         &mut self,
         name: impl Into<String>,
+        origin: Origin,
         value: Scalar,
     ) -> Result<(), DuplicateInput> {
-        self.add(name.into(), Input::Value(value))
+        self.add(name.into(), origin, Input::Value(value))
     }
 
-    /// Connects a list of values of one dtype.
+    /// Connects a list of values of one dtype that `origin` supplies.
     ///
     /// # Errors
     ///
@@ -146,34 +191,44 @@ impl Inputs {
     pub fn add_list(
         &mut self,
         name: impl Into<String>,
+        origin: Origin,
         values: Series,
     ) -> Result<(), DuplicateInput> {
-        self.add(name.into(), Input::List(values))
+        self.add(name.into(), origin, Input::List(values))
     }
 
-    /// What each input holds, in the order of their names: a table's columns
-    /// with their dtypes, a value's or a list's dtype. Dtypes are given by
-    /// their [short names](crate::allowed::dtype_name), such as
-    /// `Datetime(us)`. No data is read.
+    /// What each input holds and what supplies it, in the order of their
+    /// names: a table's columns with their dtypes, a value or the first values
+    /// of a list with their dtype. Dtypes are given by their
+    /// [short names](crate::allowed::dtype_name), such as `Datetime(us)`, and
+    /// values as Polars writes them. No table is collected.
     ///
     /// # Errors
     ///
-    /// When Polars cannot work out the schema of a connected table.
+    /// When Polars cannot work out the schema of a connected table, or cannot
+    /// read a value.
     pub fn describe(&self) -> Result<Vec<InputDescription>, PolarsError> {
         crate::startup::ensure();
         self.inputs
             .iter()
-            .map(|(name, input)| {
-                let kind = match input {
+            .map(|(name, connected)| {
+                let kind = match &connected.input {
                     Input::Table(table) => {
                         let schema = LazyFrame::clone(table).collect_schema()?;
                         InputKind::Table(ColumnDescription::of_schema(&schema))
                     }
-                    Input::Value(value) => InputKind::Value(dtype_name(value.dtype())),
-                    Input::List(values) => InputKind::List(dtype_name(values.dtype())),
+                    Input::Value(value) => InputKind::Value {
+                        dtype: dtype_name(value.dtype()),
+                        value: text_of(value.value()),
+                    },
+                    Input::List(values) => InputKind::List {
+                        dtype: dtype_name(values.dtype()),
+                        values: FirstValues::of_series(values)?,
+                    },
                 };
                 Ok(InputDescription {
                     name: name.clone(),
+                    origin: connected.origin.clone(),
                     kind,
                 })
             })
@@ -182,7 +237,7 @@ impl Inputs {
 
     /// The table called `name`, if there is one.
     pub(super) fn table(&self, name: &str) -> Option<LazyFrame> {
-        match self.inputs.get(name) {
+        match self.inputs.get(name).map(|connected| &connected.input) {
             Some(Input::Table(table)) => Some(LazyFrame::clone(table)),
             _ => None,
         }
@@ -191,7 +246,7 @@ impl Inputs {
     /// What the single value or list called `name` is as the start of an
     /// expression, or `None` when no value or list has the name.
     pub(super) fn start_literal(&self, name: &str) -> Option<StartLiteral> {
-        let (dtype, shape) = match self.inputs.get(name)? {
+        let (dtype, shape) = match &self.inputs.get(name)?.input {
             Input::Value(value) => (value.dtype(), Shape::One),
             Input::List(values) => (values.dtype(), Shape::Many),
             Input::Table(_) => return None,
@@ -205,7 +260,7 @@ impl Inputs {
     /// The single value or list called `name` as an expression: a literal of
     /// its dtype.
     pub(super) fn literal(&self, name: &str) -> Option<Expr> {
-        match self.inputs.get(name) {
+        match self.inputs.get(name).map(|connected| &connected.input) {
             Some(Input::Value(value)) => Some(lit(value.clone())),
             Some(Input::List(values)) => Some(lit(values.clone())),
             _ => None,

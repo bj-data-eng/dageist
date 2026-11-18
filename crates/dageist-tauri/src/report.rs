@@ -471,7 +471,7 @@ enum OutcomeView {
 
 fn outcome_view(outcome: &Outcome) -> OutcomeView {
     match outcome {
-        Outcome::Valid { schema } => OutcomeView::Valid {
+        Outcome::Valid { schema, .. } => OutcomeView::Valid {
             columns: FieldView::of_columns(&ColumnDescription::of_schema(schema)),
         },
         Outcome::Refused(refusal) => OutcomeView::Refused {

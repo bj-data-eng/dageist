@@ -495,7 +495,19 @@ as not run. The rows of any step come from running
 it on an in-memory working window, and a preview gives them as text, every
 cell written as Polars writes it and each dtype by the engine's short name,
 such as `Datetime(us)`, so the view formats no value. Polars' own message is
-the reason when Polars refuses. Some mistakes, such as `dt.date` on a String
+the reason when Polars refuses.
+A valid step also says which columns it added and which it replaced: a column
+the table before it lacked is added, and one it had is replaced when the step
+writes it, as `with_columns` does by name, or gives it another dtype.
+Run on the working window, the report also counts for each step the rows it was
+given and the rows it kept, with the first values of each column it changed
+written as text. Each step is collected once and its table is the next step's
+input, so the window is run through the steps once and not again for every step;
+the window is the only table that is counted, because it is held in memory
+and bounded. A step Polars accepts but cannot collect on those rows is reported
+as failed, and the steps after it are not counted. A connected input is
+reported with what supplies it, and a value or the first values of a list as
+Polars writes them. Some mistakes, such as `dt.date` on a String
 column, are only found when rows are read, not from the schema; the editor
 learns them in advance from the
 [tables of allowed combinations](#which-combinations-polars-allows).

@@ -81,11 +81,11 @@ pub fn node_view() -> Result<NodeView, ErrorView> {
                     name,
                     columns: FieldView::of_columns(columns),
                 },
-                InputKind::Value(dtype) => InputView::Value {
+                InputKind::Value { dtype, .. } => InputView::Value {
                     name,
                     dtype: dtype.clone(),
                 },
-                InputKind::List(dtype) => InputView::List {
+                InputKind::List { dtype, .. } => InputView::List {
                     name,
                     dtype: dtype.clone(),
                 },

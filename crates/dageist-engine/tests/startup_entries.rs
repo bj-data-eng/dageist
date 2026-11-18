@@ -16,7 +16,7 @@ use std::path::PathBuf;
 use dageist_engine::allowed::Literal;
 use dageist_engine::catalog::{self, Argument, Build};
 use dageist_engine::claim_timing::ClaimTiming;
-use dageist_engine::document::{Document, Inputs, StepId};
+use dageist_engine::document::{Document, Inputs, Origin, StepId};
 use dageist_engine::{ParquetTable, SampleSpec, Table, generate_claims};
 use polars::prelude::*;
 use polars::sql::SQLContext;
@@ -205,7 +205,11 @@ fn describing_an_input_table_starts_polars() {
         || {
             let mut inputs = Inputs::new();
             inputs
-                .add_table("other", small_table().lazy())
+                .add_table(
+                    "other",
+                    Origin::Node("Other".to_owned()),
+                    small_table().lazy(),
+                )
                 .expect("an input");
             inputs.describe().expect("the input is described");
             sql_resolves();
@@ -235,7 +239,11 @@ fn walking_a_step_that_names_another_table_starts_polars() {
             } }]));
             let mut inputs = Inputs::new();
             inputs
-                .add_table("other", small_table().lazy())
+                .add_table(
+                    "other",
+                    Origin::Node("Other".to_owned()),
+                    small_table().lazy(),
+                )
                 .expect("an input");
             let step = &join.steps()[0];
             let walk = step.walk(0, small_table().schema(), &inputs);

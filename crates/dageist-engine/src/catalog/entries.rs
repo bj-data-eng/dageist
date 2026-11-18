@@ -176,6 +176,15 @@ fn positional_and_named(arguments: &Arguments) -> Result<Vec<Expr>, BuildError> 
     Ok(exprs)
 }
 
+/// The expressions the step `entry` writes as columns, named as they are
+/// written. See [`Entry::writes`].
+pub(super) fn writes(entry: &Entry, arguments: &Arguments) -> Result<Vec<Expr>, BuildError> {
+    match entry.id().as_str() {
+        "LazyFrame.with_columns" => positional_and_named(arguments),
+        _ => Ok(Vec::new()),
+    }
+}
+
 /// The conditions of `*predicates` followed by the equalities of
 /// `**constraints`, each a column that must equal its value.
 fn predicates_and_constraints(arguments: &Arguments) -> Result<Vec<Expr>, BuildError> {
