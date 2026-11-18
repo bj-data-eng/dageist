@@ -554,7 +554,9 @@ export interface FitsView {
 export type ReadingView =
   /**
    * The text reads as `literal`, which has the dtype `dtype` where Polars gives it one. `fit` is
-   * what the tables say of it in the slot that was asked about, or `null` where none was.
+   * what the tables say of it in the slot that was asked about, or `null` where none was. The
+   * slot judges the literal the document would hold, which is text where the document holds no
+   * date, so a date has the `dtype` `Date` and is judged as the `String` that carries it.
    */
   | {
       readonly kind: 'read';

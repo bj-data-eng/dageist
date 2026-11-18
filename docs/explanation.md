@@ -403,15 +403,20 @@ or, for a text the slot does not take, why not. Nothing typed reads as nothing.
   `dt.offset_by`'s `by`, `"1d"` is a `String` literal like any other, which the
   tables allow there and Polars reads when it runs rows; only a parameter that
   takes a duration itself reads the text as one, and the reading has no dtype.
-  An amount too large for Polars to hold is refused, where a build with overflow
-  checks would panic in Polars.
+  An amount whose units add up to more than an `i64` of nanoseconds (a day is 24
+  hours and a week 7 days) or of months is refused, in every build: Polars adds
+  the amounts without checking, so a build with overflow checks would panic and
+  one without would wrap around to another duration.
 - **A date** is read as Polars reads text given no format, by the patterns
   `str.to_date` infers from: year, month and day, or day, month and year, with
   `-`, `/` or `.`. Polars refuses to compare a date or a datetime with a string,
   so a typed date that is to be compared would have to be a date literal, and the
   document holds none: the reading carries the ISO text of the day, with the
   dtype `Date`, for a parameter that takes one. No entry of the catalogue has a
-  parameter of that type yet.
+  parameter of that type yet. Where a slot is named, the tables judge the
+  literal the document holds, so a date reading has the dtype `Date` and its
+  `fit` is that of the `String` that carries it; this changes when the document
+  holds a date.
 - **Text** is read as typed, with the dtype `String`, or with none for a path.
 
 The reading of a text is made by plain functions in the engine's
@@ -423,6 +428,12 @@ scheduler of the other lists and prepares the answer in
 not arrived shows the text as typed, waiting. A number the engine reads with a
 fraction is held with that mark in the value or setting, so that it is written
 as a float and has the dtype that was shown.
+
+A list that closes when a row is picked keeps its rows in the order the list is
+given them, and a row that arrives later, as an answer of the engine does, takes
+its place among the rest, so a list can be reordered while it waits. A list that
+stays open keeps each row where it stood when the list opened or was last
+searched, so that the row under the pointer does not move when a row is ticked.
 
 ### What The Editor Cannot Offer
 

@@ -320,7 +320,9 @@ pub(crate) struct FitsView {
 #[serde(tag = "kind", rename_all = "camelCase")]
 enum ReadingView {
     /// The text reads as this literal, which has this dtype where Polars gives it one, and
-    /// what the tables say of it where a slot was given.
+    /// what the tables say of it where a slot was given. The slot judges the literal the
+    /// document would hold, which the document writes as text where it holds no date, so a
+    /// date reads with the dtype `Date` and is judged as the `String` that carries it.
     Read {
         literal: LiteralView,
         dtype: Option<&'static str>,
