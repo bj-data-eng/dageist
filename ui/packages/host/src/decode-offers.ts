@@ -38,24 +38,27 @@ import { readOfferPlace, readRefusal, readVerdict } from './decode-run';
 
 const readLiteral: Decode<LiteralView> = readTagged<LiteralView>('kind', {
   integer: {
-    fields: ['value'],
+    fields: ['value', 'shown'],
     read: (fields, path) => ({
       kind: 'integer',
       value: readField(fields, path, 'value', readInteger),
+      shown: readField(fields, path, 'shown', readString),
     }),
   },
   float: {
-    fields: ['value'],
+    fields: ['value', 'shown'],
     read: (fields, path) => ({
       kind: 'float',
       value: readField(fields, path, 'value', readNumber),
+      shown: readField(fields, path, 'shown', readString),
     }),
   },
   text: {
-    fields: ['value'],
+    fields: ['value', 'shown'],
     read: (fields, path) => ({
       kind: 'text',
       value: readField(fields, path, 'value', readString),
+      shown: readField(fields, path, 'shown', readString),
     }),
   },
 });

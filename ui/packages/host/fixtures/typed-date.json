@@ -4,7 +4,8 @@
       "kind": "read",
       "literal": {
         "kind": "text",
-        "value": "2026-03-10"
+        "value": "2026-03-10",
+        "shown": "2026-03-10"
       },
       "dtype": "Date",
       "fit": null

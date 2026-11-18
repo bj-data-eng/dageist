@@ -10,7 +10,7 @@ import { useEffect } from 'react';
 import { Panel } from '@dageist/design';
 import type { Host } from '@dageist/host';
 
-import { EngineProvider } from './EngineProvider';
+import { EngineProvider, useCatalogue } from './EngineProvider';
 import { moved } from './Chain';
 import { useRun } from './engine';
 import { InputsStrip } from './InputsStrip';
@@ -39,7 +39,7 @@ export function StepsWindow({ host, styleNonce }: StepsWindowProps): React.JSX.E
 }
 
 function Editor({ host, styleNonce }: StepsWindowProps): React.JSX.Element {
-  const { steps, selectedId, change } = useSharedSteps(host, 'steps');
+  const { steps, selectedId, change } = useSharedSteps(host, 'steps', useCatalogue().comparisons);
   const run = useRun(host, steps);
   const results = run.prepared.steps;
 

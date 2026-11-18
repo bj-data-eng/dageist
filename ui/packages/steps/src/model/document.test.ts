@@ -13,6 +13,7 @@ import { placeKey, translate, wrongId } from './document';
 import type { Options } from './settings';
 import { NO_OPTIONS } from './settings';
 import type { Condition, Value } from './source';
+import { asComparison } from './source';
 import type { Step } from './steps';
 import { fieldKeys } from './steps';
 
@@ -64,12 +65,12 @@ function filtering(condition: Condition): Step {
   return { id: 'keep', verb: 'filter', condition, options: NO_OPTIONS };
 }
 
-const test = (
-  id: string,
-  column: string,
-  comparison: '==' | '!=' | '>' | '>=' | '<' | '<=' | 'is_in',
-  value: Value,
-): Condition => ({ kind: 'test', id, column, comparison, value });
+/** A test of `column` that compares with the entry `comparison`, which the catalogue lists, or with membership. */
+const test = (id: string, column: string, comparison: string, value: Value): Condition => {
+  const compares = asComparison(comparison, catalogue.comparisons);
+  if (compares === null) throw new Error(`The catalogue lists no comparison ${comparison}.`);
+  return { kind: 'test', id, column, comparison: compares, value };
+};
 
 describe('the steps the editor opens with', () => {
   it('are written as the same document as the engine’s claim-timing sample', () => {
@@ -122,13 +123,15 @@ describe('a step of the editor', () => {
 
   it('writes a number the engine read with a fraction as a float though it is whole', () => {
     // A whole number is an integer, and one the engine read as a float stays a float.
-    expect(argumentsWithSuffix({ kind: 'number', value: 2 })).toMatchObject({
+    expect(argumentsWithSuffix({ kind: 'number', value: 2, shown: '2' })).toMatchObject({
       suffix: { integer: 2 },
     });
-    expect(argumentsWithSuffix({ kind: 'number', value: 2, float: true })).toMatchObject({
+    expect(
+      argumentsWithSuffix({ kind: 'number', value: 2, float: true, shown: '2.0' }),
+    ).toMatchObject({
       suffix: { float: 2 },
     });
-    expect(argumentsWithSuffix({ kind: 'number', value: 2.5 })).toMatchObject({
+    expect(argumentsWithSuffix({ kind: 'number', value: 2.5, shown: '2.5' })).toMatchObject({
       suffix: { float: 2.5 },
     });
   });
@@ -147,15 +150,17 @@ describe('a step of the editor', () => {
   });
 
   it('writes a whole number as an integer and a number with a fraction as a float', () => {
-    expect(startOfColumnHolding({ kind: 'literal', value: 3 })).toEqual({ value: { integer: 3 } });
-    expect(startOfColumnHolding({ kind: 'literal', value: 1.5 })).toEqual({
+    expect(startOfColumnHolding({ kind: 'literal', value: 3, shown: '3' })).toEqual({
+      value: { integer: 3 },
+    });
+    expect(startOfColumnHolding({ kind: 'literal', value: 1.5, shown: '1.5' })).toEqual({
       value: { float: 1.5 },
     });
   });
 
   it('writes a whole number the engine read with a fraction as a float', () => {
     // `1.0` typed is a `Float64` to the engine, and what is written is what it said.
-    expect(startOfColumnHolding({ kind: 'literal', value: 1, float: true })).toEqual({
+    expect(startOfColumnHolding({ kind: 'literal', value: 1, float: true, shown: '1.0' })).toEqual({
       value: { float: 1 },
     });
   });
@@ -227,8 +232,8 @@ describe('what the document cannot hold', () => {
 
   it('holds back a group of which any one line is enough, and writes one of which every line must be as separate predicates', () => {
     const lines = [
-      test('t1', 'a', '==', { kind: 'literal', value: 1 }),
-      test('t2', 'b', '>', { kind: 'literal', value: 2 }),
+      test('t1', 'a', 'Expr.eq', { kind: 'literal', value: 1, shown: '1' }),
+      test('t2', 'b', 'Expr.gt', { kind: 'literal', value: 2, shown: '2' }),
     ];
     const anyOf = filtering({ kind: 'group', id: 'g', every: false, items: lines });
     const allOf = filtering({ kind: 'group', id: 'g', every: true, items: lines });
@@ -253,7 +258,7 @@ describe('what the document cannot hold', () => {
   it('holds back a when with more than one case, which the document has no place for', () => {
     const arm = (id: string): { id: string; condition: Condition; returns: Value } => ({
       id,
-      condition: test(`t-${id}`, 'a', '==', { kind: 'literal', value: 1 }),
+      condition: test(`t-${id}`, 'a', 'Expr.eq', { kind: 'literal', value: 1, shown: '1' }),
       returns: col('b'),
     });
     const step = adding('x', {
@@ -370,11 +375,11 @@ describe('where the document places the words of the editor', () => {
           arms: [
             {
               id: 'arm',
-              condition: test('t1', 'a', '==', { kind: 'literal', value: 1 }),
+              condition: test('t1', 'a', 'Expr.eq', { kind: 'literal', value: 1, shown: '1' }),
               returns: col('b'),
             },
           ],
-          otherwise: { kind: 'literal', value: 0 },
+          otherwise: { kind: 'literal', value: 0, shown: '0' },
         },
         methods: [{ id: 'm1', name: 'cum_sum', argument: null, options: NO_OPTIONS }],
       },

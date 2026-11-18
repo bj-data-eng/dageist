@@ -535,7 +535,10 @@ export function StepRow({
                       ]),
                   ...verbOffers(catalogue, typed, changeStarts, (verb, start) => {
                     if (verb !== step.verb) {
-                      onChange({ ...startedStep(verb, start), id: step.id });
+                      onChange({
+                        ...startedStep(verb, start, catalogue.comparisons),
+                        id: step.id,
+                      });
                     }
                   }),
                 ]}

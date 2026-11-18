@@ -38,7 +38,7 @@ import { useListState, usePositions } from './positions';
 import { findColumn } from './model/frame';
 import type { Dtype, Frame } from './model/frame';
 import { placeRequest, within } from './model/place';
-import { literalSetting, literalWords } from './model/literal';
+import { literalSetting } from './model/literal';
 import type { PreparedOption, PreparedReading } from './model/offers';
 import { findInput } from './model/inputs';
 import type { LiteralSetting, Options, PairSetting, SetParameter, Setting } from './model/settings';
@@ -80,9 +80,9 @@ function wordOfSetting(kind: KindView, setting: Setting): { label: string; quote
     case 'flag':
       return { label: setting.value ? 'true' : 'false', quoted: false };
     case 'number':
-      return { label: String(setting.value), quoted: false };
+      return { label: setting.shown, quoted: false };
     case 'text':
-      return { label: setting.value, quoted: true };
+      return { label: setting.shown, quoted: true };
     case 'word': {
       // A choice is shown by the words the catalogue gives it.
       const shown =
@@ -453,12 +453,8 @@ export function LiteralDrawing({
   );
   let shown: { label: string; look: 'plain' | 'quoted' | 'none' };
   if (value === null) shown = { label: waiting, look: 'none' };
-  else if (value.kind === 'number') {
-    shown = {
-      label: literalWords({ kind: value.float === true ? 'float' : 'integer', value: value.value }),
-      look: 'plain',
-    };
-  } else shown = { label: value.value, look: 'quoted' };
+  else if (value.kind === 'number') shown = { label: value.shown, look: 'plain' };
+  else shown = { label: value.shown, look: 'quoted' };
   return (
     <Slot
       label={shown.label}

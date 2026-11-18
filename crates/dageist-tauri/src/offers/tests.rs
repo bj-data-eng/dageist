@@ -171,7 +171,7 @@ fn a_method_that_takes_a_whole_number_by_default_is_offered_with_it() {
     // `shift(n=1)`: one row.
     assert_eq!(
         offered(&answer, "Expr.shift")["argument"],
-        json!({ "parameter": "n", "literal": { "kind": "integer", "value": 1 } })
+        json!({ "parameter": "n", "literal": { "kind": "integer", "value": 1, "shown": "1" } })
     );
     // `date` takes none, and a refused method is given none.
     assert_eq!(offered(&answer, "Expr.dt.date")["argument"], Value::Null);
@@ -456,24 +456,75 @@ fn a_number_typed_into_an_expression_reads_as_a_number_and_as_text_with_the_dtyp
     assert_eq!(
         read("12"),
         json!({ "readings": [
-            { "kind": "read", "literal": { "kind": "integer", "value": 12 }, "dtype": "Int32", "fit": null },
-            { "kind": "read", "literal": { "kind": "text", "value": "12" }, "dtype": "String", "fit": null },
+            { "kind": "read", "literal": { "kind": "integer", "value": 12, "shown": "12" }, "dtype": "Int32", "fit": null },
+            { "kind": "read", "literal": { "kind": "text", "value": "12", "shown": "12" }, "dtype": "String", "fit": null },
         ] })
     );
     let fraction = read("1.0");
     assert_eq!(
         fraction["readings"][0]["literal"],
-        json!({ "kind": "float", "value": 1.0 })
+        json!({ "kind": "float", "value": 1.0, "shown": "1.0" })
     );
     assert_eq!(fraction["readings"][0]["dtype"], "Float64");
     // What is no number is text alone, and nothing typed is nothing.
     assert_eq!(
         read("abc"),
         json!({ "readings": [
-            { "kind": "read", "literal": { "kind": "text", "value": "abc" }, "dtype": "String", "fit": null },
+            { "kind": "read", "literal": { "kind": "text", "value": "abc", "shown": "abc" }, "dtype": "String", "fit": null },
         ] })
     );
     assert_eq!(read(""), json!({ "readings": [] }));
+}
+
+#[test]
+fn a_typed_number_is_shown_as_python_writes_it() {
+    let shown = |typed: Value, text: &str| {
+        let answer = invoke(
+            "read_typed",
+            json!({ "text": text, "typed": typed, "start": null, "argument": null }),
+        )
+        .expect("readings");
+        answer["readings"][0]["literal"]["shown"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{text} is shown"))
+            .to_owned()
+    };
+    let expression = || json!({ "kind": "expression" });
+    // Python's `repr` of the number: a whole float keeps its fraction, and an exponent is
+    // written, with a sign and two digits at least, only below 1e-4 and from 1e16 on.
+    for (text, words) in [
+        ("1.0", "1.0"),
+        ("-3", "-3"),
+        ("2.50", "2.5"),
+        ("1e3", "1000.0"),
+        ("1e15", "1000000000000000.0"),
+        ("1e16", "1e+16"),
+        ("1e20", "1e+20"),
+        ("0.0001", "0.0001"),
+        ("0.00001", "1e-05"),
+        ("-0.0", "-0.0"),
+        // Past the largest whole number a JSON number carries, the nearest number with a fraction.
+        ("9007199254740993", "9007199254740992.0"),
+    ] {
+        assert_eq!(shown(expression(), text), words, "{text}");
+    }
+    // A slot that takes a number with a fraction reads a whole number as one.
+    let float_slot = json!({ "kind": "value", "type": "float" });
+    assert_eq!(shown(float_slot.clone(), "7"), "7.0");
+    assert_eq!(shown(float_slot, "0.5"), "0.5");
+}
+
+#[test]
+fn a_typed_text_is_shown_as_it_is_without_quotation_marks() {
+    let answer = invoke(
+        "read_typed",
+        json!({ "text": " a \"b\" ", "typed": { "kind": "value", "type": "string" }, "start": null, "argument": null }),
+    )
+    .expect("readings");
+    assert_eq!(
+        answer["readings"][0]["literal"],
+        json!({ "kind": "text", "value": " a \"b\" ", "shown": " a \"b\" " })
+    );
 }
 
 #[test]
@@ -524,7 +575,7 @@ fn a_typed_text_reads_as_the_slot_it_is_typed_into_takes_it() {
     // A whole number slot reads a whole number, and says why a number with a fraction is not.
     assert_eq!(
         read(value("integer"), "7")["readings"][0]["literal"],
-        json!({ "kind": "integer", "value": 7 })
+        json!({ "kind": "integer", "value": 7, "shown": "7" })
     );
     assert_eq!(
         read(value("integer"), "7.5")["readings"],
@@ -533,26 +584,26 @@ fn a_typed_text_reads_as_the_slot_it_is_typed_into_takes_it() {
     // A number slot reads a whole number as a number with a fraction.
     assert_eq!(
         read(value("float"), "7")["readings"][0],
-        json!({ "kind": "read", "literal": { "kind": "float", "value": 7.0 }, "dtype": "Float64", "fit": null })
+        json!({ "kind": "read", "literal": { "kind": "float", "value": 7.0, "shown": "7.0" }, "dtype": "Float64", "fit": null })
     );
     // Text is text, though it is a number; a path has no dtype.
     assert_eq!(
         read(value("string"), "7")["readings"],
-        json!([{ "kind": "read", "literal": { "kind": "text", "value": "7" }, "dtype": "String", "fit": null }])
+        json!([{ "kind": "read", "literal": { "kind": "text", "value": "7", "shown": "7" }, "dtype": "String", "fit": null }])
     );
     assert_eq!(
         read(json!({ "kind": "path" }), "data/claims.parquet")["readings"],
-        json!([{ "kind": "read", "literal": { "kind": "text", "value": "data/claims.parquet" }, "dtype": null, "fit": null }])
+        json!([{ "kind": "read", "literal": { "kind": "text", "value": "data/claims.parquet", "shown": "data/claims.parquet" }, "dtype": null, "fit": null }])
     );
     // A date is read as Polars reads one and carried as the day, a duration as Polars reads a
     // duration string and carried as typed.
     assert_eq!(
         read(value("date"), "10-03-2026")["readings"],
-        json!([{ "kind": "read", "literal": { "kind": "text", "value": "2026-03-10" }, "dtype": "Date", "fit": null }])
+        json!([{ "kind": "read", "literal": { "kind": "text", "value": "2026-03-10", "shown": "2026-03-10" }, "dtype": "Date", "fit": null }])
     );
     assert_eq!(
         read(json!({ "kind": "duration" }), "2d12h")["readings"],
-        json!([{ "kind": "read", "literal": { "kind": "text", "value": "2d12h" }, "dtype": null, "fit": null }])
+        json!([{ "kind": "read", "literal": { "kind": "text", "value": "2d12h", "shown": "2d12h" }, "dtype": null, "fit": null }])
     );
     // What Polars does not read is unread, with Polars' own words.
     for (typed, text) in [
@@ -764,7 +815,7 @@ fn every_step_of_the_list_starts_with_what_the_engine_gives_it() {
             { "entry": "LazyFrame.sort", "arguments": [argument("by", unset_list())] },
             { "entry": "LazyFrame.with_columns", "arguments": [
                 argument("named_exprs", json!({ "kind": "pairs", "entries": [
-                    { "key": { "kind": "text", "value": "new_column" }, "value": unset() },
+                    { "key": { "kind": "text", "value": "new_column", "shown": "new_column" }, "value": unset() },
                 ] })),
             ] },
         ] })
@@ -1097,6 +1148,33 @@ fn the_snapshots_are_what_the_commands_return() {
         (
             "typed-unread.json",
             json_of(&read_view("1x", TypedRequest::Duration, None, None).expect("readings")),
+        ),
+        (
+            // The numbers and the text the editor's starting steps hold, typed as a value is.
+            "typed-sample-values.json",
+            json_of(
+                &[
+                    "1",
+                    "0",
+                    "Company A",
+                    "within",
+                    "late",
+                    "holiday",
+                    "over",
+                    "ok",
+                ]
+                .into_iter()
+                .map(|text| {
+                    (
+                        text.to_owned(),
+                        json_of(
+                            &read_view(text, TypedRequest::Expression, None, None)
+                                .expect("readings"),
+                        ),
+                    )
+                })
+                .collect::<serde_json::Map<String, Value>>(),
+            ),
         ),
         (
             "options.json",

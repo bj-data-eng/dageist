@@ -7,7 +7,7 @@
 //! names fields, tables and values as the document holds them and says `…`
 //! for anything that is worked out, so it never takes the place of the step.
 
-use crate::catalog::{SummaryPhrase, Words};
+use crate::catalog::{Comparison, SummaryPhrase, Words};
 
 use super::model::{Expression, Start, Step, Value};
 use super::source::{field_alone, scalar};
@@ -164,7 +164,7 @@ impl Say<'_> {
         match (predicates.as_slice(), constraints) {
             ([], []) => self.phrase(SummaryPhrase::Condition),
             ([only], []) => self.condition(only),
-            ([], [(name, value)]) => self.compared(&self.key(name), SummaryPhrase::Equal, value),
+            ([], [(name, value)]) => self.compared(&self.key(name), Comparison::Equal, value),
             _ => self.phrase(SummaryPhrase::AllOf {
                 count: predicates.len() + constraints.len(),
             }),
@@ -179,14 +179,8 @@ impl Say<'_> {
         let (Some(link), 1) = (expression.links().first(), expression.links().len()) else {
             return self.phrase(SummaryPhrase::Worked);
         };
-        let sign = match link.entry().id().as_str() {
-            "Expr.eq" => SummaryPhrase::Equal,
-            "Expr.ne" => SummaryPhrase::NotEqual,
-            "Expr.gt" => SummaryPhrase::Greater,
-            "Expr.ge" => SummaryPhrase::AtLeast,
-            "Expr.lt" => SummaryPhrase::Less,
-            "Expr.le" => SummaryPhrase::AtMost,
-            _ => return self.phrase(SummaryPhrase::Worked),
+        let Some(sign) = Comparison::of_entry(link.entry().id().as_str()) else {
+            return self.phrase(SummaryPhrase::Worked);
         };
         let field = match expression.start() {
             Start::Hole => self.phrase(SummaryPhrase::Field),
@@ -204,10 +198,10 @@ impl Say<'_> {
         }
     }
 
-    fn compared(&self, field: &str, sign: SummaryPhrase<'_>, value: &Value) -> String {
+    fn compared(&self, field: &str, sign: Comparison, value: &Value) -> String {
         self.phrase(SummaryPhrase::Compared {
             field,
-            sign: &self.phrase(sign),
+            sign: &self.phrase(sign.phrase()),
             value: &self.key(value),
         })
     }

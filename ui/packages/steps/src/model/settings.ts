@@ -33,10 +33,18 @@ export type Setting =
   /** Still to be given. It stands for nothing until it is. */
   | { readonly kind: 'unset' }
   | { readonly kind: 'flag'; readonly value: boolean }
-  /** A number. `float` is set for one the engine read as a number with a fraction, which stays one though it is whole. */
-  | { readonly kind: 'number'; readonly value: number; readonly float?: true }
-  /** Text that was typed: a string, a duration or a path. */
-  | { readonly kind: 'text'; readonly value: string }
+  /**
+   * A number, with the words the engine shows it as. `float` is set for one the engine read as a
+   * number with a fraction, which stays one though it is whole.
+   */
+  | {
+      readonly kind: 'number';
+      readonly value: number;
+      readonly float?: true;
+      readonly shown: string;
+    }
+  /** Text that was typed: a string, a duration or a path, with the words the engine shows it as. */
+  | { readonly kind: 'text'; readonly value: string; readonly shown: string }
   /** A name picked from a list: a choice's word, a dtype, a column or a table. */
   | { readonly kind: 'word'; readonly value: string }
   | { readonly kind: 'expression'; readonly value: Value }

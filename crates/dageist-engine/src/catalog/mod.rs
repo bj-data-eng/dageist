@@ -13,6 +13,7 @@
 //! language files beside this module, keyed by the same identifiers.
 
 mod arguments;
+mod comparison;
 mod condition;
 mod defaults;
 mod entries;
@@ -23,6 +24,7 @@ mod tests;
 mod words;
 
 pub use arguments::{Argument, Arguments, BuildError};
+pub use comparison::Comparison;
 pub use condition::Conditional;
 pub use defaults::{DefaultValue, ParameterDefault};
 pub use left_out::{LeftOut, Reason, left_out};

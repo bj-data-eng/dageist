@@ -173,7 +173,8 @@
               {
                 "key": {
                   "kind": "text",
-                  "value": "new_column"
+                  "value": "new_column",
+                  "shown": "new_column"
                 },
                 "value": {
                   "kind": "unset"

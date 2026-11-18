@@ -25,7 +25,7 @@ use crate::allowed::{
     Place as OfferPlace, Position as Slot, Refusal, Representative, Shape, Unknown, Verdict,
 };
 use crate::allowed::{Loose, is_count, is_required, operand_adapts, receiver_adapts};
-use crate::catalog::{Applies, Entry, Kind, Role};
+use crate::catalog::{Applies, Comparison, Entry, Kind, Role};
 
 use super::error::{Place, Segment};
 use super::inputs::Inputs;
@@ -1315,14 +1315,9 @@ fn wholly_single(expression: &Expression, upto: usize, literals: bool) -> bool {
     }
 }
 
-/// The comparisons, which with a null literal give a null.
-const COMPARISONS: [&str; 6] = [
-    "Expr.eq", "Expr.ne", "Expr.gt", "Expr.ge", "Expr.lt", "Expr.le",
-];
-
-/// Whether `link` is a comparison.
+/// Whether `link` is a comparison, which with a null literal gives a null.
 fn is_a_comparison(link: &Call) -> bool {
-    COMPARISONS.contains(&link.entry().id().as_str())
+    Comparison::of_entry(link.entry().id().as_str()).is_some()
 }
 
 /// The calls of an expression: its start, then its links.
@@ -1469,7 +1464,7 @@ fn holds_a_null_comparison(expression: &Expression) -> bool {
         Some(start) if start.entry().id().as_str() == "polars.col"
     ) || start.is_some_and(|start| operands(start).into_iter().any(reads_a_column));
     for (at, link) in expression.links().iter().enumerate() {
-        if COMPARISONS.contains(&link.entry().id().as_str()) {
+        if is_a_comparison(link) {
             let given = operands(link);
             let null_given = given.iter().any(|operand| is_a_null(operand));
             let column_given = given.iter().any(|operand| {

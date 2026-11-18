@@ -12,10 +12,10 @@
 
 use std::fmt;
 
-use dageist_engine::allowed::{Nested, Outer, Position};
+use dageist_engine::allowed::{Literal, Nested, Outer, Position};
 use dageist_engine::catalog::{
-    Applies, DefaultValue, Entry, Family, Kind, Laziness, Parameter, ParameterDefault, Setting,
-    Shape, ValueType, Words, english, entries,
+    Applies, Comparison, DefaultValue, Entry, Family, Kind, Laziness, Parameter, ParameterDefault,
+    Setting, Shape, ValueType, Words, english, entries,
 };
 use dageist_engine::document::Dtype;
 use serde::Serialize;
@@ -105,7 +105,8 @@ enum DefaultView {
 }
 
 /// What a parameter holds, in the one shape the view draws every kind of
-/// parameter from. It mirrors `SettingView` in `ui/packages/host/src/contract.ts`.
+/// parameter from. It mirrors `SettingView` in `ui/packages/host/src/contract.ts`. A number or text
+/// comes with the words the engine shows it as.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub(crate) enum SettingView {
@@ -117,13 +118,16 @@ pub(crate) enum SettingView {
     },
     Integer {
         value: i64,
+        shown: String,
     },
     Float {
         value: f64,
+        shown: String,
     },
     /// Text that is typed: a string, a duration or a path.
     Text {
         value: String,
+        shown: String,
     },
     /// A name picked from a list: a choice's word, a dtype, a column or a table.
     Word {
@@ -163,10 +167,17 @@ pub(crate) fn setting_view(setting: &Setting) -> SettingView {
     match setting {
         Setting::ToGive => SettingView::ToGive,
         Setting::Flag(value) => SettingView::Flag { value: *value },
-        Setting::Integer(value) => SettingView::Integer { value: *value },
-        Setting::Float(value) => SettingView::Float { value: *value },
+        Setting::Integer(value) => SettingView::Integer {
+            value: *value,
+            shown: Literal::Integer(*value).shown(),
+        },
+        Setting::Float(value) => SettingView::Float {
+            value: *value,
+            shown: Literal::Float(*value).shown(),
+        },
         Setting::Text(value) => SettingView::Text {
             value: value.clone(),
+            shown: Literal::String(value.clone()).shown(),
         },
         Setting::Word(value) => SettingView::Word {
             value: value.clone(),
@@ -278,6 +289,13 @@ struct WordsView {
     title: String,
 }
 
+/// A comparison of a field with a value: the entry that makes it, and its sign.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct ComparisonView {
+    entry: &'static str,
+    sign: String,
+}
+
 /// The whole catalogue with its words.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -285,6 +303,9 @@ pub struct CatalogueView {
     families: Vec<WordsView>,
     /// The dtypes a document names by one word, in the order a list gives them.
     listed_dtypes: Vec<String>,
+    /// The comparisons a test makes, in the order they are offered, each by the entry that makes
+    /// it and the sign the language file gives it.
+    comparisons: Vec<ComparisonView>,
     entries: Vec<EntryView>,
 }
 
@@ -465,6 +486,17 @@ fn catalogue_view(words: &Words) -> Result<CatalogueView, MissingWord> {
             })
             .collect::<Result<_, MissingWord>>()?,
         listed_dtypes: Dtype::listed().iter().map(ToString::to_string).collect(),
+        comparisons: Comparison::ALL
+            .iter()
+            .map(|&comparison| {
+                Ok(ComparisonView {
+                    entry: comparison.entry(),
+                    sign: given(words.sign(comparison), || {
+                        format!("sign of {}", comparison.entry())
+                    })?,
+                })
+            })
+            .collect::<Result<_, MissingWord>>()?,
         entries: entries()
             .iter()
             .map(|entry| entry_view(entry, words))
@@ -540,7 +572,7 @@ mod tests {
                         "kind": { "kind": "expression" },
                         "shape": { "shape": "one" },
                         "default": { "kind": "integer", "value": 1 },
-                        "defaultSetting": { "kind": "integer", "value": 1 },
+                        "defaultSetting": { "kind": "integer", "value": 1, "shown": "1" },
                         "start": { "kind": "unset" },
                         "python": "1",
                         "position": null
@@ -604,6 +636,33 @@ mod tests {
                 "position": null
             })
         );
+    }
+
+    #[test]
+    fn the_comparisons_a_test_makes_come_with_the_signs_of_the_language_file() {
+        // Each is an entry of the catalogue that takes what a field is compared with as `other`,
+        // in the order they are offered. The signs are written as on paper: `≠`, `≥` and `≤`
+        // each take one character, while Polars' own text keeps `!=`, `>=` and `<=`.
+        let view = view();
+        assert_eq!(
+            view["comparisons"],
+            json!([
+                { "entry": "Expr.eq", "sign": "==" },
+                { "entry": "Expr.ne", "sign": "≠" },
+                { "entry": "Expr.gt", "sign": ">" },
+                { "entry": "Expr.ge", "sign": "≥" },
+                { "entry": "Expr.lt", "sign": "<" },
+                { "entry": "Expr.le", "sign": "≤" },
+            ])
+        );
+        for comparison in view["comparisons"].as_array().expect("comparisons") {
+            let id = comparison["entry"].as_str().expect("an entry");
+            assert_eq!(
+                parameter(&view, id, "other")["kind"],
+                json!({ "kind": "expression" }),
+                "{id}"
+            );
+        }
     }
 
     #[test]
@@ -827,7 +886,7 @@ mod tests {
         );
         assert_eq!(
             setting("LazyFrame.join", "suffix", "defaultSetting"),
-            json!({ "kind": "text", "value": "_right" })
+            json!({ "kind": "text", "value": "_right", "shown": "_right" })
         );
         assert_eq!(
             setting("LazyFrame.sort", "descending", "defaultSetting"),
@@ -835,7 +894,7 @@ mod tests {
         );
         assert_eq!(
             setting("Expr.shift", "n", "defaultSetting"),
-            json!({ "kind": "integer", "value": 1 })
+            json!({ "kind": "integer", "value": 1, "shown": "1" })
         );
         // Where Polars decides, or the parameter must be given, there is none.
         assert!(setting("LazyFrame.join", "coalesce", "defaultSetting").is_null());

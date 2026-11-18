@@ -19,7 +19,6 @@ import { useCatalogue, useNode } from './EngineProvider';
 import { usePreparedStep } from './engine';
 import { comparisonEntryId, wrongId } from './model/document';
 import { ChainBlocks } from './Chain';
-import { COMPARISON_SIGNS } from './comparisons';
 import { fieldGroup, inputGroup, refusalOf, startFunctions, valueGroup } from './engineLists';
 import { FreshContext, Line, Lines } from './Lists';
 import { PositionsContext, useListState, usePositions } from './positions';
@@ -30,7 +29,7 @@ import { findColumn } from './model/frame';
 import { NO_POSITIONS, startRequest } from './model/place';
 import { nextId } from './model/ids';
 import { findInput, inputLines } from './model/inputs';
-import { literalValue, valueWords } from './model/literal';
+import { literalValue } from './model/literal';
 import type {
   ChainCondition,
   Comparison,
@@ -40,38 +39,18 @@ import type {
   Test,
   Value,
 } from './model/source';
-import { COMPARISONS } from './model/source';
-
-/** What each comparison means, for someone who reads the symbol for the first time. */
-const COMPARISON_WORDS: Readonly<Record<Comparison, string>> = {
-  '==': 'equal to',
-  '!=': 'not equal to',
-  '>': 'greater than',
-  '>=': 'at least',
-  '<': 'less than',
-  '<=': 'at most',
-  is_in: 'one of a list',
-};
+import { IS_IN } from './model/source';
+import type { Catalogue } from './model/catalogue';
+import { comparisonChoices, comparisonOption } from './model/catalogue';
+import { emptyTest } from './model/conditions';
 
 /** A value that is still to be picked. */
 const UNSET_VALUE: Value = { kind: 'unset' };
 
-/** Returns how a typed value is shown as a block. */
+/** Returns how a typed value is shown as a block: in the words the engine gave it, text between quotation marks the block draws. */
 function literalBlock(value: LiteralValue): { label: string; look: Look } {
-  const words = valueWords(value);
-  if (words === null) return { label: 'None', look: 'none' };
-  return { label: words, look: typeof value.value === 'number' ? 'plain' : 'quoted' };
-}
-
-/** Returns a comparison with nothing picked yet: a field, equal to, a value. */
-export function emptyTest(): Test {
-  return {
-    kind: 'test',
-    id: nextId('test'),
-    column: '',
-    comparison: '==',
-    value: { kind: 'unset' },
-  };
+  if (value.value === null) return { label: 'None', look: 'none' };
+  return { label: value.shown, look: typeof value.value === 'number' ? 'plain' : 'quoted' };
 }
 
 /** Returns a condition written as a chain, with nothing picked yet. */
@@ -218,7 +197,11 @@ export function ValueSlot({
       ...startFunctions(catalogue, startOffers, startKnown, typed, (id) => {
         const made = nextId('chain');
         if (id === 'polars.when') {
-          const arm = { id: nextId('arm'), condition: emptyTest(), returns: UNSET_VALUE };
+          const arm = {
+            id: nextId('arm'),
+            condition: emptyTest(catalogue),
+            returns: UNSET_VALUE,
+          };
           onChange({
             kind: 'chain',
             id: made,
@@ -345,6 +328,7 @@ interface TestBlocksProps {
 /** Draws a comparison as three blocks: a field, a comparison and a value. */
 function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Element {
   const fresh = useContext(FreshContext);
+  const catalogue = useCatalogue();
   const node = useNode();
   const prepared = usePreparedStep();
   const fieldHint = useFieldHint();
@@ -364,13 +348,16 @@ function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Eleme
         };
   const wrongSign = prepared?.wrong.has(wrongId({ kind: 'test', testId: test.id })) ?? false;
 
+  // What each comparison is written as and means is the engine's, as the catalogue lists it.
+  const comparisons = comparisonChoices(catalogue);
+  const held = comparisonOption(catalogue, test.comparison);
   const compare = (comparison: Comparison): void => {
-    const wasList = test.comparison === 'is_in';
-    if (comparison === 'is_in' && !wasList) {
+    const wasList = test.comparison === IS_IN;
+    if (comparison === IS_IN && !wasList) {
       // Membership needs a list, so start from the first connected one.
       const list = node.inputs.find((input) => input.kind === 'list');
       onChange({ ...test, comparison, value: { kind: 'input', name: list?.name ?? '' } });
-    } else if (comparison !== 'is_in' && wasList) {
+    } else if (comparison !== IS_IN && wasList) {
       onChange({ ...test, comparison, value: { kind: 'unset' } });
     } else {
       onChange({ ...test, comparison });
@@ -403,34 +390,29 @@ function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Eleme
         />
       </Hint>
       <Slot
-        label={COMPARISON_SIGNS[test.comparison]}
+        label={held.sign}
         tone="compare"
         look="compare"
         wrong={wrongSign}
         names
-        describedAs={`Comparison: ${COMPARISON_WORDS[test.comparison]}`}
+        describedAs={`Comparison: ${held.hint}`}
         placeholder="Search the comparisons"
         offers={(typed) => [
           titled(
             'Comparison',
-            COMPARISONS.filter((comparison) =>
-              matches(
-                typed,
-                comparison,
-                COMPARISON_SIGNS[comparison],
-                COMPARISON_WORDS[comparison],
+            comparisons
+              .filter((option) => matches(typed, option.entry, option.sign, option.hint))
+              .map((option) =>
+                offer(
+                  option.sign,
+                  'compare',
+                  option.hint,
+                  () => {
+                    compare(option.entry);
+                  },
+                  { id: option.entry, look: 'compare' },
+                ),
               ),
-            ).map((comparison) =>
-              offer(
-                COMPARISON_SIGNS[comparison],
-                'compare',
-                COMPARISON_WORDS[comparison],
-                () => {
-                  compare(comparison);
-                },
-                { id: comparison, look: 'compare' },
-              ),
-            ),
           ),
         ]}
       />
@@ -438,7 +420,7 @@ function TestBlocks({ test, frame, onChange }: TestBlocksProps): React.JSX.Eleme
         value={test.value}
         frame={frame}
         label={unset ? 'The value it is compared with' : `Value compared with ${test.column}`}
-        lists={test.comparison === 'is_in'}
+        lists={test.comparison === IS_IN}
         positions={positions.length === 0 ? null : positions}
         argument={argument}
         onChange={(value) => {
@@ -520,6 +502,7 @@ interface GroupLinesProps {
  * the comparison in it that is filled in first.
  */
 function lineOffers(
+  catalogue: Catalogue,
   group: Group,
   typed: string,
   onAdd: (item: Condition, first: string) => void,
@@ -533,7 +516,7 @@ function lineOffers(
           'value',
           'a comparison',
           () => {
-            const test = emptyTest();
+            const test = emptyTest(catalogue);
             onAdd(test, test.id);
           },
           { look: 'none', act: true },
@@ -543,7 +526,7 @@ function lineOffers(
           'function',
           'a group with lines of its own',
           () => {
-            const test = emptyTest();
+            const test = emptyTest(catalogue);
             onAdd(
               { kind: 'group', id: nextId('group'), every: !group.every, items: [test] },
               test.id,
@@ -573,6 +556,7 @@ interface LineInsertion {
  */
 function GroupLines({ group, frame, nested, onChange }: GroupLinesProps): React.JSX.Element {
   const fresh = useContext(FreshContext);
+  const catalogue = useCatalogue();
   const [insertion, setInsertion] = useState<LineInsertion | null>(null);
   const closeList = useCallback(() => {
     setInsertion(null);
@@ -665,7 +649,7 @@ function GroupLines({ group, frame, nested, onChange }: GroupLinesProps): React.
           <OfferList
             placeholder="Search"
             groups={(typed) =>
-              lineOffers(group, typed, (item, first) => {
+              lineOffers(catalogue, group, typed, (item, first) => {
                 insert(insertion.at, item, first);
               })
             }
@@ -714,6 +698,7 @@ function ConditionContent({
   onChange,
 }: ConditionBlocksProps): React.JSX.Element {
   const fresh = useContext(FreshContext);
+  const catalogue = useCatalogue();
   const [adding, setAdding] = useState<HTMLElement | null>(null);
   const closeList = useCallback(() => {
     setAdding(null);
@@ -745,7 +730,7 @@ function ConditionContent({
   if (group.items.length === 0) {
     const start = (every: boolean): (() => void) => {
       return () => {
-        const test = emptyTest();
+        const test = emptyTest(catalogue);
         onChange({ ...group, every, items: [test] });
         fresh.mark(test.id);
       };
@@ -808,7 +793,7 @@ function ConditionContent({
           <OfferList
             placeholder="Search"
             groups={(typed) =>
-              lineOffers(group, typed, (item, first) => {
+              lineOffers(catalogue, group, typed, (item, first) => {
                 onChange({ ...group, items: [item, ...group.items] });
                 fresh.mark(first);
               })

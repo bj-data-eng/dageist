@@ -27,10 +27,10 @@ import { fieldGroup, inputGroup, methodGroups, startFunctions, valueGroup } from
 import { FreshContext, Line, Lines } from './Lists';
 import { OptionRows, optionOffers } from './Parameters';
 import { useListState, usePositions } from './positions';
-import { ConditionBlocks, ValueSlot, emptyTest } from './Values';
+import { ConditionBlocks, ValueSlot } from './Values';
 import { matches, offer, titled } from './offers';
 import { useFieldHint } from './origins';
-import type { ConditionWord } from './model/catalogue';
+import type { Catalogue, ConditionWord } from './model/catalogue';
 import {
   conditionEntry,
   conditionId,
@@ -55,7 +55,8 @@ import { chosenOptions } from './model/offers';
 import type { PreparedOffer } from './model/offers';
 import { placeRequest, startRequest, within } from './model/place';
 import { NO_OPTIONS, carriedOptions } from './model/settings';
-import { literalValue, valueWords } from './model/literal';
+import { emptyTest } from './model/conditions';
+import { literalValue } from './model/literal';
 import type { Arm, Chain, Source, Value } from './model/source';
 import type { ChainDtypes } from './model/report';
 import { usePreparedStep } from './engine';
@@ -121,8 +122,8 @@ function withMethodMoved(chain: Chain, from: number, to: number): Chain {
 }
 
 /** Returns a condition with nothing picked yet, and the value it gives. */
-function emptyArm(): Arm {
-  return { id: nextId('arm'), condition: emptyTest(), returns: { kind: 'unset' } };
+function emptyArm(catalogue: Catalogue): Arm {
+  return { id: nextId('arm'), condition: emptyTest(catalogue), returns: { kind: 'unset' } };
 }
 
 interface ArgumentSlotProps {
@@ -154,10 +155,10 @@ function shownArgument(
     case 'chain':
       return { label: '…', tone: 'function', look: 'plain' };
     case 'literal': {
-      const words = valueWords(argument);
-      if (words === null) return { label: 'None', tone: 'value', look: 'none' };
+      // A number or text is shown in the words the engine gave it.
+      if (argument.value === null) return { label: 'None', tone: 'value', look: 'none' };
       return {
-        label: words,
+        label: argument.shown,
         tone: 'value',
         look: typeof argument.value === 'number' ? 'plain' : 'quoted',
       };
@@ -652,7 +653,7 @@ export function ChainBlocks({
                   return [
                     ...startFunctions(catalogue, startOffers, startKnown, typed, (id) => {
                       if (id === 'polars.when') {
-                        const made = emptyArm();
+                        const made = emptyArm(catalogue);
                         withSource({ kind: 'when', arms: [made], otherwise: { kind: 'unset' } });
                         fresh.mark(made.condition.id);
                       } else {

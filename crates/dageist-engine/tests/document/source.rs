@@ -2,6 +2,7 @@
 //! hand from how Python writes its values and calls its methods, and from the
 //! signatures in `api/polars/python.txt`, not read from what is written.
 
+use dageist_engine::allowed::Literal;
 use dageist_engine::claim_timing::ClaimTiming;
 use dageist_engine::document::{Document, Inputs, ListOrigin, NotRunnableReason};
 use polars::prelude::*;
@@ -59,6 +60,48 @@ fn floats_are_written_as_python_writes_them() {
             "pl.lit(-0.0).alias(\"i\"), pl.lit(100.0).alias(\"j\"))"
         )
     );
+}
+
+#[test]
+fn a_number_is_shown_to_the_editor_as_the_source_writes_it() {
+    // The editor's words for a number are the source's, worked out by hand from Python's `repr`:
+    // a whole float is `1.0` there as it is here, and an exponent is written the same way.
+    for (number, words) in [
+        (1.0, "1.0"),
+        (0.1, "0.1"),
+        (1e16, "1e+16"),
+        (1e20, "1e+20"),
+        (123_456_789_012_345.0, "123456789012345.0"),
+        (1e-5, "1e-05"),
+        (0.0001, "0.0001"),
+        (-2.5e-7, "-2.5e-07"),
+        (-0.0, "-0.0"),
+        (100.0, "100.0"),
+    ] {
+        assert_eq!(Literal::Float(number).shown(), words, "{number:e}");
+        assert_eq!(
+            named_columns(vec![("a", float(number))]),
+            format!(".with_columns(pl.lit({words}).alias(\"a\"))"),
+            "{number:e}"
+        );
+    }
+    // A whole number is its digits, as the source writes one.
+    for number in [0, 7, -3, i64::MAX, i64::MIN] {
+        assert_eq!(Literal::Integer(number).shown(), number.to_string());
+        assert_eq!(
+            named_columns(vec![("a", whole(number))]),
+            format!(".with_columns(pl.lit({number}).alias(\"a\"))"),
+        );
+    }
+}
+
+#[test]
+fn text_is_shown_to_the_editor_as_it_is_where_the_source_quotes_and_escapes_it() {
+    // The editor draws the quotation marks of a block that holds text, so nothing is added or
+    // escaped, and the white space it was typed with stays.
+    for typed in ["within", " a b ", "say \"hi\"\n\\ é\t", "", "1.0"] {
+        assert_eq!(Literal::String(typed.to_owned()).shown(), typed);
+    }
 }
 
 #[test]

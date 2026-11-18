@@ -19,6 +19,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { Host } from '@dageist/host';
 
+import type { Comparisons } from './model/shape';
 import { isCondition, isOptions, isRecord, isValue } from './model/shape';
 import type { Step } from './model/steps';
 import { VERBS } from './model/steps';
@@ -50,23 +51,25 @@ type Message =
  * condition is checked all the way down, chains and the options of their
  * methods included. It looks no deeper at the rest.
  */
-function isStep(value: unknown): value is Step {
+function isStep(value: unknown, comparisons: Comparisons): value is Step {
   if (!isRecord(value) || typeof value.id !== 'string') return false;
-  if (!VERBS.some((verb) => verb === value.verb) || !isOptions(value.options)) return false;
-  if (value.verb === 'with_columns') return isValue(value.value);
-  if (value.verb === 'filter') return isCondition(value.condition);
+  if (!VERBS.some((verb) => verb === value.verb) || !isOptions(value.options, comparisons)) {
+    return false;
+  }
+  if (value.verb === 'with_columns') return isValue(value.value, comparisons);
+  if (value.verb === 'filter') return isCondition(value.condition, comparisons);
   return true;
 }
 
 /** Returns `message` as something a window says about the steps, or `null` when it is not. */
-function readMessage(message: unknown): Message | null {
+function readMessage(message: unknown, comparisons: Comparisons): Message | null {
   if (typeof message !== 'object' || message === null || !('kind' in message)) return null;
   if (message.kind === 'hello' || message.kind === 'here' || message.kind === 'gone') {
     return { kind: message.kind };
   }
   if (message.kind !== 'state' || !('steps' in message) || !('selectedId' in message)) return null;
   const { steps, selectedId } = message;
-  if (!Array.isArray(steps) || !steps.every((step) => isStep(step))) return null;
+  if (!Array.isArray(steps) || !steps.every((step) => isStep(step, comparisons))) return null;
   if (selectedId !== null && typeof selectedId !== 'string') return null;
   return { kind: 'state', steps, selectedId };
 }
@@ -82,8 +85,11 @@ export interface SharedSteps extends Held {
   readonly change: (steps: readonly Step[], selectedId: string | null) => void;
 }
 
-/** Holds the steps for one window and keeps them the same as in the others. */
-export function useSharedSteps(host: Host, role: Role): SharedSteps {
+/**
+ * Holds the steps for one window and keeps them the same as in the others. What another window
+ * sends is held only where it compares with one of the `comparisons` the catalogue lists.
+ */
+export function useSharedSteps(host: Host, role: Role, comparisons: Comparisons): SharedSteps {
   const [held, setHeld] = useState<Held>({ steps: START, selectedId: START[2]?.id ?? null });
   const [stepsOpen, setStepsOpen] = useState(false);
   // What is held now, for answering a window that asks after this one drew.
@@ -95,7 +101,7 @@ export function useSharedSteps(host: Host, role: Role): SharedSteps {
       host.broadcast(TOPIC, message);
     };
     const stop = host.listen(TOPIC, (raw) => {
-      const message = readMessage(raw);
+      const message = readMessage(raw, comparisons);
       if (message === null) return;
       if (message.kind === 'state') {
         latest.current = { steps: message.steps, selectedId: message.selectedId };
@@ -123,7 +129,7 @@ export function useSharedSteps(host: Host, role: Role): SharedSteps {
       window.clearInterval(beat);
       stop();
     };
-  }, [host, role]);
+  }, [host, role, comparisons]);
 
   const change = useCallback(
     (steps: readonly Step[], selectedId: string | null) => {

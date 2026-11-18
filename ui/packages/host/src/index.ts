@@ -19,6 +19,7 @@ export type {
   ColumnChangeView,
   ColumnValuesView,
   ColumnView,
+  ComparisonView,
   ConditionStateView,
   ContextView,
   CountView,

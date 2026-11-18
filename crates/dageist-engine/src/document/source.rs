@@ -751,7 +751,7 @@ pub(super) fn string(text: &str) -> String {
 /// `number` as Python's `repr` writes it: the shortest digits that read back
 /// as the same number, with a fraction or an exponent so that it is a float,
 /// and an exponent only where the number is below 1e-4 or from 1e16 on.
-pub(super) fn float(number: f64) -> String {
+pub(crate) fn float(number: f64) -> String {
     if number == 0.0 {
         return if number.is_sign_negative() {
             "-0.0"
