@@ -27,6 +27,9 @@
 //! for a join's key whose whole expression holds an aggregate beside a column,
 //! or a column compared with a null, and [`rule_forbids_a_repeated_pair_of_key_names`]
 //! for a join's key that makes a pair of output names again.
+//!
+//! [`read_typed`] answers what a text typed into a slot is: a number, a date, a
+//! duration or text, as the engine reads it, with the dtype Polars gives it.
 
 mod adapt;
 mod candidates;
@@ -38,6 +41,7 @@ mod rules;
 mod table;
 #[cfg(test)]
 mod tests;
+mod typed;
 
 pub(crate) use adapt::{Loose, is_count, is_required, operand_adapts, receiver_adapts};
 pub use candidates::{
@@ -55,3 +59,4 @@ pub use offers::{
 };
 pub use rules::Rule;
 pub use table::{Outcome, Produces, Reason, Shape, Stage};
+pub use typed::{LARGEST_WHOLE_NUMBER, Read, Typed, Unread, read_typed};

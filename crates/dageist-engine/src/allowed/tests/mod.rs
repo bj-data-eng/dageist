@@ -12,3 +12,4 @@ mod probe;
 mod rebuilt;
 mod sample;
 mod tables;
+mod typed;
