@@ -233,3 +233,57 @@ describe('the catalogue the host sends', () => {
     expect(found.problem).toBe('must be a whole number, not 1.5');
   });
 });
+
+describe('the default and the first setting of a parameter', () => {
+  const decoded = decodeCatalogue(catalogue);
+  const parameterOf = (id: string, name: string) => {
+    const found = decoded.entries
+      .find((entry) => entry.id === id)
+      ?.parameters.find((parameter) => parameter.name === name);
+    if (found === undefined) throw new Error(`no parameter ${name} of ${id}`);
+    return found;
+  };
+
+  it('are the engine’s: Polars’ default as a setting, and what is set when it is first added', () => {
+    // Worked out from Python Polars: `join(how="inner", suffix="_right", coalesce=None)`.
+    const how = parameterOf('LazyFrame.join', 'how');
+    expect(how.defaultSetting).toEqual({ kind: 'word', value: 'inner' });
+    expect(how.start).toEqual({ kind: 'word', value: 'left' });
+    expect(parameterOf('LazyFrame.join', 'suffix').defaultSetting).toEqual({
+      kind: 'text',
+      value: '_right',
+    });
+    expect(parameterOf('Expr.shift', 'n').defaultSetting).toEqual({ kind: 'integer', value: 1 });
+    expect(parameterOf('LazyFrame.join', 'coalesce').defaultSetting).toBeNull();
+    expect(parameterOf('LazyFrame.sort', 'descending').start).toEqual({
+      kind: 'flag',
+      value: true,
+    });
+    expect(parameterOf('LazyFrame.join', 'left_on').start).toEqual({
+      kind: 'list',
+      items: [{ kind: 'unset' }],
+    });
+    expect(parameterOf('LazyFrame.rename', 'mapping').start).toEqual({
+      kind: 'pairs',
+      entries: [],
+    });
+  });
+
+  it('are refused where a setting is of a kind the contract lacks or holds another kind of value', () => {
+    const how = parameterPath(catalogue, 'LazyFrame.join', 'how');
+    const here = `$.entries[${String(how[1])}].parameters[${String(how[3])}]`;
+    expect(refusal(replaced(catalogue, [...how, 'start'], { kind: 'text-ish' })).message).toContain(
+      `${here}.start.kind`,
+    );
+    expect(
+      refusal(replaced(catalogue, [...how, 'start'], { kind: 'flag', value: 'yes' })).message,
+    ).toBe(`${here}.start.value: must be a boolean, not a string`);
+    expect(refusal(without(catalogue, how, 'defaultSetting')).message).toBe(
+      `${here}: is missing the field "defaultSetting"`,
+    );
+    expect(
+      refusal(replaced(catalogue, [...how, 'start'], { kind: 'list', items: [{ kind: 'nope' }] }))
+        .message,
+    ).toContain(`${here}.start.items[0].kind`);
+  });
+});

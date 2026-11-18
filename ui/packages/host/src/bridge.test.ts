@@ -7,6 +7,7 @@ import offersFixture from '../fixtures/offers-value.json';
 import optionsFixture from '../fixtures/options.json';
 import typedFixture from '../fixtures/typed-expression.json';
 import reportFixture from '../fixtures/step-report.json';
+import startsFixture from '../fixtures/step-starts.json';
 import rowsFixture from '../fixtures/step-rows.json';
 import { withField } from '../test-support/tamper';
 
@@ -104,6 +105,16 @@ describe('the host that calls the bridge', () => {
       path: '/bridge/option_offers',
       body: { entry: 'LazyFrame.join', chosen },
     });
+  });
+
+  it('sends the columns and the tables a new step is started on, and decodes what each step starts with', async () => {
+    bridgeAnswers(() => jsonResponse(startsFixture));
+    const request = { columns: ['dcn', 'owner'], tables: ['step_names'] };
+
+    const found = await bridgeHost().stepStarts(request);
+
+    expect(found.starts.map((start) => start.entry)).toContain('LazyFrame.join');
+    expect(sent[0]).toMatchObject({ path: '/bridge/step_starts', body: request });
   });
 
   it('sends a typed text with what it is typed into and the slot it stands in', async () => {

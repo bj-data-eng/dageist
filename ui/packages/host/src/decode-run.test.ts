@@ -257,6 +257,37 @@ describe('the Python source and the summary of each step', () => {
   });
 });
 
+describe('the arguments of a step that are at their default', () => {
+  it('are the places the engine names, whether or not the step ran', () => {
+    const run = decodeRun(report);
+    // The sample gives the first argument of `shift` its default of 1, and no other step an
+    // argument equal to its default.
+    expect(stepNamed(run, 'resolved_at').atDefault).toEqual([
+      {
+        stepIndex: 2,
+        stepId: 'resolved_at',
+        path: [
+          { kind: 'parameter', name: 'named_exprs' },
+          { kind: 'value', index: 0 },
+          { kind: 'link', index: 0 },
+          { kind: 'parameter', name: 'n' },
+        ],
+      },
+    ]);
+    expect(stepNamed(run, 'sort').atDefault).toEqual([]);
+    expect(stepNamed(decodeRun(variants), 'variants').atDefault).toHaveLength(2);
+  });
+
+  it('are refused where the field is missing or holds something that is not a place', () => {
+    expect(refusal(without(report, ['steps', 0], 'atDefault')).message).toBe(
+      '$.steps[0]: is missing the field "atDefault"',
+    );
+    expect(refusal(replaced(report, ['steps', 2, 'atDefault', 0, 'stepIndex'], -1)).message).toBe(
+      '$.steps[2].atDefault[0].stepIndex: must be a whole number from 0, not -1',
+    );
+  });
+});
+
 describe('the report of a document with a step Polars refuses', () => {
   const run = decodeRun(refused);
 

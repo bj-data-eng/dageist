@@ -1,78 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { decodeCatalogue, decodeNode } from '@dageist/host';
+import { decodeCatalogue } from '@dageist/host';
 
 import catalogueFixture from '../../../host/fixtures/catalogue.json';
-import nodeFixture from '../../../host/fixtures/node-inputs.json';
 import { indexCatalogue } from './catalogue';
-import { translate } from './document';
 import { startingArgument, swappedArgument } from './expr';
-import { tablesOf } from './inputs';
 import { expressionSetting } from './settings';
-import { defaultStep, stepItems } from './steps';
+import { stepItems } from './steps';
 import type { Step } from './steps';
 
 const catalogue = indexCatalogue(decodeCatalogue(catalogueFixture));
-const node = decodeNode(nodeFixture);
-const tables = tablesOf(node);
-
-describe('a new step', () => {
-  it('is a join on the first connected table, whose keys are still to be picked', () => {
-    // The fields are not matched by their dtype: the engine says whether two keys fit, and the
-    // step says what is missing until they are picked.
-    const step = defaultStep('join', node.source.columns, tables);
-
-    expect(step).toMatchObject({
-      verb: 'join',
-      table: 'step_names',
-      options: {
-        left_on: { kind: 'list', items: [{ kind: 'unset' }] },
-        right_on: { kind: 'list', items: [{ kind: 'unset' }] },
-        how: { kind: 'word', value: 'left' },
-      },
-    });
-    // The keys are holes in the document, so the engine says the step is incomplete.
-    const [sent] = translate(catalogue, [step]).steps;
-    expect(sent).toMatchObject({ kind: 'sent' });
-  });
-
-  it('is a pivot whose three fields are still to be picked, over the first connected table', () => {
-    const step = defaultStep('pivot', node.source.columns, tables);
-
-    expect(step).toMatchObject({
-      verb: 'pivot',
-      on: '',
-      index: '',
-      values: '',
-      options: { on_columns: { kind: 'word', value: 'step_names' } },
-    });
-    const [held] = translate(catalogue, [step]).steps;
-    expect(held).toMatchObject({
-      kind: 'held',
-      problem: { cause: 'unset', message: 'Pick the field for on.' },
-    });
-  });
-
-  it('is a join with no table at all when none is connected', () => {
-    expect(defaultStep('join', node.source.columns, [])).toMatchObject({ table: '' });
-    expect(defaultStep('pivot', node.source.columns, [])).toMatchObject({
-      options: { on_columns: { kind: 'unset' } },
-    });
-  });
-
-  it('keeps every field for a select, in the order of the rows', () => {
-    const step = defaultStep('select', node.source.columns, tables);
-
-    expect(step).toMatchObject({ verb: 'select' });
-    expect(step.verb === 'select' ? step.options.exprs : null).toMatchObject({
-      kind: 'list',
-      items: node.source.columns.map((column) => ({
-        kind: 'expression',
-        value: { kind: 'column', column: column.name },
-      })),
-    });
-  });
-});
 
 describe('the argument of a method that is added', () => {
   it('is the default the engine allowed, a number typed in', () => {

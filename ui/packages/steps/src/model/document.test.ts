@@ -106,7 +106,7 @@ describe('a step of the editor', () => {
     });
   });
 
-  it('leaves out a parameter that is set to what Polars does when it is not given', () => {
+  it('writes a parameter that is set to what Polars does when it is not given, which the engine judges', () => {
     const options: Options = {
       left_on: fieldKeys(['a']),
       right_on: fieldKeys(['b']),
@@ -116,8 +116,8 @@ describe('a step of the editor', () => {
 
     const call = firstCall([{ id: 'j', verb: 'join', table: 'step_sla', options }]);
 
-    expect(call.arguments).toMatchObject({ coalesce: { flag: true } });
-    expect(at(call.arguments, ['how'])).toBeUndefined();
+    // Whether `inner` is the default is the engine's to say; the editor writes what is set.
+    expect(call.arguments).toMatchObject({ coalesce: { flag: true }, how: { choice: 'inner' } });
   });
 
   it('writes a number the engine read with a fraction as a float though it is whole', () => {
