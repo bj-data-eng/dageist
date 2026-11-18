@@ -917,6 +917,25 @@ fn the_snapshots_are_what_the_commands_return() {
             ),
         ),
         (
+            "typed-start-and-argument.json",
+            json_of(
+                &read_view(
+                    "1.5",
+                    TypedRequest::Expression,
+                    Some(&outer(Outer::Filter)),
+                    Some(&ArgumentRequest {
+                        entry: "Expr.shift".to_owned(),
+                        parameter: "n".to_owned(),
+                        place: PlaceRequest {
+                            positions: select.clone(),
+                            after: value(Representative::Int64, ValueShapeView::Many),
+                        },
+                    }),
+                )
+                .expect("readings"),
+            ),
+        ),
+        (
             "typed-whole.json",
             json_of(
                 &read_view(

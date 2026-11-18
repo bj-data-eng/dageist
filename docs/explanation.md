@@ -419,6 +419,13 @@ or, for a text the slot does not take, why not. Nothing typed reads as nothing.
   holds a date.
 - **Text** is read as typed, with the dtype `String`, or with none for a path.
 
+Where a slot is both the start of an expression and the argument of a method, as
+a window's key is, a reading is refused where either side refuses it. Where both
+allow it, the result and the shape are the argument's, for they say what the call
+it is given to gives, and whether a chain may end there is the start's, for the
+mark on a reading is about the chain the reading starts and not about whether the
+call's result may end the chain the call stands in.
+
 The reading of a text is made by plain functions in the engine's
 [allowed/typed.rs](../crates/dageist-engine/src/allowed/typed.rs), served by the
 Tauri command and by the bridge through one function in the host's

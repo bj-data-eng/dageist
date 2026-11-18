@@ -18,6 +18,7 @@ import offersValueFixture from '../../../host/fixtures/offers-value.json';
 import optionsFixture from '../../../host/fixtures/options.json';
 import typedDateFixture from '../../../host/fixtures/typed-date.json';
 import typedExpressionFixture from '../../../host/fixtures/typed-expression.json';
+import typedStartAndArgumentFixture from '../../../host/fixtures/typed-start-and-argument.json';
 import typedUnreadFixture from '../../../host/fixtures/typed-unread.json';
 import typedWholeFixture from '../../../host/fixtures/typed-whole.json';
 import { replaced } from '../../../host/test-support/tamper';
@@ -264,6 +265,21 @@ describe('how the engine read a typed text', () => {
   it('says whether a chain may end at a reading only where it stands as the start of one', () => {
     const [, text] = prepareReadings(asArgument, true);
     expect(text).toMatchObject({ kind: 'read', ends: { kind: 'allowed' } });
+  });
+
+  it('says whether the chain a reading starts may end, not whether the call it is given to may', () => {
+    // `1.5` typed where it is the start of a filter's predicate and the argument of `shift`: the
+    // call may end a chain and gives a value for each row, and the number and the text may not
+    // end a predicate.
+    const readings = prepareReadings(decodeReadings(typedStartAndArgumentFixture), true);
+    expect(readings).toHaveLength(2);
+    for (const reading of readings) {
+      expect(reading).toMatchObject({
+        kind: 'read',
+        reason: null,
+        ends: { kind: 'refused', reason: "a filter's predicate must be Boolean" },
+      });
+    }
   });
 
   it('judges nothing of a reading where no slot was asked about', () => {
