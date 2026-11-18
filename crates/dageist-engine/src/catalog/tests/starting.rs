@@ -128,9 +128,18 @@ fn a_new_step_starts_with_what_it_cannot_be_built_without_still_to_be_given() {
         started("LazyFrame.sort", &["a", "b"], &[]),
         [("by", unset_list())]
     );
+    // A filter starts with a comparison for equality, `Expr.eq`, of a field and a value that are
+    // both still to be given.
     assert_eq!(
         started("LazyFrame.filter", &["a"], &[]),
-        [("predicates", unset_list())]
+        [(
+            "predicates",
+            Setting::List(vec![Setting::Comparison {
+                entry: "Expr.eq",
+                field: Box::new(Setting::ToGive),
+                other: Box::new(Setting::ToGive),
+            }])
+        )]
     );
     assert_eq!(
         started("LazyFrame.rename", &["a"], &[]),
@@ -202,6 +211,16 @@ fn a_new_pivot_takes_the_first_table_for_its_columns_and_the_first_value_of_each
     assert_eq!(
         started("LazyFrame.pivot", &["a"], &[])[1],
         ("on_columns", Setting::ToGive)
+    );
+}
+
+#[test]
+fn the_comparison_a_filter_starts_with_is_an_entry_that_takes_what_it_is_compared_with() {
+    let eq = entry("Expr.eq");
+    assert!(
+        eq.parameters()
+            .iter()
+            .any(|parameter| parameter.name() == "other")
     );
 }
 

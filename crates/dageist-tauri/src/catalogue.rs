@@ -137,6 +137,12 @@ pub(crate) enum SettingView {
     Element {
         method: &'static str,
     },
+    /// A comparison of a field with something else, by the entry that compares.
+    Comparison {
+        entry: &'static str,
+        field: Box<SettingView>,
+        other: Box<SettingView>,
+    },
     List {
         items: Vec<SettingView>,
     },
@@ -169,6 +175,15 @@ pub(crate) fn setting_view(setting: &Setting) -> SettingView {
             column: column.clone(),
         },
         Setting::Element(method) => SettingView::Element { method },
+        Setting::Comparison {
+            entry,
+            field,
+            other,
+        } => SettingView::Comparison {
+            entry,
+            field: Box::new(setting_view(field)),
+            other: Box::new(setting_view(other)),
+        },
         Setting::List(items) => SettingView::List {
             items: items.iter().map(setting_view).collect(),
         },

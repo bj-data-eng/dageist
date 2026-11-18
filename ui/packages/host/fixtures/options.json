@@ -4,6 +4,7 @@
       "parameter": "how",
       "default": "inner",
       "starter": "left",
+      "stuck": null,
       "words": [
         {
           "word": "inner",
@@ -39,6 +40,13 @@
       "parameter": "validate",
       "default": "m:m",
       "starter": null,
+      "stuck": {
+        "source": {
+          "by": "polars",
+          "stage": "schema"
+        },
+        "reason": "a cross join takes no join keys"
+      },
       "words": [
         {
           "word": "m:m",
@@ -86,6 +94,13 @@
       "parameter": "nulls_equal",
       "default": "false",
       "starter": null,
+      "stuck": {
+        "source": {
+          "by": "polars",
+          "stage": "schema"
+        },
+        "reason": "a cross join takes no join keys"
+      },
       "words": [
         {
           "word": "true",
@@ -113,6 +128,13 @@
       "parameter": "coalesce",
       "default": "unset",
       "starter": null,
+      "stuck": {
+        "source": {
+          "by": "polars",
+          "stage": "schema"
+        },
+        "reason": "a cross join takes no join keys"
+      },
       "words": [
         {
           "word": "true",
@@ -140,6 +162,13 @@
       "parameter": "maintain_order",
       "default": "unset",
       "starter": null,
+      "stuck": {
+        "source": {
+          "by": "polars",
+          "stage": "schema"
+        },
+        "reason": "a cross join takes no join keys"
+      },
       "words": [
         {
           "word": "none",
@@ -197,6 +226,13 @@
       "parameter": "build_side",
       "default": "auto",
       "starter": null,
+      "stuck": {
+        "source": {
+          "by": "polars",
+          "stage": "schema"
+        },
+        "reason": "a cross join takes no join keys"
+      },
       "words": [
         {
           "word": "auto",
@@ -254,6 +290,13 @@
       "parameter": "allow_parallel",
       "default": "true",
       "starter": null,
+      "stuck": {
+        "source": {
+          "by": "polars",
+          "stage": "schema"
+        },
+        "reason": "a cross join takes no join keys"
+      },
       "words": [
         {
           "word": "true",
@@ -281,6 +324,13 @@
       "parameter": "force_parallel",
       "default": "false",
       "starter": null,
+      "stuck": {
+        "source": {
+          "by": "polars",
+          "stage": "schema"
+        },
+        "reason": "a cross join takes no join keys"
+      },
       "words": [
         {
           "word": "true",

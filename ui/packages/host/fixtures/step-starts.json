@@ -9,7 +9,14 @@
             "kind": "list",
             "items": [
               {
-                "kind": "unset"
+                "kind": "comparison",
+                "entry": "Expr.eq",
+                "field": {
+                  "kind": "unset"
+                },
+                "other": {
+                  "kind": "unset"
+                }
               }
             ]
           }

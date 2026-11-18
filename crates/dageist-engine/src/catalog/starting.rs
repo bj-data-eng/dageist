@@ -31,6 +31,17 @@ pub enum Setting {
     /// An expression that starts from `polars.element` and calls the one method
     /// of this name, as the catalogue names it without its owner.
     Element(&'static str),
+    /// A comparison of a field with something else, which `entry` names as the
+    /// catalogue does, such as `Expr.eq`: the field it reads, and what it is
+    /// compared with. A part still to be given is [`Setting::ToGive`].
+    Comparison {
+        /// The entry that compares.
+        entry: &'static str,
+        /// What is compared: a field.
+        field: Box<Setting>,
+        /// What it is compared with.
+        other: Box<Setting>,
+    },
     /// An ordered list of settings.
     List(Vec<Setting>),
     /// Key and value entries.
@@ -137,16 +148,20 @@ const PIVOT_AGGREGATE: &str = "first";
 /// keeps them.
 const JOIN_HOW: &str = "left";
 
+/// The comparison a new filter starts with: its field and what it is compared
+/// with are still to be given.
+const FILTER_COMPARISON: &str = "Expr.eq";
+
 /// What the step the entry `entry` stands for starts with, on `frame`, or
 /// `None` where the entry is not a step of the list.
 ///
 /// A step starts with what it cannot be built without, each still to be given
 /// where the engine cannot pick it: the keys of a sort or a join, the fields of
-/// a pivot, a filter's condition and what a new column holds. What can be
-/// picked is picked: a select keeps every column, a join and a pivot take the
-/// first connected table, a join keeps the rows of the left table that have no
-/// match, which Polars does not unless it is asked, and a pivot's cells hold
-/// their first value.
+/// a pivot and what a new column holds. What can be picked is picked: a select
+/// keeps every column, a filter starts with an equality of a field and a value
+/// still to be given, a join and a pivot take the first connected table, a join
+/// keeps the rows of the left table that have no match, which Polars does not
+/// unless it is asked, and a pivot's cells hold their first value.
 #[must_use]
 pub fn start_step(entry: &Entry, frame: &StepFrame<'_>) -> Option<StepStart> {
     if entry.applies() != Applies::Frame {
@@ -173,7 +188,14 @@ pub fn start_step(entry: &Entry, frame: &StepFrame<'_>) -> Option<StepStart> {
                 Setting::ToGive,
             )]),
         )],
-        "LazyFrame.filter" => vec![start_of("predicates")?],
+        "LazyFrame.filter" => vec![(
+            "predicates",
+            Setting::List(vec![Setting::Comparison {
+                entry: FILTER_COMPARISON,
+                field: Box::new(Setting::ToGive),
+                other: Box::new(Setting::ToGive),
+            }]),
+        )],
         "LazyFrame.sort" => vec![start_of("by")?],
         "LazyFrame.select" => vec![(
             "exprs",

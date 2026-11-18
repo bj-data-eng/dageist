@@ -357,6 +357,8 @@ struct OptionView {
     /// the default and that Polars allows beside the options chosen; `None`
     /// where there is none.
     starter: Option<String>,
+    /// Why the option cannot be added, where it has no starter.
+    stuck: Option<RefusalView>,
     words: Vec<OptionWordView>,
 }
 
@@ -572,6 +574,7 @@ pub fn options_view(entry: &str, chosen: &[ChosenOptionRequest]) -> Result<Optio
             parameter: option.parameter(),
             default: option.default_word().map(str::to_owned),
             starter: option.starter().map(str::to_owned),
+            stuck: option.stuck().as_ref().map(refusal_view),
             words: option
                 .words()
                 .iter()

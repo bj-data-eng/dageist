@@ -15,5 +15,18 @@
   "changes": ["added", "replaced"],
   "errorKinds": ["noSuchStep", "notRun", "refused", "limit", "unreadable", "unknownName", "failed"],
   "applies": ["expression", "frame", "function", "condition"],
-  "valueTypes": ["integer", "float", "string", "date", "any"]
+  "valueTypes": ["integer", "float", "string", "date", "any"],
+  "settings": [
+    "unset",
+    "flag",
+    "integer",
+    "float",
+    "text",
+    "word",
+    "field",
+    "element",
+    "comparison",
+    "list",
+    "pairs"
+  ]
 }
