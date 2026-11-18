@@ -43,7 +43,7 @@
       "dtype": "String",
       "verdict": {
         "kind": "allowed",
-        "result": null,
+        "result": "Datetime(us)",
         "shape": "many",
         "ending": {
           "kind": "allowed"

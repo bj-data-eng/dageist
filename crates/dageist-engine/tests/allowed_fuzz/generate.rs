@@ -486,9 +486,10 @@ impl Gen<'_> {
 
     fn literal_loose(&mut self) -> (Call, Option<Representative>) {
         match self.draw.below(if self.untyped_numbers { 5 } else { 3 }) {
-            // A number typed without a dtype adapts to the operand it is used with, which the
-            // tables, measured with typed columns, cannot say: its class is not known. The
-            // numbers are ones that fit a narrow column and ones that do not.
+            // A number typed without a dtype adapts to the operand it is used with, so its class
+            // is not one the generator names: the walk says what it gives beside a column, and
+            // the case is held to what Polars gives. The numbers are ones that fit a narrow
+            // column and ones that do not.
             3 => {
                 let number = self.draw.pick(&[1_i64, 1, 300, -1, 70_000]);
                 (

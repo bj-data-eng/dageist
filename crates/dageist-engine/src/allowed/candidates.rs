@@ -10,12 +10,14 @@
 
 use polars::prelude::{DataFrame, DataType, IntoLazy};
 
-use crate::catalog::{self, Argument, Build, DefaultValue, Dtypes, Entry, Kind, ParameterDefault};
+use crate::catalog::{self, Argument, Build, DefaultValue, Entry, Kind, ParameterDefault};
 
+use super::adapt::{Loose, is_count, is_required, operand_adapts};
 use super::context::Context;
 use super::dtype::Representative;
 use super::offers::{
     After, Chosen, Place, Refusal, Verdict, default_word, offer, offer_input, options,
+    same_for_any_number,
 };
 use super::table::Shape;
 
@@ -163,30 +165,55 @@ pub fn fit(candidate: &Candidate, slot: &Slot<'_>) -> Option<Fit> {
     let dtype = candidate.class()?;
     let mut verdict = None;
     if let Some(argument) = slot.argument {
-        let given = [(argument.parameter, dtype)];
+        let loose = match candidate {
+            Candidate::Literal(literal) => Loose::of(literal),
+            _ => None,
+        };
+        let place = argument.method_place;
+        // A number typed without a dtype adapts to what the method follows where it fits it, so
+        // the tables are asked of it as that dtype.
+        let adapted = match (loose, place.after()) {
+            (Some(number), After::Value { dtype, .. })
+                if operand_adapts(argument.entry, argument.parameter) =>
+            {
+                number.beside(dtype)
+            }
+            _ => None,
+        };
+        let given = [(argument.parameter, adapted.unwrap_or(dtype))];
         let found = offer(
             argument.entry,
-            &argument.method_place,
+            &place,
             &Chosen::default().with_arguments(&given),
         );
-        if !found.is_allowed() {
+        let Verdict::Allowed(allowance) = found else {
             return Some(Fit {
                 dtype,
                 verdict: found,
             });
-        }
-        // A number typed without a dtype adapts to what the method follows, so what the call
-        // gives is not what the tables say of a column of the number's own dtype, unless the
-        // number counts rows.
-        verdict = Some(match (found, candidate) {
-            (Verdict::Allowed(allowance), Candidate::Literal(literal))
-                if !(matches!(literal, Literal::Integer(_))
-                    && is_count(argument.entry, argument.parameter)) =>
+        };
+        let counts = matches!(loose, Some(Loose::Integer(_)))
+            && is_count(argument.entry, argument.parameter);
+        verdict = Some(Verdict::Allowed(
+            if loose.is_none() || adapted.is_some() || counts {
+                allowance
+            } else if operand_adapts(argument.entry, argument.parameter)
+                && is_required(argument.entry, argument.parameter)
+                && let Some((result, shape)) = same_for_any_number(
+                    argument.entry,
+                    &place,
+                    &Chosen::default(),
+                    argument.parameter,
+                )
             {
-                Verdict::Allowed(allowance.without_result())
-            }
-            (other, _) => other,
-        });
+                // A number that does not adapt takes a dtype the tables cannot say, so the call gives
+                // what it gives for every dtype it could take, where that is one: a comparison is a
+                // `Boolean`.
+                allowance.with_result(result, shape)
+            } else {
+                allowance.without_result()
+            },
+        ));
     }
     if let Some(context) = slot.context {
         let place = Place::new(context, After::Start);
@@ -201,15 +228,6 @@ pub fn fit(candidate: &Candidate, slot: &Slot<'_>) -> Option<Fit> {
         verdict = Some(found);
     }
     verdict.map(|verdict| Fit { dtype, verdict })
-}
-
-/// Whether the parameter `name` of `entry` counts or indexes, which a whole
-/// number is the dtype of whatever it adapts to: `shift`'s rows.
-pub(crate) fn is_count(entry: &Entry, name: &str) -> bool {
-    entry.parameters().iter().any(|parameter| {
-        parameter.name() == name
-            && matches!(parameter.kind(), Kind::Expression(dtypes) if dtypes == [Dtypes::Integer])
-    })
 }
 
 /// What an argument is given when a method is added, if its first parameter

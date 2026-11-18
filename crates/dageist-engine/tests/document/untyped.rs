@@ -65,6 +65,15 @@ fn sub(other: Value) -> Value {
     call("Expr.sub", json!({ "other": other }))
 }
 
+/// The walk says what Polars gives `item`, or that it does not know.
+#[track_caller]
+fn agrees_in(item: &Value, walk: Option<Representative>, polars: Option<Representative>) {
+    assert!(
+        walk.is_none() || walk == polars,
+        "{item}: the walk says {walk:?}, Polars gives {polars:?}"
+    );
+}
+
 /// The select item `item` as the walk reads it, and `expression` as Polars does, each against
 /// the table with a column for every dtype class, named by the class.
 fn everywhere(item: Value, expression: Expr) -> (Option<Representative>, Option<Representative>) {
@@ -295,6 +304,9 @@ fn what_follows_a_number_beside_a_column_is_asked_of_the_tables() {
     }
 }
 
+/// How Polars combines two expressions.
+type Operation = fn(Expr, Expr) -> Expr;
+
 /// Every class as a column of the table `everywhere` reads, beside each number, in each
 /// operation, with the number behind the column and in front of it.
 #[test]
@@ -322,7 +334,7 @@ fn a_number_beside_any_dtype_is_known_only_as_polars_gives_it() {
                 start if start.is_object() => start,
                 _ => unreachable!("a number is an expression"),
             };
-            let operations: [(&str, fn(Expr, Expr) -> Expr); 3] = [
+            let operations: [(&str, Operation); 3] = [
                 ("Expr.sub", |left, right| left - right),
                 ("Expr.gt", |left, right| left.gt(right)),
                 ("Expr.eq", |left, right| left.eq(right)),
@@ -337,20 +349,21 @@ fn a_number_beside_any_dtype_is_known_only_as_polars_gives_it() {
                     build(literal.clone(), col(name)),
                 );
                 for (item, expression) in [behind, in_front] {
-                    let (walk, polars) = everywhere(item, expression);
+                    let (walk, polars) = everywhere(item.clone(), expression);
                     known += usize::from(walk.is_some());
-                    agrees(walk, polars);
+                    agrees_in(&item, walk, polars);
                 }
             }
+            let shifted = on_a_column(
+                name,
+                call("Expr.shift", json!({ "fill_value": number.clone() })),
+            );
             let (walk, polars) = everywhere(
-                on_a_column(
-                    name,
-                    call("Expr.shift", json!({ "fill_value": number.clone() })),
-                ),
+                shifted.clone(),
                 col(name).shift_and_fill(lit(1), literal.clone()),
             );
             known += usize::from(walk.is_some());
-            agrees(walk, polars);
+            agrees_in(&shifted, walk, polars);
         }
     }
     // The walk knows what a number that fits gives and what a comparison gives, and not what
