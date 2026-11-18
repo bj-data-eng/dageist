@@ -235,3 +235,23 @@ fn a_step_report_carries_the_source_and_the_summary_of_its_step() {
     }
     assert_eq!(report.steps()[0].source(), ".sort(\"dcn\", \"timestamp\")");
 }
+
+#[test]
+fn a_name_or_a_value_that_looks_like_a_place_is_written_as_it_is() {
+    // The summary of a comparison is filled in one pass: a field called {value} and a text
+    // called {field} are not filled again.
+    assert_eq!(
+        filter(vec![compare("Expr.eq", "{value}", text("{field}"))]),
+        "{value} == \"{field}\""
+    );
+    // The same of a join, whose table and fields are filled together.
+    let join = step(
+        "s",
+        "LazyFrame.join",
+        json!({
+            "other": { "table": "{fields}" },
+            "on": many(vec![field("{table}")]),
+        }),
+    );
+    assert_eq!(summary(join), "{fields} on {table}");
+}
