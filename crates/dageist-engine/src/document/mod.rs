@@ -41,6 +41,7 @@ pub use columns::ColumnDescription;
 pub use dtype::{Dtype, DtypeError};
 pub use error::{Cause, Place, Position, ReadError, Refusal, Segment};
 pub use inputs::{DuplicateInput, InputDescription, InputKind, Inputs};
+pub(crate) use json::{NotWritten, WrittenNumber, read_number};
 pub use json::{SyntaxError, SyntaxProblem};
 pub use model::{Call, Document, EmptyStepId, Expression, Given, Start, Step, StepId, Value};
 pub use preview::Preview;

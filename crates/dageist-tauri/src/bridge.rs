@@ -42,7 +42,7 @@ use crate::identity::identity_view;
 use crate::node::{node_view, rows_view, run_view};
 use crate::offers::{
     AfterRequest, ArgumentRequest, CandidateRequest, ChosenOptionRequest, PositionRequest,
-    fits_view, offers_view, options_view,
+    TypedRequest, fits_view, offers_view, options_view, read_view,
 };
 use crate::sample_table::{
     ErrorView, OpenTable, Sample, SampleGate, sample_result_view, sample_window_view,
@@ -126,6 +126,15 @@ struct FitsArguments {
 
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
+struct TypedArguments {
+    text: String,
+    typed: TypedRequest,
+    start: Option<Vec<PositionRequest>>,
+    argument: Option<ArgumentRequest>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 struct OptionsArguments {
     entry: String,
     chosen: Vec<ChosenOptionRequest>,
@@ -189,6 +198,7 @@ enum Command {
     RowsAfterStep,
     OffersAt,
     CandidateFits,
+    ReadTyped,
     OptionOffers,
     OpenSampleWindow,
     OpenSampleResult,
@@ -206,6 +216,7 @@ impl Command {
             "rows_after_step" => Self::RowsAfterStep,
             "offers_at" => Self::OffersAt,
             "candidate_fits" => Self::CandidateFits,
+            "read_typed" => Self::ReadTyped,
             "option_offers" => Self::OptionOffers,
             "open_sample_window" => Self::OpenSampleWindow,
             "open_sample_result" => Self::OpenSampleResult,
@@ -256,6 +267,20 @@ impl Command {
                     start.as_deref(),
                     argument.as_ref(),
                     &candidates,
+                )?)
+            }
+            Self::ReadTyped => {
+                let TypedArguments {
+                    text,
+                    typed,
+                    start,
+                    argument,
+                } = arguments(body)?;
+                json(&read_view(
+                    &text,
+                    typed,
+                    start.as_deref(),
+                    argument.as_ref(),
                 )?)
             }
             Self::OptionOffers => {

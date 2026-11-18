@@ -47,6 +47,8 @@ export type {
   PlaceView,
   PositionView,
   ReadProblemView,
+  ReadingView,
+  ReadingsView,
   RefusalSourceView,
   RefusalView,
   ResolutionView,
@@ -60,6 +62,8 @@ export type {
   StandingView,
   StepReportView,
   TableView,
+  TypedKind,
+  TypedRequest,
   ValueShapeView,
   ValueTypeView,
   VerdictView,
@@ -74,7 +78,7 @@ export { ERROR_KINDS } from './contract';
 export { DecodeError } from './decode';
 export { decodeCatalogue } from './decode-catalogue';
 export { decodeNode, decodeRows } from './decode-node';
-export { decodeFits, decodeOffers, decodeOptions } from './decode-offers';
+export { decodeFits, decodeOffers, decodeOptions, decodeReadings } from './decode-offers';
 export { decodeRun } from './decode-run';
 export { decodeBytes, decodeIdentity, decodeTable } from './decode-sample';
 export { deliverMessage, sealMessage } from './envelope';

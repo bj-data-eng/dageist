@@ -13,8 +13,10 @@ import type {
   EndingView,
   EntryView,
   FitsView,
+  LiteralView,
   OffersView,
   OptionsView,
+  ReadingsView,
   RefusalView,
 } from '@dageist/host';
 
@@ -165,6 +167,43 @@ export function prepareFits(
     });
   }
   return prepared;
+}
+
+/** One way a typed text reads, as a row of a list shows it. */
+export type PreparedReading =
+  | {
+      readonly kind: 'read';
+      /** What the text reads as. */
+      readonly literal: LiteralView;
+      /** The dtype the engine gave it, or `null` where it has none. */
+      readonly dtype: string | null;
+      /** Why it cannot be picked in the slot that was asked about, or `null` when it can. */
+      readonly reason: string | null;
+      /** Whether a chain may end at it, where it stands as the start of an expression. */
+      readonly ends: Ends | null;
+    }
+  /** The text is not what it was typed into, for this reason. */
+  | { readonly kind: 'unread'; readonly reason: string };
+
+/**
+ * Prepares how the engine read a typed text, in the order it offers the
+ * readings. A reading the tables cover no class of is not refused: the engine
+ * says nothing of it in the slot, and the step it is in is judged when it
+ * runs. `starts` says whether the readings stand as the start of an
+ * expression, which is when the verdict says whether a chain may end there.
+ */
+export function prepareReadings(view: ReadingsView, starts: boolean): readonly PreparedReading[] {
+  return view.readings.map((reading): PreparedReading => {
+    if (reading.kind === 'unread') return { kind: 'unread', reason: shortReason(reading.reason) };
+    const verdict = reading.fit?.kind === 'judged' ? reading.fit.verdict : null;
+    return {
+      kind: 'read',
+      literal: reading.literal,
+      dtype: reading.dtype,
+      reason: verdict?.kind === 'refused' ? refusalWords(verdict.refusal) : null,
+      ends: starts && verdict?.kind === 'allowed' ? endsOf(verdict.ending) : null,
+    };
+  });
 }
 
 /** One option of an entry: its default, and what it may be set to. */

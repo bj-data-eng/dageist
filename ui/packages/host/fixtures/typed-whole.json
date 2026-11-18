@@ -1,0 +1,13 @@
+{
+  "readings": [
+    {
+      "kind": "read",
+      "literal": {
+        "kind": "integer",
+        "value": 12
+      },
+      "dtype": "Int32",
+      "fit": null
+    }
+  ]
+}

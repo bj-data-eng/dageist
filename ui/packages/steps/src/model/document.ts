@@ -194,10 +194,14 @@ function columnsOf(...names: readonly string[]): Json {
 }
 
 /** Returns a cell as the argument of `polars.lit`. */
-function literalArgument(value: Exclude<Cell, null>, wrong: readonly string[]): Json {
+function literalArgument(
+  value: Exclude<Cell, null>,
+  float: boolean,
+  wrong: readonly string[],
+): Json {
   if (typeof value === 'string') return { string: value };
   if (!Number.isFinite(value)) throw unsupported('A number must be finite.', wrong);
-  return Number.isSafeInteger(value) ? { integer: value } : { float: value };
+  return float || !Number.isSafeInteger(value) ? { float: value } : { integer: value };
 }
 
 /** The entries of the catalogue that stand for the comparisons of a test. */
@@ -263,7 +267,9 @@ function expressionBody(
         throw unsupported('The engine does not take None as a value yet.', wrong);
       }
       return {
-        start: call('polars.lit', { value: literalArgument(value.value, wrong) }),
+        start: call('polars.lit', {
+          value: literalArgument(value.value, value.float === true, wrong),
+        }),
         links: [],
       };
     case 'input':
@@ -520,7 +526,7 @@ function settingArgument(
     case 'flag':
       return { flag: setting.value };
     case 'number':
-      return numberArgument(kind, setting.value, wrong);
+      return numberArgument(kind, setting.value, setting.float === true, wrong);
     case 'text':
       if (kind.kind === 'duration') return { duration: setting.value };
       if (kind.kind === 'path') return { path: setting.value };
@@ -610,11 +616,16 @@ function settingArgument(
 }
 
 /** Writes a number as the argument of a parameter of `kind`: a whole number or one with a fraction. */
-function numberArgument(kind: KindView, value: number, wrong: readonly string[]): Json {
+function numberArgument(
+  kind: KindView,
+  value: number,
+  float: boolean,
+  wrong: readonly string[],
+): Json {
   if (!Number.isFinite(value)) throw unsupported('A number must be finite.', wrong);
   if (kind.kind === 'value' && kind.type === 'float') return { float: value };
   if (kind.kind === 'value' && kind.type === 'integer') return { integer: value };
-  return Number.isSafeInteger(value) ? { integer: value } : { float: value };
+  return float || !Number.isSafeInteger(value) ? { float: value } : { integer: value };
 }
 
 /**

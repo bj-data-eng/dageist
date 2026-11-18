@@ -6,7 +6,7 @@
  */
 
 import type { Offer, OfferGroup } from '@dageist/design';
-import type { CandidateRequest, NodeView, OffersView } from '@dageist/host';
+import type { CandidateRequest, LiteralView, NodeView, OffersView } from '@dageist/host';
 
 import type { Asked, CandidateFits, Fits } from './ask';
 import { anyField, counted, fieldOffers, matches, offer, titled } from './offers';
@@ -14,10 +14,9 @@ import type { Catalogue } from './model/catalogue';
 import { methodNameOf } from './model/catalogue';
 import type { MethodName } from './model/expr';
 import type { Frame } from './model/frame';
-import { literalOf, typedValues } from './model/literal';
-import type { PreparedFamily, PreparedOffer } from './model/offers';
+import { literalWords } from './model/literal';
+import type { PreparedFamily, PreparedOffer, PreparedReading } from './model/offers';
 import { candidateKey, prepareOffers, refusalWords } from './model/offers';
-import type { Cell } from './model/source';
 
 /** What a list says while the engine has not answered. */
 const WAITING = 'waiting for the engine';
@@ -131,36 +130,60 @@ export interface CandidateRows {
   readonly fits: CandidateFits;
   /** Which connected inputs are offered: values, lists, or both. */
   readonly inputs: ReadonlyArray<'value' | 'list'>;
-  readonly onLiteral: (value: Cell) => void;
   readonly onInput: (name: string) => void;
   readonly onField: (name: string) => void;
 }
 
-/** Returns the rows that offer what was typed as a number and as text, each with the dtype the engine gave it. */
-export function valueGroup(rows: CandidateRows): OfferGroup {
-  const offered: Offer[] = [];
-  for (const value of typedValues(rows.typed)) {
-    const literal = literalOf(value);
-    if (literal === null) continue;
-    const verdict = verdictOn(rows.fits.typed, { kind: 'literal', literal });
-    const number = typeof value === 'number';
-    offered.push(
-      offer(
-        number ? String(value) : rows.typed,
-        'value',
-        verdict.dtype ?? (number ? 'a number' : 'String'),
-        () => {
-          rows.onLiteral(value);
-        },
-        {
-          id: number ? 'number' : 'text',
-          look: number ? 'plain' : 'quoted',
-          reason: verdict.reason,
-        },
-      ),
-    );
+/** What the rows that offer what was typed in are made of, besides the rest. */
+export interface ValueRows extends CandidateRows {
+  /** How the engine read what is typed. */
+  readonly readings: Asked<readonly PreparedReading[]>;
+  readonly onLiteral: (literal: LiteralView) => void;
+}
+
+/**
+ * Returns the rows that offer what was typed as the engine read it, each with
+ * the dtype the engine gave it, or why the engine did not read it as what the
+ * slot takes. Until the engine has answered there is one row for the text as
+ * it was typed, which waits. `onPick` is given the literal of the row that was
+ * picked. Nothing typed has no rows.
+ */
+export function readingRows(
+  typed: string,
+  readings: Asked<readonly PreparedReading[]>,
+  onPick: (literal: LiteralView) => void,
+): Offer[] {
+  const typedRow = (reason: string): Offer =>
+    offer(typed, 'value', '', () => undefined, { id: 'text', look: 'quoted', reason });
+  switch (readings.state) {
+    case 'idle':
+      return [];
+    case 'waiting':
+      return [typedRow(WAITING)];
+    case 'failed':
+      return [typedRow(readings.reason)];
+    case 'ready':
+      return readings.answer.map((reading) => {
+        if (reading.kind === 'unread') return typedRow(reading.reason);
+        const text = reading.literal.kind === 'text';
+        return offer(
+          literalWords(reading.literal),
+          'value',
+          reading.dtype ?? '',
+          () => {
+            onPick(reading.literal);
+          },
+          { id: text ? 'text' : 'number', look: text ? 'quoted' : 'plain', reason: reading.reason },
+        );
+      });
+    default:
+      return readings satisfies never;
   }
-  return titled('Value', offered);
+}
+
+/** Returns the rows that offer what was typed as the engine read it, under the heading of the values. */
+export function valueGroup(rows: ValueRows): OfferGroup {
+  return titled('Value', readingRows(rows.typed, rows.readings, rows.onLiteral));
 }
 
 /** Returns the rows that offer the connected values and lists the engine allows, each with its dtype. */

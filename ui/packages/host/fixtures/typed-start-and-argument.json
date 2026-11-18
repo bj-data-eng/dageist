@@ -1,0 +1,58 @@
+{
+  "readings": [
+    {
+      "kind": "read",
+      "literal": {
+        "kind": "float",
+        "value": 1.5
+      },
+      "dtype": "Float64",
+      "fit": {
+        "kind": "judged",
+        "dtype": "Float64",
+        "verdict": {
+          "kind": "allowed",
+          "result": null,
+          "shape": "many",
+          "ending": {
+            "kind": "refused",
+            "refusal": {
+              "source": {
+                "by": "rule",
+                "rule": "filter-predicate-is-boolean"
+              },
+              "reason": "a filter's predicate must be Boolean"
+            }
+          }
+        }
+      }
+    },
+    {
+      "kind": "read",
+      "literal": {
+        "kind": "text",
+        "value": "1.5"
+      },
+      "dtype": "String",
+      "fit": {
+        "kind": "judged",
+        "dtype": "String",
+        "verdict": {
+          "kind": "allowed",
+          "result": "Int64",
+          "shape": "many",
+          "ending": {
+            "kind": "refused",
+            "refusal": {
+              "source": {
+                "by": "rule",
+                "rule": "filter-predicate-is-boolean"
+              },
+              "reason": "a filter's predicate must be Boolean"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

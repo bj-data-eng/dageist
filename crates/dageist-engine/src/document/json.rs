@@ -142,6 +142,59 @@ fn write_string(value: &str, text: &mut String) {
     text.push('"');
 }
 
+/// A number as the document reads it from its text: a whole number an `i64`
+/// holds, a number written with a fraction or an exponent, or a whole number no
+/// `i64` holds.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum WrittenNumber {
+    /// A whole number written without fraction or exponent, that an `i64` holds.
+    Integer(i64),
+    /// A number written with a fraction or an exponent. It is finite.
+    Float(f64),
+    /// A whole number no `i64` holds; its nearest `f64`.
+    Large(f64),
+}
+
+/// Why text is not a number as the document writes one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum NotWritten {
+    /// A whole number written with a leading zero, such as `01`.
+    LeadingZero,
+    /// A number too large for an `f64`.
+    OutOfRange,
+    /// Anything else: text that is not a number, or more than a number.
+    NotANumber,
+}
+
+/// Reads `text` as the one number it is, by the grammar the document's JSON
+/// reader holds a number to, with white space allowed around it as JSON allows.
+pub(crate) fn read_number(text: &str) -> Result<WrittenNumber, NotWritten> {
+    let mut reader = Reader { text, at: 0 };
+    reader.skip_space();
+    if !matches!(reader.peek_byte(), Some(b'-' | b'0'..=b'9')) {
+        return Err(NotWritten::NotANumber);
+    }
+    let number = reader.number().map_err(|error| match error.problem {
+        SyntaxProblem::LeadingZero => NotWritten::LeadingZero,
+        SyntaxProblem::NumberOutOfRange => NotWritten::OutOfRange,
+        _ => NotWritten::NotANumber,
+    })?;
+    reader.skip_space();
+    if reader.peek().is_some() {
+        return Err(NotWritten::NotANumber);
+    }
+    match number {
+        Number::Integer(value) => Ok(WrittenNumber::Integer(value)),
+        Number::Float(value) => Ok(WrittenNumber::Float(value)),
+        Number::Large(written) => written
+            .parse::<f64>()
+            .ok()
+            .filter(|value| value.is_finite())
+            .map(WrittenNumber::Large)
+            .ok_or(NotWritten::OutOfRange),
+    }
+}
+
 /// What is wrong with text that is not JSON.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SyntaxProblem {

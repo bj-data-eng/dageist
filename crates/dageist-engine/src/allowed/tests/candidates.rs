@@ -380,3 +380,86 @@ fn polars_dtype_after(
         .expect("Polars resolves it");
     schema.iter().next().expect("one column").1.clone()
 }
+
+#[test]
+fn a_candidate_that_stands_and_is_an_argument_has_the_verdict_of_the_argument_where_both_allow() {
+    // `shift`'s `n` after a column of whole numbers is an argument, and in a select it is also an
+    // expression that starts. A `1.0` typed there is allowed by both, and the call it is given to
+    // gives one value for each row, where an expression that is a literal alone is one value.
+    let place = Place::new(select(), after(Representative::Int64));
+    let as_argument = ArgumentSlot::new(entry("Expr.shift"), "n", place);
+    let candidate = Candidate::Literal(Literal::Float(1.0));
+    let verdict_in = |slot: Slot<'_>| fit(&candidate, &slot).expect("a class").verdict().clone();
+    let argument_only = verdict_in(Slot::new(None, Some(as_argument)).expect("a slot"));
+    let start_only = verdict_in(Slot::new(Some(select()), None).expect("a slot"));
+    let both = verdict_in(Slot::new(Some(select()), Some(as_argument)).expect("a slot"));
+    assert_eq!(
+        start_only.allowance().expect("it may stand").shape(),
+        Shape::One
+    );
+    assert_eq!(
+        argument_only.allowance().expect("it may stand").shape(),
+        Shape::Many
+    );
+    assert_eq!(both, argument_only);
+    assert_ne!(both, start_only);
+}
+
+#[test]
+fn a_candidate_that_stands_and_is_an_argument_is_refused_where_either_refuses() {
+    // Text is no number for `sub`, which refuses it as an argument; a start refuses what the
+    // rule of a filter's predicate refuses to end, which is not a refusal to stand.
+    let place = Place::new(select(), after(Representative::Float64));
+    let as_argument = ArgumentSlot::new(entry("Expr.sub"), "other", place);
+    let text = Candidate::Literal(Literal::String("x".to_owned()));
+    let by_argument = Slot::new(Some(select()), Some(as_argument)).expect("a slot");
+    let found = fit(&text, &by_argument).expect("a class");
+    assert!(found.verdict().refusal().is_some(), "{found:?}");
+    // A start that refuses: `element` stands only in a pivot's aggregate, and Polars refuses a
+    // column in it; an input there is refused by the start, whatever the argument says.
+    let pivot = Context::step(Outer::PivotAggregate);
+    let by_start = Slot::new(Some(pivot), None).expect("a slot");
+    let column = fit(&Candidate::Field(Representative::Int64), &by_start).expect("a class");
+    assert!(column.verdict().refusal().is_some(), "{column:?}");
+    let allowed_argument = ArgumentSlot::new(entry("Expr.shift"), "n", place);
+    let both = Slot::new(Some(pivot), Some(allowed_argument)).expect("a slot");
+    let refused = fit(&Candidate::Field(Representative::Int64), &both).expect("a class");
+    assert!(refused.verdict().refusal().is_some(), "{refused:?}");
+}
+
+#[test]
+fn a_candidate_that_stands_and_is_an_argument_may_end_as_the_expression_it_starts_may() {
+    // `shift`'s `n` stands in a select, where the call it is given to may end a chain, and the
+    // `1.0` given to it is also the start of the expression in a filter's predicate, which may
+    // not end as a number. Whether the candidate's own chain may end is the start's to say, and
+    // what the call gives is the argument's.
+    let place = Place::new(select(), after(Representative::Int64));
+    let as_argument = ArgumentSlot::new(entry("Expr.shift"), "n", place);
+    let candidate = Candidate::Literal(Literal::Float(1.0));
+    let allowance_in = |slot: Slot<'_>| {
+        fit(&candidate, &slot)
+            .expect("a class")
+            .verdict()
+            .allowance()
+            .expect("it may stand")
+            .clone()
+    };
+    let filter = Some(Context::step(Outer::Filter));
+    let argument_only = allowance_in(Slot::new(None, Some(as_argument)).expect("a slot"));
+    let start_only = allowance_in(Slot::new(filter, None).expect("a slot"));
+    let both = allowance_in(Slot::new(filter, Some(as_argument)).expect("a slot"));
+    // The call may end a chain, and the number may not end a predicate.
+    assert!(argument_only.can_end().is_allowed());
+    let refusal = start_only
+        .can_end()
+        .refusal()
+        .expect("a number ends no predicate");
+    assert_eq!(
+        refusal.source(),
+        RefusalSource::Rule(Rule::FilterPredicateIsBoolean)
+    );
+    // Both: what the call gives is the argument's, and whether the chain may end is the start's.
+    assert_eq!(both.shape(), argument_only.shape());
+    assert_eq!(both.result(), argument_only.result());
+    assert_eq!(both.can_end(), start_only.can_end());
+}

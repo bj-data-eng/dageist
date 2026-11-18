@@ -11,9 +11,10 @@ import { useCallback, useContext, useState } from 'react';
 
 import type { Look, Offer, OfferGroup, Tone } from '@dageist/design';
 import { Hint, OfferList, Piece, Popover, Slot } from '@dageist/design';
-import type { ArgumentRequest, PositionView } from '@dageist/host';
+import type { ArgumentRequest, LiteralView, PositionView } from '@dageist/host';
 
-import { useCandidateFits, useOffers } from './ask';
+import type { FitSlot } from './ask';
+import { useCandidateFits, useOffers, useReadTyped } from './ask';
 import { useCatalogue, useNode } from './EngineProvider';
 import { usePreparedStep } from './engine';
 import { comparisonEntryId, wrongId } from './model/document';
@@ -30,12 +31,13 @@ import { findColumn } from './model/frame';
 import { NO_POSITIONS, startRequest } from './model/place';
 import { nextId } from './model/ids';
 import { findInput } from './model/inputs';
+import { literalValue, valueWords } from './model/literal';
 import type {
-  Cell,
   ChainCondition,
   Comparison,
   Condition,
   Group,
+  LiteralValue,
   Test,
   Value,
 } from './model/source';
@@ -56,11 +58,10 @@ const COMPARISON_WORDS: Readonly<Record<Comparison, string>> = {
 const UNSET_VALUE: Value = { kind: 'unset' };
 
 /** Returns how a typed value is shown as a block. */
-function literalBlock(value: Cell): { label: string; look: Look } {
-  if (value === null) return { label: 'None', look: 'none' };
-  return typeof value === 'number'
-    ? { label: String(value), look: 'plain' }
-    : { label: value, look: 'quoted' };
+function literalBlock(value: LiteralValue): { label: string; look: Look } {
+  const words = valueWords(value);
+  if (words === null) return { label: 'None', look: 'none' };
+  return { label: words, look: typeof value.value === 'number' ? 'plain' : 'quoted' };
 }
 
 /** Returns a comparison with nothing picked yet: a field, equal to, a value. */
@@ -144,21 +145,14 @@ export function ValueSlot({
   // expression, and which of the fields, inputs and values typed in fit.
   const startKnown = positions !== null && positions.length > 0;
   const startOffers = useOffers(list.open && startKnown && !lists ? startRequest(positions) : null);
-  const fits = useCandidateFits(
+  const slot: FitSlot | null =
     lists || (!startKnown && argument === null)
       ? null
-      : { start: startKnown ? positions : null, argument },
-    list.open,
-    frame,
-    node,
-    list.typed,
+      : { start: startKnown ? positions : null, argument };
+  const fits = useCandidateFits(slot, list.open, frame, node);
+  const readings = useReadTyped(
+    list.open && !lists ? { text: list.typed, typed: { kind: 'expression' }, slot } : null,
   );
-  const literal = (cell: Cell): (() => void) => {
-    return () => {
-      onChange({ kind: 'literal', value: cell });
-    };
-  };
-
   const offers = (typed: string): OfferGroup[] => {
     const connected = node.inputs
       .flatMap((input) => (input.kind === (lists ? 'list' : 'value') ? [input] : []))
@@ -177,9 +171,10 @@ export function ValueSlot({
       node,
       typed,
       fits,
+      readings,
       inputs: ['value', 'list'] as const,
-      onLiteral: (cell: Cell) => {
-        literal(cell)();
+      onLiteral: (picked: LiteralView) => {
+        onChange(literalValue(picked));
       },
       onInput: (name: string) => {
         onChange({ kind: 'input', name });
@@ -206,7 +201,15 @@ export function ValueSlot({
       { id: 'chain', look: 'dots', act: true, reason: chainRefusal },
     );
     const written = valueGroup(rows);
-    const none = offer('None', 'value', 'no value', literal(null), { id: 'none', look: 'none' });
+    const none = offer(
+      'None',
+      'value',
+      'no value',
+      () => {
+        onChange({ kind: 'literal', value: null });
+      },
+      { id: 'none', look: 'none' },
+    );
     // The groups go from the shortest to the longest, so a long one never hides a short one.
     return [
       titled(null, typed === '' ? [chain] : []),
@@ -284,7 +287,7 @@ export function ValueSlot({
     // Nothing is picked yet, so the slot says what goes there, in the colour of what is missing.
     shown = { label: 'value', tone: 'value', look: 'none', wrong: true, lines: [] };
   } else {
-    shown = { ...literalBlock(value.value), tone: 'value', wrong: false, lines: [] };
+    shown = { ...literalBlock(value), tone: 'value', wrong: false, lines: [] };
   }
   // A field can be carried on from: adding a method after it makes it the start of a chain.
   const carryOn =

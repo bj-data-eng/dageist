@@ -32,3 +32,37 @@ fn only_the_operands_the_fill_and_the_row_count_have_a_role() {
         ]
     );
 }
+
+#[test]
+fn a_parameter_that_holds_one_value_for_each_item_of_another_is_a_flag_or_a_choice() {
+    // The step editor draws such a parameter as a control at the end of the row of each item,
+    // which has room for a flag or a choice and for no list of its own, and says that it does
+    // not draw another kind. This keeps that unreachable: a parameter of another kind with this
+    // shape is to be drawn before it is added.
+    let mut per_item = Vec::new();
+    for entry in catalog::entries() {
+        for parameter in entry.parameters() {
+            if matches!(parameter.shape(), catalog::Shape::PerItem(_)) {
+                assert!(
+                    matches!(
+                        parameter.kind(),
+                        catalog::Kind::Flag | catalog::Kind::Choice(_)
+                    ),
+                    "{} {}: {:?}",
+                    entry.id().as_str(),
+                    parameter.name(),
+                    parameter.kind()
+                );
+                per_item.push((entry.id().as_str(), parameter.name()));
+            }
+        }
+    }
+    per_item.sort_unstable();
+    assert_eq!(
+        per_item,
+        [
+            ("LazyFrame.sort", "descending"),
+            ("LazyFrame.sort", "nulls_last")
+        ]
+    );
+}

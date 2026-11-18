@@ -41,6 +41,18 @@ function firstCall(steps: readonly Step[]): {
   return { entry: at(call, ['entry']), arguments: at(call, ['arguments']) };
 }
 
+/** The arguments of a join whose suffix is set to `suffix`. */
+function argumentsWithSuffix(suffix: Options[string]): unknown {
+  return firstCall([
+    {
+      id: 'j',
+      verb: 'join',
+      table: 'step_sla',
+      options: { left_on: fieldKeys(['a']), right_on: fieldKeys(['b']), suffix },
+    },
+  ]).arguments;
+}
+
 /** The arguments the start of the expression of a column added with `value` is given. */
 function startOfColumnHolding(value: Value): unknown {
   const arguments_ = firstCall([adding('x', value)]).arguments;
@@ -108,6 +120,19 @@ describe('a step of the editor', () => {
     expect(at(call.arguments, ['how'])).toBeUndefined();
   });
 
+  it('writes a number the engine read with a fraction as a float though it is whole', () => {
+    // A whole number is an integer, and one the engine read as a float stays a float.
+    expect(argumentsWithSuffix({ kind: 'number', value: 2 })).toMatchObject({
+      suffix: { integer: 2 },
+    });
+    expect(argumentsWithSuffix({ kind: 'number', value: 2, float: true })).toMatchObject({
+      suffix: { float: 2 },
+    });
+    expect(argumentsWithSuffix({ kind: 'number', value: 2.5 })).toMatchObject({
+      suffix: { float: 2.5 },
+    });
+  });
+
   it('writes the setting of each key of a sort as a list in the order of the keys', () => {
     const options: Options = {
       by: fieldKeys(['dcn', 'timestamp']),
@@ -125,6 +150,13 @@ describe('a step of the editor', () => {
     expect(startOfColumnHolding({ kind: 'literal', value: 3 })).toEqual({ value: { integer: 3 } });
     expect(startOfColumnHolding({ kind: 'literal', value: 1.5 })).toEqual({
       value: { float: 1.5 },
+    });
+  });
+
+  it('writes a whole number the engine read with a fraction as a float', () => {
+    // `1.0` typed is a `Float64` to the engine, and what is written is what it said.
+    expect(startOfColumnHolding({ kind: 'literal', value: 1, float: true })).toEqual({
+      value: { float: 1 },
     });
   });
 });

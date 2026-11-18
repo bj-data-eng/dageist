@@ -11,7 +11,7 @@ import type { BlockRequest, Host } from './contract';
 import { DecodeError } from './decode';
 import { decodeCatalogue } from './decode-catalogue';
 import { decodeNode, decodeRows } from './decode-node';
-import { decodeFits, decodeOffers, decodeOptions } from './decode-offers';
+import { decodeFits, decodeOffers, decodeOptions, decodeReadings } from './decode-offers';
 import { decodeRun } from './decode-run';
 import { decodeBytes, decodeIdentity, decodeTable } from './decode-sample';
 import { hostError } from './failure';
@@ -105,6 +105,13 @@ export function bridgeHost(): Host {
         start: request.start,
         argument: request.argument,
         candidates: request.candidates,
+      }),
+    readTyped: async (request) =>
+      call('read_typed', decodeReadings, {
+        text: request.text,
+        typed: request.typed,
+        start: request.start,
+        argument: request.argument,
       }),
     optionOffers: async (entry, chosen) => call('option_offers', decodeOptions, { entry, chosen }),
     openSampleWindow: async (keys) => call('open_sample_window', decodeTable, { keys }),

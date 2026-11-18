@@ -236,14 +236,54 @@ fn the_offers_commands_answer_the_views_the_application_answers() {
             "candidates": [
                 { "kind": "field", "dtype": "String" },
                 { "kind": "field", "dtype": "Int64" },
-                { "kind": "input", "dtype": "String", "list": false },
-                { "kind": "literal", "literal": { "kind": "text", "value": "1d" } },
-                { "kind": "literal", "literal": { "kind": "integer", "value": 1 } }
+                { "kind": "input", "dtype": "String", "list": false }
             ]
         }),
     );
     assert_eq!(reply.status, 200);
     assert_eq!(reply.json(), fixture("fits-argument.json"));
+
+    let reply = call(
+        &bridge,
+        "read_typed",
+        &json!({
+            "text": "1.5",
+            "typed": { "kind": "expression" },
+            "start": null,
+            "argument": {
+                "entry": "Expr.dt.offset_by",
+                "parameter": "by",
+                "place": {
+                    "positions": select,
+                    "after": { "kind": "value", "dtype": "Datetime(us)", "shape": "many" }
+                }
+            }
+        }),
+    );
+    assert_eq!(reply.status, 200);
+    assert_eq!(reply.json(), fixture("typed-expression.json"));
+
+    for (file, typed, text) in [
+        (
+            "typed-whole.json",
+            json!({ "kind": "value", "type": "integer" }),
+            "12",
+        ),
+        (
+            "typed-date.json",
+            json!({ "kind": "value", "type": "date" }),
+            "10-03-2026",
+        ),
+        ("typed-unread.json", json!({ "kind": "duration" }), "1x"),
+    ] {
+        let reply = call(
+            &bridge,
+            "read_typed",
+            &json!({ "text": text, "typed": typed, "start": null, "argument": null }),
+        );
+        assert_eq!(reply.status, 200, "{file}");
+        assert_eq!(reply.json(), fixture(file), "{file}");
+    }
 
     let reply = call(
         &bridge,
@@ -266,6 +306,27 @@ fn an_unknown_name_in_an_offers_request_is_refused_with_its_kind() {
         &bridge,
         "option_offers",
         &json!({ "entry": "Expr.nothing", "chosen": [] }),
+    );
+    assert_eq!(reply.status, 422);
+    assert_eq!(reply.json()["kind"], "unknownName");
+
+    // A name the catalogue lacks in the slot a text is typed into is refused by the command.
+    let reply = call(
+        &bridge,
+        "read_typed",
+        &json!({
+            "text": "1",
+            "typed": { "kind": "expression" },
+            "start": null,
+            "argument": {
+                "entry": "Expr.nothing",
+                "parameter": "n",
+                "place": {
+                    "positions": [{ "kind": "outer", "name": "select" }],
+                    "after": { "kind": "start" }
+                }
+            }
+        }),
     );
     assert_eq!(reply.status, 422);
     assert_eq!(reply.json()["kind"], "unknownName");

@@ -15,8 +15,9 @@ use tauri::webview::InvokeRequest;
 use tauri::{WebviewWindow, WebviewWindowBuilder};
 
 use super::{
-    AfterRequest, ArgumentRequest, CandidateRequest, ChosenOptionRequest, LiteralRequest,
-    PlaceRequest, PositionRequest, fits_view, offers_view, options_view,
+    AfterRequest, ArgumentRequest, CandidateRequest, ChosenOptionRequest, PlaceRequest,
+    PositionRequest, TypedRequest, ValueTypeRequest, fits_view, offers_view, options_view,
+    read_view,
 };
 use crate::report::{ConditionStateView, ValueShapeView};
 
@@ -31,6 +32,7 @@ fn window() -> WebviewWindow<MockRuntime> {
         .invoke_handler(tauri::generate_handler![
             super::offers_at,
             super::candidate_fits,
+            super::read_typed,
             super::option_offers,
         ])
         .build(mock_context(noop_assets()))
@@ -304,7 +306,7 @@ fn judged(answer: &Value) -> Vec<(String, String, String)> {
 }
 
 #[test]
-fn a_field_an_input_and_a_literal_start_a_predicate_by_their_dtype() {
+fn a_field_and_an_input_start_a_predicate_by_their_dtype() {
     let answer = invoke(
         "candidate_fits",
         json!({
@@ -315,7 +317,6 @@ fn a_field_an_input_and_a_literal_start_a_predicate_by_their_dtype() {
                 { "kind": "field", "dtype": "Int64" },
                 { "kind": "input", "dtype": "Boolean", "list": false },
                 { "kind": "input", "dtype": "Date", "list": true },
-                { "kind": "literal", "literal": { "kind": "text", "value": "x" } },
             ]
         }),
     )
@@ -331,7 +332,6 @@ fn a_field_an_input_and_a_literal_start_a_predicate_by_their_dtype() {
             triple("Int64", "allowed", "refused"),
             triple("Boolean", "allowed", "allowed"),
             triple("Date", "allowed", "refused"),
-            triple("String", "allowed", "refused"),
         ]
     );
     assert_eq!(
@@ -341,31 +341,6 @@ fn a_field_an_input_and_a_literal_start_a_predicate_by_their_dtype() {
     // A connected value gives one value, a list many.
     assert_eq!(answer["fits"][2]["verdict"]["shape"], "one");
     assert_eq!(answer["fits"][3]["verdict"]["shape"], "many");
-}
-
-#[test]
-fn a_typed_number_has_the_dtype_polars_gives_it() {
-    let answer = invoke(
-        "candidate_fits",
-        json!({
-            "start": [{ "kind": "outer", "name": "select" }],
-            "argument": null,
-            "candidates": [
-                { "kind": "literal", "literal": { "kind": "integer", "value": 1 } },
-                { "kind": "literal", "literal": { "kind": "integer", "value": 3_000_000_000_i64 } },
-                { "kind": "literal", "literal": { "kind": "float", "value": 1.5 } },
-            ]
-        }),
-    )
-    .expect("fits");
-    let dtypes: Vec<&str> = answer["fits"]
-        .as_array()
-        .expect("fits")
-        .iter()
-        .map(|fit| fit["dtype"].as_str().expect("a dtype"))
-        .collect();
-    // A whole number is the narrowest integer it fits, and a number with a fraction a float.
-    assert_eq!(dtypes, ["Int32", "Int64", "Float64"]);
 }
 
 #[test]
@@ -385,31 +360,49 @@ fn an_argument_is_judged_by_what_the_method_takes() {
             "candidates": [
                 { "kind": "field", "dtype": "String" },
                 { "kind": "field", "dtype": "Int64" },
-                { "kind": "literal", "literal": { "kind": "text", "value": "1d" } },
-                { "kind": "literal", "literal": { "kind": "float", "value": 1.5 } },
                 { "kind": "field", "dtype": "Categorical" },
             ]
         }),
     )
     .expect("fits");
-    // `offset_by` takes a duration written as text: a number is no duration, and Polars says so
-    // when it runs rows.
+    // `offset_by` takes a duration written as text: a field of numbers is no duration, and Polars
+    // says so when it runs rows.
     let fits = answer["fits"].as_array().expect("fits");
     let kinds: Vec<&str> = fits
         .iter()
         .map(|fit| fit["verdict"]["kind"].as_str().unwrap_or("-"))
         .collect();
-    assert_eq!(kinds, ["allowed", "refused", "allowed", "refused", "-"]);
-    assert_eq!(fits[3]["dtype"], "Float64");
+    assert_eq!(kinds, ["allowed", "refused", "-"]);
     assert_eq!(
         fits[1]["verdict"]["refusal"]["source"],
         json!({ "by": "polars", "stage": "rows" })
     );
     // A dtype the tables cover no class of is not judged, and says so.
     assert_eq!(
-        fits[4],
+        fits[2],
         json!({ "kind": "unjudged", "reason": "the tables cover no class of the dtype Categorical" })
     );
+}
+
+#[test]
+fn a_typed_literal_is_no_candidate_of_a_slot_for_the_engine_reads_what_is_typed() {
+    // A number or text typed in is asked of `read_typed`, which reads it and judges what it
+    // reads, so `candidate_fits` takes only what a list holds: fields and connected inputs.
+    for literal in [
+        json!({ "kind": "integer", "value": 1 }),
+        json!({ "kind": "float", "value": 1.5 }),
+        json!({ "kind": "text", "value": "1d" }),
+    ] {
+        let refused = invoke(
+            "candidate_fits",
+            json!({
+                "start": [{ "kind": "outer", "name": "select" }],
+                "argument": null,
+                "candidates": [{ "kind": "literal", "literal": literal }]
+            }),
+        );
+        assert!(refused.is_err(), "{literal}");
+    }
 }
 
 #[test]
@@ -435,6 +428,192 @@ fn a_slot_that_has_no_place_and_a_name_the_catalogue_lacks_are_refused() {
         )
         .expect_err("an unknown name");
         assert_eq!(refused["kind"], "unknownName", "{entry} {parameter}");
+    }
+}
+
+/// The kinds of the readings of `answer`, in order.
+fn reading_kinds(answer: &Value) -> Vec<&str> {
+    answer["readings"]
+        .as_array()
+        .expect("readings")
+        .iter()
+        .map(|reading| reading["kind"].as_str().expect("a kind"))
+        .collect()
+}
+
+#[test]
+fn a_number_typed_into_an_expression_reads_as_a_number_and_as_text_with_the_dtypes_polars_gives() {
+    let read = |text: &str| {
+        invoke(
+            "read_typed",
+            json!({ "text": text, "typed": { "kind": "expression" }, "start": null, "argument": null }),
+        )
+        .expect("readings")
+    };
+    // A whole number is the narrowest integer it fits, a number with a fraction a float, and
+    // the text the typed text itself; nothing is judged where no slot is given.
+    assert_eq!(
+        read("12"),
+        json!({ "readings": [
+            { "kind": "read", "literal": { "kind": "integer", "value": 12 }, "dtype": "Int32", "fit": null },
+            { "kind": "read", "literal": { "kind": "text", "value": "12" }, "dtype": "String", "fit": null },
+        ] })
+    );
+    let fraction = read("1.0");
+    assert_eq!(
+        fraction["readings"][0]["literal"],
+        json!({ "kind": "float", "value": 1.0 })
+    );
+    assert_eq!(fraction["readings"][0]["dtype"], "Float64");
+    // What is no number is text alone, and nothing typed is nothing.
+    assert_eq!(
+        read("abc"),
+        json!({ "readings": [
+            { "kind": "read", "literal": { "kind": "text", "value": "abc" }, "dtype": "String", "fit": null },
+        ] })
+    );
+    assert_eq!(read(""), json!({ "readings": [] }));
+}
+
+#[test]
+fn a_typed_text_is_judged_by_what_the_method_takes_where_a_slot_is_given() {
+    let answer = invoke(
+        "read_typed",
+        json!({
+            "text": "1.5",
+            "typed": { "kind": "expression" },
+            "start": null,
+            "argument": {
+                "entry": "Expr.dt.offset_by",
+                "parameter": "by",
+                "place": {
+                    "positions": [{ "kind": "outer", "name": "select" }],
+                    "after": { "kind": "value", "dtype": "Datetime(us)", "shape": "many" }
+                }
+            }
+        }),
+    )
+    .expect("readings");
+    // `offset_by` takes a duration written as text: the number is refused by Polars when it runs
+    // rows, and the text is allowed.
+    assert_eq!(reading_kinds(&answer), ["read", "read"]);
+    let number = &answer["readings"][0]["fit"];
+    assert_eq!(number["kind"], "judged");
+    assert_eq!(number["dtype"], "Float64");
+    assert_eq!(number["verdict"]["kind"], "refused");
+    assert_eq!(
+        number["verdict"]["refusal"]["source"],
+        json!({ "by": "polars", "stage": "rows" })
+    );
+    let text = &answer["readings"][1]["fit"];
+    assert_eq!(text["dtype"], "String");
+    assert_eq!(text["verdict"]["kind"], "allowed");
+}
+
+#[test]
+fn a_typed_text_reads_as_the_slot_it_is_typed_into_takes_it() {
+    let read = |typed: Value, text: &str| {
+        invoke(
+            "read_typed",
+            json!({ "text": text, "typed": typed, "start": null, "argument": null }),
+        )
+        .expect("readings")
+    };
+    let value = |value_type: &str| json!({ "kind": "value", "type": value_type });
+    // A whole number slot reads a whole number, and says why a number with a fraction is not.
+    assert_eq!(
+        read(value("integer"), "7")["readings"][0]["literal"],
+        json!({ "kind": "integer", "value": 7 })
+    );
+    assert_eq!(
+        read(value("integer"), "7.5")["readings"],
+        json!([{ "kind": "unread", "reason": "not a whole number" }])
+    );
+    // A number slot reads a whole number as a number with a fraction.
+    assert_eq!(
+        read(value("float"), "7")["readings"][0],
+        json!({ "kind": "read", "literal": { "kind": "float", "value": 7.0 }, "dtype": "Float64", "fit": null })
+    );
+    // Text is text, though it is a number; a path has no dtype.
+    assert_eq!(
+        read(value("string"), "7")["readings"],
+        json!([{ "kind": "read", "literal": { "kind": "text", "value": "7" }, "dtype": "String", "fit": null }])
+    );
+    assert_eq!(
+        read(json!({ "kind": "path" }), "data/claims.parquet")["readings"],
+        json!([{ "kind": "read", "literal": { "kind": "text", "value": "data/claims.parquet" }, "dtype": null, "fit": null }])
+    );
+    // A date is read as Polars reads one and carried as the day, a duration as Polars reads a
+    // duration string and carried as typed.
+    assert_eq!(
+        read(value("date"), "10-03-2026")["readings"],
+        json!([{ "kind": "read", "literal": { "kind": "text", "value": "2026-03-10" }, "dtype": "Date", "fit": null }])
+    );
+    assert_eq!(
+        read(json!({ "kind": "duration" }), "2d12h")["readings"],
+        json!([{ "kind": "read", "literal": { "kind": "text", "value": "2d12h" }, "dtype": null, "fit": null }])
+    );
+    // What Polars does not read is unread, with Polars' own words.
+    for (typed, text) in [
+        (value("date"), "yesterday"),
+        (json!({ "kind": "duration" }), "1x"),
+    ] {
+        let answer = read(typed, text);
+        assert_eq!(reading_kinds(&answer), ["unread"], "{text}");
+        assert!(
+            !answer["readings"][0]["reason"]
+                .as_str()
+                .expect("a reason")
+                .is_empty(),
+            "{text}"
+        );
+    }
+}
+
+#[test]
+fn a_typed_text_that_asks_about_a_name_the_catalogue_lacks_is_refused_with_its_kind() {
+    let place = json!({
+        "positions": [{ "kind": "outer", "name": "select" }],
+        "after": { "kind": "value", "dtype": "Int64", "shape": "many" }
+    });
+    for (entry, parameter) in [("Expr.nothing", "n"), ("Expr.shift", "m")] {
+        let refused = invoke(
+            "read_typed",
+            json!({
+                "text": "1",
+                "typed": { "kind": "expression" },
+                "start": null,
+                "argument": { "entry": entry, "parameter": parameter, "place": place }
+            }),
+        )
+        .expect_err("an unknown name");
+        assert_eq!(refused["kind"], "unknownName", "{entry} {parameter}");
+    }
+    let refused = invoke(
+        "read_typed",
+        json!({
+            "text": "1",
+            "typed": { "kind": "expression" },
+            "start": [],
+            "argument": null
+        }),
+    )
+    .expect_err("no position");
+    assert_eq!(refused["kind"], "unknownName");
+    // A kind that takes no typed text, and a type that is no type, are not arguments at all.
+    for typed in [
+        json!({ "kind": "flag" }),
+        json!({ "kind": "value", "type": "boolean" }),
+        json!({ "kind": "value" }),
+    ] {
+        assert!(
+            invoke(
+                "read_typed",
+                json!({ "text": "1", "typed": typed, "start": null, "argument": null }),
+            )
+            .is_err(),
+            "{typed}"
+        );
     }
 }
 
@@ -681,17 +860,6 @@ fn the_snapshots_are_what_the_commands_return() {
                             dtype: "Date".to_owned(),
                             list: true,
                         },
-                        CandidateRequest::Literal {
-                            literal: LiteralRequest::Integer { value: 1 },
-                        },
-                        CandidateRequest::Literal {
-                            literal: LiteralRequest::Float { value: 1.5 },
-                        },
-                        CandidateRequest::Literal {
-                            literal: LiteralRequest::Text {
-                                value: "x".to_owned(),
-                            },
-                        },
                         CandidateRequest::Field {
                             dtype: "Categorical".to_owned(),
                         },
@@ -724,18 +892,80 @@ fn the_snapshots_are_what_the_commands_return() {
                             dtype: "String".to_owned(),
                             list: false,
                         },
-                        CandidateRequest::Literal {
-                            literal: LiteralRequest::Text {
-                                value: "1d".to_owned(),
-                            },
-                        },
-                        CandidateRequest::Literal {
-                            literal: LiteralRequest::Integer { value: 1 },
-                        },
                     ],
                 )
                 .expect("fits"),
             ),
+        ),
+        (
+            "typed-expression.json",
+            json_of(
+                &read_view(
+                    "1.5",
+                    TypedRequest::Expression,
+                    None,
+                    Some(&ArgumentRequest {
+                        entry: "Expr.dt.offset_by".to_owned(),
+                        parameter: "by".to_owned(),
+                        place: PlaceRequest {
+                            positions: select.clone(),
+                            after: value(Representative::Datetime, ValueShapeView::Many),
+                        },
+                    }),
+                )
+                .expect("readings"),
+            ),
+        ),
+        (
+            "typed-start-and-argument.json",
+            json_of(
+                &read_view(
+                    "1.5",
+                    TypedRequest::Expression,
+                    Some(&outer(Outer::Filter)),
+                    Some(&ArgumentRequest {
+                        entry: "Expr.shift".to_owned(),
+                        parameter: "n".to_owned(),
+                        place: PlaceRequest {
+                            positions: select.clone(),
+                            after: value(Representative::Int64, ValueShapeView::Many),
+                        },
+                    }),
+                )
+                .expect("readings"),
+            ),
+        ),
+        (
+            "typed-whole.json",
+            json_of(
+                &read_view(
+                    "12",
+                    TypedRequest::Value {
+                        value_type: ValueTypeRequest::Integer,
+                    },
+                    None,
+                    None,
+                )
+                .expect("readings"),
+            ),
+        ),
+        (
+            "typed-date.json",
+            json_of(
+                &read_view(
+                    "10-03-2026",
+                    TypedRequest::Value {
+                        value_type: ValueTypeRequest::Date,
+                    },
+                    None,
+                    None,
+                )
+                .expect("readings"),
+            ),
+        ),
+        (
+            "typed-unread.json",
+            json_of(&read_view("1x", TypedRequest::Duration, None, None).expect("readings")),
         ),
         (
             "options.json",

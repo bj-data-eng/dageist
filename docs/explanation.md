@@ -346,19 +346,19 @@ asks the engine only while it is open, through a scheduler of its own that sends
 the newest request after a short wait, drops the answer to one that a newer
 request replaced and asks again only a failure that may pass, as the runs do. A
 list says that it is waiting, or that the engine has not reported on the place,
-and never shows what was answered for another place. Three commands answer:
+and never shows what was answered for another place. Four commands answer:
 
 - `offers_at` says which calls may stand where an expression has what it has so
   far, each with the engine's verdict, whether the chain may end there and the
   argument a method starts with. A method's place is the one the engine's walk
   reported for its link, which a chain's prepared dtypes carry; a chain's start
   is the positions that hold it and nothing yet.
-- `candidate_fits` says which fields, connected inputs and numbers or text typed
-  in fit a slot, as the start of an expression, as the argument of a method or
-  both. The dtype of each is the engine's: a typed literal has the dtype Polars
-  gives it, so a whole number is the narrowest integer it fits and `1.5` is a
-  `Float64`. A start is offered a connected input where the engine allows a
-  literal of its dtype, which is what a run makes of an input.
+- `candidate_fits` says which fields and connected inputs fit a slot, as the
+  start of an expression, as the argument of a method or both. A start is offered
+  a connected input where the engine allows a literal of its dtype, which is what
+  a run makes of an input.
+- `read_typed` says how a text typed into a slot reads, which is the engine's
+  to say and not the view's; see [How a typed text is read](#how-a-typed-text-is-read).
 - `option_offers` says what the flags and choices of an entry may be set to
   beside those already chosen, so that an option is added with a word Polars
   allows, or not at all.
@@ -377,6 +377,71 @@ as a refusal when the steps run, not in its list; only the list that adds an
 option asks. The values of `is_in` are connected lists the engine has no entry
 to judge yet, so that list offers them unjudged.
 
+### How A Typed Text Is Read
+
+The view sends the text it was given with what it is typed into, which is the
+kind of the parameter as the catalogue writes it (an expression, a literal of a
+type, a duration or a path) and, for an expression, the slot it stands in. It
+holds no pattern of a number, a date or a duration and no word for a dtype. The
+engine's `read_typed` answers with each way the slot reads the text, in the
+order the slot offers them: the literal the document would hold, the dtype
+Polars gives it and, where a slot was named, what the tables say of it there;
+or, for a text the slot does not take, why not. Nothing typed reads as nothing.
+
+- **A number** is read as the document's own JSON reader reads one, so what is
+  read is what a document holds once it is written: `12` is a whole number,
+  `1.5`, `1.0` and `1e3` are numbers with a fraction, and `01`, `.5` and `+1` are
+  none. A whole number is the narrowest integer it fits, and a number with a
+  fraction a `Float64`. A whole number past 2^53 - 1 is read as the number with a
+  fraction nearest to it, because the host sends it as JSON and the document
+  must read back the number that was read; a slot that takes a whole number
+  refuses it. A slot that takes a number with a fraction reads a whole number as
+  one. A slot that takes a number or text, and an expression, reads a number
+  first and the text as typed after it.
+- **A duration** is read as Polars reads a duration string, such as `1mo` or
+  `2d12h`, by the parser that `dt.offset_by` uses. Given to an expression, as
+  `dt.offset_by`'s `by`, `"1d"` is a `String` literal like any other, which the
+  tables allow there and Polars reads when it runs rows; only a parameter that
+  takes a duration itself reads the text as one, and the reading has no dtype.
+  An amount whose units add up to more than an `i64` of nanoseconds (a day is 24
+  hours and a week 7 days) or of months is refused, in every build: Polars adds
+  the amounts without checking, so a build with overflow checks would panic and
+  one without would wrap around to another duration.
+- **A date** is read as Polars reads text given no format, by the patterns
+  `str.to_date` infers from: year, month and day, or day, month and year, with
+  `-`, `/` or `.`. Polars refuses to compare a date or a datetime with a string,
+  so a typed date that is to be compared would have to be a date literal, and the
+  document holds none: the reading carries the ISO text of the day, with the
+  dtype `Date`, for a parameter that takes one. No entry of the catalogue has a
+  parameter of that type yet. Where a slot is named, the tables judge the
+  literal the document holds, so a date reading has the dtype `Date` and its
+  `fit` is that of the `String` that carries it; this changes when the document
+  holds a date.
+- **Text** is read as typed, with the dtype `String`, or with none for a path.
+
+Where a slot is both the start of an expression and the argument of a method, as
+a window's key is, a reading is refused where either side refuses it. Where both
+allow it, the result and the shape are the argument's, for they say what the call
+it is given to gives, and whether a chain may end there is the start's, for the
+mark on a reading is about the chain the reading starts and not about whether the
+call's result may end the chain the call stands in.
+
+The reading of a text is made by plain functions in the engine's
+[allowed/typed.rs](../crates/dageist-engine/src/allowed/typed.rs), served by the
+Tauri command and by the bridge through one function in the host's
+[offers.rs](../crates/dageist-tauri/src/offers.rs). The view asks it with the
+scheduler of the other lists and prepares the answer in
+[model/offers.ts](../ui/packages/steps/src/model/offers.ts); an answer that has
+not arrived shows the text as typed, waiting. A number the engine reads with a
+fraction is held with that mark in the value or setting, so that it is written
+as a float and has the dtype that was shown.
+
+A list that closes when a row is picked keeps its rows in the order the list is
+given them, and a row that arrives later, as an answer of the engine does, takes
+its place among the rest, so a list can be reordered while it waits. A list that
+stays open keeps each row where it stood when the list opened or was last
+searched, so that the row under the pointer does not move when a row is ticked.
+
 ### What The Editor Cannot Offer
 
 What the editor has no way to draw is written once, in
@@ -392,8 +457,9 @@ parameters of a start or a condition that it does not set: `col`'s further
 names, `lit`'s dtype and its object flag, and the keyword constraints of a
 condition. Changing either side changes the list, which the test then fails on. The check
 covers entries and their parameters. It does not cover which classes of dtype
-the editor can type as an argument: it types a number or text, so a typed date,
-duration or Boolean literal, which the engine may allow, is not on the list.
+the editor can type as an argument: the document holds a number, text or a flag
+as a literal, so a typed date, duration or Boolean literal, which the engine may
+allow, is not on the list.
 
 ## The Step Document
 

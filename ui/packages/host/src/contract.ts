@@ -451,20 +451,19 @@ export interface PlaceRequest {
   readonly after: AfterView;
 }
 
-/** A number or text typed in, as a step document writes it. Mirrors `LiteralView` in crates/dageist-tauri/src/offers.rs. */
+/** A number or text the engine reads from what is typed, as a step document writes it. Mirrors `LiteralView` in crates/dageist-tauri/src/offers.rs. */
 export type LiteralView =
   | { readonly kind: 'integer'; readonly value: number }
   | { readonly kind: 'float'; readonly value: number }
   | { readonly kind: 'text'; readonly value: string };
 
 /**
- * A value that may be picked for a slot: the short name of the dtype of a
- * field or an input, or a literal typed in, whose dtype the engine decides.
+ * A value a list holds, which may be picked for a slot: the short name of the dtype of a field or
+ * an input. What is typed is read by the engine instead, which `readTyped` asks.
  */
 export type CandidateRequest =
   | { readonly kind: 'field'; readonly dtype: string }
-  | { readonly kind: 'input'; readonly dtype: string; readonly list: boolean }
-  | { readonly kind: 'literal'; readonly literal: LiteralView };
+  | { readonly kind: 'input'; readonly dtype: string; readonly list: boolean };
 
 /** The argument a candidate would be given: a parameter of a method that stands at a place. */
 export interface ArgumentRequest {
@@ -483,6 +482,29 @@ export interface FitsRequest {
   /** The argument a candidate would be given, or `null` when it only starts an expression. */
   readonly argument: ArgumentRequest | null;
   readonly candidates: readonly CandidateRequest[];
+}
+
+/**
+ * What a text is typed into, as the catalogue writes the kind of a parameter that takes a typed
+ * value: an expression, a literal of a type, a duration or a path. The engine reads the text as
+ * that slot takes it.
+ */
+export type TypedKind =
+  | { readonly kind: 'expression' }
+  | { readonly kind: 'value'; readonly type: ValueTypeView }
+  | { readonly kind: 'duration' }
+  | { readonly kind: 'path' };
+
+/**
+ * A text typed into a slot, to be read by the engine. `start` and `argument` name the slot an
+ * expression stands in, as for the fits of candidates, and the engine says what the tables
+ * allow of each reading there; where neither is given, the text is only read.
+ */
+export interface TypedRequest {
+  readonly text: string;
+  readonly typed: TypedKind;
+  readonly start: readonly PositionView[] | null;
+  readonly argument: ArgumentRequest | null;
 }
 
 /** An option of an entry that is already chosen. */
@@ -526,6 +548,31 @@ export type FitView =
 /** What the tables say of each candidate, in the order they were asked. Mirrors `FitsView` in crates/dageist-tauri/src/offers.rs. */
 export interface FitsView {
   readonly fits: readonly FitView[];
+}
+
+/** One way a typed text reads. */
+export type ReadingView =
+  /**
+   * The text reads as `literal`, which has the dtype `dtype` where Polars gives it one. `fit` is
+   * what the tables say of it in the slot that was asked about, or `null` where none was. The
+   * slot judges the literal the document would hold, which is text where the document holds no
+   * date, so a date has the `dtype` `Date` and is judged as the `String` that carries it.
+   */
+  | {
+      readonly kind: 'read';
+      readonly literal: LiteralView;
+      readonly dtype: string | null;
+      readonly fit: FitView | null;
+    }
+  /** The text is not what it was typed into, for this reason. */
+  | { readonly kind: 'unread'; readonly reason: string };
+
+/**
+ * How a typed text reads, each way in the order the slot offers it; none for a text that was not
+ * typed. Mirrors `ReadingsView` in crates/dageist-tauri/src/offers.rs.
+ */
+export interface ReadingsView {
+  readonly readings: readonly ReadingView[];
 }
 
 /** One word an option may be set to, and why Polars refuses it, if it does. */
@@ -607,6 +654,13 @@ export interface Host {
    * entry, a parameter or a place the engine does not know.
    */
   readonly candidateFits: (request: FitsRequest) => Promise<FitsView>;
+  /**
+   * Asks how the engine reads a text typed into a slot: as a number, a date, a duration or text,
+   * as the slot takes it, with the literal and the dtype each reading has or why the text is not
+   * that. It rejects with `unknownName` for an entry, a parameter or a place the engine does not
+   * know.
+   */
+  readonly readTyped: (request: TypedRequest) => Promise<ReadingsView>;
   /**
    * Asks what the flags and choices of the entry `entry` may be set to,
    * beside the options already `chosen`. It rejects with `unknownName` for an

@@ -37,6 +37,8 @@ export interface ColumnValue {
 export interface LiteralValue {
   readonly kind: 'literal';
   readonly value: Cell;
+  /** Set for a number the engine read as one with a fraction, which stays one though it is whole. */
+  readonly float?: true;
 }
 
 /** A value worked out by a chain of its own. */

@@ -21,23 +21,27 @@ import type {
   KindView,
   OfferPlaceView,
   ParameterView,
+  TypedKind,
 } from '@dageist/host';
 import type { Entry, Offer, OfferGroup } from '@dageist/design';
 import { Block, Hint, ManySlot, Piece, Slot, Word } from '@dageist/design';
 
 import type { Asked } from './ask';
+import { useReadTyped } from './ask';
 import { FreshContext, Line, Lines } from './Lists';
 import { useCatalogue, useNode } from './EngineProvider';
 import { ValueSlot } from './Values';
+import { readingRows } from './engineLists';
 import { anyField, counted, fieldOffers, matches, offer, titled } from './offers';
 import { useFieldHint } from './origins';
-import { usePositions } from './positions';
+import { useListState, usePositions } from './positions';
 import { findColumn } from './model/frame';
 import type { Dtype, Frame } from './model/frame';
 import { placeRequest, within } from './model/place';
-import type { PreparedOption } from './model/offers';
+import { literalSetting, literalWords } from './model/literal';
+import type { PreparedOption, PreparedReading } from './model/offers';
 import { findInput } from './model/inputs';
-import type { Options, PairSetting, SetParameter, Setting } from './model/settings';
+import type { LiteralSetting, Options, PairSetting, SetParameter, Setting } from './model/settings';
 import {
   UNSET,
   atDefaultOver,
@@ -49,12 +53,6 @@ import {
   withOption,
   withoutOption,
 } from './model/settings';
-
-const WHOLE_NUMBER = /^-?\d+$/;
-const DECIMAL_NUMBER = /^-?\d+(\.\d+)?$/;
-/** Polars' durations: whole amounts of units written one after another, such as `1mo` or `2d12h`. */
-const DURATION = /^-?(\d+(ns|us|ms|s|m|h|d|w|mo|q|y|i))+$/;
-const DATE = /^\d{4}-\d{2}-\d{2}/;
 
 /** Returns what a parameter is for, for assistive technology: its name, and its label when that adds to it. */
 function describe(parameter: ParameterView): string {
@@ -378,10 +376,17 @@ export function DtypeDrawing({
 /** What is typed into a literal: a number of a stated type, text, a duration, a path or a date. */
 export type LiteralType = 'integer' | 'float' | 'string' | 'date' | 'any' | 'duration' | 'path';
 
-/** What a literal holds. */
-export type Literal =
-  | { readonly kind: 'number'; readonly value: number }
-  | { readonly kind: 'text'; readonly value: string };
+/** Returns what the engine is asked a text is typed into, for a literal of `type`. */
+function typedInto(type: LiteralType): TypedKind {
+  switch (type) {
+    case 'duration':
+      return { kind: 'duration' };
+    case 'path':
+      return { kind: 'path' };
+    default:
+      return { kind: 'value', type };
+  }
+}
 
 /** What the search box says for each type of literal. */
 const LITERAL_PLACEHOLDERS: Readonly<Record<LiteralType, string>> = {
@@ -405,71 +410,29 @@ const LITERAL_WAITING: Readonly<Record<LiteralType, string>> = {
   path: 'path',
 };
 
-/** What a row that offers typed text says it is, for each type of literal. */
-const LITERAL_NOTES: Readonly<Record<LiteralType, string>> = {
-  integer: 'a number',
-  float: 'a number',
-  string: 'String',
-  date: 'a date',
-  any: 'String',
-  duration: 'a duration',
-  path: 'a path',
-};
-
-/** Returns the rows that offer what was typed as a literal of `type`, with why one is not taken. */
+/**
+ * Returns the rows that offer what was typed as the engine read it for a
+ * literal of `type`, with why one is not taken. Nothing is typed yet, so the
+ * list says what goes in the search box.
+ */
 function literalOffers(
   type: LiteralType,
   typed: string,
-  onPick: (literal: Literal) => void,
+  readings: Asked<readonly PreparedReading[]>,
+  onPick: (literal: LiteralSetting) => void,
 ): Offer[] {
-  const rows: Offer[] = [];
-  const text = typed.trim();
-  const numeric = type === 'integer' ? WHOLE_NUMBER : DECIMAL_NUMBER;
-  if (
-    (type === 'integer' || type === 'float' || type === 'any') &&
-    numeric.test(text) &&
-    Number.isFinite(Number(text))
-  ) {
-    rows.push(
-      offer(
-        text,
-        'value',
-        type === 'integer' || WHOLE_NUMBER.test(text) ? 'a number' : 'a decimal number',
-        () => {
-          onPick({ kind: 'number', value: Number(text) });
-        },
-        { id: 'number' },
-      ),
-    );
-  }
-  if (type !== 'integer' && type !== 'float' && typed !== '') {
-    let reason: string | null = null;
-    if (type === 'duration' && !DURATION.test(text)) reason = 'not a duration such as 1mo';
-    if (type === 'date' && !DATE.test(text)) reason = 'not a date such as 2026-03-10';
-    const note = LITERAL_NOTES[type];
-    rows.push(
-      offer(
-        typed,
-        'value',
-        note,
-        () => {
-          onPick({ kind: 'text', value: typed });
-        },
-        { id: 'text', look: 'quoted', reason },
-      ),
-    );
-  }
-  if (rows.length === 0 && typed === '') {
-    // Nothing is typed yet, so the list says what goes in the search box.
-    rows.push(
+  if (typed === '') {
+    return [
       offer(LITERAL_WAITING[type], 'value', '', () => undefined, {
         id: 'type',
         look: 'none',
         reason: 'type it in the search box',
       }),
-    );
+    ];
   }
-  return rows;
+  return readingRows(typed, readings, (literal) => {
+    onPick(literalSetting(literal));
+  });
 }
 
 /** Draws something typed into the search box of its list: a value, a duration or a path. */
@@ -480,13 +443,22 @@ export function LiteralDrawing({
   openId,
   value,
   onChange,
-}: DrawingProps<Literal | null> & { readonly type: LiteralType }): React.JSX.Element {
+}: DrawingProps<LiteralSetting | null> & { readonly type: LiteralType }): React.JSX.Element {
   const placeholder = LITERAL_PLACEHOLDERS[type];
   const waiting = type === 'duration' || type === 'path' ? type : 'value';
+  const list = useListState();
+  // The engine reads what is typed, only while the list is open.
+  const readings = useReadTyped(
+    list.open ? { text: list.typed, typed: typedInto(type), slot: null } : null,
+  );
   let shown: { label: string; look: 'plain' | 'quoted' | 'none' };
   if (value === null) shown = { label: waiting, look: 'none' };
-  else if (value.kind === 'number') shown = { label: String(value.value), look: 'plain' };
-  else shown = { label: value.value, look: 'quoted' };
+  else if (value.kind === 'number') {
+    shown = {
+      label: literalWords({ kind: value.float === true ? 'float' : 'integer', value: value.value }),
+      look: 'plain',
+    };
+  } else shown = { label: value.value, look: 'quoted' };
   return (
     <Slot
       label={shown.label}
@@ -497,7 +469,9 @@ export function LiteralDrawing({
       openNow={useIsFresh(openId)}
       describedAs={describedAs}
       placeholder={placeholder}
-      offers={(typed) => [titled('Value', literalOffers(type, typed, onChange))]}
+      offers={(typed) => [titled('Value', literalOffers(type, typed, readings, onChange))]}
+      onOpenChange={list.onOpenChange}
+      onType={list.onType}
     />
   );
 }
@@ -518,7 +492,7 @@ interface OneProps {
 }
 
 /** Returns the literal a setting holds, or `null` when it holds none. */
-function literalOf(setting: Setting): Literal | null {
+function literalOf(setting: Setting): LiteralSetting | null {
   return setting.kind === 'number' || setting.kind === 'text' ? setting : null;
 }
 
@@ -834,23 +808,10 @@ function EachControl({
       </select>
     );
   }
-  // A setting that can be anything is typed in a field inside the list.
+  // What a value takes when it is typed is read by the engine in a list of its own, which a row
+  // of a list has no room for, so a parameter of another kind is not drawn here.
   return (
-    <input
-      type="text"
-      aria-label={label}
-      className="dg-given"
-      spellCheck={false}
-      value={value === null ? '' : wordOfSetting(kind, value).label}
-      onChange={(event) => {
-        const typed = event.currentTarget.value;
-        onChange(
-          DECIMAL_NUMBER.test(typed)
-            ? { kind: 'number', value: Number(typed) }
-            : { kind: 'text', value: typed },
-        );
-      }}
-    />
+    <span className="font-sans text-xs text-wrong">{`${parameter.shown} is not drawn here`}</span>
   );
 }
 

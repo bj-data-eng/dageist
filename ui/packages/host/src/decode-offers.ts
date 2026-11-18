@@ -15,6 +15,8 @@ import type {
   OptionView,
   OptionWordView,
   OptionsView,
+  ReadingView,
+  ReadingsView,
 } from './contract';
 import type { Decode } from './decode';
 import {
@@ -98,6 +100,29 @@ const readFits: Decode<FitsView> = readRecord(['fits'], (fields, path) => ({
   fits: readField(fields, path, 'fits', readList(readFit)),
 }));
 
+const readReading: Decode<ReadingView> = readTagged<ReadingView>('kind', {
+  read: {
+    fields: ['literal', 'dtype', 'fit'],
+    read: (fields, path) => ({
+      kind: 'read',
+      literal: readField(fields, path, 'literal', readLiteral),
+      dtype: readField(fields, path, 'dtype', readNullable(readString)),
+      fit: readField(fields, path, 'fit', readNullable(readFit)),
+    }),
+  },
+  unread: {
+    fields: ['reason'],
+    read: (fields, path) => ({
+      kind: 'unread',
+      reason: readField(fields, path, 'reason', readString),
+    }),
+  },
+});
+
+const readReadings: Decode<ReadingsView> = readRecord(['readings'], (fields, path) => ({
+  readings: readField(fields, path, 'readings', readList(readReading)),
+}));
+
 const readOptionWord: Decode<OptionWordView> = readRecord(['word', 'refusal'], (fields, path) => ({
   word: readField(fields, path, 'word', readString),
   refusal: readField(fields, path, 'refusal', readNullable(readRefusal)),
@@ -132,6 +157,15 @@ export function decodeOffers(value: unknown): OffersView {
  */
 export function decodeFits(value: unknown): FitsView {
   return readFits(value, ROOT);
+}
+
+/**
+ * Reads what the host's `read_typed` command sent.
+ *
+ * @throws {DecodeError} When it is not the readings of a typed text, saying where and why.
+ */
+export function decodeReadings(value: unknown): ReadingsView {
+  return readReadings(value, ROOT);
 }
 
 /**

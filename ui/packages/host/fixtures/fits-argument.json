@@ -37,32 +37,6 @@
           "kind": "allowed"
         }
       }
-    },
-    {
-      "kind": "judged",
-      "dtype": "String",
-      "verdict": {
-        "kind": "allowed",
-        "result": "Datetime(us)",
-        "shape": "many",
-        "ending": {
-          "kind": "allowed"
-        }
-      }
-    },
-    {
-      "kind": "judged",
-      "dtype": "Int32",
-      "verdict": {
-        "kind": "refused",
-        "refusal": {
-          "source": {
-            "by": "polars",
-            "stage": "rows"
-          },
-          "reason": "invalid series dtype: expected `String`, got `i32` for series with name `b`"
-        }
-      }
     }
   ]
 }

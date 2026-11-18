@@ -5,6 +5,7 @@ import fitsFixture from '../fixtures/fits-argument.json';
 import nodeFixture from '../fixtures/node-inputs.json';
 import offersFixture from '../fixtures/offers-value.json';
 import optionsFixture from '../fixtures/options.json';
+import typedFixture from '../fixtures/typed-expression.json';
 import reportFixture from '../fixtures/step-report.json';
 import rowsFixture from '../fixtures/step-rows.json';
 import { withField } from '../test-support/tamper';
@@ -84,7 +85,7 @@ describe('the host that calls the bridge', () => {
     const request = {
       start: null,
       argument: { entry: 'Expr.dt.offset_by', parameter: 'by', place },
-      candidates: [{ kind: 'literal', literal: { kind: 'text', value: '1d' } }],
+      candidates: [{ kind: 'field', dtype: 'String' }],
     } as const;
     const fits = await bridgeHost().candidateFits(request);
     const fitsSent = [...sent];
@@ -93,7 +94,7 @@ describe('the host that calls the bridge', () => {
     const found = await bridgeHost().optionOffers('LazyFrame.join', chosen);
 
     expect(offers.entries).toHaveLength(35);
-    expect(fits.fits).toHaveLength(5);
+    expect(fits.fits).toHaveLength(3);
     expect(found.options.length).toBeGreaterThan(0);
     expect(fitsSent[0]).toMatchObject({
       path: '/bridge/candidate_fits',
@@ -103,6 +104,28 @@ describe('the host that calls the bridge', () => {
       path: '/bridge/option_offers',
       body: { entry: 'LazyFrame.join', chosen },
     });
+  });
+
+  it('sends a typed text with what it is typed into and the slot it stands in', async () => {
+    bridgeAnswers(() => jsonResponse(typedFixture));
+    const request = {
+      text: '1.5',
+      typed: { kind: 'expression' },
+      start: null,
+      argument: {
+        entry: 'Expr.dt.offset_by',
+        parameter: 'by',
+        place: {
+          positions: [{ kind: 'outer', name: 'select' }],
+          after: { kind: 'value', dtype: 'Datetime(us)', shape: 'many' },
+        },
+      },
+    } as const;
+
+    const read = await bridgeHost().readTyped(request);
+
+    expect(read.readings).toHaveLength(2);
+    expect(sent[0]).toMatchObject({ path: '/bridge/read_typed', body: request });
   });
 
   it('sends the place of the offers as the positions and what the expression has', async () => {

@@ -134,11 +134,27 @@ pub dageist_engine::allowed::Stage::Schema
 impl dageist_engine::allowed::Stage
 pub const dageist_engine::allowed::Stage::ALL: [Self; 3]
 pub const fn dageist_engine::allowed::Stage::name(self) -> &'static str
+pub enum dageist_engine::allowed::Typed
+pub dageist_engine::allowed::Typed::Duration
+pub dageist_engine::allowed::Typed::Expression
+pub dageist_engine::allowed::Typed::Path
+pub dageist_engine::allowed::Typed::Value(dageist_engine::catalog::ValueType)
 pub enum dageist_engine::allowed::Unknown
 pub dageist_engine::allowed::Unknown::TheResultsDtype
 pub dageist_engine::allowed::Unknown::TheStartsDtype
 impl core::fmt::Display for dageist_engine::allowed::Unknown
 pub fn dageist_engine::allowed::Unknown::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum dageist_engine::allowed::Unread
+pub dageist_engine::allowed::Unread::LeadingZero
+pub dageist_engine::allowed::Unread::NotADate(alloc::string::String)
+pub dageist_engine::allowed::Unread::NotADuration(alloc::string::String)
+pub dageist_engine::allowed::Unread::NotANumber
+pub dageist_engine::allowed::Unread::NotAWholeNumber
+pub dageist_engine::allowed::Unread::OutOfRange
+pub dageist_engine::allowed::Unread::TooLargeForAWholeNumber
+impl core::error::Error for dageist_engine::allowed::Unread
+impl core::fmt::Display for dageist_engine::allowed::Unread
+pub fn dageist_engine::allowed::Unread::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub enum dageist_engine::allowed::Verdict
 pub dageist_engine::allowed::Verdict::Allowed(dageist_engine::allowed::Allowance)
 pub dageist_engine::allowed::Verdict::Refused(dageist_engine::allowed::Refusal)
@@ -202,6 +218,10 @@ pub const fn dageist_engine::allowed::Place::new(context: dageist_engine::allowe
 pub struct dageist_engine::allowed::Produces
 pub dageist_engine::allowed::Produces::result: dageist_engine::allowed::ResultDtype
 pub dageist_engine::allowed::Produces::shape: dageist_engine::allowed::Shape
+pub struct dageist_engine::allowed::Read
+impl dageist_engine::allowed::Read
+pub const fn dageist_engine::allowed::Read::dtype(&self) -> core::option::Option<dageist_engine::allowed::Representative>
+pub const fn dageist_engine::allowed::Read::literal(&self) -> &dageist_engine::allowed::Literal
 pub struct dageist_engine::allowed::Reason
 pub dageist_engine::allowed::Reason::stage: dageist_engine::allowed::Stage
 pub dageist_engine::allowed::Reason::text: alloc::string::String
@@ -221,6 +241,7 @@ pub fn dageist_engine::allowed::ResultDtype::fmt(&self, formatter: &mut core::fm
 pub struct dageist_engine::allowed::Slot<'a>
 impl<'a> dageist_engine::allowed::Slot<'a>
 pub const fn dageist_engine::allowed::Slot<'a>::new(context: core::option::Option<dageist_engine::allowed::Context>, argument: core::option::Option<dageist_engine::allowed::ArgumentSlot<'a>>) -> core::option::Option<Self>
+pub const dageist_engine::allowed::LARGEST_WHOLE_NUMBER: i64
 pub fn dageist_engine::allowed::argument_dtypes(entry: &dageist_engine::catalog::Entry, parameter: &str, receiver: dageist_engine::allowed::Representative) -> alloc::vec::Vec<(dageist_engine::allowed::Representative, dageist_engine::allowed::Outcome)>
 pub fn dageist_engine::allowed::default_argument(entry: &'static dageist_engine::catalog::Entry, place: &dageist_engine::allowed::Place) -> core::option::Option<dageist_engine::allowed::DefaultArgument>
 pub fn dageist_engine::allowed::dtype_name(dtype: &polars_core::datatypes::dtype::DataType) -> alloc::string::String
@@ -230,6 +251,7 @@ pub fn dageist_engine::allowed::offer_input(place: &dageist_engine::allowed::Pla
 pub fn dageist_engine::allowed::offers(place: &dageist_engine::allowed::Place) -> alloc::vec::Vec<dageist_engine::allowed::Offer>
 pub fn dageist_engine::allowed::option_offers(entry: &dageist_engine::catalog::Entry, chosen: &[(&str, &str)]) -> alloc::vec::Vec<dageist_engine::allowed::OptionOffer>
 pub fn dageist_engine::allowed::options(entry: &dageist_engine::catalog::Entry, chosen: &[(&str, &str)]) -> core::result::Result<(), dageist_engine::allowed::Refusal>
+pub fn dageist_engine::allowed::read_typed(text: &str, typed: dageist_engine::allowed::Typed) -> alloc::vec::Vec<core::result::Result<dageist_engine::allowed::Read, dageist_engine::allowed::Unread>>
 pub fn dageist_engine::allowed::rule_forbids(entry: &dageist_engine::catalog::Entry, context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_key_known_not_elementwise(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_repeated_pair_of_key_names(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
