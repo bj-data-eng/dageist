@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import type { CandidateRequest, FitsView, OfferPlaceView, OptionsView } from '@dageist/host';
+import type {
+  CandidateRequest,
+  FitsView,
+  OfferPlaceView,
+  OptionsView,
+  RefusalView,
+} from '@dageist/host';
 import {
   decodeCatalogue,
   decodeFits,
@@ -178,7 +184,10 @@ describe('the options of an entry', () => {
   it('start with the word the engine says, not one the editor picks from the words', () => {
     // An option the engine says starts with `right`, though `left` is the first other word and
     // Polars allows it: the editor does not choose between the words itself.
-    const stuckBecause = { source: { by: 'structure' }, reason: 'the engine says why\nand more' };
+    const stuckBecause: RefusalView = {
+      source: { by: 'structure' },
+      reason: 'the engine says why\nand more',
+    };
     const view: OptionsView = {
       options: [
         {

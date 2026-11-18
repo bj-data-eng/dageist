@@ -214,6 +214,14 @@ const COMPARISON_ENTRIES: Readonly<Record<Exclude<Comparison, 'is_in'>, string>>
   '<=': 'Expr.le',
 };
 
+/** The comparisons the catalogue has entries for. */
+const COMPARISONS = ['==', '!=', '>', '>=', '<', '<='] as const;
+
+/** Returns the comparison the entry `id` stands for, or `null` where it is none of the editor's. */
+export function comparisonOfEntry(id: string): (typeof COMPARISONS)[number] | null {
+  return COMPARISONS.find((comparison) => COMPARISON_ENTRIES[comparison] === id) ?? null;
+}
+
 /**
  * Returns the identifier of the entry a comparison is written as, or `null`
  * for `is_in`, which the catalogue has no entry for yet.

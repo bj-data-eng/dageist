@@ -87,7 +87,7 @@ export type {
   WordsView,
 } from './contract';
 export { BRIDGE_START_COMMAND, BridgeUnavailableError, bridgeHost } from './bridge';
-export { ERROR_KINDS } from './contract';
+export { ERROR_KINDS, SETTING_KINDS } from './contract';
 export { DecodeError } from './decode';
 export { decodeCatalogue } from './decode-catalogue';
 export { decodeNode, decodeRows } from './decode-node';

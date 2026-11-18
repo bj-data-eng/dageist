@@ -8,6 +8,7 @@
 
 import type { ParameterView, SettingView, StepStartView, StepStartsView } from '@dageist/host';
 
+import { comparisonOfEntry } from './document';
 import { assertNever } from './frame';
 import { nextId } from './ids';
 import type { Setting } from './settings';
@@ -17,16 +18,29 @@ import type { Options } from './settings';
 import type { Step, Verb } from './steps';
 import { elementChain } from './steps';
 
-/** Returns what an expression the engine reports is, as the value an expression parameter holds. */
-function valueOf(view: SettingView): Value {
+/** Raised where the engine reports a setting the editor has no place for. */
+export class UnrepresentableSetting extends Error {
+  constructor(what: string, held: SettingView) {
+    super(`The engine gave ${what} a ${held.kind} setting, which the editor cannot hold.`);
+    this.name = 'UnrepresentableSetting';
+  }
+}
+
+/**
+ * Returns what an expression the engine reports is, as the value an expression parameter holds.
+ *
+ * @throws {UnrepresentableSetting} When it is not an expression, or still to be given.
+ */
+function valueOf(view: SettingView, what: string): Value {
   switch (view.kind) {
+    case 'unset':
+      return { kind: 'unset' };
     case 'field':
       return { kind: 'column', column: view.column };
     case 'element':
       return { kind: 'chain', id: nextId('chain'), chain: elementChain(view.method) };
     default:
-      // Nothing else is an expression: it is still to be picked.
-      return { kind: 'unset' };
+      throw new UnrepresentableSetting(what, view);
   }
 }
 
@@ -47,7 +61,10 @@ export function settingOf(view: SettingView): Setting {
       return { kind: 'word', value: view.value };
     case 'field':
     case 'element':
-      return expressionSetting(valueOf(view));
+      return expressionSetting(valueOf(view, 'a parameter'));
+    case 'comparison':
+      // A comparison is a condition of a filter, which `startedStep` reads.
+      throw new UnrepresentableSetting('a parameter', view);
     case 'list':
       return { kind: 'list', items: view.items.map((item) => settingOf(item)) };
     case 'pairs':
@@ -92,9 +109,21 @@ function argumentOf(start: StepStartView, name: string): SettingView {
   );
 }
 
-/** Returns the name `view` holds, or none where it holds no name yet. */
-function nameOf(view: SettingView): string {
-  return view.kind === 'word' || view.kind === 'text' ? view.value : '';
+/**
+ * Returns the name `view` holds, or none where it holds no name yet.
+ *
+ * @throws {UnrepresentableSetting} When it is not a name.
+ */
+function nameOf(view: SettingView, what: string): string {
+  switch (view.kind) {
+    case 'unset':
+      return '';
+    case 'word':
+    case 'text':
+      return view.value;
+    default:
+      throw new UnrepresentableSetting(what, view);
+  }
 }
 
 /** Returns the settings of every parameter the step starts with that its structure does not hold. */
@@ -106,14 +135,42 @@ function startedOptions(verb: Verb, start: StepStartView): Options {
   return entries.length === 0 ? NO_OPTIONS : Object.fromEntries(entries);
 }
 
-/** Returns the comparison a filter starts with, whose field and value are still to be picked. */
-function startedTest(): Condition {
+/**
+ * Returns the column a comparison reads, or none where it is still to be given.
+ *
+ * @throws {UnrepresentableSetting} When it is neither.
+ */
+function columnOf(view: SettingView): string {
+  switch (view.kind) {
+    case 'unset':
+      return '';
+    case 'field':
+      return view.column;
+    default:
+      throw new UnrepresentableSetting('a filter', view);
+  }
+}
+
+/**
+ * Returns the condition a filter starts with, from the comparison the engine says it starts with:
+ * the field it reads and what it is compared with, as the editor draws a test.
+ *
+ * @throws {UnrepresentableSetting} When it is not a comparison the editor has a sign for.
+ */
+function startedTest(view: SettingView): Condition {
+  if (view.kind !== 'comparison') throw new UnrepresentableSetting('a filter', view);
+  const comparison = comparisonOfEntry(view.entry);
+  if (comparison === null) {
+    throw new Error(
+      `The engine started a filter with ${view.entry}, which the editor has no sign for.`,
+    );
+  }
   return {
     kind: 'test',
     id: nextId('test'),
-    column: '',
-    comparison: '==',
-    value: { kind: 'unset' },
+    column: columnOf(view.field),
+    comparison,
+    value: valueOf(view.other, 'a filter'),
   };
 }
 
@@ -139,26 +196,32 @@ export function startedStep(verb: Verb, start: StepStartView): Step {
       return {
         id,
         verb,
-        alias: first === undefined ? '' : nameOf(first.key),
-        value: first === undefined ? { kind: 'unset' } : valueOf(first.value),
+        alias: first === undefined ? '' : nameOf(first.key, 'a new column'),
+        value: first === undefined ? { kind: 'unset' } : valueOf(first.value, 'a new column'),
         options,
       };
     }
-    case 'filter':
-      return { id, verb, condition: startedTest(), options };
+    case 'filter': {
+      const predicates = argumentOf(start, 'predicates');
+      const first = predicates.kind === 'list' ? predicates.items[0] : undefined;
+      if (first === undefined) {
+        throw new Error('The engine gave a filter no condition to start with.');
+      }
+      return { id, verb, condition: startedTest(first), options };
+    }
     case 'sort':
     case 'select':
     case 'rename':
       return { id, verb, options };
     case 'join':
-      return { id, verb, table: nameOf(argumentOf(start, 'other')), options };
+      return { id, verb, table: nameOf(argumentOf(start, 'other'), 'a join'), options };
     case 'pivot':
       return {
         id,
         verb,
-        on: nameOf(argumentOf(start, 'on')),
-        index: nameOf(argumentOf(start, 'index')),
-        values: nameOf(argumentOf(start, 'values')),
+        on: nameOf(argumentOf(start, 'on'), 'a pivot'),
+        index: nameOf(argumentOf(start, 'index'), 'a pivot'),
+        values: nameOf(argumentOf(start, 'values'), 'a pivot'),
         options,
       };
     default:

@@ -133,11 +133,12 @@ const readOptionWord: Decode<OptionWordView> = readRecord(['word', 'refusal'], (
 }));
 
 const readOption: Decode<OptionView> = readRecord(
-  ['parameter', 'default', 'starter', 'words'],
+  ['parameter', 'default', 'starter', 'stuck', 'words'],
   (fields, path) => ({
     parameter: readField(fields, path, 'parameter', readString),
     default: readField(fields, path, 'default', readNullable(readString)),
     starter: readField(fields, path, 'starter', readNullable(readString)),
+    stuck: readField(fields, path, 'stuck', readNullable(readRefusal)),
     words: readField(fields, path, 'words', readList(readOptionWord)),
   }),
 );

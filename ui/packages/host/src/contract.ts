@@ -80,6 +80,21 @@ export type DefaultView =
   | { readonly kind: 'empty' }
   | { readonly kind: 'other' };
 
+/** The kinds of setting the engine reports, mirroring `Setting` in the engine's catalogue. */
+export const SETTING_KINDS = [
+  'unset',
+  'flag',
+  'integer',
+  'float',
+  'text',
+  'word',
+  'field',
+  'element',
+  'comparison',
+  'list',
+  'pairs',
+] as const;
+
 /**
  * What a parameter holds, in the one shape every kind of parameter is drawn from. The engine
  * decides every setting it reports: what a parameter holds when it is not given, what it is set
@@ -101,6 +116,13 @@ export type SettingView =
   | { readonly kind: 'field'; readonly column: string }
   /** An expression that starts from `polars.element` and calls this method, named without its owner. */
   | { readonly kind: 'element'; readonly method: string }
+  /** A comparison of a field with something else, by the entry that compares, such as `Expr.eq`. */
+  | {
+      readonly kind: 'comparison';
+      readonly entry: string;
+      readonly field: SettingView;
+      readonly other: SettingView;
+    }
   | { readonly kind: 'list'; readonly items: readonly SettingView[] }
   | { readonly kind: 'pairs'; readonly entries: readonly PairView[] };
 
@@ -729,6 +751,8 @@ export interface OptionView {
    * Polars allows beside the options chosen, or `null` where there is none.
    */
   readonly starter: string | null;
+  /** Why the option cannot be added, where it has no starter: the refusal that stops it. */
+  readonly stuck: RefusalView | null;
   readonly words: readonly OptionWordView[];
 }
 

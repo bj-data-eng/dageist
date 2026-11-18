@@ -218,7 +218,7 @@ export interface PreparedOption {
    * is none.
    */
   readonly starter: string | null;
-  /** Why the option cannot be added: Polars refuses every word but the default. */
+  /** Why the option cannot be added, as the engine says: the refusal that stops it. */
   readonly stuck: string | null;
 }
 
@@ -230,18 +230,13 @@ export function prepareOptions(view: OptionsView): ReadonlyMap<string, PreparedO
       word: word.word,
       reason: word.refusal === null ? null : refusalWords(word.refusal),
     }));
-    // The engine says which word the option starts with. Where there is none, the reason is
-    // that of the first word that is not the default.
-    const others = words.filter((word) => word.word !== option.default);
+    // The engine says which word the option starts with, and why it cannot be added where none.
     prepared.set(option.parameter, {
       parameter: option.parameter,
       default: option.default,
       words,
       starter: option.starter,
-      stuck:
-        option.starter === null
-          ? (others[0]?.reason ?? 'there is nothing else to set it to')
-          : null,
+      stuck: option.stuck === null ? null : refusalWords(option.stuck),
     });
   }
   return prepared;

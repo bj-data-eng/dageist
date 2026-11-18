@@ -168,6 +168,16 @@ const readSetting: Decode<SettingView> = readTagged<SettingView>('kind', {
       method: readField(fields, path, 'method', readString),
     }),
   },
+  comparison: {
+    fields: ['entry', 'field', 'other'],
+    read: (fields, path) => ({
+      kind: 'comparison',
+      entry: readField(fields, path, 'entry', readString),
+      // What is compared are settings in their own right, so a setting reads itself.
+      field: readField(fields, path, 'field', (value, at) => readSetting(value, at)),
+      other: readField(fields, path, 'other', (value, at) => readSetting(value, at)),
+    }),
+  },
   list: {
     fields: ['items'],
     read: (fields, path) => ({

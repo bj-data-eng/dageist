@@ -128,6 +128,26 @@ const noTable = (entry: string, parameter: string): StepStartView => {
   };
 };
 
+/** The start of a new column that holds `setting`. */
+const withColumns = (setting: SettingView): StepStartView => ({
+  entry: 'LazyFrame.with_columns',
+  arguments: [
+    {
+      parameter: 'named_exprs',
+      setting: {
+        kind: 'pairs',
+        entries: [{ key: { kind: 'text', value: 'x' }, value: setting }],
+      },
+    },
+  ],
+});
+
+/** The start of a filter whose first condition is `setting`. */
+const filtering = (setting: SettingView): StepStartView => ({
+  entry: 'LazyFrame.filter',
+  arguments: [{ parameter: 'predicates', setting: { kind: 'list', items: [setting] } }],
+});
+
 describe('a new step', () => {
   it('is a join on the first connected table, whose keys are still to be picked', () => {
     // The fields are not matched by their dtype: the engine says whether two keys fit, and the
@@ -254,22 +274,6 @@ describe('a new step', () => {
   });
 
   it('is refused where the engine says something the editor cannot hold, and not made into a hole', () => {
-    const withColumns = (setting: SettingView): StepStartView => ({
-      entry: 'LazyFrame.with_columns',
-      arguments: [
-        {
-          parameter: 'named_exprs',
-          setting: {
-            kind: 'pairs',
-            entries: [{ key: { kind: 'text', value: 'x' }, value: setting }],
-          },
-        },
-      ],
-    });
-    const filtering = (setting: SettingView): StepStartView => ({
-      entry: 'LazyFrame.filter',
-      arguments: [{ parameter: 'predicates', setting: { kind: 'list', items: [setting] } }],
-    });
     const join: StepStartView = {
       entry: 'LazyFrame.join',
       arguments: [{ parameter: 'other', setting: { kind: 'flag', value: true } }],
