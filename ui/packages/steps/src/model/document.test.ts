@@ -41,6 +41,18 @@ function firstCall(steps: readonly Step[]): {
   return { entry: at(call, ['entry']), arguments: at(call, ['arguments']) };
 }
 
+/** The arguments of a join whose suffix is set to `suffix`. */
+function argumentsWithSuffix(suffix: Options[string]): unknown {
+  return firstCall([
+    {
+      id: 'j',
+      verb: 'join',
+      table: 'step_sla',
+      options: { left_on: fieldKeys(['a']), right_on: fieldKeys(['b']), suffix },
+    },
+  ]).arguments;
+}
+
 /** The arguments the start of the expression of a column added with `value` is given. */
 function startOfColumnHolding(value: Value): unknown {
   const arguments_ = firstCall([adding('x', value)]).arguments;
@@ -109,20 +121,16 @@ describe('a step of the editor', () => {
   });
 
   it('writes a number the engine read with a fraction as a float though it is whole', () => {
-    const options = (suffix: Options[string]): Options => ({
-      left_on: fieldKeys(['a']),
-      right_on: fieldKeys(['b']),
-      suffix,
-    });
-    const arguments_ = (suffix: Options[string]) =>
-      firstCall([{ id: 'j', verb: 'join', table: 'step_sla', options: options(suffix) }]).arguments;
-
     // A whole number is an integer, and one the engine read as a float stays a float.
-    expect(arguments_({ kind: 'number', value: 2 })).toMatchObject({ suffix: { integer: 2 } });
-    expect(arguments_({ kind: 'number', value: 2, float: true })).toMatchObject({
+    expect(argumentsWithSuffix({ kind: 'number', value: 2 })).toMatchObject({
+      suffix: { integer: 2 },
+    });
+    expect(argumentsWithSuffix({ kind: 'number', value: 2, float: true })).toMatchObject({
       suffix: { float: 2 },
     });
-    expect(arguments_({ kind: 'number', value: 2.5 })).toMatchObject({ suffix: { float: 2.5 } });
+    expect(argumentsWithSuffix({ kind: 'number', value: 2.5 })).toMatchObject({
+      suffix: { float: 2.5 },
+    });
   });
 
   it('writes the setting of each key of a sort as a list in the order of the keys', () => {
