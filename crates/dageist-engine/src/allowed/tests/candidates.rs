@@ -324,6 +324,30 @@ fn an_option_starts_with_the_first_word_that_differs_from_its_default_and_polars
 }
 
 #[test]
+fn an_option_that_cannot_be_added_says_why_with_the_refusal_of_its_first_other_word() {
+    let find = |chosen: &[(&str, &str)], name: &str| {
+        option_offers(entry("LazyFrame.join"), chosen)
+            .into_iter()
+            .find(|option| option.parameter() == name)
+            .unwrap_or_else(|| panic!("join has the option {name}"))
+    };
+    // Beside a cross join Polars refuses `m:1` with its own reason, and the offer says it.
+    let cross = find(&[("how", "cross")], "validate");
+    let stuck = cross
+        .stuck()
+        .expect("validate cannot be added beside a cross join");
+    assert!(matches!(stuck.source(), RefusalSource::Polars(_)));
+    let first_other = cross
+        .words()
+        .iter()
+        .find(|word| word.word() == "m:1")
+        .and_then(|word| word.refusal().cloned());
+    assert_eq!(Some(stuck), first_other);
+    // An option that can be added has no reason it cannot.
+    assert_eq!(find(&[("how", "inner")], "validate").stuck(), None);
+}
+
+#[test]
 fn a_number_that_fits_the_receiver_gives_the_dtype_polars_gives_the_call() {
     // `u8 - 1` is a `UInt8` and `f32 - 1` a `Float32`: the number adapts to the column, where the
     // tables, measured with a column of its own dtype, would say `Int32` and `Float64`. A number

@@ -132,6 +132,11 @@ impl StepStart {
 /// only one where a group has one row.
 const PIVOT_AGGREGATE: &str = "first";
 
+/// The word a new join starts with for `how`. Polars joins `inner` unless it is
+/// asked, which drops the rows of the left table that have no match; `left`
+/// keeps them.
+const JOIN_HOW: &str = "left";
+
 /// What the step the entry `entry` stands for starts with, on `frame`, or
 /// `None` where the entry is not a step of the list.
 ///
@@ -179,7 +184,7 @@ pub fn start_step(entry: &Entry, frame: &StepFrame<'_>) -> Option<StepStart> {
             ("other", first_table()),
             start_of("left_on")?,
             start_of("right_on")?,
-            start_of("how")?,
+            ("how", Setting::Word(JOIN_HOW.to_owned())),
         ],
         "LazyFrame.pivot" => vec![
             ("on", Setting::ToGive),

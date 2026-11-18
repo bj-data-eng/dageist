@@ -206,6 +206,44 @@ fn a_new_pivot_takes_the_first_table_for_its_columns_and_the_first_value_of_each
 }
 
 #[test]
+fn the_word_a_join_starts_with_is_a_word_of_how_that_differs_from_its_default() {
+    let how = parameter("LazyFrame.join", "how");
+    let default = how.default_setting();
+    let catalog::Kind::Choice(words) = how.kind() else {
+        panic!("how is a choice");
+    };
+    let started = started("LazyFrame.join", &["a"], &["t"]);
+    let Some((_, Setting::Word(word))) = started.iter().find(|(name, _)| *name == "how") else {
+        panic!("a join starts with how");
+    };
+    assert!(words.contains(&word.as_str()));
+    assert_ne!(default, Some(Setting::Word(word.clone())));
+}
+
+#[test]
+fn every_step_of_the_catalogue_has_a_start() {
+    // A start that cannot be built, such as one for a parameter the entry lacks, is not given:
+    // the steps the catalogue has must each be given one.
+    let columns = names(&["a"]);
+    let tables = names(&["t"]);
+    let frame = StepFrame {
+        columns: &columns,
+        tables: &tables,
+    };
+    for id in [
+        "LazyFrame.filter",
+        "LazyFrame.join",
+        "LazyFrame.pivot",
+        "LazyFrame.rename",
+        "LazyFrame.select",
+        "LazyFrame.sort",
+        "LazyFrame.with_columns",
+    ] {
+        assert!(start_step(entry(id), &frame).is_some(), "{id} has no start");
+    }
+}
+
+#[test]
 fn what_is_not_a_step_starts_with_nothing() {
     let frame = StepFrame {
         columns: &[],
