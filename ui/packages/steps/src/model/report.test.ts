@@ -175,6 +175,36 @@ function counted(count: unknown): ReturnType<typeof decodeRun> {
   });
 }
 
+describe('a step the engine could not run on the rows', () => {
+  it('says what Polars said, as far as the first paragraph, which is before its plan', () => {
+    const steps = START.slice(0, 2);
+    const translation = translate(catalogue, steps);
+    const reason = 'the date of text is not a date\n\nResolved plan until failure: …';
+
+    const prepared = prepareRun(
+      steps,
+      translation,
+      answeredFor(translation, counted({ kind: 'failed', reason })),
+      source,
+    );
+
+    expect(prepared.steps[1]).toMatchObject({
+      status: 'valid',
+      rowsProblem: 'Could not be run on the sample rows: the date of text is not a date',
+    });
+    // The step before it was not counted, which is not a failure.
+    expect(prepared.steps[0]).toMatchObject({ rowsProblem: null });
+  });
+
+  it('is nothing for a step that was counted or not counted, or not reported on', () => {
+    const prepared = started();
+
+    for (const step of prepared.steps) {
+      expect(step, step.id).toMatchObject({ rowsProblem: null });
+    }
+  });
+});
+
 describe('the rows each step kept and the first values it added', () => {
   it('are how many rows the step kept of those it received, where the engine counted them', () => {
     const prepared = started();
