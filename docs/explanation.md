@@ -299,7 +299,7 @@ families, hints, step heads and the words `when`, `then` and `otherwise` from
 it, and draws every parameter by its kind. A method's first expression
 parameter is written inline. Any other parameter of a method or step is an
 option: the list its name opens offers the rest by name, and an option is
-written into the Polars text only when it differs from its default. A step's
+written into the engine's Polars text only when it differs from its default. A step's
 own parameters are drawn by kind too: sort's keys and their per-item
 `descending`, select's expressions, join's table, keys and `how`, a rename's
 pairs, and a pivot's aggregate, which is a chain from `pl.element()`. A new
@@ -353,7 +353,7 @@ asks the engine only while it is open, through a scheduler of its own that sends
 the newest request after a short wait, drops the answer to one that a newer
 request replaced and asks again only a failure that may pass, as the runs do. A
 list says that it is waiting, or that the engine has not reported on the place,
-and never shows what was answered for another place. Four commands answer:
+and never shows what was answered for another place. Five commands answer:
 
 - `offers_at` says which calls may stand where an expression has what it has so
   far, each with the engine's verdict, whether the chain may end there and the
@@ -367,8 +367,21 @@ and never shows what was answered for another place. Four commands answer:
 - `read_typed` says how a text typed into a slot reads, which is the engine's
   to say and not the view's; see [How a typed text is read](#how-a-typed-text-is-read).
 - `option_offers` says what the flags and choices of an entry may be set to
-  beside those already chosen, so that an option is added with a word Polars
-  allows, or not at all.
+  beside those already chosen, and the word each starts with when it is added,
+  so that an option is added with a word Polars allows, or not at all.
+- `step_starts` says what each step of the list starts with on a table: the
+  list of steps asks it while it is open, and a step is added or changed to
+  with what the engine says, so it cannot be picked until the engine has said.
+
+What a parameter holds when it is not given, what it is first set to and
+whether an option is at its default are rules about Polars, so the engine
+decides them and the editor applies them. The catalogue carries each
+parameter's default and its first setting, and a step report names the
+arguments of the step, and of the calls inside its expressions, that are what
+their parameter holds when it is not given, which the editor shows as "same as
+the default". The editor writes every option that is set; Python calls a method
+the same with a parameter left out or given its default, so the Python source
+leaves out a named argument that is at its default.
 
 The catalogue gives each expression parameter the position the tables name for
 it, so the editor says where a slot stands and the engine works out the context.
