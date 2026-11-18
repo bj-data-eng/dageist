@@ -1,0 +1,70 @@
+{
+  "rows": 46,
+  "columns": [
+    {
+      "name": "dcn",
+      "dataType": "str",
+      "numeric": false
+    },
+    {
+      "name": "timestamp",
+      "dataType": "datetime[μs]",
+      "numeric": false
+    },
+    {
+      "name": "step_from",
+      "dataType": "str",
+      "numeric": false
+    },
+    {
+      "name": "step_to",
+      "dataType": "str",
+      "numeric": false
+    },
+    {
+      "name": "workflow_from",
+      "dataType": "str",
+      "numeric": false
+    },
+    {
+      "name": "workflow_to",
+      "dataType": "str",
+      "numeric": false
+    },
+    {
+      "name": "doctype",
+      "dataType": "str",
+      "numeric": false
+    },
+    {
+      "name": "date_of_receipt",
+      "dataType": "date",
+      "numeric": false
+    },
+    {
+      "name": "measure_001",
+      "dataType": "f64",
+      "numeric": true
+    },
+    {
+      "name": "measure_002",
+      "dataType": "i32",
+      "numeric": true
+    },
+    {
+      "name": "measure_003",
+      "dataType": "i32",
+      "numeric": true
+    },
+    {
+      "name": "measure_004",
+      "dataType": "f64",
+      "numeric": true
+    }
+  ],
+  "figures": {
+    "rows": "46 rows",
+    "columns": "12 columns",
+    "opened": "12.0 ms"
+  }
+}

@@ -13,9 +13,11 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod block;
 mod bridge;
 mod catalogue;
 mod cli;
+mod figures;
 mod identity;
 mod node;
 mod offers;

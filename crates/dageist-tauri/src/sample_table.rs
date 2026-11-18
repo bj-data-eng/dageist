@@ -11,6 +11,7 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};
+use std::time::{Duration, Instant};
 
 use dageist_engine::{
     ColumnInfo, EngineError, ParquetTable, SampleSpec, Table, claims_generated, generate_claims,
@@ -18,6 +19,9 @@ use dageist_engine::{
 use serde::Serialize;
 use tauri::ipc::Response;
 use tauri::{AppHandle, Manager, Runtime, State};
+
+use crate::block::frame;
+use crate::figures::{elapsed, quantity};
 
 /// The sample generated on first use: about two million rows of 300 columns,
 /// roughly 2 GB of Parquet.
@@ -43,11 +47,23 @@ enum Opened {
 }
 
 impl Opened {
-    fn view(&self) -> TableView {
+    fn height(&self) -> usize {
         match self {
-            Self::Window(table) => TableView::new(table.height(), table.columns()),
-            Self::Stored(table) => TableView::new(table.height(), table.columns()),
+            Self::Window(table) => table.height(),
+            Self::Stored(table) => table.height(),
         }
+    }
+
+    fn columns(&self) -> &[ColumnInfo] {
+        match self {
+            Self::Window(table) => table.columns(),
+            Self::Stored(table) => table.columns(),
+        }
+    }
+
+    /// The table's shape, which it took `opened` to open.
+    fn view(&self, opened: Duration) -> TableView {
+        TableView::new(self.height(), self.columns(), opened)
     }
 
     fn block_ipc(
@@ -88,6 +104,17 @@ impl OpenTable {
 pub struct ColumnView {
     name: String,
     data_type: String,
+    numeric: bool,
+}
+
+/// The figures of the open table, written as text for the view to show as they
+/// are.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FiguresView {
+    rows: String,
+    columns: String,
+    opened: String,
 }
 
 /// The shape of the open table, as presented to the view.
@@ -96,10 +123,11 @@ pub struct ColumnView {
 pub struct TableView {
     rows: usize,
     columns: Vec<ColumnView>,
+    figures: FiguresView,
 }
 
 impl TableView {
-    fn new(rows: usize, columns: &[ColumnInfo]) -> Self {
+    fn new(rows: usize, columns: &[ColumnInfo], opened: Duration) -> Self {
         Self {
             rows,
             columns: columns
@@ -107,8 +135,14 @@ impl TableView {
                 .map(|column| ColumnView {
                     name: column.name.clone(),
                     data_type: column.data_type.clone(),
+                    numeric: column.numeric,
                 })
                 .collect(),
+            figures: FiguresView {
+                rows: quantity(rows, "row", "rows"),
+                columns: quantity(columns.len(), "column", "columns"),
+                opened: elapsed(opened),
+            },
         }
     }
 }
@@ -255,8 +289,8 @@ impl Sample {
     }
 }
 
-fn show(open: &OpenTable, table: Opened) -> TableView {
-    let view = table.view();
+fn show(open: &OpenTable, table: Opened, opened: Duration) -> TableView {
+    let view = table.view(opened);
     open.replace(Arc::new(table));
     view
 }
@@ -272,6 +306,7 @@ pub fn sample_window_view(
     sample: &Sample,
     keys: u32,
 ) -> Result<TableView, ErrorView> {
+    let started = Instant::now();
     if keys > MAX_WINDOW_KEYS {
         return Err(ErrorView::of(
             ErrorKind::Limit,
@@ -279,7 +314,7 @@ pub fn sample_window_view(
         ));
     }
     let table = open_window(gate, &sample.directory, sample.spec, keys)?;
-    Ok(show(open, table))
+    Ok(show(open, table, started.elapsed()))
 }
 
 /// Opens the whole of `sample` where it is stored, without loading it, keeps
@@ -291,13 +326,15 @@ pub fn sample_result_view(
     open: &OpenTable,
     sample: &Sample,
 ) -> Result<TableView, ErrorView> {
+    let started = Instant::now();
     let table = open_stored(gate, &sample.directory, sample.spec)?;
-    Ok(show(open, table))
+    Ok(show(open, table, started.elapsed()))
 }
 
 /// Returns `length` rows of the table open in `open` starting at `offset`,
-/// limited to `columns`, as the bytes of an Arrow IPC stream. A block holds at
-/// most `MAX_BLOCK_ROWS` rows.
+/// limited to `columns`, as the bytes of a frame: the number of each row and a
+/// report of the block, and the block as an Arrow IPC stream of text. A block
+/// holds at most `MAX_BLOCK_ROWS` rows.
 pub fn table_block_bytes(
     open: &OpenTable,
     offset: usize,
@@ -313,7 +350,16 @@ pub fn table_block_bytes(
     let table = open
         .current()
         .ok_or_else(|| ErrorView::new("no table is open"))?;
-    Ok(table.block_ipc(offset, length, columns)?)
+    let started = Instant::now();
+    let arrow = table.block_ipc(offset, length, columns)?;
+    let built = started.elapsed();
+    let rows = length.min(table.height().saturating_sub(offset));
+    let width = if columns.is_empty() {
+        table.columns().len()
+    } else {
+        columns.len()
+    };
+    frame(offset, rows, width, &arrow, built)
 }
 
 /// Opens a working window of `keys` whole keys of the sample table, held in
@@ -344,7 +390,8 @@ pub fn open_sample_result<R: Runtime>(
 }
 
 /// Returns `length` rows of the open table starting at `offset`, limited to
-/// `columns`, as the raw bytes of an Arrow IPC stream. A block holds at most
+/// `columns`, as the raw bytes of a frame: the number of each row and a report of
+/// the block, and the block as an Arrow IPC stream of text. A block holds at most
 /// `MAX_BLOCK_ROWS` rows.
 #[tauri::command(async)]
 pub fn table_block(
@@ -363,6 +410,7 @@ mod tests {
     use std::fs;
     use std::path::PathBuf;
     use std::sync::Arc;
+    use std::time::Duration;
 
     use dageist_engine::SampleSpec;
     use tauri::ipc::{CallbackFn, InvokeBody, InvokeResponseBody};
@@ -374,7 +422,11 @@ mod tests {
         ErrorKind, OpenTable, Opened, Sample, SampleGate, open_stored, open_window,
         sample_result_view, sample_window_view,
     };
+    use crate::block::frame;
     use crate::test_support::split_block;
+
+    const REFRESH: &str = "DAGEIST_REFRESH_TABLES";
+    const REFRESH_COMMAND: &str = "cargo test --offline --locked -p dageist-tauri sample_table::tests::the_snapshots_are_what_the_commands_return";
 
     const SMALL: SampleSpec = SampleSpec {
         keys: 40,
@@ -401,7 +453,8 @@ mod tests {
     }
 
     fn rows_and_columns(table: &Opened) -> (u64, Vec<serde_json::Value>) {
-        let view = serde_json::to_value(table.view()).expect("the view serializes");
+        let view = serde_json::to_value(table.view(Duration::from_millis(12)))
+            .expect("the view serializes");
         (
             view["rows"].as_u64().expect("a row count"),
             view["columns"].as_array().expect("a column list").clone(),
@@ -675,6 +728,76 @@ mod tests {
                 .all(|(dtype, flag)| *flag == (*dtype == "i32" || *dtype == "f64")),
             "{numeric:?}"
         );
+    }
+
+    /// The bytes as lowercase hexadecimal text.
+    fn hex(bytes: &[u8]) -> String {
+        bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+    }
+
+    /// A block as the view's fixture holds it: what was asked for and the frame
+    /// answered, with the time the engine took fixed so that the frame is the same
+    /// on every run.
+    fn block_snapshot(
+        table: &Opened,
+        offset: usize,
+        length: usize,
+        columns: &[&str],
+    ) -> serde_json::Value {
+        let columns: Vec<String> = columns.iter().map(|name| (*name).to_owned()).collect();
+        let arrow = table
+            .block_ipc(offset, length, &columns)
+            .expect("the engine writes the block");
+        let rows = length.min(table.height().saturating_sub(offset));
+        let frame = frame(
+            offset,
+            rows,
+            columns.len(),
+            &arrow,
+            Duration::from_micros(850),
+        )
+        .expect("the block is framed");
+        serde_json::json!({
+            "request": { "offset": offset, "length": length, "columns": columns },
+            "frame": hex(&frame),
+        })
+    }
+
+    #[test]
+    fn the_snapshots_are_what_the_commands_return() {
+        let sample = SampleDirectory::empty("snapshots");
+        let gate = SampleGate::default();
+        let window = open_window(&gate, &sample.path, SMALL, 10).expect("the window opens");
+        let stored = open_stored(&gate, &sample.path, SMALL).expect("the result opens");
+        let opened = Duration::from_millis(12);
+        let columns = [
+            "dcn",
+            "timestamp",
+            "date_of_receipt",
+            "measure_001",
+            "measure_003",
+        ];
+        let snapshots = [
+            (
+                "table-window.json",
+                serde_json::to_value(window.view(opened)).expect("the view serializes"),
+            ),
+            (
+                "table-result.json",
+                serde_json::to_value(stored.view(opened)).expect("the view serializes"),
+            ),
+            (
+                "table-block-window.json",
+                block_snapshot(&window, 3, 7, &columns),
+            ),
+            (
+                "table-block-result.json",
+                block_snapshot(&stored, 78, 10, &columns),
+            ),
+        ];
+        for (file, returned) in &snapshots {
+            crate::snapshot::check(file, returned, REFRESH, REFRESH_COMMAND);
+        }
     }
 
     /// The kind that follows `kind` in the list the view's contract gives, or `None` after the
