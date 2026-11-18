@@ -7,7 +7,7 @@
 //! itself. A [`Setting`] is the one shape they are all given in, whatever kind
 //! of parameter holds it.
 
-use super::{Applies, DefaultValue, Entry, Kind, Parameter, Shape};
+use super::{Applies, Comparison, DefaultValue, Entry, Kind, Parameter, Shape};
 
 /// What a parameter holds, in the one shape every kind of parameter is drawn
 /// from.
@@ -150,7 +150,7 @@ const JOIN_HOW: &str = "left";
 
 /// The comparison a new filter starts with: its field and what it is compared
 /// with are still to be given.
-const FILTER_COMPARISON: &str = "Expr.eq";
+const FILTER_COMPARISON: Comparison = Comparison::Equal;
 
 /// What the step the entry `entry` stands for starts with, on `frame`, or
 /// `None` where the entry is not a step of the list.
@@ -191,7 +191,7 @@ pub fn start_step(entry: &Entry, frame: &StepFrame<'_>) -> Option<StepStart> {
         "LazyFrame.filter" => vec![(
             "predicates",
             Setting::List(vec![Setting::Comparison {
-                entry: FILTER_COMPARISON,
+                entry: FILTER_COMPARISON.entry(),
                 field: Box::new(Setting::ToGive),
                 other: Box::new(Setting::ToGive),
             }]),

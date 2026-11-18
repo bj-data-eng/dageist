@@ -41,7 +41,7 @@ use std::sync::OnceLock;
 
 use toml::{Table, Value};
 
-use super::{Dtypes, EntryId, Family};
+use super::{Comparison, Dtypes, EntryId, Family};
 
 /// Why a language file could not be read.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -548,6 +548,15 @@ impl Words {
         self.summary
             .get(&phrase.word())
             .map_or_else(String::new, |template| filled(template, &phrase.fill()))
+    }
+
+    /// The sign the language file gives `comparison`: a phrase of no places, so what its
+    /// template says. `None` where the file gives none.
+    #[must_use]
+    pub fn sign(&self, comparison: Comparison) -> Option<&str> {
+        self.summary
+            .get(&comparison.phrase().word())
+            .map(String::as_str)
     }
 
     /// The title of a family's group in a list.

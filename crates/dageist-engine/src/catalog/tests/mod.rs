@@ -4,6 +4,7 @@
 mod accepts;
 mod arguments;
 mod build;
+mod comparison;
 mod condition;
 mod defaults;
 mod every_variant;
