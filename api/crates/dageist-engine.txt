@@ -392,6 +392,30 @@ pub enum dageist_engine::catalog::Shape
 pub dageist_engine::catalog::Shape::Many
 pub dageist_engine::catalog::Shape::One
 pub dageist_engine::catalog::Shape::PerItem(&'static str)
+pub enum dageist_engine::catalog::SummaryWord
+pub dageist_engine::catalog::SummaryWord::AllOf
+pub dageist_engine::catalog::SummaryWord::AtLeast
+pub dageist_engine::catalog::SummaryWord::AtMost
+pub dageist_engine::catalog::SummaryWord::Compared
+pub dageist_engine::catalog::SummaryWord::Condition
+pub dageist_engine::catalog::SummaryWord::Equal
+pub dageist_engine::catalog::SummaryWord::Field
+pub dageist_engine::catalog::SummaryWord::Fields
+pub dageist_engine::catalog::SummaryWord::Greater
+pub dageist_engine::catalog::SummaryWord::JoinedOn
+pub dageist_engine::catalog::SummaryWord::Less
+pub dageist_engine::catalog::SummaryWord::Name
+pub dageist_engine::catalog::SummaryWord::NoFields
+pub dageist_engine::catalog::SummaryWord::NotEqual
+pub dageist_engine::catalog::SummaryWord::PivotedOn
+pub dageist_engine::catalog::SummaryWord::Renamed
+pub dageist_engine::catalog::SummaryWord::SortedBy
+pub dageist_engine::catalog::SummaryWord::Value
+pub dageist_engine::catalog::SummaryWord::Worked
+impl dageist_engine::catalog::SummaryWord
+pub const dageist_engine::catalog::SummaryWord::ALL: [Self; 19]
+pub const fn dageist_engine::catalog::SummaryWord::key(self) -> &'static str
+pub const fn dageist_engine::catalog::SummaryWord::places(self) -> &'static [&'static str]
 pub enum dageist_engine::catalog::ValueType
 pub dageist_engine::catalog::ValueType::Any
 pub dageist_engine::catalog::ValueType::Date
@@ -403,6 +427,9 @@ pub const dageist_engine::catalog::ValueType::ALL: [Self; 5]
 pub enum dageist_engine::catalog::WordsError
 pub dageist_engine::catalog::WordsError::Missing
 pub dageist_engine::catalog::WordsError::Missing::path: alloc::string::String
+pub dageist_engine::catalog::WordsError::Places
+pub dageist_engine::catalog::WordsError::Places::expected: &'static [&'static str]
+pub dageist_engine::catalog::WordsError::Places::path: alloc::string::String
 pub dageist_engine::catalog::WordsError::Syntax(alloc::string::String)
 pub dageist_engine::catalog::WordsError::Unknown
 pub dageist_engine::catalog::WordsError::Unknown::path: alloc::string::String
@@ -450,6 +477,7 @@ pub const fn dageist_engine::catalog::LeftOut::reason(&self) -> dageist_engine::
 pub struct dageist_engine::catalog::Parameter
 impl dageist_engine::catalog::Parameter
 pub const fn dageist_engine::catalog::Parameter::default(&self) -> dageist_engine::catalog::ParameterDefault
+pub const fn dageist_engine::catalog::Parameter::is_keyword_only(&self) -> bool
 pub const fn dageist_engine::catalog::Parameter::kind(&self) -> dageist_engine::catalog::Kind
 pub const fn dageist_engine::catalog::Parameter::name(&self) -> &'static str
 pub const fn dageist_engine::catalog::Parameter::role(&self) -> dageist_engine::catalog::Role
@@ -468,6 +496,7 @@ pub fn dageist_engine::catalog::Words::family_title(&self, family: dageist_engin
 pub fn dageist_engine::catalog::Words::parameter_label(&self, id: dageist_engine::catalog::EntryId, parameter: &str) -> core::option::Option<&str>
 pub fn dageist_engine::catalog::Words::parameter_name(&self, id: dageist_engine::catalog::EntryId, parameter: &str) -> core::option::Option<&str>
 pub fn dageist_engine::catalog::Words::parse(source: &str) -> core::result::Result<Self, dageist_engine::catalog::WordsError>
+pub fn dageist_engine::catalog::Words::summary(&self, word: dageist_engine::catalog::SummaryWord, fill: &[(&str, &str)]) -> alloc::string::String
 pub fn dageist_engine::catalog::english() -> &'static dageist_engine::catalog::Words
 pub fn dageist_engine::catalog::entries() -> &'static [dageist_engine::catalog::Entry]
 pub fn dageist_engine::catalog::entry(id: &str) -> core::option::Option<&'static dageist_engine::catalog::Entry>
@@ -581,6 +610,12 @@ impl core::error::Error for dageist_engine::document::ReadError
 pub fn dageist_engine::document::ReadError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
 impl core::fmt::Display for dageist_engine::document::ReadError
 pub fn dageist_engine::document::ReadError::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum dageist_engine::document::Reason
+pub dageist_engine::document::Reason::NotConnected(alloc::string::String)
+pub dageist_engine::document::Reason::SameName(alloc::string::String, alloc::string::String)
+pub dageist_engine::document::Reason::Unfinished
+impl core::fmt::Display for dageist_engine::document::Reason
+pub fn dageist_engine::document::Reason::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub enum dageist_engine::document::Resolution
 pub dageist_engine::document::Resolution::Dtype(polars_core::datatypes::dtype::DataType)
 pub dageist_engine::document::Resolution::NoContext
@@ -688,6 +723,8 @@ pub fn dageist_engine::document::Document::rows(&self, inputs: &dageist_engine::
 pub fn dageist_engine::document::Document::run(&self, inputs: &dageist_engine::document::Inputs, source: polars_lazy::frame::LazyFrame) -> core::result::Result<dageist_engine::document::Report, polars_error::PolarsError>
 pub fn dageist_engine::document::Document::run_on(&self, inputs: &dageist_engine::document::Inputs, working: &polars_core::frame::dataframe::DataFrame) -> core::result::Result<dageist_engine::document::Report, polars_error::PolarsError>
 impl dageist_engine::document::Document
+pub fn dageist_engine::document::Document::source(&self, frame: &str, inputs: &dageist_engine::document::Inputs) -> dageist_engine::document::Source
+impl dageist_engine::document::Document
 pub fn dageist_engine::document::Document::write(&self) -> alloc::string::String
 pub struct dageist_engine::document::Dtype(_)
 impl dageist_engine::document::Dtype
@@ -740,6 +777,10 @@ pub fn dageist_engine::document::Inputs::describe(&self) -> core::result::Result
 pub fn dageist_engine::document::Inputs::new() -> Self
 impl core::fmt::Debug for dageist_engine::document::Inputs
 pub fn dageist_engine::document::Inputs::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct dageist_engine::document::NotRunnable
+impl dageist_engine::document::NotRunnable
+pub const fn dageist_engine::document::NotRunnable::reason(&self) -> &dageist_engine::document::Reason
+pub const fn dageist_engine::document::NotRunnable::step(&self) -> core::option::Option<&dageist_engine::document::StepId>
 pub struct dageist_engine::document::Place
 impl dageist_engine::document::Place
 pub const fn dageist_engine::document::Place::of_step(index: usize, step: core::option::Option<dageist_engine::document::StepId>) -> Self
@@ -767,6 +808,15 @@ pub struct dageist_engine::document::Report
 impl dageist_engine::document::Report
 pub const fn dageist_engine::document::Report::source(&self) -> &polars_core::schema::SchemaRef
 pub fn dageist_engine::document::Report::steps(&self) -> &[dageist_engine::document::StepReport]
+pub struct dageist_engine::document::Source
+impl dageist_engine::document::Source
+pub fn dageist_engine::document::Source::lines(&self) -> &[dageist_engine::document::SourceLine]
+pub fn dageist_engine::document::Source::not_runnable(&self) -> &[dageist_engine::document::NotRunnable]
+pub fn dageist_engine::document::Source::text(&self) -> alloc::string::String
+pub struct dageist_engine::document::SourceLine
+impl dageist_engine::document::SourceLine
+pub const fn dageist_engine::document::SourceLine::step(&self) -> core::option::Option<&dageist_engine::document::StepId>
+pub fn dageist_engine::document::SourceLine::text(&self) -> &str
 pub struct dageist_engine::document::Standing
 impl dageist_engine::document::Standing
 pub const fn dageist_engine::document::Standing::follows(&self) -> core::option::Option<dageist_engine::allowed::After>
@@ -778,6 +828,10 @@ pub const fn dageist_engine::document::Step::id(&self) -> &dageist_engine::docum
 pub fn dageist_engine::document::Step::new(id: dageist_engine::document::StepId, call: dageist_engine::document::Call) -> core::result::Result<Self, dageist_engine::document::Refusal>
 impl dageist_engine::document::Step
 pub fn dageist_engine::document::Step::first_hole(&self) -> core::option::Option<alloc::vec::Vec<dageist_engine::document::Segment>>
+impl dageist_engine::document::Step
+pub fn dageist_engine::document::Step::source(&self, inputs: &dageist_engine::document::Inputs) -> alloc::string::String
+impl dageist_engine::document::Step
+pub fn dageist_engine::document::Step::summary(&self, words: &dageist_engine::catalog::Words) -> alloc::string::String
 impl dageist_engine::document::Step
 pub fn dageist_engine::document::Step::walk(&self, index: usize, source: &polars_core::schema::Schema, inputs: &dageist_engine::document::Inputs) -> dageist_engine::document::Walk
 pub struct dageist_engine::document::StepId(_)
@@ -802,6 +856,8 @@ pub const fn dageist_engine::document::StepReport::laziness(&self) -> dageist_en
 pub const fn dageist_engine::document::StepReport::outcome(&self) -> &dageist_engine::document::Outcome
 pub const fn dageist_engine::document::StepReport::rows(&self) -> &dageist_engine::document::StepRows
 pub const fn dageist_engine::document::StepReport::schema(&self) -> core::option::Option<&polars_core::schema::SchemaRef>
+pub fn dageist_engine::document::StepReport::source(&self) -> &str
+pub fn dageist_engine::document::StepReport::summary(&self) -> &str
 pub const fn dageist_engine::document::StepReport::walk(&self) -> &dageist_engine::document::Walk
 pub struct dageist_engine::document::SyntaxError
 impl dageist_engine::document::SyntaxError
