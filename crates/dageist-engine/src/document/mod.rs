@@ -37,6 +37,7 @@ mod model;
 mod preview;
 mod read;
 mod run;
+mod source;
 #[cfg(test)]
 mod tests;
 mod values;
@@ -56,6 +57,7 @@ pub use preview::Preview;
 pub use run::{
     ExpressionDtypes, Outcome, Report, Resolution, RowsError, RunCause, StepRefusal, StepReport,
 };
+pub use source::{NotRunnable, Reason, Source, SourceLine};
 pub use values::{FIRST_VALUES, FirstValues};
 pub use walk::{Standing, Walk, WalkRefusal, WalkedExpression};
 

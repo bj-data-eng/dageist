@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
-use polars::prelude::{Expr, LazyFrame, PolarsError, Scalar, Series, lit};
+use polars::prelude::{DataType, Expr, LazyFrame, PolarsError, Scalar, Series, lit};
 
 use crate::allowed::{Representative, Shape, dtype_name};
 
@@ -134,6 +134,15 @@ struct Connected {
 pub(super) struct StartLiteral {
     pub(super) class: Option<Representative>,
     pub(super) shape: Shape,
+}
+
+/// What a connected name is, for the source written of a document: a table, a
+/// single value of a dtype, or a list of values of one.
+#[derive(Debug, Clone, PartialEq)]
+pub(super) enum Binding {
+    Table,
+    Value(DataType),
+    List(DataType),
 }
 
 /// The inputs of a node by name: tables, single values and lists. A name
@@ -282,6 +291,15 @@ impl Inputs {
         Some(StartLiteral {
             class: Representative::of(dtype),
             shape,
+        })
+    }
+
+    /// What the input called `name` is, if there is one.
+    pub(super) fn binding(&self, name: &str) -> Option<Binding> {
+        Some(match &self.inputs.get(name)?.input {
+            Input::Table(_) => Binding::Table,
+            Input::Value(value) => Binding::Value(value.dtype().clone()),
+            Input::List(values) => Binding::List(values.dtype().clone()),
         })
     }
 
