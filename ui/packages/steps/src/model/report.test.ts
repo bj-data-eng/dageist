@@ -80,9 +80,12 @@ function timestampRun(changes: ReadonlyArray<{ name: string; change: string }>):
     run: decodeRun({
       status: 'run',
       source,
+      python: [],
       steps: [
         {
           id: 'timestamp',
+          source: '.with_columns(pl.col("timestamp").alias("timestamp"))',
+          summary: 'timestamp',
           lazy: true,
           outcome: { status: 'valid', columns: source, changes },
           count: { kind: 'notCounted' },
@@ -164,8 +167,11 @@ function counted(count: unknown): ReturnType<typeof decodeRun> {
   return decodeRun({
     status: 'run',
     source,
+    python: [],
     steps: ['sort', 'step_index'].map((id) => ({
       id,
+      source: `.step(${id})`,
+      summary: id,
       lazy: true,
       outcome: { status: 'valid', columns: source, changes: [] },
       count: id === 'sort' ? { kind: 'notCounted' } : count,

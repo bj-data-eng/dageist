@@ -522,6 +522,8 @@ describe('a report that is not what the host sends', () => {
 function handWrittenStep(count: unknown): unknown {
   return {
     id: 'add',
+    source: '.with_columns(pl.col("owner").alias("slow"))',
+    summary: 'slow',
     lazy: true,
     outcome: {
       status: 'valid',
@@ -548,7 +550,7 @@ const COUNTED = {
 };
 
 function runOf(count: unknown): unknown {
-  return { status: 'run', source: [], steps: [handWrittenStep(count)] };
+  return { status: 'run', source: [], python: [], steps: [handWrittenStep(count)] };
 }
 
 describe('the columns a step changed and how its rows were counted', () => {
