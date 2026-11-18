@@ -392,6 +392,40 @@ pub enum dageist_engine::catalog::Shape
 pub dageist_engine::catalog::Shape::Many
 pub dageist_engine::catalog::Shape::One
 pub dageist_engine::catalog::Shape::PerItem(&'static str)
+pub enum dageist_engine::catalog::SummaryPhrase<'a>
+pub dageist_engine::catalog::SummaryPhrase::AllOf
+pub dageist_engine::catalog::SummaryPhrase::AllOf::count: usize
+pub dageist_engine::catalog::SummaryPhrase::AtLeast
+pub dageist_engine::catalog::SummaryPhrase::AtMost
+pub dageist_engine::catalog::SummaryPhrase::Compared
+pub dageist_engine::catalog::SummaryPhrase::Compared::field: &'a str
+pub dageist_engine::catalog::SummaryPhrase::Compared::sign: &'a str
+pub dageist_engine::catalog::SummaryPhrase::Compared::value: &'a str
+pub dageist_engine::catalog::SummaryPhrase::Condition
+pub dageist_engine::catalog::SummaryPhrase::Equal
+pub dageist_engine::catalog::SummaryPhrase::Field
+pub dageist_engine::catalog::SummaryPhrase::Fields
+pub dageist_engine::catalog::SummaryPhrase::Fields::count: usize
+pub dageist_engine::catalog::SummaryPhrase::Greater
+pub dageist_engine::catalog::SummaryPhrase::JoinedOn
+pub dageist_engine::catalog::SummaryPhrase::JoinedOn::fields: &'a str
+pub dageist_engine::catalog::SummaryPhrase::JoinedOn::table: &'a str
+pub dageist_engine::catalog::SummaryPhrase::Less
+pub dageist_engine::catalog::SummaryPhrase::Name
+pub dageist_engine::catalog::SummaryPhrase::NoFields
+pub dageist_engine::catalog::SummaryPhrase::NotEqual
+pub dageist_engine::catalog::SummaryPhrase::PivotedOn
+pub dageist_engine::catalog::SummaryPhrase::PivotedOn::field: &'a str
+pub dageist_engine::catalog::SummaryPhrase::Renamed
+pub dageist_engine::catalog::SummaryPhrase::Renamed::from: &'a str
+pub dageist_engine::catalog::SummaryPhrase::Renamed::to: &'a str
+pub dageist_engine::catalog::SummaryPhrase::Separator
+pub dageist_engine::catalog::SummaryPhrase::SortedBy
+pub dageist_engine::catalog::SummaryPhrase::SortedBy::fields: &'a str
+pub dageist_engine::catalog::SummaryPhrase::Value
+pub dageist_engine::catalog::SummaryPhrase::Worked
+impl dageist_engine::catalog::SummaryPhrase<'_>
+pub const fn dageist_engine::catalog::SummaryPhrase<'_>::word(self) -> dageist_engine::catalog::SummaryWord
 pub enum dageist_engine::catalog::SummaryWord
 pub dageist_engine::catalog::SummaryWord::AllOf
 pub dageist_engine::catalog::SummaryWord::AtLeast
@@ -409,11 +443,12 @@ pub dageist_engine::catalog::SummaryWord::NoFields
 pub dageist_engine::catalog::SummaryWord::NotEqual
 pub dageist_engine::catalog::SummaryWord::PivotedOn
 pub dageist_engine::catalog::SummaryWord::Renamed
+pub dageist_engine::catalog::SummaryWord::Separator
 pub dageist_engine::catalog::SummaryWord::SortedBy
 pub dageist_engine::catalog::SummaryWord::Value
 pub dageist_engine::catalog::SummaryWord::Worked
 impl dageist_engine::catalog::SummaryWord
-pub const dageist_engine::catalog::SummaryWord::ALL: [Self; 19]
+pub const dageist_engine::catalog::SummaryWord::ALL: [Self; 20]
 pub const fn dageist_engine::catalog::SummaryWord::key(self) -> &'static str
 pub const fn dageist_engine::catalog::SummaryWord::places(self) -> &'static [&'static str]
 pub enum dageist_engine::catalog::ValueType
@@ -424,6 +459,9 @@ pub dageist_engine::catalog::ValueType::Integer
 pub dageist_engine::catalog::ValueType::String
 impl dageist_engine::catalog::ValueType
 pub const dageist_engine::catalog::ValueType::ALL: [Self; 5]
+pub enum dageist_engine::catalog::Variadic
+pub dageist_engine::catalog::Variadic::Args
+pub dageist_engine::catalog::Variadic::Kwargs
 pub enum dageist_engine::catalog::WordsError
 pub dageist_engine::catalog::WordsError::Missing
 pub dageist_engine::catalog::WordsError::Missing::path: alloc::string::String
@@ -482,6 +520,7 @@ pub const fn dageist_engine::catalog::Parameter::kind(&self) -> dageist_engine::
 pub const fn dageist_engine::catalog::Parameter::name(&self) -> &'static str
 pub const fn dageist_engine::catalog::Parameter::role(&self) -> dageist_engine::catalog::Role
 pub const fn dageist_engine::catalog::Parameter::shape(&self) -> dageist_engine::catalog::Shape
+pub const fn dageist_engine::catalog::Parameter::variadic(&self) -> core::option::Option<dageist_engine::catalog::Variadic>
 pub const fn dageist_engine::catalog::Parameter::writes(&self) -> dageist_engine::catalog::Writes
 pub struct dageist_engine::catalog::Words
 impl dageist_engine::catalog::Words
@@ -496,7 +535,7 @@ pub fn dageist_engine::catalog::Words::family_title(&self, family: dageist_engin
 pub fn dageist_engine::catalog::Words::parameter_label(&self, id: dageist_engine::catalog::EntryId, parameter: &str) -> core::option::Option<&str>
 pub fn dageist_engine::catalog::Words::parameter_name(&self, id: dageist_engine::catalog::EntryId, parameter: &str) -> core::option::Option<&str>
 pub fn dageist_engine::catalog::Words::parse(source: &str) -> core::result::Result<Self, dageist_engine::catalog::WordsError>
-pub fn dageist_engine::catalog::Words::summary(&self, word: dageist_engine::catalog::SummaryWord, fill: &[(&str, &str)]) -> alloc::string::String
+pub fn dageist_engine::catalog::Words::say(&self, phrase: dageist_engine::catalog::SummaryPhrase<'_>) -> alloc::string::String
 pub fn dageist_engine::catalog::english() -> &'static dageist_engine::catalog::Words
 pub fn dageist_engine::catalog::entries() -> &'static [dageist_engine::catalog::Entry]
 pub fn dageist_engine::catalog::entry(id: &str) -> core::option::Option<&'static dageist_engine::catalog::Entry>
@@ -580,6 +619,16 @@ pub dageist_engine::document::ListOrigin::Column::node: alloc::string::String
 pub dageist_engine::document::ListOrigin::Parameter
 impl core::convert::From<dageist_engine::document::ListOrigin> for dageist_engine::document::Origin
 pub fn dageist_engine::document::Origin::from(origin: dageist_engine::document::ListOrigin) -> Self
+pub enum dageist_engine::document::NotRunnableReason
+pub dageist_engine::document::NotRunnableReason::NamedLikeFrame(alloc::string::String)
+pub dageist_engine::document::NotRunnableReason::NotConnected(alloc::string::String)
+pub dageist_engine::document::NotRunnableReason::SameName(alloc::string::String, alloc::string::String)
+pub dageist_engine::document::NotRunnableReason::Unfinished
+pub dageist_engine::document::NotRunnableReason::UnwritableDtype
+pub dageist_engine::document::NotRunnableReason::UnwritableDtype::dtype: alloc::string::String
+pub dageist_engine::document::NotRunnableReason::UnwritableDtype::input: alloc::string::String
+impl core::fmt::Display for dageist_engine::document::NotRunnableReason
+pub fn dageist_engine::document::NotRunnableReason::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub enum dageist_engine::document::Origin
 pub dageist_engine::document::Origin::Column
 pub dageist_engine::document::Origin::Column::column: alloc::string::String
@@ -610,12 +659,6 @@ impl core::error::Error for dageist_engine::document::ReadError
 pub fn dageist_engine::document::ReadError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
 impl core::fmt::Display for dageist_engine::document::ReadError
 pub fn dageist_engine::document::ReadError::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-pub enum dageist_engine::document::Reason
-pub dageist_engine::document::Reason::NotConnected(alloc::string::String)
-pub dageist_engine::document::Reason::SameName(alloc::string::String, alloc::string::String)
-pub dageist_engine::document::Reason::Unfinished
-impl core::fmt::Display for dageist_engine::document::Reason
-pub fn dageist_engine::document::Reason::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub enum dageist_engine::document::Resolution
 pub dageist_engine::document::Resolution::Dtype(polars_core::datatypes::dtype::DataType)
 pub dageist_engine::document::Resolution::NoContext
@@ -779,7 +822,7 @@ impl core::fmt::Debug for dageist_engine::document::Inputs
 pub fn dageist_engine::document::Inputs::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub struct dageist_engine::document::NotRunnable
 impl dageist_engine::document::NotRunnable
-pub const fn dageist_engine::document::NotRunnable::reason(&self) -> &dageist_engine::document::Reason
+pub const fn dageist_engine::document::NotRunnable::reason(&self) -> &dageist_engine::document::NotRunnableReason
 pub const fn dageist_engine::document::NotRunnable::step(&self) -> core::option::Option<&dageist_engine::document::StepId>
 pub struct dageist_engine::document::Place
 impl dageist_engine::document::Place
