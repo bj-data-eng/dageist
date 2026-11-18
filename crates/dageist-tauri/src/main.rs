@@ -23,6 +23,8 @@ mod report;
 mod sample_table;
 #[cfg(test)]
 mod snapshot;
+#[cfg(test)]
+mod test_support;
 mod windows;
 
 use std::process::ExitCode;

@@ -18,6 +18,7 @@ use serde_json::{Value, json};
 
 use super::{Bridge, Deadlines, Session, admits, bind, serve, serve_connection};
 use crate::sample_table::Sample;
+use crate::test_support::split_block;
 
 const SMALL: SampleSpec = SampleSpec {
     keys: 40,
@@ -414,7 +415,7 @@ fn the_sample_commands_keep_the_open_table_between_requests() {
     );
     assert_eq!(
         shape["columns"][0],
-        json!({ "name": "dcn", "dataType": "str" })
+        json!({ "name": "dcn", "dataType": "str", "numeric": false })
     );
 
     let block = call(
@@ -425,10 +426,16 @@ fn the_sample_commands_keep_the_open_table_between_requests() {
     assert_eq!(block.status, 200);
     assert_eq!(
         block.header("content-type"),
-        Some("application/vnd.apache.arrow.stream")
+        Some("application/vnd.dageist.block")
     );
-    // An Arrow IPC stream begins with a continuation marker.
-    assert_eq!(&block.body[..4], &[0xff, 0xff, 0xff, 0xff]);
+    // The block's frame holds the numbers of its rows, then the Arrow IPC stream, which begins
+    // with a continuation marker.
+    let (header, arrow) = split_block(&block.body);
+    assert_eq!(
+        header["numbers"],
+        json!(["4", "5", "6", "7", "8", "9", "10"])
+    );
+    assert_eq!(&arrow[..4], &[0xff, 0xff, 0xff, 0xff]);
 
     let stored = call(&bridge, "open_sample_result", &json!({}));
     assert_eq!(stored.status, 200);
@@ -878,7 +885,9 @@ fn through_a_socket_the_open_table_is_kept_across_connections() {
     );
 
     assert_eq!(block.status, 200);
-    assert_eq!(&block.body[..4], &[0xff, 0xff, 0xff, 0xff]);
+    let (header, arrow) = split_block(&block.body);
+    assert_eq!(header["numbers"], json!(["1", "2", "3"]));
+    assert_eq!(&arrow[..4], &[0xff, 0xff, 0xff, 0xff]);
 }
 
 #[test]

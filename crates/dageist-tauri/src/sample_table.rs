@@ -370,7 +370,11 @@ mod tests {
     use tauri::webview::InvokeRequest;
     use tauri::{WebviewWindow, WebviewWindowBuilder};
 
-    use super::{ErrorKind, OpenTable, Opened, SampleGate, open_stored, open_window};
+    use super::{
+        ErrorKind, OpenTable, Opened, Sample, SampleGate, open_stored, open_window,
+        sample_result_view, sample_window_view,
+    };
+    use crate::test_support::split_block;
 
     const SMALL: SampleSpec = SampleSpec {
         keys: 40,
@@ -442,7 +446,7 @@ mod tests {
         assert_eq!(columns.len(), SMALL_COLUMNS);
         assert_eq!(
             columns[0],
-            serde_json::json!({ "name": "dcn", "dataType": "str" })
+            serde_json::json!({ "name": "dcn", "dataType": "str", "numeric": false })
         );
         // Ten keys of two to eight step rows each.
         assert!((20..=80).contains(&rows), "{rows} rows for ten keys");
@@ -486,8 +490,39 @@ mod tests {
         assert_eq!(rows_and_columns(&table).1.len(), SMALL_COLUMNS);
     }
 
+    /// The text of a size as a block's report writes it: whole bytes below a
+    /// kilobyte of 1,024, and kilobytes with one decimal below a megabyte.
+    fn size_text(bytes: usize) -> String {
+        if bytes < 1024 {
+            format!("{bytes} B")
+        } else {
+            format!("{:.1} KB", bytes as f64 / 1024.0)
+        }
+    }
+
+    /// Checks a block's report: its rows and columns, the size of its Arrow
+    /// bytes, and a time that ends in a unit.
+    fn assert_report(report: &serde_json::Value, rows: &str, columns: &str, arrow: usize) {
+        let report = report.as_str().expect("a report is text");
+        let expected = format!("{rows} × {columns} · {} · built in ", size_text(arrow));
+        let time = report
+            .strip_prefix(&expected)
+            .unwrap_or_else(|| panic!("{report:?} does not start with {expected:?}"));
+        assert!(
+            ["µs", "ms", " s"].iter().any(|unit| time.ends_with(unit)),
+            "{time:?} is not a time"
+        );
+    }
+
+    fn block_of(response: Result<InvokeResponseBody, serde_json::Value>) -> Vec<u8> {
+        match response {
+            Ok(InvokeResponseBody::Raw(bytes)) => bytes,
+            other => panic!("expected raw bytes, got {other:?}"),
+        }
+    }
+
     #[test]
-    fn block_command_answers_with_the_raw_arrow_bytes_of_a_window() {
+    fn block_command_answers_a_window_block_with_its_row_numbers_and_arrow_bytes() {
         let sample = SampleDirectory::empty("window-block");
         let table =
             open_window(&SampleGate::default(), &sample.path, SMALL, 10).expect("the window opens");
@@ -503,14 +538,20 @@ mod tests {
             })),
         );
 
-        match response {
-            Ok(InvokeResponseBody::Raw(bytes)) => assert_eq!(bytes, expected),
-            other => panic!("expected raw bytes, got {other:?}"),
-        }
+        let bytes = block_of(response);
+        let (header, arrow) = split_block(&bytes);
+        assert_eq!(arrow, expected);
+        // The numbers of rows 4 to 10, counting from 1.
+        assert_eq!(
+            header["numbers"],
+            serde_json::json!(["4", "5", "6", "7", "8", "9", "10"])
+        );
+        assert_report(&header["report"], "7 rows", "2 columns", arrow.len());
+        assert_eq!(header.as_object().expect("an object").len(), 2);
     }
 
     #[test]
-    fn block_command_answers_with_the_raw_arrow_bytes_of_a_stored_result() {
+    fn block_command_answers_a_stored_block_with_its_row_numbers_and_arrow_bytes() {
         let sample = SampleDirectory::empty("stored-block");
         let table =
             open_stored(&SampleGate::default(), &sample.path, SMALL).expect("the result opens");
@@ -526,10 +567,114 @@ mod tests {
             })),
         );
 
-        match response {
-            Ok(InvokeResponseBody::Raw(bytes)) => assert_eq!(bytes, expected),
-            other => panic!("expected raw bytes, got {other:?}"),
+        let bytes = block_of(response);
+        let (header, arrow) = split_block(&bytes);
+        assert_eq!(arrow, expected);
+        let numbers: Vec<String> = (51..=62).map(|number| number.to_string()).collect();
+        assert_eq!(header["numbers"], serde_json::json!(numbers));
+        assert_report(&header["report"], "12 rows", "2 columns", arrow.len());
+    }
+
+    #[test]
+    fn block_past_the_end_is_numbered_only_as_far_as_it_has_rows() {
+        let sample = SampleDirectory::empty("numbers-end");
+        let table =
+            open_stored(&SampleGate::default(), &sample.path, SMALL).expect("the result opens");
+        let rows = rows_and_columns(&table).0;
+        let columns = ["dcn".to_owned()];
+        let webview = webview(Some(table));
+
+        let last = block_of(tauri::test::get_ipc_response(
+            &webview,
+            block_request(serde_json::json!({
+                "offset": rows - 2,
+                "length": 10,
+                "columns": columns,
+            })),
+        ));
+        let beyond = block_of(tauri::test::get_ipc_response(
+            &webview,
+            block_request(serde_json::json!({
+                "offset": rows + 5,
+                "length": 10,
+                "columns": columns,
+            })),
+        ));
+
+        assert_eq!(
+            split_block(&last).0["numbers"],
+            serde_json::json!([(rows - 1).to_string(), rows.to_string()])
+        );
+        assert_report(
+            &split_block(&last).0["report"],
+            "2 rows",
+            "1 column",
+            split_block(&last).1.len(),
+        );
+        assert_eq!(split_block(&beyond).0["numbers"], serde_json::json!([]));
+        assert_report(
+            &split_block(&beyond).0["report"],
+            "0 rows",
+            "1 column",
+            split_block(&beyond).1.len(),
+        );
+    }
+
+    #[test]
+    fn an_opened_table_reports_its_figures_as_text() {
+        let sample = SampleDirectory::empty("figures");
+        let sample = Sample::new(sample.path.clone(), SMALL);
+        let gate = SampleGate::default();
+
+        let window = sample_window_view(&gate, &OpenTable::default(), &sample, 10)
+            .expect("the window opens");
+        let stored =
+            sample_result_view(&gate, &OpenTable::default(), &sample).expect("the result opens");
+
+        for view in [window, stored] {
+            let view = serde_json::to_value(view).expect("the view serializes");
+            let rows = view["rows"].as_u64().expect("a row count");
+            // Below a thousand rows a count has no separator.
+            assert!(rows < 1000);
+            let figures = &view["figures"];
+            assert_eq!(figures["rows"], format!("{rows} rows"));
+            assert_eq!(figures["columns"], format!("{SMALL_COLUMNS} columns"));
+            let opened = figures["opened"].as_str().expect("the open time is text");
+            assert!(
+                ["µs", "ms", " s"].iter().any(|unit| opened.ends_with(unit)),
+                "{opened:?} is not a time"
+            );
+            assert_eq!(figures.as_object().expect("an object").len(), 3);
         }
+    }
+
+    #[test]
+    fn columns_say_which_of_them_hold_numbers() {
+        let sample = SampleDirectory::empty("numeric");
+        let table =
+            open_window(&SampleGate::default(), &sample.path, SMALL, 5).expect("the window opens");
+
+        let (_, columns) = rows_and_columns(&table);
+
+        let numeric: Vec<(&str, bool)> = columns
+            .iter()
+            .map(|column| {
+                (
+                    column["dataType"].as_str().expect("a dtype"),
+                    column["numeric"].as_bool().expect("a flag"),
+                )
+            })
+            .collect();
+        assert!(numeric.contains(&("i32", true)), "{numeric:?}");
+        assert!(numeric.contains(&("f64", true)), "{numeric:?}");
+        assert!(numeric.contains(&("str", false)), "{numeric:?}");
+        assert!(numeric.contains(&("date", false)), "{numeric:?}");
+        assert!(
+            numeric
+                .iter()
+                .all(|(dtype, flag)| *flag == (*dtype == "i32" || *dtype == "f64")),
+            "{numeric:?}"
+        );
     }
 
     /// The kind that follows `kind` in the list the view's contract gives, or `None` after the
