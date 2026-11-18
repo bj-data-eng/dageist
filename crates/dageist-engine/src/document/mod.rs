@@ -38,6 +38,7 @@ mod preview;
 mod read;
 mod run;
 mod source;
+mod summary;
 #[cfg(test)]
 mod tests;
 mod values;
