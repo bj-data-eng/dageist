@@ -103,15 +103,28 @@ impl Block {
     }
 }
 
-/// A column of `frame` written as text: a string column as it is, any other
-/// cell by Polars' own text for the value, and a null left null.
+/// A column of `frame` written as text: a string column as it is, an integer or
+/// Boolean column by Polars' cast, which writes the same text as for a preview,
+/// and any other cell by Polars' own text for the value. A null stays null.
+///
+/// The cast is used only for the dtypes whose cast and text are the same by
+/// construction, decimal digits and the words `true` and `false`. A float is
+/// written differently by the two for a number with an exponent, and a datetime,
+/// a time and a duration by their fraction and zone, so those are written cell by
+/// cell, and so is anything the cast cannot write.
 fn text_column(column: &Column) -> PolarsResult<Column> {
-    if column.dtype() == &DataType::String {
+    let dtype = column.dtype();
+    if dtype == &DataType::String {
         return Ok(column.clone());
     }
-    let cells = (0..column.len())
-        .map(|row| column.get(row).map(|value| text_of(&value)))
-        .collect::<PolarsResult<Vec<Option<String>>>>()?;
+    if dtype.is_integer() || dtype == &DataType::Boolean {
+        return column.cast(&DataType::String);
+    }
+    let cells: Vec<Option<String>> = column
+        .as_materialized_series()
+        .iter()
+        .map(|value| text_of(&value))
+        .collect();
     Ok(Column::new(column.name().clone(), cells))
 }
 
