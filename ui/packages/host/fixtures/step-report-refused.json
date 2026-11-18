@@ -25,6 +25,8 @@
   "steps": [
     {
       "id": "sort",
+      "source": ".sort(\"dcn\")",
+      "summary": "by dcn",
       "lazy": true,
       "outcome": {
         "status": "valid",
@@ -141,6 +143,8 @@
     },
     {
       "id": "total",
+      "source": ".with_columns(pl.col(\"dcn\").sum().alias(\"total\"))",
+      "summary": "total",
       "lazy": true,
       "outcome": {
         "status": "refused",
@@ -301,6 +305,8 @@
     },
     {
       "id": "after",
+      "source": ".with_columns(pl.col(\"row_days\").alias(\"days\"))",
+      "summary": "days",
       "lazy": true,
       "outcome": {
         "status": "notRun",
@@ -315,6 +321,56 @@
         "refusal": null,
         "notKnown": null
       }
+    }
+  ],
+  "python": [
+    {
+      "text": "import polars as pl",
+      "step": null
+    },
+    {
+      "text": "",
+      "step": null
+    },
+    {
+      "text": "",
+      "step": null
+    },
+    {
+      "text": "def run(",
+      "step": null
+    },
+    {
+      "text": "    claims: pl.LazyFrame,",
+      "step": null
+    },
+    {
+      "text": ") -> pl.LazyFrame:",
+      "step": null
+    },
+    {
+      "text": "    return (",
+      "step": null
+    },
+    {
+      "text": "        claims",
+      "step": null
+    },
+    {
+      "text": "        .sort(\"dcn\")",
+      "step": "sort"
+    },
+    {
+      "text": "        .with_columns(pl.col(\"dcn\").sum().alias(\"total\"))",
+      "step": "total"
+    },
+    {
+      "text": "        .with_columns(pl.col(\"row_days\").alias(\"days\"))",
+      "step": "after"
+    },
+    {
+      "text": "    )",
+      "step": null
     }
   ]
 }
