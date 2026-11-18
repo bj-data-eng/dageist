@@ -492,3 +492,50 @@ fn the_claim_timing_sample_is_written_as_this_module() {
         )
     );
 }
+
+fn one_table(name: &str) -> Inputs {
+    let mut inputs = Inputs::new();
+    inputs
+        .add_table(name, "Node", df!("a" => [1_i64]).expect("a table").lazy())
+        .expect("a table");
+    inputs
+}
+
+#[test]
+fn an_input_named_like_the_table_the_document_starts_from_is_marked() {
+    // `run(claims, claims)` is not Python that runs.
+    let document = read(vec![step(
+        "join",
+        "LazyFrame.join",
+        json!({ "other": { "table": "claims" }, "on": many(vec![field("a")]) }),
+    )]);
+    let source = document.source("claims", &one_table("claims"));
+    assert!(
+        !source.not_runnable().is_empty(),
+        "the module says it runs: {}",
+        source.text()
+    );
+}
+
+#[test]
+fn an_input_used_as_one_kind_by_a_step_and_as_another_by_a_later_step_is_marked() {
+    // The first step takes the name as a table, the second as a value.
+    let document = read(vec![
+        step(
+            "join",
+            "LazyFrame.join",
+            json!({ "other": { "table": "lookup" }, "on": many(vec![field("a")]) }),
+        ),
+        step(
+            "value",
+            "LazyFrame.with_columns",
+            json!({ "named_exprs": named(vec![("x", chain(json!({ "input": "lookup" }), vec![]))]) }),
+        ),
+    ]);
+    let source = document.source("data", &one_table("lookup"));
+    assert!(
+        !source.not_runnable().is_empty(),
+        "the module says it runs: {}",
+        source.text()
+    );
+}
