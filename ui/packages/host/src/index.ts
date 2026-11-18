@@ -62,6 +62,7 @@ export type {
   RunView,
   SegmentView,
   ShapeView,
+  SourceLineView,
   SourceView,
   StageView,
   StandingView,

@@ -575,3 +575,27 @@ hint = "lowest value"
 [entries."Expr.sum"]
 name = "sum"
 hint = "total"
+
+# The words of a step's short summary, as a list of steps shows it. A `{name}` is filled
+# when the summary is written.
+[summary]
+no_fields = "no fields"
+fields = "{count} fields"
+sorted_by = "by {fields}"
+joined_on = "{table} on {fields}"
+pivoted_on = "on {field}"
+renamed = "{from} → {to}"
+compared = "{field} {sign} {value}"
+field = "field"
+name = "name"
+value = "value"
+condition = "condition"
+all_of = "all of {count} conditions"
+worked = "…"
+equal = "=="
+not_equal = "≠"
+greater = ">"
+at_least = "≥"
+less = "<"
+at_most = "≤"
+separator = ", "

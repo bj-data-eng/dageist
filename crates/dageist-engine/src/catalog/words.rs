@@ -30,6 +30,10 @@
 //!
 //! `changed` names what is shown differently from Polars' name, as
 //! `Entry.id`, `Entry.id#parameter` or `Entry.id#parameter#word`.
+//!
+//! The `summary` table holds the words a step's short summary is written
+//! with, each a template whose `{name}` places are filled when the summary is
+//! written; see [`SummaryWord`].
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -61,6 +65,13 @@ pub enum WordsError {
         /// Where.
         path: String,
     },
+    /// A summary template does not hold exactly the places it is filled at.
+    Places {
+        /// Where.
+        path: String,
+        /// The places the template must hold, each written `{name}`.
+        expected: &'static [&'static str],
+    },
 }
 
 impl fmt::Display for WordsError {
@@ -72,6 +83,12 @@ impl fmt::Display for WordsError {
                 write!(formatter, "{path} in the language file must be {expected}")
             }
             Self::Unknown { path } => write!(formatter, "the language file has an unknown {path}"),
+            Self::Places { path, expected } => {
+                write!(
+                    formatter,
+                    "{path} in the language file must hold {expected:?}"
+                )
+            }
         }
     }
 }
@@ -99,6 +116,314 @@ struct DtypesWords {
     hint: String,
 }
 
+/// A word a step's summary is written with. A language file gives each as a
+/// template in its `summary` table, under [`key`](Self::key), with the
+/// [`places`](Self::places) it is filled at written `{name}`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum SummaryWord {
+    /// What a list of no fields is called.
+    NoFields,
+    /// A list of more fields than are named, by how many there are.
+    Fields,
+    /// What a sort orders by.
+    SortedBy,
+    /// A join: the table, and the fields that are matched.
+    JoinedOn,
+    /// A pivot: the field whose values become columns.
+    PivotedOn,
+    /// One rename: the name it was and the name it becomes.
+    Renamed,
+    /// A comparison: the field, the sign and the value.
+    Compared,
+    /// A field that is not picked yet.
+    Field,
+    /// A new name that is not picked yet.
+    Name,
+    /// A value that is not picked yet.
+    Value,
+    /// A condition that is not picked yet.
+    Condition,
+    /// Conditions that must all hold, by how many there are.
+    AllOf,
+    /// What stands for an expression or a value worked out by a chain.
+    Worked,
+    /// The sign of a test for equal.
+    Equal,
+    /// The sign of a test for not equal.
+    NotEqual,
+    /// The sign of a test for greater.
+    Greater,
+    /// The sign of a test for at least.
+    AtLeast,
+    /// The sign of a test for less.
+    Less,
+    /// What stands between the names of a list.
+    Separator,
+    /// The sign of a test for at most.
+    AtMost,
+}
+
+impl SummaryWord {
+    /// Every word, in the order a language file lists them.
+    pub const ALL: [Self; 20] = [
+        Self::NoFields,
+        Self::Fields,
+        Self::SortedBy,
+        Self::JoinedOn,
+        Self::PivotedOn,
+        Self::Renamed,
+        Self::Compared,
+        Self::Field,
+        Self::Name,
+        Self::Value,
+        Self::Condition,
+        Self::AllOf,
+        Self::Worked,
+        Self::Equal,
+        Self::NotEqual,
+        Self::Greater,
+        Self::AtLeast,
+        Self::Less,
+        Self::AtMost,
+        Self::Separator,
+    ];
+
+    /// The key the language files give the word under.
+    #[must_use]
+    pub const fn key(self) -> &'static str {
+        match self {
+            Self::NoFields => "no_fields",
+            Self::Fields => "fields",
+            Self::SortedBy => "sorted_by",
+            Self::JoinedOn => "joined_on",
+            Self::PivotedOn => "pivoted_on",
+            Self::Renamed => "renamed",
+            Self::Compared => "compared",
+            Self::Field => "field",
+            Self::Name => "name",
+            Self::Value => "value",
+            Self::Condition => "condition",
+            Self::AllOf => "all_of",
+            Self::Worked => "worked",
+            Self::Equal => "equal",
+            Self::NotEqual => "not_equal",
+            Self::Greater => "greater",
+            Self::AtLeast => "at_least",
+            Self::Less => "less",
+            Self::AtMost => "at_most",
+            Self::Separator => "separator",
+        }
+    }
+
+    /// The places the word's template is filled at, as `{name}` in it.
+    #[must_use]
+    pub const fn places(self) -> &'static [&'static str] {
+        match self {
+            Self::Fields | Self::AllOf => &["count"],
+            Self::SortedBy => &["fields"],
+            Self::JoinedOn => &["table", "fields"],
+            Self::PivotedOn => &["field"],
+            Self::Renamed => &["from", "to"],
+            Self::Compared => &["field", "sign", "value"],
+            Self::NoFields
+            | Self::Field
+            | Self::Name
+            | Self::Value
+            | Self::Condition
+            | Self::Worked
+            | Self::Equal
+            | Self::NotEqual
+            | Self::Greater
+            | Self::AtLeast
+            | Self::Less
+            | Self::AtMost
+            | Self::Separator => &[],
+        }
+    }
+}
+
+/// A summary phrase: a [`SummaryWord`] with what fills each of its places. A
+/// place is a field of the variant, so none can be misspelled, left out or
+/// given to a word that does not have it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SummaryPhrase<'a> {
+    /// See [`SummaryWord::NoFields`].
+    NoFields,
+    /// See [`SummaryWord::Fields`].
+    Fields {
+        /// How many fields there are.
+        count: usize,
+    },
+    /// See [`SummaryWord::SortedBy`].
+    SortedBy {
+        /// The fields, already listed.
+        fields: &'a str,
+    },
+    /// See [`SummaryWord::JoinedOn`].
+    JoinedOn {
+        /// The table that is joined.
+        table: &'a str,
+        /// The fields that are matched, already listed.
+        fields: &'a str,
+    },
+    /// See [`SummaryWord::PivotedOn`].
+    PivotedOn {
+        /// The field whose values become columns.
+        field: &'a str,
+    },
+    /// See [`SummaryWord::Renamed`].
+    Renamed {
+        /// The name it was.
+        from: &'a str,
+        /// The name it becomes.
+        to: &'a str,
+    },
+    /// See [`SummaryWord::Compared`].
+    Compared {
+        /// The field.
+        field: &'a str,
+        /// The sign, written.
+        sign: &'a str,
+        /// The value.
+        value: &'a str,
+    },
+    /// See [`SummaryWord::Field`].
+    Field,
+    /// See [`SummaryWord::Name`].
+    Name,
+    /// See [`SummaryWord::Value`].
+    Value,
+    /// See [`SummaryWord::Condition`].
+    Condition,
+    /// See [`SummaryWord::AllOf`].
+    AllOf {
+        /// How many conditions.
+        count: usize,
+    },
+    /// See [`SummaryWord::Worked`].
+    Worked,
+    /// See [`SummaryWord::Equal`].
+    Equal,
+    /// See [`SummaryWord::NotEqual`].
+    NotEqual,
+    /// See [`SummaryWord::Greater`].
+    Greater,
+    /// See [`SummaryWord::AtLeast`].
+    AtLeast,
+    /// See [`SummaryWord::Less`].
+    Less,
+    /// See [`SummaryWord::AtMost`].
+    AtMost,
+    /// See [`SummaryWord::Separator`].
+    Separator,
+}
+
+impl SummaryPhrase<'_> {
+    /// The word of the language file the phrase is written from.
+    #[must_use]
+    pub const fn word(self) -> SummaryWord {
+        match self {
+            Self::NoFields => SummaryWord::NoFields,
+            Self::Fields { .. } => SummaryWord::Fields,
+            Self::SortedBy { .. } => SummaryWord::SortedBy,
+            Self::JoinedOn { .. } => SummaryWord::JoinedOn,
+            Self::PivotedOn { .. } => SummaryWord::PivotedOn,
+            Self::Renamed { .. } => SummaryWord::Renamed,
+            Self::Compared { .. } => SummaryWord::Compared,
+            Self::Field => SummaryWord::Field,
+            Self::Name => SummaryWord::Name,
+            Self::Value => SummaryWord::Value,
+            Self::Condition => SummaryWord::Condition,
+            Self::AllOf { .. } => SummaryWord::AllOf,
+            Self::Worked => SummaryWord::Worked,
+            Self::Equal => SummaryWord::Equal,
+            Self::NotEqual => SummaryWord::NotEqual,
+            Self::Greater => SummaryWord::Greater,
+            Self::AtLeast => SummaryWord::AtLeast,
+            Self::Less => SummaryWord::Less,
+            Self::AtMost => SummaryWord::AtMost,
+            Self::Separator => SummaryWord::Separator,
+        }
+    }
+
+    /// What fills each place of the word's template, by the place's name.
+    pub(super) fn fill(self) -> Vec<(&'static str, String)> {
+        match self {
+            Self::Fields { count } | Self::AllOf { count } => {
+                vec![("count", count.to_string())]
+            }
+            Self::SortedBy { fields } => vec![("fields", fields.to_owned())],
+            Self::JoinedOn { table, fields } => {
+                vec![("table", table.to_owned()), ("fields", fields.to_owned())]
+            }
+            Self::PivotedOn { field } => vec![("field", field.to_owned())],
+            Self::Renamed { from, to } => {
+                vec![("from", from.to_owned()), ("to", to.to_owned())]
+            }
+            Self::Compared { field, sign, value } => vec![
+                ("field", field.to_owned()),
+                ("sign", sign.to_owned()),
+                ("value", value.to_owned()),
+            ],
+            Self::NoFields
+            | Self::Field
+            | Self::Name
+            | Self::Value
+            | Self::Condition
+            | Self::Worked
+            | Self::Equal
+            | Self::NotEqual
+            | Self::Greater
+            | Self::AtLeast
+            | Self::Less
+            | Self::AtMost
+            | Self::Separator => Vec::new(),
+        }
+    }
+}
+
+/// `template` with each place written `{name}` replaced by what `fill` gives
+/// for it, in one pass over the template, so that what fills a place is never
+/// itself filled. A place `fill` does not give is left as it is written.
+fn filled(template: &str, fill: &[(&str, String)]) -> String {
+    let mut text = String::with_capacity(template.len());
+    let mut rest = template;
+    while let Some(open) = rest.find('{') {
+        text.push_str(&rest[..open]);
+        let after = &rest[open + 1..];
+        let Some(close) = after.find('}') else {
+            text.push('{');
+            rest = after;
+            continue;
+        };
+        let place = &after[..close];
+        match fill.iter().find(|(name, _)| *name == place) {
+            Some((_, value)) => text.push_str(value),
+            None => {
+                text.push('{');
+                text.push_str(place);
+                text.push('}');
+            }
+        }
+        rest = &after[close + 1..];
+    }
+    text.push_str(rest);
+    text
+}
+
+/// The places written `{name}` in `template`, in the order they appear.
+fn places_in(template: &str) -> Vec<&str> {
+    let mut places = Vec::new();
+    let mut rest = template;
+    while let Some(open) = rest.find('{') {
+        let after = &rest[open + 1..];
+        let Some(close) = after.find('}') else { break };
+        places.push(&after[..close]);
+        rest = &after[close + 1..];
+    }
+    places
+}
+
 /// The words of one language.
 #[derive(Debug, Clone)]
 pub struct Words {
@@ -106,6 +431,7 @@ pub struct Words {
     families: BTreeMap<String, String>,
     dtypes: BTreeMap<String, DtypesWords>,
     entries: BTreeMap<String, EntryWords>,
+    summary: BTreeMap<SummaryWord, String>,
 }
 
 /// The English words, from `en.toml`.
@@ -131,7 +457,11 @@ impl Words {
         let root: Table = source
             .parse()
             .map_err(|error: toml::de::Error| WordsError::Syntax(error.to_string()))?;
-        only(&root, &["changed", "families", "dtypes", "entries"], "")?;
+        only(
+            &root,
+            &["changed", "families", "dtypes", "entries", "summary"],
+            "",
+        )?;
         let changed = match root.get("changed") {
             None => Vec::new(),
             Some(value) => array_of_text(value, "changed")?,
@@ -150,6 +480,7 @@ impl Words {
                 })
             })?,
             entries: section(&root, "", "entries", entry_words)?,
+            summary: summary_words(&root)?,
         })
     }
 
@@ -208,6 +539,15 @@ impl Words {
             .choices
             .get(word)
             .map(String::as_str)
+    }
+
+    /// The summary `phrase` in this language: its word's template with each
+    /// place filled once. A file with no summary table gives the empty text.
+    #[must_use]
+    pub fn say(&self, phrase: SummaryPhrase<'_>) -> String {
+        self.summary
+            .get(&phrase.word())
+            .map_or_else(String::new, |template| filled(template, &phrase.fill()))
     }
 
     /// The title of a family's group in a list.
@@ -273,6 +613,34 @@ pub(super) struct Named<'a> {
     pub(super) entries: Vec<&'a str>,
     pub(super) parameters: Vec<(&'a str, &'a str)>,
     pub(super) choices: Vec<(&'a str, &'a str, &'a str)>,
+}
+
+/// The `summary` table: every word of [`SummaryWord`], each a template that
+/// holds the places it is filled at and no others. A file with no table gives
+/// no words, as a file with no `entries` gives no entry.
+fn summary_words(root: &Table) -> Result<BTreeMap<SummaryWord, String>, WordsError> {
+    let Some(value) = root.get("summary") else {
+        return Ok(BTreeMap::new());
+    };
+    let table = as_table(value, "summary")?;
+    only(table, &SummaryWord::ALL.map(SummaryWord::key), "summary")?;
+    SummaryWord::ALL
+        .into_iter()
+        .map(|word| {
+            let template = text(table, word.key(), "summary")?;
+            let mut found = places_in(&template);
+            found.sort_unstable();
+            let mut expected = word.places().to_vec();
+            expected.sort_unstable();
+            if found != expected {
+                return Err(WordsError::Places {
+                    path: join("summary", word.key()),
+                    expected: word.places(),
+                });
+            }
+            Ok((word, template))
+        })
+        .collect()
 }
 
 fn join(path: &str, key: &str) -> String {

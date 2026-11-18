@@ -25,6 +25,8 @@
   "steps": [
     {
       "id": "sort",
+      "source": ".sort(\"dcn\", \"timestamp\")",
+      "summary": "by dcn, timestamp",
       "lazy": true,
       "outcome": {
         "status": "valid",
@@ -213,6 +215,8 @@
     },
     {
       "id": "step_index",
+      "source": ".with_columns(pl.col(\"dcn\").cum_count().over(pl.col(\"dcn\")).alias(\"step_index\"))",
+      "summary": "step_index",
       "lazy": true,
       "outcome": {
         "status": "valid",
@@ -503,6 +507,8 @@
     },
     {
       "id": "resolved_at",
+      "source": ".with_columns(pl.col(\"timestamp\").shift(pl.lit(1)).over(pl.col(\"dcn\")).alias(\"resolved_at\"))",
+      "summary": "resolved_at",
       "lazy": true,
       "outcome": {
         "status": "valid",
@@ -883,6 +889,8 @@
     },
     {
       "id": "received_at",
+      "source": ".with_columns(pl.col(\"timestamp\").alias(\"received_at\"))",
+      "summary": "received_at",
       "lazy": true,
       "outcome": {
         "status": "valid",
@@ -1029,6 +1037,8 @@
     },
     {
       "id": "resolved_day",
+      "source": ".with_columns(pl.col(\"resolved_at\").dt.date().alias(\"resolved_day\"))",
+      "summary": "resolved_day",
       "lazy": true,
       "outcome": {
         "status": "valid",
@@ -1205,6 +1215,8 @@
     },
     {
       "id": "days_open",
+      "source": ".with_columns(pl.col(\"received_at\").sub(pl.col(\"resolved_at\")).dt.total_days().alias(\"days_open\"))",
+      "summary": "days_open",
       "lazy": true,
       "outcome": {
         "status": "valid",
@@ -1501,6 +1513,8 @@
     },
     {
       "id": "a_days",
+      "source": ".with_columns(pl.when(pl.col(\"owner\").eq(pl.lit(\"Company A\"))).then(pl.col(\"row_days\")).otherwise(pl.lit(0)).cum_sum().over(pl.col(\"dcn\")).alias(\"a_days\"))",
+      "summary": "a_days",
       "lazy": true,
       "outcome": {
         "status": "valid",
@@ -2289,6 +2303,8 @@
     },
     {
       "id": "join",
+      "source": ".join(step_sla, how=\"left\", left_on=\"step_to\", right_on=\"step\", maintain_order=\"left\")",
+      "summary": "step_sla on step_to",
       "lazy": true,
       "outcome": {
         "status": "valid",
@@ -2518,6 +2534,8 @@
     },
     {
       "id": "sla_status",
+      "source": ".with_columns(pl.when(pl.col(\"row_days\").le(pl.col(\"sla_days\"))).then(pl.lit(\"within\")).otherwise(pl.lit(\"late\")).alias(\"sla_status\"))",
+      "summary": "sla_status",
       "lazy": true,
       "outcome": {
         "status": "valid",
@@ -3158,6 +3176,8 @@
     },
     {
       "id": "flag",
+      "source": ".with_columns(pl.when(pl.col(\"received_at\").dt.date().eq(pl.lit(as_of, dtype=pl.Date))).then(pl.lit(\"holiday\")).otherwise(pl.when(pl.col(\"row_days\").gt(pl.lit(sla_cutoff, dtype=pl.Int64))).then(pl.lit(\"over\")).otherwise(pl.lit(\"ok\"))).alias(\"flag\"))",
+      "summary": "flag",
       "lazy": true,
       "outcome": {
         "status": "valid",
@@ -4382,6 +4402,8 @@
     },
     {
       "id": "holiday_count",
+      "source": ".with_columns(pl.lit(holidays).len().alias(\"holiday_count\"))",
+      "summary": "holiday_count",
       "lazy": true,
       "outcome": {
         "status": "valid",
@@ -4582,6 +4604,8 @@
     },
     {
       "id": "pivot",
+      "source": ".pivot(\"step_to\", on_columns=step_names.collect(), index=\"dcn\", values=\"row_days\", aggregate_function=pl.element().first())",
+      "summary": "on step_to",
       "lazy": false,
       "outcome": {
         "status": "valid",
@@ -4769,6 +4793,120 @@
         "refusal": null,
         "notKnown": null
       }
+    }
+  ],
+  "python": [
+    {
+      "text": "from datetime import date",
+      "step": null
+    },
+    {
+      "text": "",
+      "step": null
+    },
+    {
+      "text": "import polars as pl",
+      "step": null
+    },
+    {
+      "text": "",
+      "step": null
+    },
+    {
+      "text": "",
+      "step": null
+    },
+    {
+      "text": "def run(",
+      "step": null
+    },
+    {
+      "text": "    claims: pl.LazyFrame,",
+      "step": null
+    },
+    {
+      "text": "    step_sla: pl.LazyFrame,",
+      "step": null
+    },
+    {
+      "text": "    as_of: date,",
+      "step": null
+    },
+    {
+      "text": "    sla_cutoff: int,",
+      "step": null
+    },
+    {
+      "text": "    holidays: pl.Series,",
+      "step": null
+    },
+    {
+      "text": "    step_names: pl.LazyFrame,",
+      "step": null
+    },
+    {
+      "text": ") -> pl.LazyFrame:",
+      "step": null
+    },
+    {
+      "text": "    return (",
+      "step": null
+    },
+    {
+      "text": "        claims",
+      "step": null
+    },
+    {
+      "text": "        .sort(\"dcn\", \"timestamp\")",
+      "step": "sort"
+    },
+    {
+      "text": "        .with_columns(pl.col(\"dcn\").cum_count().over(pl.col(\"dcn\")).alias(\"step_index\"))",
+      "step": "step_index"
+    },
+    {
+      "text": "        .with_columns(pl.col(\"timestamp\").shift(pl.lit(1)).over(pl.col(\"dcn\")).alias(\"resolved_at\"))",
+      "step": "resolved_at"
+    },
+    {
+      "text": "        .with_columns(pl.col(\"timestamp\").alias(\"received_at\"))",
+      "step": "received_at"
+    },
+    {
+      "text": "        .with_columns(pl.col(\"resolved_at\").dt.date().alias(\"resolved_day\"))",
+      "step": "resolved_day"
+    },
+    {
+      "text": "        .with_columns(pl.col(\"received_at\").sub(pl.col(\"resolved_at\")).dt.total_days().alias(\"days_open\"))",
+      "step": "days_open"
+    },
+    {
+      "text": "        .with_columns(pl.when(pl.col(\"owner\").eq(pl.lit(\"Company A\"))).then(pl.col(\"row_days\")).otherwise(pl.lit(0)).cum_sum().over(pl.col(\"dcn\")).alias(\"a_days\"))",
+      "step": "a_days"
+    },
+    {
+      "text": "        .join(step_sla, how=\"left\", left_on=\"step_to\", right_on=\"step\", maintain_order=\"left\")",
+      "step": "join"
+    },
+    {
+      "text": "        .with_columns(pl.when(pl.col(\"row_days\").le(pl.col(\"sla_days\"))).then(pl.lit(\"within\")).otherwise(pl.lit(\"late\")).alias(\"sla_status\"))",
+      "step": "sla_status"
+    },
+    {
+      "text": "        .with_columns(pl.when(pl.col(\"received_at\").dt.date().eq(pl.lit(as_of, dtype=pl.Date))).then(pl.lit(\"holiday\")).otherwise(pl.when(pl.col(\"row_days\").gt(pl.lit(sla_cutoff, dtype=pl.Int64))).then(pl.lit(\"over\")).otherwise(pl.lit(\"ok\"))).alias(\"flag\"))",
+      "step": "flag"
+    },
+    {
+      "text": "        .with_columns(pl.lit(holidays).len().alias(\"holiday_count\"))",
+      "step": "holiday_count"
+    },
+    {
+      "text": "        .pivot(\"step_to\", on_columns=step_names.collect(), index=\"dcn\", values=\"row_days\", aggregate_function=pl.element().first())",
+      "step": "pivot"
+    },
+    {
+      "text": "    )",
+      "step": null
     }
   ]
 }

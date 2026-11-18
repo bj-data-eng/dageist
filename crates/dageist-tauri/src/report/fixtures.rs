@@ -51,6 +51,8 @@ pub(crate) fn variants() -> RunView {
     };
     let refused = |id: &str, cause: CauseView| StepReportView {
         id: id.to_owned(),
+        source: ".sort(\"a\")".to_owned(),
+        summary: "by a".to_owned(),
         lazy: true,
         outcome: OutcomeView::Refused {
             place: PlaceView {
@@ -77,6 +79,8 @@ pub(crate) fn variants() -> RunView {
     ];
     let variants = StepReportView {
         id: "variants".to_owned(),
+        source: ".with_columns(pl.col(\"a\").alias(\"b\"))".to_owned(),
+        summary: "b".to_owned(),
         lazy: false,
         outcome: OutcomeView::Valid {
             columns: vec![
@@ -184,6 +188,17 @@ pub(crate) fn variants() -> RunView {
     rows_stage.lazy = false;
     RunView::Run {
         source: Vec::new(),
+        python: vec![
+            SourceLineView {
+                text: "# Not runnable as written: step \"variants\", something in it is still to be picked."
+                    .to_owned(),
+                step: Some("variants".to_owned()),
+            },
+            SourceLineView {
+                text: "import polars as pl".to_owned(),
+                step: None,
+            },
+        ],
         steps: vec![
             variants,
             refused(

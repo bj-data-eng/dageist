@@ -3,7 +3,9 @@
 
 use std::collections::BTreeSet;
 
-use crate::catalog::{Applies, Dtypes, Family, Kind, Words, WordsError, english, entries};
+use crate::catalog::{
+    Applies, Dtypes, Family, Kind, SummaryPhrase, SummaryWord, Words, WordsError, english, entries,
+};
 
 const ENGLISH: &str = include_str!("../en.toml");
 
@@ -307,6 +309,124 @@ fn a_language_file_with_a_fault_is_refused_with_where_it_is() {
         Words::parse("mystery = 1").unwrap_err(),
         WordsError::Unknown {
             path: "mystery".to_owned()
+        }
+    );
+}
+
+/// One phrase for each word, with something in every place.
+fn one_phrase_of_each() -> Vec<SummaryPhrase<'static>> {
+    vec![
+        SummaryPhrase::NoFields,
+        SummaryPhrase::Fields { count: 4 },
+        SummaryPhrase::SortedBy { fields: "a" },
+        SummaryPhrase::JoinedOn {
+            table: "t",
+            fields: "a",
+        },
+        SummaryPhrase::PivotedOn { field: "a" },
+        SummaryPhrase::Renamed { from: "a", to: "b" },
+        SummaryPhrase::Compared {
+            field: "a",
+            sign: "==",
+            value: "1",
+        },
+        SummaryPhrase::Field,
+        SummaryPhrase::Name,
+        SummaryPhrase::Value,
+        SummaryPhrase::Condition,
+        SummaryPhrase::AllOf { count: 3 },
+        SummaryPhrase::Worked,
+        SummaryPhrase::Equal,
+        SummaryPhrase::NotEqual,
+        SummaryPhrase::Greater,
+        SummaryPhrase::AtLeast,
+        SummaryPhrase::Less,
+        SummaryPhrase::AtMost,
+        SummaryPhrase::Separator,
+    ]
+}
+
+#[test]
+fn every_summary_word_has_a_phrase_that_fills_exactly_its_places() {
+    let words = english();
+    let phrases = one_phrase_of_each();
+    let said: BTreeSet<&str> = phrases.iter().map(|phrase| phrase.word().key()).collect();
+    let listed: BTreeSet<&str> = SummaryWord::ALL.iter().map(|word| word.key()).collect();
+    assert_eq!(said, listed, "a phrase for each word");
+    for phrase in phrases {
+        let word = phrase.word();
+        let mut filled: Vec<&str> = phrase.fill().iter().map(|(place, _)| *place).collect();
+        filled.sort_unstable();
+        let mut expected = word.places().to_vec();
+        expected.sort_unstable();
+        assert_eq!(filled, expected, "the places {} is filled at", word.key());
+        let text = words.say(phrase);
+        assert!(!text.is_empty(), "{} has no words", word.key());
+        assert!(
+            !text.contains('{'),
+            "{} has a place left: {text}",
+            word.key()
+        );
+    }
+    assert_eq!(
+        words.say(SummaryPhrase::JoinedOn {
+            table: "step_sla",
+            fields: "a, b"
+        }),
+        "step_sla on a, b"
+    );
+    assert_eq!(
+        words.say(SummaryPhrase::Renamed { from: "a", to: "b" }),
+        "a → b"
+    );
+    assert_eq!(words.say(SummaryPhrase::Separator), ", ");
+}
+
+#[test]
+fn each_place_is_filled_once_whatever_it_is_filled_with() {
+    let words = english();
+    assert_eq!(
+        words.say(SummaryPhrase::Compared {
+            field: "{value}",
+            sign: "{field}",
+            value: "{sign}",
+        }),
+        "{value} {field} {sign}"
+    );
+}
+
+#[test]
+fn a_language_file_with_a_summary_word_missing_or_in_the_wrong_place_is_refused() {
+    // A file with no summary table gives no words, as one with no entries gives no entry.
+    let without = ENGLISH
+        .split("\n[summary]")
+        .next()
+        .expect("the file has a summary");
+    let words = Words::parse(without).expect("a language file");
+    assert_eq!(words.say(SummaryPhrase::NoFields), "");
+
+    let wrong_place = ENGLISH.replacen("{count} fields", "{number} fields", 1);
+    assert_eq!(
+        Words::parse(&wrong_place).unwrap_err(),
+        WordsError::Places {
+            path: "summary.fields".to_owned(),
+            expected: &["count"]
+        }
+    );
+
+    let unknown = ENGLISH.replacen("[summary]", "[summary]\nshout = \"x\"", 1);
+    assert_eq!(
+        Words::parse(&unknown).unwrap_err(),
+        WordsError::Unknown {
+            path: "summary.shout".to_owned()
+        }
+    );
+
+    let absent = ENGLISH.replacen("no_fields = \"no fields\"\n", "", 1);
+    assert_eq!(
+        Words::parse(&absent).unwrap_err(),
+        WordsError::Missing {
+            path: "summary.no_fields".to_owned()
         }
     );
 }

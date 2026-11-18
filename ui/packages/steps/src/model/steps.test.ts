@@ -8,7 +8,9 @@ import { indexCatalogue } from './catalogue';
 import { translate } from './document';
 import { startingArgument, swappedArgument } from './expr';
 import { tablesOf } from './inputs';
-import { defaultStep } from './steps';
+import { expressionSetting } from './settings';
+import { defaultStep, stepItems } from './steps';
+import type { Step } from './steps';
 
 const catalogue = indexCatalogue(decodeCatalogue(catalogueFixture));
 const node = decodeNode(nodeFixture);
@@ -107,5 +109,31 @@ describe('the argument of a method that is added', () => {
     ).toEqual({ kind: 'literal', value: 1 });
     // A method that takes no argument has none to keep.
     expect(swappedArgument(catalogue, kept, 'is_null', null)).toBeNull();
+  });
+});
+
+describe('the keys of a sort that each have a setting of their own', () => {
+  it('are told apart by the name of the field, or by their place where a key is not a field', () => {
+    const sort: Step = {
+      id: 'sort',
+      verb: 'sort',
+      options: {
+        by: {
+          kind: 'list',
+          items: [
+            expressionSetting({ kind: 'column', column: 'dcn' }),
+            { kind: 'unset' },
+            {
+              kind: 'expression',
+              value: { kind: 'literal', value: 3 },
+            },
+          ],
+        },
+      },
+    };
+
+    // The key still to be picked is not one yet; the one after it is the third in the list.
+    expect(stepItems(sort, 'by')).toEqual(['dcn', 'key 3']);
+    expect(stepItems(sort, 'other')).toEqual([]);
   });
 });

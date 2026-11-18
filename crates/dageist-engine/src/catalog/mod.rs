@@ -25,7 +25,7 @@ pub use arguments::{Argument, Arguments, BuildError};
 pub use condition::Conditional;
 pub use defaults::{DefaultValue, ParameterDefault};
 pub use left_out::{LeftOut, Reason, left_out};
-pub use words::{Words, WordsError, english};
+pub use words::{SummaryPhrase, SummaryWord, Words, WordsError, english};
 
 use polars::prelude::{Expr, LazyFrame};
 
@@ -288,6 +288,16 @@ pub enum Writes {
     Columns,
 }
 
+/// What a starred parameter of Python's signature takes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Variadic {
+    /// `*name`: any number of arguments by position.
+    Args,
+    /// `**name`: any number of arguments by name, which the entry holds as
+    /// pairs of a name and a value.
+    Kwargs,
+}
+
 /// One parameter of an entry, named as Python names it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Parameter {
@@ -297,6 +307,8 @@ pub struct Parameter {
     default: ParameterDefault,
     role: Role,
     writes: Writes,
+    keyword_only: bool,
+    variadic: Option<Variadic>,
 }
 
 impl Parameter {
@@ -308,7 +320,23 @@ impl Parameter {
             default,
             role: Role::Plain,
             writes: Writes::Nothing,
+            keyword_only: false,
+            variadic: None,
         }
+    }
+
+    /// The same parameter, which Python writes with the stars that make it
+    /// take any number of arguments.
+    const fn with_variadic(mut self, variadic: Variadic) -> Self {
+        self.variadic = Some(variadic);
+        self
+    }
+
+    /// The same parameter, which Python takes only by its name: it follows a
+    /// bare `*` or a starred parameter in Python's signature.
+    const fn keyword_only(mut self) -> Self {
+        self.keyword_only = true;
+        self
     }
 
     /// The same parameter, whose expressions write columns.
@@ -358,6 +386,23 @@ impl Parameter {
     #[must_use]
     pub const fn writes(&self) -> Writes {
         self.writes
+    }
+
+    /// The stars of the parameter in Python's signature, if it has any: `*name`
+    /// takes the rest of the arguments by position and `**name` the rest by
+    /// name.
+    #[must_use]
+    pub const fn variadic(&self) -> Option<Variadic> {
+        self.variadic
+    }
+
+    /// Whether Python takes the parameter only by its name, because it follows
+    /// a bare `*` or a starred parameter in Python's signature. A starred or
+    /// double-starred parameter is not one: it takes what Python gives it
+    /// without a name.
+    #[must_use]
+    pub const fn is_keyword_only(&self) -> bool {
+        self.keyword_only
     }
 }
 

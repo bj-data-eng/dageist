@@ -25,6 +25,7 @@ import type {
   RuleName,
   RunView,
   SegmentView,
+  SourceLineView,
   StageView,
   StandingView,
   StepReportView,
@@ -378,9 +379,11 @@ const readOutcome: Decode<OutcomeView> = readTagged<OutcomeView>('status', {
 });
 
 const readStepReport: Decode<StepReportView> = readRecord(
-  ['id', 'lazy', 'outcome', 'count', 'expressions', 'walk'],
+  ['id', 'source', 'summary', 'lazy', 'outcome', 'count', 'expressions', 'walk'],
   (fields, path) => ({
     id: readField(fields, path, 'id', readString),
+    source: readField(fields, path, 'source', readString),
+    summary: readField(fields, path, 'summary', readString),
     lazy: readField(fields, path, 'lazy', readBoolean),
     outcome: readField(fields, path, 'outcome', readOutcome),
     count: readField(fields, path, 'count', readCountView),
@@ -409,13 +412,19 @@ const readReadProblem: Decode<ReadProblemView> = readTagged<ReadProblemView>('ki
   },
 });
 
+const readSourceLine: Decode<SourceLineView> = readRecord(['text', 'step'], (fields, path) => ({
+  text: readField(fields, path, 'text', readString),
+  step: readField(fields, path, 'step', readNullable(readString)),
+}));
+
 const readRun: Decode<RunView> = readTagged<RunView>('status', {
   run: {
-    fields: ['source', 'steps'],
+    fields: ['source', 'steps', 'python'],
     read: (fields, path) => ({
       status: 'run',
       source: readField(fields, path, 'source', readList(readFieldView)),
       steps: readField(fields, path, 'steps', readList(readStepReport)),
+      python: readField(fields, path, 'python', readList(readSourceLine)),
     }),
   },
   unreadable: {

@@ -17,7 +17,6 @@ import { dragSettingsFor } from './Chain';
 import { useCatalogue } from './EngineProvider';
 import type { PreparedStep } from './model/report';
 import type { Step } from './model/steps';
-import { stepDetail } from './summary';
 import { VERB_COLOURS, verbHead } from './verbs';
 
 /** The sortable group the names of the steps belong to. */
@@ -39,6 +38,8 @@ interface StepNameProps {
   readonly index: number;
   /** Why the step cannot be worked out, or `null` when it can. */
   readonly problem: string | null;
+  /** What the step works on, as the engine said it, or `null` before it has. */
+  readonly summary: string | null;
   readonly selected: boolean;
   readonly onSelect: () => void;
   readonly onOpen: (() => void) | null;
@@ -49,6 +50,7 @@ function StepName({
   step,
   index,
   problem,
+  summary,
   selected,
   onSelect,
   onOpen,
@@ -90,7 +92,7 @@ function StepName({
             problem === null ? 'text-ink' : 'text-wrong',
           )}
         >
-          {stepDetail(step)}
+          {summary}
         </span>
       </button>
     </li>
@@ -142,6 +144,7 @@ export function StepNavigator({
             step={step}
             index={index}
             problem={results[index]?.problem ?? null}
+            summary={results[index]?.summary ?? null}
             selected={step.id === selectedId}
             onSelect={() => {
               onSelect(step.id);

@@ -19,7 +19,7 @@ use polars::prelude::{
 
 use super::{
     Argument, Arguments, Build, BuildError, Conditional, Dtypes, Entry, EntryId, Family, Kind,
-    Laziness, Parameter, ParameterDefault, Role, Shape, ValueType, Writes,
+    Laziness, Parameter, ParameterDefault, Role, Shape, ValueType, Variadic, Writes,
 };
 
 const ANY: &[Dtypes] = &[Dtypes::Any];
@@ -70,12 +70,12 @@ const fn optional(name: &'static str, kind: Kind, shape: Shape, python: &'static
 
 /// `*name`: any number of arguments of `kind`.
 const fn starred(name: &'static str, kind: Kind) -> Parameter {
-    optional(name, kind, Shape::Many, "()")
+    optional(name, kind, Shape::Many, "()").with_variadic(Variadic::Args)
 }
 
 /// `**name`: entries of a new column's name and its expression.
 const fn double_starred(name: &'static str) -> Parameter {
-    optional(name, NAMED_EXPRESSIONS, Shape::One, "{}")
+    optional(name, NAMED_EXPRESSIONS, Shape::One, "{}").with_variadic(Variadic::Kwargs)
 }
 
 /// A flag with Python's default text, which may be `None` where Polars decides.
@@ -712,7 +712,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         id: EntryId("Expr.cum_count"),
         family: Family::Cumulative,
         accepts: ANY,
-        parameters: &[flag("reverse", "False")],
+        parameters: &[flag("reverse", "False").keyword_only()],
         laziness: Laziness::Lazy,
         build: Build::Expression(cum_count),
     },
@@ -720,7 +720,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         id: EntryId("Expr.cum_max"),
         family: Family::Cumulative,
         accepts: CUM_MAX,
-        parameters: &[flag("reverse", "False")],
+        parameters: &[flag("reverse", "False").keyword_only()],
         laziness: Laziness::Lazy,
         build: Build::Expression(cum_max),
     },
@@ -728,7 +728,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         id: EntryId("Expr.cum_sum"),
         family: Family::Cumulative,
         accepts: CUM_SUM,
-        parameters: &[flag("reverse", "False")],
+        parameters: &[flag("reverse", "False").keyword_only()],
         laziness: Laziness::Lazy,
         build: Build::Expression(cum_sum),
     },
@@ -769,7 +769,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         id: EntryId("Expr.dt.total_days"),
         family: Family::Temporal,
         accepts: DURATION,
-        parameters: &[flag("fractional", "False")],
+        parameters: &[flag("fractional", "False").keyword_only()],
         laziness: Laziness::Lazy,
         build: Build::Expression(dt_total_days),
     },
@@ -785,7 +785,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         id: EntryId("Expr.first"),
         family: Family::Rows,
         accepts: ANY,
-        parameters: &[flag("ignore_nulls", "False")],
+        parameters: &[flag("ignore_nulls", "False").keyword_only()],
         laziness: Laziness::Lazy,
         build: Build::Expression(first),
     },
@@ -825,7 +825,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         id: EntryId("Expr.last"),
         family: Family::Rows,
         accepts: ANY,
-        parameters: &[flag("ignore_nulls", "False")],
+        parameters: &[flag("ignore_nulls", "False").keyword_only()],
         laziness: Laziness::Lazy,
         build: Build::Expression(last),
     },
@@ -884,15 +884,16 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[
             optional("partition_by", EXPRESSION, Shape::Many, "None"),
             starred("more_exprs", EXPRESSION),
-            optional("order_by", EXPRESSION, Shape::Many, "None"),
-            flag("descending", "False"),
-            flag("nulls_last", "False"),
+            optional("order_by", EXPRESSION, Shape::Many, "None").keyword_only(),
+            flag("descending", "False").keyword_only(),
+            flag("nulls_last", "False").keyword_only(),
             optional(
                 "mapping_strategy",
                 Kind::Choice(MAPPING_STRATEGY),
                 Shape::One,
                 "'group_to_rows'",
-            ),
+            )
+            .keyword_only(),
         ],
         laziness: Laziness::Lazy,
         build: Build::Expression(over),
@@ -903,7 +904,9 @@ pub(super) const ENTRIES: &[Entry] = &[
         accepts: ANY,
         parameters: &[
             optional("n", Kind::Expression(INTEGER), Shape::One, "1").with_role(Role::Count),
-            optional("fill_value", EXPRESSION, Shape::One, "None").with_role(Role::Filler),
+            optional("fill_value", EXPRESSION, Shape::One, "None")
+                .keyword_only()
+                .with_role(Role::Filler),
         ],
         laziness: Laziness::Lazy,
         build: Build::Expression(shift),
@@ -940,26 +943,28 @@ pub(super) const ENTRIES: &[Entry] = &[
             required("other", Kind::Table, Shape::One),
             optional("on", EXPRESSION, Shape::Many, "None"),
             optional("how", Kind::Choice(HOW), Shape::One, "'inner'"),
-            optional("left_on", EXPRESSION, Shape::Many, "None"),
-            optional("right_on", EXPRESSION, Shape::Many, "None"),
+            optional("left_on", EXPRESSION, Shape::Many, "None").keyword_only(),
+            optional("right_on", EXPRESSION, Shape::Many, "None").keyword_only(),
             optional(
                 "suffix",
                 Kind::Value(ValueType::String),
                 Shape::One,
                 "'_right'",
-            ),
-            optional("validate", Kind::Choice(VALIDATE), Shape::One, "'m:m'"),
-            flag("nulls_equal", "False"),
-            flag("coalesce", "None"),
+            )
+            .keyword_only(),
+            optional("validate", Kind::Choice(VALIDATE), Shape::One, "'m:m'").keyword_only(),
+            flag("nulls_equal", "False").keyword_only(),
+            flag("coalesce", "None").keyword_only(),
             optional(
                 "maintain_order",
                 Kind::Choice(MAINTAIN_ORDER),
                 Shape::One,
                 "None",
-            ),
-            optional("build_side", Kind::Choice(BUILD_SIDE), Shape::One, "'auto'"),
-            flag("allow_parallel", "True"),
-            flag("force_parallel", "False"),
+            )
+            .keyword_only(),
+            optional("build_side", Kind::Choice(BUILD_SIDE), Shape::One, "'auto'").keyword_only(),
+            flag("allow_parallel", "True").keyword_only(),
+            flag("force_parallel", "False").keyword_only(),
         ],
         laziness: Laziness::Lazy,
         build: Build::Frame(join),
@@ -972,22 +977,24 @@ pub(super) const ENTRIES: &[Entry] = &[
             required("on", Kind::Column, Shape::One),
             // A table of the values to make columns for, not a Python series or data frame.
             required("on_columns", Kind::Table, Shape::One),
-            optional("index", Kind::Column, Shape::One, "None"),
-            optional("values", Kind::Column, Shape::One, "None"),
-            optional("aggregate_function", EXPRESSION, Shape::One, "None"),
-            flag("maintain_order", "False"),
+            optional("index", Kind::Column, Shape::One, "None").keyword_only(),
+            optional("values", Kind::Column, Shape::One, "None").keyword_only(),
+            optional("aggregate_function", EXPRESSION, Shape::One, "None").keyword_only(),
+            flag("maintain_order", "False").keyword_only(),
             optional(
                 "separator",
                 Kind::Value(ValueType::String),
                 Shape::One,
                 "'_'",
-            ),
+            )
+            .keyword_only(),
             optional(
                 "column_naming",
                 Kind::Choice(COLUMN_NAMING),
                 Shape::One,
                 "'auto'",
-            ),
+            )
+            .keyword_only(),
         ],
         // Building the step collects the table given for `on_columns`, which runs its query.
         laziness: Laziness::NeedsCollect,
@@ -1004,7 +1011,7 @@ pub(super) const ENTRIES: &[Entry] = &[
                 Kind::Pairs(&Kind::Column, &Kind::Value(ValueType::String)),
                 Shape::One,
             ),
-            flag("strict", "True"),
+            flag("strict", "True").keyword_only(),
         ],
         laziness: Laziness::Lazy,
         build: Build::Frame(rename),
@@ -1027,10 +1034,10 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[
             required("by", EXPRESSION, Shape::Many),
             starred("more_by", EXPRESSION),
-            optional("descending", Kind::Flag, Shape::PerItem("by"), "False"),
-            optional("nulls_last", Kind::Flag, Shape::PerItem("by"), "False"),
-            flag("maintain_order", "False"),
-            flag("multithreaded", "True"),
+            optional("descending", Kind::Flag, Shape::PerItem("by"), "False").keyword_only(),
+            optional("nulls_last", Kind::Flag, Shape::PerItem("by"), "False").keyword_only(),
+            flag("maintain_order", "False").keyword_only(),
+            flag("multithreaded", "True").keyword_only(),
         ],
         laziness: Laziness::Lazy,
         build: Build::Frame(sort),
@@ -1096,7 +1103,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[
             required("value", Kind::Value(ValueType::Any), Shape::One),
             optional("dtype", Kind::Dtype, Shape::One, "None"),
-            flag("allow_object", "False"),
+            flag("allow_object", "False").keyword_only(),
         ],
         laziness: Laziness::Lazy,
         build: Build::Function(polars_lit),
