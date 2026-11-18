@@ -704,6 +704,55 @@ mod tests {
     }
 
     #[test]
+    fn a_parameter_carries_what_it_holds_by_default_and_what_it_is_first_set_to() {
+        let view = view();
+        let setting = |id: &str, name: &str, which: &str| parameter(&view, id, name)[which].clone();
+        // Worked out from Python Polars' signatures: `join(how="inner", suffix="_right",
+        // coalesce=None)` and `sort(descending=False)`, `shift(n=1)`.
+        assert_eq!(
+            setting("LazyFrame.join", "how", "defaultSetting"),
+            json!({ "kind": "word", "value": "inner" })
+        );
+        assert_eq!(
+            setting("LazyFrame.join", "suffix", "defaultSetting"),
+            json!({ "kind": "text", "value": "_right" })
+        );
+        assert_eq!(
+            setting("LazyFrame.sort", "descending", "defaultSetting"),
+            json!({ "kind": "flag", "value": false })
+        );
+        assert_eq!(
+            setting("Expr.shift", "n", "defaultSetting"),
+            json!({ "kind": "integer", "value": 1 })
+        );
+        // Where Polars decides, or the parameter must be given, there is none.
+        assert!(setting("LazyFrame.join", "coalesce", "defaultSetting").is_null());
+        assert!(setting("LazyFrame.join", "other", "defaultSetting").is_null());
+        // A first setting differs from the default: the first other word, the opposite flag,
+        // a list with one item to give, pairs with none, and otherwise nothing yet.
+        assert_eq!(
+            setting("LazyFrame.join", "how", "start"),
+            json!({ "kind": "word", "value": "left" })
+        );
+        assert_eq!(
+            setting("LazyFrame.sort", "descending", "start"),
+            json!({ "kind": "flag", "value": true })
+        );
+        assert_eq!(
+            setting("LazyFrame.join", "left_on", "start"),
+            json!({ "kind": "list", "items": [{ "kind": "unset" }] })
+        );
+        assert_eq!(
+            setting("LazyFrame.rename", "mapping", "start"),
+            json!({ "kind": "pairs", "entries": [] })
+        );
+        assert_eq!(
+            setting("Expr.shift", "n", "start"),
+            json!({ "kind": "unset" })
+        );
+    }
+
+    #[test]
     fn families_come_in_the_order_they_are_offered() {
         let view = view();
         let keys: Vec<&str> = view["families"]

@@ -809,6 +809,31 @@ fn a_run_reports_each_steps_source_and_summary_and_the_module_written_from_the_d
 }
 
 #[test]
+fn a_run_reports_the_arguments_of_each_step_that_are_at_their_default() {
+    let run = json(&run_view(steps_text()).expect("a report"));
+    let steps = run["steps"].as_array().expect("steps");
+    // The sample gives `shift` its default of 1 as its first argument, which is the only
+    // argument of its steps that equals what Polars holds when it is not given.
+    for step in steps {
+        let expected = if step["id"] == "resolved_at" {
+            json!([{
+                "stepIndex": 2,
+                "stepId": "resolved_at",
+                "path": [
+                    { "kind": "parameter", "name": "named_exprs" },
+                    { "kind": "value", "index": 0 },
+                    { "kind": "link", "index": 0 },
+                    { "kind": "parameter", "name": "n" }
+                ]
+            }])
+        } else {
+            json!([])
+        };
+        assert_eq!(step["atDefault"], expected, "{}", step["id"]);
+    }
+}
+
+#[test]
 fn a_run_marks_the_module_it_writes_for_a_step_that_is_not_finished() {
     let run = json(&run_view(&incomplete_text()).expect("a report"));
     let lines = module_lines(&run);

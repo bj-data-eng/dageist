@@ -667,6 +667,32 @@ fn the_options_of_a_cross_join_refuse_every_validation_with_polars_reason() {
 }
 
 #[test]
+fn an_option_says_which_word_it_starts_with_when_it_is_added() {
+    let answer = invoke(
+        "option_offers",
+        json!({
+            "entry": "LazyFrame.join",
+            "chosen": [{ "parameter": "how", "word": "cross" }]
+        }),
+    )
+    .expect("options");
+    let starter = |name: &str| {
+        answer["options"]
+            .as_array()
+            .expect("options")
+            .iter()
+            .find(|option| option["parameter"] == name)
+            .unwrap_or_else(|| panic!("no option {name}"))["starter"]
+            .clone()
+    };
+    // Polars refuses every validation but its default beside a cross join, so there is none.
+    assert!(starter("validate").is_null());
+    // `how` is judged against the other options and not its own word: its default is `inner`,
+    // and `left` is the next word Polars lists.
+    assert_eq!(starter("how"), "left");
+}
+
+#[test]
 fn an_entry_that_has_no_options_has_none_and_an_unknown_one_is_refused() {
     let none = invoke(
         "option_offers",
