@@ -126,7 +126,9 @@ each row and a report of the block without writing either. It is defined in
 The figures are written in [figures.rs](../crates/dageist-tauri/src/figures.rs):
 a count with commas, a size in bytes, kilobytes or megabytes (1,024 to the
 unit, one decimal), and a time in microseconds, milliseconds or seconds (one
-decimal). The view refuses a frame whose header is not that object, whose
+decimal). They are English: commas between groups of three digits, `row` and
+`rows`, `KB` and `MB` for multiples of 1,024 bytes, and `µs`. Another language
+or number convention is not written yet. The view refuses a frame whose header is not that object, whose
 Arrow stream cannot be read, whose columns are not the ones asked for or are
 not text, or whose rows are not as many as the header has numbers.
 

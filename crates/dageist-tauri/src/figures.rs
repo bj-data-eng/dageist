@@ -2,6 +2,11 @@
 //!
 //! The view formats no number: a count, a size or a time is text from here,
 //! written the same way wherever it is shown.
+//!
+//! The figures are English: groups of three digits are separated by commas, a
+//! unit is a word or symbol in English (`row`, `rows`, `B`, `KB`, `MB`, `µs`,
+//! `ms`, `s`), and a kilobyte is 1,024 bytes. Other languages and conventions
+//! are not written here yet.
 
 use std::time::Duration;
 
