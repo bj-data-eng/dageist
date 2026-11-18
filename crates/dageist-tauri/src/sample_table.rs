@@ -541,24 +541,38 @@ mod tests {
         assert_eq!(rows_and_columns(&table).1.len(), SMALL_COLUMNS);
     }
 
-    /// The text of a size as a block's report writes it: whole bytes below a
-    /// kilobyte of 1,024, and kilobytes with one decimal below a megabyte.
-    fn size_text(bytes: usize) -> String {
-        if bytes < 1024 {
-            format!("{bytes} B")
-        } else {
-            format!("{:.1} KB", bytes as f64 / 1024.0)
+    /// Checks that `text` is the size `bytes` as a block's report writes it: the bytes
+    /// themselves below a kilobyte of 1,024 bytes, and the kilobytes to one decimal below a
+    /// megabyte. The decimal may be rounded either way, so it is held to within half a tenth.
+    fn assert_size(text: &str, bytes: usize) {
+        if let Some(whole) = text.strip_suffix(" B") {
+            assert_eq!(whole.parse::<usize>().expect("a whole number"), bytes);
+            return;
         }
+        let kilobytes: f64 = text
+            .strip_suffix(" KB")
+            .unwrap_or_else(|| panic!("{text:?} is not a size in bytes or kilobytes"))
+            .parse()
+            .expect("a number of kilobytes");
+        assert!(bytes >= 1024, "{text:?} for {bytes} bytes");
+        assert!(
+            (bytes as f64 / 1024.0 - kilobytes).abs() <= 0.05 + 1e-9,
+            "{text:?} is not {bytes} bytes to a tenth of a kilobyte"
+        );
     }
 
     /// Checks a block's report: its rows and columns, the size of its Arrow
     /// bytes, and a time that ends in a unit.
     fn assert_report(report: &serde_json::Value, rows: &str, columns: &str, arrow: usize) {
         let report = report.as_str().expect("a report is text");
-        let expected = format!("{rows} × {columns} · {} · built in ", size_text(arrow));
-        let time = report
-            .strip_prefix(&expected)
-            .unwrap_or_else(|| panic!("{report:?} does not start with {expected:?}"));
+        let counts = format!("{rows} × {columns} · ");
+        let rest = report
+            .strip_prefix(&counts)
+            .unwrap_or_else(|| panic!("{report:?} does not start with {counts:?}"));
+        let (size, time) = rest
+            .split_once(" · built in ")
+            .unwrap_or_else(|| panic!("{report:?} does not say how long it was built in"));
+        assert_size(size, arrow);
         assert!(
             ["µs", "ms", " s"].iter().any(|unit| time.ends_with(unit)),
             "{time:?} is not a time"
