@@ -470,6 +470,34 @@ not arrived shows the text as typed, waiting. A number the engine reads with a
 fraction is held with that mark in the value or setting, so that it is written
 as a float and has the dtype that was shown.
 
+The engine also words each literal it reads, as `shown` beside its value, and the
+view puts that text in a block and words no number or text of its own: the
+reading of a typed text, the argument a method is added with and the settings of
+the catalogue and of a new step's start carry it, and a value or setting the
+editor holds keeps it beside the value, which is what the offer rows, the blocks
+and the parameter drawings show. The words are those the engine writes
+elsewhere ([Literal::shown](../crates/dageist-engine/src/allowed/literal.rs)):
+
+- A whole number is its digits.
+- A number with a fraction is written as Python's `repr` writes it, which is also
+  how the Python source writes it, so a whole one keeps its fraction (`1.0`, not
+  `1`), the shortest digits that read back are used, and an exponent, with a sign
+  and two digits at least, is written only below 1e-4 and from 1e16 on (`1e+20`,
+  `1e-05`).
+- Text is written as it is, with no quotation marks and nothing escaped. The
+  editor draws a block that holds text between quotation marks of its own, so
+  adding them to the words would show them twice, and escaping is for a Python
+  string. The Python source and a summary have no such drawing, and write text as
+  a Python string.
+
+The comparisons a test makes are the catalogue's entries `Expr.eq`, `Expr.ne`,
+`Expr.gt`, `Expr.ge`, `Expr.lt` and `Expr.le`, which the engine lists in the order
+they are offered in the catalogue's `comparisons`, each with the sign the
+language file gives it, the same sign a summary is written with. A test in the
+editor holds the entry that compares. Its sign and what it means, which is the
+entry's hint, are the engine's. Membership in a list, `is_in`, has no entry yet,
+so the editor shows it as its own name.
+
 A list that closes when a row is picked keeps its rows in the order the list is
 given them, and a row that arrives later, as an answer of the engine does, takes
 its place among the rest, so a list can be reordered while it waits. A list that
@@ -1037,7 +1065,9 @@ engine. The decisions below are the ones the core is expected to carry.
   two signs side by side are never drawn as one: `==` is two equals signs.
   In a step and in the list of steps, a comparison that has a sign of its
   own is written as it: `≠`, `≥` and `≤`, each one character wide. The
-  Polars text of a step keeps `!=`, `>=` and `<=`.
+  Polars text of a step keeps `!=`, `>=` and `<=`. The signs are the
+  engine's, from the language file, so the editor and the list of steps write
+  them the same.
 - **Conditions.** A comparison is a field, a comparison and a value. A
   condition is always a list of lines under `all of` or `any of`, even when
   it has one line, and a group is a list set in again. Nothing depends on
@@ -1050,7 +1080,8 @@ engine. The decisions below are the ones the core is expected to carry.
   what it lacks.
 - **Values.** A value is typed into the search box of its list, where it is
   offered as a number or as text, or picked from the connected inputs and the
-  fields. Text is shown between quotation marks that are drawn, not typed.
+  fields. Text is shown between quotation marks that are drawn, not typed, and
+  a number as the engine writes it.
   The list never offers the values a field holds, since a column can hold
   millions of them.
 - **Inputs, not variables.** A node declares no variables. What its steps can
