@@ -1272,6 +1272,55 @@ mod tests {
     }
 
     #[test]
+    fn a_bitwise_call_on_an_array_in_a_condition_of_equal_branches_is_refused_alone_where_polars_cannot_cast_it()
+     {
+        // `sort(by=when(g <= lit(null, Int8) & b).then(x).otherwise(x))` with an array `b`: Polars
+        // folds a condition whose branches are the same expression into that expression, so it
+        // never evaluates the predicate. The tables refuse the call as Polars on one thread does,
+        // by failing to unpack the array as a whole number; the streaming engine on many threads
+        // fails to cast the array to that number.
+        let found =
+            settled("stricter-a-bitwise-call-on-an-array-in-a-condition-of-equal-branches.case");
+        assert!(
+            found.reason.starts_with("cannot cast Array type")
+                || found.reason.starts_with("cannot unpack series of type"),
+            "{}",
+            found.reason
+        );
+        assert!(found.probe.contains("Expr.and_"), "{}", found.probe);
+    }
+
+    #[test]
+    fn a_failure_to_unpack_an_array_is_matched_by_a_failure_to_cast_the_array_and_by_nothing_else()
+    {
+        let tables = "cannot unpack series of type `array[i64, 2]` into `i8`";
+        let cast = "cannot cast Array type (inner: 'Int64', to: 'Int8')";
+        assert!(same_reason(&Source::Polars, tables, cast));
+        // The cast of a list is another dtype's, and neither is a cast the tables' reason does not
+        // name, nor the unpacking of text.
+        assert!(!same_reason(
+            &Source::Polars,
+            tables,
+            "cannot cast List type (inner: 'Int64', to: 'Int8')"
+        ));
+        assert!(!same_reason(
+            &Source::Polars,
+            "cannot unpack series of type `list[i64]` into `i8`",
+            cast
+        ));
+        assert!(!same_reason(
+            &Source::Polars,
+            "cannot unpack series of type `str` into `i64`",
+            cast
+        ));
+        assert!(!same_reason(
+            &Source::Polars,
+            tables,
+            "cannot cast String type to Int64"
+        ));
+    }
+
+    #[test]
     fn a_reason_is_matched_by_what_polars_objected_to_and_not_by_the_names_it_quotes() {
         let tables = "could not evaluate '<' comparison between series 'a' of dtype: Boolean and series 'b' of dtype: Date";
         let probe = "could not evaluate '<' comparison between series '_POLARS_TMP_PHYS_2' of dtype: Boolean and series '_POLARS_TMP_PHYS_3' of dtype: Date";
