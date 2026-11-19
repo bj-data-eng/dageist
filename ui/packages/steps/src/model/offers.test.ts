@@ -84,12 +84,12 @@ describe('the methods the engine offers after a timestamp', () => {
     expect(offerNamed('dt.date')).toMatchObject({ reason: null, stoppedBy: null });
   });
 
-  it('hold the maths and rounding in the words of the catalogue, each refused for a timestamp', () => {
-    // The roots, the error functions and the rounding to significant figures are shown in plain
-    // words, which the hint names Polars' spelling of, and the rest keep Polars' names.
-    expect(offerNamed('cbrt')).toBeUndefined();
-    expect(offerNamed('cube_root')?.hint).toBe('cube root, cbrt in Polars');
-    expect(offerNamed('round_significant_figures')).toMatchObject({ family: 'rounding' });
+  it('hold the maths and rounding under Polars’ names, with the plain words in the hints', () => {
+    // The abbreviations keep their names and the hint says them in words.
+    expect(offerNamed('cube_root')).toBeUndefined();
+    expect(offerNamed('cbrt')?.hint).toBe('cube root');
+    expect(offerNamed('erf')?.hint).toBe('error function');
+    expect(offerNamed('round_sig_figs')).toMatchObject({ family: 'rounding' });
     expect(offerNamed('sqrt')).toMatchObject({ family: 'maths', stoppedBy: 'engine' });
     expect(offerNamed('arctan')).toMatchObject({ family: 'trigonometry', stoppedBy: 'engine' });
     // A timestamp is no number to round, and a call whose rows give a dtype other than its
