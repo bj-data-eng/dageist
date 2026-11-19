@@ -2189,6 +2189,58 @@ mod tests {
         );
     }
 
+    #[test]
+    fn a_filter_predicate_of_the_dtype_null_is_excused_where_a_bitwise_call_is_in_the_case() {
+        // Polars gives `null & f` as a filter's predicate the dtype Null, where select shows a
+        // `Boolean`.
+        let reason = "filter predicate must be of type `Boolean`, got `Null`";
+        let filtered = |predicate: Expression| {
+            case_of(call(
+                "LazyFrame.filter",
+                vec![("predicates", many(vec![predicate]))],
+            ))
+        };
+        let case = filtered(chain_of(null(), vec![and_of(chain(column("f"), &[]))]));
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Rows, reason, Vec::new()),
+            vec![Limit::ABitwiseCallOnANull]
+        );
+        let other_side = filtered(chain_of(column("f"), vec![and_of(chain(null(), &[]))]));
+        assert_eq!(
+            polars_refuses(&other_side, None, Stage::Rows, reason, Vec::new()),
+            vec![Limit::ABitwiseCallOnANull]
+        );
+        // A predicate that holds no bitwise call, and another step, are not why.
+        let plain = filtered(chain(null(), &["Expr.is_null"]));
+        assert_eq!(
+            polars_refuses(&plain, None, Stage::Rows, reason, Vec::new()),
+            vec![]
+        );
+        let selected = select(vec![chain_of(
+            null(),
+            vec![and_of(chain(column("f"), &[]))],
+        )]);
+        assert_eq!(
+            polars_refuses(&selected, None, Stage::Rows, reason, Vec::new()),
+            vec![]
+        );
+        // Only the refusal of a predicate of the dtype Null, at the rows, without a place.
+        assert_eq!(
+            polars_refuses(
+                &case,
+                None,
+                Stage::Rows,
+                "filter predicate must be of type `Boolean`, got `Int64`",
+                Vec::new()
+            ),
+            vec![]
+        );
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Schema, reason, Vec::new()),
+            vec![]
+        );
+    }
+
     // ----- A value beyond a decimal
 
     const BEYOND_A_DECIMAL: &str = "conversion from `u128` to `decimal[38,0]` failed in column \
