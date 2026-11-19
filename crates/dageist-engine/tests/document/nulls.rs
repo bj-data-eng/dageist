@@ -820,3 +820,27 @@ fn one_value_over_a_window_is_as_many_values_as_the_rows_and_a_default_of_many_i
     assert!(polars_says(&report).is_none(), "{:?}", outcome(&report));
     assert_eq!(walk(&report).refusal(), None);
 }
+
+#[test]
+fn a_null_literal_of_another_dtype_given_to_a_fill_leaves_what_it_gives_not_known() {
+    // Polars gives the supertype of the two in its plan, and the dtype of what it fills in the
+    // rows where the null is folded away, for a list, so the walk does not say which.
+    let filler = chain(
+        json!({
+            "entry": "polars.lit",
+            "arguments": { "value": { "flag": null }, "dtype": dtype("Float64") },
+        }),
+        Vec::new(),
+    );
+    let fill = call("Expr.fill_null", json!({ "value": filler }));
+    let report = report_of(
+        "LazyFrame.select",
+        select(vec![field_then(
+            "a",
+            vec![fill, call("Expr.is_null", json!({}))],
+        )]),
+    );
+    let outer = walk(&report).expressions().last().expect("the expression");
+    assert_eq!(outer.places()[1], None);
+    assert_eq!(walk(&report).refusal(), None);
+}
