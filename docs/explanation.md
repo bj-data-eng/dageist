@@ -326,10 +326,8 @@ short and a method is swapped for one that takes the same arguments. Maths holds
 cotangent, their inverses, the hyperbolic functions and their inverses, and `degrees` and
 `radians`; and Rounding `ceil`, `floor`, `round`, `round_sig_figs` and `truncate`, of which
 `round` and `truncate` take the same places. `sign` and `clip` join `abs` and `neg` in
-Arithmetic. The editor shows `cbrt`, `erf`, `erfc` and `round_sig_figs` as `cube_root`,
-`error_function`, `complementary_error_function` and `round_significant_figures`, which the
-language file lists as changed and whose hints say the name Polars gives; the other names are
-Polars'.
+Arithmetic. Every name is Polars' own, `cbrt`, `erf`, `erfc` and `round_sig_figs` among
+them; the hints, such as "cube root" and "error function", are where the plain words go.
 
 What Polars does with each is what the tables say, and some of it is not what a name suggests:
 
