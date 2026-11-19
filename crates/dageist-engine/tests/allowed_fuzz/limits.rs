@@ -215,7 +215,7 @@ pub enum Limit {
     /// refuse a clip. A bound that is a bare column holds the sample's rows, as the tables
     /// measured it, so a refusal that is its own is not this, whatever the other bound is.
     ABoundWithValuesOfItsOwn,
-    /// A window whose partition is a literal alone gives Polars' streaming engine no rows, so
+    /// A window whose partition holds no column gives Polars' streaming engine no rows, so
     /// what follows it in a chain that starts from a literal is never evaluated, and the rows
     /// do not show a plan that they contradict. The tables hold the schema of a method and what
     /// its rows give as one thing, and refuse a root of a date whose schema names the date and
@@ -1171,8 +1171,9 @@ fn has_a_bound(call: &Call) -> bool {
             .any(|bound| call.argument(bound).is_some())
 }
 
-/// Whether the call is a window whose partition is literals alone: it has `partition_by`, and
-/// each key, and each of `more_exprs`, is a literal and nothing else.
+/// Whether the call is a window whose partition holds no column: it has `partition_by`, and each
+/// key, and each of `more_exprs`, starts from a literal and reads no column, as a running sum of
+/// a literal does not.
 fn partitions_by_a_literal(call: &Call) -> bool {
     let keys = |parameter: &str| -> Vec<&Expression> {
         match call.argument(parameter) {
@@ -1187,7 +1188,9 @@ fn partitions_by_a_literal(call: &Call) -> bool {
             _ => Vec::new(),
         }
     };
-    let literal = |key: &&Expression| key.links().is_empty() && starts_from_a_literal(key);
+    let literal = |key: &&Expression| {
+        starts_from_a_literal(key) && !any_call(key, &|call| is(call, "polars.col"))
+    };
     is(call, "Expr.over")
         && call.argument("partition_by").is_some()
         && keys("partition_by").iter().all(literal)
@@ -2786,9 +2789,28 @@ mod tests {
 
     const SCHEMA_SAYS_FLOAT: &str = "the schema says Datetime(us, UTC) and the rows give Float64";
     const LITERAL_START: &str = r#"{"entry":"polars.lit","arguments":{"value":{"flag":null},"dtype":{"dtype":"Datetime(time_unit='us', time_zone='UTC')"}}}"#;
-    const LITERAL_KEY: &str = r#"{"entry":"polars.lit","arguments":{"value":{"flag":null}}}"#;
+    const LITERAL_NULL: &str = r#"{"entry":"polars.lit","arguments":{"value":{"flag":null}}}"#;
+    const LITERAL_KEY: &str =
+        r#"{"start":{"entry":"polars.lit","arguments":{"value":{"flag":null}}},"then":[]}"#;
     const COLUMN_K: &str = r#"{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}}"#;
-    const WINDOW: &str = r#"{"entry":"Expr.over","arguments":{"partition_by":{"many":[{"expression":{"start":KEY,"then":[]}}]}}},"#;
+    const COLUMN_KEY: &str =
+        r#"{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[]}"#;
+    const WINDOW: &str =
+        r#"{"entry":"Expr.over","arguments":{"partition_by":{"many":[{"expression":KEY}]}}},"#;
+
+    /// A key that is a running sum of a literal, which reads no column.
+    fn running_sum_of_a_literal() -> String {
+        format!(
+            r#"{{"start":{LITERAL_NULL},"then":[{{"entry":"Expr.cum_sum","arguments":{{}}}}]}}"#
+        )
+    }
+
+    /// A key that is a literal with a column added to it, which reads one.
+    fn literal_plus_a_column() -> String {
+        format!(
+            r#"{{"start":{LITERAL_NULL},"then":[{{"entry":"Expr.add","arguments":{{"other":{{"expression":{{"start":{COLUMN_K},"then":[]}}}}}}}}]}}"#
+        )
+    }
 
     /// `select(start.over(key).cbrt())` on a sample where `a` and `b` are dates, as text.
     fn root_after_a_window(start: &str, key: &str, windowed: bool) -> Case {
@@ -2829,6 +2851,21 @@ mod tests {
     }
 
     #[test]
+    fn a_window_whose_key_reads_no_column_gives_no_rows_but_one_that_reads_a_column_does() {
+        let sum = running_sum_of_a_literal();
+        let case = root_after_a_window(LITERAL_START, &sum, true);
+        assert_eq!(
+            excused_for_a_root(&case, 1, SCHEMA_SAYS_FLOAT),
+            vec![Limit::AWindowOverALiteral]
+        );
+        let reads_a_column = literal_plus_a_column();
+        let case = root_after_a_window(LITERAL_START, &reads_a_column, true);
+        assert!(
+            !excused_for_a_root(&case, 1, SCHEMA_SAYS_FLOAT).contains(&Limit::AWindowOverALiteral)
+        );
+    }
+
+    #[test]
     fn a_root_is_not_excused_by_a_window_that_is_not_over_a_literal_in_a_chain_of_a_literal() {
         // The same root after a column start, after a window over a column, with no window, at
         // the window itself, or refused for another reason, is not excused by this limit: rows
@@ -2840,7 +2877,7 @@ mod tests {
                 SCHEMA_SAYS_FLOAT,
             ),
             (
-                root_after_a_window(LITERAL_START, COLUMN_K, true),
+                root_after_a_window(LITERAL_START, COLUMN_KEY, true),
                 1,
                 SCHEMA_SAYS_FLOAT,
             ),
