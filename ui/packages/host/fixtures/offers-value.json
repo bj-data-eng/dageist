@@ -79,11 +79,13 @@
     {
       "entry": "Expr.and_",
       "verdict": {
-        "kind": "allowed",
-        "result": "Datetime(us)",
-        "shape": "many",
-        "ending": {
-          "kind": "allowed"
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "& not allowed on datetime[μs] and i8"
         }
       },
       "argument": null
@@ -417,11 +419,13 @@
     {
       "entry": "Expr.or_",
       "verdict": {
-        "kind": "allowed",
-        "result": "Datetime(us)",
-        "shape": "many",
-        "ending": {
-          "kind": "allowed"
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "| not allowed on datetime[μs] and i8"
         }
       },
       "argument": null
