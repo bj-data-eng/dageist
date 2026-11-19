@@ -29,6 +29,8 @@
 //!   column of the dtype that Polars gave what reaches it, which Polars cannot fold;
 //!   and again with each literal it is given a column of its dtype too, for a
 //!   literal hides what Polars skips as it hides what it evaluates.
+//!   And once more with the receiver and every argument a column of the dtype that reaches it,
+//!   so that nothing an argument holds is refused before the call is.
 //! - [`settle_as_a_key`]: a refusal that a join's key is not elementwise is of the
 //!   position, so the part that holds the refused call is the whole key of the
 //!   same join, and what comes before the call as a key is not refused for it:
@@ -48,6 +50,11 @@
 //! editor shows for such a call is the tables' for a stand-in dtype, not Polars' for
 //! the argument's own.
 //!
+//! A refusal by a rule that a predicate be a `Boolean` is asked the same way
+//! ([`settle_a_predicate_on_a_value`]): the predicate as written may be refused first for a
+//! call it holds, or not evaluated at all, so a column of the dtype that reaches its end stands
+//! as the predicate, and Polars refusing it as the rule says shows the rule right about it.
+//!
 //! The last has no reason to match. [`settle_in_the_position`] is for a refusal
 //! that is the target's own comparison of a call's plan with its rows, which is no
 //! refusal of Polars and so is neither the tables' reason nor one a probe is refused
@@ -65,8 +72,8 @@ use dageist_engine::document::{
 };
 
 use super::case::{Case, STEP};
-use super::frames::STAND_IN;
-use super::literal::{call_with_columns, class_of, operand_causes};
+use super::frames::{STAND_IN, key_column, stand_in_column};
+use super::literal::{call_with_columns, class_of, operand_causes, placed_operands};
 use super::observe::{
     Observed, Refusal, SCHEMA_SAYS, Seen, Tables, is_bare_key, is_the_targets_own, observe_probe,
 };
@@ -395,15 +402,19 @@ const UNPACKING: &str = "cannot unpack series of type";
 /// failure to unpack a list: it casts the list to the dtype of the other side.
 const CASTING_A_LIST: &str = "cannot cast List type";
 
+/// The same where the tables' reason is a failure to unpack an array.
+const CASTING_AN_ARRAY: &str = "cannot cast Array type";
+
 /// Whether `probe` is how Polars on many threads refuses what the tables' reason, a failure to
 /// unpack a series, refuses. Its streaming engine does not unpack the text as a whole number:
 /// it gives the column of the whole number where its schema says text, which is the same call
-/// refused, for it is not what the schema says. And it fails to cast a list to the dtype of the
-/// other side where Polars on one thread fails to unpack the list as that dtype.
+/// refused, for it is not what the schema says. And it fails to cast a list, or an array, to the
+/// dtype of the other side where Polars on one thread fails to unpack it as that dtype.
 fn is_the_same_unpacking(tables: &str, probe: &str) -> bool {
     tables.starts_with(UNPACKING)
         && (probe.starts_with(SCHEMA_SAYS)
-            || (tables.contains("`list[") && probe.starts_with(CASTING_A_LIST)))
+            || (tables.contains("`list[") && probe.starts_with(CASTING_A_LIST))
+            || (tables.contains("`array[") && probe.starts_with(CASTING_AN_ARRAY)))
 }
 
 /// Whether `probe` is refused as the tables refused the part: for Polars' own
@@ -462,6 +473,31 @@ fn place_of_the_part(found: &Found, filter: bool) -> Place {
     }
 }
 
+/// The probe of a predicate that a rule refused: `predicate` as the predicate of a condition, or as
+/// a filter's, as the rule is about.
+fn predicate_probe(found: &Found, rule: &str, predicate: Expression) -> Option<Probe> {
+    if rule == "condition-predicate-is-boolean" {
+        let held = place_of_the_part(found, false).then(Segment::Start);
+        let inside = held
+            .clone()
+            .then(Segment::Parameter("predicates".to_owned()))
+            .then(Segment::Item(0));
+        Some(Probe {
+            part: condition_of(predicate)?,
+            filter: false,
+            before: None,
+            at: vec![held, inside],
+        })
+    } else {
+        Some(Probe {
+            part: predicate,
+            filter: true,
+            before: None,
+            at: vec![place_of_the_part(found, true)],
+        })
+    }
+}
+
 /// The probe of the part the tables refused, by who refused it.
 fn probe_of_the_part(found: &Found, source: &Source) -> Option<Probe> {
     match source {
@@ -489,26 +525,9 @@ fn probe_of_the_part(found: &Found, source: &Source) -> Option<Probe> {
                 at: vec![at],
             })
         }
-        Source::Rule("condition-predicate-is-boolean") => {
-            let predicate = found_predicate(found)?;
-            let held = place_of_the_part(found, false).then(Segment::Start);
-            let inside = held
-                .clone()
-                .then(Segment::Parameter("predicates".to_owned()))
-                .then(Segment::Item(0));
-            Some(Probe {
-                part: condition_of(predicate)?,
-                filter: false,
-                before: None,
-                at: vec![held, inside],
-            })
+        Source::Rule(rule) if PREDICATE_RULES.contains(rule) => {
+            predicate_probe(found, rule, found_predicate(found)?)
         }
-        Source::Rule("filter-predicate-is-boolean") => Some(Probe {
-            part: found_predicate(found)?,
-            filter: true,
-            before: None,
-            at: vec![place_of_the_part(found, true)],
-        }),
         _ => None,
     }
 }
@@ -601,6 +620,28 @@ fn dtype_reaching(
     predicted: &Prediction,
     observed: &Observed,
 ) -> Option<Representative> {
+    dtype_given(held, link, predicted, observed, false)
+}
+
+/// As [`dtype_reaching`], where the tables made no claim of the dtype too: Polars gives a condition
+/// with no `otherwise` the dtype of its values, and the tables say nothing of one that is not
+/// finished, so there is no dtype of theirs for it to differ from.
+fn dtype_polars_gave(
+    held: &Place,
+    link: usize,
+    predicted: &Prediction,
+    observed: &Observed,
+) -> Option<Representative> {
+    dtype_given(held, link, predicted, observed, true)
+}
+
+fn dtype_given(
+    held: &Place,
+    link: usize,
+    predicted: &Prediction,
+    observed: &Observed,
+    unsaid_is_free: bool,
+) -> Option<Representative> {
     let seen = observed
         .expressions
         .iter()
@@ -614,7 +655,11 @@ fn dtype_reaching(
         Some(before) => (seen.links.get(before)?, *traced.links.get(before)?),
     };
     match found {
-        Seen::Dtype(_, _, Some(class)) if Some(*class) == said => Some(*class),
+        Seen::Dtype(_, _, Some(class))
+            if Some(*class) == said || (unsaid_is_free && said.is_none()) =>
+        {
+            Some(*class)
+        }
         _ => None,
     }
 }
@@ -676,6 +721,14 @@ pub fn settle_on_a_value(
             attempts.push((columns, [vec![class], literal_classes].concat()));
         }
     }
+    // And with every argument a column of the dtype that reaches its end, so that nothing an
+    // argument holds, as a call the tables allow without knowing a dtype, is refused before the
+    // call is.
+    if let Some((columns, argument_classes)) =
+        call_on_columns(refused_call, &refused.place, predicted, observed)
+    {
+        attempts.push((columns, [vec![class], argument_classes].concat()));
+    }
     attempts.into_iter().find_map(|(link_call, classes)| {
         let part = Expression::new(Start::Call(name.clone()), vec![link_call]).ok()?;
         let probed = Case {
@@ -694,12 +747,115 @@ pub fn settle_on_a_value(
     })
 }
 
+/// Asks Polars about a predicate that a rule refused, apart from what the predicate holds: a
+/// column of the dtype that reaches its end, as the predicate of a condition or of a filter. The
+/// predicate as written may be refused first for a call inside it that the tables allow, as a
+/// comparison of text with a number they were not told the dtype of, and then Polars refuses it
+/// for another reason than the rule; and it may not be evaluated at all, as under the length of a
+/// condition. A column that has the dtype is not folded, and Polars refuses it as the rule says
+/// where it evaluates it, which shows the rule right about that dtype. The dtype is Polars' as
+/// well as the tables': a wrong prediction of it is a disagreement of the dtypes, found before
+/// anything is probed. `None` for a refusal of Polars, for a predicate in a pivot's aggregate,
+/// which reads no column, when Polars gave the predicate no dtype, and when Polars allows the
+/// column or refuses it for another reason.
+pub fn settle_a_predicate_on_a_value(
+    case: &Case,
+    refused: &Refused,
+    predicted: &Prediction,
+    observed: &Observed,
+) -> Option<Settled> {
+    let Source::Rule(rule) = refused.source else {
+        return None;
+    };
+    if !PREDICATE_RULES.contains(&rule) {
+        return None;
+    }
+    let found = find(case, &refused.place)?;
+    if !found.rest.is_empty() || found.in_the_aggregate {
+        return None;
+    }
+    let held = refused.place.clone();
+    let class = dtype_reaching(&held, found.expression.links().len(), predicted, observed)?;
+    let name = call(
+        "polars.col",
+        vec![("name", Value::Columns(vec![STAND_IN.to_owned()]))],
+    )?;
+    let column = Expression::new(Start::Call(name), Vec::new()).ok()?;
+    let probe = predicate_probe(&found, rule, column)?;
+    let probed = Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        document: document_of(case, &found, probe.part, probe.filter)?,
+    };
+    let tables = Tables::standing(found.on_the_other_table, &[class])?;
+    let refusal = refused_as(&probed, tables, refused, &probe.at)?;
+    Some(Settled {
+        probe: probed.document.write(),
+        reason: refusal.reason,
+        showing: Showing::TheSameReason,
+    })
+}
+
+/// `call`, which is at `at`, with every expression it is given a column of the class that reaches
+/// its end, as Polars and the tables both gave it, and those classes in the order of the columns,
+/// which are [`stand_in_column`]s from the second: the first stands for what the call follows.
+/// `None` for a call given nothing, or an argument whose dtype is not known to both.
+fn call_on_columns(
+    call: &Call,
+    at: &Place,
+    predicted: &Prediction,
+    observed: &Observed,
+) -> Option<(Call, Vec<Representative>)> {
+    fn columns_in(value: &Value, next: &mut usize) -> Option<Value> {
+        Some(match value {
+            Value::Expression(_) => {
+                *next += 1;
+                let name = self::call(
+                    "polars.col",
+                    vec![("name", Value::Columns(vec![stand_in_column(*next)]))],
+                )?;
+                Value::Expression(Expression::new(Start::Call(name), Vec::new()).ok()?)
+            }
+            Value::Many(items) => Value::Many(
+                items
+                    .iter()
+                    .map(|item| columns_in(item, next))
+                    .collect::<Option<Vec<_>>>()?,
+            ),
+            Value::Pairs(pairs) => Value::Pairs(
+                pairs
+                    .iter()
+                    .map(|(key, entry)| Some((columns_in(key, next)?, columns_in(entry, next)?)))
+                    .collect::<Option<Vec<_>>>()?,
+            ),
+            other => other.clone(),
+        })
+    }
+    let classes = placed_operands(call, at)
+        .into_iter()
+        .map(|(_, place, operand)| {
+            dtype_polars_gave(&place, operand.links().len(), predicted, observed)
+        })
+        .collect::<Option<Vec<_>>>()?;
+    if classes.is_empty() {
+        return None;
+    }
+    let mut next = 0;
+    let given = call
+        .arguments()
+        .iter()
+        .map(|given| Some((given.parameter(), columns_in(given.value(), &mut next)?)))
+        .collect::<Option<Vec<_>>>()?;
+    Some((self::call(call.entry().id().as_str(), given)?, classes))
+}
+
 /// The parameters of a join that hold its keys.
 const KEYS: [&str; 3] = ["on", "left_on", "right_on"];
 
-/// The join of the case with the key that `parameter` holds replaced by `part`.
-/// Another key must be the bare `key` column, so that the refusal can only be
-/// the part's.
+/// The join of the case with the key that `parameter` holds replaced by `part`, which is then the
+/// only key of the join. The other side's key is the bare `key` column, so that the refusal can
+/// only be the part's: it is kept where it is that, and where the case has several keys it is
+/// put in the place of them all.
 fn join_on(case: &Case, parameter: &str, part: &Expression) -> Option<Document> {
     let original = case.document.steps()[0].call();
     if original.entry().id().as_str() != "LazyFrame.join" {
@@ -715,9 +871,16 @@ fn join_on(case: &Case, parameter: &str, part: &Expression) -> Option<Document> 
                 return None;
             };
             match items.as_slice() {
-                [_] if name == parameter => Value::Many(vec![Value::Expression(part.clone())]),
-                [Value::Expression(key)] if name != parameter && is_bare_key(key) => {
-                    argument.value().clone()
+                _ if name == parameter => Value::Many(vec![Value::Expression(part.clone())]),
+                [Value::Expression(key)] if is_bare_key(key) => argument.value().clone(),
+                [_, _, ..] => {
+                    let bare = call(
+                        "polars.col",
+                        vec![("name", Value::Columns(vec![key_column(0)]))],
+                    )?;
+                    Value::Many(vec![Value::Expression(
+                        Expression::new(Start::Call(bare), Vec::new()).ok()?,
+                    )])
                 }
                 _ => return None,
             }
@@ -1097,6 +1260,13 @@ pub fn settle_apart(
         .or_else(|| settle_on_a_value_as_a_key(case, refused, predicted, observed))
         .or_else(|| settle_in_the_position(case, refused, predicted, observed))
         .or_else(|| settle_given_no_known_dtype(case, refused))
+        .or_else(|| settle_a_predicate_on_a_value(case, refused, predicted, observed))
+}
+
+/// Whether `rule` is one that a predicate be a `Boolean`, which a probe of the predicate apart
+/// from what it holds can show right.
+pub fn is_a_predicate_rule(rule: &str) -> bool {
+    PREDICATE_RULES.contains(&rule)
 }
 
 /// Asks Polars about a call the tables refused without knowing the dtype of an
@@ -1220,6 +1390,133 @@ mod tests {
         assert!(found.probe.contains("Expr.or_"), "{}", found.probe);
     }
 
+    /// What the probe of a refused part apart from the case settles: the tables' refusal of the
+    /// kept case, and what Polars gave it.
+    fn settled_apart(name: &str) -> Option<Settled> {
+        let case = kept(name);
+        settle_apart(&case, &refusal(&case), &predict(&case), &observe(&case))
+    }
+
+    #[test]
+    fn a_whole_number_as_the_predicate_of_a_condition_under_a_len_is_refused_on_a_column_of_its_dtype()
+     {
+        // `when((h < 1.5).cum_count()).then(f).when(f).then(g).len()`: the length of a condition
+        // never evaluates its predicate, and the predicate alone is refused for the comparison of
+        // text with a number, which the tables do not refuse, before it is for what the rule is
+        // about. A column of the dtype that reaches the end of the predicate, the count, is refused
+        // as the rule says, in the place the predicate stands.
+        let found =
+            settled_apart("stricter-a-count-as-the-predicate-of-a-condition-under-a-len.case")
+                .expect("a column of the dtype that Polars refuses as a predicate");
+        assert!(found.reason.contains("Boolean"), "{}", found.reason);
+        assert!(found.probe.contains("polars.when"), "{}", found.probe);
+        assert!(!found.probe.contains("Expr.cum_count"), "{}", found.probe);
+    }
+
+    #[test]
+    fn a_call_whose_argument_polars_refuses_first_is_refused_on_columns_of_the_dtypes_that_reach_it()
+     {
+        // `sort(by=lit(null).pow((h < 1.5).first()))`: Polars drops a sort key that is a literal
+        // and never meets the power, and the probe of the power on a column is refused first for
+        // the comparison of text with a number in its exponent, which the tables allow without
+        // knowing the dtype of the number. The power of a column of the dtype Null by a column of
+        // the dtype that the exponent has is refused as the tables say.
+        let found = settled_apart("stricter-a-power-of-a-null-literal-in-a-sort-key.case")
+            .expect("the call on columns of the dtypes that reach it");
+        assert!(found.reason.contains("not supported"), "{}", found.reason);
+        assert!(found.probe.contains("Expr.pow"), "{}", found.probe);
+        // The receiver and the exponent are each a column; the comparison is not in the probe.
+        assert!(found.probe.contains("\"p2\""), "{}", found.probe);
+        assert!(!found.probe.contains("Expr.lt"), "{}", found.probe);
+    }
+
+    #[test]
+    fn a_condition_no_row_takes_is_asked_on_a_column_of_the_dtype_polars_gave_it() {
+        // `h > when(b.arccosh() == k).then(a)` with a list `a`: no row of the sample takes the
+        // branch, so the condition is all nulls, which Polars compares with text where it refuses
+        // the list. The tables say nothing of the dtype of a condition with no `otherwise`, and
+        // Polars gives it the dtype of its values, so a column of that dtype beside a column of
+        // text is refused as the tables say.
+        let found = settled_apart("stricter-a-condition-with-no-otherwise-that-no-row-takes.case")
+            .expect("the call on columns of the dtypes that Polars gave it");
+        assert!(
+            found.reason.contains("cannot cast List"),
+            "{}",
+            found.reason
+        );
+        assert!(!found.probe.contains("polars.when"), "{}", found.probe);
+    }
+
+    #[test]
+    fn a_condition_is_not_asked_on_a_column_where_the_tables_gave_it_another_dtype() {
+        // The tables made no claim of the condition above, so Polars' dtype stands; where they
+        // claim another, the case is a disagreement about the dtype and nothing is asked.
+        let case = kept("stricter-a-condition-with-no-otherwise-that-no-row-takes.case");
+        let mut wrong = predict(&case);
+        for traced in &mut wrong.expressions {
+            for held in &mut traced.links {
+                if held.is_none() {
+                    *held = Some(Representative::String);
+                }
+            }
+        }
+        assert_eq!(
+            settle_apart(&case, &refusal(&case), &wrong, &observe(&case)),
+            None
+        );
+    }
+
+    #[test]
+    fn a_call_is_not_asked_on_columns_where_polars_gave_an_argument_no_dtype() {
+        let case = kept("stricter-a-power-of-a-null-literal-in-a-sort-key.case");
+        assert_eq!(
+            settle_apart(
+                &case,
+                &refusal(&case),
+                &predict(&case),
+                &Observed::default()
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn a_key_beside_another_key_is_asked_as_the_only_key_of_the_join() {
+        // `join(left_on=[lit(1, Float32).cum_max(), f | 1], right_on=[key, key2])`: a literal is
+        // folded into one value, which Polars allows as a key, where the running maximum of a
+        // column is not elementwise. The other key is refused first for what it holds when the
+        // join is asked as it is written, so the key is asked as the only one of the join, as a
+        // column of the dtype that reaches the call is.
+        let found = settled_apart(
+            "stricter-a-running-value-of-a-literal-in-a-join-key-beside-another-key.case",
+        )
+        .expect("the call on a column as the only key of the join");
+        assert!(found.reason.contains("elementwise"), "{}", found.reason);
+        assert!(found.probe.contains("LazyFrame.join"), "{}", found.probe);
+        assert!(!found.probe.contains("Expr.or_"), "{}", found.probe);
+    }
+
+    #[test]
+    fn a_predicate_is_not_asked_on_a_column_where_polars_gave_no_dtype_or_the_tables_gave_no_rule()
+    {
+        let case = kept("stricter-a-count-as-the-predicate-of-a-condition-under-a-len.case");
+        let rule = refusal(&case);
+        // What Polars gave the predicate is not known, so the column is of no dtype it has.
+        assert_eq!(
+            settle_apart(&case, &rule, &predict(&case), &Observed::default()),
+            None
+        );
+        // A refusal of Polars' own, the same place, is no rule's.
+        let polars = Refused {
+            source: Source::Polars,
+            ..rule
+        };
+        assert_eq!(
+            settle_apart(&case, &polars, &predict(&case), &observe(&case)),
+            None
+        );
+    }
+
     #[test]
     fn a_failure_to_unpack_a_series_is_matched_by_a_schema_the_rows_do_not_give_and_by_nothing_else()
      {
@@ -1259,6 +1556,55 @@ mod tests {
         let cast = "cannot cast List type (inner: 'Int64', to: 'UInt8')";
         assert!(same_reason(&Source::Polars, tables, cast));
         // A cast of another dtype is not it, nor is a cast the tables' reason names.
+        assert!(!same_reason(
+            &Source::Polars,
+            "cannot unpack series of type `str` into `i64`",
+            cast
+        ));
+        assert!(!same_reason(
+            &Source::Polars,
+            tables,
+            "cannot cast String type to Int64"
+        ));
+    }
+
+    #[test]
+    fn a_bitwise_call_on_an_array_in_a_condition_of_equal_branches_is_refused_alone_where_polars_cannot_cast_it()
+     {
+        // `sort(by=when(g <= lit(null, Int8) & b).then(x).otherwise(x))` with an array `b`: Polars
+        // folds a condition whose branches are the same expression into that expression, so it
+        // never evaluates the predicate. The tables refuse the call as Polars on one thread does,
+        // by failing to unpack the array as a whole number; the streaming engine on many threads
+        // fails to cast the array to that number.
+        let found =
+            settled("stricter-a-bitwise-call-on-an-array-in-a-condition-of-equal-branches.case");
+        assert!(
+            found.reason.starts_with("cannot cast Array type")
+                || found.reason.starts_with("cannot unpack series of type"),
+            "{}",
+            found.reason
+        );
+        assert!(found.probe.contains("Expr.and_"), "{}", found.probe);
+    }
+
+    #[test]
+    fn a_failure_to_unpack_an_array_is_matched_by_a_failure_to_cast_the_array_and_by_nothing_else()
+    {
+        let tables = "cannot unpack series of type `array[i64, 2]` into `i8`";
+        let cast = "cannot cast Array type (inner: 'Int64', to: 'Int8')";
+        assert!(same_reason(&Source::Polars, tables, cast));
+        // The cast of a list is another dtype's, and neither is a cast the tables' reason does not
+        // name, nor the unpacking of text.
+        assert!(!same_reason(
+            &Source::Polars,
+            tables,
+            "cannot cast List type (inner: 'Int64', to: 'Int8')"
+        ));
+        assert!(!same_reason(
+            &Source::Polars,
+            "cannot unpack series of type `list[i64]` into `i8`",
+            cast
+        ));
         assert!(!same_reason(
             &Source::Polars,
             "cannot unpack series of type `str` into `i64`",

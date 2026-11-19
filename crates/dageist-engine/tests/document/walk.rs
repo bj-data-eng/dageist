@@ -1169,6 +1169,146 @@ fn an_aggregate_that_the_first_fold_drops_stays_dropped_for_the_comparisons_afte
     assert_eq!(joined_on(key), None);
 }
 
+/// `when(null != <compared>).then(null).otherwise(a)`.
+fn condition_of_a_null_compared_with(compared_with: Value) -> Value {
+    let nothing = null();
+    chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![chain(
+                call("polars.lit", json!({ "value": { "flag": null } })),
+                vec![compared("Expr.ne", compared_with)],
+            )]) }),
+        ),
+        vec![
+            call("When.then", json!({ "statement": nothing })),
+            call("Then.otherwise", json!({ "statement": field("a") })),
+        ],
+    )
+}
+
+#[test]
+fn a_comparison_of_a_null_drops_what_it_is_given_where_that_is_one_value() {
+    // `null != (f != null).min()` is a null whatever it is given, so the comparison of a column
+    // with a null that the aggregate holds is not met: Polars allows these keys, as it allows
+    // `null != f.min()`.
+    let given = || {
+        field_then(
+            "f",
+            vec![compared("Expr.ne", null()), call("Expr.min", json!({}))],
+        )
+    };
+    let keys = [
+        condition_of_a_null_compared_with(given()),
+        condition_of_a_null_compared_with(field_then("f", vec![call("Expr.min", json!({}))])),
+        field_then(
+            "a",
+            vec![compared(
+                "Expr.eq",
+                chain(
+                    call("polars.lit", json!({ "value": { "flag": null } })),
+                    vec![compared("Expr.ne", given())],
+                ),
+            )],
+        ),
+    ];
+    for (at, key) in keys.into_iter().enumerate() {
+        assert_eq!(joined_on(key), None, "key {at}");
+    }
+}
+
+#[test]
+fn a_comparison_of_a_null_drops_nothing_that_is_more_than_one_value() {
+    // The value it is given that is a column, or compares one with a null, leaves a null where a
+    // column was, which Polars refuses as not elementwise; so is a condition whose predicate
+    // compares a column with a null.
+    let rule = Some(RefusalSource::Rule(Rule::KeyIsElementwise));
+    let nothing = null();
+    let keys = [
+        condition_of_a_null_compared_with(field_then("f", vec![compared("Expr.ne", null())])),
+        condition_of_a_null_compared_with(field("f")),
+        chain(
+            call(
+                "polars.when",
+                json!({ "predicates": many(vec![field_then(
+                    "f",
+                    vec![compared("Expr.ne", null())],
+                )]) }),
+            ),
+            vec![
+                call("When.then", json!({ "statement": nothing })),
+                call("Then.otherwise", json!({ "statement": field("a") })),
+            ],
+        ),
+    ];
+    for (at, key) in keys.into_iter().enumerate() {
+        assert_eq!(joined_on(key), rule, "key {at}");
+    }
+}
+
+/// `null > h`, a comparison that leaves a null where a column was.
+fn a_null_compared_with_a_column_start() -> Vec<Value> {
+    vec![compared("Expr.gt", field("h"))]
+}
+
+#[test]
+fn a_comparison_with_a_null_that_follows_one_value_drops_a_null_compared_before_it() {
+    // `(null > h).last() >= null`: the comparison with a null follows one value, which it drops
+    // with what that value holds, so `null > h` is not met and Polars allows the key, as it does
+    // with a subtraction after it.
+    let key = |links: Vec<Value>| {
+        let mut all = a_null_compared_with_a_column_start();
+        all.extend(links);
+        all
+    };
+    let keys = [
+        key(vec![
+            call("Expr.last", json!({})),
+            compared("Expr.ge", null()),
+            compared("Expr.sub", field("k")),
+        ]),
+        key(vec![
+            call("Expr.last", json!({})),
+            compared("Expr.ge", null()),
+            compared("Expr.add", field("k")),
+        ]),
+    ];
+    for (at, links) in keys.into_iter().enumerate() {
+        let key = chain(
+            call("polars.lit", json!({ "value": { "flag": null } })),
+            links,
+        );
+        assert_eq!(joined_on(key), None, "key {at}");
+    }
+}
+
+#[test]
+fn a_comparison_with_a_null_drops_a_null_compared_before_it_only_where_it_follows_one_value() {
+    // Without the `.last()` the comparison follows `null > h`, which is more than one value, so
+    // nothing is dropped, and with the `.last()` but no comparison with a null after it nothing
+    // drops it either.
+    let rule = Some(RefusalSource::Rule(Rule::KeyIsElementwise));
+    let keys = [
+        vec![
+            compared("Expr.ge", null()),
+            compared("Expr.sub", field("k")),
+        ],
+        vec![
+            call("Expr.last", json!({})),
+            compared("Expr.sub", field("k")),
+        ],
+    ];
+    for (at, links) in keys.into_iter().enumerate() {
+        let mut all = a_null_compared_with_a_column_start();
+        all.extend(links);
+        let key = chain(
+            call("polars.lit", json!({ "value": { "flag": null } })),
+            all,
+        );
+        assert_eq!(joined_on(key), rule, "key {at}");
+    }
+}
+
 #[test]
 fn a_comparison_given_a_null_drops_the_aggregate_it_follows_after_an_earlier_fold() {
     // `null < true`, `.last()`, `!= null`, `.is_not_null()` and `!= f` is a key

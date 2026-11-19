@@ -86,6 +86,10 @@ pub struct Observed {
     pub refusal: Option<Refusal>,
     /// The dtypes of the expressions, as far as they could be built.
     pub expressions: Vec<SeenExpression>,
+    /// Whether a column of the other table is paired with keys that Polars gives different
+    /// dtypes. Polars refuses the join for that when no dtype of the column fits them all, which
+    /// the tables are not asked about, and joins whole numbers of different widths.
+    pub keys_conflict: bool,
 }
 
 fn panic_text(payload: &(dyn std::any::Any + Send)) -> String {
@@ -278,10 +282,13 @@ fn key_expressions<'a>(document: &'a Document, parameter: &str) -> Vec<&'a Expre
 /// dtype the chain it is paired with has: the join of a key with another dtype is
 /// refused for that, which is no matter of the tables. It is found by building the
 /// step once, as the report says what the chain has even when the join is
-/// refused. A column that no pair makes is of whole numbers.
-fn key_dtypes(case: &Case, first: &Observed) -> Vec<DataType> {
+/// refused. A column that no pair makes is of whole numbers. A column that two
+/// keys of different dtypes are paired with has the first's, and the join is said
+/// to conflict.
+fn key_dtypes(case: &Case, first: &Observed) -> (Vec<DataType>, bool) {
     let document = &case.document;
     let mut found: Vec<Option<DataType>> = Vec::new();
+    let mut conflict = false;
     let sides = ["left_on", "right_on"];
     for (side, parameter) in sides.into_iter().enumerate() {
         let held_parameter = sides[1 - side];
@@ -313,16 +320,24 @@ fn key_dtypes(case: &Case, first: &Observed) -> Vec<DataType> {
             if found.len() <= column {
                 found.resize(column + 1, None);
             }
+            if let (Some(known), Some(other)) = (&found[column], &dtype)
+                && known != other
+            {
+                conflict = true;
+            }
             found[column].get_or_insert(dtype.unwrap_or(DataType::Int64));
         }
     }
     if found.is_empty() {
-        return vec![DataType::Int64];
+        return (vec![DataType::Int64], conflict);
     }
-    found
-        .into_iter()
-        .map(|dtype| dtype.unwrap_or(DataType::Int64))
-        .collect()
+    (
+        found
+            .into_iter()
+            .map(|dtype| dtype.unwrap_or(DataType::Int64))
+            .collect(),
+        conflict,
+    )
 }
 
 /// How many columns that stand in for a value a probe may read.
@@ -385,9 +400,15 @@ fn observe_on(case: &Case, tables: Tables) -> Observed {
     if !is_join {
         return observed;
     }
-    let keys = key_dtypes(case, &observed);
+    let (keys, conflict) = key_dtypes(case, &observed);
     if keys == [DataType::Int64] {
-        return observed;
+        return Observed {
+            keys_conflict: conflict,
+            ..observed
+        };
     }
-    run_on(&case.document, &tables.of(case, &keys))
+    Observed {
+        keys_conflict: conflict,
+        ..run_on(&case.document, &tables.of(case, &keys))
+    }
 }

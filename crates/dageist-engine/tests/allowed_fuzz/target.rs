@@ -4,6 +4,7 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
+use dageist_engine::document::Place;
 use dageist_fuzz::registry::FuzzManifest;
 use dageist_fuzz::{
     CaseOutcome, CaseTarget, FailureClass, FailureKey, FuzzError, FuzzErrorKind, Generation,
@@ -13,9 +14,9 @@ use dageist_fuzz::{
 use super::case::Case;
 use super::generate::generate;
 use super::limits::{excuses, strict};
-use super::observe::{Observed, Refusal, Seen, is_the_targets_own, observe};
+use super::observe::{Observed, Refusal, Seen, Stage, is_the_targets_own, observe};
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
-use super::probe::{Settled, same_reason, settle, settle_apart};
+use super::probe::{Settled, is_a_predicate_rule, same_reason, settle, settle_apart};
 use super::reduce::candidates;
 
 /// The named rules that are stricter than Polars by design, each with why. A
@@ -254,8 +255,23 @@ fn dtype_difference(case: &Case, prediction: &Prediction, observed: &Observed) -
     // aggregate that holds `element` in a nested expression is not Polars'
     // verdict on the pivot.
     // A refusal predicted anywhere explains a prefix that Polars refuses: the
-    // case is refused, and the prefix is one place where it is.
-    let refused_anyway = matches!(prediction.verdict, Verdict::Refuses(_));
+    // case is refused, and the prefix is one place where it is. So does a refusal
+    // that Polars gives when it works out the schema at the very call the tables
+    // said they could not be asked about, for the expressions that hold the call:
+    // such an expression has the dtype its own calls give, and the tables did not
+    // say the call allows it. Another expression is refused for itself.
+    let refused_anyway = |expression: &Place| match &prediction.verdict {
+        Verdict::Refuses(_) => true,
+        Verdict::Undetermined(why) => observed.refusal.as_ref().is_some_and(|refusal| {
+            refusal.stage == Stage::Schema
+                && why.starts_with(&format!("{}: ", refusal.at))
+                && refusal
+                    .place
+                    .as_ref()
+                    .is_some_and(|at| at.path().starts_with(expression.path()))
+        }),
+        Verdict::Allows => false,
+    };
     let pivot = case.document.steps()[0].call().entry().id().as_str() == "LazyFrame.pivot";
     for expected in &prediction.expressions {
         let Some(seen) = observed
@@ -275,10 +291,12 @@ fn dtype_difference(case: &Case, prediction: &Prediction, observed: &Observed) -
                     expected.place,
                     predicted.name()
                 )),
-                Seen::Refused(reason) if !pivot && !refused_anyway => Some(format!(
-                    "{} {what}: the tables allow it, Polars refuses it: {reason}",
-                    expected.place
-                )),
+                Seen::Refused(reason) if !pivot && !refused_anyway(&expected.place) => {
+                    Some(format!(
+                        "{} {what}: the tables allow it, Polars refuses it: {reason}",
+                        expected.place
+                    ))
+                }
                 _ => None,
             }
         };
@@ -293,6 +311,9 @@ fn dtype_difference(case: &Case, prediction: &Prediction, observed: &Observed) -
     }
     None
 }
+
+/// How Polars words its refusal of a join whose keys have dtypes that do not match.
+const KEYS_DO_NOT_MATCH: &str = "datatypes of join keys don't match";
 
 /// How a refusal of the tables is worded when it is of where an expression may end.
 const CANNOT_END: &str = "it cannot end here: ";
@@ -374,6 +395,21 @@ impl CaseTarget for AllowedTarget {
         let allowed_by_polars = observed.refusal.is_none();
         if case.document.steps()[0].call().entry().id().as_str() == "LazyFrame.pivot" {
             tally("pivot case");
+        }
+        // One column of the other table holds one dtype, so where Polars gives keys that are paired
+        // with it different ones and refuses the join for the dtypes of the keys, no dtype of the
+        // column fits and the refusal is no matter of the tables. Polars joins whole numbers of
+        // different widths, so the keys differing is not enough.
+        if observed.keys_conflict
+            && observed
+                .refusal
+                .as_ref()
+                .is_some_and(|refusal| refusal.reason.starts_with(KEYS_DO_NOT_MATCH))
+        {
+            tally("join keys of different dtypes share a column");
+            return CaseOutcome::unsupported(
+                "one column of the other table is paired with keys of different dtypes",
+            );
         }
         let allowance = Self::property(ALLOWANCE);
         let dtypes = Self::property(DTYPES);
@@ -482,6 +518,14 @@ impl CaseTarget for AllowedTarget {
                         if let Some(outcome) = stricter(probe_of(case, &refused), rule) {
                             return outcome;
                         }
+                        // A predicate the rule refuses may hold a call Polars refuses first,
+                        // or may not be evaluated, so it is asked on a column of its dtype.
+                        if is_a_predicate_rule(rule)
+                            && let Some(outcome) =
+                                stricter(probe_apart(case, &refused, &prediction, &observed), rule)
+                        {
+                            return outcome;
+                        }
                         return failure(
                             ALLOWANCE,
                             &format!("rule-refuses-what-polars-allows-{rule}"),
@@ -561,7 +605,10 @@ impl CaseTarget for AllowedTarget {
 #[cfg(test)]
 mod tests {
     use dageist_engine::allowed::Representative;
+    use dageist_engine::document::{Place, Segment};
 
+    use super::super::observe::SeenExpression;
+    use super::super::predict::Traced;
     use super::*;
 
     /// The outcome of `text` and what was tallied while it was evaluated.
@@ -778,6 +825,130 @@ mod tests {
         let detail = outcome.detail().expect("a detail");
         assert!(detail.contains("plan and rows"), "{detail}");
         assert!(!detail.contains("for the tables' reason"), "{detail}");
+    }
+
+    #[test]
+    fn a_prefix_polars_refuses_at_the_call_the_tables_could_not_be_asked_about_is_no_difference() {
+        // `when(when(g + 1).then(a)).then(f).otherwise(a)`: the tables cannot say what a number
+        // given no dtype is added to text, and Polars refuses the sum when it works out the
+        // schema. The condition that holds it has the dtype of its values, and Polars refuses it
+        // for the call the tables could not judge, which is not a dtype the tables got wrong.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+            "tests/allowed_fuzz/regressions/fixed-a-prefix-refused-at-the-call-the-tables-could-not-be-asked-about.case",
+        );
+        let case = Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case");
+        let observed = observe(&case);
+        let prediction = predict(&case);
+        assert!(matches!(prediction.verdict, Verdict::Undetermined(_)));
+        assert_eq!(dtype_difference(&case, &prediction, &observed), None);
+        // Polars refusing somewhere else, which the tables did not say they could not judge, is
+        // one: the prefix is refused where the tables gave it a dtype.
+        let mut elsewhere = observed.clone();
+        let refusal = elsewhere.refusal.as_mut().expect("Polars refuses the case");
+        refusal.at = "step \"s\", exprs item 1, link 1".to_owned();
+        let difference = dtype_difference(&case, &prediction, &elsewhere).expect("a difference");
+        assert!(difference.contains("Polars refuses it"), "{difference}");
+        // And a refusal of the rows is no refusal of the schema the tables were asked about.
+        let mut at_the_rows = observed;
+        at_the_rows.refusal.as_mut().expect("a refusal").stage = Stage::Rows;
+        assert!(dtype_difference(&case, &prediction, &at_the_rows).is_some());
+    }
+
+    /// A join whose two right keys are the one column `key`, beside left keys that Polars gives
+    /// different dtypes: `array[f64, 2]` and `array[i64, 2]`, which the tables give the one class
+    /// Array. One column of the other table cannot hold both.
+    const TWO_KEYS_OF_DIFFERENT_DTYPES_SHARING_A_COLUMN: &str = r#"{"a":"Array(Int64, 2)","b":"Decimal(10, 2)","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.join","arguments":{"other":{"table":"other"},"left_on":{"many":[{"expression":{"start":{"entry":"polars.when","arguments":{"predicates":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["f"]}}},"then":[{"entry":"Expr.le","arguments":{"other":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[]}}}},{"entry":"Expr.erf","arguments":{}},{"entry":"Expr.is_not_null","arguments":{}}]}}]}}},"then":[{"entry":"When.then","arguments":{"statement":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[{"entry":"Expr.cosh","arguments":{}},{"entry":"Expr.floordiv","arguments":{"other":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"flag":null}}},"then":[]}}}},{"entry":"Expr.sinh","arguments":{}},{"entry":"Expr.truediv","arguments":{"other":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[]}}}}]}}}}]}},{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[]}}]},"right_on":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["key"]}}},"then":[]}},{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["key"]}}},"then":[]}}]}}}}]}"#;
+
+    #[test]
+    fn a_join_that_pairs_one_column_with_keys_of_different_dtypes_is_not_a_case_for_the_tables() {
+        // Polars refuses the join, as it must, for no dtype of the column `key` fits both keys,
+        // which the tables are not asked about.
+        let (outcome, _) = evaluated_and_tallied(TWO_KEYS_OF_DIFFERENT_DTYPES_SHARING_A_COLUMN);
+        assert_eq!(
+            outcome.kind(),
+            dageist_fuzz::OutcomeKind::Unsupported,
+            "{outcome:?}"
+        );
+    }
+
+    /// A join of the two keys `a` and `k` with the one column `key`, as the left keys of the dtypes
+    /// that `a` and `k` are: whole numbers of the widths the two are.
+    fn keys_sharing_a_column(first: &str, second: &str) -> &'static str {
+        let key = |name: &str| {
+            format!(
+                r#"{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["{name}"]}}}}}},"then":[]}}}}"#
+            )
+        };
+        let text = format!(
+            r#"{{"a":"Int32","b":"Date","revision":1}}
+{{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.join","arguments":{{"other":{{"table":"other"}},"left_on":{{"many":[{},{}]}},"right_on":{{"many":[{},{}]}}}}}}}}]}}"#,
+            key(first),
+            key(second),
+            key("key"),
+            key("key")
+        );
+        Box::leak(text.into_boxed_str())
+    }
+
+    #[test]
+    fn a_join_that_pairs_one_column_with_whole_numbers_of_two_widths_is_compared() {
+        // Polars joins an `Int32` and an `Int64` key with the one column, so there is nothing
+        // that makes the case one the tables are not asked about.
+        let (outcome, tally) = evaluated_and_tallied(keys_sharing_a_column("a", "k"));
+        assert_ne!(
+            outcome.kind(),
+            dageist_fuzz::OutcomeKind::Unsupported,
+            "{outcome:?}"
+        );
+        assert!(counted(&tally, "share a column").is_none(), "{tally:?}");
+    }
+
+    #[test]
+    fn a_join_that_pairs_one_column_with_keys_of_the_same_dtype_is_still_a_case() {
+        // The same two keys, both the column `k`, paired with the one column `key`.
+        let key = r#"{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[]}}"#;
+        let bare = r#"{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["key"]}}},"then":[]}}"#;
+        let text = format!(
+            r#"{{"a":"Date","b":"Date","revision":1}}
+{{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.join","arguments":{{"other":{{"table":"other"}},"left_on":{{"many":[{key},{key}]}},"right_on":{{"many":[{bare},{bare}]}}}}}}}}]}}"#
+        );
+        let text: &'static str = Box::leak(text.into_boxed_str());
+        let (outcome, _) = evaluated_and_tallied(text);
+        assert_ne!(
+            outcome.kind(),
+            dageist_fuzz::OutcomeKind::Unsupported,
+            "{outcome:?}"
+        );
+    }
+
+    #[test]
+    fn a_refusal_at_the_call_the_tables_could_not_judge_explains_only_the_prefixes_that_hold_it() {
+        // Another item of the same step, which the tables gave a dtype and Polars refuses, is
+        // refused where the call is not: the refusal at the call that the tables could not be
+        // asked about explains the expression that holds it, and no other.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+            "tests/allowed_fuzz/regressions/fixed-a-prefix-refused-at-the-call-the-tables-could-not-be-asked-about.case",
+        );
+        let case = Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case");
+        let mut observed = observe(&case);
+        let mut prediction = predict(&case);
+        let other = Place::of_step(0, Some(case.document.steps()[0].id().clone()))
+            .then(Segment::Parameter("exprs".to_owned()))
+            .then(Segment::Item(1));
+        prediction.expressions.push(Traced {
+            place: other.clone(),
+            start: Some(Representative::Boolean),
+            links: Vec::new(),
+        });
+        observed.expressions.push(SeenExpression {
+            place: other,
+            start: Seen::Refused("another refusal".to_owned()),
+            links: Vec::new(),
+        });
+        let difference = dtype_difference(&case, &prediction, &observed).expect("a difference");
+        assert!(difference.contains("exprs item 2"), "{difference}");
+        assert!(difference.contains("another refusal"), "{difference}");
     }
 
     #[test]

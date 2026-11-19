@@ -1522,21 +1522,6 @@ fn holds_a_null_comparison(expression: &Expression) -> bool {
         start,
         Some(start) if start.entry().id().as_str() == "polars.col"
     ) || start.is_some_and(|start| operands(start).into_iter().any(reads_a_column));
-    for (at, link) in expression.links().iter().enumerate() {
-        if is_a_comparison(link) {
-            let given = operands(link);
-            let null_given = given.iter().any(|operand| is_a_null(operand));
-            let column_given = given.iter().any(|operand| {
-                reads_a_column(operand) && !wholly_single(operand, operand.links().len(), true)
-            });
-            let column_before = reads && !wholly_single(expression, at, true);
-            let null_start = follows_the_start(expression, at) && starts_from_a_null(expression);
-            if (null_given && column_before) || (null_start && column_given) {
-                return true;
-            }
-        }
-        reads |= operands(link).into_iter().any(reads_a_column);
-    }
     // A comparison with a null that follows one value or literals alone folds into a null and
     // drops what it follows, the calls before it and what they are given, unevaluated: a
     // comparison of a column with a null among them is not one Polars meets.
@@ -1553,11 +1538,52 @@ fn holds_a_null_comparison(expression: &Expression) -> bool {
         .map(|(at, _)| at + usize::from(start.is_some()))
         .max()
         .unwrap_or(0);
+    for (at, link) in expression.links().iter().enumerate() {
+        // What a later fold drops is not met, so the comparisons before the last of them, which
+        // are among the calls it drops, are not asked about.
+        if at + usize::from(start.is_some()) < dropped {
+            reads |= operands(link).into_iter().any(reads_a_column);
+            continue;
+        }
+        if is_a_comparison(link) {
+            let given = operands(link);
+            let null_given = given.iter().any(|operand| is_a_null(operand));
+            let column_given = given.iter().any(|operand| {
+                reads_a_column(operand) && !wholly_single(operand, operand.links().len(), true)
+            });
+            let column_before = reads && !wholly_single(expression, at, true);
+            let null_start = follows_the_start(expression, at) && starts_from_a_null(expression);
+            if (null_given && column_before) || (null_start && column_given) {
+                return true;
+            }
+        }
+        reads |= operands(link).into_iter().any(reads_a_column);
+    }
+    // A comparison with a null is a null whatever it is given, so what it is given that is one
+    // value or literals alone is not evaluated either, and a comparison of a column with a null
+    // in it is not one Polars meets.
+    let folds = |at: usize, link: &Call| {
+        is_a_comparison(link)
+            && (operands(link).into_iter().any(is_a_null)
+                || (starts_from_a_null(expression) && follows_the_start(expression, at)))
+    };
     start
         .into_iter()
-        .chain(expression.links())
+        .map(|call| (call, false))
+        .chain(
+            expression
+                .links()
+                .iter()
+                .enumerate()
+                .map(|(at, link)| (link, folds(at, link))),
+        )
         .skip(dropped)
-        .any(|call| operands(call).into_iter().any(holds_a_null_comparison))
+        .any(|(call, folded)| {
+            operands(call)
+                .into_iter()
+                .filter(|operand| !(folded && wholly_single(operand, operand.links().len(), true)))
+                .any(holds_a_null_comparison)
+        })
 }
 
 /// Whether a key is not elementwise, as Polars takes it: it holds an aggregate

@@ -568,7 +568,8 @@ Polars by hand, and decide which it is:
   that alone. Keep the
   case as `regressions/uncovered-<limit>.case`, which the normal run replays and
   expects the limit to excuse; every limit has one. A limit may have others, filed as
-  `regressions/uncovered-<limit>--<what it shows>.case`.
+  `regressions/uncovered-<limit>--<what it shows>.case`, with `--also-<limit>` after
+  it where another limit explains the case too.
 - **A mistake of the generator** (a case that Polars refuses for what no table
   is about, such as a value that depends on the rows): correct
   `allowed_fuzz/generate.rs` and say why in a comment there.

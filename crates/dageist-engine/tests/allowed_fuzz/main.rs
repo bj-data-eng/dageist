@@ -287,22 +287,43 @@ fn kept_cases_replay_as_settled() {
                 detail_of(outcome)
             );
             stricter += 1;
-        } else if let Some(slug) = name
+        } else if let Some(slugs) = name
             .strip_prefix("uncovered-")
             .and_then(|rest| rest.strip_suffix(".case"))
-            // `uncovered-<limit>--<what it shows>.case` is another case of a limit.
-            .map(|rest| rest.split("--").next().unwrap_or(rest))
+            // `uncovered-<limit>--<what it shows>.case` is another case of a limit, and
+            // `--also-<limit>` after it names another limit that explains the case too.
+            .map(|rest| {
+                let mut parts = rest.split("--");
+                let first = parts.next().unwrap_or(rest);
+                let also = parts.filter_map(|part| part.strip_prefix("also-"));
+                std::iter::once(first).chain(also).collect::<Vec<_>>()
+            })
         {
-            let limit = Limit::ALL
+            let named: Vec<Limit> = slugs
+                .iter()
+                .map(|slug| {
+                    Limit::ALL
+                        .into_iter()
+                        .find(|limit| limit.slug() == *slug)
+                        .unwrap_or_else(|| panic!("{name} names no limit {slug}"))
+                })
+                .collect();
+            // The detail is the statement of every limit that excuses the case, in order.
+            let expected: Vec<&str> = Limit::ALL
                 .into_iter()
-                .find(|limit| limit.slug() == slug)
-                .unwrap_or_else(|| panic!("{name} names no limit"));
+                .filter(|limit| named.contains(limit))
+                .map(Limit::statement)
+                .collect();
             assert_eq!(
                 (outcome.kind(), outcome.detail()),
-                (OutcomeKind::ExpectedRejection, Some(limit.statement())),
-                "{name} is excused by {slug}"
+                (
+                    OutcomeKind::ExpectedRejection,
+                    Some(expected.join("; ").as_str())
+                ),
+                "{name} is excused by {}",
+                slugs.join(" and ")
             );
-            excused.insert(slug.to_owned());
+            excused.insert(slugs[0].to_owned());
         } else {
             panic!("{name} is neither fixed-* nor uncovered-*");
         }

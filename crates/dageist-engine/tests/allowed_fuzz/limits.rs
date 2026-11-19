@@ -41,6 +41,7 @@ use dageist_engine::document::{Call, Document, Expression, Place, Segment, Start
 
 use super::case::Case;
 use super::frames::Frames;
+use super::frames::stand_in_column;
 use super::literal::{
     LiteralCause, call_with_columns, class_of, expression_with_columns, operand_causes,
     placed_operands, starts_from_a_literal,
@@ -141,16 +142,20 @@ pub enum Limit {
     /// values of a column below zero; the sample's rows are 1, a null and 3, which a sum
     /// or a product of them does not.
     ANegativeExponent,
-    /// A column or a literal of the dtype Null is an operand of `and`, `or` and `xor`
-    /// that the tables allow, giving a `Boolean`, as `select` shows. Polars treats it
-    /// in ways `select` hides. It negates what a bitwise call combines operand by
-    /// operand, as the negation of a conjunction is the disjunction of the negations,
-    /// so a `not` meets each operand, which it refuses for the dtype Null. Polars
-    /// refusing the rows with the reason that the dtype Null is not supported in `not`,
-    /// which has no place, in a case that holds a `not` straight after an `and` or an
-    /// `or` that meets a null. It gives a filter's predicate the dtype Null, which Polars
-    /// refuses with the reason that a predicate must be a `Boolean`, in a filter that
-    /// holds a bitwise call that meets a null.
+    /// A value of the dtype Null, a column or a literal, typed as it or not, or what a call
+    /// gives that dtype, is an operand of `and`, `or` and `xor` that the tables allow,
+    /// giving a `Boolean`, as `select` shows. Polars treats it in ways `select` hides. It
+    /// negates what a bitwise call combines operand by operand, as the negation of a
+    /// conjunction is the disjunction of the negations, so a `not` meets each operand,
+    /// which it refuses for the dtype Null. Polars refusing the rows with the reason that
+    /// the dtype Null is not supported in `not`, which has no place, in a case that holds
+    /// a `not` after a run of `and` and `or`, any call of which meets a null, as the tables
+    /// give the dtypes and as a null goes on through the `and` and the `or` after it. It
+    /// gives a filter's predicate the dtype Null, which Polars refuses with the reason that
+    /// a predicate must be a `Boolean`: an `and` that meets a null does, as does an `or` of
+    /// nulls, and the dtype goes on through the `and` and the `or` that follow it, so the
+    /// predicate is one that ends in bitwise calls the first of which meets a null. An `or`
+    /// or an `xor` of a `Boolean` and a null is a `Boolean`.
     ABitwiseCallOnANull,
     /// A `UInt128` is compared with a `Decimal` by casting it to `decimal[38,0]`,
     /// which holds up to 38 digits, and a `UInt128` holds more. The sample's values
@@ -225,11 +230,19 @@ pub enum Limit {
     /// starts from a literal, which Polars allows; the window is why where Polars, asked again
     /// with each literal partition a column, refuses the case for that reason.
     AWindowOverALiteral,
+    /// Polars refuses some dtypes of `and`, `or` and `xor` when it works out the schema of a
+    /// select, a filter or a sort key, and accepts them in a join's key, as `date ^ int64` and
+    /// `bool | int64`: the docs list the pairs measured. The tables measured a bitwise call in
+    /// select, and refuse it for the dtypes it is given. The tables refusing, with a reason that
+    /// names the two dtypes, at a bitwise call in one of a join's own keys, which Polars allows;
+    /// the key is why where Polars, asked to select the refused call on a column of each of the
+    /// two dtypes, refuses it at the call for the tables' reason.
+    ABitwiseCallInAJoinKey,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 19] = [
+    pub const ALL: [Self; 20] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -249,6 +262,7 @@ impl Limit {
         Self::ABoundTheDtypeCannotHold,
         Self::ABoundWithValuesOfItsOwn,
         Self::AWindowOverALiteral,
+        Self::ABitwiseCallInAJoinKey,
     ];
 
     /// The name a kept case is filed under.
@@ -273,6 +287,7 @@ impl Limit {
             Self::ABoundTheDtypeCannotHold => "a-bound-the-dtype-cannot-hold",
             Self::ABoundWithValuesOfItsOwn => "a-bound-with-values-of-its-own",
             Self::AWindowOverALiteral => "a-window-over-a-literal",
+            Self::ABitwiseCallInAJoinKey => "a-bitwise-call-in-a-join-key",
         }
     }
 
@@ -329,6 +344,9 @@ impl Limit {
             }
             Self::AWindowOverALiteral => {
                 "a window over a literal partition gives no rows, so the rows do not show the plan of what follows it"
+            }
+            Self::ABitwiseCallInAJoinKey => {
+                "Polars does not check the dtypes of a bitwise call in a join's key as it does in select, so it accepts a call the tables refuse for them"
             }
             Self::ABoundWithValuesOfItsOwn => {
                 "Polars casts the values of a bound of clip to the dtype it clips, which the tables measured as the sample's rows, and a bound with others passes"
@@ -415,67 +433,121 @@ fn is_a_bitwise_call(call: &Call) -> bool {
     )
 }
 
-/// Whether `expression` starts from a null of the dtype Null the case holds: a literal null with
-/// no dtype, or the column `a` or `b` when it is the dtype Null.
-fn starts_from_a_null(case: &Case, expression: &Expression) -> bool {
-    match expression.start() {
-        Start::Call(start) if is(start, "polars.lit") => {
-            start.argument("dtype").is_none()
-                && matches!(start.argument("value"), Some(Value::Flag(None)))
-        }
-        Start::Call(start) if is(start, "polars.col") => {
-            matches!(start.argument("name"), Some(Value::Columns(names))
-                if names.len() == 1
-                    && super::frames::column_class(&names[0], case.receiver, case.argument)
-                        == Some(Representative::Null))
-        }
-        _ => false,
+/// What the tables say the expression at `place` is after its first `done` links: its start for
+/// none.
+fn class_after(prediction: &Prediction, place: &Place, done: usize) -> Option<Representative> {
+    let traced = prediction
+        .expressions
+        .iter()
+        .find(|traced| traced.place == *place)?;
+    match done.checked_sub(1) {
+        None => traced.start,
+        Some(last) => traced.links.get(last).copied().flatten(),
     }
 }
 
-/// Whether the link `at` of `expression` is a bitwise call that meets a null: one given a null as
-/// an operand, or the first call of a chain that starts from one.
-fn meets_a_null(case: &Case, expression: &Expression, at: usize) -> bool {
-    let link = &expression.links()[at];
-    is_a_bitwise_call(link)
-        && (operands(link)
+/// Whether the tables give the whole of `expression`, at `place`, the dtype Null.
+fn is_a_null(prediction: &Prediction, expression: &Expression, place: &Place) -> bool {
+    class_after(prediction, place, expression.links().len()) == Some(Representative::Null)
+}
+
+/// Where a null goes along a chain, as the tables give the dtypes and Polars treats a null that a
+/// bitwise call meets. For each link: whether it is a bitwise call that meets a null, as the value
+/// it follows or an operand it is given, and whether what the chain is after it has the dtype Null
+/// where the tables give a `Boolean`.
+///
+/// An `and` with a null on either side is a null, and goes on being one through the `and` and the
+/// `or` of another null after it; an `or` of nulls is one; an `xor` of a `Boolean` and a null is a
+/// `Boolean`, and the tables refuse an `or` or an `xor` of a receiver that is a null. Any other call
+/// gives what the tables say. A filter's predicate takes the dtype Null through it, and a negation
+/// reaches the null through the calls it is pushed through.
+struct NullsAlong {
+    meets: Vec<bool>,
+    is_null_after: Vec<bool>,
+}
+
+fn nulls_along(prediction: &Prediction, expression: &Expression, place: &Place) -> NullsAlong {
+    let null = Some(Representative::Null);
+    let mut is_null = class_after(prediction, place, 0) == null;
+    let mut along = NullsAlong {
+        meets: Vec::new(),
+        is_null_after: Vec::new(),
+    };
+    for (at, link) in expression.links().iter().enumerate() {
+        let operands: Vec<bool> = placed_operands(link, &place.clone().then(Segment::Link(at)))
             .into_iter()
-            .any(|(_, operand)| operand.links().is_empty() && starts_from_a_null(case, operand))
-            || (at == 0 && starts_from_a_null(case, expression)))
+            .map(|(_, held_at, operand)| is_a_null(prediction, operand, &held_at))
+            .collect();
+        let meets = is_a_bitwise_call(link) && (is_null || operands.contains(&true));
+        is_null = match link.entry().id().as_str() {
+            "Expr.and_" => meets,
+            "Expr.or_" => is_null && operands.iter().all(|null| *null),
+            "Expr.xor" => false,
+            _ => class_after(prediction, place, at + 1) == null,
+        };
+        along.meets.push(meets);
+        along.is_null_after.push(is_null);
+    }
+    along
 }
 
-/// The calls of an expression: its start, then its links.
-fn calls_of_expression(expression: &Expression) -> impl Iterator<Item = &Call> {
-    std::iter::once(expression.start())
-        .filter_map(|start| match start {
-            Start::Call(call) => Some(call),
-            Start::Input(_) | Start::Hole => None,
+/// Every expression inside `expression`, which is at `place`, itself first, and where each is.
+fn expressions_inside<'a>(
+    expression: &'a Expression,
+    place: &Place,
+    found: &mut Vec<(Place, &'a Expression)>,
+) {
+    found.push((place.clone(), expression));
+    let start = match expression.start() {
+        Start::Call(call) => Some((call, place.clone().then(Segment::Start))),
+        Start::Input(_) | Start::Hole => None,
+    };
+    let links = expression
+        .links()
+        .iter()
+        .enumerate()
+        .map(|(at, link)| (link, place.clone().then(Segment::Link(at))));
+    for (call, call_at) in start.into_iter().chain(links) {
+        for (_, held_at, inside) in placed_operands(call, &call_at) {
+            expressions_inside(inside, &held_at, found);
+        }
+    }
+}
+
+/// Whether an expression has a `not` after a run of `and` and `or`, any call of which meets a
+/// null, at any depth: the negation is pushed through the run and meets the null wherever it is
+/// in it. Another call ends the run.
+fn negates_a_bitwise_call_on_a_null(
+    prediction: &Prediction,
+    expression: &Expression,
+    place: &Place,
+) -> bool {
+    let mut inside = Vec::new();
+    expressions_inside(expression, place, &mut inside);
+    let combines = |link: &Call| is(link, "Expr.and_") || is(link, "Expr.or_");
+    inside.into_iter().any(|(at, inside)| {
+        let along = nulls_along(prediction, inside, &at);
+        let links = inside.links();
+        (0..links.len()).any(|negation| {
+            is(&links[negation], "Expr.not_")
+                && (0..negation)
+                    .rev()
+                    .take_while(|link| combines(&links[*link]))
+                    .any(|link| along.meets[link])
         })
-        .chain(expression.links())
-}
-
-/// Whether an expression holds, at any depth, a bitwise call that meets a null.
-fn holds_a_bitwise_call_on_a_null(case: &Case, expression: &Expression) -> bool {
-    (0..expression.links().len()).any(|at| meets_a_null(case, expression, at))
-        || calls_of_expression(expression).any(|call| {
-            operands(call)
-                .into_iter()
-                .any(|(_, inside)| holds_a_bitwise_call_on_a_null(case, inside))
-        })
-}
-
-/// Whether an expression has a `not` straight after an `and` or an `or` that meets a null, at
-/// any depth.
-fn negates_a_bitwise_call_on_a_null(case: &Case, expression: &Expression) -> bool {
-    expression.links().windows(2).enumerate().any(|(at, pair)| {
-        is(&pair[1], "Expr.not_")
-            && (is(&pair[0], "Expr.and_") || is(&pair[0], "Expr.or_"))
-            && meets_a_null(case, expression, at)
-    }) || calls_of_expression(expression).any(|call| {
-        operands(call)
-            .into_iter()
-            .any(|(_, inside)| negates_a_bitwise_call_on_a_null(case, inside))
     })
+}
+
+/// Whether Polars gives a filter's predicate the dtype Null where the tables give a `Boolean`: it
+/// ends in a bitwise call that a null has reached, which [`nulls_along`] follows.
+fn gives_a_predicate_the_dtype_null(
+    prediction: &Prediction,
+    predicate: &Expression,
+    place: &Place,
+) -> bool {
+    let along = nulls_along(prediction, predicate, place);
+    predicate.links().last().is_some_and(is_a_bitwise_call)
+        && along.is_null_after.last().copied().unwrap_or(false)
 }
 
 /// Whether `call` is a literal that is a whole number below zero.
@@ -1511,6 +1583,143 @@ fn control_with_columns(
     ))
 }
 
+/// The class that Polars' name for a dtype, as its objections spell it, stands for.
+fn class_of_polars_name(name: &str) -> Option<Representative> {
+    Some(match name.trim().to_ascii_lowercase().as_str() {
+        "i8" | "int8" => Representative::Int8,
+        "i16" | "int16" => Representative::Int16,
+        "i32" | "int32" => Representative::Int32,
+        "i64" | "int64" => Representative::Int64,
+        "u8" | "uint8" => Representative::UInt8,
+        "u16" | "uint16" => Representative::UInt16,
+        "u32" | "uint32" => Representative::UInt32,
+        "u64" | "uint64" => Representative::UInt64,
+        "f32" | "float32" => Representative::Float32,
+        "f64" | "float64" => Representative::Float64,
+        "bool" | "boolean" => Representative::Boolean,
+        "str" | "string" => Representative::String,
+        "date" => Representative::Date,
+        "time" => Representative::Time,
+        _ => return None,
+    })
+}
+
+/// The dtypes that Polars' objection to a bitwise call names, which are the receiver's and the
+/// argument's: `^ not allowed on date and i8`, or `| on Boolean and Int64 is not supported`.
+fn dtypes_of_a_bitwise_objection(reason: &str) -> Option<(Representative, Representative)> {
+    let symbol = reason
+        .chars()
+        .next()
+        .filter(|symbol| "^|&".contains(*symbol))?;
+    let rest = reason[symbol.len_utf8()..].trim_start();
+    let named = rest
+        .strip_prefix("not allowed on ")
+        .or_else(|| {
+            rest.strip_prefix("on ")
+                .and_then(|rest| rest.strip_suffix(" is not supported"))
+        })
+        .or_else(|| {
+            rest.strip_prefix("on ")
+                .and_then(|rest| rest.split(" is not supported").next())
+        })?;
+    let (receiver, argument) = named.split_once(" and ")?;
+    Some((
+        class_of_polars_name(receiver)?,
+        class_of_polars_name(argument)?,
+    ))
+}
+
+/// `call` with every expression it is given a column that stands in for it, the first for the
+/// second dtype of the objection and so on, and how many there are.
+fn call_on_stand_ins(call: &Call) -> Option<Call> {
+    fn columns_in(value: &Value, next: &mut usize) -> Option<Value> {
+        Some(match value {
+            Value::Expression(_) => {
+                *next += 1;
+                let name = Call::new(
+                    catalog::entry("polars.col")?,
+                    vec![("name", Value::Columns(vec![stand_in_column(*next)]))],
+                )
+                .ok()?;
+                Value::Expression(Expression::new(Start::Call(name), Vec::new()).ok()?)
+            }
+            Value::Many(items) => Value::Many(
+                items
+                    .iter()
+                    .map(|item| columns_in(item, next))
+                    .collect::<Option<Vec<_>>>()?,
+            ),
+            other => other.clone(),
+        })
+    }
+    let mut next = 0;
+    let given = call
+        .arguments()
+        .iter()
+        .map(|given| Some((given.parameter(), columns_in(given.value(), &mut next)?)))
+        .collect::<Option<Vec<_>>>()?;
+    Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
+}
+
+/// Whether Polars refuses the refused call as a select does, on columns of the two dtypes that
+/// the tables' objection names, for the objection the tables gave and at the call: the call is then
+/// one that select refuses for those dtypes, so the join key is why Polars allows it. A key that
+/// holds another call that select refuses, or a call whose dtypes select accepts, is no cause.
+fn refused_on_columns_as_a_select(case: &Case, refused: &Refused) -> bool {
+    let Some((receiver, argument)) = dtypes_of_a_bitwise_objection(&refused.reason) else {
+        return false;
+    };
+    let Some(link) = locate(case, &refused.place).call else {
+        return false;
+    };
+    let (Some(on_columns), Some(entry), Some(tables)) = (
+        call_on_stand_ins(link),
+        catalog::entry("LazyFrame.select"),
+        Tables::standing(false, &[receiver, argument, argument]),
+    ) else {
+        return false;
+    };
+    let Ok(start) = Call::new(
+        catalog::entry("polars.col").expect("an entry"),
+        vec![("name", Value::Columns(vec![stand_in_column(0)]))],
+    ) else {
+        return false;
+    };
+    let Ok(chain) = Expression::new(Start::Call(start), vec![on_columns]) else {
+        return false;
+    };
+    let step = &case.document.steps()[0];
+    let Ok(select) = Call::new(
+        entry,
+        vec![("exprs", Value::Many(vec![Value::Expression(chain)]))],
+    ) else {
+        return false;
+    };
+    let Ok(rebuilt) = Step::new(step.id().clone(), select) else {
+        return false;
+    };
+    let Ok(document) = Document::new(vec![rebuilt]) else {
+        return false;
+    };
+    let control = Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        document,
+    };
+    let at = Place::of_step(0, Some(step.id().clone()))
+        .then(Segment::Parameter("exprs".to_owned()))
+        .then(Segment::Item(0))
+        .then(Segment::Link(0));
+    (0..RUNS).any(|_| {
+        observe_probe(&control, tables)
+            .refusal
+            .is_some_and(|refusal| {
+                same_reason(&refused.source, &refused.reason, &refusal.reason)
+                    && refusal.place.as_ref().is_none_or(|place| *place == at)
+            })
+    })
+}
+
 /// Whether the limit is why the tables and Polars disagree.
 fn applies(
     limit: Limit,
@@ -1658,17 +1867,31 @@ fn applies(
         }
         (Limit::ABitwiseCallOnANull, Disagreement::PolarsRefuses(refusal)) => {
             let reason = refusal.reason.as_str();
+            let origin = Place::of_step(0, Some(case.document.steps()[0].id().clone()));
+            let placed = placed_operands(step, &origin);
             let negated = reason.contains("dtype Null not supported in 'not' operation")
-                && held
+                && placed
                     .iter()
-                    .any(|(_, held)| negates_a_bitwise_call_on_a_null(case, held));
+                    .any(|(_, at, held)| negates_a_bitwise_call_on_a_null(prediction, held, at));
             let filtered = reason
                 .contains("filter predicate must be of type `Boolean`, got `Null`")
                 && is(step, "LazyFrame.filter")
-                && held
-                    .iter()
-                    .any(|(_, held)| holds_a_bitwise_call_on_a_null(case, held));
+                && placed.iter().any(|(parameter, at, held)| {
+                    *parameter == "predicates"
+                        && gives_a_predicate_the_dtype_null(prediction, held, at)
+                });
             unplaced(refusal) && refusal.stage == Stage::Rows && (negated || filtered)
+        }
+        (Limit::ABitwiseCallInAJoinKey, Disagreement::PolarsAllows(refused)) => {
+            // A bitwise call in one of the join's own keys, refused for the dtypes it names, which
+            // select refuses the call on columns of too.
+            is(step, "LazyFrame.join")
+                && matches!(refused.place.path().first(), Some(Segment::Parameter(name))
+                    if ["on", "left_on", "right_on"].contains(&name.as_str()))
+                && locate(case, &refused.place)
+                    .call
+                    .is_some_and(is_a_bitwise_call)
+                && refused_on_columns_as_a_select(case, refused)
         }
         (Limit::ADivisionByZero, Disagreement::PolarsRefuses(refusal)) => {
             // The rows hold the divisor; a table with no rows holds none.
@@ -1959,8 +2182,32 @@ mod tests {
                 reason: reason.to_owned(),
             }),
             expressions: Vec::new(),
+            ..Observed::default()
         };
         excuses(case, &prediction(Verdict::Allows, traced), &observed)
+    }
+
+    /// The tables allow the case, as they do, so the prediction is theirs and not made up, and
+    /// Polars refuses it at `place`, if it said.
+    fn polars_refuses_what_the_tables_allow(
+        case: &Case,
+        place: Option<Place>,
+        stage: Stage,
+        reason: &str,
+    ) -> Vec<Limit> {
+        let prediction = predict(case);
+        assert_eq!(prediction.verdict, Verdict::Allows, "the tables allow it");
+        let observed = Observed {
+            refusal: Some(Refusal {
+                stage,
+                at: String::new(),
+                place,
+                reason: reason.to_owned(),
+            }),
+            expressions: Vec::new(),
+            ..Observed::default()
+        };
+        excuses(case, &prediction, &observed)
     }
 
     const ROWS: Option<TableStage> = Some(TableStage::Rows);
@@ -2053,6 +2300,37 @@ mod tests {
         assert_eq!(
             excused_by_kept("uncovered-a-panic--a-literal-in-a-sort-key.case"),
             vec![Limit::APanic]
+        );
+    }
+
+    #[test]
+    fn a_literal_nested_in_an_operand_of_the_refused_call_is_excused_where_a_column_is_refused() {
+        // `a <= b / lit(null, Int64)`, `h > a * lit(null, Duration)` and
+        // `g == null - lit(null, List(Int64))`: Polars folds the arithmetic with the literal into a
+        // null and never meets the dtype the tables refuse the comparison for. Every literal the
+        // operand holds is a column in the case run again, and the start of the operand is not
+        // the only one. A condition of three branches stands for a column as one of one does.
+        for name in [
+            "uncovered-a-literal--given-to-a-call-of-an-operand.case",
+            "uncovered-a-literal--given-to-a-call-of-an-operand-of-a-comparison-with-text.case",
+            "uncovered-a-literal--a-literal-given-to-a-call-after-a-literal.case",
+            "uncovered-a-literal--a-condition-of-three-branches.case",
+        ] {
+            assert_eq!(excused_by_kept(name), vec![Limit::ALiteral], "{name}");
+        }
+    }
+
+    #[test]
+    fn a_literal_nested_in_an_operand_is_no_cause_where_polars_allows_the_column_of_its_dtype_too()
+    {
+        // `sort(by=(a <= b / lit(null, Int64)).len())`: the key is one value, which Polars
+        // drops whatever the comparison holds, so the column in the literal's place is allowed
+        // as well and the literal is not why. A probe of the comparison settles it.
+        assert_eq!(
+            excused_by_kept(
+                "stricter-a-literal-given-to-a-call-of-an-operand-in-a-sort-key-of-one-value.case"
+            ),
+            vec![]
         );
     }
 
@@ -2915,6 +3193,282 @@ mod tests {
         call("Expr.and_", vec![("others", many(vec![operand]))])
     }
 
+    /// A null of the dtype Null, which is given as a dtype.
+    fn typed_null() -> Call {
+        let dtype = Dtype::new(Representative::Null.dtype()).expect("a dtype");
+        call(
+            "polars.lit",
+            vec![("value", Value::Flag(None)), ("dtype", Value::Dtype(dtype))],
+        )
+    }
+
+    fn truth() -> Call {
+        call("polars.lit", vec![("value", Value::Flag(Some(true)))])
+    }
+
+    fn or_of(operand: Expression) -> Call {
+        call("Expr.or_", vec![("others", many(vec![operand]))])
+    }
+
+    fn xor_of(operand: Expression) -> Call {
+        call("Expr.xor", vec![("other", Value::Expression(operand))])
+    }
+
+    fn null_plus_null() -> Expression {
+        chain_of(null(), vec![compared_with("Expr.add", chain(null(), &[]))])
+    }
+
+    fn not() -> Call {
+        call("Expr.not_", Vec::new())
+    }
+
+    #[test]
+    fn a_not_of_the_dtype_null_is_excused_whatever_gives_the_null_its_dtype() {
+        for expression in [
+            // A null given the dtype Null, which the tables give a literal with none.
+            chain_of(
+                typed_null(),
+                vec![
+                    or_of(chain(column("f"), &[])),
+                    not(),
+                    call("Expr.sum", vec![]),
+                ],
+            ),
+            // A null that a call gives the dtype, as the receiver.
+            chain_of(
+                null(),
+                vec![
+                    call("Expr.max", Vec::new()),
+                    and_of(chain(column("f"), &[])),
+                    not(),
+                ],
+            ),
+            // As an operand, given by a call and by a literal that has the dtype.
+            chain_of(column("f"), vec![and_of(null_plus_null()), not()]),
+            chain_of(
+                column("f"),
+                vec![
+                    or_of(chain(typed_null(), &[])),
+                    not(),
+                    call("Expr.min", vec![]),
+                ],
+            ),
+        ] {
+            let case = select(vec![expression]);
+            assert_eq!(
+                polars_refuses_what_the_tables_allow(&case, None, Stage::Rows, NOT_OF_A_NULL),
+                vec![Limit::ABitwiseCallOnANull],
+                "{}",
+                case.document.write()
+            );
+        }
+    }
+
+    #[test]
+    fn a_not_of_the_dtype_null_is_not_excused_where_the_tables_give_the_bitwise_call_no_null() {
+        for expression in [
+            // A null in an operand whose own dtype is a `Boolean`.
+            chain_of(
+                column("f"),
+                vec![
+                    and_of(chain(null(), &["Expr.is_null"])),
+                    not(),
+                    call("Expr.min", vec![]),
+                ],
+            ),
+            // A null that a comparison meets, before a conjunction of columns.
+            chain_of(
+                column("f"),
+                vec![
+                    compared_with("Expr.eq", chain(typed_null(), &[])),
+                    and_of(chain(column("f"), &[])),
+                    not(),
+                ],
+            ),
+        ] {
+            let case = select(vec![expression]);
+            assert_eq!(
+                polars_refuses_what_the_tables_allow(&case, None, Stage::Rows, NOT_OF_A_NULL),
+                vec![],
+                "{}",
+                case.document.write()
+            );
+        }
+    }
+
+    #[test]
+    fn a_not_after_a_run_of_and_and_or_is_excused_where_any_call_of_the_run_meets_a_null() {
+        // `f & a & true` then `not`, with `a` a null: the null is met by the first call and
+        // stays in what the run combines, which the negation reaches through the calls after it.
+        let and_then_and = |first: Call, second: Call| {
+            chain_of(
+                column("f"),
+                vec![first, second, not(), call("Expr.min", vec![])],
+            )
+        };
+        for expression in [
+            and_then_and(
+                and_of(chain(typed_null(), &[])),
+                and_of(chain(truth(), &[])),
+            ),
+            and_then_and(and_of(chain(typed_null(), &[])), or_of(chain(truth(), &[]))),
+            and_then_and(or_of(chain(typed_null(), &[])), and_of(chain(truth(), &[]))),
+            and_then_and(and_of(chain(truth(), &[])), or_of(chain(typed_null(), &[]))),
+            // A null that a call gives the dtype, and a null the run starts from.
+            and_then_and(and_of(null_plus_null()), or_of(chain(truth(), &[]))),
+            chain_of(
+                typed_null(),
+                vec![
+                    and_of(chain(truth(), &[])),
+                    and_of(chain(truth(), &[])),
+                    not(),
+                    call("Expr.min", vec![]),
+                ],
+            ),
+        ] {
+            let case = select(vec![expression]);
+            assert_eq!(
+                polars_refuses_what_the_tables_allow(&case, None, Stage::Rows, NOT_OF_A_NULL),
+                vec![Limit::ABitwiseCallOnANull],
+                "{}",
+                case.document.write()
+            );
+        }
+    }
+
+    #[test]
+    fn a_not_after_bitwise_calls_that_meet_no_null_or_a_run_that_a_call_breaks_is_not_excused() {
+        for expression in [
+            // No null at all.
+            chain_of(
+                column("f"),
+                vec![
+                    and_of(chain(truth(), &[])),
+                    or_of(chain(truth(), &[])),
+                    not(),
+                ],
+            ),
+            // The null is in an operand whose own dtype is a `Boolean`.
+            chain_of(
+                column("f"),
+                vec![
+                    and_of(chain(null(), &["Expr.is_null"])),
+                    and_of(chain(truth(), &[])),
+                    not(),
+                ],
+            ),
+            // A call that is no `and` or `or` between the null and the negation ends the run.
+            chain_of(
+                column("f"),
+                vec![
+                    and_of(chain(typed_null(), &[])),
+                    call("Expr.is_null", Vec::new()),
+                    and_of(chain(truth(), &[])),
+                    not(),
+                ],
+            ),
+            chain_of(
+                column("f"),
+                vec![
+                    and_of(chain(typed_null(), &[])),
+                    xor_of(chain(truth(), &[])),
+                    and_of(chain(truth(), &[])),
+                    not(),
+                ],
+            ),
+            // An `xor` is not what the negation is pushed through.
+            chain_of(column("f"), vec![xor_of(chain(typed_null(), &[])), not()]),
+        ] {
+            let case = select(vec![expression]);
+            assert_eq!(
+                polars_refuses_what_the_tables_allow(&case, None, Stage::Rows, NOT_OF_A_NULL),
+                vec![],
+                "{}",
+                case.document.write()
+            );
+        }
+    }
+
+    fn filtered(predicate: Expression) -> Case {
+        case_of(call(
+            "LazyFrame.filter",
+            vec![("predicates", many(vec![predicate]))],
+        ))
+    }
+
+    const NULL_PREDICATE: &str = "filter predicate must be of type `Boolean`, got `Null`";
+
+    #[test]
+    fn a_filter_predicate_that_ends_in_a_bitwise_call_that_meets_a_null_of_any_origin_is_excused() {
+        for predicate in [
+            // A null given the dtype Null, starting the chain, and as the operand.
+            chain_of(typed_null(), vec![and_of(chain(truth(), &[]))]),
+            chain_of(column("f"), vec![and_of(chain(typed_null(), &[]))]),
+            // A null that a call gives the dtype, before the `and` and in it.
+            chain_of(
+                null(),
+                vec![
+                    compared_with("Expr.add", chain(null(), &[])),
+                    and_of(chain(column("f"), &[])),
+                ],
+            ),
+            chain_of(column("f"), vec![and_of(null_plus_null())]),
+            // The dtype Null goes on through the `and` and through an `or` of another null.
+            chain_of(
+                column("f"),
+                vec![and_of(chain(null(), &[])), and_of(chain(column("f"), &[]))],
+            ),
+            chain_of(
+                column("f"),
+                vec![and_of(chain(null(), &[])), or_of(chain(null(), &[]))],
+            ),
+        ] {
+            let case = filtered(predicate);
+            assert_eq!(
+                polars_refuses_what_the_tables_allow(&case, None, Stage::Rows, NULL_PREDICATE),
+                vec![Limit::ABitwiseCallOnANull],
+                "{}",
+                case.document.write()
+            );
+        }
+    }
+
+    #[test]
+    fn a_filter_predicate_that_polars_gives_a_boolean_is_not_excused_for_the_dtype_null() {
+        for predicate in [
+            // An `or` or an `xor` of a `Boolean` and a null is a `Boolean`.
+            chain_of(column("f"), vec![or_of(chain(null(), &[]))]),
+            chain_of(null(), vec![or_of(chain(column("f"), &[]))]),
+            chain_of(column("f"), vec![xor_of(chain(null(), &[]))]),
+            // A call after the `and` gives what the tables say.
+            chain_of(
+                column("f"),
+                vec![and_of(chain(null(), &[])), call("Expr.is_null", Vec::new())],
+            ),
+            // An `xor` of what an `and` of a null gave is no null.
+            chain_of(
+                column("f"),
+                vec![and_of(chain(null(), &[])), xor_of(chain(column("f"), &[]))],
+            ),
+            // The `and` is inside another call, whose result is what the predicate is.
+            chain_of(
+                column("f"),
+                vec![compared_with(
+                    "Expr.eq",
+                    chain_of(column("f"), vec![and_of(chain(null(), &[]))]),
+                )],
+            ),
+        ] {
+            let case = filtered(predicate);
+            assert_eq!(
+                polars_refuses_what_the_tables_allow(&case, None, Stage::Rows, NULL_PREDICATE),
+                vec![],
+                "{}",
+                case.document.write()
+            );
+        }
+    }
+
     #[test]
     fn a_not_of_the_dtype_null_is_excused_where_a_not_comes_straight_after_an_and_or_an_or() {
         for combined in [
@@ -2933,7 +3487,7 @@ mod tests {
                 ],
             )]);
             assert_eq!(
-                polars_refuses(&case, None, Stage::Rows, NOT_OF_A_NULL, Vec::new()),
+                polars_refuses_what_the_tables_allow(&case, None, Stage::Rows, NOT_OF_A_NULL),
                 vec![Limit::ABitwiseCallOnANull]
             );
         }
@@ -2952,7 +3506,7 @@ mod tests {
             )],
         )]);
         assert_eq!(
-            polars_refuses(&nested, None, Stage::Rows, NOT_OF_A_NULL, Vec::new()),
+            polars_refuses_what_the_tables_allow(&nested, None, Stage::Rows, NOT_OF_A_NULL),
             vec![Limit::ABitwiseCallOnANull]
         );
     }
@@ -2960,8 +3514,8 @@ mod tests {
     #[test]
     fn a_not_of_the_dtype_null_is_not_excused_without_a_not_straight_after_a_bitwise_call() {
         for case in [
-            // A not of a null, and no bitwise call.
-            select(vec![chain(null(), &["Expr.not_"])]),
+            // A not, and no bitwise call.
+            select(vec![chain(column("f"), &["Expr.not_"])]),
             // A bitwise call that no not follows.
             select(vec![chain_of(
                 null(),
@@ -2981,7 +3535,7 @@ mod tests {
             )]),
         ] {
             assert_eq!(
-                polars_refuses(&case, None, Stage::Rows, NOT_OF_A_NULL, Vec::new()),
+                polars_refuses_what_the_tables_allow(&case, None, Stage::Rows, NOT_OF_A_NULL),
                 vec![]
             );
         }
@@ -2999,37 +3553,35 @@ mod tests {
                 vec![("predicates", many(predicates))],
             ))
         };
-        let columns = || chain_of(column("f"), vec![and_of(chain(column("g"), &[]))]);
+        let columns = || chain_of(column("f"), vec![and_of(chain(column("f"), &[]))]);
         assert_eq!(
-            polars_refuses(
+            polars_refuses_what_the_tables_allow(
                 &filtered(vec![columns()]),
                 None,
                 Stage::Rows,
-                predicate,
-                Vec::new()
+                predicate
             ),
             vec![]
         );
         // A null in another predicate, which no bitwise call meets, is no cause either.
         assert_eq!(
-            polars_refuses(
+            polars_refuses_what_the_tables_allow(
                 &filtered(vec![chain(null(), &["Expr.is_null"]), columns()]),
                 None,
                 Stage::Rows,
-                predicate,
-                Vec::new()
+                predicate
             ),
             vec![]
         );
         let negated = select(vec![chain_of(
             column("f"),
             vec![
-                and_of(chain(column("g"), &[])),
+                and_of(chain(column("f"), &[])),
                 call("Expr.not_", Vec::new()),
             ],
         )]);
         assert_eq!(
-            polars_refuses(&negated, None, Stage::Rows, NOT_OF_A_NULL, Vec::new()),
+            polars_refuses_what_the_tables_allow(&negated, None, Stage::Rows, NOT_OF_A_NULL),
             vec![]
         );
     }
@@ -3045,27 +3597,25 @@ mod tests {
             ],
         )]);
         assert_eq!(
-            polars_refuses(
+            polars_refuses_what_the_tables_allow(
                 &case,
                 None,
                 Stage::Rows,
-                "dtype Int8 not supported in 'not' operation",
-                Vec::new()
+                "dtype Int8 not supported in 'not' operation"
             ),
             vec![]
         );
         assert_eq!(
-            polars_refuses(
+            polars_refuses_what_the_tables_allow(
                 &case,
                 Some(link_of("exprs", 0, 1)),
                 Stage::Rows,
-                NOT_OF_A_NULL,
-                Vec::new()
+                NOT_OF_A_NULL
             ),
             vec![]
         );
         assert_eq!(
-            polars_refuses(&case, None, Stage::Schema, NOT_OF_A_NULL, Vec::new()),
+            polars_refuses_what_the_tables_allow(&case, None, Stage::Schema, NOT_OF_A_NULL),
             vec![]
         );
     }
@@ -3083,18 +3633,18 @@ mod tests {
         };
         let case = filtered(chain_of(null(), vec![and_of(chain(column("f"), &[]))]));
         assert_eq!(
-            polars_refuses(&case, None, Stage::Rows, reason, Vec::new()),
+            polars_refuses_what_the_tables_allow(&case, None, Stage::Rows, reason),
             vec![Limit::ABitwiseCallOnANull]
         );
         let other_side = filtered(chain_of(column("f"), vec![and_of(chain(null(), &[]))]));
         assert_eq!(
-            polars_refuses(&other_side, None, Stage::Rows, reason, Vec::new()),
+            polars_refuses_what_the_tables_allow(&other_side, None, Stage::Rows, reason),
             vec![Limit::ABitwiseCallOnANull]
         );
         // A predicate that holds no bitwise call, and another step, are not why.
         let plain = filtered(chain(null(), &["Expr.is_null"]));
         assert_eq!(
-            polars_refuses(&plain, None, Stage::Rows, reason, Vec::new()),
+            polars_refuses_what_the_tables_allow(&plain, None, Stage::Rows, reason),
             vec![]
         );
         let selected = select(vec![chain_of(
@@ -3102,22 +3652,142 @@ mod tests {
             vec![and_of(chain(column("f"), &[]))],
         )]);
         assert_eq!(
-            polars_refuses(&selected, None, Stage::Rows, reason, Vec::new()),
+            polars_refuses_what_the_tables_allow(&selected, None, Stage::Rows, reason),
             vec![]
         );
         // Only the refusal of a predicate of the dtype Null, at the rows, without a place.
         assert_eq!(
-            polars_refuses(
+            polars_refuses_what_the_tables_allow(
                 &case,
                 None,
                 Stage::Rows,
-                "filter predicate must be of type `Boolean`, got `Int64`",
-                Vec::new()
+                "filter predicate must be of type `Boolean`, got `Int64`"
             ),
             vec![]
         );
         assert_eq!(
-            polars_refuses(&case, None, Stage::Schema, reason, Vec::new()),
+            polars_refuses_what_the_tables_allow(&case, None, Stage::Schema, reason),
+            vec![]
+        );
+    }
+
+    // ----- A bitwise call in a join's key
+
+    const A_BITWISE_OBJECTION: &str = "^ on Int64 and Boolean is not supported Hint: cast the Boolean to Int64 using pl.Expr.cast().";
+
+    fn right_key_link() -> Place {
+        at(&[parameter("right_on"), Segment::Item(0), Segment::Link(0)])
+    }
+
+    /// `join(left_on=[k], right_on=[<right>])`, which the tables refuse at the first link of the
+    /// right key with `reason`, and Polars allows.
+    fn refused_in_a_right_key(right: Expression, reason: &str) -> Vec<Limit> {
+        let case = join(chain(column("k"), &[]), right);
+        excused_by_the_tables_refusing(&case, right_key_link(), reason)
+    }
+
+    fn excused_by_the_tables_refusing(case: &Case, place: Place, reason: &str) -> Vec<Limit> {
+        std::thread::scope(|scope| {
+            std::thread::Builder::new()
+                .stack_size(256 << 20)
+                .spawn_scoped(scope, || {
+                    tables_refuse(case, place, Some(TableStage::Schema), reason)
+                })
+                .expect("a thread")
+                .join()
+                .expect("the limits are asked")
+        })
+    }
+
+    #[test]
+    fn a_bitwise_call_in_a_join_key_is_excused_where_polars_refuses_the_key_when_it_is_selected() {
+        // `rb ^ rf` of a whole number and a `Boolean`: Polars refuses it as a select item, and
+        // the join accepts it.
+        assert_eq!(
+            refused_in_a_right_key(
+                chain_of(
+                    column("rb"),
+                    vec![compared_with("Expr.xor", chain(column("rf"), &[]))],
+                ),
+                A_BITWISE_OBJECTION
+            ),
+            vec![Limit::ABitwiseCallInAJoinKey]
+        );
+        assert_eq!(
+            excused_by_kept("uncovered-a-bitwise-call-in-a-join-key.case"),
+            vec![Limit::ABitwiseCallInAJoinKey]
+        );
+    }
+
+    #[test]
+    fn a_bitwise_call_in_a_join_key_excuses_nothing_that_is_not_one_polars_refuses_in_select() {
+        let xor = |left: &str, right: &str| {
+            chain_of(
+                column(left),
+                vec![compared_with("Expr.xor", chain(column(right), &[]))],
+            )
+        };
+        // A call that select accepts, so the position is not why Polars allows it.
+        assert_eq!(
+            refused_in_a_right_key(xor("rk", "rk"), "^ not allowed on i64 and i64"),
+            vec![]
+        );
+        // A refusal that is not about a bitwise call's dtypes.
+        assert_eq!(refused_in_a_right_key(xor("rb", "rf"), "no"), vec![]);
+        // A call that is not a bitwise one, whatever the reason says.
+        assert_eq!(
+            refused_in_a_right_key(
+                chain_of(
+                    column("rb"),
+                    vec![compared_with("Expr.add", chain(column("rf"), &[]))],
+                ),
+                A_BITWISE_OBJECTION
+            ),
+            vec![]
+        );
+        // A call that select accepts, with another bitwise call that it refuses in what the call
+        // is given: the refusal of the tables is of the outer call, whose dtypes select accepts,
+        // so that other call is not why.
+        assert_eq!(
+            refused_in_a_right_key(
+                chain_of(
+                    column("rk"),
+                    vec![compared_with(
+                        "Expr.xor",
+                        chain_of(
+                            column("rb"),
+                            vec![compared_with("Expr.xor", chain(column("rf"), &[]))],
+                        ),
+                    )],
+                ),
+                "^ not allowed on i64 and i64"
+            ),
+            vec![]
+        );
+        // The same refusal where the step is no join, which Polars refuses as the tables do.
+        let selected = select(vec![xor("a", "f")]);
+        assert_eq!(
+            excused_by_the_tables_refusing(&selected, link_of("exprs", 0, 0), A_BITWISE_OBJECTION),
+            vec![]
+        );
+        // A key that is no join's own: the window's key in a select.
+        let windowed = select(vec![chain_of(
+            column("a"),
+            vec![call(
+                "Expr.over",
+                vec![("partition_by", many(vec![xor("a", "f")]))],
+            )],
+        )]);
+        let place = at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Link(0),
+            parameter("partition_by"),
+            Segment::Item(0),
+            Segment::Link(0),
+        ]);
+        assert_eq!(
+            excused_by_the_tables_refusing(&windowed, place, A_BITWISE_OBJECTION),
             vec![]
         );
     }
