@@ -1405,6 +1405,23 @@ mod tests {
     }
 
     #[test]
+    fn a_condition_no_row_takes_is_asked_on_a_column_of_the_dtype_polars_gave_it() {
+        // `h > when(b.arccosh() == k).then(a)` with a list `a`: no row of the sample takes the
+        // branch, so the condition is all nulls, which Polars compares with text where it refuses
+        // the list. The tables say nothing of the dtype of a condition with no `otherwise`, and
+        // Polars gives it the dtype of its values, so a column of that dtype beside a column of
+        // text is refused as the tables say.
+        let found = settled_apart("stricter-a-condition-with-no-otherwise-that-no-row-takes.case")
+            .expect("the call on columns of the dtypes that Polars gave it");
+        assert!(
+            found.reason.contains("cannot cast List"),
+            "{}",
+            found.reason
+        );
+        assert!(!found.probe.contains("polars.when"), "{}", found.probe);
+    }
+
+    #[test]
     fn a_call_is_not_asked_on_columns_where_polars_gave_an_argument_no_dtype() {
         let case = kept("stricter-a-power-of-a-null-literal-in-a-sort-key.case");
         assert_eq!(
