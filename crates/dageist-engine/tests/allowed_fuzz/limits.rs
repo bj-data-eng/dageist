@@ -148,8 +148,8 @@ pub enum Limit {
     /// conjunction is the disjunction of the negations, so a `not` meets each operand,
     /// which it refuses for the dtype Null. Polars refusing the rows with the reason that
     /// the dtype Null is not supported in `not`, which has no place, in a case that holds
-    /// a `not` straight after an `and` or an `or` that meets a null, as the tables give
-    /// the dtypes. It gives a filter's predicate the dtype Null, which Polars refuses with
+    /// a `not` after a run of `and` and `or`, any call of which meets a null, as the tables
+    /// give the dtypes and as a null goes on through the `and` and the `or` after it. It gives a filter's predicate the dtype Null, which Polars refuses with
     /// the reason that a predicate must be a `Boolean`: an `and` that meets a null does,
     /// as does an `or` of nulls, and the dtype goes on through the `and` and the `or` that
     /// follow it, so the predicate is one that ends in bitwise calls the first of which
@@ -436,20 +436,44 @@ fn is_a_null(prediction: &Prediction, expression: &Expression, place: &Place) ->
     class_after(prediction, place, expression.links().len()) == Some(Representative::Null)
 }
 
-/// Whether the link `at` of `expression`, which is at `place`, is a bitwise call that meets a
-/// value of the dtype Null as the tables give it: the value it follows, or one it is given.
-fn meets_a_null(
-    prediction: &Prediction,
-    expression: &Expression,
-    place: &Place,
-    at: usize,
-) -> bool {
-    let link = &expression.links()[at];
-    is_a_bitwise_call(link)
-        && (class_after(prediction, place, at) == Some(Representative::Null)
-            || placed_operands(link, &place.clone().then(Segment::Link(at)))
-                .into_iter()
-                .any(|(_, held_at, operand)| is_a_null(prediction, operand, &held_at)))
+/// Where a null goes along a chain, as the tables give the dtypes and Polars treats a null that a
+/// bitwise call meets. For each link: whether it is a bitwise call that meets a null, as the value
+/// it follows or an operand it is given, and whether what the chain is after it has the dtype Null
+/// where the tables give a `Boolean`.
+///
+/// An `and` with a null on either side is a null, and goes on being one through the `and` and the
+/// `or` of another null after it; an `or` of nulls is one; an `xor` of a `Boolean` and a null is a
+/// `Boolean`, and the tables refuse an `or` or an `xor` of a receiver that is a null. Any other call
+/// gives what the tables say. A filter's predicate takes the dtype Null through it, and a negation
+/// reaches the null through the calls it is pushed through.
+struct NullsAlong {
+    meets: Vec<bool>,
+    is_null_after: Vec<bool>,
+}
+
+fn nulls_along(prediction: &Prediction, expression: &Expression, place: &Place) -> NullsAlong {
+    let null = Some(Representative::Null);
+    let mut is_null = class_after(prediction, place, 0) == null;
+    let mut along = NullsAlong {
+        meets: Vec::new(),
+        is_null_after: Vec::new(),
+    };
+    for (at, link) in expression.links().iter().enumerate() {
+        let operands: Vec<bool> = placed_operands(link, &place.clone().then(Segment::Link(at)))
+            .into_iter()
+            .map(|(_, held_at, operand)| is_a_null(prediction, operand, &held_at))
+            .collect();
+        let meets = is_a_bitwise_call(link) && (is_null || operands.contains(&true));
+        is_null = match link.entry().id().as_str() {
+            "Expr.and_" => meets,
+            "Expr.or_" => is_null && operands.iter().all(|null| *null),
+            "Expr.xor" => false,
+            _ => class_after(prediction, place, at + 1) == null,
+        };
+        along.meets.push(meets);
+        along.is_null_after.push(is_null);
+    }
+    along
 }
 
 /// Every expression inside `expression`, which is at `place`, itself first, and where each is.
@@ -475,8 +499,9 @@ fn expressions_inside<'a>(
     }
 }
 
-/// Whether an expression has a `not` straight after an `and` or an `or` that meets a null, at
-/// any depth.
+/// Whether an expression has a `not` after a run of `and` and `or`, any call of which meets a
+/// null, at any depth: the negation is pushed through the run and meets the null wherever it is
+/// in it. Another call ends the run.
 fn negates_a_bitwise_call_on_a_null(
     prediction: &Prediction,
     expression: &Expression,
@@ -484,42 +509,30 @@ fn negates_a_bitwise_call_on_a_null(
 ) -> bool {
     let mut inside = Vec::new();
     expressions_inside(expression, place, &mut inside);
+    let combines = |link: &Call| is(link, "Expr.and_") || is(link, "Expr.or_");
     inside.into_iter().any(|(at, inside)| {
-        inside.links().windows(2).enumerate().any(|(link, pair)| {
-            is(&pair[1], "Expr.not_")
-                && (is(&pair[0], "Expr.and_") || is(&pair[0], "Expr.or_"))
-                && meets_a_null(prediction, inside, &at, link)
+        let along = nulls_along(prediction, inside, &at);
+        let links = inside.links();
+        (0..links.len()).any(|negation| {
+            is(&links[negation], "Expr.not_")
+                && (0..negation)
+                    .rev()
+                    .take_while(|link| combines(&links[*link]))
+                    .any(|link| along.meets[link])
         })
     })
 }
 
 /// Whether Polars gives a filter's predicate the dtype Null where the tables give a `Boolean`: it
-/// ends in bitwise calls, the first of which meets a value of the dtype Null. An `and` with a
-/// null on either side is a null, and goes on being one through an `and`, and through an `or` of
-/// another null, however it began. An `or` or an `xor` of a `Boolean` and a null is a `Boolean`,
-/// and the tables refuse either of a receiver that is a null; and any other call that follows
-/// gives what the tables say.
+/// ends in a bitwise call that a null has reached, which [`nulls_along`] follows.
 fn gives_a_predicate_the_dtype_null(
     prediction: &Prediction,
     predicate: &Expression,
     place: &Place,
 ) -> bool {
-    let null = Some(Representative::Null);
-    // Whether what the chain is has the dtype Null, and whether a bitwise call made it so.
-    let mut is_null = class_after(prediction, place, 0) == null;
-    let mut made_by_a_bitwise_call = false;
-    for (at, link) in predicate.links().iter().enumerate() {
-        let mut operands = placed_operands(link, &place.clone().then(Segment::Link(at)))
-            .into_iter()
-            .map(|(_, held_at, operand)| is_a_null(prediction, operand, &held_at));
-        (is_null, made_by_a_bitwise_call) = match link.entry().id().as_str() {
-            "Expr.and_" => (is_null || operands.any(|null| null), true),
-            "Expr.or_" => (is_null && operands.all(|null| null), true),
-            "Expr.xor" => (false, true),
-            _ => (class_after(prediction, place, at + 1) == null, false),
-        };
-    }
-    is_null && made_by_a_bitwise_call
+    let along = nulls_along(prediction, predicate, place);
+    predicate.links().last().is_some_and(is_a_bitwise_call)
+        && along.is_null_after.last().copied().unwrap_or(false)
 }
 
 /// Whether `call` is a literal that is a whole number below zero.
