@@ -1400,6 +1400,11 @@ impl Walker<'_> {
 /// follows and is given an operand of many: the one value is met by each of them, as the count of
 /// nulls is by the base of a logarithm that is a column.
 fn broadcast(entry: &Entry, arguments: &[(String, Operand)], shape: Shape) -> Shape {
+    // A window gives each row of its group the value it gives the group, so one value over a
+    // window is as many values as the table has rows.
+    if entry.id().as_str() == "Expr.over" && shape == Shape::One {
+        return Shape::Many;
+    }
     // What a replacement lists is a table of values, which gives no more values than what it
     // follows, as many values as that table holds.
     let given_many = !matches!(entry.id().as_str(), "Expr.replace" | "Expr.replace_strict")
