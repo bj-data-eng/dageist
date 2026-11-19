@@ -1224,6 +1224,50 @@ mod tests {
         assert!(found.probe.contains("Expr.or_"), "{}", found.probe);
     }
 
+    /// What the probe of a refused part apart from the case settles: the tables' refusal of the
+    /// kept case, and what Polars gave it.
+    fn settled_apart(name: &str) -> Option<Settled> {
+        let case = kept(name);
+        settle_apart(&case, &refusal(&case), &predict(&case), &observe(&case))
+    }
+
+    #[test]
+    fn a_whole_number_as_the_predicate_of_a_condition_under_a_len_is_refused_on_a_column_of_its_dtype()
+     {
+        // `when((h < 1.5).cum_count()).then(f).when(f).then(g).len()`: the length of a condition
+        // never evaluates its predicate, and the predicate alone is refused for the comparison of
+        // text with a number, which the tables do not refuse, before it is for what the rule is
+        // about. A column of the dtype that reaches the end of the predicate, the count, is refused
+        // as the rule says, in the place the predicate stands.
+        let found =
+            settled_apart("stricter-a-count-as-the-predicate-of-a-condition-under-a-len.case")
+                .expect("a column of the dtype that Polars refuses as a predicate");
+        assert!(found.reason.contains("Boolean"), "{}", found.reason);
+        assert!(found.probe.contains("polars.when"), "{}", found.probe);
+        assert!(!found.probe.contains("Expr.cum_count"), "{}", found.probe);
+    }
+
+    #[test]
+    fn a_predicate_is_not_asked_on_a_column_where_polars_gave_no_dtype_or_the_tables_gave_no_rule()
+    {
+        let case = kept("stricter-a-count-as-the-predicate-of-a-condition-under-a-len.case");
+        let rule = refusal(&case);
+        // What Polars gave the predicate is not known, so the column is of no dtype it has.
+        assert_eq!(
+            settle_apart(&case, &rule, &predict(&case), &Observed::default()),
+            None
+        );
+        // A refusal of Polars' own, the same place, is no rule's.
+        let polars = Refused {
+            source: Source::Polars,
+            ..rule
+        };
+        assert_eq!(
+            settle_apart(&case, &polars, &predict(&case), &observe(&case)),
+            None
+        );
+    }
+
     #[test]
     fn a_failure_to_unpack_a_series_is_matched_by_a_schema_the_rows_do_not_give_and_by_nothing_else()
      {
