@@ -578,7 +578,10 @@ impl CaseTarget for AllowedTarget {
 #[cfg(test)]
 mod tests {
     use dageist_engine::allowed::Representative;
+    use dageist_engine::document::{Place, Segment};
 
+    use super::super::observe::SeenExpression;
+    use super::super::predict::Traced;
     use super::*;
 
     /// The outcome of `text` and what was tallied while it was evaluated.
@@ -822,6 +825,35 @@ mod tests {
         let mut at_the_rows = observed;
         at_the_rows.refusal.as_mut().expect("a refusal").stage = Stage::Rows;
         assert!(dtype_difference(&case, &prediction, &at_the_rows).is_some());
+    }
+
+    #[test]
+    fn a_refusal_at_the_call_the_tables_could_not_judge_explains_only_the_prefixes_that_hold_it() {
+        // Another item of the same step, which the tables gave a dtype and Polars refuses, is
+        // refused where the call is not: the refusal at the call that the tables could not be
+        // asked about explains the expression that holds it, and no other.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+            "tests/allowed_fuzz/regressions/fixed-a-prefix-refused-at-the-call-the-tables-could-not-be-asked-about.case",
+        );
+        let case = Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case");
+        let mut observed = observe(&case);
+        let mut prediction = predict(&case);
+        let other = Place::of_step(0, Some(case.document.steps()[0].id().clone()))
+            .then(Segment::Parameter("exprs".to_owned()))
+            .then(Segment::Item(1));
+        prediction.expressions.push(Traced {
+            place: other.clone(),
+            start: Some(Representative::Boolean),
+            links: Vec::new(),
+        });
+        observed.expressions.push(SeenExpression {
+            place: other,
+            start: Seen::Refused("another refusal".to_owned()),
+            links: Vec::new(),
+        });
+        let difference = dtype_difference(&case, &prediction, &observed).expect("a difference");
+        assert!(difference.contains("exprs item 2"), "{difference}");
+        assert!(difference.contains("another refusal"), "{difference}");
     }
 
     #[test]
