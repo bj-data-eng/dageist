@@ -1198,6 +1198,19 @@ impl Walker<'_> {
             })
             .flatten()
             .collect();
+        // A null literal of another dtype than what it fills is folded away by Polars where it
+        // runs the rows, which then give the dtype of what it fills, where its plan gives the
+        // supertype of the two, so what the call gives is not known.
+        let fills_with_a_null_of_another_dtype = entry.id().as_str() == "Expr.fill_null"
+            && matches!(link.argument("value"), Some(Value::Expression(filler)) if is_a_null(filler))
+            && matches!(
+                (class_of_given("value"), receiver),
+                (Some(filler), Some(follows)) if filler != follows
+            );
+        let mut meeting = meeting;
+        if fills_with_a_null_of_another_dtype {
+            meeting.push("value");
+        }
         let supertyped = !meeting.is_empty();
         // What the tables are not told is not guessed: an argument whose dtype
         // is not known leaves the call to be offered for any dtype that fits,
