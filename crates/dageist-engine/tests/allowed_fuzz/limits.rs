@@ -34,6 +34,7 @@
 //! asked after the part as written and before the probes apart from the case,
 //! which cannot tell what Polars evaluates from what it skips.
 
+use dageist_engine::allowed::Representative;
 use dageist_engine::allowed::Stage as TableStage;
 use dageist_engine::catalog;
 use dageist_engine::document::{Call, Document, Expression, Place, Segment, Start, Step, Value};
@@ -136,8 +137,9 @@ pub enum Limit {
     /// run: the number is a value, which the tables measured as the dtype and the
     /// number 1. Polars refusing the rows with a failed conversion to `u32`, which
     /// has no place, in a case that holds a `pow` whose exponent is a whole number
-    /// typed below zero or holds a subtraction, a negation, a not, a sum or a product,
-    /// which can take the values of a column below zero.
+    /// typed below zero or holds a subtraction, a negation or a not, which can take the
+    /// values of a column below zero; the sample's rows are 1, a null and 3, which a sum
+    /// or a product of them does not.
     ANegativeExponent,
     /// A column or a literal of the dtype Null is an operand of `and`, `or` and `xor`
     /// that the tables allow, giving a `Boolean`, as `select` shows. Polars treats it
@@ -146,8 +148,9 @@ pub enum Limit {
     /// so a `not` meets each operand, which it refuses for the dtype Null. Polars
     /// refusing the rows with the reason that the dtype Null is not supported in `not`,
     /// which has no place, in a case that holds a `not` straight after an `and` or an
-    /// `or`. It gives a filter's predicate the dtype Null, which Polars refuses with
-    /// the reason that a predicate must be a `Boolean`, in a filter that holds one.
+    /// `or` that meets a null. It gives a filter's predicate the dtype Null, which Polars
+    /// refuses with the reason that a predicate must be a `Boolean`, in a filter that
+    /// holds a bitwise call that meets a null.
     ABitwiseCallOnANull,
     /// A `UInt128` is compared with a `Decimal` by casting it to `decimal[38,0]`,
     /// which holds up to 38 digits, and a `UInt128` holds more. The sample's values
@@ -160,8 +163,8 @@ pub enum Limit {
     /// zero is null and a float is infinite: the divisor is a value, which the tables
     /// measured as the dtype and the sample's values, none of them zero. A remainder
     /// or a difference of the sample's values can be. Polars refusing the rows with
-    /// the reason that it divides by zero, which has no place, in a case that holds a
-    /// division, a floor division or a remainder.
+    /// the reason that it divides a Decimal by zero, which has no place, in a case with a
+    /// Decimal as a column, that holds a division, a floor division or a remainder.
     ADivisionByZero,
     /// Polars panicking has no place, and is gated by its reason. A panic of
     /// Polars is an internal check that failed. The tables record
@@ -366,21 +369,67 @@ fn is_a_bitwise_call(call: &Call) -> bool {
     )
 }
 
-/// Whether an expression has a `not` straight after an `and` or an `or`, at any depth.
-fn negates_a_bitwise_call(expression: &Expression) -> bool {
-    expression.links().windows(2).any(|pair| {
-        is(&pair[1], "Expr.not_") && (is(&pair[0], "Expr.and_") || is(&pair[0], "Expr.or_"))
-    }) || std::iter::once(expression.start())
+/// Whether `expression` starts from a null of the dtype Null the case holds: a literal null with
+/// no dtype, or the column `a` or `b` when it is the dtype Null.
+fn starts_from_a_null(case: &Case, expression: &Expression) -> bool {
+    match expression.start() {
+        Start::Call(start) if is(start, "polars.lit") => {
+            start.argument("dtype").is_none()
+                && matches!(start.argument("value"), Some(Value::Flag(None)))
+        }
+        Start::Call(start) if is(start, "polars.col") => {
+            matches!(start.argument("name"), Some(Value::Columns(names))
+                if names.len() == 1
+                    && super::frames::column_class(&names[0], case.receiver, case.argument)
+                        == Some(Representative::Null))
+        }
+        _ => false,
+    }
+}
+
+/// Whether the link `at` of `expression` is a bitwise call that meets a null: one given a null as
+/// an operand, or the first call of a chain that starts from one.
+fn meets_a_null(case: &Case, expression: &Expression, at: usize) -> bool {
+    let link = &expression.links()[at];
+    is_a_bitwise_call(link)
+        && (operands(link)
+            .into_iter()
+            .any(|(_, operand)| operand.links().is_empty() && starts_from_a_null(case, operand))
+            || (at == 0 && starts_from_a_null(case, expression)))
+}
+
+/// The calls of an expression: its start, then its links.
+fn calls_of_expression(expression: &Expression) -> impl Iterator<Item = &Call> {
+    std::iter::once(expression.start())
         .filter_map(|start| match start {
             Start::Call(call) => Some(call),
             Start::Input(_) | Start::Hole => None,
         })
         .chain(expression.links())
-        .any(|call| {
+}
+
+/// Whether an expression holds, at any depth, a bitwise call that meets a null.
+fn holds_a_bitwise_call_on_a_null(case: &Case, expression: &Expression) -> bool {
+    (0..expression.links().len()).any(|at| meets_a_null(case, expression, at))
+        || calls_of_expression(expression).any(|call| {
             operands(call)
                 .into_iter()
-                .any(|(_, inside)| negates_a_bitwise_call(inside))
+                .any(|(_, inside)| holds_a_bitwise_call_on_a_null(case, inside))
         })
+}
+
+/// Whether an expression has a `not` straight after an `and` or an `or` that meets a null, at
+/// any depth.
+fn negates_a_bitwise_call_on_a_null(case: &Case, expression: &Expression) -> bool {
+    expression.links().windows(2).enumerate().any(|(at, pair)| {
+        is(&pair[1], "Expr.not_")
+            && (is(&pair[0], "Expr.and_") || is(&pair[0], "Expr.or_"))
+            && meets_a_null(case, expression, at)
+    }) || calls_of_expression(expression).any(|call| {
+        operands(call)
+            .into_iter()
+            .any(|(_, inside)| negates_a_bitwise_call_on_a_null(case, inside))
+    })
 }
 
 /// Whether `call` is a literal that is a whole number below zero.
@@ -399,7 +448,7 @@ fn is_a_power_that_may_be_given_a_value_below_zero(call: &Call) -> bool {
             is_a_whole_number_below_zero(inner)
                 || matches!(
                     inner.entry().id().as_str(),
-                    "Expr.sub" | "Expr.neg" | "Expr.not_" | "Expr.add" | "Expr.mul"
+                    "Expr.sub" | "Expr.neg" | "Expr.not_"
                 )
         }))
 }
@@ -1283,20 +1332,23 @@ fn applies(
         (Limit::ABitwiseCallOnANull, Disagreement::PolarsRefuses(refusal)) => {
             let reason = refusal.reason.as_str();
             let negated = reason.contains("dtype Null not supported in 'not' operation")
-                && held.iter().any(|(_, held)| negates_a_bitwise_call(held));
+                && held
+                    .iter()
+                    .any(|(_, held)| negates_a_bitwise_call_on_a_null(case, held));
             let filtered = reason
                 .contains("filter predicate must be of type `Boolean`, got `Null`")
                 && is(step, "LazyFrame.filter")
                 && held
                     .iter()
-                    .any(|(_, held)| any_call(held, &is_a_bitwise_call));
+                    .any(|(_, held)| holds_a_bitwise_call_on_a_null(case, held));
             unplaced(refusal) && refusal.stage == Stage::Rows && (negated || filtered)
         }
         (Limit::ADivisionByZero, Disagreement::PolarsRefuses(refusal)) => {
             // The rows hold the divisor; a table with no rows holds none.
             unplaced(refusal)
                 && refusal.stage == Stage::Rows
-                && refusal.reason.contains("division by zero")
+                && refusal.reason.contains("division by zero Decimal")
+                && [case.receiver, case.argument].contains(&Representative::Decimal)
                 && held.iter().any(|(_, held)| {
                     any_call(held, &|call| {
                         matches!(
