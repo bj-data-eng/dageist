@@ -1007,3 +1007,79 @@ fn a_replacement_of_columns_that_is_evaluated_is_refused_in_a_joins_key_beside_o
         Some(RefusalSource::Rule(Rule::KeyIsElementwise))
     );
 }
+
+fn a_count_compared_with(entry: &str, number: i64) -> Value {
+    chain(
+        call("polars.lit", json!({ "value": { "integer": 1 } })),
+        vec![
+            call("Expr.len", json!({})),
+            call(entry, json!({ "other": whole(number) })),
+            call("Expr.sub", json!({ "other": field("a") })),
+        ],
+    )
+}
+
+#[test]
+fn a_count_compared_as_a_value_with_a_number_no_dtype_holds_is_one_polars_may_fold_in_a_joins_key()
+{
+    // Polars decides a comparison that takes a missing value as a value, of an unsigned count
+    // with a number below zero, at once, so what it follows is a literal and no aggregate, and the
+    // key is taken. It does not decide a comparison that is not of missing values so.
+    for entry in ["Expr.ne_missing", "Expr.eq_missing"] {
+        let report = join_on(a_count_compared_with(entry, -1));
+        assert!(
+            polars_says(&report).is_none(),
+            "{entry}: {:?}",
+            outcome(&report)
+        );
+        assert_eq!(walk(&report).refusal(), None, "{entry}");
+    }
+}
+
+#[test]
+fn a_count_compared_with_a_number_that_is_kept_is_an_aggregate_beside_a_column_in_a_joins_key() {
+    // A number that every dtype holds is never decided at once, and a comparison that is not of
+    // missing values is kept whatever the number is.
+    for (entry, number) in [
+        ("Expr.ne_missing", 1),
+        ("Expr.eq_missing", 1),
+        ("Expr.ne", -1),
+        ("Expr.ge", -1),
+        ("Expr.gt", 1),
+    ] {
+        let report = join_on(a_count_compared_with(entry, number));
+        assert!(
+            polars_says(&report).is_some(),
+            "{entry}: {:?}",
+            outcome(&report)
+        );
+        assert_eq!(
+            walk(&report)
+                .refusal()
+                .map(|refusal| refusal.refusal().source()),
+            Some(RefusalSource::Rule(Rule::KeyIsElementwise)),
+            "{entry}"
+        );
+    }
+}
+
+#[test]
+fn a_number_no_dtype_holds_that_a_count_is_compared_by_is_a_value_polars_may_fold_too() {
+    // The number that starts the chain is the one compared with the count it is given.
+    let key = chain(
+        call("polars.lit", json!({ "value": { "integer": -1 } })),
+        vec![
+            call(
+                "Expr.ne_missing",
+                json!({ "other": chain(
+                    call("polars.lit", json!({ "value": { "integer": 1 } })),
+                    vec![call("Expr.len", json!({}))],
+                ) }),
+            ),
+            call("Expr.sub", json!({ "other": field("a") })),
+        ],
+    );
+    let report = join_on(key);
+    assert!(polars_says(&report).is_none(), "{:?}", outcome(&report));
+    assert_eq!(walk(&report).refusal(), None);
+}
