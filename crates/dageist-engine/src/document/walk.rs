@@ -1371,7 +1371,7 @@ fn follows_the_start(expression: &Expression, at: usize) -> bool {
             return false;
         }
     }
-    nots % 2 == 0
+    nots.is_multiple_of(2)
 }
 
 /// The calls of an expression: its start, then its links.
