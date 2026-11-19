@@ -549,6 +549,7 @@ pub struct dageist_engine::catalog::Parameter
 impl dageist_engine::catalog::Parameter
 pub const fn dageist_engine::catalog::Parameter::default(&self) -> dageist_engine::catalog::ParameterDefault
 pub const fn dageist_engine::catalog::Parameter::is_keyword_only(&self) -> bool
+pub const fn dageist_engine::catalog::Parameter::is_needed(&self) -> bool
 pub const fn dageist_engine::catalog::Parameter::kind(&self) -> dageist_engine::catalog::Kind
 pub const fn dageist_engine::catalog::Parameter::name(&self) -> &'static str
 pub const fn dageist_engine::catalog::Parameter::role(&self) -> dageist_engine::catalog::Role
