@@ -2019,8 +2019,8 @@ mod tests {
 
     #[test]
     fn a_failed_conversion_to_a_u32_is_excused_where_a_power_is_given_a_value_below_zero() {
-        // A subtraction, a negation, the bits of a number flipped, a sum and a product can take
-        // the values of a column below zero, as a number typed below zero does.
+        // A subtraction, a negation, the bits of a number flipped and a number typed below zero
+        // take the values of a column below zero.
         for exponent in [
             chain_of(
                 column("b"),
@@ -2029,15 +2029,35 @@ mod tests {
             chain(column("k"), &["Expr.neg"]),
             chain(column("k"), &["Expr.not_"]),
             chain_of(column("k"), vec![compared_with("Expr.add", whole(-3))]),
-            chain_of(
-                column("k"),
-                vec![compared_with("Expr.mul", chain(column("a"), &[]))],
-            ),
+            chain_of(column("k"), vec![compared_with("Expr.mul", whole(-1))]),
         ] {
             let case = select(vec![chain_of(column("a"), vec![pow_of(exponent)])]);
             assert_eq!(
                 polars_refuses(&case, None, Stage::Rows, NEGATIVE_EXPONENT, Vec::new()),
                 vec![Limit::ANegativeExponent]
+            );
+        }
+    }
+
+    #[test]
+    fn a_failed_conversion_to_a_u32_is_not_excused_by_a_sum_or_a_product_of_columns() {
+        // The sample's rows are 1, a null and 3, so a sum or a product of columns and of numbers
+        // above zero never goes below it: something else made the number fail to convert.
+        for exponent in [
+            chain_of(
+                column("k"),
+                vec![compared_with("Expr.add", chain(column("a"), &[]))],
+            ),
+            chain_of(
+                column("k"),
+                vec![compared_with("Expr.mul", chain(column("a"), &[]))],
+            ),
+            chain_of(column("k"), vec![compared_with("Expr.add", whole(3))]),
+        ] {
+            let case = select(vec![chain_of(column("a"), vec![pow_of(exponent)])]);
+            assert_eq!(
+                polars_refuses(&case, None, Stage::Rows, NEGATIVE_EXPONENT, Vec::new()),
+                vec![]
             );
         }
     }
@@ -2175,6 +2195,53 @@ mod tests {
     }
 
     #[test]
+    fn a_bitwise_call_that_meets_no_null_excuses_neither_a_not_nor_a_filter_predicate_of_the_dtype_null()
+     {
+        // A conjunction of two columns, in a filter or before a not, is not what gave the dtype
+        // Null: no null reaches it.
+        let predicate = "filter predicate must be of type `Boolean`, got `Null`";
+        let filtered = |predicates: Vec<Expression>| {
+            case_of(call(
+                "LazyFrame.filter",
+                vec![("predicates", many(predicates))],
+            ))
+        };
+        let columns = || chain_of(column("f"), vec![and_of(chain(column("g"), &[]))]);
+        assert_eq!(
+            polars_refuses(
+                &filtered(vec![columns()]),
+                None,
+                Stage::Rows,
+                predicate,
+                Vec::new()
+            ),
+            vec![]
+        );
+        // A null in another predicate, which no bitwise call meets, is no cause either.
+        assert_eq!(
+            polars_refuses(
+                &filtered(vec![chain(null(), &["Expr.is_null"]), columns()]),
+                None,
+                Stage::Rows,
+                predicate,
+                Vec::new()
+            ),
+            vec![]
+        );
+        let negated = select(vec![chain_of(
+            column("f"),
+            vec![
+                and_of(chain(column("g"), &[])),
+                call("Expr.not_", Vec::new()),
+            ],
+        )]);
+        assert_eq!(
+            polars_refuses(&negated, None, Stage::Rows, NOT_OF_A_NULL, Vec::new()),
+            vec![]
+        );
+    }
+
+    #[test]
     fn only_a_refusal_of_a_not_of_the_dtype_null_at_the_rows_without_a_place_is_excused_for_a_not()
     {
         let case = select(vec![chain_of(
@@ -2266,13 +2333,19 @@ mod tests {
 
     const DIVISION_BY_ZERO: &str = "division by zero Decimal";
 
+    /// The case with a `Decimal` as the column `a`.
+    fn with_a_decimal(mut case: Case) -> Case {
+        case.receiver = Representative::Decimal;
+        case
+    }
+
     #[test]
-    fn a_division_by_zero_is_excused_where_a_division_is_in_the_case() {
+    fn a_division_by_zero_is_excused_where_a_division_is_in_a_case_with_a_decimal() {
         for division in ["Expr.floordiv", "Expr.truediv", "Expr.mod"] {
-            let case = select(vec![chain_of(
+            let case = with_a_decimal(select(vec![chain_of(
                 column("b"),
                 vec![compared_with(division, chain(column("a"), &[]))],
-            )]);
+            )]));
             assert_eq!(
                 polars_refuses(&case, None, Stage::Rows, DIVISION_BY_ZERO, Vec::new()),
                 vec![Limit::ADivisionByZero],
@@ -2280,7 +2353,7 @@ mod tests {
             );
         }
         // A division in an expression the chain is given reaches it too.
-        let nested = select(vec![chain_of(
+        let nested = with_a_decimal(select(vec![chain_of(
             column("a"),
             vec![compared_with(
                 "Expr.eq",
@@ -2289,27 +2362,56 @@ mod tests {
                     vec![compared_with("Expr.floordiv", chain(column("k"), &[]))],
                 ),
             )],
-        )]);
+        )]));
         assert_eq!(
             polars_refuses(&nested, None, Stage::Rows, DIVISION_BY_ZERO, Vec::new()),
+            vec![Limit::ADivisionByZero]
+        );
+        // The Decimal may be the argument column.
+        let mut other_side = select(vec![chain_of(
+            column("a"),
+            vec![compared_with("Expr.mod", chain(column("b"), &[]))],
+        )]);
+        other_side.argument = Representative::Decimal;
+        assert_eq!(
+            polars_refuses(&other_side, None, Stage::Rows, DIVISION_BY_ZERO, Vec::new()),
             vec![Limit::ADivisionByZero]
         );
     }
 
     #[test]
-    fn a_division_by_zero_is_not_excused_without_a_division_and_only_at_the_rows_without_a_place() {
-        let none = select(vec![chain_of(
+    fn a_division_by_zero_is_not_excused_without_a_decimal_nor_a_division_nor_at_a_place() {
+        let divided = || {
+            select(vec![chain_of(
+                column("b"),
+                vec![compared_with("Expr.floordiv", chain(column("a"), &[]))],
+            )])
+        };
+        // No Decimal in the case: Polars divides whole numbers and floats by zero without refusing.
+        assert_eq!(
+            polars_refuses(&divided(), None, Stage::Rows, DIVISION_BY_ZERO, Vec::new()),
+            vec![]
+        );
+        // A refusal that is not of a Decimal.
+        assert_eq!(
+            polars_refuses(
+                &with_a_decimal(divided()),
+                None,
+                Stage::Rows,
+                "division by zero Int64",
+                Vec::new()
+            ),
+            vec![]
+        );
+        let none = with_a_decimal(select(vec![chain_of(
             column("b"),
             vec![compared_with("Expr.mul", chain(column("a"), &[]))],
-        )]);
+        )]));
         assert_eq!(
             polars_refuses(&none, None, Stage::Rows, DIVISION_BY_ZERO, Vec::new()),
             vec![]
         );
-        let case = select(vec![chain_of(
-            column("b"),
-            vec![compared_with("Expr.floordiv", chain(column("a"), &[]))],
-        )]);
+        let case = with_a_decimal(divided());
         assert_eq!(
             polars_refuses(
                 &case,
