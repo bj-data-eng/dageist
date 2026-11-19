@@ -194,11 +194,21 @@ pub enum Limit {
     /// dtype and the rows give another, at a call that is not the last of the step's
     /// own expression or in a key that no probe settles, which Polars allows.
     AHiddenSchema,
+    /// Polars casts a bound of `clip` to the dtype it clips as strictly as it can, and refuses
+    /// the rows when a bound holds a value that dtype cannot hold: a number typed without a dtype
+    /// that is out of its range or negative beside an unsigned dtype, or a value of a float
+    /// that is not a whole number it can hold, as the infinity and the not-a-number that a
+    /// logarithm to the base 1 or a root of a negative number gives, or a value out of its
+    /// range. The tables measured a bound as a column of the dtype or of the sample's rows,
+    /// which every dtype holds. Polars refusing the rows, with a failed conversion that has no
+    /// place, in a case whose refusal is the bound's: the case run again with the bounds of
+    /// every `clip` undone is not refused for a failed conversion.
+    ABoundTheDtypeCannotHold,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 17] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -215,6 +225,7 @@ impl Limit {
         Self::AWindowOverAWindow,
         Self::AJoinKeyDtype,
         Self::AHiddenSchema,
+        Self::ABoundTheDtypeCannotHold,
     ];
 
     /// The name a kept case is filed under.
@@ -236,6 +247,7 @@ impl Limit {
             Self::AWindowOverAWindow => "a-window-over-a-window",
             Self::AJoinKeyDtype => "a-join-key-dtype",
             Self::AHiddenSchema => "a-hidden-schema",
+            Self::ABoundTheDtypeCannotHold => "a-bound-the-dtype-cannot-hold",
         }
     }
 
@@ -286,6 +298,9 @@ impl Limit {
             }
             Self::AHiddenSchema => {
                 "a method whose plan and rows differ in dtype is hidden by what goes on from it"
+            }
+            Self::ABoundTheDtypeCannotHold => {
+                "Polars casts a bound of clip to the dtype it clips and refuses a value that dtype cannot hold, which the tables measured only with values it holds"
             }
         }
     }
@@ -1040,55 +1055,57 @@ fn leaves_only_nulls(frames: &Frames, expression: &Expression, upto: usize) -> b
         .is_some_and(|rows| !rows.is_empty() && rows.iter().all(|cell| *cell == Cell::Null))
 }
 
-/// `value` with every window in it that explodes given the mapping it has when none
-/// is named.
-fn value_without_explodes(value: &Value) -> Value {
+/// Whether a call undoes the argument `parameter` of the call `call`.
+type Undo<'a> = &'a dyn Fn(&Call, &str) -> bool;
+
+/// `value` with every argument `undo` names undone, in the calls it holds.
+fn value_without(value: &Value, undo: Undo<'_>) -> Value {
     match value {
-        Value::Expression(expression) => {
-            Value::Expression(without_explodes(expression).unwrap_or_else(|| expression.clone()))
+        Value::Expression(expression) => Value::Expression(
+            expression_without(expression, undo).unwrap_or_else(|| expression.clone()),
+        ),
+        Value::Many(items) => {
+            Value::Many(items.iter().map(|item| value_without(item, undo)).collect())
         }
-        Value::Many(items) => Value::Many(items.iter().map(value_without_explodes).collect()),
         Value::Pairs(pairs) => Value::Pairs(
             pairs
                 .iter()
-                .map(|(key, entry)| (value_without_explodes(key), value_without_explodes(entry)))
+                .map(|(key, entry)| (value_without(key, undo), value_without(entry, undo)))
                 .collect(),
         ),
         other => other.clone(),
     }
 }
 
-/// `call` with the arguments that explode, and the windows in them, undone.
-fn call_without_explodes(call: &Call) -> Option<Call> {
-    let explodes = has_explode(call);
+/// `call` with the arguments `undo` names, and those in the calls it holds, undone.
+fn call_without(call: &Call, undo: Undo<'_>) -> Option<Call> {
     let given: Vec<(&str, Value)> = call
         .arguments()
         .iter()
-        .filter(|given| !(explodes && given.parameter() == "mapping_strategy"))
-        .map(|given| (given.parameter(), value_without_explodes(given.value())))
+        .filter(|given| !undo(call, given.parameter()))
+        .map(|given| (given.parameter(), value_without(given.value(), undo)))
         .collect();
     Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
 }
 
-/// `expression` with no window that explodes: each is the window the same call
-/// makes when it is not told how to map.
-fn without_explodes(expression: &Expression) -> Option<Expression> {
+/// `expression` with the arguments `undo` names undone.
+fn expression_without(expression: &Expression, undo: Undo<'_>) -> Option<Expression> {
     let start = match expression.start() {
-        Start::Call(call) => Start::Call(call_without_explodes(call)?),
+        Start::Call(call) => Start::Call(call_without(call, undo)?),
         other => other.clone(),
     };
     let links = expression
         .links()
         .iter()
-        .map(call_without_explodes)
+        .map(|link| call_without(link, undo))
         .collect::<Option<Vec<_>>>()?;
     Expression::new(start, links).ok()
 }
 
-/// The case with no window that explodes, the same in all else.
-fn case_without_explodes(case: &Case) -> Option<Case> {
+/// The case with the arguments `undo` names undone, the same in all else.
+fn case_without(case: &Case, undo: Undo<'_>) -> Option<Case> {
     let step = &case.document.steps()[0];
-    let rebuilt = Step::new(step.id().clone(), call_without_explodes(step.call())?).ok()?;
+    let rebuilt = Step::new(step.id().clone(), call_without(step.call(), undo)?).ok()?;
     Some(Case {
         receiver: case.receiver,
         argument: case.argument,
@@ -1096,9 +1113,51 @@ fn case_without_explodes(case: &Case) -> Option<Case> {
     })
 }
 
+/// The case with no window that explodes: each is the window the same call makes when it is not
+/// told how to map.
+fn case_without_explodes(case: &Case) -> Option<Case> {
+    case_without(case, &|call, parameter| {
+        has_explode(call) && parameter == "mapping_strategy"
+    })
+}
+
+/// The case with no bound given to any `clip`, which is then the expression it follows.
+fn case_without_bounds(case: &Case) -> Option<Case> {
+    case_without(case, &|call, parameter| {
+        is(call, "Expr.clip") && matches!(parameter, "lower_bound" | "upper_bound")
+    })
+}
+
 /// How often the case without its explodes is run again: which of two failures of
 /// a plan Polars names depends on which thread gets there first.
 const RUNS: usize = 8;
+
+/// Whether the call is a `clip` that has a bound.
+fn has_a_bound(call: &Call) -> bool {
+    is(call, "Expr.clip")
+        && ["lower_bound", "upper_bound"]
+            .iter()
+            .any(|bound| call.argument(bound).is_some())
+}
+
+/// Whether the reason is that of a value that could not be cast: Polars' words for it, which
+/// name the dtypes.
+fn is_a_failed_conversion(reason: &str) -> bool {
+    reason.starts_with("conversion from `") && reason.contains("` failed")
+}
+
+/// Whether Polars refuses the case for a failed conversion still when no `clip` has a bound: the
+/// bound is then no cause of it. Which of two failures of a plan Polars names depends on which
+/// thread gets there first, so the case is run again.
+fn refused_for_a_failed_conversion_without_bounds(case: &Case) -> bool {
+    case_without_bounds(case).is_some_and(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control).refusal.is_some_and(|refusal| {
+                unplaced(&refusal) && is_a_failed_conversion(&refusal.reason)
+            })
+        })
+    })
+}
 
 /// Whether Polars refuses the case for lengths still when no window explodes: the
 /// explode is then no cause of the refusal, which the rows' lengths are.
@@ -1451,6 +1510,16 @@ fn applies(
                         step.entry().id().as_str(),
                         "LazyFrame.sort" | "LazyFrame.join"
                     ) && settle_in_the_position(case, refused, prediction, observed).is_none()))
+        }
+        (Limit::ABoundTheDtypeCannotHold, Disagreement::PolarsRefuses(refusal)) => {
+            // The rows hold the value; a table with no rows holds none to convert. The bound is
+            // the cause where Polars stops refusing for a failed conversion when no `clip` has
+            // one.
+            unplaced(refusal)
+                && refusal.stage == Stage::Rows
+                && is_a_failed_conversion(&refusal.reason)
+                && held.iter().any(|(_, held)| any_call(held, &has_a_bound))
+                && !refused_for_a_failed_conversion_without_bounds(case)
         }
         (Limit::AWindowOverAWindow, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
@@ -2221,6 +2290,142 @@ mod tests {
             polars_refuses(&case, None, Stage::Schema, NEGATIVE_EXPONENT, Vec::new()),
             vec![]
         );
+    }
+
+    // ----- A bound the dtype cannot hold
+
+    const BOUND_NOT_HELD: &str =
+        "conversion from `f64` to `i8` failed in column 'b' for 1 out of 1 values: [NaN]";
+
+    fn clip_with(lower: Option<Expression>, upper: Option<Expression>) -> Call {
+        let mut given = Vec::new();
+        if let Some(lower) = lower {
+            given.push(("lower_bound", Value::Expression(lower)));
+        }
+        if let Some(upper) = upper {
+            given.push(("upper_bound", Value::Expression(upper)));
+        }
+        call("Expr.clip", given)
+    }
+
+    /// What the limits make of a refusal that Polars gives `case`, asked on a stack that Polars'
+    /// plans fit on: the limit runs Polars again.
+    fn refused_for_a_bound(
+        case: &Case,
+        place: Option<Place>,
+        stage: Stage,
+        reason: &str,
+    ) -> Vec<Limit> {
+        std::thread::scope(|scope| {
+            std::thread::Builder::new()
+                .stack_size(256 << 20)
+                .spawn_scoped(scope, || {
+                    polars_refuses(case, place, stage, reason, Vec::new())
+                })
+                .expect("a thread")
+                .join()
+                .expect("the limits are asked")
+        })
+    }
+
+    #[test]
+    fn a_failed_conversion_is_excused_where_a_bound_of_a_clip_is_why() {
+        // A bound given to a clip, whatever it holds, a start or a link, is the cause where
+        // Polars stops refusing for a failed conversion once the clip has none.
+        for clip in [
+            clip_with(Some(chain(column("b"), &["Expr.sqrt"])), None),
+            clip_with(None, Some(whole(300))),
+            clip_with(Some(whole(-1)), Some(chain(column("k"), &["Expr.log1p"]))),
+        ] {
+            let case = select(vec![chain_of(column("a"), vec![clip])]);
+            assert_eq!(
+                refused_for_a_bound(&case, None, Stage::Rows, BOUND_NOT_HELD),
+                vec![Limit::ABoundTheDtypeCannotHold]
+            );
+        }
+        // A clip inside what another call is given is the same.
+        let nested = select(vec![chain_of(
+            column("a"),
+            vec![compared_with(
+                "Expr.eq",
+                chain_of(column("k"), vec![clip_with(Some(whole(-1)), None)]),
+            )],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&nested, None, Stage::Rows, BOUND_NOT_HELD),
+            vec![Limit::ABoundTheDtypeCannotHold]
+        );
+    }
+
+    #[test]
+    fn a_failed_conversion_that_remains_without_the_bounds_is_not_a_bounds() {
+        // A negative exponent fails to become a `u32` whether or not a clip has a bound, so the
+        // bound is no cause, and the power's limit excuses it alone.
+        let case = select(vec![chain_of(
+            column("a"),
+            vec![clip_with(Some(whole(1)), None), pow_of(whole(-1))],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, NEGATIVE_EXPONENT),
+            vec![Limit::ANegativeExponent]
+        );
+    }
+
+    #[test]
+    fn a_failed_conversion_is_not_excused_by_a_bound_without_a_clip_or_without_a_bound_given() {
+        let nothing = [
+            // No clip at all, and a number that fails to convert elsewhere.
+            select(vec![chain_of(
+                column("a"),
+                vec![compared_with(
+                    "Expr.sub",
+                    chain(column("b"), &["Expr.sqrt"]),
+                )],
+            )]),
+            // A clip with no bound is the expression it follows.
+            select(vec![chain_of(column("a"), vec![clip_with(None, None)])]),
+        ];
+        for case in nothing {
+            assert_eq!(
+                refused_for_a_bound(&case, None, Stage::Rows, BOUND_NOT_HELD),
+                vec![]
+            );
+        }
+    }
+
+    #[test]
+    fn only_a_failed_conversion_of_the_rows_without_a_place_is_excused_for_a_bound() {
+        let case = select(vec![chain_of(
+            column("a"),
+            vec![clip_with(Some(chain(column("b"), &["Expr.sqrt"])), None)],
+        )]);
+        for reason in [
+            "`clip` operation not supported for dtype `str` (expected: numeric or temporal)",
+            "cannot compare string with numeric type (i64)",
+        ] {
+            assert_eq!(
+                refused_for_a_bound(&case, None, Stage::Rows, reason),
+                vec![],
+                "{reason}"
+            );
+        }
+        // A refusal that Polars places at a call is the call's, and a table with no rows holds
+        // no value to convert.
+        assert_eq!(
+            refused_for_a_bound(
+                &case,
+                Some(link_of("exprs", 0, 0)),
+                Stage::Rows,
+                BOUND_NOT_HELD
+            ),
+            vec![]
+        );
+        for stage in [Stage::Schema, Stage::Empty] {
+            assert_eq!(
+                refused_for_a_bound(&case, None, stage, BOUND_NOT_HELD),
+                vec![]
+            );
+        }
     }
 
     // ----- A negated bitwise call
