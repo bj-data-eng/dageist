@@ -542,9 +542,10 @@ fn a_candidate_that_stands_and_is_an_argument_may_end_as_the_expression_it_start
 
 #[test]
 fn a_candidate_fits_the_operand_of_and_and_or_only_where_some_operand_suits_the_receiver() {
-    // A step always gives and and or an operand, so what they follow decides whether a
-    // candidate may be one: no candidate fits after a float, text or a date, and a Boolean or a
-    // whole number fits after its own dtype.
+    // What they follow decides whether a candidate given as the operand fits: none fits after a
+    // float, text or a date, and a Boolean or a whole number fits after its own dtype. This is
+    // the dtype table's verdict on the operand given; judging a step that gives none as one that
+    // does is the offers' (`and_and_or_are_offered_only_where_some_operand_is_allowed`).
     for id in ["Expr.and_", "Expr.or_"] {
         for receiver in [
             Representative::Float64,
