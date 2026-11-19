@@ -20,15 +20,24 @@ fn only_the_operands_the_fill_and_the_row_count_have_a_role() {
     assert_eq!(
         found,
         [
+            ("Expr.add", "other", Role::Operand),
+            ("Expr.and_", "others", Role::Operand),
             ("Expr.eq", "other", Role::Operand),
+            ("Expr.floordiv", "other", Role::Operand),
             ("Expr.ge", "other", Role::Operand),
             ("Expr.gt", "other", Role::Operand),
             ("Expr.le", "other", Role::Operand),
             ("Expr.lt", "other", Role::Operand),
+            ("Expr.mod", "other", Role::Operand),
+            ("Expr.mul", "other", Role::Operand),
             ("Expr.ne", "other", Role::Operand),
+            ("Expr.or_", "others", Role::Operand),
+            ("Expr.pow", "exponent", Role::Operand),
             ("Expr.shift", "fill_value", Role::Filler),
             ("Expr.shift", "n", Role::Count),
             ("Expr.sub", "other", Role::Operand),
+            ("Expr.truediv", "other", Role::Operand),
+            ("Expr.xor", "other", Role::Operand),
         ]
     );
 }

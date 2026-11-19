@@ -213,7 +213,7 @@ fn a_name_that_differs_from_polars_is_caught_unless_it_is_listed_as_changed() {
     let words = Words::parse(&renamed).expect("a language file");
     assert_eq!(unlisted_differences(&words), ["Expr.shift"]);
 
-    let listed = renamed.replacen("changed = []", "changed = [\"Expr.shift\"]", 1);
+    let listed = renamed.replacen("changed = [", "changed = [\"Expr.shift\", ", 1);
     let words = Words::parse(&listed).expect("a language file");
     assert_eq!(unlisted_differences(&words), Vec::<String>::new());
 

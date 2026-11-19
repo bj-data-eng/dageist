@@ -83,7 +83,7 @@ pub enum Family {
     Rows,
     /// Running values: `cum_sum`, `cum_count`, `cum_max`.
     Cumulative,
-    /// Arithmetic between two values.
+    /// Arithmetic on values: `add`, `sub`, `mul`, `neg`, `abs`, and the like.
     Arithmetic,
     /// One value for a whole group: `sum`, `min`, `max`, `len`.
     Aggregate,
@@ -93,6 +93,9 @@ pub enum Family {
     Window,
     /// Comparisons and tests that give a Boolean.
     Compare,
+    /// Combining and negating truth: `and`, `or`, `xor` and `not`, which work bit
+    /// by bit on whole numbers.
+    Logic,
     /// Where an expression starts: `col`, `lit`.
     Start,
     /// Conditions: `when`, `then`, `otherwise`.
@@ -101,7 +104,7 @@ pub enum Family {
 
 impl Family {
     /// Every family, in the order they are offered.
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::Steps,
         Self::Rows,
         Self::Cumulative,
@@ -110,6 +113,7 @@ impl Family {
         Self::Temporal,
         Self::Window,
         Self::Compare,
+        Self::Logic,
         Self::Start,
         Self::Condition,
     ];
@@ -126,6 +130,7 @@ impl Family {
             Self::Temporal => "temporal",
             Self::Window => "window",
             Self::Compare => "compare",
+            Self::Logic => "logic",
             Self::Start => "start",
             Self::Condition => "condition",
         }
