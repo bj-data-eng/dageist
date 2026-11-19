@@ -1227,6 +1227,41 @@ mod tests {
     }
 
     #[test]
+    fn a_bitwise_call_on_a_list_in_a_key_of_one_value_is_refused_alone_where_polars_cannot_cast_it()
+    {
+        // `sort(by=when(lit(1, UInt8) | b).then(k).len())` with a list `b`: the length of the
+        // value is one number, so Polars never evaluates the call. The tables refuse it as
+        // Polars on one thread does, by failing to unpack the list as a whole number; the
+        // streaming engine on many threads fails to cast the list to that number.
+        let found = settled("stricter-a-bitwise-or-of-a-list-in-a-sort-key-of-one-value.case");
+        assert!(
+            found.reason.starts_with("cannot unpack series of type"),
+            "{}",
+            found.reason
+        );
+        assert!(found.probe.contains("Expr.or_"), "{}", found.probe);
+    }
+
+    #[test]
+    fn a_failure_to_unpack_a_list_is_matched_by_a_failure_to_cast_the_list_and_by_nothing_else() {
+        let tables = "cannot unpack series of type `list[i64]` into `u8`";
+        let cast = "cannot cast List type (inner: 'Int64', to: 'UInt8')";
+        assert!(same_reason(&Source::Polars, tables, cast));
+        // A cast of another dtype is not it, nor is a cast the tables' reason names.
+        assert!(!same_reason(
+            &Source::Polars,
+            "cannot unpack series of type `str` into `i64`",
+            cast
+        ));
+        assert!(!same_reason(
+            &Source::Polars,
+            tables,
+            "cannot cast String type to Int64"
+        ));
+        assert!(!same_reason(&Source::Polars, cast, cast));
+    }
+
+    #[test]
     fn a_reason_is_matched_by_what_polars_objected_to_and_not_by_the_names_it_quotes() {
         let tables = "could not evaluate '<' comparison between series 'a' of dtype: Boolean and series 'b' of dtype: Date";
         let probe = "could not evaluate '<' comparison between series '_POLARS_TMP_PHYS_2' of dtype: Boolean and series '_POLARS_TMP_PHYS_3' of dtype: Date";
