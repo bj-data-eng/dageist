@@ -1010,11 +1010,14 @@ an expected rejection that names both reasons.
 The tally ends with the totals of the cases that agreed, that both refused for another
 reason, that a limit excused, that were refused where Polars does not evaluate the
 part, that a rule stricter by design refused, and that disagreed. The fixed seed's
-1000 cases give 784 agreeing, 117 refused by both for another reason, 6 excused by a
-limit, 5 refused where Polars does not evaluate the part, 67 refused by the rule that
-is stricter by design, and none disagreeing; 20 of those that agree are refused by the
-rule against a repeated pair of key names, and the tables could not be asked past a
-point in 32 more.
+1000 cases give 6 excused by a limit, 67 refused by the rule that is stricter by design,
+and none disagreeing; 20 of those that agree are refused by the rule against a repeated
+pair of key names, and the tables could not be asked past a point in 32 more. These
+counts are the same at every thread count. The others are not: Polars' thread count
+changes which reason it gives where the tables and Polars both refuse, and with it the
+totals, so the cases that agree are 783 to 785, those refused by both for another
+reason are 116 to 118, and those refused where Polars does not evaluate the part are 5
+or 6. The test asserts none of those three.
 
 | Limit | Excuses |
 | --- | --- |
