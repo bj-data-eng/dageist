@@ -1246,6 +1246,69 @@ fn a_comparison_of_a_null_drops_nothing_that_is_more_than_one_value() {
     }
 }
 
+/// `null > h`, a comparison that leaves a null where a column was.
+fn a_null_compared_with_a_column_start() -> Vec<Value> {
+    vec![compared("Expr.gt", field("h"))]
+}
+
+#[test]
+fn a_comparison_with_a_null_that_follows_one_value_drops_a_null_compared_before_it() {
+    // `(null > h).last() >= null`: the comparison with a null follows one value, which it drops
+    // with what that value holds, so `null > h` is not met and Polars allows the key, as it does
+    // with a subtraction after it.
+    let key = |links: Vec<Value>| {
+        let mut all = a_null_compared_with_a_column_start();
+        all.extend(links);
+        all
+    };
+    let keys = [
+        key(vec![
+            call("Expr.last", json!({})),
+            compared("Expr.ge", null()),
+            compared("Expr.sub", field("k")),
+        ]),
+        key(vec![
+            call("Expr.last", json!({})),
+            compared("Expr.ge", null()),
+            compared("Expr.add", field("k")),
+        ]),
+    ];
+    for (at, links) in keys.into_iter().enumerate() {
+        let key = chain(
+            call("polars.lit", json!({ "value": { "flag": null } })),
+            links,
+        );
+        assert_eq!(joined_on(key), None, "key {at}");
+    }
+}
+
+#[test]
+fn a_comparison_with_a_null_drops_a_null_compared_before_it_only_where_it_follows_one_value() {
+    // Without the `.last()` the comparison follows `null > h`, which is more than one value, so
+    // nothing is dropped, and with the `.last()` but no comparison with a null after it nothing
+    // drops it either.
+    let rule = Some(RefusalSource::Rule(Rule::KeyIsElementwise));
+    let keys = [
+        vec![
+            compared("Expr.ge", null()),
+            compared("Expr.sub", field("k")),
+        ],
+        vec![
+            call("Expr.last", json!({})),
+            compared("Expr.sub", field("k")),
+        ],
+    ];
+    for (at, links) in keys.into_iter().enumerate() {
+        let mut all = a_null_compared_with_a_column_start();
+        all.extend(links);
+        let key = chain(
+            call("polars.lit", json!({ "value": { "flag": null } })),
+            all,
+        );
+        assert_eq!(joined_on(key), rule, "key {at}");
+    }
+}
+
 #[test]
 fn a_comparison_given_a_null_drops_the_aggregate_it_follows_after_an_earlier_fold() {
     // `null < true`, `.last()`, `!= null`, `.is_not_null()` and `!= f` is a key
