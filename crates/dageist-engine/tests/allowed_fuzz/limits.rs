@@ -7026,4 +7026,31 @@ mod tests {
         let case = select_of_a_null_literal(&["Expr.cbrt"]);
         assert!(!refused_with_values_that_differ(&case, reason));
     }
+
+    /// `lit(None).over(order_by=a.last())` as what `replace` is given: no key of the window holds a
+    /// value for each row, so a window of a value that reads no column gives no rows.
+    fn replace_by_a_window(window: &str) -> Case {
+        let text = format!(
+            r#"{{"a":"Date","b":"Date","revision":1}}
+{{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.select","arguments":{{"exprs":{{"many":[{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["g"]}}}}}},"then":[{{"entry":"Expr.replace","arguments":{{"old":{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["u"]}}}}}},"then":[]}}}},"new":{{"expression":{{"start":{{"entry":"polars.lit","arguments":{{"value":{{"flag":null}}}}}},"then":[{{"entry":"Expr.over","arguments":{{{window}}}}}]}}}}}}}}]}}}}]}}}}}}}}]}}"#
+        );
+        Case::decode(text.as_bytes()).expect("a case")
+    }
+
+    #[test]
+    fn a_window_of_a_literal_with_no_key_for_each_row_is_why_what_replaces_has_no_values() {
+        let by_the_last = r#""order_by":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[{"entry":"Expr.last","arguments":{}}]}}]}"#;
+        assert_eq!(
+            excused_by_kept("uncovered-a-window-over-a-literal--what-replaces.case"),
+            vec![Limit::AWindowOverALiteral]
+        );
+        assert_eq!(
+            excused_by(&replace_by_a_window(by_the_last)),
+            vec![Limit::AWindowOverALiteral]
+        );
+        // A key that holds a value for each row gives the rows, and what replaces is as many as
+        // the table has: nothing is refused.
+        let by_a_column = r#""order_by":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[]}}]}"#;
+        assert_eq!(excused_by(&replace_by_a_window(by_a_column)), vec![]);
+    }
 }
