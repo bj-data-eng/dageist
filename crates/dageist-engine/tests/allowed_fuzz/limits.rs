@@ -248,6 +248,16 @@ pub enum Limit {
     /// starts from a literal, which Polars allows; the window is why where Polars, asked again
     /// with each literal partition a column, refuses the case for that reason.
     AWindowOverALiteral,
+    /// A drop of nulls of a value of the dtype Null, a null literal or a column of it, leaves
+    /// no rows, so the rows do not show a plan that they contradict. The tables hold the schema
+    /// of a method and what its rows give as one thing, and refuse a method whose schema says
+    /// the dtype Null and whose rows give another, as the cube root of a null does, which is
+    /// the target's own comparison and shows only where rows are given. The tables refusing,
+    /// when they run rows, with the reason that the schema says one dtype and the rows give
+    /// another, at a call after a `drop_nulls` in its chain, which Polars allows; the drop is
+    /// why where Polars, asked again with each drop a fill of nulls forward, refuses the case
+    /// for that reason.
+    ADropLeavesNoRows,
     /// Polars refuses some dtypes of `and`, `or` and `xor` when it works out the schema of a
     /// select, a filter or a sort key, and accepts them in a join's key, as `date ^ int64` and
     /// `bool | int64`: the docs list the pairs measured. The tables measured a bitwise call in
@@ -323,7 +333,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 26] = [
+    pub const ALL: [Self; 27] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -343,6 +353,7 @@ impl Limit {
         Self::ABoundTheDtypeCannotHold,
         Self::ABoundWithValuesOfItsOwn,
         Self::AWindowOverALiteral,
+        Self::ADropLeavesNoRows,
         Self::ABitwiseCallInAJoinKey,
         Self::ACastOfAValueTheDtypeCannotHold,
         Self::ADropChangesTheLengths,
@@ -374,6 +385,7 @@ impl Limit {
             Self::ABoundTheDtypeCannotHold => "a-bound-the-dtype-cannot-hold",
             Self::ABoundWithValuesOfItsOwn => "a-bound-with-values-of-its-own",
             Self::AWindowOverALiteral => "a-window-over-a-literal",
+            Self::ADropLeavesNoRows => "a-drop-leaves-no-rows",
             Self::ABitwiseCallInAJoinKey => "a-bitwise-call-in-a-join-key",
             Self::ACastOfAValueTheDtypeCannotHold => "a-cast-of-a-value-the-dtype-cannot-hold",
             Self::ADropChangesTheLengths => "a-drop-changes-the-lengths",
@@ -437,6 +449,9 @@ impl Limit {
             }
             Self::AWindowOverALiteral => {
                 "a window over a literal partition gives no rows, so the rows do not show the plan of what follows it"
+            }
+            Self::ADropLeavesNoRows => {
+                "a drop of the nulls of a value of the dtype Null leaves no rows, so the rows do not show the plan of what follows it"
             }
             Self::ABitwiseCallInAJoinKey => {
                 "Polars does not check the dtypes of a bitwise call in a join's key as it does in select, so it accepts a call the tables refuse for them"
@@ -6719,6 +6734,15 @@ mod tests {
             ),
             vec![Limit::ADropChangesTheLengths]
         );
+        // A replacement given what replaces it after a comparison and a drop: the fill that stands
+        // for the drop is refused about lengths for another reason, which is no evidence for the
+        // drop, so the control compares the words of the replacement alone.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-drop-changes-the-lengths--what-replaces-after-a-comparison.case"
+            ),
+            vec![Limit::ADropChangesTheLengths]
+        );
         // Without a drop the lengths are the rows' own, and the shared words are no limit's.
         assert_eq!(
             refused_for_a_bound(&replace(whole(1)), None, Stage::Rows, reason),
@@ -6775,5 +6799,40 @@ mod tests {
             vec![("exprs", many(vec![chain(column("a"), &["Expr.cum_sum"])]))],
         ));
         assert!(!refused_for_lengths(&case).contains(&Limit::ADropChangesTheLengths));
+    }
+    /// A select of a null literal followed by the calls, the first of which is `links` named.
+    fn select_of_a_null_literal(links: &[&str]) -> Case {
+        let then: Vec<String> = links
+            .iter()
+            .map(|entry| format!(r#"{{"entry":"{entry}","arguments":{{}}}}"#))
+            .collect();
+        let text = format!(
+            r#"{{"a":"Date","b":"Date","revision":1}}
+{{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.select","arguments":{{"exprs":{{"many":[{{"expression":{{"start":{{"entry":"polars.lit","arguments":{{"value":{{"flag":null}}}}}},"then":[{}]}}}}]}}}}}}}}]}}"#,
+            then.join(",")
+        );
+        Case::decode(text.as_bytes()).expect("a case")
+    }
+
+    #[test]
+    fn a_call_after_a_drop_of_a_null_gives_the_tables_no_rows_to_contradict_the_plan() {
+        // The drop leaves no rows, so the rows do not show that the cube root of a null is a
+        // float where its plan says the dtype Null. Polars allows it, and the tables refuse it.
+        assert_eq!(
+            excused_by_kept("uncovered-a-drop-leaves-no-rows.case"),
+            vec![Limit::ADropLeavesNoRows]
+        );
+        let case = select_of_a_null_literal(&["Expr.drop_nulls", "Expr.cbrt"]);
+        assert_eq!(excused_by(&case), vec![Limit::ADropLeavesNoRows]);
+    }
+
+    #[test]
+    fn a_call_before_a_drop_of_a_null_is_not_excused_by_the_drop() {
+        // The drop follows the cube root, so it leaves no rows of what the root gave and the
+        // call before it is no call after a drop: the limit is no cause of what Polars shows.
+        let case = select_of_a_null_literal(&["Expr.cbrt", "Expr.drop_nulls", "Expr.cbrt"]);
+        assert!(!excused_by(&case).contains(&Limit::ADropLeavesNoRows));
+        let case = select_of_a_null_literal(&["Expr.cbrt", "Expr.drop_nulls"]);
+        assert!(!excused_by(&case).contains(&Limit::ADropLeavesNoRows));
     }
 }
