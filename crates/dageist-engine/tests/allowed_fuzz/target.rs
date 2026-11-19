@@ -15,7 +15,7 @@ use super::generate::generate;
 use super::limits::{excuses, strict};
 use super::observe::{Observed, Refusal, Seen, is_the_targets_own, observe};
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
-use super::probe::{Settled, same_reason, settle, settle_apart};
+use super::probe::{Settled, is_a_predicate_rule, same_reason, settle, settle_apart};
 use super::reduce::candidates;
 
 /// The named rules that are stricter than Polars by design, each with why. A
@@ -480,6 +480,14 @@ impl CaseTarget for AllowedTarget {
                         // Polars does not evaluate everything: a probe of the part
                         // says whether the rule is right where it does.
                         if let Some(outcome) = stricter(probe_of(case, &refused), rule) {
+                            return outcome;
+                        }
+                        // A predicate the rule refuses may hold a call Polars refuses first,
+                        // or may not be evaluated, so it is asked on a column of its dtype.
+                        if is_a_predicate_rule(rule)
+                            && let Some(outcome) =
+                                stricter(probe_apart(case, &refused, &prediction, &observed), rule)
+                        {
                             return outcome;
                         }
                         return failure(

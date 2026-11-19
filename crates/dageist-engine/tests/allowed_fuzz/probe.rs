@@ -48,6 +48,11 @@
 //! editor shows for such a call is the tables' for a stand-in dtype, not Polars' for
 //! the argument's own.
 //!
+//! A refusal by a rule that a predicate be a `Boolean` is asked the same way
+//! ([`settle_a_predicate_on_a_value`]): the predicate as written may be refused first for a
+//! call it holds, or not evaluated at all, so a column of the dtype that reaches its end stands
+//! as the predicate, and Polars refusing it as the rule says shows the rule right about it.
+//!
 //! The last has no reason to match. [`settle_in_the_position`] is for a refusal
 //! that is the target's own comparison of a call's plan with its rows, which is no
 //! refusal of Polars and so is neither the tables' reason nor one a probe is refused
@@ -466,6 +471,31 @@ fn place_of_the_part(found: &Found, filter: bool) -> Place {
     }
 }
 
+/// The probe of a predicate that a rule refused: `predicate` as the predicate of a condition, or as
+/// a filter's, as the rule is about.
+fn predicate_probe(found: &Found, rule: &str, predicate: Expression) -> Option<Probe> {
+    if rule == "condition-predicate-is-boolean" {
+        let held = place_of_the_part(found, false).then(Segment::Start);
+        let inside = held
+            .clone()
+            .then(Segment::Parameter("predicates".to_owned()))
+            .then(Segment::Item(0));
+        Some(Probe {
+            part: condition_of(predicate)?,
+            filter: false,
+            before: None,
+            at: vec![held, inside],
+        })
+    } else {
+        Some(Probe {
+            part: predicate,
+            filter: true,
+            before: None,
+            at: vec![place_of_the_part(found, true)],
+        })
+    }
+}
+
 /// The probe of the part the tables refused, by who refused it.
 fn probe_of_the_part(found: &Found, source: &Source) -> Option<Probe> {
     match source {
@@ -493,26 +523,9 @@ fn probe_of_the_part(found: &Found, source: &Source) -> Option<Probe> {
                 at: vec![at],
             })
         }
-        Source::Rule("condition-predicate-is-boolean") => {
-            let predicate = found_predicate(found)?;
-            let held = place_of_the_part(found, false).then(Segment::Start);
-            let inside = held
-                .clone()
-                .then(Segment::Parameter("predicates".to_owned()))
-                .then(Segment::Item(0));
-            Some(Probe {
-                part: condition_of(predicate)?,
-                filter: false,
-                before: None,
-                at: vec![held, inside],
-            })
+        Source::Rule(rule) if PREDICATE_RULES.contains(rule) => {
+            predicate_probe(found, rule, found_predicate(found)?)
         }
-        Source::Rule("filter-predicate-is-boolean") => Some(Probe {
-            part: found_predicate(found)?,
-            filter: true,
-            before: None,
-            at: vec![place_of_the_part(found, true)],
-        }),
         _ => None,
     }
 }
@@ -695,6 +708,55 @@ pub fn settle_on_a_value(
             reason: refusal.reason,
             showing: Showing::TheSameReason,
         })
+    })
+}
+
+/// Asks Polars about a predicate that a rule refused, apart from what the predicate holds: a
+/// column of the dtype that reaches its end, as the predicate of a condition or of a filter. The
+/// predicate as written may be refused first for a call inside it that the tables allow, as a
+/// comparison of text with a number they were not told the dtype of, and then Polars refuses it
+/// for another reason than the rule; and it may not be evaluated at all, as under the length of a
+/// condition. A column that has the dtype is not folded, and Polars refuses it as the rule says
+/// where it evaluates it, which shows the rule right about that dtype. The dtype is Polars' as
+/// well as the tables': a wrong prediction of it is a disagreement of the dtypes, found before
+/// anything is probed. `None` for a refusal of Polars, for a predicate in a pivot's aggregate,
+/// which reads no column, when Polars gave the predicate no dtype, and when Polars allows the
+/// column or refuses it for another reason.
+pub fn settle_a_predicate_on_a_value(
+    case: &Case,
+    refused: &Refused,
+    predicted: &Prediction,
+    observed: &Observed,
+) -> Option<Settled> {
+    let Source::Rule(rule) = refused.source else {
+        return None;
+    };
+    if !PREDICATE_RULES.contains(&rule) {
+        return None;
+    }
+    let found = find(case, &refused.place)?;
+    if !found.rest.is_empty() || found.in_the_aggregate {
+        return None;
+    }
+    let held = refused.place.clone();
+    let class = dtype_reaching(&held, found.expression.links().len(), predicted, observed)?;
+    let name = call(
+        "polars.col",
+        vec![("name", Value::Columns(vec![STAND_IN.to_owned()]))],
+    )?;
+    let column = Expression::new(Start::Call(name), Vec::new()).ok()?;
+    let probe = predicate_probe(&found, rule, column)?;
+    let probed = Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        document: document_of(case, &found, probe.part, probe.filter)?,
+    };
+    let tables = Tables::standing(found.on_the_other_table, &[class])?;
+    let refusal = refused_as(&probed, tables, refused, &probe.at)?;
+    Some(Settled {
+        probe: probed.document.write(),
+        reason: refusal.reason,
+        showing: Showing::TheSameReason,
     })
 }
 
@@ -1101,6 +1163,13 @@ pub fn settle_apart(
         .or_else(|| settle_on_a_value_as_a_key(case, refused, predicted, observed))
         .or_else(|| settle_in_the_position(case, refused, predicted, observed))
         .or_else(|| settle_given_no_known_dtype(case, refused))
+        .or_else(|| settle_a_predicate_on_a_value(case, refused, predicted, observed))
+}
+
+/// Whether `rule` is one that a predicate be a `Boolean`, which a probe of the predicate apart
+/// from what it holds can show right.
+pub fn is_a_predicate_rule(rule: &str) -> bool {
+    PREDICATE_RULES.contains(&rule)
 }
 
 /// Asks Polars about a call the tables refused without knowing the dtype of an
