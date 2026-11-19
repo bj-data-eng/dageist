@@ -188,8 +188,6 @@ export interface ParameterView {
   readonly defaultSetting: SettingView | null;
   /** What the parameter is set to when it is first added, which differs from its default. */
   readonly start: SettingView;
-  /** Polars' default as Python writes it, or `null` when it must be given. */
-  readonly python: string | null;
   /**
    * Where the expression the parameter holds stands, when a named position
    * holds it; the engine's tables are asked at that place.

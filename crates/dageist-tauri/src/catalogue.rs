@@ -251,8 +251,6 @@ struct ParameterView {
     /// What the parameter is set to when it is first added, which differs from
     /// its default.
     start: SettingView,
-    /// Polars' default as Python writes it; `None` when it must be given.
-    python: Option<&'static str>,
     /// Where the expression the parameter holds stands, when a named position
     /// holds it. The tables of allowed combinations are asked at that place.
     position: Option<PositionView>,
@@ -444,10 +442,6 @@ fn parameter_view(
         default: default_view(parameter.default()),
         default_setting: parameter.default_setting().as_ref().map(setting_view),
         start: setting_view(&parameter.start_setting()),
-        python: match parameter.default() {
-            ParameterDefault::Required => None,
-            ParameterDefault::Python(text) => Some(text),
-        },
         position: Position::of_parameter(id.as_str(), parameter.name()).map(position_view),
     })
 }
@@ -574,7 +568,6 @@ mod tests {
                         "default": { "kind": "integer", "value": 1 },
                         "defaultSetting": { "kind": "integer", "value": 1, "shown": "1" },
                         "start": { "kind": "unset" },
-                        "python": "1",
                         "position": null
                     },
                     {
@@ -586,7 +579,6 @@ mod tests {
                         "default": { "kind": "none" },
                         "defaultSetting": null,
                         "start": { "kind": "unset" },
-                        "python": "None",
                         "position": null
                     }
                 ]
@@ -611,7 +603,6 @@ mod tests {
                 "default": { "kind": "text", "value": "inner" },
                 "defaultSetting": { "kind": "word", "value": "inner" },
                 "start": { "kind": "word", "value": "left" },
-                "python": "'inner'",
                 "position": null
             })
         );
@@ -632,7 +623,6 @@ mod tests {
                 "default": { "kind": "flag", "value": false },
                 "defaultSetting": { "kind": "flag", "value": false },
                 "start": { "kind": "flag", "value": true },
-                "python": "False",
                 "position": null
             })
         );
@@ -671,7 +661,6 @@ mod tests {
         // `LazyFrame.join(other, ...)`: `other` has no default.
         let other = parameter(&view, "LazyFrame.join", "other");
         assert_eq!(other["default"], json!({ "kind": "required" }));
-        assert_eq!(other["python"], Value::Null);
         assert_eq!(other["kind"], json!({ "kind": "table" }));
         // A frame step is the only entry with a plain head.
         assert!(entry(&view, "LazyFrame.join")["head"].is_string());
@@ -680,46 +669,32 @@ mod tests {
     }
 
     #[test]
-    fn defaults_serialize_as_the_value_the_engine_read_and_the_python_text() {
+    fn defaults_serialize_as_the_value_the_engine_read() {
         let view = view();
-        // Each case: entry, parameter, the default as Python writes it, and the value read.
+        // Each case: entry, parameter, and the value the engine read from Polars' default.
         // `LazyFrame.join(..., coalesce=None, allow_parallel=True)`, `filter(*predicates)`,
         // `filter(**constraints)`, and `LazyFrame.pivot(separator='_')`.
         let cases = [
-            (
-                "LazyFrame.join",
-                "coalesce",
-                "None",
-                json!({ "kind": "none" }),
-            ),
+            ("LazyFrame.join", "coalesce", json!({ "kind": "none" })),
             (
                 "LazyFrame.join",
                 "allow_parallel",
-                "True",
                 json!({ "kind": "flag", "value": true }),
             ),
-            (
-                "LazyFrame.filter",
-                "predicates",
-                "()",
-                json!({ "kind": "empty" }),
-            ),
+            ("LazyFrame.filter", "predicates", json!({ "kind": "empty" })),
             (
                 "LazyFrame.filter",
                 "constraints",
-                "{}",
                 json!({ "kind": "empty" }),
             ),
             (
                 "LazyFrame.pivot",
                 "separator",
-                "'_'",
                 json!({ "kind": "text", "value": "_" }),
             ),
         ];
-        for (id, name, python, read) in cases {
+        for (id, name, read) in cases {
             let found = parameter(&view, id, name);
-            assert_eq!(found["python"], python, "{id} {name}");
             assert_eq!(found["default"], read, "{id} {name}");
         }
     }

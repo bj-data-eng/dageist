@@ -85,7 +85,6 @@ describe('the catalogue the host sends', () => {
           default: { kind: 'integer', value: 1 },
           defaultSetting: { kind: 'integer', value: 1, shown: '1' },
           start: { kind: 'unset' },
-          python: '1',
           position: null,
         },
         {
@@ -97,7 +96,6 @@ describe('the catalogue the host sends', () => {
           default: { kind: 'none' },
           defaultSetting: null,
           start: { kind: 'unset' },
-          python: 'None',
           position: null,
         },
       ],
@@ -165,7 +163,6 @@ describe('the catalogue the host sends', () => {
     expect(parameter('LazyFrame.join', 'other')).toMatchObject({
       kind: { kind: 'table' },
       default: { kind: 'required' },
-      python: null,
     });
   });
 

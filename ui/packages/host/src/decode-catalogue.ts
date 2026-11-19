@@ -233,18 +233,7 @@ const readPosition: Decode<PositionView> = readTagged<PositionView>('kind', {
 });
 
 const readParameter: Decode<ParameterView> = readRecord(
-  [
-    'name',
-    'shown',
-    'label',
-    'kind',
-    'shape',
-    'default',
-    'defaultSetting',
-    'start',
-    'python',
-    'position',
-  ],
+  ['name', 'shown', 'label', 'kind', 'shape', 'default', 'defaultSetting', 'start', 'position'],
   (fields, path) => ({
     name: readField(fields, path, 'name', readString),
     shown: readField(fields, path, 'shown', readString),
@@ -254,7 +243,6 @@ const readParameter: Decode<ParameterView> = readRecord(
     default: readField(fields, path, 'default', readDefault),
     defaultSetting: readField(fields, path, 'defaultSetting', readNullable(readSetting)),
     start: readField(fields, path, 'start', readSetting),
-    python: readField(fields, path, 'python', readNullable(readString)),
     position: readField(fields, path, 'position', readNullable(readPosition)),
   }),
 );
