@@ -46,7 +46,7 @@ use super::literal::{
 };
 use super::observe::{Observed, Refusal, SCHEMA_SAYS, Stage, Tables, observe, observe_probe};
 use super::predict::{Prediction, Refused, Source, Verdict};
-use super::probe::same_reason;
+use super::probe::{same_reason, settle_in_the_position};
 
 /// A limit of the tables, and what it says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -171,9 +171,11 @@ pub enum Limit {
     /// target's own comparison, not a refusal of Polars, which shows only where the
     /// method is the output of the step. Inside an expression that goes on from it
     /// or compares it, Polars evaluates the method and the step's rows do not show
-    /// the difference. The tables refusing, with the reason that the schema says one
-    /// dtype and the rows give another, at a call that is not the last of the
-    /// step's own expression, which Polars allows.
+    /// the difference; and a sort key is never an output of the step, which a probe
+    /// of the call on a column in the key may show refused as well, and then settles
+    /// it. The tables refusing, with the reason that the schema says one dtype and
+    /// the rows give another, at a call that is not the last of the step's own
+    /// expression or in a sort key that no probe settles, which Polars allows.
     AHiddenSchema,
 }
 
@@ -1096,7 +1098,13 @@ fn control_with_columns(
 }
 
 /// Whether the limit is why the tables and Polars disagree.
-fn applies(limit: Limit, case: &Case, disagreement: &Disagreement, observed: &Observed) -> bool {
+fn applies(
+    limit: Limit,
+    case: &Case,
+    disagreement: &Disagreement,
+    prediction: &Prediction,
+    observed: &Observed,
+) -> bool {
     let step = case.document.steps()[0].call();
     let pivot = is(step, "LazyFrame.pivot");
     let held = operands(step);
@@ -1265,7 +1273,13 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement, observed: &Ob
             let locus = locate(case, &refused.place);
             let last = locus.inside.last().map(|chain| chain.links().len());
             refused.reason.starts_with(SCHEMA_SAYS)
-                && (locus.inside.len() > 1 || locus.index.is_some_and(|at| Some(at + 1) != last))
+                && (locus.inside.len() > 1
+                    || locus.index.is_some_and(|at| Some(at + 1) != last)
+                    // A sort key is no output of the step, unless a probe of the call on a
+                    // column in the key settles it, which is asked of a case the limits do
+                    // not excuse.
+                    || (is(step, "LazyFrame.sort")
+                        && settle_in_the_position(case, refused, prediction, observed).is_none()))
         }
         (Limit::AWindowOverAWindow, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
@@ -1294,7 +1308,7 @@ pub fn excuses(case: &Case, prediction: &Prediction, observed: &Observed) -> Vec
     };
     Limit::ALL
         .into_iter()
-        .filter(|limit| applies(*limit, case, &disagreement, observed))
+        .filter(|limit| applies(*limit, case, &disagreement, prediction, observed))
         .collect()
 }
 
