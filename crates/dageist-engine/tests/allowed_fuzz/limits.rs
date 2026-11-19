@@ -1930,6 +1930,30 @@ mod tests {
     }
 
     #[test]
+    fn a_failed_conversion_to_a_u32_is_excused_where_a_power_is_given_a_value_below_zero() {
+        // A subtraction, a negation, a sum and a product can take the values of a column below
+        // zero, as a number typed below zero does.
+        for exponent in [
+            chain_of(
+                column("b"),
+                vec![compared_with("Expr.sub", chain(column("k"), &[]))],
+            ),
+            chain(column("k"), &["Expr.neg"]),
+            chain_of(column("k"), vec![compared_with("Expr.add", whole(-3))]),
+            chain_of(
+                column("k"),
+                vec![compared_with("Expr.mul", chain(column("a"), &[]))],
+            ),
+        ] {
+            let case = select(vec![chain_of(column("a"), vec![pow_of(exponent)])]);
+            assert_eq!(
+                polars_refuses(&case, None, Stage::Rows, NEGATIVE_EXPONENT, Vec::new()),
+                vec![Limit::ANegativeExponent]
+            );
+        }
+    }
+
+    #[test]
     fn a_failed_conversion_to_a_u32_is_not_excused_without_a_power_of_a_negative_number() {
         // A power of a positive number or of a column, and a negative number given to another
         // call, are not why a number fails to become a `u32`.
