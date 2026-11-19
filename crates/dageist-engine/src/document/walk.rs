@@ -1478,9 +1478,10 @@ fn reads_a_column(expression: &Expression) -> bool {
         .any(|call| operands(call).into_iter().any(reads_a_column))
 }
 
-/// Whether an expression is a null literal and no more.
+/// Whether an expression is a null literal and no more, as it is where only calls that are the
+/// expression they follow come after it.
 fn is_a_null(expression: &Expression) -> bool {
-    expression.links().is_empty() && starts_from_a_null(expression)
+    expression.links().iter().all(is_the_expression_it_follows) && starts_from_a_null(expression)
 }
 
 /// Whether an expression starts from a null literal.
