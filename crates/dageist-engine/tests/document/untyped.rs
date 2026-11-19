@@ -9,7 +9,7 @@ use dageist_engine::document::{Document, Inputs};
 use polars::prelude::*;
 use serde_json::{Value, json};
 
-use crate::support::{call, chain, document, field, many, step, whole};
+use crate::support::{call, chain, document, field, field_then, many, step, whole};
 
 fn source() -> DataFrame {
     df!(
@@ -292,6 +292,21 @@ fn an_integer_raised_to_a_fraction_is_a_float64_where_polars_resolves_it_and_not
         walked_in("LazyFrame.sort", "by", float),
         Some(Representative::Float32)
     );
+}
+
+#[test]
+fn an_integer_raised_to_a_fraction_adapts_to_what_it_meets_and_is_not_said_to_be_a_float64() {
+    // The unresolved float that `i8 ** 1.5` is adapts to the operand it meets as the number does:
+    // `f32 / (i8 ** 1.5)` is a `Float32`, so the dtype of the power is not a `Float64` the walk
+    // may say, and it says none.
+    let power = field_then(
+        "i8",
+        vec![call("Expr.pow", json!({ "exponent": fraction(1.5) }))],
+    );
+    let item = on_a_column("f32", call("Expr.truediv", json!({ "other": power })));
+    let expression = col("f32").true_div(col("i8").pow(lit(1.5)));
+    assert_eq!(polars(expression.clone()), Some(Representative::Float32));
+    agrees(walked(item), polars(expression));
 }
 
 #[test]
