@@ -141,16 +141,19 @@ pub enum Limit {
     /// values of a column below zero; the sample's rows are 1, a null and 3, which a sum
     /// or a product of them does not.
     ANegativeExponent,
-    /// A column or a literal of the dtype Null is an operand of `and`, `or` and `xor`
-    /// that the tables allow, giving a `Boolean`, as `select` shows. Polars treats it
-    /// in ways `select` hides. It negates what a bitwise call combines operand by
-    /// operand, as the negation of a conjunction is the disjunction of the negations,
-    /// so a `not` meets each operand, which it refuses for the dtype Null. Polars
-    /// refusing the rows with the reason that the dtype Null is not supported in `not`,
-    /// which has no place, in a case that holds a `not` straight after an `and` or an
-    /// `or` that meets a null. It gives a filter's predicate the dtype Null, which Polars
-    /// refuses with the reason that a predicate must be a `Boolean`, in a filter that
-    /// holds a bitwise call that meets a null.
+    /// A value of the dtype Null, a column or a literal, typed as it or not, or what a call
+    /// gives that dtype, is an operand of `and`, `or` and `xor` that the tables allow,
+    /// giving a `Boolean`, as `select` shows. Polars treats it in ways `select` hides. It
+    /// negates what a bitwise call combines operand by operand, as the negation of a
+    /// conjunction is the disjunction of the negations, so a `not` meets each operand,
+    /// which it refuses for the dtype Null. Polars refusing the rows with the reason that
+    /// the dtype Null is not supported in `not`, which has no place, in a case that holds
+    /// a `not` straight after an `and` or an `or` that meets a null, as the tables give
+    /// the dtypes. It gives a filter's predicate the dtype Null, which Polars refuses with
+    /// the reason that a predicate must be a `Boolean`: an `and` that meets a null does,
+    /// as does an `or` of nulls, and the dtype goes on through the `and` and the `or` that
+    /// follow it, so the predicate is one that ends in bitwise calls the first of which
+    /// meets a null. An `or` or an `xor` of a `Boolean` and a null is a `Boolean`.
     ABitwiseCallOnANull,
     /// A `UInt128` is compared with a `Decimal` by casting it to `decimal[38,0]`,
     /// which holds up to 38 digits, and a `UInt128` holds more. The sample's values
@@ -415,67 +418,108 @@ fn is_a_bitwise_call(call: &Call) -> bool {
     )
 }
 
-/// Whether `expression` starts from a null of the dtype Null the case holds: a literal null with
-/// no dtype, or the column `a` or `b` when it is the dtype Null.
-fn starts_from_a_null(case: &Case, expression: &Expression) -> bool {
-    match expression.start() {
-        Start::Call(start) if is(start, "polars.lit") => {
-            start.argument("dtype").is_none()
-                && matches!(start.argument("value"), Some(Value::Flag(None)))
-        }
-        Start::Call(start) if is(start, "polars.col") => {
-            matches!(start.argument("name"), Some(Value::Columns(names))
-                if names.len() == 1
-                    && super::frames::column_class(&names[0], case.receiver, case.argument)
-                        == Some(Representative::Null))
-        }
-        _ => false,
+/// What the tables say the expression at `place` is after its first `done` links: its start for
+/// none.
+fn class_after(prediction: &Prediction, place: &Place, done: usize) -> Option<Representative> {
+    let traced = prediction
+        .expressions
+        .iter()
+        .find(|traced| traced.place == *place)?;
+    match done.checked_sub(1) {
+        None => traced.start,
+        Some(last) => traced.links.get(last).copied().flatten(),
     }
 }
 
-/// Whether the link `at` of `expression` is a bitwise call that meets a null: one given a null as
-/// an operand, or the first call of a chain that starts from one.
-fn meets_a_null(case: &Case, expression: &Expression, at: usize) -> bool {
+/// Whether the tables give the whole of `expression`, at `place`, the dtype Null.
+fn is_a_null(prediction: &Prediction, expression: &Expression, place: &Place) -> bool {
+    class_after(prediction, place, expression.links().len()) == Some(Representative::Null)
+}
+
+/// Whether the link `at` of `expression`, which is at `place`, is a bitwise call that meets a
+/// value of the dtype Null as the tables give it: the value it follows, or one it is given.
+fn meets_a_null(
+    prediction: &Prediction,
+    expression: &Expression,
+    place: &Place,
+    at: usize,
+) -> bool {
     let link = &expression.links()[at];
     is_a_bitwise_call(link)
-        && (operands(link)
-            .into_iter()
-            .any(|(_, operand)| operand.links().is_empty() && starts_from_a_null(case, operand))
-            || (at == 0 && starts_from_a_null(case, expression)))
-}
-
-/// The calls of an expression: its start, then its links.
-fn calls_of_expression(expression: &Expression) -> impl Iterator<Item = &Call> {
-    std::iter::once(expression.start())
-        .filter_map(|start| match start {
-            Start::Call(call) => Some(call),
-            Start::Input(_) | Start::Hole => None,
-        })
-        .chain(expression.links())
-}
-
-/// Whether an expression holds, at any depth, a bitwise call that meets a null.
-fn holds_a_bitwise_call_on_a_null(case: &Case, expression: &Expression) -> bool {
-    (0..expression.links().len()).any(|at| meets_a_null(case, expression, at))
-        || calls_of_expression(expression).any(|call| {
-            operands(call)
+        && (class_after(prediction, place, at) == Some(Representative::Null)
+            || placed_operands(link, &place.clone().then(Segment::Link(at)))
                 .into_iter()
-                .any(|(_, inside)| holds_a_bitwise_call_on_a_null(case, inside))
-        })
+                .any(|(_, held_at, operand)| is_a_null(prediction, operand, &held_at)))
+}
+
+/// Every expression inside `expression`, which is at `place`, itself first, and where each is.
+fn expressions_inside<'a>(
+    expression: &'a Expression,
+    place: &Place,
+    found: &mut Vec<(Place, &'a Expression)>,
+) {
+    found.push((place.clone(), expression));
+    let start = match expression.start() {
+        Start::Call(call) => Some((call, place.clone().then(Segment::Start))),
+        Start::Input(_) | Start::Hole => None,
+    };
+    let links = expression
+        .links()
+        .iter()
+        .enumerate()
+        .map(|(at, link)| (link, place.clone().then(Segment::Link(at))));
+    for (call, call_at) in start.into_iter().chain(links) {
+        for (_, held_at, inside) in placed_operands(call, &call_at) {
+            expressions_inside(inside, &held_at, found);
+        }
+    }
 }
 
 /// Whether an expression has a `not` straight after an `and` or an `or` that meets a null, at
 /// any depth.
-fn negates_a_bitwise_call_on_a_null(case: &Case, expression: &Expression) -> bool {
-    expression.links().windows(2).enumerate().any(|(at, pair)| {
-        is(&pair[1], "Expr.not_")
-            && (is(&pair[0], "Expr.and_") || is(&pair[0], "Expr.or_"))
-            && meets_a_null(case, expression, at)
-    }) || calls_of_expression(expression).any(|call| {
-        operands(call)
-            .into_iter()
-            .any(|(_, inside)| negates_a_bitwise_call_on_a_null(case, inside))
+fn negates_a_bitwise_call_on_a_null(
+    prediction: &Prediction,
+    expression: &Expression,
+    place: &Place,
+) -> bool {
+    let mut inside = Vec::new();
+    expressions_inside(expression, place, &mut inside);
+    inside.into_iter().any(|(at, inside)| {
+        inside.links().windows(2).enumerate().any(|(link, pair)| {
+            is(&pair[1], "Expr.not_")
+                && (is(&pair[0], "Expr.and_") || is(&pair[0], "Expr.or_"))
+                && meets_a_null(prediction, inside, &at, link)
+        })
     })
+}
+
+/// Whether Polars gives a filter's predicate the dtype Null where the tables give a `Boolean`: it
+/// ends in bitwise calls, the first of which meets a value of the dtype Null. An `and` with a
+/// null on either side is a null, and goes on being one through an `and`, and through an `or` of
+/// another null, however it began. An `or` or an `xor` of a `Boolean` and a null is a `Boolean`,
+/// and the tables refuse either of a receiver that is a null; and any other call that follows
+/// gives what the tables say.
+fn gives_a_predicate_the_dtype_null(
+    prediction: &Prediction,
+    predicate: &Expression,
+    place: &Place,
+) -> bool {
+    let null = Some(Representative::Null);
+    // Whether what the chain is has the dtype Null, and whether a bitwise call made it so.
+    let mut is_null = class_after(prediction, place, 0) == null;
+    let mut made_by_a_bitwise_call = false;
+    for (at, link) in predicate.links().iter().enumerate() {
+        let mut operands = placed_operands(link, &place.clone().then(Segment::Link(at)))
+            .into_iter()
+            .map(|(_, held_at, operand)| is_a_null(prediction, operand, &held_at));
+        (is_null, made_by_a_bitwise_call) = match link.entry().id().as_str() {
+            "Expr.and_" => (is_null || operands.any(|null| null), true),
+            "Expr.or_" => (is_null && operands.all(|null| null), true),
+            "Expr.xor" => (false, true),
+            _ => (class_after(prediction, place, at + 1) == null, false),
+        };
+    }
+    is_null && made_by_a_bitwise_call
 }
 
 /// Whether `call` is a literal that is a whole number below zero.
@@ -1658,16 +1702,19 @@ fn applies(
         }
         (Limit::ABitwiseCallOnANull, Disagreement::PolarsRefuses(refusal)) => {
             let reason = refusal.reason.as_str();
+            let origin = Place::of_step(0, Some(case.document.steps()[0].id().clone()));
+            let placed = placed_operands(step, &origin);
             let negated = reason.contains("dtype Null not supported in 'not' operation")
-                && held
+                && placed
                     .iter()
-                    .any(|(_, held)| negates_a_bitwise_call_on_a_null(case, held));
+                    .any(|(_, at, held)| negates_a_bitwise_call_on_a_null(prediction, held, at));
             let filtered = reason
                 .contains("filter predicate must be of type `Boolean`, got `Null`")
                 && is(step, "LazyFrame.filter")
-                && held
-                    .iter()
-                    .any(|(_, held)| holds_a_bitwise_call_on_a_null(case, held));
+                && placed.iter().any(|(parameter, at, held)| {
+                    *parameter == "predicates"
+                        && gives_a_predicate_the_dtype_null(prediction, held, at)
+                });
             unplaced(refusal) && refusal.stage == Stage::Rows && (negated || filtered)
         }
         (Limit::ADivisionByZero, Disagreement::PolarsRefuses(refusal)) => {
@@ -3073,9 +3120,6 @@ mod tests {
                 column("f"),
                 vec![and_of(chain(null(), &[])), or_of(chain(null(), &[]))],
             ),
-            // An `or` and an `xor` of nulls only.
-            chain_of(null(), vec![or_of(chain(null(), &[]))]),
-            chain_of(null(), vec![xor_of(chain(typed_null(), &[]))]),
         ] {
             let case = filtered(predicate);
             assert_eq!(
