@@ -1536,9 +1536,26 @@ fn holds_a_null_comparison(expression: &Expression) -> bool {
         }
         reads |= operands(link).into_iter().any(reads_a_column);
     }
+    // A comparison with a null that follows one value or literals alone folds into a null and
+    // drops what it follows, the calls before it and what they are given, unevaluated: a
+    // comparison of a column with a null among them is not one Polars meets.
+    let dropped = expression
+        .links()
+        .iter()
+        .enumerate()
+        .filter(|(at, link)| {
+            is_a_comparison(link)
+                && (operands(link).into_iter().any(is_a_null)
+                    || (starts_from_a_null(expression) && follows_the_start(expression, *at)))
+                && wholly_single(expression, *at, true)
+        })
+        .map(|(at, _)| at + usize::from(start.is_some()))
+        .max()
+        .unwrap_or(0);
     start
         .into_iter()
         .chain(expression.links())
+        .skip(dropped)
         .any(|call| operands(call).into_iter().any(holds_a_null_comparison))
 }
 
