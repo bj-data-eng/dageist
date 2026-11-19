@@ -311,9 +311,9 @@ pub enum Role {
     /// The base of a logarithm, as `log`'s `base` is. A number typed without a dtype adapts to the
     /// value the method follows, where that is a float, as an operand's does, but the value the
     /// method follows does not adapt to it. A number with a fraction beside a value that is no
-    /// float, a whole number or a `Boolean`, leaves the result the unresolved float the number is,
-    /// which a select resolves to a `Float64` where it ends and a sort key or a join's key does
-    /// not.
+    /// float, a whole number, a `Boolean` or a `Decimal`, leaves the result the unresolved float
+    /// the number is, which a select resolves to a `Float64` where it ends and a sort key or a
+    /// join's key does not.
     Base,
     /// A limit a value is held to, as `clip`'s bounds are. A number typed without a dtype is cast
     /// to the dtype of the value the method follows, as strictly as Polars can: it refuses a

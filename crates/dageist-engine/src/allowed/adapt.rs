@@ -67,9 +67,7 @@ impl Loose {
             _ => None,
         }
     }
-}
 
-impl Loose {
     /// The dtype the number has as a bound of a value of the class `other`, which is cast to it:
     /// the class itself where the number fits it, and for a number with a fraction beside whole
     /// numbers, which Polars cuts to a whole number, that class too. A whole number the class
