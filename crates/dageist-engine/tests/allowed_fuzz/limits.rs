@@ -153,8 +153,11 @@ pub enum Limit {
     APanic,
     /// The other table's key is made of the dtype its chain gives on its own,
     /// and the join may resolve the chain to another, as the precision of a
-    /// decimal that a null is taken from. Polars' message names the decimal, and
-    /// the refusal is of the step.
+    /// decimal that a null is taken from, or leave it unresolved: an integer raised
+    /// to a number with a fraction typed without a dtype is a `Float64` where it is
+    /// selected and a `dyn float`, which no dtype matches, where it is a key. Polars'
+    /// message names the decimal or the `dyn float`, the latter in a case that holds
+    /// such a power, and the refusal is of the step.
     AJoinKeyDtype,
     /// A window whose receiver holds another window is run by Polars in the
     /// aggregation context of the outer one, where a key that is not elementwise
@@ -336,6 +339,17 @@ fn is_a_power_of_a_negative_number(call: &Call) -> bool {
                 && matches!(exponent.start(), Start::Call(start)
                     if is(start, "polars.lit")
                         && matches!(start.argument("value"), Some(Value::Integer(number)) if *number < 0)))
+}
+
+/// Whether `call` is a `pow` whose exponent is a number with a fraction typed without a dtype.
+fn is_a_power_of_a_fraction(call: &Call) -> bool {
+    is(call, "Expr.pow")
+        && matches!(call.argument("exponent"), Some(Value::Expression(exponent))
+            if exponent.links().is_empty()
+                && matches!(exponent.start(), Start::Call(start)
+                    if is(start, "polars.lit")
+                        && start.argument("dtype").is_none()
+                        && matches!(start.argument("value"), Some(Value::Float(_)))))
 }
 
 fn has_explode(call: &Call) -> bool {
@@ -1229,7 +1243,11 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement, observed: &Ob
             is(step, "LazyFrame.join")
                 && unplaced(refusal)
                 && refusal.reason.contains("datatypes of join keys")
-                && refusal.reason.contains("decimal")
+                && (refusal.reason.contains("decimal")
+                    || (refusal.reason.contains("dyn float")
+                        && held
+                            .iter()
+                            .any(|(_, held)| any_call(held, &is_a_power_of_a_fraction))))
         }
         (Limit::AHiddenSchema, Disagreement::PolarsAllows(refused)) => {
             let locus = locate(case, &refused.place);
