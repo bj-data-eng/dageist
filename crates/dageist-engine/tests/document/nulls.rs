@@ -844,3 +844,32 @@ fn a_null_literal_of_another_dtype_given_to_a_fill_leaves_what_it_gives_not_know
     assert_eq!(outer.places()[1], None);
     assert_eq!(walk(&report).refusal(), None);
 }
+
+#[test]
+fn one_value_over_a_window_that_explodes_is_one_value_for_each_group_and_not_for_each_row() {
+    // With no partition the table is one group, so the window that explodes gives one value, and
+    // a default of many values beside it is refused for the lengths.
+    let replace = call(
+        "Expr.replace_strict",
+        json!({ "old": field("a"), "new": field("k"), "default": field("k") }),
+    );
+    let windowed = call(
+        "Expr.over",
+        json!({ "order_by": many(vec![field("k")]), "mapping_strategy": choice("explode") }),
+    );
+    let report = report_of(
+        "LazyFrame.select",
+        select(vec![field_then(
+            "k",
+            vec![call("Expr.min", json!({})), windowed, replace],
+        )]),
+    );
+    assert!(polars_says(&report).is_some(), "{:?}", outcome(&report));
+    assert!(
+        walk(&report)
+            .refusal()
+            .is_some_and(|refusal| matches!(refusal.refusal().source(), RefusalSource::Rule(_))),
+        "{:?}",
+        walk(&report).refusal()
+    );
+}
