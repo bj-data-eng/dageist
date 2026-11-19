@@ -1959,14 +1959,15 @@ mod tests {
 
     #[test]
     fn a_failed_conversion_to_a_u32_is_excused_where_a_power_is_given_a_value_below_zero() {
-        // A subtraction, a negation, a sum and a product can take the values of a column below
-        // zero, as a number typed below zero does.
+        // A subtraction, a negation, the bits of a number flipped, a sum and a product can take
+        // the values of a column below zero, as a number typed below zero does.
         for exponent in [
             chain_of(
                 column("b"),
                 vec![compared_with("Expr.sub", chain(column("k"), &[]))],
             ),
             chain(column("k"), &["Expr.neg"]),
+            chain(column("k"), &["Expr.not_"]),
             chain_of(column("k"), vec![compared_with("Expr.add", whole(-3))]),
             chain_of(
                 column("k"),
