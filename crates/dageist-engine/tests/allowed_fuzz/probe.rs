@@ -1411,6 +1411,22 @@ mod tests {
     }
 
     #[test]
+    fn a_key_beside_another_key_is_asked_as_the_only_key_of_the_join() {
+        // `join(left_on=[lit(1, Float32).cum_max(), f | 1], right_on=[key, key2])`: a literal is
+        // folded into one value, which Polars allows as a key, where the running maximum of a
+        // column is not elementwise. The other key is refused first for what it holds when the
+        // join is asked as it is written, so the key is asked as the only one of the join, as a
+        // column of the dtype that reaches the call is.
+        let found = settled_apart(
+            "stricter-a-running-value-of-a-literal-in-a-join-key-beside-another-key.case",
+        )
+        .expect("the call on a column as the only key of the join");
+        assert!(found.reason.contains("elementwise"), "{}", found.reason);
+        assert!(found.probe.contains("LazyFrame.join"), "{}", found.probe);
+        assert!(!found.probe.contains("Expr.or_"), "{}", found.probe);
+    }
+
+    #[test]
     fn a_predicate_is_not_asked_on_a_column_where_polars_gave_no_dtype_or_the_tables_gave_no_rule()
     {
         let case = kept("stricter-a-count-as-the-predicate-of-a-condition-under-a-len.case");
