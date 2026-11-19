@@ -1698,13 +1698,36 @@ fn refused_for_lengths_without_drops(case: &Case) -> Option<bool> {
     })
 }
 
-/// Whether Polars refuses the case for lengths, or for the reason given, still when no call drops.
+/// What a replacement is refused with when what replaces it has fewer values than what it replaces.
+const NEW_AS_LONG_AS_OLD: &str = "must have the same length as `old`";
+
+/// Whether Polars refuses the case for the reason given still when no call drops: for the words of
+/// a replacement that it be given as many values as it replaces, those words, and not another
+/// refusal about lengths, which a fill in place of the drop may meet for its own reasons.
 fn refused_for_lengths_without_drops_as(case: &Case, reason: &str) -> Option<bool> {
     changed(case_without_drops(case), case).map(|control| {
         (0..RUNS).any(|_| {
             observe(&control).refusal.is_some_and(|refusal| {
-                unplaced(&refusal) && (is_lengths(&refusal.reason) || refusal.reason == reason)
+                unplaced(&refusal)
+                    && if reason.contains(NEW_AS_LONG_AS_OLD) {
+                        refusal.reason.contains(NEW_AS_LONG_AS_OLD)
+                    } else {
+                        is_lengths(&refusal.reason)
+                    }
             })
+        })
+    })
+}
+
+/// Whether Polars refuses the case for the reason the tables gave once each drop is a fill of
+/// nulls forward: the rows are then given, and show the plan that they contradict, so the drop
+/// was why they did not. Polars allows the case as it is.
+fn refused_with_each_drop_a_fill(case: &Case, reason: &str) -> bool {
+    changed(case_without_drops(case), case).is_some_and(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| refusal.reason == reason)
         })
     })
 }
@@ -2576,10 +2599,7 @@ fn applies(
             // a drop makes fewer where the rows hold a null: that is a refusal about lengths here
             // and is not one for the rows' own, which the drop's control shows.
             unplaced(refusal)
-                && (is_lengths(&refusal.reason)
-                    || refusal
-                        .reason
-                        .contains("must have the same length as `old`"))
+                && (is_lengths(&refusal.reason) || refusal.reason.contains(NEW_AS_LONG_AS_OLD))
                 && held.iter().any(|(_, held)| any_call(held, &is_a_drop))
                 && refused_for_lengths_without_drops_as(case, &refusal.reason) == Some(false)
         }
@@ -2859,6 +2879,20 @@ fn applies(
                         && chain.links()[..at].iter().any(partitions_by_a_literal)
                 })
                 && refused_with_columns_to_partition_by(case, refused)
+        }
+        (Limit::ADropLeavesNoRows, Disagreement::PolarsAllows(refused)) => {
+            // The rows are none where a drop of nulls meets a value that is all nulls, so the
+            // target's own comparison of a plan with rows is not shown for a call that follows
+            // one in its chain.
+            let locus = locate(case, &refused.place);
+            refused.stage == Some(TableStage::Rows)
+                && refused.reason.starts_with(SCHEMA_SAYS)
+                && locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
+                    chain.links()[..at]
+                        .iter()
+                        .any(|call| is(call, "Expr.drop_nulls"))
+                })
+                && refused_with_each_drop_a_fill(case, &refused.reason)
         }
         (Limit::ACastOfAValueTheDtypeCannotHold, Disagreement::PolarsRefuses(refusal)) => {
             // The rows hold the value, and so may a table with no rows, where an aggregate of
