@@ -797,3 +797,26 @@ fn a_condition_of_single_values_that_are_one_expression_gives_one_value_for_a_re
         walk(&report).refusal()
     );
 }
+
+#[test]
+fn one_value_over_a_window_is_as_many_values_as_the_rows_and_a_default_of_many_is_not_refused() {
+    // The minimum is one value, and a window gives each row of its group that value, so a strict
+    // replacement of it, given a default of many values, is given as many as it follows.
+    let replace = call(
+        "Expr.replace_strict",
+        json!({ "old": field("a"), "new": field("k"), "default": field("k") }),
+    );
+    let windowed = call(
+        "Expr.over",
+        json!({ "partition_by": many(vec![field("k")]) }),
+    );
+    let report = report_of(
+        "LazyFrame.select",
+        select(vec![field_then(
+            "k",
+            vec![call("Expr.min", json!({})), windowed, replace],
+        )]),
+    );
+    assert!(polars_says(&report).is_none(), "{:?}", outcome(&report));
+    assert_eq!(walk(&report).refusal(), None);
+}
