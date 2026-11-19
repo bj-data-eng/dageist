@@ -68,7 +68,7 @@ use super::case::{Case, STEP};
 use super::frames::STAND_IN;
 use super::literal::{call_with_columns, class_of, operand_causes};
 use super::observe::{
-    Observed, Refusal, Seen, Tables, is_bare_key, is_the_targets_own, observe_probe,
+    Observed, Refusal, SCHEMA_SAYS, Seen, Tables, is_bare_key, is_the_targets_own, observe_probe,
 };
 use super::predict::{Prediction, Refused, Source};
 
@@ -387,6 +387,18 @@ fn objection(reason: &str) -> String {
         .join(" ")
 }
 
+/// How Polars on one thread, which the tables are measured on, refuses a bitwise call between a
+/// whole number and text, and others that read a series as a dtype it is not.
+const UNPACKING: &str = "cannot unpack series of type";
+
+/// Whether `probe` is the mismatch of the target's own that Polars on many threads gives where
+/// the tables' reason is a failure to unpack a series. Its streaming engine does not unpack the
+/// text as a whole number: it gives the column of the whole number where its schema says text,
+/// which is the same call refused, for it is not what the schema says.
+fn is_the_same_unpacking(tables: &str, probe: &str) -> bool {
+    tables.starts_with(UNPACKING) && probe.starts_with(SCHEMA_SAYS)
+}
+
 /// Whether `probe` is refused as the tables refused the part: for Polars' own
 /// reason the same objection, and for a rule that a predicate be a `Boolean`
 /// Polars' words for it.
@@ -395,10 +407,11 @@ pub fn same_reason(source: &Source, tables: &str, probe: &str) -> bool {
         // What the target says of a schema is no objection of Polars, so it is
         // neither the tables' reason nor one that a probe can be refused for.
         Source::Polars => {
-            !is_the_targets_own(tables)
+            (!is_the_targets_own(tables)
                 && !is_the_targets_own(probe)
                 && !objection(tables).is_empty()
-                && objection(tables) == objection(probe)
+                && objection(tables) == objection(probe))
+                || is_the_same_unpacking(tables, probe)
         }
         Source::Rule(rule) if PREDICATE_RULES.contains(rule) => {
             let probe = probe.to_ascii_lowercase();
