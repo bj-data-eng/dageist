@@ -43,7 +43,7 @@ mod table;
 mod tests;
 mod typed;
 
-pub(crate) use adapt::{Loose, is_count, is_required, operand_adapts, receiver_adapts};
+pub(crate) use adapt::{Loose, Receiver, is_count, is_required, operand_adapts, receiver_beside};
 pub use candidates::{
     ArgumentSlot, Candidate, DefaultArgument, Fit, OptionOffer, OptionWord, Slot, default_argument,
     fit, option_offers,

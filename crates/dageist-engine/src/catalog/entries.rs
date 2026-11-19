@@ -111,6 +111,9 @@ const fn flag(name: &'static str, default: &'static str) -> Parameter {
 /// The parameter every comparison and every method of arithmetic or logic on two values takes.
 const OTHER: Parameter = required("other", EXPRESSION, Shape::One).with_role(Role::Operand);
 
+/// The parameter `truediv` takes, which is divided by.
+const DIVISOR: Parameter = required("other", EXPRESSION, Shape::One).with_role(Role::Divisor);
+
 /// `*predicates`: conditions that must all hold, which `when` and `filter` take.
 const PREDICATES: Parameter = starred("predicates", Kind::Expression(BOOLEAN));
 /// `**constraints`: columns that must equal a value, which `when` and `filter` take.
@@ -1061,7 +1064,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         id: EntryId("Expr.pow"),
         family: Family::Arithmetic,
         accepts: NUMERIC,
-        parameters: &[required("exponent", EXPRESSION, Shape::One).with_role(Role::Operand)],
+        parameters: &[required("exponent", EXPRESSION, Shape::One).with_role(Role::Exponent)],
         laziness: Laziness::Lazy,
         build: Build::Expression(pow),
     },
@@ -1098,7 +1101,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         id: EntryId("Expr.truediv"),
         family: Family::Arithmetic,
         accepts: SCALABLE,
-        parameters: &[OTHER],
+        parameters: &[DIVISOR],
         laziness: Laziness::Lazy,
         build: Build::Expression(truediv),
     },

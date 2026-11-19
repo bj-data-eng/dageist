@@ -24,7 +24,7 @@ use crate::allowed::{
     self, After, Chosen, ConditionState, Context, Ending, Literal, Nested, Outer,
     Place as OfferPlace, Position as Slot, Refusal, Representative, Shape, Unknown, Verdict,
 };
-use crate::allowed::{Loose, is_count, is_required, operand_adapts, receiver_adapts};
+use crate::allowed::{Loose, Receiver, is_count, is_required, operand_adapts, receiver_beside};
 use crate::catalog::{Applies, Comparison, Entry, Kind, Role};
 
 use super::error::{Place, Segment};
@@ -410,7 +410,8 @@ fn loose_number(call: &Call) -> Option<Loose> {
 }
 
 /// Whether a method takes an operand besides what it follows, which a number
-/// typed without a dtype adapts to: arithmetic, comparisons, a fill value.
+/// typed without a dtype adapts to or keeps its dtype beside: arithmetic,
+/// comparisons, a fill value, an exponent.
 fn takes_an_operand(entry: &Entry) -> bool {
     entry.applies() == Applies::Expression
         && entry.parameters().iter().any(|parameter| {
@@ -994,23 +995,44 @@ impl Walker<'_> {
         } = around;
         let entry = link.entry();
         // A number typed without a dtype that a method takes another operand beside adapts to
-        // it, as the dtype of that operand where it fits it. Where there is no such operand the
-        // tables, measured with typed columns, cannot say what it follows.
+        // it, as the dtype of that operand where it fits it, or keeps the dtype it has alone, as
+        // the base of a power does. Where there is no such operand the tables, measured with typed
+        // columns, cannot say what it follows.
         let cur = match (cur, receiver_loose) {
-            (Cur::Value { shape, .. }, Some(number)) if takes_an_operand(entry) => Cur::Value {
-                dtype: arguments
+            (
+                Cur::Value {
+                    shape,
+                    dtype: alone,
+                },
+                Some(number),
+            ) if takes_an_operand(entry) => {
+                let meetings: Vec<(Receiver, &Operand)> = arguments
                     .iter()
-                    .filter(|(name, operand)| {
-                        receiver_adapts(entry, name) && operand.loose.is_none()
+                    .filter_map(|(name, operand)| {
+                        receiver_beside(entry, name, number).map(|meeting| (meeting, operand))
                     })
-                    .map(|(_, operand)| operand.dtype)
-                    .collect::<Option<Vec<_>>>()
-                    .and_then(|dtypes| match dtypes.as_slice() {
-                        [dtype] => number.beside(*dtype),
-                        _ => None,
-                    }),
-                shape,
-            },
+                    .collect();
+                let keeps = !meetings.is_empty()
+                    && meetings
+                        .iter()
+                        .all(|(meeting, _)| *meeting == Receiver::Keeps);
+                let dtype = if keeps {
+                    alone
+                } else {
+                    meetings
+                        .iter()
+                        .filter(|(meeting, operand)| {
+                            *meeting == Receiver::Adapts && operand.loose.is_none()
+                        })
+                        .map(|(_, operand)| operand.dtype)
+                        .collect::<Option<Vec<_>>>()
+                        .and_then(|dtypes| match dtypes.as_slice() {
+                            [dtype] => number.beside(*dtype),
+                            _ => None,
+                        })
+                };
+                Cur::Value { dtype, shape }
+            }
             (other, _) => other,
         };
         let after = match &cur {

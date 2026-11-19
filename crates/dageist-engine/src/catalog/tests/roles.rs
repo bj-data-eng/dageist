@@ -5,7 +5,7 @@
 use crate::catalog::{self, Role};
 
 #[test]
-fn only_the_operands_the_fill_and_the_row_count_have_a_role() {
+fn only_the_operands_the_fill_the_row_count_the_power_and_the_divisor_have_a_role() {
     let mut found: Vec<(&str, &str, Role)> = catalog::entries()
         .iter()
         .flat_map(|entry| {
@@ -32,11 +32,11 @@ fn only_the_operands_the_fill_and_the_row_count_have_a_role() {
             ("Expr.mul", "other", Role::Operand),
             ("Expr.ne", "other", Role::Operand),
             ("Expr.or_", "others", Role::Operand),
-            ("Expr.pow", "exponent", Role::Operand),
+            ("Expr.pow", "exponent", Role::Exponent),
             ("Expr.shift", "fill_value", Role::Filler),
             ("Expr.shift", "n", Role::Count),
             ("Expr.sub", "other", Role::Operand),
-            ("Expr.truediv", "other", Role::Operand),
+            ("Expr.truediv", "other", Role::Divisor),
             ("Expr.xor", "other", Role::Operand),
         ]
     );

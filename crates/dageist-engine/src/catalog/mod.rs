@@ -280,6 +280,15 @@ pub enum Role {
     /// A count or an index of rows, as `shift`'s `n` is. A whole number there is
     /// that dtype and adapts to nothing.
     Count,
+    /// The power a value is raised to, as `pow`'s `exponent` is. A number typed
+    /// without a dtype adapts to the value the method follows, but that value
+    /// does not adapt to it: a number raised to a power is the dtype it has.
+    Exponent,
+    /// What a value is divided by, as `truediv`'s `other` is. A number typed
+    /// without a dtype adapts to the value the method follows, and a whole number
+    /// that the method follows adapts to it, but a number with a fraction that
+    /// the method follows does not: it is a `Float64` divided by any float.
+    Divisor,
 }
 
 /// Whether the expressions a parameter holds write columns of the table the
