@@ -950,8 +950,9 @@ impl Gen<'_> {
                 ("Expr.clip", "upper_bound") => bounds != 0,
                 ("Expr.fill_null", "value") => !fill_by_strategy,
                 // A strict replacement without a default is refused where a value is not listed,
-                // which depends on the rows.
-                ("Expr.replace_strict", "default") => true,
+                // which depends on the rows, so one is sometimes given none and a limit holds the
+                // refusal.
+                ("Expr.replace_strict", "default") => !self.draw.chance(12),
                 (_, _) if required => true,
                 ("Expr.over", "partition_by") => {
                     partitioned = self.draw.chance(80);

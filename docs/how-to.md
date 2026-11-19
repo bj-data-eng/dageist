@@ -541,7 +541,13 @@ Polars by hand, and decide which it is:
   refused without knowing the dtype of an argument, whose reason is Polars' for
   another dtype, the part as written, where Polars refusing it at the refused call
   counts without the reason being compared, and the part before the call alone is
-  allowed. The replay shows the probe
+  allowed. A call that the tables judge by each of its values beside a companion,
+  `replace`, `replace_strict`, `is_between` and `is_close`, counts when Polars refuses
+  the part at the call, or in what the call is given, whatever words it uses, for the
+  value the tables refused first is not always the one Polars meets; the limit for a
+  literal asks the same of the case run again with columns, and for a comparison that
+  follows the null literal accepts either the tables' reason or a refusal at the call or
+  in what it is given. The replay shows the probe
   and what it showed. Where it does not settle a case, Polars allows the probe,
   refuses it for another reason or at another call, or the evidence is missing, and
   the case is one of the other kinds. Keep a case the probe settles as
@@ -565,7 +571,8 @@ Polars by hand, and decide which it is:
   there beside another cause (a literal beside a part Polars skips), gate it on the
   case run again without the feature, as the limits for an `explode` and for a
   literal do, and show it with a case that has the cause and one that differs in
-  that alone. Keep the
+  that alone. A control that cannot be built, or that is the case itself, shows
+  nothing, so the limit does not apply. Keep the
   case as `regressions/uncovered-<limit>.case`, which the normal run replays and
   expects the limit to excuse; every limit has one. A limit may have others, filed as
   `regressions/uncovered-<limit>--<what it shows>.case`, with `--also-<limit>` after
