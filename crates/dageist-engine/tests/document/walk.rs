@@ -752,6 +752,24 @@ fn a_comparison_of_a_null_after_a_call_that_is_not_a_step_of_the_plan_is_still_w
         );
         assert_eq!(joined_on(key), rule, "{identity}");
     }
+    // The null a column is compared with is the same null followed by such a call.
+    let key = chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![field_then(
+                "a",
+                vec![compared(
+                    "Expr.gt",
+                    chain(
+                        call("polars.lit", json!({ "value": { "flag": null } })),
+                        vec![call("Expr.or_", json!({}))],
+                    ),
+                )],
+            )]) }),
+        ),
+        vec![call("When.then", json!({ "statement": field("k") }))],
+    );
+    assert_eq!(joined_on(key), rule);
     // Given an operand they are a call of their own, which the rule does not see through.
     let key = chain(
         null_start(),
