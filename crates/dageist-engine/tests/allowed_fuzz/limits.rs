@@ -136,8 +136,8 @@ pub enum Limit {
     /// run: the number is a value, which the tables measured as the dtype and the
     /// number 1. Polars refusing the rows with a failed conversion to `u32`, which
     /// has no place, in a case that holds a `pow` whose exponent is a whole number
-    /// typed below zero or holds a subtraction, a negation, a sum or a product, which
-    /// can take the values of a column below zero.
+    /// typed below zero or holds a subtraction, a negation, a not, a sum or a product,
+    /// which can take the values of a column below zero.
     ANegativeExponent,
     /// A `UInt128` is compared with a `Decimal` by casting it to `decimal[38,0]`,
     /// which holds up to 38 digits, and a `UInt128` holds more. The sample's values
@@ -350,7 +350,7 @@ fn is_a_power_that_may_be_given_a_value_below_zero(call: &Call) -> bool {
             is_a_whole_number_below_zero(inner)
                 || matches!(
                     inner.entry().id().as_str(),
-                    "Expr.sub" | "Expr.neg" | "Expr.add" | "Expr.mul"
+                    "Expr.sub" | "Expr.neg" | "Expr.not_" | "Expr.add" | "Expr.mul"
                 )
         }))
 }
