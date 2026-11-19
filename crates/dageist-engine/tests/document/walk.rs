@@ -831,6 +831,50 @@ fn a_null_that_two_nots_undo_is_still_the_null_a_comparison_is_given() {
 }
 
 #[test]
+fn a_comparison_with_a_null_drops_what_it_follows_where_that_is_one_value() {
+    // `(k - (k != null)).len() <= null` is a null that Polars folds before it meets the
+    // comparison of the column with a null inside the subtraction, so the key is allowed; a
+    // comparison with a null after what is not one value drops nothing, and its column is met.
+    let rule = Some(RefusalSource::Rule(Rule::KeyIsElementwise));
+    let in_a_condition = |predicate: Value| {
+        chain(
+            call(
+                "polars.when",
+                json!({ "predicates": many(vec![predicate]) }),
+            ),
+            vec![call("When.then", json!({ "statement": field("a") }))],
+        )
+    };
+    let inside = |method: &str| {
+        field_then(
+            "k",
+            vec![
+                call(
+                    method,
+                    json!({ "other": field_then("k", vec![compared("Expr.ne", null())]) }),
+                ),
+                call("Expr.len", json!({})),
+                compared("Expr.le", null()),
+            ],
+        )
+    };
+    for method in ["Expr.sub", "Expr.add", "Expr.mul"] {
+        assert_eq!(joined_on(in_a_condition(inside(method))), None, "{method}");
+    }
+    let evaluated = field_then(
+        "k",
+        vec![
+            call(
+                "Expr.sub",
+                json!({ "other": field_then("k", vec![compared("Expr.ne", null())]) }),
+            ),
+            compared("Expr.le", null()),
+        ],
+    );
+    assert_eq!(joined_on(in_a_condition(evaluated)), rule);
+}
+
+#[test]
 fn a_join_key_that_compares_nothing_of_a_column_with_a_null_is_not_refused() {
     let keys = [
         // A null, a comparison of two literals, a column with a whole number.
