@@ -873,3 +873,57 @@ fn one_value_over_a_window_that_explodes_is_one_value_for_each_group_and_not_for
         walk(&report).refusal()
     );
 }
+
+#[test]
+fn one_value_over_a_partitioned_window_that_explodes_is_one_value_for_each_group_which_the_rows_decide()
+ {
+    // Partitioned by a column of three different values the table has three groups, as many as
+    // it has rows, so a default of many values is as many as the window gives and Polars takes
+    // it. How many groups there are depends on the rows, so the walk does not refuse it.
+    let replace = call(
+        "Expr.replace_strict",
+        json!({ "old": field("a"), "new": field("a"), "default": field("k") }),
+    );
+    let windowed = call(
+        "Expr.over",
+        json!({ "partition_by": many(vec![field("a")]), "mapping_strategy": choice("explode") }),
+    );
+    let report = report_of(
+        "LazyFrame.select",
+        select(vec![field_then(
+            "k",
+            vec![call("Expr.sum", json!({})), windowed, replace],
+        )]),
+    );
+    assert!(polars_says(&report).is_none(), "{:?}", outcome(&report));
+    assert_eq!(walk(&report).refusal(), None);
+}
+
+#[test]
+fn a_condition_of_identical_many_valued_branches_gives_many_values_for_what_replaces() {
+    // Whether or not Polars drops the predicate, the values are the column, so what replaces one
+    // value by them is given many, which Polars refuses and the rule says so.
+    let condition = chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![field("f")]) }),
+        ),
+        vec![
+            call("When.then", json!({ "statement": field("k") })),
+            call("Then.otherwise", json!({ "statement": field("k") })),
+        ],
+    );
+    let replace = call("Expr.replace", json!({ "old": whole(1), "new": condition }));
+    let report = report_of(
+        "LazyFrame.select",
+        select(vec![field_then("a", vec![replace])]),
+    );
+    assert!(polars_says(&report).is_some(), "{:?}", outcome(&report));
+    assert!(
+        walk(&report)
+            .refusal()
+            .is_some_and(|refusal| matches!(refusal.refusal().source(), RefusalSource::Rule(_))),
+        "{:?}",
+        walk(&report).refusal()
+    );
+}
