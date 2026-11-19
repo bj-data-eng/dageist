@@ -139,14 +139,15 @@ pub enum Limit {
     /// typed below zero or holds a subtraction, a negation, a not, a sum or a product,
     /// which can take the values of a column below zero.
     ANegativeExponent,
-    /// Polars negates what a bitwise call combines operand by operand, as the negation
-    /// of a conjunction is the disjunction of the negations, so the `not` meets each
-    /// operand: a column or a literal of the dtype Null, which the tables allow as an
-    /// operand of `and` and `or` and refuse for `not`, measured singly, and which
-    /// the plan of the call, a `Boolean`, hides. Polars refusing the rows with the
-    /// reason that the dtype Null is not supported in `not`, which has no place, in a
-    /// case that holds a `not` straight after an `and` or an `or`.
-    ANegatedBitwiseCall,
+    /// A column or a literal of the dtype Null is an operand of `and`, `or` and `xor`
+    /// that the tables allow, giving a `Boolean`, as `select` shows. Polars treats it
+    /// in ways `select` hides. It negates what a bitwise call combines operand by
+    /// operand, as the negation of a conjunction is the disjunction of the negations,
+    /// so a `not` meets each operand, which it refuses for the dtype Null. Polars
+    /// refusing the rows with the reason that the dtype Null is not supported in `not`,
+    /// which has no place, in a case that holds a `not` straight after an `and` or an
+    /// `or`.
+    ABitwiseCallOnANull,
     /// A `UInt128` is compared with a `Decimal` by casting it to `decimal[38,0]`,
     /// which holds up to 38 digits, and a `UInt128` holds more. The sample's values
     /// are within the decimal, so the tables did not measure what a value beyond
@@ -199,7 +200,7 @@ impl Limit {
         Self::TheLengthsOfTheRows,
         Self::AnOverflow,
         Self::ANegativeExponent,
-        Self::ANegatedBitwiseCall,
+        Self::ABitwiseCallOnANull,
         Self::AValueBeyondADecimal,
         Self::APanic,
         Self::AWindowOverAWindow,
@@ -219,7 +220,7 @@ impl Limit {
             Self::TheLengthsOfTheRows => "the-lengths-of-the-rows",
             Self::AnOverflow => "an-overflow",
             Self::ANegativeExponent => "a-negative-exponent",
-            Self::ANegatedBitwiseCall => "a-negated-bitwise-call",
+            Self::ABitwiseCallOnANull => "a-bitwise-call-on-a-null",
             Self::AValueBeyondADecimal => "a-value-beyond-a-decimal",
             Self::APanic => "a-panic",
             Self::AWindowOverAWindow => "a-window-over-a-window",
@@ -243,8 +244,8 @@ impl Limit {
             Self::ANegativeExponent => {
                 "Polars takes the exponent of an integer as a UInt32, so a negative one fails when the rows run, which the tables measured with the number 1"
             }
-            Self::ANegatedBitwiseCall => {
-                "Polars negates what a bitwise call combines operand by operand, and refuses an operand of the dtype Null that the tables allowed singly"
+            Self::ABitwiseCallOnANull => {
+                "Polars meets an operand of the dtype Null of a bitwise call where select does not, and refuses it, though the tables allowed the call as a Boolean"
             }
             Self::AValueBeyondADecimal => {
                 "a UInt128 beyond the digits of a decimal cannot be cast to it, which the tables measured on values within it"
@@ -1272,7 +1273,7 @@ fn applies(
                     any_call(held, &is_a_power_that_may_be_given_a_value_below_zero)
                 })
         }
-        (Limit::ANegatedBitwiseCall, Disagreement::PolarsRefuses(refusal)) => {
+        (Limit::ABitwiseCallOnANull, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
                 && refusal.stage == Stage::Rows
                 && refusal
@@ -2099,7 +2100,7 @@ mod tests {
             )]);
             assert_eq!(
                 polars_refuses(&case, None, Stage::Rows, NOT_OF_A_NULL, Vec::new()),
-                vec![Limit::ANegatedBitwiseCall]
+                vec![Limit::ABitwiseCallOnANull]
             );
         }
         // In an expression the chain is given too.
@@ -2118,7 +2119,7 @@ mod tests {
         )]);
         assert_eq!(
             polars_refuses(&nested, None, Stage::Rows, NOT_OF_A_NULL, Vec::new()),
-            vec![Limit::ANegatedBitwiseCall]
+            vec![Limit::ABitwiseCallOnANull]
         );
     }
 
