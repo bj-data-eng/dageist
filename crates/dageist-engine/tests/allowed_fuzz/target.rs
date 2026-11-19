@@ -13,6 +13,8 @@ use dageist_fuzz::{
 use super::case::Case;
 use super::generate::generate;
 use super::limits::{excuses, strict};
+use dageist_engine::document::Place;
+
 use super::observe::{Observed, Refusal, Seen, Stage, is_the_targets_own, observe};
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
 use super::probe::{Settled, is_a_predicate_rule, same_reason, settle, settle_apart};
@@ -256,12 +258,18 @@ fn dtype_difference(case: &Case, prediction: &Prediction, observed: &Observed) -
     // A refusal predicted anywhere explains a prefix that Polars refuses: the
     // case is refused, and the prefix is one place where it is. So does a refusal
     // that Polars gives when it works out the schema at the very call the tables
-    // said they could not be asked about: an expression that holds the call has the
-    // dtype its own calls give, and the tables did not say the call allows it.
-    let refused_anyway = match &prediction.verdict {
+    // said they could not be asked about, for the expressions that hold the call:
+    // such an expression has the dtype its own calls give, and the tables did not
+    // say the call allows it. Another expression is refused for itself.
+    let refused_anyway = |expression: &Place| match &prediction.verdict {
         Verdict::Refuses(_) => true,
         Verdict::Undetermined(why) => observed.refusal.as_ref().is_some_and(|refusal| {
-            refusal.stage == Stage::Schema && why.starts_with(&format!("{}: ", refusal.at))
+            refusal.stage == Stage::Schema
+                && why.starts_with(&format!("{}: ", refusal.at))
+                && refusal
+                    .place
+                    .as_ref()
+                    .is_some_and(|at| at.path().starts_with(expression.path()))
         }),
         Verdict::Allows => false,
     };
@@ -284,10 +292,12 @@ fn dtype_difference(case: &Case, prediction: &Prediction, observed: &Observed) -
                     expected.place,
                     predicted.name()
                 )),
-                Seen::Refused(reason) if !pivot && !refused_anyway => Some(format!(
-                    "{} {what}: the tables allow it, Polars refuses it: {reason}",
-                    expected.place
-                )),
+                Seen::Refused(reason) if !pivot && !refused_anyway(&expected.place) => {
+                    Some(format!(
+                        "{} {what}: the tables allow it, Polars refuses it: {reason}",
+                        expected.place
+                    ))
+                }
                 _ => None,
             }
         };
