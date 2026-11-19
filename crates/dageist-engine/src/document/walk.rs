@@ -1344,7 +1344,7 @@ impl Walker<'_> {
         let next = match (entry.applies(), cur) {
             (Applies::Expression, _) => Cur::Value {
                 dtype: allowance.result().and_then(allowed::ResultDtype::class),
-                shape: broadcast(entry, arguments, allowance.shape()),
+                shape: broadcast(link, arguments, allowance.shape()),
             },
             (
                 Applies::Condition,
@@ -1412,11 +1412,17 @@ impl Walker<'_> {
 /// The number of values a method gives, which is many where it gives one value of the value it
 /// follows and is given an operand of many: the one value is met by each of them, as the count of
 /// nulls is by the base of a logarithm that is a column.
-fn broadcast(entry: &Entry, arguments: &[(String, Operand)], shape: Shape) -> Shape {
+fn broadcast(link: &Call, arguments: &[(String, Operand)], shape: Shape) -> Shape {
+    let entry = link.entry();
     // A window gives each row of its group the value it gives the group, so one value over a
-    // window is as many values as the table has rows.
+    // window is as many values as the table has rows, unless the window explodes, which gives
+    // one row for each group.
     if entry.id().as_str() == "Expr.over" && shape == Shape::One {
-        return Shape::Many;
+        let explodes = matches!(
+            link.argument("mapping_strategy"),
+            Some(Value::Choice(word)) if word == "explode"
+        );
+        return if explodes { shape } else { Shape::Many };
     }
     // What a replacement lists is a table of values, which gives no more values than what it
     // follows, as many values as that table holds.
