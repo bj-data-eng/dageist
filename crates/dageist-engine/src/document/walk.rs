@@ -24,7 +24,9 @@ use crate::allowed::{
     self, After, Chosen, ConditionState, Context, Ending, Literal, Nested, Outer,
     Place as OfferPlace, Position as Slot, Refusal, Representative, Shape, Unknown, Verdict,
 };
-use crate::allowed::{Loose, Receiver, is_count, is_required, operand_adapts, receiver_beside};
+use crate::allowed::{
+    Loose, Receiver, is_count, is_left_unresolved, is_required, operand_adapts, receiver_beside,
+};
 use crate::catalog::{Applies, Comparison, Entry, Kind, Role};
 
 use super::error::{Place, Segment};
@@ -1079,6 +1081,9 @@ impl Walker<'_> {
                         .loose
                         .zip(receiver)
                         .filter(|_| operand_adapts(entry, name))
+                        .filter(|(number, receiver)| {
+                            !is_left_unresolved(entry, name, *number, *receiver, context)
+                        })
                         .and_then(|(number, receiver)| number.beside(receiver))
                 } else {
                     operand.dtype

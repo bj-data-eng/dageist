@@ -171,11 +171,8 @@ pub enum Limit {
     APanic,
     /// The other table's key is made of the dtype its chain gives on its own,
     /// and the join may resolve the chain to another, as the precision of a
-    /// decimal that a null is taken from, or leave it unresolved: an integer raised
-    /// to a number with a fraction typed without a dtype is a `Float64` where it is
-    /// selected and a `dyn float`, which no dtype matches, where it is a key. Polars'
-    /// message names the decimal or the `dyn float`, the latter in a case that holds
-    /// such a power, and the refusal is of the step.
+    /// decimal that a null is taken from. Polars' message names the decimal, and
+    /// the refusal is of the step.
     AJoinKeyDtype,
     /// A window whose receiver holds another window is run by Polars in the
     /// aggregation context of the outer one, where a key that is not elementwise
@@ -405,17 +402,6 @@ fn is_a_power_that_may_be_given_a_value_below_zero(call: &Call) -> bool {
                     "Expr.sub" | "Expr.neg" | "Expr.not_" | "Expr.add" | "Expr.mul"
                 )
         }))
-}
-
-/// Whether `call` is a `pow` whose exponent is a number with a fraction typed without a dtype.
-fn is_a_power_of_a_fraction(call: &Call) -> bool {
-    is(call, "Expr.pow")
-        && matches!(call.argument("exponent"), Some(Value::Expression(exponent))
-            if exponent.links().is_empty()
-                && matches!(exponent.start(), Start::Call(start)
-                    if is(start, "polars.lit")
-                        && start.argument("dtype").is_none()
-                        && matches!(start.argument("value"), Some(Value::Float(_)))))
 }
 
 fn has_explode(call: &Call) -> bool {
@@ -1341,11 +1327,7 @@ fn applies(
             is(step, "LazyFrame.join")
                 && unplaced(refusal)
                 && refusal.reason.contains("datatypes of join keys")
-                && (refusal.reason.contains("decimal")
-                    || (refusal.reason.contains("dyn float")
-                        && held
-                            .iter()
-                            .any(|(_, held)| any_call(held, &is_a_power_of_a_fraction))))
+                && refusal.reason.contains("decimal")
         }
         (Limit::AHiddenSchema, Disagreement::PolarsAllows(refused)) => {
             let locus = locate(case, &refused.place);
@@ -2466,60 +2448,6 @@ mod tests {
             polars_refuses(&select, None, Stage::Schema, reason, Vec::new()),
             vec![]
         );
-    }
-
-    const DYN_FLOAT: &str = "datatypes of join keys don't match - `key`: f64 on left does not match `rk`: dyn float on right (and no other type was available to cast to)";
-
-    /// A literal that is the number `number`, typed without a dtype.
-    fn fraction(number: f64) -> Expression {
-        chain(
-            call("polars.lit", vec![("value", Value::Float(number))]),
-            &[],
-        )
-    }
-
-    #[test]
-    fn a_join_key_that_raises_an_integer_to_a_fraction_is_a_dyn_float_that_no_key_matches() {
-        // Polars resolves `rk ** 1.5` to a `Float64` where it is selected, and leaves it the
-        // unresolved `dyn float` where it is a join's key, which no key of a dtype matches.
-        let case = join(
-            chain(column("key"), &[]),
-            chain_of(column("rk"), vec![pow_of(fraction(1.5))]),
-        );
-        assert_eq!(
-            polars_refuses(
-                &case,
-                Some(step_place()),
-                Stage::Schema,
-                DYN_FLOAT,
-                Vec::new()
-            ),
-            vec![Limit::AJoinKeyDtype]
-        );
-    }
-
-    #[test]
-    fn a_dyn_float_join_key_is_not_excused_without_a_power_of_a_fraction() {
-        // A power of a whole number, a subtraction of a fraction and no power at all resolve
-        // to the dtype the chain gives, so Polars refusing the keys for a `dyn float` is no
-        // limit's for them.
-        for key in [
-            chain_of(column("rk"), vec![pow_of(whole(2))]),
-            chain_of(column("rk"), vec![compared_with("Expr.sub", fraction(1.5))]),
-            chain(column("rk"), &[]),
-        ] {
-            let case = join(chain(column("key"), &[]), key);
-            assert_eq!(
-                polars_refuses(
-                    &case,
-                    Some(step_place()),
-                    Stage::Schema,
-                    DYN_FLOAT,
-                    Vec::new()
-                ),
-                vec![]
-            );
-        }
     }
 
     #[test]

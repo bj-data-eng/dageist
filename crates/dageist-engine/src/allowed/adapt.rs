@@ -9,6 +9,7 @@
 
 use crate::catalog::{Entry, ParameterDefault, Role};
 
+use super::context::{Context, Outer};
 use super::dtype::Representative;
 use super::literal::Literal;
 
@@ -145,6 +146,26 @@ pub(crate) fn operand_adapts(entry: &Entry, name: &str) -> bool {
         role(entry, name),
         Some(Role::Operand | Role::Filler | Role::Exponent | Role::Divisor)
     )
+}
+
+/// Whether the number typed without a dtype that is the parameter `name` of `entry` is left
+/// unresolved by Polars where the expression stands in `context`, though a select resolves it:
+/// an integer raised to a number with a fraction is the unresolved float the number is, which
+/// a sort key and a join's key do not resolve, and Polars refuses them for it.
+pub(crate) fn is_left_unresolved(
+    entry: &Entry,
+    name: &str,
+    number: Loose,
+    receiver: Representative,
+    context: Context,
+) -> bool {
+    role(entry, name) == Some(Role::Exponent)
+        && !number.is_whole()
+        && is_integer(receiver)
+        && matches!(
+            context.outer(),
+            Outer::Sort | Outer::JoinLeft | Outer::JoinRight
+        )
 }
 
 /// What a number typed without a dtype that the method `entry` follows becomes beside the

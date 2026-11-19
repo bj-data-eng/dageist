@@ -10,7 +10,7 @@
 
 use crate::catalog::{self, DefaultValue, Entry, Kind, ParameterDefault};
 
-use super::adapt::{Loose, is_count, is_required, operand_adapts};
+use super::adapt::{Loose, is_count, is_left_unresolved, is_required, operand_adapts};
 use super::context::Context;
 use super::dtype::Representative;
 use super::literal::Literal;
@@ -138,7 +138,14 @@ pub fn fit(candidate: &Candidate, slot: &Slot<'_>) -> Option<Fit> {
         // the tables are asked of it as that dtype.
         let adapted = match (loose, place.after()) {
             (Some(number), After::Value { dtype, .. })
-                if operand_adapts(argument.entry, argument.parameter) =>
+                if operand_adapts(argument.entry, argument.parameter)
+                    && !is_left_unresolved(
+                        argument.entry,
+                        argument.parameter,
+                        number,
+                        dtype,
+                        place.context(),
+                    ) =>
             {
                 number.beside(dtype)
             }
