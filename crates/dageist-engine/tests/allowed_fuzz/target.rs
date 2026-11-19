@@ -864,6 +864,38 @@ mod tests {
         );
     }
 
+    /// A join of the two keys `a` and `k` with the one column `key`, as the left keys of the dtypes
+    /// that `a` and `k` are: whole numbers of the widths the two are.
+    fn keys_sharing_a_column(first: &str, second: &str) -> &'static str {
+        let key = |name: &str| {
+            format!(
+                r#"{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["{name}"]}}}}}},"then":[]}}}}"#
+            )
+        };
+        let text = format!(
+            r#"{{"a":"Int32","b":"Date","revision":1}}
+{{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.join","arguments":{{"other":{{"table":"other"}},"left_on":{{"many":[{},{}]}},"right_on":{{"many":[{},{}]}}}}}}}}]}}"#,
+            key(first),
+            key(second),
+            key("key"),
+            key("key")
+        );
+        Box::leak(text.into_boxed_str())
+    }
+
+    #[test]
+    fn a_join_that_pairs_one_column_with_whole_numbers_of_two_widths_is_compared() {
+        // Polars joins an `Int32` and an `Int64` key with the one column, so there is nothing
+        // that makes the case one the tables are not asked about.
+        let (outcome, tally) = evaluated_and_tallied(keys_sharing_a_column("a", "k"));
+        assert_ne!(
+            outcome.kind(),
+            dageist_fuzz::OutcomeKind::Unsupported,
+            "{outcome:?}"
+        );
+        assert!(counted(&tally, "share a column").is_none(), "{tally:?}");
+    }
+
     #[test]
     fn a_join_that_pairs_one_column_with_keys_of_the_same_dtype_is_still_a_case() {
         // The same two keys, both the column `k`, paired with the one column `key`.
