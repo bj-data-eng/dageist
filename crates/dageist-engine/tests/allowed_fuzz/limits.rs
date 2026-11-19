@@ -930,6 +930,13 @@ fn holds_a_null_comparison(key: &Expression) -> bool {
             && matches!(expression.start(), Start::Call(start)
                 if is(start, "polars.lit") && matches!(start.argument("value"), Some(Value::Flag(None))))
     };
+    // A whole number below zero bounds an interval of what is unsigned, as a count is, in a way
+    // that Polars decides at once, and so folds the interval, which the document does not decide.
+    let is_below_zero = |expression: &Expression| {
+        expression.links().is_empty()
+            && matches!(expression.start(), Start::Call(start)
+                if is(start, "polars.lit") && matches!(start.argument("value"), Some(Value::Integer(number)) if *number < 0))
+    };
     let compares = |expression: &Expression| {
         let null_start = matches!(expression.start(), Start::Call(start)
             if is(start, "polars.lit") && matches!(start.argument("value"), Some(Value::Flag(None))));
@@ -949,6 +956,10 @@ fn holds_a_null_comparison(key: &Expression) -> bool {
                     && operands(link)
                         .into_iter()
                         .any(|(_, operand)| is_null(operand)))
+                || (id == "Expr.is_between"
+                    && operands(link)
+                        .into_iter()
+                        .any(|(_, operand)| is_below_zero(operand)))
         })
     };
     fn walk(expression: &Expression, compares: &dyn Fn(&Expression) -> bool) -> bool {
@@ -4803,6 +4814,34 @@ mod tests {
         assert_eq!(
             polars_refuses(
                 &after_a_cast,
+                Some(step_place()),
+                Stage::Schema,
+                reason,
+                Vec::new()
+            ),
+            vec![Limit::ANullComparisonInAKey]
+        );
+        // An interval with a whole number below zero as a bound, which Polars decides for what is
+        // unsigned and keeps for what is not.
+        let negative = join(
+            chain_of(
+                column("rb"),
+                vec![
+                    call("Expr.max", Vec::new()),
+                    call(
+                        "Expr.is_between",
+                        vec![
+                            ("lower_bound", Value::Expression(chain(column("rk"), &[]))),
+                            ("upper_bound", Value::Expression(whole(-1))),
+                        ],
+                    ),
+                ],
+            ),
+            chain(column("key"), &[]),
+        );
+        assert_eq!(
+            polars_refuses(
+                &negative,
                 Some(step_place()),
                 Stage::Schema,
                 reason,
