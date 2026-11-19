@@ -928,7 +928,8 @@ what surrounds it, after the limits, in these ways:
   a branch no row takes or a sort key of one value, is not hidden by the literal in it. A
   literal that a call inside an argument is given counts too. The call is asked a last time
   with its receiver and every argument a column of the dtype that reaches it, which Polars
-  and the tables both gave, so that nothing an argument holds, as a comparison the tables
+  and the tables both gave, or that Polars gave an argument where the tables made no claim of
+  it, as of a condition with no `otherwise`, so that nothing an argument holds, as a comparison the tables
   allow without knowing the dtype of a number, is refused before the call is;
 - for a refusal that a join's key is not elementwise, the part that holds the refused
   call as the whole key of the same join, the only one where the join has several, for the refusal is of the position and
