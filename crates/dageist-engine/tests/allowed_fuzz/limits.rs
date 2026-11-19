@@ -139,6 +139,14 @@ pub enum Limit {
     /// typed below zero or holds a subtraction, a negation, a not, a sum or a product,
     /// which can take the values of a column below zero.
     ANegativeExponent,
+    /// Polars negates what a bitwise call combines operand by operand, as the negation
+    /// of a conjunction is the disjunction of the negations, so the `not` meets each
+    /// operand: a column or a literal of the dtype Null, which the tables allow as an
+    /// operand of `and` and `or` and refuse for `not`, measured singly, and which
+    /// the plan of the call, a `Boolean`, hides. Polars refusing the rows with the
+    /// reason that the dtype Null is not supported in `not`, which has no place, in a
+    /// case that holds a `not` straight after an `and` or an `or`.
+    ANegatedBitwiseCall,
     /// A `UInt128` is compared with a `Decimal` by casting it to `decimal[38,0]`,
     /// which holds up to 38 digits, and a `UInt128` holds more. The sample's values
     /// are within the decimal, so the tables did not measure what a value beyond
@@ -181,7 +189,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 14] = [
+    pub const ALL: [Self; 15] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -191,6 +199,7 @@ impl Limit {
         Self::TheLengthsOfTheRows,
         Self::AnOverflow,
         Self::ANegativeExponent,
+        Self::ANegatedBitwiseCall,
         Self::AValueBeyondADecimal,
         Self::APanic,
         Self::AWindowOverAWindow,
@@ -210,6 +219,7 @@ impl Limit {
             Self::TheLengthsOfTheRows => "the-lengths-of-the-rows",
             Self::AnOverflow => "an-overflow",
             Self::ANegativeExponent => "a-negative-exponent",
+            Self::ANegatedBitwiseCall => "a-negated-bitwise-call",
             Self::AValueBeyondADecimal => "a-value-beyond-a-decimal",
             Self::APanic => "a-panic",
             Self::AWindowOverAWindow => "a-window-over-a-window",
@@ -232,6 +242,9 @@ impl Limit {
             }
             Self::ANegativeExponent => {
                 "Polars takes the exponent of an integer as a UInt32, so a negative one fails when the rows run, which the tables measured with the number 1"
+            }
+            Self::ANegatedBitwiseCall => {
+                "Polars negates what a bitwise call combines operand by operand, and refuses an operand of the dtype Null that the tables allowed singly"
             }
             Self::AValueBeyondADecimal => {
                 "a UInt128 beyond the digits of a decimal cannot be cast to it, which the tables measured on values within it"
@@ -332,6 +345,23 @@ fn any_call(expression: &Expression, found: &dyn Fn(&Call) -> bool) -> bool {
 fn is_a_single_value(call: &Call) -> bool {
     is_one_value(call)
         || (is(call, "polars.lit") && matches!(call.argument("value"), Some(Value::Flag(None))))
+}
+
+/// Whether an expression has a `not` straight after an `and` or an `or`, at any depth.
+fn negates_a_bitwise_call(expression: &Expression) -> bool {
+    expression.links().windows(2).any(|pair| {
+        is(&pair[1], "Expr.not_") && (is(&pair[0], "Expr.and_") || is(&pair[0], "Expr.or_"))
+    }) || std::iter::once(expression.start())
+        .filter_map(|start| match start {
+            Start::Call(call) => Some(call),
+            Start::Input(_) | Start::Hole => None,
+        })
+        .chain(expression.links())
+        .any(|call| {
+            operands(call)
+                .into_iter()
+                .any(|(_, inside)| negates_a_bitwise_call(inside))
+        })
 }
 
 /// Whether `call` is a literal that is a whole number below zero.
@@ -1242,6 +1272,14 @@ fn applies(
                     any_call(held, &is_a_power_that_may_be_given_a_value_below_zero)
                 })
         }
+        (Limit::ANegatedBitwiseCall, Disagreement::PolarsRefuses(refusal)) => {
+            unplaced(refusal)
+                && refusal.stage == Stage::Rows
+                && refusal
+                    .reason
+                    .contains("dtype Null not supported in 'not' operation")
+                && held.iter().any(|(_, held)| negates_a_bitwise_call(held))
+        }
         (Limit::AValueBeyondADecimal, Disagreement::PolarsRefuses(refusal)) => {
             // The rows hold the values; a table with no rows holds none to fail.
             unplaced(refusal)
@@ -2030,6 +2068,122 @@ mod tests {
         );
         assert_eq!(
             polars_refuses(&case, None, Stage::Schema, NEGATIVE_EXPONENT, Vec::new()),
+            vec![]
+        );
+    }
+
+    // ----- A negated bitwise call
+
+    const NOT_OF_A_NULL: &str = "dtype Null not supported in 'not' operation";
+
+    fn and_of(operand: Expression) -> Call {
+        call("Expr.and_", vec![("others", many(vec![operand]))])
+    }
+
+    #[test]
+    fn a_not_of_the_dtype_null_is_excused_where_a_not_comes_straight_after_an_and_or_an_or() {
+        for combined in [
+            and_of(chain(column("f"), &[])),
+            call(
+                "Expr.or_",
+                vec![("others", many(vec![chain(column("f"), &[])]))],
+            ),
+        ] {
+            let case = select(vec![chain_of(
+                null(),
+                vec![
+                    combined,
+                    call("Expr.not_", Vec::new()),
+                    call("Expr.min", Vec::new()),
+                ],
+            )]);
+            assert_eq!(
+                polars_refuses(&case, None, Stage::Rows, NOT_OF_A_NULL, Vec::new()),
+                vec![Limit::ANegatedBitwiseCall]
+            );
+        }
+        // In an expression the chain is given too.
+        let nested = select(vec![chain_of(
+            column("a"),
+            vec![compared_with(
+                "Expr.eq",
+                chain_of(
+                    null(),
+                    vec![
+                        and_of(chain(column("f"), &[])),
+                        call("Expr.not_", Vec::new()),
+                    ],
+                ),
+            )],
+        )]);
+        assert_eq!(
+            polars_refuses(&nested, None, Stage::Rows, NOT_OF_A_NULL, Vec::new()),
+            vec![Limit::ANegatedBitwiseCall]
+        );
+    }
+
+    #[test]
+    fn a_not_of_the_dtype_null_is_not_excused_without_a_not_straight_after_a_bitwise_call() {
+        for case in [
+            // A not of a null, and no bitwise call.
+            select(vec![chain(null(), &["Expr.not_"])]),
+            // A bitwise call that no not follows.
+            select(vec![chain_of(
+                null(),
+                vec![
+                    and_of(chain(column("f"), &[])),
+                    call("Expr.min", Vec::new()),
+                ],
+            )]),
+            // A call between the two.
+            select(vec![chain_of(
+                null(),
+                vec![
+                    and_of(chain(column("f"), &[])),
+                    call("Expr.cum_max", vec![]),
+                    call("Expr.not_", Vec::new()),
+                ],
+            )]),
+        ] {
+            assert_eq!(
+                polars_refuses(&case, None, Stage::Rows, NOT_OF_A_NULL, Vec::new()),
+                vec![]
+            );
+        }
+    }
+
+    #[test]
+    fn only_a_refusal_of_a_not_of_the_dtype_null_at_the_rows_without_a_place_is_excused_for_a_not()
+    {
+        let case = select(vec![chain_of(
+            null(),
+            vec![
+                and_of(chain(column("f"), &[])),
+                call("Expr.not_", Vec::new()),
+            ],
+        )]);
+        assert_eq!(
+            polars_refuses(
+                &case,
+                None,
+                Stage::Rows,
+                "dtype Int8 not supported in 'not' operation",
+                Vec::new()
+            ),
+            vec![]
+        );
+        assert_eq!(
+            polars_refuses(
+                &case,
+                Some(link_of("exprs", 0, 1)),
+                Stage::Rows,
+                NOT_OF_A_NULL,
+                Vec::new()
+            ),
+            vec![]
+        );
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Schema, NOT_OF_A_NULL, Vec::new()),
             vec![]
         );
     }
