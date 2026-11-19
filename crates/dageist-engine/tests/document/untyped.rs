@@ -304,14 +304,10 @@ fn what_follows_a_number_beside_a_column_is_asked_of_the_tables() {
     }
 }
 
-/// How Polars combines two expressions.
-type Operation = fn(Expr, Expr) -> Expr;
-
-/// Every class as a column of the table `everywhere` reads, beside each number, in each
-/// operation, with the number behind the column and in front of it.
-#[test]
-fn a_number_beside_any_dtype_is_known_only_as_polars_gives_it() {
-    let numbers: Vec<(Value, Expr)> = vec![
+/// Numbers typed without a dtype, each as the document holds it and as Polars does: ones that
+/// fit a narrow column and ones that do not, whole and with a fraction.
+fn numbers() -> Vec<(Value, Expr)> {
+    vec![
         (whole(1), lit(1_i64)),
         (whole(-1), lit(-1_i64)),
         (whole(127), lit(127_i64)),
@@ -325,7 +321,43 @@ fn a_number_beside_any_dtype_is_known_only_as_polars_gives_it() {
         (fraction(1.5), lit(1.5_f64)),
         (fraction(1.0), lit(1.0_f64)),
         (fraction(1e40), lit(1e40_f64)),
-    ];
+    ]
+}
+
+/// How Polars combines two expressions.
+type Combine = fn(Expr, Expr) -> Expr;
+
+/// A method that takes another expression, and how Polars combines the two: the entry, the
+/// parameter that holds the other one, whether the parameter holds a list, and the combination.
+struct Operation {
+    entry: &'static str,
+    parameter: &'static str,
+    list: bool,
+    combine: Combine,
+}
+
+impl Operation {
+    const fn new(entry: &'static str, combine: Combine) -> Self {
+        Self {
+            entry,
+            parameter: "other",
+            list: false,
+            combine,
+        }
+    }
+
+    /// The call of the method given `other`.
+    fn given(&self, other: Value) -> Value {
+        let other = if self.list { many(vec![other]) } else { other };
+        call(self.entry, json!({ self.parameter: other }))
+    }
+}
+
+/// Every class as a column of the table `everywhere` reads, beside each number, in each of
+/// `operations`, with the number behind the column and in front of it. How many of the
+/// combinations the walk knows the dtype of.
+fn numbers_beside_every_dtype(operations: &[Operation]) -> usize {
+    let numbers = numbers();
     let mut known = 0;
     for class in Representative::ALL {
         let name = class.name();
@@ -334,18 +366,14 @@ fn a_number_beside_any_dtype_is_known_only_as_polars_gives_it() {
                 start if start.is_object() => start,
                 _ => unreachable!("a number is an expression"),
             };
-            let operations: [(&str, Operation); 3] = [
-                ("Expr.sub", |left, right| left - right),
-                ("Expr.gt", |left, right| left.gt(right)),
-                ("Expr.eq", |left, right| left.eq(right)),
-            ];
-            for (entry, build) in operations {
+            for operation in operations {
+                let build = operation.combine;
                 let behind = (
-                    on_a_column(name, compare(entry, number.clone())),
+                    on_a_column(name, operation.given(number.clone())),
                     build(col(name), literal.clone()),
                 );
                 let in_front = (
-                    chain(start.clone(), vec![compare(entry, field(name))]),
+                    chain(start.clone(), vec![operation.given(field(name))]),
                     build(literal.clone(), col(name)),
                 );
                 for (item, expression) in [behind, in_front] {
@@ -354,6 +382,29 @@ fn a_number_beside_any_dtype_is_known_only_as_polars_gives_it() {
                     agrees_in(&item, walk, polars);
                 }
             }
+        }
+    }
+    known
+}
+
+#[test]
+fn a_number_beside_any_dtype_is_known_only_as_polars_gives_it() {
+    let known = numbers_beside_every_dtype(&[
+        Operation::new("Expr.sub", |left, right| left - right),
+        Operation::new("Expr.gt", |left, right| left.gt(right)),
+        Operation::new("Expr.eq", |left, right| left.eq(right)),
+    ]);
+    // The walk knows what a number that fits gives and what a comparison gives, and not what
+    // every number beside every dtype gives.
+    assert!(known > 100, "the walk knew {known} of them");
+}
+
+#[test]
+fn a_number_as_a_fill_value_is_known_only_as_polars_gives_it() {
+    let mut known = 0;
+    for class in Representative::ALL {
+        let name = class.name();
+        for (number, literal) in numbers() {
             let shifted = on_a_column(
                 name,
                 call("Expr.shift", json!({ "fill_value": number.clone() })),
@@ -366,8 +417,6 @@ fn a_number_beside_any_dtype_is_known_only_as_polars_gives_it() {
             agrees_in(&shifted, walk, polars);
         }
     }
-    // The walk knows what a number that fits gives and what a comparison gives, and not what
-    // every number beside every dtype gives.
     assert!(known > 100, "the walk knew {known} of them");
 }
 
