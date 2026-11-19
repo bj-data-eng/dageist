@@ -296,9 +296,30 @@ reason: deprecated, taking a Python function, meaningful only with a Python
 object, never offered because it is not an operation a step could use (such
 as running a query or printing a plan), or not yet catalogued. When Polars
 moves, refreshing the audit makes that test name every item that changed.
+
+Python's operators are spellings of entries, not entries of their own. `Expr.__add__`
+is `+`, which `Expr.add` is; the same holds for `-`, `*`, `/`, `//`, `%`, `**`, unary
+`-`, `abs()`, `&`, `|`, `^`, `~` and the six comparisons, and for each reflected form,
+which is the same operation with the sides swapped. Unary `+` returns the expression it is
+given and is left out for that. A step puts a value on the left of an operator by starting
+its chain from that value. Offering both would show one operation twice, so each dunder
+method of `Expr` is left out as never offered, with the entry it spells.
+
+`and_`, `or_`, `xor` and `not_` are logical on Booleans and bitwise on whole
+numbers, so they have a family of their own, Logic, and are not swapped for a
+comparison, and the editor shows `and`, `or` and `not` without Python's trailing
+underscore, which the language file lists as changed. `and_` and `or_` take any
+number of operands and fold them from the left as Python does; given none they are
+the expression they follow, so the tables allow them on every dtype until an operand
+is given. The tables judge each operand beside what the method follows, as they do
+for any method with more than one expression parameter, and not beside what the
+operands before it gave.
+
 The catalogue holds the seven steps, the expression methods the storyboard
-uses, the aggregates `sum`, `min`, `max` and `len`, `col`, `lit`, `element`,
-and the links of `when`, `then` and `otherwise`.
+uses, the aggregates `sum`, `min`, `max` and `len`, the six comparisons, the
+arithmetic of `add`, `sub`, `mul`, `truediv`, `floordiv`, `mod`, `pow`, `neg`
+and `abs`, the logic of `and_`, `or_`, `xor` and `not_`, `col`, `lit`,
+`element`, and the links of `when`, `then` and `otherwise`.
 
 The host serves the catalogue with its English words to the view through the
 `operation_catalogue` command. The step editor takes its method lists,
@@ -598,7 +619,15 @@ does not fit, or the other side is no number, Polars widens the column to a dtyp
 depends on the number, as `u8 - 300` is a `UInt16`, or refuses the call, and the dtype
 of what the call gives is not known; the call still gives what the tables say it gives
 for every dtype the number could take, where that is the same for all of them, as a
-comparison always gives a `Boolean`. Where it is an operand of another method, such as a
+comparison always gives a `Boolean`. Two operands are not met so. The base of a power
+does not adapt to its exponent, which adapts to the base: `2 ** u8` is an `Int32`, as the
+number is alone, and the walk says so. A number with a fraction that is divided by a float
+column is a `Float64` beside it, where a whole number adapts to the float: `1.5 / f32` is a
+`Float64` and `2 / f32` a `Float32`. An integer raised to a number with a fraction is the
+unresolved float the number is, which a select resolves to a `Float64` and a sort key or a
+join's key does not, so there its dtype is not known. The catalogue gives `pow`'s `exponent`
+and `truediv`'s `other` roles of their own for it. Where it is an operand of another method,
+such as a
 key to group by, what the call gives is not known. The walk and `fit` know it where it
 stands alone, counts rows as `shift` does, or is a value of a condition beside typed
 values that it fits: a whole number adapts to whole numbers and numbers with a
@@ -706,7 +735,7 @@ and referenced from the lines of the context table they govern:
 | `filter-predicate-is-boolean` | A filter's predicate is a `Boolean`, and so is what a condition in it gives. Polars refuses a chain that ends in anything else, but a method that is not a `Boolean` may stand partway through one. |
 | `element-only-in-pivot-aggregate` | `polars.element` stands only in a pivot's aggregate. Polars refuses it elsewhere, but as a panic when the table is sorted. |
 | `join-key-names-are-not-repeated` | A join pairs no two output column names twice. Polars names a key by the column its chain starts from, whatever methods follow it, `literal` for a literal and by its first value for a condition, and refuses a join in which the key of one side and the key it is paired with repeat the names of an earlier pair: `left_on=[k, k.sum()]` with `right_on=[rk, rk.sum()]` is refused, and with `right_on=[rk, ra]` is not, for the pairs differ. A name repeated on one side only is allowed. `on` pairs each key with itself. An alias is refused in a join's key by Polars, and the catalogue holds none. The rule is asked by the walk, which finds the names of the whole join and places the refusal at the later left key that makes the pair again. Polars pairs the keys after expanding each side, so a key that may expand to several columns (a `col` of several names or a pattern), a key that starts from an input or is not picked yet (a hole), and an item that is no expression shift every pair after them. The rule judges only the pairs before the first such key on either side, and none after it. |
-| `key-is-elementwise` | A join's own key holds no aggregate beside a column and no column compared with a null literal. Polars refuses such a key as not elementwise: it folds a comparison with a null literal into a null, at any depth, in an operand, before a method or in a condition's predicate, and a key whose column has gone is not elementwise. A subtraction with a null does not drop an aggregate it follows or is given: `k != f.len() - null` is refused. Nor does a fold drop a side that is more than one value or literals alone: `(k - a.sum()) > (b.first() == null)` is refused, for Polars evaluates the side that holds a column beside the aggregate. It allows a key that is wholly an aggregate, a null alone, a comparison of literals, a null beside a column that is not compared, an aggregate compared with a null, and in the key of a window in a select, a filter or a sort an aggregate beside a column. The rule holds what the evidence settles. What Polars does with a comparison with what an earlier one folded depends on dtypes that the document does not decide, so a limit covers it. The context table measured an entry as the whole key, and what a key holds is a matter of the whole expression, so the caller that walks it asks `rule_forbids_a_key_known_not_elementwise`. |
+| `key-is-elementwise` | A join's own key holds no aggregate beside a column and no column compared with a null literal. Polars refuses such a key as not elementwise: it folds a comparison with a null literal into a null, at any depth, in an operand, before a method or in a condition's predicate, and a key whose column has gone is not elementwise. A subtraction with a null does not drop an aggregate it follows or is given: `k != f.len() - null` is refused. Nor does a fold drop a side that is more than one value or literals alone: `(k - a.sum()) > (b.first() == null)` is refused, for Polars evaluates the side that holds a column beside the aggregate. It allows a key that is wholly an aggregate, a null alone, a comparison of literals, a null beside a column that is not compared, an aggregate compared with a null, and in the key of a window in a select, a filter or a sort an aggregate beside a column. `and_` and `or_` given no operand are the expression they follow, so a null followed by one is still the null a comparison is given, and a comparison that follows it is the first Polars meets. The rule holds what the evidence settles. What Polars does with a comparison with what an earlier one folded depends on dtypes that the document does not decide, so a limit covers it. The context table measured an entry as the whole key, and what a key holds is a matter of the whole expression, so the caller that walks it asks `rule_forbids_a_key_known_not_elementwise`. |
 
 `dageist_engine::allowed::offers` answers which entries may stand at a place,
 given the context and what the expression has so far: nothing, a value of a
@@ -912,10 +941,17 @@ limits say what Polars evaluates and accepts, so they are asked before those pro
 and after the part as written: in that order the part as written, then the limits,
 then the probes apart from the case.
 
+One pair of reasons is matched though their words differ. The tables are measured on
+one thread, where Polars refuses a bitwise call between a whole number and text by
+failing to unpack the text as the number. On many threads its streaming engine does not
+fail: it gives the column of the whole number where its schema says text, which the target
+counts as a refusal in words of its own. A failure to unpack a series, as the tables'
+reason, and that mismatch, as a probe's, are the same refusal of the same call.
+
 The second kind is a limit, for what Polars evaluates and accepts, which no probe
 of the part shows, and for where the tables allow and Polars refuses. A limit is
 never for a part Polars skips: the editor holds that to its types, and a probe
-settles it. There are thirteen. Each is named in the target, counted when it excuses a
+settles it. There are sixteen. Each is named in the target, counted when it excuses a
 case, and has a kept case that the normal tests replay, which only that limit
 excuses, named `uncovered-<limit>.case`, with others
 `uncovered-<limit>--<what it shows>.case`; each has a test that the same feature
@@ -949,7 +985,7 @@ rule a probe shows right where Polars does not evaluate the part. Any other rule
 refuses what Polars allows is a disagreement. The target compares nothing
 more of a case that the rule by design refuses and Polars allows: the dtypes before the
 refusal are compared, but whether Polars allows the rest is not. That rule is stricter
-wherever it refuses, which is about a third of the pivot cases (58 of the 158 of the fixed
+wherever it refuses, which is about half of the pivot cases (71 of the 157 of the fixed
 seed, and the same share in longer campaigns), so those pivot aggregates are checked
 little; the tally counts the pivot cases and those the rule refuses apart.
 
@@ -970,11 +1006,11 @@ an expected rejection that names both reasons.
 The tally ends with the totals of the cases that agreed, that both refused for another
 reason, that a limit excused, that were refused where Polars does not evaluate the
 part, that a rule stricter by design refused, and that disagreed. The fixed seed's
-1000 cases give 806 agreeing, 82 refused by both for another reason, 11 excused by a
-limit, 7 refused where Polars does not evaluate the part, 58 refused by the rule that
-is stricter by design, and none disagreeing; 25 of those that agree are refused by the
+1000 cases give 776 agreeing, 119 refused by both for another reason, 6 excused by a
+limit, 3 refused where Polars does not evaluate the part, 71 refused by the rule that
+is stricter by design, and none disagreeing; 19 of those that agree are refused by the
 rule against a repeated pair of key names, and the tables could not be asked past a
-point in 54 more.
+point in 34 more.
 
 | Limit | Excuses |
 | --- | --- |
@@ -990,7 +1026,10 @@ point in 54 more.
 | A value beyond a decimal | Polars compares a `UInt128` with a `Decimal` by casting the `UInt128` to `decimal[38,0]`, which holds 38 digits, and a `UInt128` holds more. The sample's values are within the decimal, so the tables measured what a value within it meets, and a comparison of a `UInt128` with a `Decimal` is allowed by the dtypes alone; a value beyond it, which a subtraction wraps to below zero, fails the cast. Polars refusing the rows with a failed conversion of `u128` to a decimal, in a case that holds a subtraction (no place: the reason and the subtraction gate it). The table with no rows holds no value to fail, and another conversion is not this. |
 | A panic | One is an internal check that failed on the plan Polars made in `select`; another place, or a combination of what was measured singly, may not reach it, or may reach another. Polars panicking where the tables allow (no place), and the tables recording a panic where Polars allows. |
 | A window over a window | A window whose receiver holds another window, in its chain before it, or in the arguments of those calls, is run in the aggregation context of the outer one, where a key that is not elementwise is refused; the tables measured one window. Polars refusing the rows with that reason (no place). A window in a key, or two windows apart, is not this. |
-| A hidden schema | The tables hold the schema of a method and what its rows give as one thing, and refuse a method whose plan says another dtype than its rows give. That is the target's own comparison, not a refusal of Polars, and it shows only where the method is the output of the step: inside an expression that goes on from it or compares it, Polars evaluates the method and the step's rows do not show the difference. The tables refusing, with the reason that the schema says one dtype and the rows give another, at a call that is not the last of the step's own expression, which Polars allows. |
+| A hidden schema | The tables hold the schema of a method and what its rows give as one thing, and refuse a method whose plan says another dtype than its rows give. That is the target's own comparison, not a refusal of Polars, and it shows only where the method is the output of the step: inside an expression that goes on from it or compares it, Polars evaluates the method and the step's rows do not show the difference. The tables refusing, with the reason that the schema says one dtype and the rows give another, at a call that is not the last of the step's own expression, which Polars allows. A sort key and a join's key are no output of the step either, so the same reason at the last call of one is excused, unless a probe of the call on a column in the key settles it, which says more of it and is asked first. |
+| A negative exponent | Polars raises an integer to a power by taking the exponent as a `UInt32`, so it refuses a negative whole number as the exponent of an integer when the rows run. The exponent is a value, which the tables measured as the dtype and the number 1. Polars refusing the rows with a failed conversion to `u32`, in a case with a `pow` whose exponent is a whole number typed below zero or holds a subtraction, a negation, a not, a sum or a product, which can take the values of a column below zero (no place). A power of a positive number or of a column is not this. |
+| A null in a bitwise call | A column or a literal of the dtype Null is an operand of `and_`, `or_` and `xor` that the tables allow, giving a `Boolean`, as `select` shows, and Polars meets it where `select` hides it. It negates what a bitwise call combines operand by operand, so a `not_` meets each operand and refuses the dtype Null: Polars refusing the rows with the dtype Null not supported in `not`, in a case with a `not_` straight after an `and_` or an `or_` (no place). It gives a filter's predicate the dtype Null: Polars refusing the rows with a predicate that must be a `Boolean`, got `Null`, in a filter that holds an `and_`, an `or_` or an `xor` (no place). |
+| A division by zero | Polars refuses to divide a `Decimal` by zero, where a whole number divided by zero is null and a float is infinite. The divisor is a value, which the tables measured as the dtype and the sample's values, none of them zero; a remainder or a difference of them can be. Polars refusing the rows with the reason that it divides by zero, in a case with a division, a floor division or a remainder (no place). |
 
 
 A case that the tables cannot be asked about, because the dtype of an argument or
