@@ -869,7 +869,15 @@ impl Walker<'_> {
             };
             // A condition whose predicates and values are all one value gives one value whether
             // or not Polars drops its predicates, so what follows it need not wait on that.
-            let all_single = matches!(&cur, Cur::Condition { single: true, .. });
+            // Values that are many are many whether or not Polars drops the predicates.
+            let all_single = matches!(
+                &cur,
+                Cur::Condition { single: true, .. }
+                    | Cur::Condition {
+                        values_single: false,
+                        ..
+                    }
+            );
             let (next, standing) = self.link(
                 link,
                 &arguments,
@@ -1416,13 +1424,23 @@ fn broadcast(link: &Call, arguments: &[(String, Operand)], shape: Shape) -> Shap
     let entry = link.entry();
     // A window gives each row of its group the value it gives the group, so one value over a
     // window is as many values as the table has rows, unless the window explodes, which gives
-    // one row for each group.
+    // one row for each group, and a partitioned one as many as the groups of the rows.
     if entry.id().as_str() == "Expr.over" && shape == Shape::One {
         let explodes = matches!(
             link.argument("mapping_strategy"),
             Some(Value::Choice(word)) if word == "explode"
         );
-        return if explodes { shape } else { Shape::Many };
+        // With nothing to partition by the table is one group, so the window gives one value;
+        // with a partition it gives one for each group, as many as the rows decide.
+        let partitions = ["partition_by", "more_exprs"].iter().any(|name| {
+            matches!(link.argument(name), Some(Value::Many(items)) if !items.is_empty())
+                || matches!(link.argument(name), Some(Value::Expression(_)))
+        });
+        return if explodes && !partitions {
+            shape
+        } else {
+            Shape::Many
+        };
     }
     // What a replacement lists is a table of values, which gives no more values than what it
     // follows, as many values as that table holds.
