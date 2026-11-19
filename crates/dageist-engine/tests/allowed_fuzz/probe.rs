@@ -1317,6 +1317,37 @@ mod tests {
     }
 
     #[test]
+    fn a_call_whose_argument_polars_refuses_first_is_refused_on_columns_of_the_dtypes_that_reach_it()
+     {
+        // `sort(by=lit(null).pow((h < 1.5).first()))`: Polars drops a sort key that is a literal
+        // and never meets the power, and the probe of the power on a column is refused first for
+        // the comparison of text with a number in its exponent, which the tables allow without
+        // knowing the dtype of the number. The power of a column of the dtype Null by a column of
+        // the dtype that the exponent has is refused as the tables say.
+        let found = settled_apart("stricter-a-power-of-a-null-literal-in-a-sort-key.case")
+            .expect("the call on columns of the dtypes that reach it");
+        assert!(found.reason.contains("not supported"), "{}", found.reason);
+        assert!(found.probe.contains("Expr.pow"), "{}", found.probe);
+        // The receiver and the exponent are each a column; the comparison is not in the probe.
+        assert!(found.probe.contains("\"p2\""), "{}", found.probe);
+        assert!(!found.probe.contains("Expr.lt"), "{}", found.probe);
+    }
+
+    #[test]
+    fn a_call_is_not_asked_on_columns_where_polars_gave_an_argument_no_dtype() {
+        let case = kept("stricter-a-power-of-a-null-literal-in-a-sort-key.case");
+        assert_eq!(
+            settle_apart(
+                &case,
+                &refusal(&case),
+                &predict(&case),
+                &Observed::default()
+            ),
+            None
+        );
+    }
+
+    #[test]
     fn a_predicate_is_not_asked_on_a_column_where_polars_gave_no_dtype_or_the_tables_gave_no_rule()
     {
         let case = kept("stricter-a-count-as-the-predicate-of-a-condition-under-a-len.case");
