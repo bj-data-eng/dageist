@@ -10,7 +10,9 @@
 
 use crate::catalog::{self, DefaultValue, Entry, Kind, ParameterDefault};
 
-use super::adapt::{Loose, is_count, is_left_unresolved, is_required, operand_adapts};
+use super::adapt::{
+    Loose, adapted_dtype, is_count, is_left_unresolved, is_required, operand_adapts,
+};
 use super::context::Context;
 use super::dtype::Representative;
 use super::literal::Literal;
@@ -141,7 +143,7 @@ pub fn fit(candidate: &Candidate, slot: &Slot<'_>) -> Option<Fit> {
                 if operand_adapts(argument.entry, argument.parameter)
                     && !is_left_unresolved(argument.entry, argument.parameter, number, dtype) =>
             {
-                number.beside(dtype)
+                adapted_dtype(argument.entry, argument.parameter, number, dtype)
             }
             _ => None,
         };

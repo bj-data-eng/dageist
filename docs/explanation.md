@@ -627,8 +627,10 @@ column is a `Float64` beside it, where a whole number adapts to the float: `1.5 
 `Float64` and `2 / f32` a `Float32`. An integer raised to a number with a fraction is the
 unresolved float the number is, which a select resolves to a `Float64` where it ends and
 a sort key or a join's key does not, and which an operand it meets adapts as it does the
-number, so its dtype is not known. The catalogue gives `pow`'s `exponent`
-and `truediv`'s `other` roles of their own for it. Where it is an operand of another method,
+number, so its dtype is not known. A number with a fraction beside a Boolean that is floor
+divided is a Boolean, which Polars cannot floor divide, though it floor divides a Boolean by a
+typed float, so `f // 1.5` is refused and `f // 1` and `f * 1.5` are not. The catalogue gives
+`pow`'s `exponent`, `truediv`'s `other` and `floordiv`'s `other` roles of their own for these. Where it is an operand of another method,
 such as a
 key to group by, what the call gives is not known. The walk and `fit` know it where it
 stands alone, counts rows as `shift` does, or is a value of a condition beside typed

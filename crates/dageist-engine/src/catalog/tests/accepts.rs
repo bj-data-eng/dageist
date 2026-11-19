@@ -45,7 +45,10 @@ fn accepted(accepts: &[Dtypes], groups: &[Dtypes]) -> bool {
 /// receiver has no say in.
 fn takes_an_operand(entry: &Entry) -> bool {
     entry.parameters().iter().any(|parameter| {
-        parameter.role() == Role::Operand && matches!(parameter.kind(), Kind::Expression(_))
+        matches!(
+            parameter.role(),
+            Role::Operand | Role::Exponent | Role::Divisor | Role::FloorDivisor
+        ) && matches!(parameter.kind(), Kind::Expression(_))
     })
 }
 
@@ -68,7 +71,7 @@ fn arguments_for(entry: &Entry, column: &str, operand: &str) -> Arguments {
                 // `by` of `dt.offset_by` is a duration string; anything else is compared with,
                 // or taken from, a column of the table.
                 Kind::Expression(&[Dtypes::String]) => expression_arg(lit("1d")),
-                Kind::Expression(_) if parameter.role() == Role::Operand => {
+                Kind::Expression(_) if parameter.role() != Role::Plain => {
                     expression_arg(col(operand))
                 }
                 Kind::Expression(_) => expression_arg(col(column)),

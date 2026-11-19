@@ -289,6 +289,11 @@ pub enum Role {
     /// that the method follows adapts to it, but a number with a fraction that
     /// the method follows does not: it is a `Float64` divided by any float.
     Divisor,
+    /// What a value is floor divided by, as `floordiv`'s `other` is. A number typed without
+    /// a dtype adapts as an operand's does, except that a number with a fraction beside a
+    /// Boolean is a Boolean, which Polars cannot floor divide, though it floor divides a
+    /// Boolean by a typed float.
+    FloorDivisor,
 }
 
 /// Whether the expressions a parameter holds write columns of the table the

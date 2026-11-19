@@ -143,7 +143,7 @@ pub(crate) fn is_count(entry: &Entry, name: &str) -> bool {
 pub(crate) fn operand_adapts(entry: &Entry, name: &str) -> bool {
     matches!(
         role(entry, name),
-        Some(Role::Operand | Role::Filler | Role::Exponent | Role::Divisor)
+        Some(Role::Operand | Role::Filler | Role::Exponent | Role::Divisor | Role::FloorDivisor)
     )
 }
 
@@ -159,6 +159,25 @@ pub(crate) fn is_left_unresolved(
     receiver: Representative,
 ) -> bool {
     role(entry, name) == Some(Role::Exponent) && !number.is_whole() && is_integer(receiver)
+}
+
+/// The dtype of the number typed without a dtype that is the parameter `name` of the method
+/// `entry`, beside a receiver of the dtype `receiver`, where the tables can say it: that of the
+/// receiver where it fits it, a Boolean for a number with a fraction that a Boolean is floor
+/// divided by, which Polars adapts it to and so refuses the call, and otherwise none.
+pub(crate) fn adapted_dtype(
+    entry: &Entry,
+    name: &str,
+    number: Loose,
+    receiver: Representative,
+) -> Option<Representative> {
+    if role(entry, name) == Some(Role::FloorDivisor)
+        && !number.is_whole()
+        && receiver == Representative::Boolean
+    {
+        return Some(Representative::Boolean);
+    }
+    number.beside(receiver)
 }
 
 /// What a number typed without a dtype that the method `entry` follows becomes beside the
@@ -179,7 +198,7 @@ pub(crate) enum Receiver {
 /// fills with, the rows it counts, or an expression that meets nothing.
 pub(crate) fn receiver_beside(entry: &Entry, name: &str, number: Loose) -> Option<Receiver> {
     match role(entry, name)? {
-        Role::Operand => Some(Receiver::Adapts),
+        Role::Operand | Role::FloorDivisor => Some(Receiver::Adapts),
         Role::Exponent => Some(Receiver::Keeps),
         Role::Divisor if number.is_whole() => Some(Receiver::Adapts),
         Role::Divisor => Some(Receiver::Keeps),

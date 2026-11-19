@@ -114,6 +114,10 @@ const OTHER: Parameter = required("other", EXPRESSION, Shape::One).with_role(Rol
 /// The parameter `truediv` takes, which is divided by.
 const DIVISOR: Parameter = required("other", EXPRESSION, Shape::One).with_role(Role::Divisor);
 
+/// The parameter `floordiv` takes, which is floor divided by.
+const FLOOR_DIVISOR: Parameter =
+    required("other", EXPRESSION, Shape::One).with_role(Role::FloorDivisor);
+
 /// `*predicates`: conditions that must all hold, which `when` and `filter` take.
 const PREDICATES: Parameter = starred("predicates", Kind::Expression(BOOLEAN));
 /// `**constraints`: columns that must equal a value, which `when` and `filter` take.
@@ -909,7 +913,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         id: EntryId("Expr.floordiv"),
         family: Family::Arithmetic,
         accepts: DIVISIBLE,
-        parameters: &[OTHER],
+        parameters: &[FLOOR_DIVISOR],
         laziness: Laziness::Lazy,
         build: Build::Expression(floordiv),
     },

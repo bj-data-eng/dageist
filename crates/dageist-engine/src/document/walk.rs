@@ -25,7 +25,8 @@ use crate::allowed::{
     Place as OfferPlace, Position as Slot, Refusal, Representative, Shape, Unknown, Verdict,
 };
 use crate::allowed::{
-    Loose, Receiver, is_count, is_left_unresolved, is_required, operand_adapts, receiver_beside,
+    Loose, Receiver, adapted_dtype, is_count, is_left_unresolved, is_required, operand_adapts,
+    receiver_beside,
 };
 use crate::catalog::{Applies, Comparison, Entry, Kind, Role};
 
@@ -1084,7 +1085,7 @@ impl Walker<'_> {
                         .filter(|(number, receiver)| {
                             !is_left_unresolved(entry, name, *number, *receiver)
                         })
-                        .and_then(|(number, receiver)| number.beside(receiver))
+                        .and_then(|(number, receiver)| adapted_dtype(entry, name, number, receiver))
                 } else {
                     operand.dtype
                 };
