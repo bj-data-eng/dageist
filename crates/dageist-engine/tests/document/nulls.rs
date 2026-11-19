@@ -927,3 +927,83 @@ fn a_condition_of_identical_many_valued_branches_gives_many_values_for_what_repl
         walk(&report).refusal()
     );
 }
+
+/// `when(first).then(k).when(a.is_null()).then(1)`, the key a join is given.
+fn two_branches_of_which_the_first_is(first: Value) -> Value {
+    chain(
+        call("polars.when", json!({ "predicates": many(vec![first]) })),
+        vec![
+            call("When.then", json!({ "statement": field("k") })),
+            call(
+                "Then.when",
+                json!({ "predicates": many(vec![field_then("a", vec![call("Expr.is_null", json!({}))])]) }),
+            ),
+            call("ChainedWhen.then", json!({ "statement": whole(1) })),
+        ],
+    )
+}
+
+fn a_replacement_of_columns_summed() -> Vec<Value> {
+    vec![
+        call(
+            "Expr.replace_strict",
+            json!({ "old": field("a"), "new": whole(1) }),
+        ),
+        call("Expr.sum", json!({})),
+    ]
+}
+
+#[test]
+fn a_replacement_of_columns_that_a_comparison_with_a_null_leaves_unevaluated_is_no_refusal_in_a_joins_key()
+ {
+    // Polars folds the comparison of the sum with a null into a null before it asks whether the
+    // key is elementwise, so the replacement that the sum follows is never met.
+    let mut links = a_replacement_of_columns_summed();
+    links.push(call("Expr.lt", json!({ "other": null_literal() })));
+    let report = join_on(two_branches_of_which_the_first_is(field_then("k", links)));
+    assert!(polars_says(&report).is_none(), "{:?}", outcome(&report));
+    assert_eq!(walk(&report).refusal(), None);
+}
+
+#[test]
+fn a_replacement_of_columns_that_is_evaluated_is_refused_in_a_joins_key_beside_one_a_null_drops() {
+    // Compared with a number it is evaluated, and Polars refuses the key as it does a
+    // replacement of columns anywhere else in one.
+    let mut links = a_replacement_of_columns_summed();
+    links.push(call("Expr.lt", json!({ "other": whole(5) })));
+    let compared = join_on(two_branches_of_which_the_first_is(field_then("k", links)));
+    // The sum is an aggregate beside a column, which is a refusal of its own.
+    assert!(polars_says(&compared).is_some(), "{:?}", outcome(&compared));
+    assert!(walk(&compared).refusal().is_some());
+    // A replacement of columns that is a value of the key, beside a comparison with a null that
+    // drops another, is evaluated too.
+    let mut links = a_replacement_of_columns_summed();
+    links.push(call("Expr.lt", json!({ "other": null_literal() })));
+    let key = chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![field_then("k", links)]) }),
+        ),
+        vec![
+            call(
+                "When.then",
+                json!({ "statement": field_then(
+                    "k",
+                    vec![call(
+                        "Expr.replace",
+                        json!({ "old": field("k"), "new": whole(7) }),
+                    )],
+                ) }),
+            ),
+            call("Then.otherwise", json!({ "statement": whole(1) })),
+        ],
+    );
+    let report = join_on(key);
+    assert!(polars_says(&report).is_some(), "{:?}", outcome(&report));
+    assert_eq!(
+        walk(&report)
+            .refusal()
+            .map(|refusal| refusal.refusal().source()),
+        Some(RefusalSource::Rule(Rule::KeyIsElementwise))
+    );
+}
