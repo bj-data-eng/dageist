@@ -32,9 +32,8 @@ pub enum DefaultValue {
     Text(String),
     /// An empty `*` or `**` parameter: `()` or `{}`.
     Empty,
-    /// Anything else Python can write: a name such as `DEFAULT_QUERY_OPT_FLAGS`
-    /// or `math.e`, a tuple, a number in hexadecimal. The engine does not read
-    /// it as a value.
+    /// Anything else Python can write: a name such as `DEFAULT_QUERY_OPT_FLAGS`,
+    /// a tuple, a number in hexadecimal. The engine does not read it as a value.
     Other,
 }
 
@@ -55,9 +54,11 @@ impl DefaultValue {
     /// Python's literals are read as Python writes them: `None`, `True` and
     /// `False`; decimal integers and floats, signed, with the underscores
     /// Python allows between digits; single- or double-quoted text, with the
-    /// escapes `\\`, `\'`, `\"`, `\n`, `\t` and `\r`; and the empty `()` and
-    /// `{}`. Text with any other escape, or with an unescaped quote inside, is
-    /// [`DefaultValue::Other`], as is a number outside `i64` or `f64`.
+    /// escapes `\\`, `\'`, `\"`, `\n`, `\t` and `\r`; the empty `()` and
+    /// `{}`; and the one name of the inventory's defaults that is a number,
+    /// `math.e`, as Euler's number. Text with any other escape, or with an
+    /// unescaped quote inside, is [`DefaultValue::Other`], as is a number
+    /// outside `i64` or `f64`.
     #[must_use]
     pub fn from_python(text: &str) -> Self {
         match text {
@@ -65,6 +66,7 @@ impl DefaultValue {
             "True" => Self::Flag(true),
             "False" => Self::Flag(false),
             "()" | "{}" => Self::Empty,
+            "math.e" => Self::Float(std::f64::consts::E),
             _ => number(text)
                 .or_else(|| string(text).map(Self::Text))
                 .unwrap_or(Self::Other),

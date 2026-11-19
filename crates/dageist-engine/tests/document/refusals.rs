@@ -321,6 +321,45 @@ fn a_missing_argument_is_refused_at_its_parameter() {
 }
 
 #[test]
+fn a_number_out_of_the_range_a_parameter_takes_is_refused_at_the_link_and_its_parameter() {
+    // Python passes the places of a rounding as an unsigned and the figures as a signed 32-bit
+    // number, so a build refuses one outside them, before Polars is asked anything.
+    let cases: [(&str, &str, i64); 3] = [
+        ("Expr.round", "decimals", -1),
+        ("Expr.truncate", "decimals", 4_294_967_296),
+        ("Expr.round_sig_figs", "digits", 2_147_483_648),
+    ];
+    for (entry, name, number) in cases {
+        let report = run(vec![step(
+            "bad",
+            "LazyFrame.with_columns",
+            json!({ "named_exprs": named(vec![(
+                "x",
+                field_then("row_days", vec![call(entry, json!({ name: { "integer": number } }))]),
+            )]) }),
+        )]);
+        let refusal = refusal_of(&report, "bad");
+        assert_eq!(
+            refusal.place().path(),
+            [
+                parameter("named_exprs"),
+                Segment::Value(0),
+                Segment::Link(0),
+                parameter(name),
+            ],
+            "{entry}"
+        );
+        assert!(
+            matches!(
+                refusal.cause(),
+                RunCause::Build(BuildError::OutOfRange { parameter, .. }) if *parameter == name
+            ),
+            "{entry}"
+        );
+    }
+}
+
+#[test]
 fn a_missing_argument_of_a_link_is_refused_at_the_link_and_its_parameter() {
     // `sub` needs the value to take away.
     let report = run(vec![step(

@@ -10,11 +10,10 @@
 //! with some column of the table as the operand: a datetime has no sum with a datetime, and
 //! one with a duration. It refuses a receiver only when it refuses every column.
 
-use polars::prelude::{DataType, Expr, LazyFrame, PolarsResult, col, lit};
+use polars::prelude::{DataType, Expr, LazyFrame, PolarsError, PolarsResult, col, lit};
 
 use crate::catalog::{
-    Applies, Argument, Arguments, Build, Dtypes, Entry, Kind, ParameterDefault, Role, Variadic,
-    entries,
+    Applies, Argument, Arguments, Build, Dtypes, Entry, Kind, Role, ValueType, Variadic, entries,
 };
 
 use super::build::{expression_arg, many, sample};
@@ -47,7 +46,12 @@ fn takes_an_operand(entry: &Entry) -> bool {
     entry.parameters().iter().any(|parameter| {
         matches!(
             parameter.role(),
-            Role::Operand | Role::Exponent | Role::Divisor | Role::FloorDivisor
+            Role::Operand
+                | Role::Exponent
+                | Role::Divisor
+                | Role::FloorDivisor
+                | Role::Base
+                | Role::Bound
         ) && matches!(parameter.kind(), Kind::Expression(_))
     })
 }
@@ -59,13 +63,9 @@ fn arguments_for(entry: &Entry, column: &str, operand: &str) -> Arguments {
     let mut given: Vec<(&str, Argument)> = entry
         .parameters()
         .iter()
-        .filter(|parameter| {
-            // `and_(*others)` is its receiver as it was without an operand, and so says nothing
-            // of the receiver's dtype.
-            parameter.default() == ParameterDefault::Required
-                || (parameter.variadic() == Some(Variadic::Args)
-                    && parameter.role() == Role::Operand)
-        })
+        // `and_(*others)` and `clip` are their receiver as it was without an operand or a bound,
+        // and so say nothing of the receiver's dtype: they are given one, as a step is.
+        .filter(|parameter| parameter.is_needed())
         .map(|parameter| {
             let value = match parameter.kind() {
                 // `by` of `dt.offset_by` is a duration string; anything else is compared with,
@@ -75,6 +75,8 @@ fn arguments_for(entry: &Entry, column: &str, operand: &str) -> Arguments {
                     expression_arg(col(operand))
                 }
                 Kind::Expression(_) => expression_arg(col(column)),
+                // `round_sig_figs`'s `digits`: any whole number it takes will do.
+                Kind::Value(ValueType::Integer) => Argument::Integer(2),
                 other => panic!("{} takes {other:?}", entry.id().as_str()),
             };
             let value = if parameter.variadic() == Some(Variadic::Args) {
@@ -114,7 +116,9 @@ fn operands(entry: &Entry, column: &str) -> Vec<&'static str> {
 }
 
 /// What Polars says of `expr` on the sample: its dtype from the schema, which reads no data,
-/// then the rows, which run it.
+/// then the rows, which run it. A method whose schema says one dtype and whose rows give another
+/// is not resolved: `sqrt` of a date says it is a `Date` and gives a `Float64`, which the tables of
+/// allowed combinations refuse as they do any such call.
 fn polars_resolves(expr: Expr) -> PolarsResult<DataType> {
     let frame = typed_sample().select([expr.alias("out")]);
     let dtype = frame
@@ -123,7 +127,13 @@ fn polars_resolves(expr: Expr) -> PolarsResult<DataType> {
         .get("out")
         .expect("one column, out")
         .clone();
-    frame.collect()?;
+    let rows = frame.collect()?;
+    let given = rows.column("out")?.dtype().clone();
+    if given != dtype {
+        return Err(PolarsError::SchemaMismatch(
+            format!("the schema says {dtype} and the rows give {given}").into(),
+        ));
+    }
     Ok(dtype)
 }
 

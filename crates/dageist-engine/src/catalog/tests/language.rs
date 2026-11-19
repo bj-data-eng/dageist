@@ -444,6 +444,33 @@ fn the_shown_names_of_and_or_and_not_are_those_without_pythons_underscore() {
 }
 
 #[test]
+fn the_abbreviations_of_the_maths_are_shown_as_polars_names_them_and_the_hint_says_it_in_words() {
+    // A name is Polars' own unless the only change is Python's trailing underscore, so `cbrt`,
+    // `erf`, `erfc` and `round_sig_figs` are shown as they are and nothing lists them as changed.
+    // The hint is where the plain words go.
+    let words = english();
+    let cases = [
+        ("Expr.cbrt", "cbrt", "cube root"),
+        ("Expr.erf", "erf", "error function"),
+        ("Expr.erfc", "erfc", "complementary error function"),
+        (
+            "Expr.round_sig_figs",
+            "round_sig_figs",
+            "rounded to a number of significant figures",
+        ),
+    ];
+    for (id, name, hint) in cases {
+        let entry = crate::catalog::entry(id).expect("an entry");
+        assert_eq!(words.entry_name(entry.id()), Some(name), "{id}");
+        assert_eq!(words.entry_hint(entry.id()), Some(hint), "{id}");
+        assert!(
+            !words.changed().iter().any(|listed| listed.starts_with(id)),
+            "{id} is listed as changed"
+        );
+    }
+}
+
+#[test]
 fn every_name_listed_as_changed_is_shown_differently_from_polars() {
     let words = english();
     assert!(!words.changed().is_empty());

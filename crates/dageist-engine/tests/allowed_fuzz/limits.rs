@@ -46,7 +46,7 @@ use super::literal::{
     placed_operands, starts_from_a_literal,
 };
 use super::observe::{Observed, Refusal, SCHEMA_SAYS, Stage, Tables, observe, observe_probe};
-use super::predict::{Prediction, Refused, Source, Verdict};
+use super::predict::{Prediction, Refused, Source, Verdict, predict};
 use super::probe::{same_reason, settle_in_the_position};
 
 /// A limit of the tables, and what it says.
@@ -194,11 +194,42 @@ pub enum Limit {
     /// dtype and the rows give another, at a call that is not the last of the step's
     /// own expression or in a key that no probe settles, which Polars allows.
     AHiddenSchema,
+    /// Polars casts a bound of `clip` to the dtype it clips as strictly as it can, and refuses
+    /// the rows when a bound holds a value that dtype cannot hold: a number typed without a dtype
+    /// that is out of its range or negative beside an unsigned dtype, or a value of a float
+    /// that is not a whole number it can hold, as the infinity and the not-a-number that a
+    /// logarithm to the base 1 or a root of a negative number gives, or a value out of its
+    /// range. The tables measured a bound as a column of the sample's rows, whose numbers every
+    /// number dtype holds. Polars refusing the rows, with a failed conversion that has no
+    /// place, in a case whose refusal is the bound's: the case run again with the bounds of
+    /// every `clip` undone is not refused for a failed conversion.
+    ABoundTheDtypeCannotHold,
+    /// Polars casts a bound of `clip` to the dtype it clips, and a bound whose values that dtype
+    /// holds is cast whatever its dtype is: text that reads as the number, a list or another
+    /// dtype that holds nothing but nulls. The tables measured a bound as a column of the
+    /// sample's rows, whose text is a duration no number reads and whose lists no dtype holds,
+    /// so they refuse the cast of a dtype to another that the values of another bound pass. The
+    /// tables refusing, when they run rows, with a failed conversion or a failed cast of a
+    /// dtype, at a `clip` that has a bound that is not a bare column, which Polars allows, and
+    /// where the tables, asked again with the computed bounds of every clip undone, no longer
+    /// refuse a clip. A bound that is a bare column holds the sample's rows, as the tables
+    /// measured it, so a refusal that is its own is not this, whatever the other bound is.
+    ABoundWithValuesOfItsOwn,
+    /// A window whose partition holds no column gives Polars' streaming engine no rows, so
+    /// what follows it in a chain that starts from a literal is never evaluated, and the rows
+    /// do not show a plan that they contradict. The tables hold the schema of a method and what
+    /// its rows give as one thing, and refuse a root of a date whose schema names the date and
+    /// whose rows are a float, which is the target's own comparison and shows only where rows
+    /// are given. The tables refusing, when they run rows, with the reason that the schema says
+    /// one dtype and the rows give another, at a call after such a window in a chain that
+    /// starts from a literal, which Polars allows; the window is why where Polars, asked again
+    /// with each literal partition a column, refuses the case for that reason.
+    AWindowOverALiteral,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 19] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -215,6 +246,9 @@ impl Limit {
         Self::AWindowOverAWindow,
         Self::AJoinKeyDtype,
         Self::AHiddenSchema,
+        Self::ABoundTheDtypeCannotHold,
+        Self::ABoundWithValuesOfItsOwn,
+        Self::AWindowOverALiteral,
     ];
 
     /// The name a kept case is filed under.
@@ -236,6 +270,9 @@ impl Limit {
             Self::AWindowOverAWindow => "a-window-over-a-window",
             Self::AJoinKeyDtype => "a-join-key-dtype",
             Self::AHiddenSchema => "a-hidden-schema",
+            Self::ABoundTheDtypeCannotHold => "a-bound-the-dtype-cannot-hold",
+            Self::ABoundWithValuesOfItsOwn => "a-bound-with-values-of-its-own",
+            Self::AWindowOverALiteral => "a-window-over-a-literal",
         }
     }
 
@@ -286,6 +323,15 @@ impl Limit {
             }
             Self::AHiddenSchema => {
                 "a method whose plan and rows differ in dtype is hidden by what goes on from it"
+            }
+            Self::ABoundTheDtypeCannotHold => {
+                "Polars casts a bound of clip to the dtype it clips and refuses a value that dtype cannot hold, which the tables measured only with values it holds"
+            }
+            Self::AWindowOverALiteral => {
+                "a window over a literal partition gives no rows, so the rows do not show the plan of what follows it"
+            }
+            Self::ABoundWithValuesOfItsOwn => {
+                "Polars casts the values of a bound of clip to the dtype it clips, which the tables measured as the sample's rows, and a bound with others passes"
             }
         }
     }
@@ -1040,55 +1086,57 @@ fn leaves_only_nulls(frames: &Frames, expression: &Expression, upto: usize) -> b
         .is_some_and(|rows| !rows.is_empty() && rows.iter().all(|cell| *cell == Cell::Null))
 }
 
-/// `value` with every window in it that explodes given the mapping it has when none
-/// is named.
-fn value_without_explodes(value: &Value) -> Value {
+/// Whether a call undoes the argument `parameter` of the call `call`.
+type Undo<'a> = &'a dyn Fn(&Call, &str) -> bool;
+
+/// `value` with every argument `undo` names undone, in the calls it holds.
+fn value_without(value: &Value, undo: Undo<'_>) -> Value {
     match value {
-        Value::Expression(expression) => {
-            Value::Expression(without_explodes(expression).unwrap_or_else(|| expression.clone()))
+        Value::Expression(expression) => Value::Expression(
+            expression_without(expression, undo).unwrap_or_else(|| expression.clone()),
+        ),
+        Value::Many(items) => {
+            Value::Many(items.iter().map(|item| value_without(item, undo)).collect())
         }
-        Value::Many(items) => Value::Many(items.iter().map(value_without_explodes).collect()),
         Value::Pairs(pairs) => Value::Pairs(
             pairs
                 .iter()
-                .map(|(key, entry)| (value_without_explodes(key), value_without_explodes(entry)))
+                .map(|(key, entry)| (value_without(key, undo), value_without(entry, undo)))
                 .collect(),
         ),
         other => other.clone(),
     }
 }
 
-/// `call` with the arguments that explode, and the windows in them, undone.
-fn call_without_explodes(call: &Call) -> Option<Call> {
-    let explodes = has_explode(call);
+/// `call` with the arguments `undo` names, and those in the calls it holds, undone.
+fn call_without(call: &Call, undo: Undo<'_>) -> Option<Call> {
     let given: Vec<(&str, Value)> = call
         .arguments()
         .iter()
-        .filter(|given| !(explodes && given.parameter() == "mapping_strategy"))
-        .map(|given| (given.parameter(), value_without_explodes(given.value())))
+        .filter(|given| !undo(call, given.parameter()))
+        .map(|given| (given.parameter(), value_without(given.value(), undo)))
         .collect();
     Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
 }
 
-/// `expression` with no window that explodes: each is the window the same call
-/// makes when it is not told how to map.
-fn without_explodes(expression: &Expression) -> Option<Expression> {
+/// `expression` with the arguments `undo` names undone.
+fn expression_without(expression: &Expression, undo: Undo<'_>) -> Option<Expression> {
     let start = match expression.start() {
-        Start::Call(call) => Start::Call(call_without_explodes(call)?),
+        Start::Call(call) => Start::Call(call_without(call, undo)?),
         other => other.clone(),
     };
     let links = expression
         .links()
         .iter()
-        .map(call_without_explodes)
+        .map(|link| call_without(link, undo))
         .collect::<Option<Vec<_>>>()?;
     Expression::new(start, links).ok()
 }
 
-/// The case with no window that explodes, the same in all else.
-fn case_without_explodes(case: &Case) -> Option<Case> {
+/// The case with the arguments `undo` names undone, the same in all else.
+fn case_without(case: &Case, undo: Undo<'_>) -> Option<Case> {
     let step = &case.document.steps()[0];
-    let rebuilt = Step::new(step.id().clone(), call_without_explodes(step.call())?).ok()?;
+    let rebuilt = Step::new(step.id().clone(), call_without(step.call(), undo)?).ok()?;
     Some(Case {
         receiver: case.receiver,
         argument: case.argument,
@@ -1096,9 +1144,231 @@ fn case_without_explodes(case: &Case) -> Option<Case> {
     })
 }
 
+/// The case with no window that explodes: each is the window the same call makes when it is not
+/// told how to map.
+fn case_without_explodes(case: &Case) -> Option<Case> {
+    case_without(case, &|call, parameter| {
+        has_explode(call) && parameter == "mapping_strategy"
+    })
+}
+
+/// The case with no bound given to any `clip`, which is then the expression it follows.
+fn case_without_bounds(case: &Case) -> Option<Case> {
+    case_without(case, &|call, parameter| {
+        is(call, "Expr.clip") && matches!(parameter, "lower_bound" | "upper_bound")
+    })
+}
+
 /// How often the case without its explodes is run again: which of two failures of
 /// a plan Polars names depends on which thread gets there first.
 const RUNS: usize = 8;
+
+/// Whether the call is a `clip` that has a bound.
+fn has_a_bound(call: &Call) -> bool {
+    is(call, "Expr.clip")
+        && ["lower_bound", "upper_bound"]
+            .iter()
+            .any(|bound| call.argument(bound).is_some())
+}
+
+/// Whether the call is a window whose partition holds no column: it has `partition_by`, and each
+/// key, and each of `more_exprs`, starts from a literal and reads no column, as a running sum of
+/// a literal does not.
+fn partitions_by_a_literal(call: &Call) -> bool {
+    let keys = |parameter: &str| -> Vec<&Expression> {
+        match call.argument(parameter) {
+            Some(Value::Expression(key)) => vec![key],
+            Some(Value::Many(items)) => items
+                .iter()
+                .filter_map(|item| match item {
+                    Value::Expression(key) => Some(key),
+                    _ => None,
+                })
+                .collect(),
+            _ => Vec::new(),
+        }
+    };
+    let literal = |key: &&Expression| {
+        starts_from_a_literal(key) && !any_call(key, &|call| is(call, "polars.col"))
+    };
+    is(call, "Expr.over")
+        && call.argument("partition_by").is_some()
+        && keys("partition_by").iter().all(literal)
+        && keys("more_exprs").iter().all(literal)
+}
+
+/// `value` with the partition of every window that partitions by a literal made the column
+/// `column`, in the calls it holds.
+fn value_partitioned_by(value: &Value, column: &str) -> Value {
+    match value {
+        Value::Expression(expression) => Value::Expression(
+            expression_partitioned_by(expression, column).unwrap_or_else(|| expression.clone()),
+        ),
+        Value::Many(items) => Value::Many(
+            items
+                .iter()
+                .map(|item| value_partitioned_by(item, column))
+                .collect(),
+        ),
+        Value::Pairs(pairs) => Value::Pairs(
+            pairs
+                .iter()
+                .map(|(key, entry)| {
+                    (
+                        value_partitioned_by(key, column),
+                        value_partitioned_by(entry, column),
+                    )
+                })
+                .collect(),
+        ),
+        other => other.clone(),
+    }
+}
+
+fn call_partitioned_by(call: &Call, column: &str) -> Option<Call> {
+    let windowed = partitions_by_a_literal(call);
+    let given: Vec<(&str, Value)> = call
+        .arguments()
+        .iter()
+        .map(|given| {
+            let value = if windowed && given.parameter() == "partition_by" {
+                let key = Call::new(
+                    catalog::entry("polars.col")?,
+                    vec![("name", Value::Columns(vec![column.to_owned()]))],
+                )
+                .ok()?;
+                Value::Many(vec![Value::Expression(
+                    Expression::new(Start::Call(key), Vec::new()).ok()?,
+                )])
+            } else if windowed && given.parameter() == "more_exprs" {
+                Value::Many(Vec::new())
+            } else {
+                value_partitioned_by(given.value(), column)
+            };
+            Some((given.parameter(), value))
+        })
+        .collect::<Option<Vec<_>>>()?;
+    Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
+}
+
+fn expression_partitioned_by(expression: &Expression, column: &str) -> Option<Expression> {
+    let start = match expression.start() {
+        Start::Call(call) => Start::Call(call_partitioned_by(call, column)?),
+        other => other.clone(),
+    };
+    let links = expression
+        .links()
+        .iter()
+        .map(|link| call_partitioned_by(link, column))
+        .collect::<Option<Vec<_>>>()?;
+    Expression::new(start, links).ok()
+}
+
+/// The case with the partition of every window that partitions by a literal made a column of
+/// the table the expression is read against, the same in all else. None in a pivot's
+/// aggregate, which has no column to stand in.
+fn case_with_columns_to_partition_by(case: &Case, refused: &Refused) -> Option<Case> {
+    let step = &case.document.steps()[0];
+    if is(step.call(), "LazyFrame.pivot") {
+        return None;
+    }
+    let column = match (
+        is(step.call(), "LazyFrame.join"),
+        refused.place.path().first(),
+    ) {
+        (true, Some(Segment::Parameter(name))) if name == "right_on" => "rk",
+        (true, Some(Segment::Parameter(name))) if name == "on" => "u",
+        _ => "k",
+    };
+    let rebuilt = Step::new(step.id().clone(), call_partitioned_by(step.call(), column)?).ok()?;
+    Some(Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        document: Document::new(vec![rebuilt]).ok()?,
+    })
+}
+
+/// Whether Polars refuses the case for the reason the tables gave once each window that
+/// partitions by a literal partitions by a column: the rows are then given, and show the plan
+/// that they contradict, so the window was why they did not. Polars allows the case as it is.
+fn refused_with_columns_to_partition_by(case: &Case, refused: &Refused) -> bool {
+    case_with_columns_to_partition_by(case, refused).is_some_and(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| refusal.reason == refused.reason)
+        })
+    })
+}
+
+/// Whether the expression is a column and nothing else, which holds the sample's rows.
+fn is_a_bare_column(expression: &Expression) -> bool {
+    expression.links().is_empty()
+        && matches!(expression.start(), Start::Call(call) if is(call, "polars.col"))
+}
+
+/// Whether the call is a `clip` with a bound that is not a bare column: one that may hold other
+/// values than the sample's rows.
+fn has_a_bound_of_its_own(call: &Call) -> bool {
+    is(call, "Expr.clip")
+        && ["lower_bound", "upper_bound"].iter().any(|bound| {
+            matches!(call.argument(bound), Some(Value::Expression(expression)) if !is_a_bare_column(expression))
+        })
+}
+
+/// The case with the computed bounds of every `clip` undone, which are the bounds that hold
+/// values of their own; a bound that is a bare column stays.
+fn case_without_computed_bounds(case: &Case) -> Option<Case> {
+    case_without(case, &|call, parameter| {
+        is(call, "Expr.clip")
+            && matches!(parameter, "lower_bound" | "upper_bound")
+            && matches!(
+                call.argument(parameter),
+                Some(Value::Expression(expression)) if !is_a_bare_column(expression)
+            )
+    })
+}
+
+/// Whether the tables still refuse a failed cast at a `clip` once its computed bounds are undone:
+/// the refusal is then a bare column's, which holds the sample's rows as the tables measured it,
+/// and no bound with values of its own is why. The tables are asked and Polars is not.
+fn the_bare_bounds_alone_are_refused(case: &Case) -> bool {
+    case_without_computed_bounds(case).is_some_and(|control| match predict(&control).verdict {
+        Verdict::Refuses(refused) => {
+            refused.stage == Some(TableStage::Rows)
+                && is_a_failed_cast(&refused.reason)
+                && locate(&control, &refused.place)
+                    .call
+                    .is_some_and(|call| is(call, "Expr.clip"))
+        }
+        _ => false,
+    })
+}
+
+/// Whether the reason is that a dtype could not be cast to another, in Polars' words for a
+/// failed conversion of values or of a list's type.
+fn is_a_failed_cast(reason: &str) -> bool {
+    is_a_failed_conversion(reason) || reason.starts_with("cannot cast ")
+}
+
+/// Whether the reason is that of a value that could not be cast: Polars' words for it, which
+/// name the dtypes.
+fn is_a_failed_conversion(reason: &str) -> bool {
+    reason.starts_with("conversion from `") && reason.contains("` failed")
+}
+
+/// Whether Polars refuses the case for a failed conversion still when no `clip` has a bound: the
+/// bound is then no cause of it. Which of two failures of a plan Polars names depends on which
+/// thread gets there first, so the case is run again.
+fn refused_for_a_failed_conversion_without_bounds(case: &Case) -> bool {
+    case_without_bounds(case).is_some_and(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control).refusal.is_some_and(|refusal| {
+                unplaced(&refusal) && is_a_failed_conversion(&refusal.reason)
+            })
+        })
+    })
+}
 
 /// Whether Polars refuses the case for lengths still when no window explodes: the
 /// explode is then no cause of the refusal, which the rows' lengths are.
@@ -1451,6 +1721,42 @@ fn applies(
                         step.entry().id().as_str(),
                         "LazyFrame.sort" | "LazyFrame.join"
                     ) && settle_in_the_position(case, refused, prediction, observed).is_none()))
+        }
+        (Limit::ABoundTheDtypeCannotHold, Disagreement::PolarsRefuses(refusal)) => {
+            // The rows hold the value; a table with no rows holds none to convert. The bound is
+            // the cause where Polars stops refusing for a failed conversion when no `clip` has
+            // one.
+            unplaced(refusal)
+                && refusal.stage == Stage::Rows
+                && is_a_failed_conversion(&refusal.reason)
+                && held.iter().any(|(_, held)| any_call(held, &has_a_bound))
+                && !refused_for_a_failed_conversion_without_bounds(case)
+        }
+        (Limit::ABoundWithValuesOfItsOwn, Disagreement::PolarsAllows(refused)) => {
+            // A clip casts nothing but its bounds, so a failed cast of the rows at the clip is
+            // a bound's, and it is the one with values of its own where it is no bare column and
+            // the tables do not refuse the clip without it.
+            refused.stage == Some(TableStage::Rows)
+                && is_a_failed_cast(&refused.reason)
+                && locate(case, &refused.place)
+                    .call
+                    .is_some_and(has_a_bound_of_its_own)
+                // The computed bound is why where the tables allow the clip without it: a bare
+                // bound that the tables refuse is refused as Polars refuses it.
+                && !the_bare_bounds_alone_are_refused(case)
+        }
+        (Limit::AWindowOverALiteral, Disagreement::PolarsAllows(refused)) => {
+            // The rows are none where a window partitions a literal by a literal, so the target's
+            // own comparison of a plan with rows is not shown for a call that follows one in a
+            // chain that starts from a literal.
+            let locus = locate(case, &refused.place);
+            refused.stage == Some(TableStage::Rows)
+                && refused.reason.starts_with(SCHEMA_SAYS)
+                && locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
+                    starts_from_a_literal(chain)
+                        && chain.links()[..at].iter().any(partitions_by_a_literal)
+                })
+                && refused_with_columns_to_partition_by(case, refused)
         }
         (Limit::AWindowOverAWindow, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
@@ -2221,6 +2527,384 @@ mod tests {
             polars_refuses(&case, None, Stage::Schema, NEGATIVE_EXPONENT, Vec::new()),
             vec![]
         );
+    }
+
+    // ----- A bound the dtype cannot hold
+
+    const BOUND_NOT_HELD: &str =
+        "conversion from `f64` to `i8` failed in column 'b' for 1 out of 1 values: [NaN]";
+
+    fn clip_with(lower: Option<Expression>, upper: Option<Expression>) -> Call {
+        let mut given = Vec::new();
+        if let Some(lower) = lower {
+            given.push(("lower_bound", Value::Expression(lower)));
+        }
+        if let Some(upper) = upper {
+            given.push(("upper_bound", Value::Expression(upper)));
+        }
+        call("Expr.clip", given)
+    }
+
+    /// What the limits make of a refusal that Polars gives `case`, asked on a stack that Polars'
+    /// plans fit on: the limit runs Polars again.
+    fn refused_for_a_bound(
+        case: &Case,
+        place: Option<Place>,
+        stage: Stage,
+        reason: &str,
+    ) -> Vec<Limit> {
+        std::thread::scope(|scope| {
+            std::thread::Builder::new()
+                .stack_size(256 << 20)
+                .spawn_scoped(scope, || {
+                    polars_refuses(case, place, stage, reason, Vec::new())
+                })
+                .expect("a thread")
+                .join()
+                .expect("the limits are asked")
+        })
+    }
+
+    #[test]
+    fn a_failed_conversion_is_excused_where_a_bound_of_a_clip_is_why() {
+        // A bound given to a clip, whatever it holds, a start or a link, is the cause where
+        // Polars stops refusing for a failed conversion once the clip has none.
+        for clip in [
+            clip_with(Some(chain(column("b"), &["Expr.sqrt"])), None),
+            clip_with(None, Some(whole(300))),
+            clip_with(Some(whole(-1)), Some(chain(column("k"), &["Expr.log1p"]))),
+        ] {
+            let case = select(vec![chain_of(column("a"), vec![clip])]);
+            assert_eq!(
+                refused_for_a_bound(&case, None, Stage::Rows, BOUND_NOT_HELD),
+                vec![Limit::ABoundTheDtypeCannotHold]
+            );
+        }
+        // A clip inside what another call is given is the same.
+        let nested = select(vec![chain_of(
+            column("a"),
+            vec![compared_with(
+                "Expr.eq",
+                chain_of(column("k"), vec![clip_with(Some(whole(-1)), None)]),
+            )],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&nested, None, Stage::Rows, BOUND_NOT_HELD),
+            vec![Limit::ABoundTheDtypeCannotHold]
+        );
+    }
+
+    #[test]
+    fn a_failed_conversion_that_remains_without_the_bounds_is_not_a_bounds() {
+        // A negative exponent fails to become a `u32` whether or not a clip has a bound, so the
+        // bound is no cause, and the power's limit excuses it alone.
+        let case = select(vec![chain_of(
+            column("a"),
+            vec![clip_with(Some(whole(1)), None), pow_of(whole(-1))],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, NEGATIVE_EXPONENT),
+            vec![Limit::ANegativeExponent]
+        );
+    }
+
+    #[test]
+    fn a_failed_conversion_is_not_excused_by_a_bound_without_a_clip_or_without_a_bound_given() {
+        let nothing = [
+            // No clip at all, and a number that fails to convert elsewhere.
+            select(vec![chain_of(
+                column("a"),
+                vec![compared_with(
+                    "Expr.sub",
+                    chain(column("b"), &["Expr.sqrt"]),
+                )],
+            )]),
+            // A clip with no bound is the expression it follows.
+            select(vec![chain_of(column("a"), vec![clip_with(None, None)])]),
+        ];
+        for case in nothing {
+            assert_eq!(
+                refused_for_a_bound(&case, None, Stage::Rows, BOUND_NOT_HELD),
+                vec![]
+            );
+        }
+    }
+
+    #[test]
+    fn only_a_failed_conversion_of_the_rows_without_a_place_is_excused_for_a_bound() {
+        let case = select(vec![chain_of(
+            column("a"),
+            vec![clip_with(Some(chain(column("b"), &["Expr.sqrt"])), None)],
+        )]);
+        for reason in [
+            "`clip` operation not supported for dtype `str` (expected: numeric or temporal)",
+            "cannot compare string with numeric type (i64)",
+        ] {
+            assert_eq!(
+                refused_for_a_bound(&case, None, Stage::Rows, reason),
+                vec![],
+                "{reason}"
+            );
+        }
+        // A refusal that Polars places at a call is the call's, and a table with no rows holds
+        // no value to convert.
+        assert_eq!(
+            refused_for_a_bound(
+                &case,
+                Some(link_of("exprs", 0, 0)),
+                Stage::Rows,
+                BOUND_NOT_HELD
+            ),
+            vec![]
+        );
+        for stage in [Stage::Schema, Stage::Empty] {
+            assert_eq!(
+                refused_for_a_bound(&case, None, stage, BOUND_NOT_HELD),
+                vec![]
+            );
+        }
+    }
+
+    // ----- A bound with values of its own
+
+    const TEXT_CAST: &str = "conversion from `str` to `i8` failed in column 'b' for 2 out of 3 values: [\"1d\", \"2d\"]";
+    const LIST_CAST: &str = "cannot cast List type (inner: 'Int64', to: 'Date')";
+
+    #[test]
+    fn a_failed_cast_at_a_clip_is_excused_where_a_bound_is_no_bare_column() {
+        let at_the_clip = link_of("exprs", 0, 0);
+        for bound in [
+            whole(1),
+            chain(null(), &[]),
+            chain(column("k"), &["Expr.sqrt"]),
+        ] {
+            let case = select(vec![chain_of(
+                column("a"),
+                vec![clip_with(Some(bound), None)],
+            )]);
+            for reason in [TEXT_CAST, LIST_CAST] {
+                assert_eq!(
+                    tables_refuse(&case, at_the_clip.clone(), ROWS, reason),
+                    vec![Limit::ABoundWithValuesOfItsOwn],
+                    "{reason}"
+                );
+            }
+        }
+        // The other bound is the one with values of its own, and a pivot's aggregate is the same.
+        let upper = chain_of(
+            column("a"),
+            vec![clip_with(Some(chain(column("b"), &[])), Some(whole(1)))],
+        );
+        assert_eq!(
+            tables_refuse(
+                &select(vec![upper.clone()]),
+                at_the_clip.clone(),
+                ROWS,
+                TEXT_CAST
+            ),
+            vec![Limit::ABoundWithValuesOfItsOwn]
+        );
+        assert_eq!(
+            tables_refuse(
+                &pivot(upper),
+                at(&[parameter("aggregate_function"), Segment::Link(0)]),
+                ROWS,
+                TEXT_CAST
+            ),
+            vec![Limit::ABoundWithValuesOfItsOwn]
+        );
+    }
+
+    #[test]
+    fn a_failed_cast_at_a_clip_is_not_excused_by_a_computed_bound_beside_a_bare_one_the_tables_refuse()
+     {
+        // Beside a bound of `lit(1)`, the bare column `b` of text is refused by the tables for
+        // the sample's duration text, as Polars refuses it: the refusal is the bare bound's, and
+        // the computed one is no cause. Where `b` is a number the tables allow it, and the
+        // computed bound is why.
+        let at_the_clip = link_of("exprs", 0, 0);
+        let mixed = select(vec![chain_of(
+            column("a"),
+            vec![clip_with(Some(chain(column("b"), &[])), Some(whole(1)))],
+        )]);
+        let mut text = mixed.clone();
+        text.argument = Representative::String;
+        assert_eq!(
+            tables_refuse(&text, at_the_clip.clone(), ROWS, TEXT_CAST),
+            vec![]
+        );
+        assert_eq!(
+            tables_refuse(&mixed, at_the_clip, ROWS, TEXT_CAST),
+            vec![Limit::ABoundWithValuesOfItsOwn]
+        );
+    }
+
+    #[test]
+    fn a_failed_cast_at_a_clip_is_not_excused_by_a_bound_that_is_a_bare_column_or_absent() {
+        // A bare column holds the sample's rows as the tables measured them, and Polars refuses
+        // it the same way; a clip with no bound casts nothing.
+        let at_the_clip = link_of("exprs", 0, 0);
+        for clip in [
+            clip_with(Some(chain(column("b"), &[])), Some(chain(column("k"), &[]))),
+            clip_with(None, None),
+        ] {
+            let case = select(vec![chain_of(column("a"), vec![clip])]);
+            assert_eq!(
+                tables_refuse(&case, at_the_clip.clone(), ROWS, TEXT_CAST),
+                vec![]
+            );
+        }
+    }
+
+    #[test]
+    fn only_a_failed_cast_of_the_rows_at_the_clip_itself_is_excused_for_a_bound_of_its_own() {
+        let case = select(vec![chain_of(
+            column("a"),
+            vec![
+                clip_with(Some(whole(1)), None),
+                compared_with("Expr.sub", whole(1)),
+            ],
+        )]);
+        // Another reason, another stage, and another call of the chain.
+        assert_eq!(
+            tables_refuse(&case, link_of("exprs", 0, 0), ROWS, "no"),
+            vec![]
+        );
+        assert_eq!(
+            tables_refuse(
+                &case,
+                link_of("exprs", 0, 0),
+                Some(TableStage::Schema),
+                TEXT_CAST
+            ),
+            vec![]
+        );
+        assert_eq!(
+            tables_refuse(&case, link_of("exprs", 0, 1), ROWS, TEXT_CAST),
+            vec![]
+        );
+    }
+
+    // ----- A window over a literal
+
+    const SCHEMA_SAYS_FLOAT: &str = "the schema says Datetime(us, UTC) and the rows give Float64";
+    const LITERAL_START: &str = r#"{"entry":"polars.lit","arguments":{"value":{"flag":null},"dtype":{"dtype":"Datetime(time_unit='us', time_zone='UTC')"}}}"#;
+    const LITERAL_NULL: &str = r#"{"entry":"polars.lit","arguments":{"value":{"flag":null}}}"#;
+    const LITERAL_KEY: &str =
+        r#"{"start":{"entry":"polars.lit","arguments":{"value":{"flag":null}}},"then":[]}"#;
+    const COLUMN_K: &str = r#"{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}}"#;
+    const COLUMN_KEY: &str =
+        r#"{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[]}"#;
+    const WINDOW: &str =
+        r#"{"entry":"Expr.over","arguments":{"partition_by":{"many":[{"expression":KEY}]}}},"#;
+
+    /// A key that is a running sum of a literal, which reads no column.
+    fn running_sum_of_a_literal() -> String {
+        format!(
+            r#"{{"start":{LITERAL_NULL},"then":[{{"entry":"Expr.cum_sum","arguments":{{}}}}]}}"#
+        )
+    }
+
+    /// A key that is a literal with a column added to it, which reads one.
+    fn literal_plus_a_column() -> String {
+        format!(
+            r#"{{"start":{LITERAL_NULL},"then":[{{"entry":"Expr.add","arguments":{{"other":{{"expression":{{"start":{COLUMN_K},"then":[]}}}}}}}}]}}"#
+        )
+    }
+
+    /// `select(start.over(key).cbrt())` on a sample where `a` and `b` are dates, as text.
+    fn root_after_a_window(start: &str, key: &str, windowed: bool) -> Case {
+        let window = if windowed {
+            WINDOW.replace("KEY", key)
+        } else {
+            String::new()
+        };
+        let text = format!(
+            r#"{{"a":"Date","b":"Date","revision":1}}
+{{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.select","arguments":{{"exprs":{{"many":[{{"expression":{{"start":{start},"then":[{window}{{"entry":"Expr.cbrt","arguments":{{}}}}]}}}}]}}}}}}}}]}}"#
+        );
+        Case::decode(text.as_bytes()).expect("a case")
+    }
+
+    /// What the limits make of the tables refusing at link `link` with the plan and rows saying
+    /// two dtypes, asked on a stack that Polars' plans fit on: the limit runs Polars again.
+    fn excused_for_a_root(case: &Case, link: usize, reason: &str) -> Vec<Limit> {
+        std::thread::scope(|scope| {
+            std::thread::Builder::new()
+                .stack_size(256 << 20)
+                .spawn_scoped(scope, || {
+                    tables_refuse(case, link_of("exprs", 0, link), ROWS, reason)
+                })
+                .expect("a thread")
+                .join()
+                .expect("the limits are asked")
+        })
+    }
+
+    #[test]
+    fn a_root_after_a_window_over_a_literal_is_excused_where_the_literal_starts_the_chain() {
+        let case = root_after_a_window(LITERAL_START, LITERAL_KEY, true);
+        assert_eq!(
+            excused_for_a_root(&case, 1, SCHEMA_SAYS_FLOAT),
+            vec![Limit::AWindowOverALiteral]
+        );
+    }
+
+    #[test]
+    fn a_window_whose_key_reads_no_column_gives_no_rows_but_one_that_reads_a_column_does() {
+        let sum = running_sum_of_a_literal();
+        let case = root_after_a_window(LITERAL_START, &sum, true);
+        assert_eq!(
+            excused_for_a_root(&case, 1, SCHEMA_SAYS_FLOAT),
+            vec![Limit::AWindowOverALiteral]
+        );
+        let reads_a_column = literal_plus_a_column();
+        let case = root_after_a_window(LITERAL_START, &reads_a_column, true);
+        assert!(
+            !excused_for_a_root(&case, 1, SCHEMA_SAYS_FLOAT).contains(&Limit::AWindowOverALiteral)
+        );
+    }
+
+    #[test]
+    fn a_root_is_not_excused_by_a_window_that_is_not_over_a_literal_in_a_chain_of_a_literal() {
+        // The same root after a column start, after a window over a column, with no window, at
+        // the window itself, or refused for another reason, is not excused by this limit: rows
+        // are given, and the comparison of the plan with them is the tables' to make.
+        let cases = [
+            (
+                root_after_a_window(COLUMN_K, LITERAL_KEY, true),
+                1,
+                SCHEMA_SAYS_FLOAT,
+            ),
+            (
+                root_after_a_window(LITERAL_START, COLUMN_KEY, true),
+                1,
+                SCHEMA_SAYS_FLOAT,
+            ),
+            (
+                root_after_a_window(LITERAL_START, LITERAL_KEY, false),
+                0,
+                SCHEMA_SAYS_FLOAT,
+            ),
+            (
+                root_after_a_window(LITERAL_START, LITERAL_KEY, true),
+                0,
+                SCHEMA_SAYS_FLOAT,
+            ),
+            (
+                root_after_a_window(LITERAL_START, LITERAL_KEY, true),
+                1,
+                "no",
+            ),
+        ];
+        for (case, link, reason) in cases {
+            // Another limit may excuse a call that is not the last of the chain, which this one
+            // is not asked to.
+            assert!(
+                !excused_for_a_root(&case, link, reason).contains(&Limit::AWindowOverALiteral),
+                "{reason} at {link}"
+            );
+        }
     }
 
     // ----- A negated bitwise call
@@ -3476,6 +4160,40 @@ mod tests {
             tables_refuse(&selected, link_of("exprs", 0, 0), ROWS, reason),
             vec![]
         );
+    }
+
+    #[test]
+    fn an_unrelated_failed_conversion_is_not_excused_in_a_pivots_aggregate() {
+        // The pivot's limit is for what a group runs with kernels of its own, not for any
+        // conversion that fails: a struct that cannot become a struct, or a schema that cannot
+        // be cast to the dtype Null, is no kernel of a group.
+        let aggregate = chain_of(column("a"), vec![compared_with("Expr.sub", whole(1))]);
+        let at_the_call = at(&[parameter("aggregate_function"), Segment::Link(0)]);
+        for (stage, reason) in [
+            (
+                Some(TableStage::Rows),
+                "conversion from `struct[2]` to `struct[2]` failed in column 'b' for 2 out of 3 values: [{1,\"a\"}, {3,\"c\"}]",
+            ),
+            (
+                Some(TableStage::Schema),
+                "conversion from `i64` to `null` failed in column 'b'",
+            ),
+            (
+                Some(TableStage::Rows),
+                "conversion from `str` to `i32` failed in column 'b' for 2 out of 3 values: [\"1d\", \"2d\"]",
+            ),
+        ] {
+            assert_eq!(
+                tables_refuse(
+                    &pivot(aggregate.clone()),
+                    at_the_call.clone(),
+                    stage,
+                    reason
+                ),
+                vec![],
+                "{reason}"
+            );
+        }
     }
 
     #[test]

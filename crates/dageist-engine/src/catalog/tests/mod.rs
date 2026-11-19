@@ -10,6 +10,7 @@ mod defaults;
 mod every_variant;
 mod inventory;
 mod language;
+mod maths;
 mod roles;
 mod starting;
 mod writes;

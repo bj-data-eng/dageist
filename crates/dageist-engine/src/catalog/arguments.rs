@@ -92,6 +92,13 @@ pub enum BuildError {
         /// The parameter's name.
         parameter: &'static str,
     },
+    /// A whole number outside the range its parameter takes, as Python's binding refuses it.
+    OutOfRange {
+        /// The parameter's name.
+        parameter: &'static str,
+        /// What the parameter takes.
+        expected: &'static str,
+    },
     /// A link of a condition that cannot follow the state of the condition it
     /// was given, such as a `then` after a `then`.
     OutOfOrder {
@@ -122,6 +129,10 @@ impl std::fmt::Display for BuildError {
             Self::Repeated { parameter } => {
                 write!(formatter, "{parameter} was given more than once")
             }
+            Self::OutOfRange {
+                parameter,
+                expected,
+            } => write!(formatter, "{parameter} takes {expected}"),
             Self::OutOfOrder { expected, found } => {
                 write!(
                     formatter,

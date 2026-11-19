@@ -89,6 +89,162 @@
       "argument": null
     },
     {
+      "entry": "Expr.arccos",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.arccosh",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.arcsin",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.arcsinh",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.arctan",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.arctanh",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.cbrt",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.ceil",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.clip",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.cos",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.cosh",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.cot",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.cum_count",
       "verdict": {
         "kind": "refused",
@@ -116,6 +272,19 @@
     },
     {
       "entry": "Expr.cum_sum",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.degrees",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -206,7 +375,59 @@
       "argument": null
     },
     {
+      "entry": "Expr.erf",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.erfc",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.exp",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.first",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.floor",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -311,6 +532,32 @@
     },
     {
       "entry": "Expr.len",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.log",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.log1p",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -466,7 +713,98 @@
       "argument": null
     },
     {
+      "entry": "Expr.radians",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.round",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.round_sig_figs",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.shift",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.sign",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.sin",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.sinh",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.sqrt",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -505,7 +843,46 @@
       "argument": null
     },
     {
+      "entry": "Expr.tan",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.tanh",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.truediv",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.truncate",
       "verdict": {
         "kind": "refused",
         "refusal": {

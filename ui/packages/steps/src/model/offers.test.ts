@@ -52,16 +52,20 @@ describe('the methods the engine offers after a timestamp', () => {
 
   it('are grouped by family, the shortest group first, and those of a length in the catalogue order', () => {
     // The methods of each family: window one, rows and cumulative three, aggregate and logic
-    // four, temporal five, compare eight and arithmetic nine.
+    // four, rounding and temporal five, maths seven, compare eight, arithmetic eleven and
+    // trigonometry fifteen.
     expect(families.map((family) => [family.key, family.offers.length])).toEqual([
       ['window', 1],
       ['rows', 3],
       ['cumulative', 3],
       ['aggregate', 4],
       ['logic', 4],
+      ['rounding', 5],
       ['temporal', 5],
+      ['maths', 7],
       ['compare', 8],
-      ['arithmetic', 9],
+      ['arithmetic', 11],
+      ['trigonometry', 15],
     ]);
     expect(families[0]?.title).toBe('Window');
   });
@@ -78,6 +82,22 @@ describe('the methods the engine offers after a timestamp', () => {
     expect(refused?.stoppedBy).toBe('engine');
     expect(refused?.reason).toContain('`cum_sum` operation not supported for dtype');
     expect(offerNamed('dt.date')).toMatchObject({ reason: null, stoppedBy: null });
+  });
+
+  it('hold the maths and rounding under Polars’ names, with the plain words in the hints', () => {
+    // The abbreviations keep their names and the hint says them in words.
+    expect(offerNamed('cube_root')).toBeUndefined();
+    expect(offerNamed('cbrt')?.hint).toBe('cube root');
+    expect(offerNamed('erf')?.hint).toBe('error function');
+    expect(offerNamed('round_sig_figs')).toMatchObject({ family: 'rounding' });
+    expect(offerNamed('sqrt')).toMatchObject({ family: 'maths', stoppedBy: 'engine' });
+    expect(offerNamed('arctan')).toMatchObject({ family: 'trigonometry', stoppedBy: 'engine' });
+    // A timestamp is no number to round, and a call whose rows give a dtype other than its
+    // schema's is refused with the reason that says so.
+    expect(offerNamed('round')?.reason).toContain('rounding');
+    expect(offerNamed('sqrt')?.reason).toContain('the schema says');
+    // A timestamp can be clipped, which is the one of the batch that takes dates and times.
+    expect(offerNamed('clip')).toMatchObject({ family: 'arithmetic', reason: null });
   });
 
   it('say whether a chain may end at each of them', () => {

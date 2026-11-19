@@ -155,7 +155,7 @@ fn what_follows_a_datetime_is_what_polars_allows_of_it_with_the_reason_for_the_r
                 .expect("an id")
                 .starts_with("LazyFrame."))
     );
-    assert_eq!(answer["entries"].as_array().expect("entries").len(), 47);
+    assert_eq!(answer["entries"].as_array().expect("entries").len(), 76);
 }
 
 #[test]
@@ -920,11 +920,13 @@ fn after_request(after: After) -> AfterRequest {
 
 /// Every call the engine allows at every place of every kind, as the offers
 /// command answers them: for each context and each of what an expression may
-/// have, a number that holds one bit for each entry that stands in an
-/// expression, in the order of `entries`, set when that entry may stand there.
+/// have, words of 32 bits that hold one bit for each entry that stands in an
+/// expression, in the order of `entries`, set when that entry may stand there. A
+/// word is no more than a number the view reads exactly, and an entry's bit is
+/// the bit `entry % 32` of the word `entry / 32`.
 fn grid() -> Value {
     let mut entries: Vec<String> = Vec::new();
-    let mut masks: Vec<Vec<u64>> = Vec::new();
+    let mut masks: Vec<Vec<Vec<u32>>> = Vec::new();
     let afters = afters();
     for (_, positions) in contexts() {
         let mut row = Vec::new();
@@ -946,7 +948,10 @@ fn grid() -> Value {
                 .iter()
                 .enumerate()
                 .filter(|(_, entry)| entry["verdict"]["kind"] == "allowed")
-                .fold(0_u64, |mask, (at, _)| mask | (1 << at));
+                .fold(vec![0_u32; ids.len().div_ceil(32)], |mut mask, (at, _)| {
+                    mask[at / 32] |= 1 << (at % 32);
+                    mask
+                });
             row.push(mask);
         }
         masks.push(row);
@@ -973,7 +978,7 @@ fn the_grid_holds_a_cell_for_every_place_and_sets_a_bit_for_every_entry_that_may
         rows.iter()
             .all(|row| row.as_array().expect("a row").len() == afters)
     );
-    // A select start is `col`, `lit` and `when`, which are the entries 31, 33 and 34 of the 35.
+    // A select start is `col`, `lit` and `when`, and nothing else.
     let entries = grid["entries"].as_array().expect("entries");
     let at = |id: &str| {
         entries
@@ -981,11 +986,16 @@ fn the_grid_holds_a_cell_for_every_place_and_sets_a_bit_for_every_entry_that_may
             .position(|entry| entry == id)
             .expect("an entry")
     };
-    let select_start = rows[0][0].as_u64().expect("a mask");
-    let expected = [at("polars.col"), at("polars.lit"), at("polars.when")]
-        .iter()
-        .fold(0_u64, |mask, bit| mask | (1 << bit));
-    assert_eq!(select_start, expected);
+    let starts = [at("polars.col"), at("polars.lit"), at("polars.when")];
+    let select_start = rows[0][0].as_array().expect("words of a mask");
+    assert_eq!(select_start.len(), entries.len().div_ceil(32));
+    for (word, held) in select_start.iter().enumerate() {
+        let expected = starts
+            .iter()
+            .filter(|bit| **bit / 32 == word)
+            .fold(0_u64, |mask, bit| mask | (1 << (bit % 32)));
+        assert_eq!(held.as_u64().expect("a word"), expected, "word {word}");
+    }
     let mut report = String::new();
     write!(report, "{entries:?}").expect("a string takes text");
     assert!(report.contains("polars.element"));

@@ -56,11 +56,19 @@ fn python_literals_are_read_as_python_writes_them() {
 }
 
 #[test]
+fn the_constant_python_names_math_e_is_read_as_the_number_it_is() {
+    // `math.e` is Euler's number, the default of the base of a logarithm; Rust's constant of
+    // the same number is the independent value.
+    assert_eq!(read("math.e"), DefaultValue::Float(std::f64::consts::E));
+}
+
+#[test]
 fn what_python_writes_otherwise_is_not_read_as_a_value() {
     let others = [
         // Names, attributes and calls.
         "DEFAULT_QUERY_OPT_FLAGS",
-        "math.e",
+        "math.pi",
+        "e",
         "Int64",
         "float('inf')",
         // Containers other than the empty `()` and `{}`.
@@ -206,6 +214,8 @@ fn every_default_of_the_inventory_that_python_writes_as_a_literal_is_read() {
             // Only a literal begins with a digit, a sign, a dot or a quote; a name, a call, a
             // tuple or a list begins with something else. What is not read must not be one.
             let literal = first.is_ascii_digit() || matches!(first, '-' | '+' | '.' | '\'' | '"');
+            // `math.e` is the one name that is read, as the number it is.
+            let literal = literal || python == "math.e";
             let value = read(python);
             assert_eq!(
                 value == DefaultValue::Other,
@@ -219,10 +229,12 @@ fn every_default_of_the_inventory_that_python_writes_as_a_literal_is_read() {
 }
 
 #[test]
-fn only_the_count_of_shift_is_an_expression_with_a_default_that_is_a_value() {
+fn only_the_count_of_shift_and_the_base_of_log_are_expressions_with_a_default_that_is_a_value() {
     // The document judges an expression to be at its default only for a parameter that counts
-    // rows and has a whole number for its default (`Role::Count`), which is `shift(n=1)` alone.
-    // Another expression parameter that gets one has to be looked at there first.
+    // rows and has a whole number for its default (`Role::Count`), which is `shift(n=1)`. The
+    // base of `log` defaults to Euler's number, and an expression of that number is not judged
+    // to be at it: the editor draws the base inline, where "same as the default" is not said.
+    // Another expression parameter that gets a default has to be looked at there first.
     let mut found: Vec<(&str, &str, Role, DefaultValue)> = entries()
         .iter()
         .flat_map(|entry| {
@@ -249,6 +261,14 @@ fn only_the_count_of_shift_is_an_expression_with_a_default_that_is_a_value() {
     found.sort_by_key(|(entry, parameter, _, _)| (*entry, *parameter));
     assert_eq!(
         found,
-        [("Expr.shift", "n", Role::Count, DefaultValue::Integer(1))]
+        [
+            (
+                "Expr.log",
+                "base",
+                Role::Base,
+                DefaultValue::Float(std::f64::consts::E)
+            ),
+            ("Expr.shift", "n", Role::Count, DefaultValue::Integer(1))
+        ]
     );
 }

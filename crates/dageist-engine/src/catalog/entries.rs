@@ -12,9 +12,10 @@ use std::sync::Arc;
 
 use polars::frame::PivotColumnNaming;
 use polars::prelude::{
-    Expr, JoinBuildSide, JoinCoalesce, JoinType, JoinValidation, LazyFrame, MaintainOrderJoin,
-    NULL, NamedFrom, Operator, PolarsError, Scalar, Series, SortMultipleOptions, SortOptions,
-    WindowMapping, all, all_horizontal, binary_expr, col, cols, element, lit, when,
+    AnyValue, DataType, Expr, JoinBuildSide, JoinCoalesce, JoinType, JoinValidation, LazyFrame,
+    MaintainOrderJoin, NULL, NamedFrom, Operator, PolarsError, RoundMode, Scalar, Series,
+    SortMultipleOptions, SortOptions, WindowMapping, all, all_horizontal, binary_expr, col, cols,
+    element, lit, when,
 };
 
 use super::{
@@ -68,6 +69,17 @@ const NUMERIC_OR_DURATION: &[Dtypes] = &[Dtypes::Numeric, Dtypes::Duration];
 // numbers.
 const BITWISE: &[Dtypes] = &[Dtypes::Integer, Dtypes::Boolean];
 
+// What Polars accepts on the receiver of the maths of one value, from the functions that run
+// them: roots, logarithms, the exponential and `erf` take numbers and booleans and give a float,
+// a `Float32` staying one and every other dtype being a `Float64`; the trigonometric functions
+// take numbers and give a float; `sign` and the roundings take numbers and give the dtype they
+// are given, and `clip` also takes dates, times and durations. The tables of allowed combinations
+// say which members of a group, such as a `Decimal` or the integers for the roundings, Polars
+// refuses. Polars resolves a root of any dtype, to a `Float64` where its schema says the dtype it
+// was given, which is no resolution: the tables refuse it, and so does the accepts check.
+const NUMERIC_OR_BOOLEAN: &[Dtypes] = &[Dtypes::Numeric, Dtypes::Boolean];
+const CLIPPABLE: &[Dtypes] = &[Dtypes::Numeric, Dtypes::Temporal];
+
 const EXPRESSION: Kind = Kind::Expression(ANY);
 /// A new column's name and the expression that gives it: `**named_exprs`.
 const NAMED_EXPRESSIONS: Kind = Kind::Pairs(&Kind::Column, &EXPRESSION);
@@ -84,6 +96,9 @@ const BUILD_SIDE: &[&str] = &[
 ];
 const COLUMN_NAMING: &[&str] = &["auto", "combine"];
 const MAPPING_STRATEGY: &[&str] = &["group_to_rows", "join", "explode"];
+// The words Python's binding takes for `mode`. Polars' enum also has `to_zero`, which the
+// documentation lists and the binding refuses, as `truncate` does it.
+const ROUND_MODE: &[&str] = &["half_to_even", "half_away_from_zero"];
 
 const fn required(name: &'static str, kind: Kind, shape: Shape) -> Parameter {
     Parameter::new(name, kind, shape, ParameterDefault::Required)
@@ -117,6 +132,18 @@ const DIVISOR: Parameter = required("other", EXPRESSION, Shape::One).with_role(R
 /// The parameter `floordiv` takes, which is floor divided by.
 const FLOOR_DIVISOR: Parameter =
     required("other", EXPRESSION, Shape::One).with_role(Role::FloorDivisor);
+
+/// A bound of `clip`: one of two, of which a step gives at least one, as a clip with neither is
+/// the expression as it was.
+const fn bound(name: &'static str) -> Parameter {
+    optional(name, EXPRESSION, Shape::One, "None")
+        .with_role(Role::Bound)
+        .with_at_least_one()
+}
+
+/// `decimals`: how many places after the point a value is rounded or truncated to, which
+/// Python passes on as an unsigned 32-bit number.
+const DECIMALS: Parameter = optional("decimals", Kind::Value(ValueType::Integer), Shape::One, "0");
 
 /// `*predicates`: conditions that must all hold, which `when` and `filter` take.
 const PREDICATES: Parameter = starred("predicates", Kind::Expression(BOOLEAN));
@@ -166,6 +193,39 @@ fn per_item_flags(
             found: "a list of another length",
         }),
         Some(single) => Ok(vec![one(single)?; count]),
+    }
+}
+
+/// The whole number given for `parameter` as a `u32`, as Python's binding takes it, or
+/// `default` when it was not given.
+fn unsigned(
+    arguments: &Arguments,
+    parameter: &'static str,
+    default: u32,
+) -> Result<u32, BuildError> {
+    match arguments.get(parameter) {
+        None => Ok(default),
+        Some(Argument::Integer(value)) => {
+            u32::try_from(*value).map_err(|_| BuildError::OutOfRange {
+                parameter,
+                expected: "a whole number from 0 to 4294967295",
+            })
+        }
+        Some(other) => Err(Arguments::wrong(parameter, "a whole number", other)),
+    }
+}
+
+/// The whole number given for the required `parameter` as an `i32`, as Python's binding takes it.
+fn signed(arguments: &Arguments, parameter: &'static str) -> Result<i32, BuildError> {
+    match arguments.get(parameter) {
+        None => Err(BuildError::Missing { parameter }),
+        Some(Argument::Integer(value)) => {
+            i32::try_from(*value).map_err(|_| BuildError::OutOfRange {
+                parameter,
+                expected: "a whole number from -2147483648 to 2147483647",
+            })
+        }
+        Some(other) => Err(Arguments::wrong(parameter, "a whole number", other)),
     }
 }
 
@@ -385,6 +445,69 @@ fn xor(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
 
 fn not_(expr: Expr, _arguments: &Arguments) -> Result<Expr, BuildError> {
     Ok(expr.not())
+}
+
+/// Each function applies the method of the same name that Polars' `Expr` has, as the binding
+/// does, to the expression it follows: they take nothing else.
+macro_rules! unary {
+    ($($name:ident),+ $(,)?) => {
+        $(
+            fn $name(expr: Expr, _arguments: &Arguments) -> Result<Expr, BuildError> {
+                Ok(expr.$name())
+            }
+        )+
+    };
+}
+
+unary!(
+    sqrt, cbrt, exp, log1p, sign, ceil, floor, sin, cos, tan, cot, arcsin, arccos, arctan, sinh,
+    cosh, tanh, arcsinh, arccosh, arctanh, degrees, radians, erf, erfc,
+);
+
+/// The base defaults to `math.e`, which Python makes a number of no dtype, as it does a base
+/// given. Polars leaves the logarithm of a whole number to such a base an unresolved float, which
+/// a join's key or a sort key does not resolve, so the default is a `Float64`, which gives the
+/// logarithm of a whole number the `Float64` every other place does.
+fn log(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let base = arguments.expression("base")?.unwrap_or_else(|| {
+        lit(Scalar::new(
+            DataType::Float64,
+            AnyValue::Float64(std::f64::consts::E),
+        ))
+    });
+    Ok(expr.log(base))
+}
+
+fn round(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let mode = match arguments.choice("mode", ROUND_MODE, "half_to_even")? {
+        "half_away_from_zero" => RoundMode::HalfAwayFromZero,
+        _ => RoundMode::HalfToEven,
+    };
+    Ok(expr.round(unsigned(arguments, "decimals", 0)?, mode))
+}
+
+fn round_sig_figs(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.round_sig_figs(signed(arguments, "digits")?))
+}
+
+fn truncate(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.truncate(unsigned(arguments, "decimals", 0)?))
+}
+
+/// As the binding does: one bound clips on that side, both clip on both, and neither leaves the
+/// expression as it was.
+fn clip(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(
+        match (
+            arguments.expression("lower_bound")?,
+            arguments.expression("upper_bound")?,
+        ) {
+            (Some(lower), Some(upper)) => expr.clip(lower, upper),
+            (Some(lower), None) => expr.clip_min(lower),
+            (None, Some(upper)) => expr.clip_max(upper),
+            (None, None) => expr,
+        },
+    )
 }
 
 fn dt_date(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
@@ -829,6 +952,102 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(and_),
     },
     Entry {
+        id: EntryId("Expr.arccos"),
+        family: Family::Trigonometry,
+        accepts: NUMERIC,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(arccos),
+    },
+    Entry {
+        id: EntryId("Expr.arccosh"),
+        family: Family::Trigonometry,
+        accepts: NUMERIC,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(arccosh),
+    },
+    Entry {
+        id: EntryId("Expr.arcsin"),
+        family: Family::Trigonometry,
+        accepts: NUMERIC,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(arcsin),
+    },
+    Entry {
+        id: EntryId("Expr.arcsinh"),
+        family: Family::Trigonometry,
+        accepts: NUMERIC,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(arcsinh),
+    },
+    Entry {
+        id: EntryId("Expr.arctan"),
+        family: Family::Trigonometry,
+        accepts: NUMERIC,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(arctan),
+    },
+    Entry {
+        id: EntryId("Expr.arctanh"),
+        family: Family::Trigonometry,
+        accepts: NUMERIC,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(arctanh),
+    },
+    Entry {
+        id: EntryId("Expr.cbrt"),
+        family: Family::Maths,
+        accepts: NUMERIC_OR_BOOLEAN,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(cbrt),
+    },
+    Entry {
+        id: EntryId("Expr.ceil"),
+        family: Family::Rounding,
+        accepts: NUMERIC,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(ceil),
+    },
+    Entry {
+        id: EntryId("Expr.clip"),
+        family: Family::Arithmetic,
+        accepts: CLIPPABLE,
+        parameters: &[bound("lower_bound"), bound("upper_bound")],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(clip),
+    },
+    Entry {
+        id: EntryId("Expr.cos"),
+        family: Family::Trigonometry,
+        accepts: NUMERIC,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(cos),
+    },
+    Entry {
+        id: EntryId("Expr.cosh"),
+        family: Family::Trigonometry,
+        accepts: NUMERIC,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(cosh),
+    },
+    Entry {
+        id: EntryId("Expr.cot"),
+        family: Family::Trigonometry,
+        accepts: NUMERIC,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(cot),
+    },
+    Entry {
         id: EntryId("Expr.cum_count"),
         family: Family::Cumulative,
         accepts: ANY,
@@ -851,6 +1070,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[flag("reverse", "False").keyword_only()],
         laziness: Laziness::Lazy,
         build: Build::Expression(cum_sum),
+    },
+    Entry {
+        id: EntryId("Expr.degrees"),
+        family: Family::Trigonometry,
+        accepts: NUMERIC,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(degrees),
     },
     Entry {
         id: EntryId("Expr.dt.date"),
@@ -902,12 +1129,44 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(eq),
     },
     Entry {
+        id: EntryId("Expr.erf"),
+        family: Family::Maths,
+        accepts: NUMERIC_OR_BOOLEAN,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(erf),
+    },
+    Entry {
+        id: EntryId("Expr.erfc"),
+        family: Family::Maths,
+        accepts: NUMERIC_OR_BOOLEAN,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(erfc),
+    },
+    Entry {
+        id: EntryId("Expr.exp"),
+        family: Family::Maths,
+        accepts: NUMERIC_OR_BOOLEAN,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(exp),
+    },
+    Entry {
         id: EntryId("Expr.first"),
         family: Family::Rows,
         accepts: ANY,
         parameters: &[flag("ignore_nulls", "False").keyword_only()],
         laziness: Laziness::Lazy,
         build: Build::Expression(first),
+    },
+    Entry {
+        id: EntryId("Expr.floor"),
+        family: Family::Rounding,
+        accepts: NUMERIC,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(floor),
     },
     Entry {
         id: EntryId("Expr.floordiv"),
@@ -972,6 +1231,22 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[],
         laziness: Laziness::Lazy,
         build: Build::Expression(len),
+    },
+    Entry {
+        id: EntryId("Expr.log"),
+        family: Family::Maths,
+        accepts: NUMERIC_OR_BOOLEAN,
+        parameters: &[optional("base", EXPRESSION, Shape::One, "math.e").with_role(Role::Base)],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(log),
+    },
+    Entry {
+        id: EntryId("Expr.log1p"),
+        family: Family::Maths,
+        accepts: NUMERIC_OR_BOOLEAN,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(log1p),
     },
     Entry {
         id: EntryId("Expr.lt"),
@@ -1077,6 +1352,42 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(pow),
     },
     Entry {
+        id: EntryId("Expr.radians"),
+        family: Family::Trigonometry,
+        accepts: NUMERIC,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(radians),
+    },
+    Entry {
+        id: EntryId("Expr.round"),
+        family: Family::Rounding,
+        accepts: NUMERIC,
+        parameters: &[
+            DECIMALS,
+            optional(
+                "mode",
+                Kind::Choice(ROUND_MODE),
+                Shape::One,
+                "'half_to_even'",
+            ),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(round),
+    },
+    Entry {
+        id: EntryId("Expr.round_sig_figs"),
+        family: Family::Rounding,
+        accepts: NUMERIC,
+        parameters: &[required(
+            "digits",
+            Kind::Value(ValueType::Integer),
+            Shape::One,
+        )],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(round_sig_figs),
+    },
+    Entry {
         id: EntryId("Expr.shift"),
         family: Family::Rows,
         accepts: ANY,
@@ -1088,6 +1399,38 @@ pub(super) const ENTRIES: &[Entry] = &[
         ],
         laziness: Laziness::Lazy,
         build: Build::Expression(shift),
+    },
+    Entry {
+        id: EntryId("Expr.sign"),
+        family: Family::Arithmetic,
+        accepts: NUMERIC,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(sign),
+    },
+    Entry {
+        id: EntryId("Expr.sin"),
+        family: Family::Trigonometry,
+        accepts: NUMERIC,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(sin),
+    },
+    Entry {
+        id: EntryId("Expr.sinh"),
+        family: Family::Trigonometry,
+        accepts: NUMERIC,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(sinh),
+    },
+    Entry {
+        id: EntryId("Expr.sqrt"),
+        family: Family::Maths,
+        accepts: NUMERIC_OR_BOOLEAN,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(sqrt),
     },
     Entry {
         id: EntryId("Expr.sub"),
@@ -1106,12 +1449,36 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(sum),
     },
     Entry {
+        id: EntryId("Expr.tan"),
+        family: Family::Trigonometry,
+        accepts: NUMERIC,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(tan),
+    },
+    Entry {
+        id: EntryId("Expr.tanh"),
+        family: Family::Trigonometry,
+        accepts: NUMERIC,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(tanh),
+    },
+    Entry {
         id: EntryId("Expr.truediv"),
         family: Family::Arithmetic,
         accepts: SCALABLE,
         parameters: &[DIVISOR],
         laziness: Laziness::Lazy,
         build: Build::Expression(truediv),
+    },
+    Entry {
+        id: EntryId("Expr.truncate"),
+        family: Family::Rounding,
+        accepts: NUMERIC,
+        parameters: &[DECIMALS],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(truncate),
     },
     Entry {
         id: EntryId("Expr.xor"),

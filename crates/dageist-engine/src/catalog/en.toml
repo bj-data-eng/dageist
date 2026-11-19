@@ -20,6 +20,15 @@ title = "Cumulative"
 [families.arithmetic]
 title = "Arithmetic"
 
+[families.maths]
+title = "Maths · roots, logarithms"
+
+[families.trigonometry]
+title = "Trigonometry · angles"
+
+[families.rounding]
+title = "Rounding · places, whole numbers"
+
 [families.temporal]
 title = "dt · dates and times"
 
@@ -126,6 +135,62 @@ hint = "true where all are true, bit by bit on whole numbers"
 name = "others"
 label = "and"
 
+[entries."Expr.arccos"]
+name = "arccos"
+hint = "angle in radians whose cosine is the value"
+
+[entries."Expr.arccosh"]
+name = "arccosh"
+hint = "inverse hyperbolic cosine"
+
+[entries."Expr.arcsin"]
+name = "arcsin"
+hint = "angle in radians whose sine is the value"
+
+[entries."Expr.arcsinh"]
+name = "arcsinh"
+hint = "inverse hyperbolic sine"
+
+[entries."Expr.arctan"]
+name = "arctan"
+hint = "angle in radians whose tangent is the value"
+
+[entries."Expr.arctanh"]
+name = "arctanh"
+hint = "inverse hyperbolic tangent"
+
+[entries."Expr.cbrt"]
+name = "cbrt"
+hint = "cube root"
+
+[entries."Expr.ceil"]
+name = "ceil"
+hint = "rounded up to a whole number"
+
+[entries."Expr.clip"]
+name = "clip"
+hint = "limited to a lower and an upper bound"
+
+[entries."Expr.clip".parameters.lower_bound]
+name = "lower_bound"
+label = "not below"
+
+[entries."Expr.clip".parameters.upper_bound]
+name = "upper_bound"
+label = "not above"
+
+[entries."Expr.cos"]
+name = "cos"
+hint = "cosine of an angle in radians"
+
+[entries."Expr.cosh"]
+name = "cosh"
+hint = "hyperbolic cosine"
+
+[entries."Expr.cot"]
+name = "cot"
+hint = "cotangent of an angle in radians"
+
 [entries."Expr.cum_count"]
 name = "cum_count"
 hint = "running count"
@@ -149,6 +214,10 @@ hint = "running total"
 [entries."Expr.cum_sum".parameters.reverse]
 name = "reverse"
 label = "from the end"
+
+[entries."Expr.degrees"]
+name = "degrees"
+hint = "an angle in radians, in degrees"
 
 [entries."Expr.dt.date"]
 name = "dt.date"
@@ -186,6 +255,18 @@ hint = "equal to"
 name = "other"
 label = "compared with"
 
+[entries."Expr.erf"]
+name = "erf"
+hint = "error function"
+
+[entries."Expr.erfc"]
+name = "erfc"
+hint = "complementary error function"
+
+[entries."Expr.exp"]
+name = "exp"
+hint = "e raised to the value"
+
 [entries."Expr.first"]
 name = "first"
 hint = "first value"
@@ -193,6 +274,10 @@ hint = "first value"
 [entries."Expr.first".parameters.ignore_nulls]
 name = "ignore_nulls"
 label = "skip empty values"
+
+[entries."Expr.floor"]
+name = "floor"
+hint = "rounded down to a whole number"
 
 [entries."Expr.floordiv"]
 name = "floordiv"
@@ -241,6 +326,18 @@ hint = "at most"
 [entries."Expr.le".parameters.other]
 name = "other"
 label = "compared with"
+
+[entries."Expr.log"]
+name = "log"
+hint = "logarithm to a base, e unless another is given"
+
+[entries."Expr.log".parameters.base]
+name = "base"
+label = "to the base"
+
+[entries."Expr.log1p"]
+name = "log1p"
+hint = "natural logarithm of one plus the value"
 
 [entries."Expr.lt"]
 name = "lt"
@@ -331,6 +428,34 @@ hint = "raised to a power"
 name = "exponent"
 label = "to the power of"
 
+[entries."Expr.radians"]
+name = "radians"
+hint = "an angle in degrees, in radians"
+
+[entries."Expr.round"]
+name = "round"
+hint = "rounded to a number of decimal places"
+
+[entries."Expr.round".parameters.decimals]
+name = "decimals"
+label = "decimal places"
+
+[entries."Expr.round".parameters.mode]
+name = "mode"
+label = "ties go"
+
+[entries."Expr.round".parameters.mode.choices]
+half_to_even = "half_to_even"
+half_away_from_zero = "half_away_from_zero"
+
+[entries."Expr.round_sig_figs"]
+name = "round_sig_figs"
+hint = "rounded to a number of significant figures"
+
+[entries."Expr.round_sig_figs".parameters.digits]
+name = "digits"
+label = "significant figures"
+
 [entries."Expr.shift"]
 name = "shift"
 hint = "value n rows earlier"
@@ -343,6 +468,22 @@ label = "rows"
 name = "fill_value"
 label = "fill with"
 
+[entries."Expr.sign"]
+name = "sign"
+hint = "-1, 0 or 1 by the sign of the value"
+
+[entries."Expr.sin"]
+name = "sin"
+hint = "sine of an angle in radians"
+
+[entries."Expr.sinh"]
+name = "sinh"
+hint = "hyperbolic sine"
+
+[entries."Expr.sqrt"]
+name = "sqrt"
+hint = "square root"
+
 [entries."Expr.sub"]
 name = "sub"
 hint = "minus another value"
@@ -351,6 +492,14 @@ hint = "minus another value"
 name = "other"
 label = "minus"
 
+[entries."Expr.tan"]
+name = "tan"
+hint = "tangent of an angle in radians"
+
+[entries."Expr.tanh"]
+name = "tanh"
+hint = "hyperbolic tangent"
+
 [entries."Expr.truediv"]
 name = "truediv"
 hint = "divided by another value"
@@ -358,6 +507,14 @@ hint = "divided by another value"
 [entries."Expr.truediv".parameters.other]
 name = "other"
 label = "divided by"
+
+[entries."Expr.truncate"]
+name = "truncate"
+hint = "cut off after a number of decimal places"
+
+[entries."Expr.truncate".parameters.decimals]
+name = "decimals"
+label = "decimal places"
 
 [entries."Expr.xor"]
 name = "xor"
@@ -665,6 +822,7 @@ hint = "total"
 
 # The words of a step's short summary, as a list of steps shows it. A `{name}` is filled
 # when the summary is written.
+
 [summary]
 no_fields = "no fields"
 fields = "{count} fields"
