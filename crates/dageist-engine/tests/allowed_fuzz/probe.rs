@@ -72,7 +72,7 @@ use dageist_engine::document::{
 };
 
 use super::case::{Case, STEP};
-use super::frames::{STAND_IN, stand_in_column};
+use super::frames::{STAND_IN, key_column, stand_in_column};
 use super::literal::{call_with_columns, class_of, operand_causes, placed_operands};
 use super::observe::{
     Observed, Refusal, SCHEMA_SAYS, Seen, Tables, is_bare_key, is_the_targets_own, observe_probe,
@@ -826,9 +826,10 @@ fn call_on_columns(
 /// The parameters of a join that hold its keys.
 const KEYS: [&str; 3] = ["on", "left_on", "right_on"];
 
-/// The join of the case with the key that `parameter` holds replaced by `part`.
-/// Another key must be the bare `key` column, so that the refusal can only be
-/// the part's.
+/// The join of the case with the key that `parameter` holds replaced by `part`, which is then the
+/// only key of the join. The other side's key is the bare `key` column, so that the refusal can
+/// only be the part's: it is kept where it is that, and where the case has several keys it is
+/// put in the place of them all.
 fn join_on(case: &Case, parameter: &str, part: &Expression) -> Option<Document> {
     let original = case.document.steps()[0].call();
     if original.entry().id().as_str() != "LazyFrame.join" {
@@ -844,9 +845,16 @@ fn join_on(case: &Case, parameter: &str, part: &Expression) -> Option<Document> 
                 return None;
             };
             match items.as_slice() {
-                [_] if name == parameter => Value::Many(vec![Value::Expression(part.clone())]),
-                [Value::Expression(key)] if name != parameter && is_bare_key(key) => {
-                    argument.value().clone()
+                _ if name == parameter => Value::Many(vec![Value::Expression(part.clone())]),
+                [Value::Expression(key)] if is_bare_key(key) => argument.value().clone(),
+                [_, _, ..] => {
+                    let bare = call(
+                        "polars.col",
+                        vec![("name", Value::Columns(vec![key_column(0)]))],
+                    )?;
+                    Value::Many(vec![Value::Expression(
+                        Expression::new(Start::Call(bare), Vec::new()).ok()?,
+                    )])
                 }
                 _ => return None,
             }
