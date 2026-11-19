@@ -444,43 +444,29 @@ fn the_shown_names_of_and_or_and_not_are_those_without_pythons_underscore() {
 }
 
 #[test]
-fn the_shown_names_of_the_cube_root_the_error_functions_and_significant_figures_are_plain_words() {
-    // Polars' abbreviations of these read badly, so the editor shows them in full and each hint
-    // says the name Polars gives, which is what someone who knows Polars searches for.
+fn the_abbreviations_of_the_maths_are_shown_as_polars_names_them_and_the_hint_says_it_in_words() {
+    // A name is Polars' own unless the only change is Python's trailing underscore, so `cbrt`,
+    // `erf`, `erfc` and `round_sig_figs` are shown as they are and nothing lists them as changed.
+    // The hint is where the plain words go.
     let words = english();
-    let shown = |id: &str| {
-        let entry = crate::catalog::entry(id).expect("an entry");
-        (words.entry_name(entry.id()), words.entry_hint(entry.id()))
-    };
     let cases = [
-        ("Expr.cbrt", "cube_root", "cbrt"),
-        ("Expr.erf", "error_function", "erf"),
-        ("Expr.erfc", "complementary_error_function", "erfc"),
+        ("Expr.cbrt", "cbrt", "cube root"),
+        ("Expr.erf", "erf", "error function"),
+        ("Expr.erfc", "erfc", "complementary error function"),
         (
             "Expr.round_sig_figs",
-            "round_significant_figures",
             "round_sig_figs",
+            "rounded to a number of significant figures",
         ),
     ];
-    for (id, name, polars) in cases {
-        let (found, hint) = shown(id);
-        assert_eq!(found, Some(name), "{id}");
+    for (id, name, hint) in cases {
+        let entry = crate::catalog::entry(id).expect("an entry");
+        assert_eq!(words.entry_name(entry.id()), Some(name), "{id}");
+        assert_eq!(words.entry_hint(entry.id()), Some(hint), "{id}");
         assert!(
-            hint.is_some_and(|hint| hint.contains(polars)),
-            "the hint of {id} does not say {polars}"
+            !words.changed().iter().any(|listed| listed.starts_with(id)),
+            "{id} is listed as changed"
         );
-        assert!(words.changed().iter().any(|listed| listed == id), "{id}");
-    }
-    // Every other name of the batch is Polars' own, and the parameters keep Polars' names.
-    for id in [
-        "Expr.sqrt",
-        "Expr.exp",
-        "Expr.log1p",
-        "Expr.arcsinh",
-        "Expr.round",
-    ] {
-        let (found, _) = shown(id);
-        assert_eq!(found, id.strip_prefix("Expr."), "{id}");
     }
 }
 
