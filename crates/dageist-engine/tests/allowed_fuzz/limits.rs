@@ -2003,11 +2003,15 @@ fn literal_causes<'a>(case: &'a Case, refused: &Refused, pivot: bool) -> Vec<Lit
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Matching {
     /// The reason the tables gave.
-    TheReason,
+    Reason,
+    /// The reason the tables gave, or the call they refused: a literal that makes Polars skip a
+    /// call may be one that the call is refused for in the words of the tables, or one that
+    /// the arguments are refused for where Polars evaluates them.
+    ReasonOrCall,
     /// The call the tables refused, where Polars places its refusal, and any refusal of the rows:
     /// a call that is given two values that the tables refuse is refused by Polars for either,
     /// and which it names is not the tables' to say.
-    TheCall,
+    Call,
 }
 
 /// Whether Polars refuses the case for the tables' reason when each of `causes` is
@@ -2065,14 +2069,22 @@ fn refused_with_these_columns(
             .is_some_and(|refusal| match matching {
                 // The two engines word the refusal of a comparison of two series of dtypes it
                 // cannot compare differently, and a literal control runs in the other.
-                Matching::TheReason => {
+                Matching::Reason => {
                     same_reason(&refused.source, &refused.reason, &refusal.reason)
                         || is_the_same_comparison(&refused.reason, &refusal.reason)
+                }
+                Matching::ReasonOrCall => {
+                    same_reason(&refused.source, &refused.reason, &refusal.reason)
+                        || is_the_same_comparison(&refused.reason, &refusal.reason)
+                        || refusal.place.as_ref().is_none_or(|place| {
+                            *place == refused.place
+                                || place.path().starts_with(refused.place.path())
+                        })
                 }
                 // A refusal of the rows has no place, and a refusal that has one is at the call, or
                 // in what the call is given, which a literal that the call follows makes Polars
                 // skip with the call.
-                Matching::TheCall => refusal.place.as_ref().is_none_or(|place| {
+                Matching::Call => refusal.place.as_ref().is_none_or(|place| {
                     *place == refused.place || place.path().starts_with(refused.place.path())
                 }),
             })
@@ -2365,15 +2377,33 @@ fn applies(
             // by Polars for any of them once they are columns, and which it names is not the
             // tables' to say. An interval names the comparison of its `closed` too, which the
             // tables measured with the default.
-            let matching = if locate(case, &refused.place).call.is_some_and(|call| {
+            // What follows the null literal is folded with it, and what the call after it is
+            // given, so a column in its place meets the call or what it is given.
+            let locus = locate(case, &refused.place);
+            let by_values = locus.call.is_some_and(|call| {
                 matches!(
                     call.entry().id().as_str(),
-                    "Expr.replace" | "Expr.replace_strict" | "Expr.is_between"
+                    "Expr.replace" | "Expr.replace_strict" | "Expr.is_between" | "Expr.is_close"
                 )
-            }) {
-                Matching::TheCall
+            });
+            let after_the_null_literal =
+                locus.call.is_some_and(|call| {
+                    matches!(
+                        call.entry().id().as_str(),
+                        "Expr.eq" | "Expr.ne" | "Expr.gt" | "Expr.ge" | "Expr.lt" | "Expr.le"
+                    )
+                }) && locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
+                    at == 0
+                        && matches!(chain.start(), Start::Call(start)
+                        if is(start, "polars.lit")
+                            && matches!(start.argument("value"), Some(Value::Flag(None))))
+                });
+            let matching = if by_values {
+                Matching::Call
+            } else if after_the_null_literal {
+                Matching::ReasonOrCall
             } else {
-                Matching::TheReason
+                Matching::Reason
             };
             !causes.is_empty() && refused_with_columns(&causes, case, refused, observed, matching)
         }
