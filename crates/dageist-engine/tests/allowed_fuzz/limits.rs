@@ -1963,6 +1963,28 @@ mod tests {
         excuses(case, &prediction(Verdict::Allows, traced), &observed)
     }
 
+    /// The tables allow the case, as they do, so the prediction is theirs and not made up, and
+    /// Polars refuses it at `place`, if it said.
+    fn polars_refuses_what_the_tables_allow(
+        case: &Case,
+        place: Option<Place>,
+        stage: Stage,
+        reason: &str,
+    ) -> Vec<Limit> {
+        let prediction = predict(case);
+        assert_eq!(prediction.verdict, Verdict::Allows, "the tables allow it");
+        let observed = Observed {
+            refusal: Some(Refusal {
+                stage,
+                at: String::new(),
+                place,
+                reason: reason.to_owned(),
+            }),
+            expressions: Vec::new(),
+        };
+        excuses(case, &prediction, &observed)
+    }
+
     const ROWS: Option<TableStage> = Some(TableStage::Rows);
 
     // ----- Literal, aggregate
@@ -2915,6 +2937,192 @@ mod tests {
         call("Expr.and_", vec![("others", many(vec![operand]))])
     }
 
+    /// A null of the dtype Null, which is given as a dtype.
+    fn typed_null() -> Call {
+        let dtype = Dtype::new(Representative::Null.dtype()).expect("a dtype");
+        call(
+            "polars.lit",
+            vec![("value", Value::Flag(None)), ("dtype", Value::Dtype(dtype))],
+        )
+    }
+
+    fn truth() -> Call {
+        call("polars.lit", vec![("value", Value::Flag(Some(true)))])
+    }
+
+    fn or_of(operand: Expression) -> Call {
+        call("Expr.or_", vec![("others", many(vec![operand]))])
+    }
+
+    fn xor_of(operand: Expression) -> Call {
+        call("Expr.xor", vec![("other", Value::Expression(operand))])
+    }
+
+    fn null_plus_null() -> Expression {
+        chain_of(null(), vec![compared_with("Expr.add", chain(null(), &[]))])
+    }
+
+    fn not() -> Call {
+        call("Expr.not_", Vec::new())
+    }
+
+    #[test]
+    fn a_not_of_the_dtype_null_is_excused_whatever_gives_the_null_its_dtype() {
+        for expression in [
+            // A null given the dtype Null, which the tables give a literal with none.
+            chain_of(
+                typed_null(),
+                vec![
+                    or_of(chain(column("f"), &[])),
+                    not(),
+                    call("Expr.sum", vec![]),
+                ],
+            ),
+            // A null that a call gives the dtype, as the receiver.
+            chain_of(
+                null(),
+                vec![
+                    call("Expr.max", Vec::new()),
+                    and_of(chain(column("f"), &[])),
+                    not(),
+                ],
+            ),
+            // As an operand, given by a call and by a literal that has the dtype.
+            chain_of(column("f"), vec![and_of(null_plus_null()), not()]),
+            chain_of(
+                column("f"),
+                vec![
+                    or_of(chain(typed_null(), &[])),
+                    not(),
+                    call("Expr.min", vec![]),
+                ],
+            ),
+        ] {
+            let case = select(vec![expression]);
+            assert_eq!(
+                polars_refuses_what_the_tables_allow(&case, None, Stage::Rows, NOT_OF_A_NULL),
+                vec![Limit::ABitwiseCallOnANull],
+                "{}",
+                case.document.write()
+            );
+        }
+    }
+
+    #[test]
+    fn a_not_of_the_dtype_null_is_not_excused_where_the_tables_give_the_bitwise_call_no_null() {
+        for expression in [
+            // A null in an operand whose own dtype is a `Boolean`.
+            chain_of(
+                column("f"),
+                vec![
+                    and_of(chain(null(), &["Expr.is_null"])),
+                    not(),
+                    call("Expr.min", vec![]),
+                ],
+            ),
+            // A null that a comparison meets, before a conjunction of columns.
+            chain_of(
+                column("f"),
+                vec![
+                    compared_with("Expr.eq", chain(typed_null(), &[])),
+                    and_of(chain(column("f"), &[])),
+                    not(),
+                ],
+            ),
+        ] {
+            let case = select(vec![expression]);
+            assert_eq!(
+                polars_refuses_what_the_tables_allow(&case, None, Stage::Rows, NOT_OF_A_NULL),
+                vec![],
+                "{}",
+                case.document.write()
+            );
+        }
+    }
+
+    fn filtered(predicate: Expression) -> Case {
+        case_of(call(
+            "LazyFrame.filter",
+            vec![("predicates", many(vec![predicate]))],
+        ))
+    }
+
+    const NULL_PREDICATE: &str = "filter predicate must be of type `Boolean`, got `Null`";
+
+    #[test]
+    fn a_filter_predicate_that_ends_in_a_bitwise_call_that_meets_a_null_of_any_origin_is_excused() {
+        for predicate in [
+            // A null given the dtype Null, starting the chain, and as the operand.
+            chain_of(typed_null(), vec![and_of(chain(truth(), &[]))]),
+            chain_of(column("f"), vec![and_of(chain(typed_null(), &[]))]),
+            // A null that a call gives the dtype, before the `and` and in it.
+            chain_of(
+                null(),
+                vec![
+                    compared_with("Expr.add", chain(null(), &[])),
+                    and_of(chain(column("f"), &[])),
+                ],
+            ),
+            chain_of(column("f"), vec![and_of(null_plus_null())]),
+            // The dtype Null goes on through the `and` and through an `or` of another null.
+            chain_of(
+                column("f"),
+                vec![and_of(chain(null(), &[])), and_of(chain(column("f"), &[]))],
+            ),
+            chain_of(
+                column("f"),
+                vec![and_of(chain(null(), &[])), or_of(chain(null(), &[]))],
+            ),
+            // An `or` and an `xor` of nulls only.
+            chain_of(null(), vec![or_of(chain(null(), &[]))]),
+            chain_of(null(), vec![xor_of(chain(typed_null(), &[]))]),
+        ] {
+            let case = filtered(predicate);
+            assert_eq!(
+                polars_refuses_what_the_tables_allow(&case, None, Stage::Rows, NULL_PREDICATE),
+                vec![Limit::ABitwiseCallOnANull],
+                "{}",
+                case.document.write()
+            );
+        }
+    }
+
+    #[test]
+    fn a_filter_predicate_that_polars_gives_a_boolean_is_not_excused_for_the_dtype_null() {
+        for predicate in [
+            // An `or` or an `xor` of a `Boolean` and a null is a `Boolean`.
+            chain_of(column("f"), vec![or_of(chain(null(), &[]))]),
+            chain_of(null(), vec![or_of(chain(column("f"), &[]))]),
+            chain_of(column("f"), vec![xor_of(chain(null(), &[]))]),
+            // A call after the `and` gives what the tables say.
+            chain_of(
+                column("f"),
+                vec![and_of(chain(null(), &[])), call("Expr.is_null", Vec::new())],
+            ),
+            // An `xor` of what an `and` of a null gave is no null.
+            chain_of(
+                column("f"),
+                vec![and_of(chain(null(), &[])), xor_of(chain(column("f"), &[]))],
+            ),
+            // The `and` is inside another call, whose result is what the predicate is.
+            chain_of(
+                column("f"),
+                vec![compared_with(
+                    "Expr.eq",
+                    chain_of(column("f"), vec![and_of(chain(null(), &[]))]),
+                )],
+            ),
+        ] {
+            let case = filtered(predicate);
+            assert_eq!(
+                polars_refuses_what_the_tables_allow(&case, None, Stage::Rows, NULL_PREDICATE),
+                vec![],
+                "{}",
+                case.document.write()
+            );
+        }
+    }
+
     #[test]
     fn a_not_of_the_dtype_null_is_excused_where_a_not_comes_straight_after_an_and_or_an_or() {
         for combined in [
@@ -2933,7 +3141,7 @@ mod tests {
                 ],
             )]);
             assert_eq!(
-                polars_refuses(&case, None, Stage::Rows, NOT_OF_A_NULL, Vec::new()),
+                polars_refuses_what_the_tables_allow(&case, None, Stage::Rows, NOT_OF_A_NULL),
                 vec![Limit::ABitwiseCallOnANull]
             );
         }
@@ -2952,7 +3160,7 @@ mod tests {
             )],
         )]);
         assert_eq!(
-            polars_refuses(&nested, None, Stage::Rows, NOT_OF_A_NULL, Vec::new()),
+            polars_refuses_what_the_tables_allow(&nested, None, Stage::Rows, NOT_OF_A_NULL),
             vec![Limit::ABitwiseCallOnANull]
         );
     }
@@ -2960,8 +3168,8 @@ mod tests {
     #[test]
     fn a_not_of_the_dtype_null_is_not_excused_without_a_not_straight_after_a_bitwise_call() {
         for case in [
-            // A not of a null, and no bitwise call.
-            select(vec![chain(null(), &["Expr.not_"])]),
+            // A not, and no bitwise call.
+            select(vec![chain(column("f"), &["Expr.not_"])]),
             // A bitwise call that no not follows.
             select(vec![chain_of(
                 null(),
@@ -2981,7 +3189,7 @@ mod tests {
             )]),
         ] {
             assert_eq!(
-                polars_refuses(&case, None, Stage::Rows, NOT_OF_A_NULL, Vec::new()),
+                polars_refuses_what_the_tables_allow(&case, None, Stage::Rows, NOT_OF_A_NULL),
                 vec![]
             );
         }
@@ -2999,37 +3207,35 @@ mod tests {
                 vec![("predicates", many(predicates))],
             ))
         };
-        let columns = || chain_of(column("f"), vec![and_of(chain(column("g"), &[]))]);
+        let columns = || chain_of(column("f"), vec![and_of(chain(column("f"), &[]))]);
         assert_eq!(
-            polars_refuses(
+            polars_refuses_what_the_tables_allow(
                 &filtered(vec![columns()]),
                 None,
                 Stage::Rows,
-                predicate,
-                Vec::new()
+                predicate
             ),
             vec![]
         );
         // A null in another predicate, which no bitwise call meets, is no cause either.
         assert_eq!(
-            polars_refuses(
+            polars_refuses_what_the_tables_allow(
                 &filtered(vec![chain(null(), &["Expr.is_null"]), columns()]),
                 None,
                 Stage::Rows,
-                predicate,
-                Vec::new()
+                predicate
             ),
             vec![]
         );
         let negated = select(vec![chain_of(
             column("f"),
             vec![
-                and_of(chain(column("g"), &[])),
+                and_of(chain(column("f"), &[])),
                 call("Expr.not_", Vec::new()),
             ],
         )]);
         assert_eq!(
-            polars_refuses(&negated, None, Stage::Rows, NOT_OF_A_NULL, Vec::new()),
+            polars_refuses_what_the_tables_allow(&negated, None, Stage::Rows, NOT_OF_A_NULL),
             vec![]
         );
     }
@@ -3045,27 +3251,25 @@ mod tests {
             ],
         )]);
         assert_eq!(
-            polars_refuses(
+            polars_refuses_what_the_tables_allow(
                 &case,
                 None,
                 Stage::Rows,
-                "dtype Int8 not supported in 'not' operation",
-                Vec::new()
+                "dtype Int8 not supported in 'not' operation"
             ),
             vec![]
         );
         assert_eq!(
-            polars_refuses(
+            polars_refuses_what_the_tables_allow(
                 &case,
                 Some(link_of("exprs", 0, 1)),
                 Stage::Rows,
-                NOT_OF_A_NULL,
-                Vec::new()
+                NOT_OF_A_NULL
             ),
             vec![]
         );
         assert_eq!(
-            polars_refuses(&case, None, Stage::Schema, NOT_OF_A_NULL, Vec::new()),
+            polars_refuses_what_the_tables_allow(&case, None, Stage::Schema, NOT_OF_A_NULL),
             vec![]
         );
     }
@@ -3083,18 +3287,18 @@ mod tests {
         };
         let case = filtered(chain_of(null(), vec![and_of(chain(column("f"), &[]))]));
         assert_eq!(
-            polars_refuses(&case, None, Stage::Rows, reason, Vec::new()),
+            polars_refuses_what_the_tables_allow(&case, None, Stage::Rows, reason),
             vec![Limit::ABitwiseCallOnANull]
         );
         let other_side = filtered(chain_of(column("f"), vec![and_of(chain(null(), &[]))]));
         assert_eq!(
-            polars_refuses(&other_side, None, Stage::Rows, reason, Vec::new()),
+            polars_refuses_what_the_tables_allow(&other_side, None, Stage::Rows, reason),
             vec![Limit::ABitwiseCallOnANull]
         );
         // A predicate that holds no bitwise call, and another step, are not why.
         let plain = filtered(chain(null(), &["Expr.is_null"]));
         assert_eq!(
-            polars_refuses(&plain, None, Stage::Rows, reason, Vec::new()),
+            polars_refuses_what_the_tables_allow(&plain, None, Stage::Rows, reason),
             vec![]
         );
         let selected = select(vec![chain_of(
@@ -3102,22 +3306,21 @@ mod tests {
             vec![and_of(chain(column("f"), &[]))],
         )]);
         assert_eq!(
-            polars_refuses(&selected, None, Stage::Rows, reason, Vec::new()),
+            polars_refuses_what_the_tables_allow(&selected, None, Stage::Rows, reason),
             vec![]
         );
         // Only the refusal of a predicate of the dtype Null, at the rows, without a place.
         assert_eq!(
-            polars_refuses(
+            polars_refuses_what_the_tables_allow(
                 &case,
                 None,
                 Stage::Rows,
-                "filter predicate must be of type `Boolean`, got `Int64`",
-                Vec::new()
+                "filter predicate must be of type `Boolean`, got `Int64`"
             ),
             vec![]
         );
         assert_eq!(
-            polars_refuses(&case, None, Stage::Schema, reason, Vec::new()),
+            polars_refuses_what_the_tables_allow(&case, None, Stage::Schema, reason),
             vec![]
         );
     }
