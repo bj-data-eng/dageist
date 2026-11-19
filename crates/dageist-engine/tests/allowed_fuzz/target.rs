@@ -570,6 +570,7 @@ impl CaseTarget for AllowedTarget {
 mod tests {
     use dageist_engine::allowed::Representative;
 
+    use super::super::observe::Stage;
     use super::*;
 
     /// The outcome of `text` and what was tallied while it was evaluated.
@@ -786,6 +787,33 @@ mod tests {
         let detail = outcome.detail().expect("a detail");
         assert!(detail.contains("plan and rows"), "{detail}");
         assert!(!detail.contains("for the tables' reason"), "{detail}");
+    }
+
+    #[test]
+    fn a_prefix_polars_refuses_at_the_call_the_tables_could_not_be_asked_about_is_no_difference() {
+        // `when(when(g + 1).then(a)).then(f).otherwise(a)`: the tables cannot say what a number
+        // given no dtype is added to text, and Polars refuses the sum when it works out the
+        // schema. The condition that holds it has the dtype of its values, and Polars refuses it
+        // for the call the tables could not judge, which is not a dtype the tables got wrong.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+            "tests/allowed_fuzz/regressions/fixed-a-prefix-refused-at-the-call-the-tables-could-not-be-asked-about.case",
+        );
+        let case = Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case");
+        let observed = observe(&case);
+        let prediction = predict(&case);
+        assert!(matches!(prediction.verdict, Verdict::Undetermined(_)));
+        assert_eq!(dtype_difference(&case, &prediction, &observed), None);
+        // Polars refusing somewhere else, which the tables did not say they could not judge, is
+        // one: the prefix is refused where the tables gave it a dtype.
+        let mut elsewhere = observed.clone();
+        let refusal = elsewhere.refusal.as_mut().expect("Polars refuses the case");
+        refusal.at = "step \"s\", exprs item 1, link 1".to_owned();
+        let difference = dtype_difference(&case, &prediction, &elsewhere).expect("a difference");
+        assert!(difference.contains("Polars refuses it"), "{difference}");
+        // And a refusal of the rows is no refusal of the schema the tables were asked about.
+        let mut at_the_rows = observed;
+        at_the_rows.refusal.as_mut().expect("a refusal").stage = Stage::Rows;
+        assert!(dtype_difference(&case, &prediction, &at_the_rows).is_some());
     }
 
     #[test]
