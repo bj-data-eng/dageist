@@ -950,7 +950,9 @@ one thread, where Polars refuses a bitwise call between a whole number and text 
 failing to unpack the text as the number. On many threads its streaming engine does not
 fail: it gives the column of the whole number where its schema says text, which the target
 counts as a refusal in words of its own. A failure to unpack a series, as the tables'
-reason, and that mismatch, as a probe's, are the same refusal of the same call.
+reason, and that mismatch, as a probe's, are the same refusal of the same call. So is a
+failure to unpack a list as a number and a failure to cast the list to that number,
+which is how the streaming engine refuses a bitwise call between a number and a list.
 
 The second kind is a limit, for what Polars evaluates and accepts, which no probe
 of the part shows, and for where the tables allow and Polars refuses. A limit is

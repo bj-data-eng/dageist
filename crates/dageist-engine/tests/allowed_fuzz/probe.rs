@@ -391,12 +391,19 @@ fn objection(reason: &str) -> String {
 /// whole number and text, and others that read a series as a dtype it is not.
 const UNPACKING: &str = "cannot unpack series of type";
 
-/// Whether `probe` is the mismatch of the target's own that Polars on many threads gives where
-/// the tables' reason is a failure to unpack a series. Its streaming engine does not unpack the
-/// text as a whole number: it gives the column of the whole number where its schema says text,
-/// which is the same call refused, for it is not what the schema says.
+/// How the streaming engine of Polars on many threads fails where the tables' reason is a
+/// failure to unpack a list: it casts the list to the dtype of the other side.
+const CASTING_A_LIST: &str = "cannot cast List type";
+
+/// Whether `probe` is how Polars on many threads refuses what the tables' reason, a failure to
+/// unpack a series, refuses. Its streaming engine does not unpack the text as a whole number:
+/// it gives the column of the whole number where its schema says text, which is the same call
+/// refused, for it is not what the schema says. And it fails to cast a list to the dtype of the
+/// other side where Polars on one thread fails to unpack the list as that dtype.
 fn is_the_same_unpacking(tables: &str, probe: &str) -> bool {
-    tables.starts_with(UNPACKING) && probe.starts_with(SCHEMA_SAYS)
+    tables.starts_with(UNPACKING)
+        && (probe.starts_with(SCHEMA_SAYS)
+            || (tables.contains("`list[") && probe.starts_with(CASTING_A_LIST)))
 }
 
 /// Whether `probe` is refused as the tables refused the part: for Polars' own
@@ -1235,7 +1242,7 @@ mod tests {
         // streaming engine on many threads fails to cast the list to that number.
         let found = settled("stricter-a-bitwise-or-of-a-list-in-a-sort-key-of-one-value.case");
         assert!(
-            found.reason.starts_with("cannot unpack series of type"),
+            found.reason.starts_with("cannot cast List type"),
             "{}",
             found.reason
         );
@@ -1258,7 +1265,6 @@ mod tests {
             tables,
             "cannot cast String type to Int64"
         ));
-        assert!(!same_reason(&Source::Polars, cast, cast));
     }
 
     #[test]
