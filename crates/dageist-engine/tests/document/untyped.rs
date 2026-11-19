@@ -269,19 +269,16 @@ fn walked_in(entry: &str, parameter: &str, item: Value) -> Option<Representative
 }
 
 #[test]
-fn an_integer_raised_to_a_fraction_is_a_float64_where_polars_resolves_it_and_not_known_in_a_key() {
+fn an_integer_raised_to_a_fraction_is_not_known_where_it_ends_or_is_a_key_and_a_float_it_fits_is() {
     // Polars gives `i8 ** 1.5` the unresolved dtype of the number, which a select resolves to a
-    // `Float64`, and a sort key or a join's key does not: it refuses them for it. So the dtype is
-    // known where it is selected and not where it is a key.
+    // `Float64` where it ends and a sort key or a join's key does not: it refuses them for it.
+    // The walk says none of them, for a call after it or an operand that meets it adapts it.
     let power = || on_a_column("i8", call("Expr.pow", json!({ "exponent": fraction(1.5) })));
     assert_eq!(
         polars(col("i8").pow(lit(1.5))),
         Some(Representative::Float64)
     );
-    assert_eq!(
-        walked_in("LazyFrame.select", "exprs", power()),
-        Some(Representative::Float64)
-    );
+    assert_eq!(walked_in("LazyFrame.select", "exprs", power()), None);
     assert_eq!(walked_in("LazyFrame.sort", "by", power()), None);
     // A float it fits is no unresolved number: `f32 ** 1.5` is a `Float32` everywhere.
     let float = on_a_column(

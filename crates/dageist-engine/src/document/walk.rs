@@ -1082,7 +1082,7 @@ impl Walker<'_> {
                         .zip(receiver)
                         .filter(|_| operand_adapts(entry, name))
                         .filter(|(number, receiver)| {
-                            !is_left_unresolved(entry, name, *number, *receiver, context)
+                            !is_left_unresolved(entry, name, *number, *receiver)
                         })
                         .and_then(|(number, receiver)| number.beside(receiver))
                 } else {

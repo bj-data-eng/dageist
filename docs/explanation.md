@@ -625,8 +625,9 @@ does not adapt to its exponent, which adapts to the base: `2 ** u8` is an `Int32
 number is alone, and the walk says so. A number with a fraction that is divided by a float
 column is a `Float64` beside it, where a whole number adapts to the float: `1.5 / f32` is a
 `Float64` and `2 / f32` a `Float32`. An integer raised to a number with a fraction is the
-unresolved float the number is, which a select resolves to a `Float64` and a sort key or a
-join's key does not, so there its dtype is not known. The catalogue gives `pow`'s `exponent`
+unresolved float the number is, which a select resolves to a `Float64` where it ends and
+a sort key or a join's key does not, and which an operand it meets adapts as it does the
+number, so its dtype is not known. The catalogue gives `pow`'s `exponent`
 and `truediv`'s `other` roles of their own for it. Where it is an operand of another method,
 such as a
 key to group by, what the call gives is not known. The walk and `fit` know it where it

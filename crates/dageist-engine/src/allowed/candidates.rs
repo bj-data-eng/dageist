@@ -139,13 +139,7 @@ pub fn fit(candidate: &Candidate, slot: &Slot<'_>) -> Option<Fit> {
         let adapted = match (loose, place.after()) {
             (Some(number), After::Value { dtype, .. })
                 if operand_adapts(argument.entry, argument.parameter)
-                    && !is_left_unresolved(
-                        argument.entry,
-                        argument.parameter,
-                        number,
-                        dtype,
-                        place.context(),
-                    ) =>
+                    && !is_left_unresolved(argument.entry, argument.parameter, number, dtype) =>
             {
                 number.beside(dtype)
             }
