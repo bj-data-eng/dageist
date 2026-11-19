@@ -313,6 +313,9 @@ fn dtype_difference(case: &Case, prediction: &Prediction, observed: &Observed) -
     None
 }
 
+/// How Polars words its refusal of a join whose keys have dtypes that do not match.
+const KEYS_DO_NOT_MATCH: &str = "datatypes of join keys don't match";
+
 /// How a refusal of the tables is worded when it is of where an expression may end.
 const CANNOT_END: &str = "it cannot end here: ";
 
@@ -394,10 +397,16 @@ impl CaseTarget for AllowedTarget {
         if case.document.steps()[0].call().entry().id().as_str() == "LazyFrame.pivot" {
             tally("pivot case");
         }
-        // One column of the other table holds one dtype, so no dtype of it fits keys that Polars
-        // gives different ones, and the join is refused for that, which is no matter of the
-        // tables.
-        if observed.keys_conflict {
+        // One column of the other table holds one dtype, so where Polars gives keys that are paired
+        // with it different ones and refuses the join for the dtypes of the keys, no dtype of the
+        // column fits and the refusal is no matter of the tables. Polars joins whole numbers of
+        // different widths, so the keys differing is not enough.
+        if observed.keys_conflict
+            && observed
+                .refusal
+                .as_ref()
+                .is_some_and(|refusal| refusal.reason.starts_with(KEYS_DO_NOT_MATCH))
+        {
             tally("join keys of different dtypes share a column");
             return CaseOutcome::unsupported(
                 "one column of the other table is paired with keys of different dtypes",

@@ -87,8 +87,8 @@ pub struct Observed {
     /// The dtypes of the expressions, as far as they could be built.
     pub expressions: Vec<SeenExpression>,
     /// Whether a column of the other table is paired with keys that Polars gives different
-    /// dtypes: no dtype of the column fits them all, so the join is refused for that, which the
-    /// tables are not asked about.
+    /// dtypes. Polars refuses the join for that when no dtype of the column fits them all, which
+    /// the tables are not asked about, and joins whole numbers of different widths.
     pub keys_conflict: bool,
 }
 
