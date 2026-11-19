@@ -1181,6 +1181,39 @@ mod tests {
     }
 
     #[test]
+    fn a_bitwise_call_on_text_is_refused_alone_where_polars_gives_a_column_its_schema_does_not_say()
+    {
+        // `when(k > k).then(k).otherwise(k).or_(h)` of a whole number and text, in the value of
+        // a condition that a constant decides, so that Polars never evaluates it. The tables
+        // refuse it as Polars on one thread does, by failing to unpack the text as a whole
+        // number. On many threads Polars' streaming engine does not fail: it gives the column
+        // of the whole number where its schema says text, which the target counts as a refusal.
+        let found =
+            settled("stricter-a-bitwise-or-of-text-in-a-condition-decided-by-a-constant.case");
+        assert!(
+            found.reason.starts_with("the schema says"),
+            "{}",
+            found.reason
+        );
+        assert!(found.probe.contains("Expr.or_"), "{}", found.probe);
+    }
+
+    #[test]
+    fn a_failure_to_unpack_a_series_is_matched_by_a_schema_the_rows_do_not_give_and_by_nothing_else()
+     {
+        let tables = "cannot unpack series of type `str` into `i64`";
+        let mismatch = "the schema says String and the rows give Int64";
+        assert!(same_reason(&Source::Polars, tables, mismatch));
+        // Another reason of the tables is not that mismatch, nor a mismatch the tables' own reason.
+        assert!(!same_reason(
+            &Source::Polars,
+            "cannot compare string with numeric type (i8)",
+            mismatch
+        ));
+        assert!(!same_reason(&Source::Polars, mismatch, mismatch));
+    }
+
+    #[test]
     fn a_reason_is_matched_by_what_polars_objected_to_and_not_by_the_names_it_quotes() {
         let tables = "could not evaluate '<' comparison between series 'a' of dtype: Boolean and series 'b' of dtype: Date";
         let probe = "could not evaluate '<' comparison between series '_POLARS_TMP_PHYS_2' of dtype: Boolean and series '_POLARS_TMP_PHYS_3' of dtype: Date";
