@@ -634,9 +634,7 @@ a comment at the top of the module. A step's summary is what it works on, such
 as `by dcn, timestamp` or `step_sla on step_to`; its words are in the language
 file's `summary` table, and what is worked out is `…`. The report of each step
 carries both, and a run carries the module with each line naming its step, so
-the Polars tab and the hints show what the engine wrote. Whether the source
-runs in Python Polars is checked, not assumed: see
-[how to check the Python source](how-to.md#check-the-python-source).
+the Polars tab and the hints show what the engine wrote.
 
 The claim-timing steps the step editor opens with, the seven claim rows they run
 on and the inputs connected to them are one sample node in the engine,
