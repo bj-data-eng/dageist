@@ -1520,11 +1520,12 @@ fn case_changed(case: &Case, change: &dyn Fn(&Call) -> Option<Call>) -> Option<C
 
 /// Whether the call converts strictly, so that it refuses a value its dtype cannot hold: a `cast`
 /// that is neither told to wrap numbers that overflow nor to give a null where a value does not
-/// convert, and a test of closeness and a fill by a value, which convert what they meet to the one
+/// convert, and a test of closeness and a fill by a value or of NaN, which convert what they meet to the one
 /// dtype that holds both as a strict cast does.
 fn is_a_strict_cast(call: &Call) -> bool {
     is(call, "Expr.is_close")
         || (is(call, "Expr.fill_null") && call.argument("value").is_some())
+        || is(call, "Expr.fill_nan")
         || (is(call, "Expr.cast")
             && !matches!(
                 call.argument("wrap_numerical"),
@@ -1545,7 +1546,7 @@ fn case_without_strict_casts(case: &Case) -> Option<Case> {
             let other = call.argument("other")?.clone();
             return Call::new(catalog::entry("Expr.gt")?, vec![("other", other)]).ok();
         }
-        if is(call, "Expr.fill_null") {
+        if is(call, "Expr.fill_null") || is(call, "Expr.fill_nan") {
             return Call::new(catalog::entry("Expr.forward_fill")?, Vec::new()).ok();
         }
         let strict = is(call, "Expr.cast");
@@ -6148,6 +6149,18 @@ mod tests {
         let case = select(vec![chain_of(column("a"), vec![fill])]);
         assert_eq!(
             refused_for_a_bound(&case, None, Stage::Rows, CLOSE_NOT_HELD),
+            vec![Limit::ACastOfAValueTheDtypeCannotHold]
+        );
+        // A fill of NaN meets its value as a fill by a value does.
+        let nan = select(vec![chain_of(
+            column("a"),
+            vec![call(
+                "Expr.fill_nan",
+                vec![("value", Value::Expression(whole(1)))],
+            )],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&nan, None, Stage::Rows, CLOSE_NOT_HELD),
             vec![Limit::ACastOfAValueTheDtypeCannotHold]
         );
         // A fill by a strategy meets no value, so it converts nothing.
