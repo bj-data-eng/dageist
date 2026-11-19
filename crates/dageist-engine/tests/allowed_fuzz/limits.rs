@@ -200,8 +200,8 @@ pub enum Limit {
     /// that is out of its range or negative beside an unsigned dtype, or a value of a float
     /// that is not a whole number it can hold, as the infinity and the not-a-number that a
     /// logarithm to the base 1 or a root of a negative number gives, or a value out of its
-    /// range. The tables measured a bound as a column of the dtype or of the sample's rows,
-    /// which every dtype holds. Polars refusing the rows, with a failed conversion that has no
+    /// range. The tables measured a bound as a column of the sample's rows, whose numbers every
+    /// number dtype holds. Polars refusing the rows, with a failed conversion that has no
     /// place, in a case whose refusal is the bound's: the case run again with the bounds of
     /// every `clip` undone is not refused for a failed conversion.
     ABoundTheDtypeCannotHold,
