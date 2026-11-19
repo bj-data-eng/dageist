@@ -989,7 +989,7 @@ rule a probe shows right where Polars does not evaluate the part. Any other rule
 refuses what Polars allows is a disagreement. The target compares nothing
 more of a case that the rule by design refuses and Polars allows: the dtypes before the
 refusal are compared, but whether Polars allows the rest is not. That rule is stricter
-wherever it refuses, which is about half of the pivot cases (71 of the 157 of the fixed
+wherever it refuses, which is about two fifths of the pivot cases (67 of the 157 of the fixed
 seed, and the same share in longer campaigns), so those pivot aggregates are checked
 little; the tally counts the pivot cases and those the rule refuses apart.
 
@@ -1010,11 +1010,11 @@ an expected rejection that names both reasons.
 The tally ends with the totals of the cases that agreed, that both refused for another
 reason, that a limit excused, that were refused where Polars does not evaluate the
 part, that a rule stricter by design refused, and that disagreed. The fixed seed's
-1000 cases give 776 agreeing, 119 refused by both for another reason, 6 excused by a
-limit, 3 refused where Polars does not evaluate the part, 71 refused by the rule that
-is stricter by design, and none disagreeing; 19 of those that agree are refused by the
+1000 cases give 784 agreeing, 117 refused by both for another reason, 6 excused by a
+limit, 5 refused where Polars does not evaluate the part, 67 refused by the rule that
+is stricter by design, and none disagreeing; 20 of those that agree are refused by the
 rule against a repeated pair of key names, and the tables could not be asked past a
-point in 34 more.
+point in 32 more.
 
 | Limit | Excuses |
 | --- | --- |
