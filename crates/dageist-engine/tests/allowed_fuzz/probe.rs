@@ -1210,8 +1210,10 @@ mod tests {
         // of the whole number where its schema says text, which the target counts as a refusal.
         let found =
             settled("stricter-a-bitwise-or-of-text-in-a-condition-decided-by-a-constant.case");
+        // On few threads Polars' reason is the tables' own, the failure to unpack the text.
         assert!(
-            found.reason.starts_with("the schema says"),
+            found.reason.starts_with("the schema says")
+                || found.reason.starts_with("cannot unpack series of type"),
             "{}",
             found.reason
         );
@@ -1241,8 +1243,10 @@ mod tests {
         // Polars on one thread does, by failing to unpack the list as a whole number; the
         // streaming engine on many threads fails to cast the list to that number.
         let found = settled("stricter-a-bitwise-or-of-a-list-in-a-sort-key-of-one-value.case");
+        // On few threads Polars' reason is the tables' own, the failure to unpack the list.
         assert!(
-            found.reason.starts_with("cannot cast List type"),
+            found.reason.starts_with("cannot cast List type")
+                || found.reason.starts_with("cannot unpack series of type"),
             "{}",
             found.reason
         );

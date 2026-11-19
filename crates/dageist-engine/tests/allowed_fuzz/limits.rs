@@ -959,9 +959,9 @@ fn rows_after(frames: &Frames, expression: &Expression, upto: usize) -> Option<V
 }
 
 /// Whether the call `id` gives a null in each row where it is given one, in the
-/// rows it follows or in an operand: a comparison and arithmetic do, and `and`, `or`
-/// and `xor` do not, for a null and a true is a true, and a call that chooses between
-/// operands does not either.
+/// rows it follows or in an operand: a comparison and arithmetic do. `and` and `or` do
+/// not, for a null with a true is a true. `xor` does, and is left out, which only
+/// excuses less. A call that chooses between operands does not either.
 fn carries_nulls(id: &str) -> bool {
     matches!(
         id,
@@ -3233,7 +3233,8 @@ mod tests {
         );
         // A null in the operand alone does not empty the rows that the receiver holds.
         assert_eq!(excused_after("k", vec![binary("Expr.mul", "a")]), vec![]);
-        // `or` and `and` do not carry a null through: a null or a true is a true.
+        // `or` and `and` do not carry a null through: a null with a true is a true. `xor`
+        // does, and is left unknown, which only excuses less.
         for id in ["Expr.or_", "Expr.and_", "Expr.xor"] {
             assert_eq!(
                 excused_after("k", vec![shift_by(3), binary(id, "f")]),
