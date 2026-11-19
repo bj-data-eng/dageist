@@ -939,6 +939,7 @@ fn rows_after(frames: &Frames, expression: &Expression, upto: usize) -> Option<V
                 vec![one]
             }
             "Expr.len" => vec![Cell::Value],
+            id if carries_nulls(id) => carried(frames, &rows, link),
             _ => match effect(link) {
                 Effect::Keeps => rows,
                 Effect::Values => vec![Cell::Value; rows.len()],
@@ -955,6 +956,62 @@ fn rows_after(frames: &Frames, expression: &Expression, upto: usize) -> Option<V
         };
     }
     Some(rows)
+}
+
+/// Whether the call `id` gives a null in each row where it is given one, in the
+/// rows it follows or in an operand: a comparison and arithmetic do, and `and`, `or`
+/// and `xor` do not, for a null and a true is a true, and a call that chooses between
+/// operands does not either.
+fn carries_nulls(id: &str) -> bool {
+    matches!(
+        id,
+        "Expr.eq"
+            | "Expr.ne"
+            | "Expr.gt"
+            | "Expr.ge"
+            | "Expr.lt"
+            | "Expr.le"
+            | "Expr.add"
+            | "Expr.sub"
+            | "Expr.mul"
+            | "Expr.truediv"
+            | "Expr.floordiv"
+            | "Expr.mod"
+            | "Expr.pow"
+    )
+}
+
+/// The rows of a call that carries nulls, which follows `rows` and is given
+/// operands: null where the rows it follows hold a null, or an operand does,
+/// and not known elsewhere. An operand of one row meets each row, and an operand of
+/// which nothing is known, or of another number of rows, carries nothing.
+fn carried(frames: &Frames, rows: &[Cell], link: &Call) -> Vec<Cell> {
+    let held: Vec<Vec<Cell>> = operands(link)
+        .into_iter()
+        .filter_map(|(_, operand)| rows_after(frames, operand, operand.links().len()))
+        .collect();
+    let count = held
+        .iter()
+        .map(Vec::len)
+        .chain(std::iter::once(rows.len()))
+        .max()
+        .map_or(SAMPLE_ROWS, |most| most.max(1));
+    let nulls_at = |cells: &[Cell], row: usize| match cells {
+        [only] => *only == Cell::Null,
+        cells => cells.get(row) == Some(&Cell::Null),
+    };
+    let fits = |cells: &Vec<Cell>| cells.len() == 1 || cells.len() == count;
+    (0..count)
+        .map(|row| {
+            if (rows.len() == 1 || rows.len() == count) && nulls_at(rows, row)
+                || held.iter().any(|cells| fits(cells) && nulls_at(cells, row))
+            {
+                Cell::Null
+            } else {
+                Cell::Unknown
+            }
+        })
+        .collect()
 }
 
 /// The name of the one column `expression` starts from, when it starts from one.
@@ -3125,7 +3182,13 @@ mod tests {
         // (a value, a null, a value) is `v, null, v`; one shift gives `null, v, null`; and
         // `.mul(a)` of the sample's `a` (a value, a null, a value) is null in every row.
         let shifts = [Limit::AShiftThatLeavesNulls];
-        let binary = |id: &str, operand: &str| compared_with(id, chain(column(operand), &[]));
+        let binary = |id: &str, operand: &str| {
+            let operand = chain(column(operand), &[]);
+            match id {
+                "Expr.and_" | "Expr.or_" => call(id, vec![("others", many(vec![operand]))]),
+                _ => compared_with(id, operand),
+            }
+        };
         assert_eq!(
             excused_after(
                 "b",
