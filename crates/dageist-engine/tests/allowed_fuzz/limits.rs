@@ -2083,6 +2083,60 @@ mod tests {
         );
     }
 
+    const DYN_FLOAT: &str = "datatypes of join keys don't match - `key`: f64 on left does not match `rk`: dyn float on right (and no other type was available to cast to)";
+
+    /// A literal that is the number `number`, typed without a dtype.
+    fn fraction(number: f64) -> Expression {
+        chain(
+            call("polars.lit", vec![("value", Value::Float(number))]),
+            &[],
+        )
+    }
+
+    #[test]
+    fn a_join_key_that_raises_an_integer_to_a_fraction_is_a_dyn_float_that_no_key_matches() {
+        // Polars resolves `rk ** 1.5` to a `Float64` where it is selected, and leaves it the
+        // unresolved `dyn float` where it is a join's key, which no key of a dtype matches.
+        let case = join(
+            chain(column("key"), &[]),
+            chain_of(column("rk"), vec![pow_of(fraction(1.5))]),
+        );
+        assert_eq!(
+            polars_refuses(
+                &case,
+                Some(step_place()),
+                Stage::Schema,
+                DYN_FLOAT,
+                Vec::new()
+            ),
+            vec![Limit::AJoinKeyDtype]
+        );
+    }
+
+    #[test]
+    fn a_dyn_float_join_key_is_not_excused_without_a_power_of_a_fraction() {
+        // A power of a whole number, a subtraction of a fraction and no power at all resolve
+        // to the dtype the chain gives, so Polars refusing the keys for a `dyn float` is no
+        // limit's for them.
+        for key in [
+            chain_of(column("rk"), vec![pow_of(whole(2))]),
+            chain_of(column("rk"), vec![compared_with("Expr.sub", fraction(1.5))]),
+            chain(column("rk"), &[]),
+        ] {
+            let case = join(chain(column("key"), &[]), key);
+            assert_eq!(
+                polars_refuses(
+                    &case,
+                    Some(step_place()),
+                    Stage::Schema,
+                    DYN_FLOAT,
+                    Vec::new()
+                ),
+                vec![]
+            );
+        }
+    }
+
     #[test]
     fn a_join_key_with_a_null_comparison_at_any_depth_excuses_the_refused_step() {
         let reason = "all join key expressions must be elementwise.";
