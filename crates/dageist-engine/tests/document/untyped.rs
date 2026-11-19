@@ -221,7 +221,7 @@ fn a_number_raised_to_a_power_or_divided_keeps_the_dtype_polars_gives_it() {
                 fractional(1.5),
                 vec![call("Expr.truediv", json!({ "other": field("f32") }))],
             ),
-            lit(1.5) / col("f32"),
+            lit(1.5).true_div(col("f32")),
             Representative::Float64,
         ),
         (
@@ -229,7 +229,7 @@ fn a_number_raised_to_a_power_or_divided_keeps_the_dtype_polars_gives_it() {
                 number(2),
                 vec![call("Expr.truediv", json!({ "other": field("f32") }))],
             ),
-            lit(2) / col("f32"),
+            lit(2).true_div(col("f32")),
             Representative::Float32,
         ),
         (
@@ -237,7 +237,7 @@ fn a_number_raised_to_a_power_or_divided_keeps_the_dtype_polars_gives_it() {
                 number(2),
                 vec![call("Expr.truediv", json!({ "other": field("u8") }))],
             ),
-            lit(2) / col("u8"),
+            lit(2).true_div(col("u8")),
             Representative::Float64,
         ),
     ];
