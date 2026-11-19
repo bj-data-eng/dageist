@@ -373,8 +373,8 @@
       "id": "Expr.cbrt",
       "applies": "expression",
       "family": "maths",
-      "name": "cube_root",
-      "hint": "cube root, cbrt in Polars",
+      "name": "cbrt",
+      "hint": "cube root",
       "head": null,
       "lazy": true,
       "parameters": []
@@ -712,8 +712,8 @@
       "id": "Expr.erf",
       "applies": "expression",
       "family": "maths",
-      "name": "error_function",
-      "hint": "error function, erf in Polars",
+      "name": "erf",
+      "hint": "error function",
       "head": null,
       "lazy": true,
       "parameters": []
@@ -722,8 +722,8 @@
       "id": "Expr.erfc",
       "applies": "expression",
       "family": "maths",
-      "name": "complementary_error_function",
-      "hint": "complementary error function, erfc in Polars",
+      "name": "erfc",
+      "hint": "complementary error function",
       "head": null,
       "lazy": true,
       "parameters": []
@@ -1500,8 +1500,8 @@
       "id": "Expr.round_sig_figs",
       "applies": "expression",
       "family": "rounding",
-      "name": "round_significant_figures",
-      "hint": "rounded to a number of significant figures, round_sig_figs in Polars",
+      "name": "round_sig_figs",
+      "hint": "rounded to a number of significant figures",
       "head": null,
       "lazy": true,
       "parameters": [
