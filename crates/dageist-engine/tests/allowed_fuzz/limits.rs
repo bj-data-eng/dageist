@@ -228,11 +228,18 @@ pub enum Limit {
     /// starts from a literal, which Polars allows; the window is why where Polars, asked again
     /// with each literal partition a column, refuses the case for that reason.
     AWindowOverALiteral,
+    /// Polars refuses `date ^ int64` and `bool | int64` when it works out the schema of a
+    /// select, a filter or a sort key, and accepts the same call in a join's key, where it
+    /// evaluates it on the physical values. The tables measured a bitwise call in select, with
+    /// the dtypes the call needs. The tables refusing, for the dtypes it is given, at a bitwise
+    /// call in a join's key, which Polars allows; the key is why where Polars, asked to select
+    /// the key, refuses it as the call's dtypes say.
+    ABitwiseCallInAJoinKey,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 19] = [
+    pub const ALL: [Self; 20] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -252,6 +259,7 @@ impl Limit {
         Self::ABoundTheDtypeCannotHold,
         Self::ABoundWithValuesOfItsOwn,
         Self::AWindowOverALiteral,
+        Self::ABitwiseCallInAJoinKey,
     ];
 
     /// The name a kept case is filed under.
@@ -276,6 +284,7 @@ impl Limit {
             Self::ABoundTheDtypeCannotHold => "a-bound-the-dtype-cannot-hold",
             Self::ABoundWithValuesOfItsOwn => "a-bound-with-values-of-its-own",
             Self::AWindowOverALiteral => "a-window-over-a-literal",
+            Self::ABitwiseCallInAJoinKey => "a-bitwise-call-in-a-join-key",
         }
     }
 
@@ -332,6 +341,9 @@ impl Limit {
             }
             Self::AWindowOverALiteral => {
                 "a window over a literal partition gives no rows, so the rows do not show the plan of what follows it"
+            }
+            Self::ABitwiseCallInAJoinKey => {
+                "Polars does not check the dtypes of a bitwise call in a join's key as it does in select, so it accepts a call the tables refuse for them"
             }
             Self::ABoundWithValuesOfItsOwn => {
                 "Polars casts the values of a bound of clip to the dtype it clips, which the tables measured as the sample's rows, and a bound with others passes"
@@ -1568,6 +1580,58 @@ fn control_with_columns(
     ))
 }
 
+/// Whether `reason` is what Polars objects to of the dtypes of a bitwise call: `^ not allowed on
+/// date and i64`, `| on Boolean and Int64 is not supported`, or that the operation is not supported
+/// for a dtype.
+fn is_a_bitwise_objection(reason: &str) -> bool {
+    ["^", "|", "&"].iter().any(|symbol| {
+        reason.starts_with(&format!("{symbol} not allowed on"))
+            || reason.starts_with(&format!("{symbol} on "))
+    }) || ["bitand", "bitor", "bitxor"]
+        .iter()
+        .any(|name| reason.contains(&format!("`{name}` operation not supported")))
+}
+
+/// Whether Polars refuses the join key that holds the refused call, when it is the only item of a
+/// `select` on the table it is read against, as a bitwise call's dtypes say: the position is then
+/// why it allows the key.
+fn refused_when_the_key_is_selected(case: &Case, refused: &Refused) -> bool {
+    let Some(key) = locate(case, &refused.place).top else {
+        return false;
+    };
+    let on_the_other_table = matches!(refused.place.path().first(),
+        Some(Segment::Parameter(name)) if name == "right_on");
+    let step = &case.document.steps()[0];
+    let Some(entry) = catalog::entry("LazyFrame.select") else {
+        return false;
+    };
+    let Ok(select) = Call::new(
+        entry,
+        vec![("exprs", Value::Many(vec![Value::Expression(key.clone())]))],
+    ) else {
+        return false;
+    };
+    let (Ok(rebuilt), Some(tables)) = (
+        Step::new(step.id().clone(), select),
+        Tables::standing(on_the_other_table, &[]),
+    ) else {
+        return false;
+    };
+    let Ok(document) = Document::new(vec![rebuilt]) else {
+        return false;
+    };
+    let control = Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        document,
+    };
+    (0..RUNS).any(|_| {
+        observe_probe(&control, tables)
+            .refusal
+            .is_some_and(|refusal| is_a_bitwise_objection(&refusal.reason))
+    })
+}
+
 /// Whether the limit is why the tables and Polars disagree.
 fn applies(
     limit: Limit,
@@ -1729,6 +1793,18 @@ fn applies(
                         && gives_a_predicate_the_dtype_null(prediction, held, at)
                 });
             unplaced(refusal) && refusal.stage == Stage::Rows && (negated || filtered)
+        }
+        (Limit::ABitwiseCallInAJoinKey, Disagreement::PolarsAllows(refused)) => {
+            // A bitwise call in one of the join's own keys, refused for what a bitwise call
+            // objects to, and refused as that when the key is selected.
+            is(step, "LazyFrame.join")
+                && is_a_bitwise_objection(&refused.reason)
+                && matches!(refused.place.path().first(), Some(Segment::Parameter(name))
+                    if ["on", "left_on", "right_on"].contains(&name.as_str()))
+                && locate(case, &refused.place)
+                    .call
+                    .is_some_and(is_a_bitwise_call)
+                && refused_when_the_key_is_selected(case, refused)
         }
         (Limit::ADivisionByZero, Disagreement::PolarsRefuses(refusal)) => {
             // The rows hold the divisor; a table with no rows holds none.
@@ -3502,6 +3578,108 @@ mod tests {
         );
         assert_eq!(
             polars_refuses_what_the_tables_allow(&case, None, Stage::Schema, reason),
+            vec![]
+        );
+    }
+
+    // ----- A bitwise call in a join's key
+
+    const A_BITWISE_OBJECTION: &str = "^ not allowed on i64 and bool";
+
+    fn right_key_link() -> Place {
+        at(&[parameter("right_on"), Segment::Item(0), Segment::Link(0)])
+    }
+
+    /// `join(left_on=[k], right_on=[<right>])`, which the tables refuse at the first link of the
+    /// right key with `reason`, and Polars allows.
+    fn refused_in_a_right_key(right: Expression, reason: &str) -> Vec<Limit> {
+        let case = join(chain(column("k"), &[]), right);
+        excused_by_the_tables_refusing(&case, right_key_link(), reason)
+    }
+
+    fn excused_by_the_tables_refusing(case: &Case, place: Place, reason: &str) -> Vec<Limit> {
+        std::thread::scope(|scope| {
+            std::thread::Builder::new()
+                .stack_size(256 << 20)
+                .spawn_scoped(scope, || {
+                    tables_refuse(case, place, Some(TableStage::Schema), reason)
+                })
+                .expect("a thread")
+                .join()
+                .expect("the limits are asked")
+        })
+    }
+
+    #[test]
+    fn a_bitwise_call_in_a_join_key_is_excused_where_polars_refuses_the_key_when_it_is_selected() {
+        // `rb ^ rf` of a whole number and a `Boolean`: Polars refuses it as a select item, and
+        // the join accepts it.
+        assert_eq!(
+            refused_in_a_right_key(
+                chain_of(
+                    column("rb"),
+                    vec![compared_with("Expr.xor", chain(column("rf"), &[]))],
+                ),
+                A_BITWISE_OBJECTION
+            ),
+            vec![Limit::ABitwiseCallInAJoinKey]
+        );
+        assert_eq!(
+            excused_by_kept("uncovered-a-bitwise-call-in-a-join-key.case"),
+            vec![Limit::ABitwiseCallInAJoinKey]
+        );
+    }
+
+    #[test]
+    fn a_bitwise_call_in_a_join_key_excuses_nothing_that_is_not_one_polars_refuses_in_select() {
+        let xor = |left: &str, right: &str| {
+            chain_of(
+                column(left),
+                vec![compared_with("Expr.xor", chain(column(right), &[]))],
+            )
+        };
+        // A call that select accepts, so the position is not why Polars allows it.
+        assert_eq!(
+            refused_in_a_right_key(xor("rk", "rk"), A_BITWISE_OBJECTION),
+            vec![]
+        );
+        // A refusal that is not about a bitwise call's dtypes.
+        assert_eq!(refused_in_a_right_key(xor("rb", "rf"), "no"), vec![]);
+        // A call that is not a bitwise one, whatever the reason says.
+        assert_eq!(
+            refused_in_a_right_key(
+                chain_of(
+                    column("rb"),
+                    vec![compared_with("Expr.add", chain(column("rf"), &[]))],
+                ),
+                A_BITWISE_OBJECTION
+            ),
+            vec![]
+        );
+        // The same refusal where the step is no join, which Polars refuses as the tables do.
+        let selected = select(vec![xor("a", "f")]);
+        assert_eq!(
+            excused_by_the_tables_refusing(&selected, link_of("exprs", 0, 0), A_BITWISE_OBJECTION),
+            vec![]
+        );
+        // A key that is no join's own: the window's key in a select.
+        let windowed = select(vec![chain_of(
+            column("a"),
+            vec![call(
+                "Expr.over",
+                vec![("partition_by", many(vec![xor("a", "f")]))],
+            )],
+        )]);
+        let place = at(&[
+            parameter("exprs"),
+            Segment::Item(0),
+            Segment::Link(0),
+            parameter("partition_by"),
+            Segment::Item(0),
+            Segment::Link(0),
+        ]);
+        assert_eq!(
+            excused_by_the_tables_refusing(&windowed, place, A_BITWISE_OBJECTION),
             vec![]
         );
     }
