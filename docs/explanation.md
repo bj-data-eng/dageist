@@ -314,13 +314,56 @@ use to a step, so the catalogue marks the operands as needed and the tables, the
 and `fit` judge them with at least one: `and` is offered after a whole number or a Boolean
 and refused after a float. The tables judge each operand beside what the method follows,
 as they do for any method with more than one expression parameter, and not beside what the
-operands before it gave.
+operands before it gave. The mark is on any optional parameter that holds expressions and
+of which a step always gives at least one, and `clip`'s two bounds carry it for the same
+reason: a clip with neither is the expression as it was, which Polars allows after any
+dtype, and is no use to a step. A bound given on its own is judged by its own lines of the
+tables.
+
+The maths of one value are three families beside Arithmetic, so that a method's list stays
+short and a method is swapped for one that takes the same arguments. Maths holds `sqrt`,
+`cbrt`, `exp`, `log`, `log1p`, `erf` and `erfc`; Trigonometry the sine, cosine, tangent and
+cotangent, their inverses, the hyperbolic functions and their inverses, and `degrees` and
+`radians`; and Rounding `ceil`, `floor`, `round`, `round_sig_figs` and `truncate`, of which
+`round` and `truncate` take the same places. `sign` and `clip` join `abs` and `neg` in
+Arithmetic. The editor shows `cbrt`, `erf`, `erfc` and `round_sig_figs` as `cube_root`,
+`error_function`, `complementary_error_function` and `round_significant_figures`, which the
+language file lists as changed and whose hints say the name Polars gives; the other names are
+Polars'.
+
+What Polars does with each is what the tables say, and some of it is not what a name suggests:
+
+- The maths and the trigonometric functions give a float: a `Float32`, and a `Float16`, stays
+  one, and every other dtype gives a `Float64`. The maths also take a `Boolean` and a
+  `Decimal`, and the trigonometric functions take neither.
+- `sqrt` and `cbrt` resolve on a column of any dtype, a date or text among them, to a schema
+  that names the dtype they were given and rows that are a `Float64`. The tables refuse that as
+  they do any call whose schema and rows differ, with the reason that the schema says one dtype
+  and the rows give another, and the check of what each method accepts does the same.
+- The roundings keep the dtype they are given, take whole numbers and leave them as they are,
+  and refuse a `Boolean`. Rounding, flooring or ceiling a `Decimal` gives it one more digit of
+  precision, which the class of its dtype does not show, and truncating it does not.
+- `round`'s `mode` has the two words Python's binding takes, `half_to_even` and
+  `half_away_from_zero`. Polars' documentation lists `to_zero` as a third, which the binding
+  refuses and `truncate` does.
+- `decimals` and `digits` are whole numbers, which Python passes to Polars as an unsigned and a
+  signed 32-bit number, so a build refuses one outside that range, and `digits` must be given.
+  Polars refuses fewer than one significant figure when it runs rows, whatever the dtype. The
+  tables, measured with two, do not say so, and the generator gives `digits` one or more.
+- `log`'s `base` defaults to `math.e`, which the engine reads as the number it is, as it reads
+  no other name. Python makes the default a number of no dtype, and Polars leaves the logarithm
+  of a whole number to such a base an unresolved float, which a join's key or a sort key does
+  not resolve, so the build makes the default a `Float64`. A base that is given keeps Python's
+  reading.
+- `clip` casts a bound to the dtype it clips and refuses a bound that dtype cannot hold, so a
+  number typed without a dtype does not widen the dtype as an operand's does.
 
 The catalogue holds the seven steps, the expression methods the storyboard
 uses, the aggregates `sum`, `min`, `max` and `len`, the six comparisons, the
-arithmetic of `add`, `sub`, `mul`, `truediv`, `floordiv`, `mod`, `pow`, `neg`
-and `abs`, the logic of `and_`, `or_`, `xor` and `not_`, `col`, `lit`,
-`element`, and the links of `when`, `then` and `otherwise`.
+arithmetic of `add`, `sub`, `mul`, `truediv`, `floordiv`, `mod`, `pow`, `neg`,
+`abs`, `sign` and `clip`, the maths, trigonometry and rounding above, the logic of
+`and_`, `or_`, `xor` and `not_`, `col`, `lit`, `element`, and the links of `when`,
+`then` and `otherwise`.
 
 The host serves the catalogue with its English words to the view through the
 `operation_catalogue` command. The step editor takes its method lists,
@@ -631,8 +674,14 @@ number, so its dtype is not known. A number with a fraction beside a Boolean tha
 divided is a Boolean, which Polars cannot floor divide, though it floor divides a Boolean
 by a typed float, so `f // 1.5` is refused and `f // 1` and `f * 1.5` are not. The
 catalogue gives `pow`'s `exponent`, `truediv`'s `other` and `floordiv`'s `other` roles of
-their own for these. Where it is an operand of another method, such as a key to group by,
-what the call gives is not known. The walk and `fit` know it where it
+their own for these. A logarithm of a whole number, a `Boolean` or a `Decimal` to a base
+with a fraction is the unresolved float the base is, as a power is, and `log`'s `base` has
+a role of its own for it. A bound of `clip` is cast to the dtype it clips, so a number
+beside it takes that dtype where it fits, a number with a fraction is cut to a whole
+number beside whole numbers, and a number the dtype cannot hold is refused when the rows
+run, so the walk does not say what the call gives; what is clipped does not adapt to the
+bound. Where it is an operand of another method, such as a key to group by, what the
+call gives is not known. The walk and `fit` know it where it
 stands alone, counts rows as `shift` does, or is a value of a condition beside typed
 values that it fits: a whole number adapts to whole numbers and numbers with a
 fraction it fits, a number with a fraction only to numbers with a fraction, and
@@ -826,8 +875,8 @@ predicate, a sort key, either side of a join key, a pivot's aggregate), with
 conditions nested two deep and `over`'s keys inside them, a second key beside a join's
 key (a copy of it, its column taken as one value or tested for a null, or a chain of
 its own, paired with the same column of the other table or another), a join's `on`,
-which reads the one column `u` that both tables hold, and sets of the options of
-each call. For each it takes the engine's
+which reads the one column `u` that both tables hold, sets of the options of
+each call, and the whole numbers that a rounding keeps. For each it takes the engine's
 [walk](#which-combinations-polars-allows) of the case, which asks `offer` at the
 place each call stands in whether the call may stand and what it gives, whether
 each expression a position holds may end there, and `options` of the options a
@@ -957,7 +1006,7 @@ which is how the streaming engine refuses a bitwise call between a number and a 
 The second kind is a limit, for what Polars evaluates and accepts, which no probe
 of the part shows, and for where the tables allow and Polars refuses. A limit is
 never for a part Polars skips: the editor holds that to its types, and a probe
-settles it. There are sixteen. Each is named in the target, counted when it excuses a
+settles it. There are seventeen. Each is named in the target, counted when it excuses a
 case, and has a kept case that the normal tests replay, which only that limit
 excuses, named `uncovered-<limit>.case`, with others
 `uncovered-<limit>--<what it shows>.case`; each has a test that the same feature
@@ -991,7 +1040,7 @@ rule a probe shows right where Polars does not evaluate the part. Any other rule
 refuses what Polars allows is a disagreement. The target compares nothing
 more of a case that the rule by design refuses and Polars allows: the dtypes before the
 refusal are compared, but whether Polars allows the rest is not. That rule is stricter
-wherever it refuses, which is about two fifths of the pivot cases (67 of the 157 of the fixed
+wherever it refuses, which is about half of the pivot cases (90 of the 157 of the fixed
 seed, and the same share in longer campaigns), so those pivot aggregates are checked
 little; the tally counts the pivot cases and those the rule refuses apart.
 
@@ -1012,20 +1061,20 @@ an expected rejection that names both reasons.
 The tally ends with the totals of the cases that agreed, that both refused for another
 reason, that a limit excused, that were refused where Polars does not evaluate the
 part, that a rule stricter by design refused, and that disagreed. The fixed seed's
-1000 cases give 6 excused by a limit, 67 refused by the rule that is stricter by design,
-and none disagreeing; 20 of those that agree are refused by the rule against a repeated
-pair of key names, and the tables could not be asked past a point in 32 more. These
-counts are the same at every thread count. The others are not: Polars' thread count
-changes which reason it gives where the tables and Polars both refuse, and with it the
-totals, so the cases that agree are 783 to 785, those refused by both for another
-reason are 116 to 118, and those refused where Polars does not evaluate the part are 5
-or 6. The test asserts none of those three.
+1000 cases give 1 excused by a limit, 90 refused by the rule that is stricter by design,
+and none disagreeing; 23 of those that agree are refused by the rule against a repeated
+pair of key names, and the tables could not be asked past a point in 12 more. These
+counts are the same at one thread, at two and at the machine's own. The others are not:
+Polars' thread count changes which reason it gives where the tables and Polars both
+refuse, and with it the totals, so the cases refused where Polars does not evaluate the
+part are 7 or 8, and the cases that agree and those refused by both for another reason
+are not a number to hold to. The test asserts none of those three.
 
 | Limit | Excuses |
 | --- | --- |
 | An `explode` changes the lengths | `Expr.over`'s `mapping_strategy` as `explode` gives other lengths, which meet those of what follows it. The tables do not measure what meets them. Polars refusing the rows, with a reason about lengths, in a case with an `explode` that is why: the case run again with each `explode` undone is not refused for lengths (no place: the reason gates it, and that run shows the cause); and the tables refusing, with a reason about lengths, at the window or at a call after it, or in the arguments of a link after it, in the same chain, which Polars allows; not before the window, not in its own arguments, and not an `explode` in another operand or item. |
 | A literal | An argument or a start is measured as a column of the dtype, except the values of `shift` and the arguments of a pivot's group. A literal, or a condition of literals, is one value, which Polars casts and broadcasts as it does not a column. The tables refusing at a call that follows a literal or is given one, which Polars allows, and what a call after a literal is given, at any depth, is met by one value: the tables refusing it when they run rows, which Polars allows. A literal at the place is why only where Polars refuses the case for the tables' reason once each such literal is a column of its dtype (the class Polars gave it, the same case in all else): the case run again. A literal beside a part Polars skips for another cause is no cause, for the column is allowed as well, and the limit that is the cause, or the probe of the call on columns, excuses the case. A key that the tables refused for a call and not as a position is run again as the only item of a `select`, for a column beside an aggregate is not elementwise and a literal is. None in a pivot's aggregate, which reads no column. |
-| A pivot's aggregate | It is run on the values of each group, with kernels of its own, and on no groups when the table is empty. Polars refusing the empty table, with a reason that an operation is not supported or that a dtype is null, in either quoting (no place); and the tables refusing, with a reason about a dtype an operation does not support, a comparison, an operation, an evaluation, a cast, a struct field or lengths of a window over a group, at a call of the aggregate, which Polars allows |
+| A pivot's aggregate | It is run on the values of each group, with kernels of its own, and on no groups when the table is empty. Polars refusing the empty table, with a reason that an operation is not supported or that a dtype is null, in either quoting (no place); and the tables refusing, with a reason about a dtype an operation does not support, a comparison, an operation, an evaluation, a cast, a failed conversion of the sample's text, which a group of nulls does not hold, a struct field or lengths of a window over a group, at a call of the aggregate, which Polars allows |
 | A single value in a key | A key that is wholly a single value, an aggregate or a null, is not one that has to be elementwise in what it holds: Polars allows a running count under a `last` there. The context table measured the entry as the whole key. The tables refusing, with a reason about a key not being elementwise, inside a key that is wholly single, which Polars allows. A key that holds an aggregate beside a column, or a column compared with a null, is refused by the rule above, and is not this. |
 | A null comparison in a key | Polars folds a comparison with a null literal into a null before it asks whether a join's key is elementwise, and what it leaves depends on the dtypes and on what the comparison follows, such as an aggregate. A column compared with a null literal is refused by the rule, and the rest, such as a comparison with what one folded, is found by running. Polars refusing the join as not elementwise, with no place, in a case where a join key, or the key of a window, holds a comparison with a null literal at any depth, and no other key of the join is a cause: a key that is not wholly one value and holds a running value, an aggregate or a window. A key that is wholly one value is allowed beside another key, so it is not. |
 | A shift that leaves nulls | The tables ran every call on columns that hold values, so what Polars does with a call that has only nulls to meet was not measured: it does not meet the dtype that the tables refuse when they run rows. A shift fills with a null unless it is given a `fill_value`, and the sample's three rows decide what is left, so the target follows them through the chain. The start column holds a value in each row, and `a` and `b` a null in the middle one; a start that is not one column of the sample holds nothing known. A shift moves the rows down for a positive number and up for a negative one, and the rows it empties hold the `fill_value` (a null where there is none). A running sum or maximum and the parts of a date keep each row where it is and null where it was; `is_null`, `is_not_null` and `cum_count` give a value in every row; a comparison and arithmetic give a null in each row where the rows they follow hold one, or an operand does (a column with a null in the middle row, or an aggregate that is null, meets every row), and leave the others unknown; `and` and `or` carry none, for a null with a true is a true; `xor` does carry one, and is left unknown, which excuses less; `offset_by`, a condition and a window that is not an `explode` keep the rows in place and leave what they hold unknown, and give the one value that an aggregate leaves to each of the sample's three rows; any other call leaves nothing known. The first and the last take a row, or the first or last that is not null where they skip nulls; the minimum and the maximum are null of rows that are all null and a value of any that holds one; a sum of rows that are all null is not known, since it is zero of numbers and null of a column of `Null`. The tables refusing, when they run rows, at a call that follows a chain whose rows are all null, or is given one. Polars refuses a comparison of a list with a `Boolean` after none, one or two shifts, and allows it after three. Nulls that Polars folds whatever the rows are, as those of a comparison with a null, are not the sample's: a probe settles them. |
@@ -1039,14 +1088,16 @@ or 6. The test asserts none of those three.
 | A negative exponent | Polars raises an integer to a power by taking the exponent as a `UInt32`, so it refuses a negative whole number as the exponent of an integer when the rows run. The exponent is a value, which the tables measured as the dtype and the number 1. Polars refusing the rows with a failed conversion to `u32`, in a case with a `pow` whose exponent is a whole number typed below zero or holds a subtraction, a negation or a not, which can take the values of a column below zero (no place). The sample's rows are 1, a null and 3, so a sum or a product of them, a power of a positive number or of a column is not this. |
 | A null in a bitwise call | A column or a literal of the dtype Null is an operand of `and_`, `or_` and `xor` that the tables allow, giving a `Boolean`, as `select` shows, and Polars meets it where `select` hides it. It negates what a bitwise call combines operand by operand, so a `not_` meets each operand and refuses the dtype Null: Polars refusing the rows with the dtype Null not supported in `not`, in a case with a `not_` straight after an `and_` or an `or_` that meets a null, as an operand or as the start of its chain (no place). It gives a filter's predicate the dtype Null: Polars refusing the rows with a predicate that must be a `Boolean`, got `Null`, in a filter that holds an `and_`, an `or_` or an `xor` that meets a null (no place). |
 | A division by zero | Polars refuses to divide a `Decimal` by zero, where a whole number divided by zero is null and a float is infinite. The divisor is a value, which the tables measured as the dtype and the sample's values, none of them zero; a remainder or a difference of them can be. Polars refusing the rows with the reason that it divides a `Decimal` by zero, in a case with a `Decimal` as a column that holds a division, a floor division or a remainder (no place). |
+| A bound the dtype cannot hold | Polars casts a bound of `clip` to the dtype it clips as strictly as it can, and refuses the rows when the bound holds a value that dtype cannot hold: a number typed without a dtype that is out of its range or below zero beside an unsigned dtype, or a value of a float that is no whole number it can hold, such as the infinity and the not-a-number that a logarithm to the base 1 or a root of a negative number gives beside whole numbers. The tables measured a bound as a column of the sample's rows, whose numbers every number dtype holds. Polars refusing the rows, with a failed conversion that has no place, in a case whose bound is why: the case run again with the bounds of every `clip` undone is not refused for a failed conversion, which is also why a failed conversion that another call causes, and a clip with no bound, are not excused. The table with no rows holds no value to convert. |
 
 
 A case that the tables cannot be asked about, because the dtype of an argument or
 before a method is not known, is not predicted past that point and is counted. The
 generator keeps to what the tables measured where a value, not a dtype, decides: a
 `shift` by the number 1 of a dtype, or the number -1 of a signed integer dtype (the
-tables measured the dtype, which the sign does not change), durations that are text
-of `b`, two values of a condition of one dtype, a join without `validate`.
+tables measured the dtype, which the sign does not change), a number of significant figures
+of one or more, durations that are text of `b`, two values of a condition of one dtype, a join
+without `validate`.
 
 ## What The Step Editor Storyboard Has Settled
 
