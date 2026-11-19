@@ -395,15 +395,19 @@ const UNPACKING: &str = "cannot unpack series of type";
 /// failure to unpack a list: it casts the list to the dtype of the other side.
 const CASTING_A_LIST: &str = "cannot cast List type";
 
+/// The same where the tables' reason is a failure to unpack an array.
+const CASTING_AN_ARRAY: &str = "cannot cast Array type";
+
 /// Whether `probe` is how Polars on many threads refuses what the tables' reason, a failure to
 /// unpack a series, refuses. Its streaming engine does not unpack the text as a whole number:
 /// it gives the column of the whole number where its schema says text, which is the same call
-/// refused, for it is not what the schema says. And it fails to cast a list to the dtype of the
-/// other side where Polars on one thread fails to unpack the list as that dtype.
+/// refused, for it is not what the schema says. And it fails to cast a list, or an array, to the
+/// dtype of the other side where Polars on one thread fails to unpack it as that dtype.
 fn is_the_same_unpacking(tables: &str, probe: &str) -> bool {
     tables.starts_with(UNPACKING)
         && (probe.starts_with(SCHEMA_SAYS)
-            || (tables.contains("`list[") && probe.starts_with(CASTING_A_LIST)))
+            || (tables.contains("`list[") && probe.starts_with(CASTING_A_LIST))
+            || (tables.contains("`array[") && probe.starts_with(CASTING_AN_ARRAY)))
 }
 
 /// Whether `probe` is refused as the tables refused the part: for Polars' own
