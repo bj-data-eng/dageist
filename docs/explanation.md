@@ -305,15 +305,15 @@ given and is left out for that. A step puts a value on the left of an operator b
 its chain from that value. Offering both would show one operation twice, so each dunder
 method of `Expr` is left out as never offered, with the entry it spells.
 
-`and_`, `or_`, `xor` and `not_` are logical on Booleans and bitwise on whole
-numbers, so they have a family of their own, Logic, and are not swapped for a
-comparison, and the editor shows `and`, `or` and `not` without Python's trailing
-underscore, which the language file lists as changed. `and_` and `or_` take any
-number of operands and fold them from the left as Python does; given none they are
-the expression they follow, which is no use to a step, so the catalogue marks the
-operands as needed and the tables, the offers and `fit` judge them with at least one:
-`and` is offered after a whole number or a Boolean and refused after a float. The tables judge each operand beside what the method follows, as they do
-for any method with more than one expression parameter, and not beside what the
+`and_`, `or_`, `xor` and `not_` are logical on Booleans and bitwise on whole numbers, so
+they have a family of their own, Logic, and are not swapped for a comparison, and the
+editor shows `and`, `or` and `not` without Python's trailing underscore, which the
+language file lists as changed. `and_` and `or_` take any number of operands and fold them
+from the left as Python does; given none they are the expression they follow, which is no
+use to a step, so the catalogue marks the operands as needed and the tables, the offers
+and `fit` judge them with at least one: `and` is offered after a whole number or a Boolean
+and refused after a float. The tables judge each operand beside what the method follows,
+as they do for any method with more than one expression parameter, and not beside what the
 operands before it gave.
 
 The catalogue holds the seven steps, the expression methods the storyboard
@@ -628,11 +628,11 @@ column is a `Float64` beside it, where a whole number adapts to the float: `1.5 
 unresolved float the number is, which a select resolves to a `Float64` where it ends and
 a sort key or a join's key does not, and which an operand it meets adapts as it does the
 number, so its dtype is not known. A number with a fraction beside a Boolean that is floor
-divided is a Boolean, which Polars cannot floor divide, though it floor divides a Boolean by a
-typed float, so `f // 1.5` is refused and `f // 1` and `f * 1.5` are not. The catalogue gives
-`pow`'s `exponent`, `truediv`'s `other` and `floordiv`'s `other` roles of their own for these. Where it is an operand of another method,
-such as a
-key to group by, what the call gives is not known. The walk and `fit` know it where it
+divided is a Boolean, which Polars cannot floor divide, though it floor divides a Boolean
+by a typed float, so `f // 1.5` is refused and `f // 1` and `f * 1.5` are not. The
+catalogue gives `pow`'s `exponent`, `truediv`'s `other` and `floordiv`'s `other` roles of
+their own for these. Where it is an operand of another method, such as a key to group by,
+what the call gives is not known. The walk and `fit` know it where it
 stands alone, counts rows as `shift` does, or is a value of a condition beside typed
 values that it fits: a whole number adapts to whole numbers and numbers with a
 fraction it fits, a number with a fraction only to numbers with a fraction, and
