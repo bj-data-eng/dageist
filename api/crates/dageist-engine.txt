@@ -365,13 +365,14 @@ pub dageist_engine::catalog::Family::Arithmetic
 pub dageist_engine::catalog::Family::Compare
 pub dageist_engine::catalog::Family::Condition
 pub dageist_engine::catalog::Family::Cumulative
+pub dageist_engine::catalog::Family::Logic
 pub dageist_engine::catalog::Family::Rows
 pub dageist_engine::catalog::Family::Start
 pub dageist_engine::catalog::Family::Steps
 pub dageist_engine::catalog::Family::Temporal
 pub dageist_engine::catalog::Family::Window
 impl dageist_engine::catalog::Family
-pub const dageist_engine::catalog::Family::ALL: [Self; 10]
+pub const dageist_engine::catalog::Family::ALL: [Self; 11]
 pub const fn dageist_engine::catalog::Family::key(self) -> &'static str
 pub enum dageist_engine::catalog::Kind
 pub dageist_engine::catalog::Kind::Choice(&'static [&'static str])
@@ -400,6 +401,8 @@ pub dageist_engine::catalog::Reason::PythonObject
 pub dageist_engine::catalog::Reason::TakesPythonFunction
 pub enum dageist_engine::catalog::Role
 pub dageist_engine::catalog::Role::Count
+pub dageist_engine::catalog::Role::Divisor
+pub dageist_engine::catalog::Role::Exponent
 pub dageist_engine::catalog::Role::Filler
 pub dageist_engine::catalog::Role::Operand
 pub dageist_engine::catalog::Role::Plain
