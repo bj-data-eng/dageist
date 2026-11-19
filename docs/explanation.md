@@ -1112,8 +1112,10 @@ expression that holds such a call has the dtype of its own calls, and Polars ref
 at that call, when it works out the schema, is no dtype the tables got wrong. A join that
 pairs one column of the other table with two keys that Polars gives different dtypes, as
 an array of whole numbers and the array of floats that a division of it gives, which the
-tables take for one class, is no case at all: no dtype of the column fits both, and the
-target counts it apart and does not compare it. The
+tables take for one class, and that Polars refuses for the dtypes of the keys not matching,
+is no case at all: no dtype of the column fits both, and the target counts it apart
+(`join keys of different dtypes share a column`) and does not compare it. Polars joins whole
+numbers of different widths with one column, so a join it accepts is compared. The
 generator keeps to what the tables measured where a value, not a dtype, decides: a
 `shift` by the number 1 of a dtype, or the number -1 of a signed integer dtype (the
 tables measured the dtype, which the sign does not change), a number of significant figures
