@@ -228,9 +228,9 @@ fn arguments_refused(
     use crate::catalog::BuildError;
     let (name, inside) = match &error {
         BuildError::UnknownParameter { parameter } => (Some(parameter.clone()), Vec::new()),
-        BuildError::Repeated { parameter } | BuildError::Missing { parameter } => {
-            (Some((*parameter).to_owned()), Vec::new())
-        }
+        BuildError::Repeated { parameter }
+        | BuildError::Missing { parameter }
+        | BuildError::OutOfRange { parameter, .. } => (Some((*parameter).to_owned()), Vec::new()),
         BuildError::WrongKind { parameter, .. } | BuildError::UnknownChoice { parameter, .. } => {
             let found = entry
                 .parameters()

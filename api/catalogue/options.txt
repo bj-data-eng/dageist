@@ -27,7 +27,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 440 combinations: 408 allowed; 32 refused when Polars resolved the schema, 0 when it ran the rows, 0 when it ran the empty table.
+# 442 combinations: 410 allowed; 32 refused when Polars resolved the schema, 0 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.cum_count | Int64 | reverse=false | allowed UInt32 many
 Expr.cum_count | Int64 | reverse=true | allowed UInt32 many
@@ -57,6 +57,8 @@ Expr.over | Int64 | nulls_last=false, mapping_strategy=join | allowed List(Int64
 Expr.over | Int64 | nulls_last=true, mapping_strategy=explode | allowed Int64 many
 Expr.over | Int64 | nulls_last=true, mapping_strategy=group_to_rows | allowed Int64 many
 Expr.over | Int64 | nulls_last=true, mapping_strategy=join | allowed List(Int64) many
+Expr.round | Int64 | mode=half_away_from_zero | allowed Int64 many
+Expr.round | Int64 | mode=half_to_even | allowed Int64 many
 LazyFrame.join | - | allow_parallel=false, force_parallel=false | allowed -
 LazyFrame.join | - | allow_parallel=false, force_parallel=true | allowed -
 LazyFrame.join | - | allow_parallel=true, force_parallel=false | allowed -

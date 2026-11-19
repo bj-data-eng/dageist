@@ -444,6 +444,47 @@ fn the_shown_names_of_and_or_and_not_are_those_without_pythons_underscore() {
 }
 
 #[test]
+fn the_shown_names_of_the_cube_root_the_error_functions_and_significant_figures_are_plain_words() {
+    // Polars' abbreviations of these read badly, so the editor shows them in full and each hint
+    // says the name Polars gives, which is what someone who knows Polars searches for.
+    let words = english();
+    let shown = |id: &str| {
+        let entry = crate::catalog::entry(id).expect("an entry");
+        (words.entry_name(entry.id()), words.entry_hint(entry.id()))
+    };
+    let cases = [
+        ("Expr.cbrt", "cube_root", "cbrt"),
+        ("Expr.erf", "error_function", "erf"),
+        ("Expr.erfc", "complementary_error_function", "erfc"),
+        (
+            "Expr.round_sig_figs",
+            "round_significant_figures",
+            "round_sig_figs",
+        ),
+    ];
+    for (id, name, polars) in cases {
+        let (found, hint) = shown(id);
+        assert_eq!(found, Some(name), "{id}");
+        assert!(
+            hint.is_some_and(|hint| hint.contains(polars)),
+            "the hint of {id} does not say {polars}"
+        );
+        assert!(words.changed().iter().any(|listed| listed == id), "{id}");
+    }
+    // Every other name of the batch is Polars' own, and the parameters keep Polars' names.
+    for id in [
+        "Expr.sqrt",
+        "Expr.exp",
+        "Expr.log1p",
+        "Expr.arcsinh",
+        "Expr.round",
+    ] {
+        let (found, _) = shown(id);
+        assert_eq!(found, id.strip_prefix("Expr."), "{id}");
+    }
+}
+
+#[test]
 fn every_name_listed_as_changed_is_shown_differently_from_polars() {
     let words = english();
     assert!(!words.changed().is_empty());

@@ -131,11 +131,13 @@ fn argument_expression(
 /// What a call needs besides the parameter under test to mean anything.
 /// Python's `over` is refused without something to group or order by, and
 /// `*more_exprs` extends `partition_by`, so unless `partition_by` or `order_by`
-/// is what is tested, which each stand alone, it is given the key.
+/// is what is tested, which each stand alone, it is given the key. A rounding to significant
+/// figures is given two, which a number of the dtypes has.
 fn companions(entry: &str, parameter: Option<&str>, key: &Expr) -> Vec<(&'static str, Argument)> {
     match (entry, parameter) {
         ("Expr.over", Some("partition_by" | "order_by")) => Vec::new(),
         ("Expr.over", _) => vec![("partition_by", expressions(vec![key.clone()]))],
+        ("Expr.round_sig_figs", _) => vec![("digits", Argument::Integer(2))],
         _ => Vec::new(),
     }
 }
@@ -172,9 +174,16 @@ fn dtype_jobs() -> Vec<DtypeJob> {
                 });
             }
         }
+        // Python requires at most one; the rest that are needed stand for one another, as the
+        // bounds of `clip` do, and are measured one at a time.
+        let python_required: Vec<_> = parameters
+            .iter()
+            .filter(|parameter| parameter.default() == ParameterDefault::Required)
+            .map(|parameter| parameter.name())
+            .collect();
         for parameter in &parameters {
             assert!(
-                required.iter().all(|name| *name == parameter.name()),
+                python_required.iter().all(|name| *name == parameter.name()),
                 "{} has two parameters that must be given; teach the generator a fitting default \
                  for the one it does not vary",
                 entry.id().as_str()

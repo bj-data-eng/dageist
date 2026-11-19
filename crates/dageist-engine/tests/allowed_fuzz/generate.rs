@@ -17,7 +17,9 @@ use dageist_engine::allowed::{
     self, After, Chosen, ConditionState, Context, Place as OfferPlace, Position as Slot,
     Representative, Shape, Verdict as OfferVerdict,
 };
-use dageist_engine::catalog::{self, Applies, Entry, Kind, ParameterDefault, Shape as ParamShape};
+use dageist_engine::catalog::{
+    self, Applies, Entry, Kind, ParameterDefault, Shape as ParamShape, ValueType,
+};
 use dageist_engine::document::{Call, Document, Dtype, Expression, Start, Step, StepId, Value};
 use dageist_fuzz::generation::Entropy;
 
@@ -1001,6 +1003,7 @@ impl Gen<'_> {
             };
             given.push((name, value));
         }
+        given.extend(self.whole_numbers(entry));
         given.extend(self.options(entry));
         if id == "Expr.over" {
             let ordered = given.iter().any(|(name, _)| *name == "order_by");
@@ -1036,6 +1039,30 @@ impl Gen<'_> {
         }
         let call = Call::new(entry, given).ok()?;
         Some((call, dtypes))
+    }
+
+    /// The whole numbers a method is given for the parameters that take one, as the places a
+    /// rounding keeps and the significant figures it keeps. The values are those that Polars
+    /// accepts: a number of significant figures below one is refused when rows run, for every
+    /// dtype alike, which the tables, measured with two, do not say. They include the places
+    /// from which Polars leaves a float as it is, which differ for each width of float.
+    fn whole_numbers(&mut self, entry: &'static Entry) -> Vec<(&'static str, Value)> {
+        let mut given = Vec::new();
+        for parameter in entry.parameters() {
+            if parameter.kind() != Kind::Value(ValueType::Integer) {
+                continue;
+            }
+            if !parameter.is_needed() && !self.draw.chance(40) {
+                continue;
+            }
+            let values: &[i64] = match parameter.name() {
+                "digits" => &[1, 2, 3, 6, 15, 40],
+                "decimals" => &[0, 1, 2, 3, 5, 12, 50, 310, 400],
+                other => panic!("the generator does not know what to give {other}"),
+            };
+            given.push((parameter.name(), Value::Integer(self.draw.pick(values))));
+        }
+        given
     }
 
     fn literal_loose_text(&mut self) -> (Call, Option<Representative>) {

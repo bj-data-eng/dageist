@@ -69,6 +69,18 @@ impl Loose {
     }
 }
 
+impl Loose {
+    /// The dtype the number has as a bound of a value of the class `other`, which is cast to it:
+    /// the class itself where the number fits it, and for a number with a fraction beside whole
+    /// numbers, which Polars cuts to a whole number, that class too. A whole number the class
+    /// cannot hold is refused when rows run, where an operand's would widen the dtype, so the
+    /// tables cannot say what it gives, and neither can they beside what is no number.
+    pub(crate) fn cut_to(self, other: Representative) -> Option<Representative> {
+        let cut = matches!(self.0, Number::Float) && is_integer(other);
+        (self.fits(other) || cut).then_some(other)
+    }
+}
+
 /// Whether the whole number `value` fits the class, as Polars adapts a number
 /// typed without a dtype to a column of it.
 fn integer_fits(value: i64, class: Representative) -> bool {
@@ -136,14 +148,22 @@ pub(crate) fn is_count(entry: &Entry, name: &str) -> bool {
 
 /// Whether Polars adapts a number typed without a dtype that is the parameter
 /// `name` of the method `entry` to what the method follows, as it does the operand
-/// of arithmetic and of a comparison, the value `shift` fills with, an exponent and
-/// what a value is divided by. A method takes other expressions that do not meet what
+/// of arithmetic and of a comparison, the value `shift` fills with, an exponent, what a value
+/// is divided by and a bound. A method takes other expressions that do not meet what
 /// it follows as an operand does: a key to group or order by, or the duration to
 /// offset a date by.
 pub(crate) fn operand_adapts(entry: &Entry, name: &str) -> bool {
     matches!(
         role(entry, name),
-        Some(Role::Operand | Role::Filler | Role::Exponent | Role::Divisor | Role::FloorDivisor)
+        Some(
+            Role::Operand
+                | Role::Filler
+                | Role::Exponent
+                | Role::Divisor
+                | Role::FloorDivisor
+                | Role::Base
+                | Role::Bound
+        )
     )
 }
 
@@ -151,20 +171,26 @@ pub(crate) fn operand_adapts(entry: &Entry, name: &str) -> bool {
 /// the method gives unresolved: an integer raised to a number with a fraction is the unresolved
 /// float the number is. A select resolves it to a `Float64` where it ends, a sort key or a join's
 /// key does not, and an operand it meets adapts it as it does the number, so `f32 / (i8 ** 1.5)`
-/// is a `Float32`: what it gives is not a dtype the tables can say.
+/// is a `Float32`: what it gives is not a dtype the tables can say. The same holds for a
+/// logarithm of a whole number, a `Boolean` or a `Decimal` to such a base.
 pub(crate) fn is_left_unresolved(
     entry: &Entry,
     name: &str,
     number: Loose,
     receiver: Representative,
 ) -> bool {
-    role(entry, name) == Some(Role::Exponent) && !number.is_whole() && is_integer(receiver)
+    match role(entry, name) {
+        Some(Role::Exponent) => !number.is_whole() && is_integer(receiver),
+        Some(Role::Base) => !number.is_whole() && !is_float(receiver),
+        _ => false,
+    }
 }
 
 /// The dtype of the number typed without a dtype that is the parameter `name` of the method
 /// `entry`, beside a receiver of the dtype `receiver`, where the tables can say it: that of the
 /// receiver where it fits it, a Boolean for a number with a fraction that a Boolean is floor
-/// divided by, which Polars adapts it to and so refuses the call, and otherwise none.
+/// divided by, which Polars adapts it to and so refuses the call, the receiver for a bound that
+/// it is cast to, and otherwise none.
 pub(crate) fn adapted_dtype(
     entry: &Entry,
     name: &str,
@@ -176,6 +202,9 @@ pub(crate) fn adapted_dtype(
         && receiver == Representative::Boolean
     {
         return Some(Representative::Boolean);
+    }
+    if role(entry, name) == Some(Role::Bound) {
+        return number.cut_to(receiver);
     }
     number.beside(receiver)
 }
@@ -199,7 +228,7 @@ pub(crate) enum Receiver {
 pub(crate) fn receiver_beside(entry: &Entry, name: &str, number: Loose) -> Option<Receiver> {
     match role(entry, name)? {
         Role::Operand | Role::FloorDivisor => Some(Receiver::Adapts),
-        Role::Exponent => Some(Receiver::Keeps),
+        Role::Exponent | Role::Base | Role::Bound => Some(Receiver::Keeps),
         Role::Divisor if number.is_whole() => Some(Receiver::Adapts),
         Role::Divisor => Some(Receiver::Keeps),
         Role::Plain | Role::Filler | Role::Count => None,

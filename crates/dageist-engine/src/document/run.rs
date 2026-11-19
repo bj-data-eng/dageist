@@ -625,6 +625,7 @@ impl Builder<'_> {
                 BuildError::Missing { parameter }
                 | BuildError::WrongKind { parameter, .. }
                 | BuildError::UnknownChoice { parameter, .. }
+                | BuildError::OutOfRange { parameter, .. }
                 | BuildError::Repeated { parameter } => Some((*parameter).to_owned()),
                 BuildError::UnknownParameter { parameter } => Some(parameter.clone()),
                 BuildError::OutOfOrder { .. } | BuildError::Polars(_) => None,

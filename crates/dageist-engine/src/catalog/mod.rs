@@ -83,8 +83,16 @@ pub enum Family {
     Rows,
     /// Running values: `cum_sum`, `cum_count`, `cum_max`.
     Cumulative,
-    /// Arithmetic on values: `add`, `sub`, `mul`, `neg`, `abs`, and the like.
+    /// Arithmetic on values: `add`, `sub`, `mul`, `neg`, `abs`, `sign`, `clip`, and the like.
     Arithmetic,
+    /// Roots, logarithms and the exponential: `sqrt`, `log`, `exp`, and the like, which give a
+    /// float.
+    Maths,
+    /// Angles: `sin`, `arccos`, `tanh`, `degrees`, and the like, which give a float.
+    Trigonometry,
+    /// Rounding a number: `round`, `ceil`, `floor`, `truncate` and `round_sig_figs`, which give
+    /// the dtype they are given.
+    Rounding,
     /// One value for a whole group: `sum`, `min`, `max`, `len`.
     Aggregate,
     /// Dates and times: the `dt` namespace.
@@ -104,11 +112,14 @@ pub enum Family {
 
 impl Family {
     /// Every family, in the order they are offered.
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 14] = [
         Self::Steps,
         Self::Rows,
         Self::Cumulative,
         Self::Arithmetic,
+        Self::Maths,
+        Self::Trigonometry,
+        Self::Rounding,
         Self::Aggregate,
         Self::Temporal,
         Self::Window,
@@ -126,6 +137,9 @@ impl Family {
             Self::Rows => "rows",
             Self::Cumulative => "cumulative",
             Self::Arithmetic => "arithmetic",
+            Self::Maths => "maths",
+            Self::Trigonometry => "trigonometry",
+            Self::Rounding => "rounding",
             Self::Aggregate => "aggregate",
             Self::Temporal => "temporal",
             Self::Window => "window",
@@ -294,6 +308,19 @@ pub enum Role {
     /// Boolean is a Boolean, which Polars cannot floor divide, though it floor divides a
     /// Boolean by a typed float.
     FloorDivisor,
+    /// The base of a logarithm, as `log`'s `base` is. A number typed without a dtype adapts to the
+    /// value the method follows, where that is a float, as an operand's does, but the value the
+    /// method follows does not adapt to it. A number with a fraction beside a value that is no
+    /// float, a whole number or a `Boolean`, leaves the result the unresolved float the number is,
+    /// which a select resolves to a `Float64` where it ends and a sort key or a join's key does
+    /// not.
+    Base,
+    /// A limit a value is held to, as `clip`'s bounds are. A number typed without a dtype is cast
+    /// to the dtype of the value the method follows, as strictly as Polars can: it refuses a
+    /// number that dtype cannot hold, where an operand's would widen the dtype, and cuts a number
+    /// with a fraction to a whole number beside whole numbers. The value the method follows does
+    /// not adapt to it, and keeps the dtype it has.
+    Bound,
 }
 
 /// Whether the expressions a parameter holds write columns of the table the
@@ -350,13 +377,15 @@ impl Parameter {
         }
     }
 
-    /// The same parameter, a starred one of which a step always gives at least one, though
-    /// Python takes none: `and_` and `or_` are the expression they follow without an operand,
-    /// which is no use to a step, so they are judged with one.
+    /// The same parameter, of which a step always gives at least one, though Python takes none:
+    /// `and_` and `or_` are the expression they follow without an operand, and `clip` is it
+    /// without a bound, which is no use to a step, so they are judged with one. The parameter is
+    /// a starred one, or one of several that stand for one another, as `clip`'s two bounds do.
     const fn with_at_least_one(mut self) -> Self {
         assert!(
-            matches!(self.variadic, Some(Variadic::Args)),
-            "only a starred parameter is one of which a step gives at least one"
+            matches!(self.default, ParameterDefault::Python(_))
+                && matches!(self.kind, Kind::Expression(_)),
+            "only an optional parameter that holds expressions is one of which a step gives at least one"
         );
         self.at_least_one = true;
         self
@@ -406,8 +435,9 @@ impl Parameter {
         self.shape
     }
 
-    /// Whether a step gives the parameter: Python requires it, or it is a starred parameter of
-    /// which a step always gives at least one. What is offered is judged with it given.
+    /// Whether a step gives the parameter: Python requires it, or a step always gives at least
+    /// one of it, or of it and the parameters that stand for it. What is offered is judged with it
+    /// given.
     #[must_use]
     pub const fn is_needed(&self) -> bool {
         matches!(self.default, ParameterDefault::Required) || self.at_least_one
