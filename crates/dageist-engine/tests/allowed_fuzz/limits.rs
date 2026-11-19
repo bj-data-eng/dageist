@@ -249,7 +249,13 @@ pub enum Limit {
     /// are given. The tables refusing, when they run rows, with the reason that the schema says
     /// one dtype and the rows give another, at a call after such a window in a chain that
     /// starts from a literal, which Polars allows; the window is why where Polars, asked again
-    /// with each literal partition a column, refuses the case for that reason.
+    /// with each literal partition a column, refuses the case for that reason. The same window,
+    /// and one whose keys, in its partition or its order, are literals that read no column or one
+    /// value each, as an aggregate is, give a window of a value that reads no column no rows, so
+    /// what a replacement is given as its new values has none beside old values of the table's
+    /// rows. Polars refusing the rows, with no place, for the new values of a replacement being
+    /// neither as many as the old nor one, in a case with such a window: the case run again with
+    /// the partition of each a column of the table, which gives it the rows, is not refused for it.
     AWindowOverALiteral,
     /// A drop of nulls can leave no rows, as one of a null literal does, so the rows do not show
     /// a plan that they contradict. The tables hold the schema of a method and what its rows
@@ -461,7 +467,7 @@ impl Limit {
                 "Polars casts a bound of clip, and the values a replacement lists, to the dtype of what they follow and refuses a value that dtype cannot hold, which the tables measured only with values it holds"
             }
             Self::AWindowOverALiteral => {
-                "a window over a literal partition gives no rows, so the rows do not show the plan of what follows it"
+                "a window of a literal that has no key for each row gives no rows, so the rows do not show the plan of what follows it, and what it gives has no values"
             }
             Self::ADropLeavesNoRows => {
                 "a drop of nulls can leave no rows, so the rows do not show the plan of what follows it"
@@ -1999,17 +2005,18 @@ fn partitions_by_a_literal(call: &Call) -> bool {
         && keys("more_exprs").iter().all(literal)
 }
 
-/// `value` with the partition of every window that partitions by a literal made the column
+/// `value` with the partition of every window that `windowed` says yes to made the column
 /// `column`, in the calls it holds.
-fn value_partitioned_by(value: &Value, column: &str) -> Value {
+fn value_partitioned_by(value: &Value, column: &str, windowed: &dyn Fn(&Call) -> bool) -> Value {
     match value {
         Value::Expression(expression) => Value::Expression(
-            expression_partitioned_by(expression, column).unwrap_or_else(|| expression.clone()),
+            expression_partitioned_by(expression, column, windowed)
+                .unwrap_or_else(|| expression.clone()),
         ),
         Value::Many(items) => Value::Many(
             items
                 .iter()
-                .map(|item| value_partitioned_by(item, column))
+                .map(|item| value_partitioned_by(item, column, windowed))
                 .collect(),
         ),
         Value::Pairs(pairs) => Value::Pairs(
@@ -2017,8 +2024,8 @@ fn value_partitioned_by(value: &Value, column: &str) -> Value {
                 .iter()
                 .map(|(key, entry)| {
                     (
-                        value_partitioned_by(key, column),
-                        value_partitioned_by(entry, column),
+                        value_partitioned_by(key, column, windowed),
+                        value_partitioned_by(entry, column, windowed),
                     )
                 })
                 .collect(),
@@ -2027,67 +2034,120 @@ fn value_partitioned_by(value: &Value, column: &str) -> Value {
     }
 }
 
-fn call_partitioned_by(call: &Call, column: &str) -> Option<Call> {
-    let windowed = partitions_by_a_literal(call);
-    let given: Vec<(&str, Value)> = call
+fn call_partitioned_by(
+    call: &Call,
+    column: &str,
+    windowed: &dyn Fn(&Call) -> bool,
+) -> Option<Call> {
+    let is_windowed = windowed(call);
+    let by_the_column = || -> Option<Value> {
+        let key = Call::new(
+            catalog::entry("polars.col")?,
+            vec![("name", Value::Columns(vec![column.to_owned()]))],
+        )
+        .ok()?;
+        Some(Value::Many(vec![Value::Expression(
+            Expression::new(Start::Call(key), Vec::new()).ok()?,
+        )]))
+    };
+    let mut given: Vec<(&str, Value)> = call
         .arguments()
         .iter()
         .map(|given| {
-            let value = if windowed && given.parameter() == "partition_by" {
-                let key = Call::new(
-                    catalog::entry("polars.col")?,
-                    vec![("name", Value::Columns(vec![column.to_owned()]))],
-                )
-                .ok()?;
-                Value::Many(vec![Value::Expression(
-                    Expression::new(Start::Call(key), Vec::new()).ok()?,
-                )])
-            } else if windowed && given.parameter() == "more_exprs" {
+            let value = if is_windowed && given.parameter() == "partition_by" {
+                by_the_column()?
+            } else if is_windowed && given.parameter() == "more_exprs" {
                 Value::Many(Vec::new())
             } else {
-                value_partitioned_by(given.value(), column)
+                value_partitioned_by(given.value(), column, windowed)
             };
             Some((given.parameter(), value))
         })
         .collect::<Option<Vec<_>>>()?;
+    if is_windowed && call.argument("partition_by").is_none() {
+        given.push(("partition_by", by_the_column()?));
+    }
     Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
 }
 
-fn expression_partitioned_by(expression: &Expression, column: &str) -> Option<Expression> {
+fn expression_partitioned_by(
+    expression: &Expression,
+    column: &str,
+    windowed: &dyn Fn(&Call) -> bool,
+) -> Option<Expression> {
     let start = match expression.start() {
-        Start::Call(call) => Start::Call(call_partitioned_by(call, column)?),
+        Start::Call(call) => Start::Call(call_partitioned_by(call, column, windowed)?),
         other => other.clone(),
     };
     let links = expression
         .links()
         .iter()
-        .map(|link| call_partitioned_by(link, column))
+        .map(|link| call_partitioned_by(link, column, windowed))
         .collect::<Option<Vec<_>>>()?;
     Expression::new(start, links).ok()
 }
 
-/// The case with the partition of every window that partitions by a literal made a column of
-/// the table the expression is read against, the same in all else. None in a pivot's
-/// aggregate, which has no column to stand in.
-fn case_with_columns_to_partition_by(case: &Case, refused: &Refused) -> Option<Case> {
+/// The case with the partition of every window that `windowed` says yes to made a column of the
+/// table the expression is read against, the same in all else. None in a pivot's aggregate, which
+/// has no column to stand in.
+fn case_with_windows_partitioned(
+    case: &Case,
+    at: Option<&Segment>,
+    windowed: &dyn Fn(&Call) -> bool,
+) -> Option<Case> {
     let step = &case.document.steps()[0];
     if is(step.call(), "LazyFrame.pivot") {
         return None;
     }
-    let column = match (
-        is(step.call(), "LazyFrame.join"),
-        refused.place.path().first(),
-    ) {
+    let column = match (is(step.call(), "LazyFrame.join"), at) {
         (true, Some(Segment::Parameter(name))) if name == "right_on" => "rk",
         (true, Some(Segment::Parameter(name))) if name == "on" => "u",
         _ => "k",
     };
-    let rebuilt = Step::new(step.id().clone(), call_partitioned_by(step.call(), column)?).ok()?;
+    let rebuilt = Step::new(
+        step.id().clone(),
+        call_partitioned_by(step.call(), column, windowed)?,
+    )
+    .ok()?;
     Some(Case {
         receiver: case.receiver,
         argument: case.argument,
         document: Document::new(vec![rebuilt]).ok()?,
     })
+}
+
+/// The case with the partition of every window that partitions by a literal made a column.
+fn case_with_columns_to_partition_by(case: &Case, refused: &Refused) -> Option<Case> {
+    case_with_windows_partitioned(case, refused.place.path().first(), &partitions_by_a_literal)
+}
+
+/// Whether the call is a window none of whose keys, in its partition or its order, holds a value
+/// for each row: each is a literal that reads no column, or holds one value, as an aggregate is.
+/// Polars gives such a window of a value that reads no column no rows.
+fn has_no_key_for_each_row(call: &Call) -> bool {
+    let keys = |parameter: &str| -> Vec<&Expression> {
+        match call.argument(parameter) {
+            Some(Value::Expression(key)) => vec![key],
+            Some(Value::Many(items)) => items
+                .iter()
+                .filter_map(|item| match item {
+                    Value::Expression(key) => Some(key),
+                    _ => None,
+                })
+                .collect(),
+            _ => Vec::new(),
+        }
+    };
+    let all: Vec<&Expression> = ["partition_by", "more_exprs", "order_by"]
+        .iter()
+        .flat_map(|parameter| keys(parameter))
+        .collect();
+    is(call, "Expr.over")
+        && !all.is_empty()
+        && all.iter().all(|key| {
+            (starts_from_a_literal(key) && !any_call(key, &|call| is(call, "polars.col")))
+                || any_call(key, &is_one_value)
+        })
 }
 
 /// Whether Polars refuses the case for the reason the tables gave once each window that
@@ -2099,6 +2159,23 @@ fn refused_with_columns_to_partition_by(case: &Case, refused: &Refused) -> bool 
             observe(&control)
                 .refusal
                 .is_some_and(|refusal| refusal.reason == refused.reason)
+        })
+    })
+}
+
+/// Whether Polars refuses the case for the new values of a replacement being fewer than the old
+/// still when each window that has no key for each row has a column to partition by, which gives
+/// it the rows: the window is then no cause of it, and the table's rows are.
+fn refused_for_new_values_with_columns_to_partition_by(case: &Case) -> Option<bool> {
+    changed(
+        case_with_windows_partitioned(case, None, &has_no_key_for_each_row),
+        case,
+    )
+    .map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control).refusal.is_some_and(|refusal| {
+                unplaced(&refusal) && refusal.reason.contains(NEW_AS_LONG_AS_OLD)
+            })
         })
     })
 }
@@ -2953,6 +3030,18 @@ fn applies(
                         && chain.links()[..at].iter().any(partitions_by_a_literal)
                 })
                 && refused_with_columns_to_partition_by(case, refused)
+        }
+        (Limit::AWindowOverALiteral, Disagreement::PolarsRefuses(refusal)) => {
+            // A window of a value that reads no column, none of whose keys holds a value for each
+            // row, gives no rows, so what it is given as the new values of a replacement is none
+            // where the table's rows are three.
+            unplaced(refusal)
+                && refusal.stage == Stage::Rows
+                && refusal.reason.contains(NEW_AS_LONG_AS_OLD)
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &has_no_key_for_each_row))
+                && refused_for_new_values_with_columns_to_partition_by(case) == Some(false)
         }
         (Limit::ADropLeavesNoRows, Disagreement::PolarsAllows(refused)) => {
             // The rows are none where a drop of nulls meets a value that is all nulls, so the
