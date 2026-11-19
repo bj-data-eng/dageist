@@ -307,6 +307,31 @@ fn an_integer_raised_to_a_fraction_adapts_to_what_it_meets_and_is_not_said_to_be
 }
 
 #[test]
+fn a_boolean_floor_divided_by_a_number_with_a_fraction_is_refused_as_polars_refuses_it() {
+    // Polars adapts the number to a Boolean, which it cannot floor divide, though it divides a
+    // Boolean by a typed float, and takes the whole number 1 and the other arithmetic with the
+    // number as they are: `f // 1.5` is refused, `f // 1` and `f * 1.5` are not.
+    let refused = |method: &str, number: Value| {
+        let item = on_a_column("f", call(method, json!({ "other": number })));
+        let text = document(vec![step(
+            "s",
+            "LazyFrame.select",
+            json!({ "exprs": many(vec![item]) }),
+        )]);
+        let document = Document::read(&text).expect("a document");
+        let walk = document.steps()[0].walk(0, source().schema(), &Inputs::new());
+        walk.refusal().is_some()
+    };
+    let runs = |expression: Expr| source().lazy().select([expression]).collect().is_ok();
+    assert!(!runs(col("f").floor_div(lit(1.5))));
+    assert!(refused("Expr.floordiv", fraction(1.5)));
+    assert!(runs(col("f").floor_div(lit(1))));
+    assert!(!refused("Expr.floordiv", whole(1)));
+    assert!(runs(col("f") * lit(1.5)));
+    assert!(!refused("Expr.mul", fraction(1.5)));
+}
+
+#[test]
 fn a_comparison_with_a_number_is_a_boolean_whatever_dtype_the_number_takes() {
     // The result of a comparison does not depend on the dtype of its operand, so it is known
     // beside a column the number fits and beside one it does not.
