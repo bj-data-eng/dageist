@@ -928,6 +928,9 @@ impl Gen<'_> {
         // Whether a window is given `partition_by`, which Polars takes without
         // `order_by` and `order_by` without it, and refuses neither.
         let mut partitioned = true;
+        // Which bounds a `clip` is given: one of them, or both, for a step gives at least one and
+        // Polars builds each alone differently.
+        let bounds = self.draw.below(3);
         for parameter in entry.parameters() {
             if !matches!(parameter.kind(), Kind::Expression(_)) {
                 continue;
@@ -935,6 +938,8 @@ impl Gen<'_> {
             let name = parameter.name();
             let required = parameter.is_needed();
             let given_it = match (id, name) {
+                ("Expr.clip", "lower_bound") => bounds != 1,
+                ("Expr.clip", "upper_bound") => bounds != 0,
                 (_, _) if required => true,
                 ("Expr.over", "partition_by") => {
                     partitioned = self.draw.chance(80);
