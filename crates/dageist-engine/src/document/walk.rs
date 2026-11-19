@@ -1359,12 +1359,19 @@ fn is_the_expression_it_follows(link: &Call) -> bool {
         }
 }
 
-/// Whether the link `at` of `expression` is the first that Polars meets after its start, which
-/// the links before it that are the expression they follow do not change.
+/// Whether the calls of `expression` before the link `at` leave its start as it was, for Polars
+/// does not make a node of a call that is the expression it follows, and simplifies a not of a
+/// not away: the link `at` is then the first it meets after the start.
 fn follows_the_start(expression: &Expression, at: usize) -> bool {
-    expression.links()[..at]
-        .iter()
-        .all(is_the_expression_it_follows)
+    let mut nots = 0_usize;
+    for link in &expression.links()[..at] {
+        if link.entry().id().as_str() == "Expr.not_" {
+            nots += 1;
+        } else if !is_the_expression_it_follows(link) {
+            return false;
+        }
+    }
+    nots % 2 == 0
 }
 
 /// The calls of an expression: its start, then its links.
@@ -1483,10 +1490,11 @@ fn reads_a_column(expression: &Expression) -> bool {
         .any(|call| operands(call).into_iter().any(reads_a_column))
 }
 
-/// Whether an expression is a null literal and no more, as it is where only calls that are the
-/// expression they follow come after it.
+/// Whether an expression is a null literal and no more, as it is where only calls that leave it
+/// as it was come after it: calls that are the expression they follow, and nots that undo each
+/// other.
 fn is_a_null(expression: &Expression) -> bool {
-    expression.links().iter().all(is_the_expression_it_follows) && starts_from_a_null(expression)
+    follows_the_start(expression, expression.links().len()) && starts_from_a_null(expression)
 }
 
 /// Whether an expression starts from a null literal.
