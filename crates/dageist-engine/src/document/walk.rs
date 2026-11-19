@@ -1553,11 +1553,31 @@ fn holds_a_null_comparison(expression: &Expression) -> bool {
         .map(|(at, _)| at + usize::from(start.is_some()))
         .max()
         .unwrap_or(0);
+    // A comparison with a null is a null whatever it is given, so what it is given that is one
+    // value or literals alone is not evaluated either, and a comparison of a column with a null
+    // in it is not one Polars meets.
+    let folds = |at: usize, link: &Call| {
+        is_a_comparison(link)
+            && (operands(link).into_iter().any(is_a_null)
+                || (starts_from_a_null(expression) && follows_the_start(expression, at)))
+    };
     start
         .into_iter()
-        .chain(expression.links())
+        .map(|call| (call, false))
+        .chain(
+            expression
+                .links()
+                .iter()
+                .enumerate()
+                .map(|(at, link)| (link, folds(at, link))),
+        )
         .skip(dropped)
-        .any(|call| operands(call).into_iter().any(holds_a_null_comparison))
+        .any(|(call, folded)| {
+            operands(call)
+                .into_iter()
+                .filter(|operand| !(folded && wholly_single(operand, operand.links().len(), true)))
+                .any(holds_a_null_comparison)
+        })
 }
 
 /// Whether a key is not elementwise, as Polars takes it: it holds an aggregate
