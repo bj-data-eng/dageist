@@ -942,6 +942,12 @@ what surrounds it, after the limits, in these ways:
   there, and so is the column alone. A refusal that the control meets too, as a
   filter's predicate that is not a `Boolean`, or a panic that has no part in the
   mismatch, shows nothing;
+- for a refusal by the rule that a predicate be a `Boolean`, where Polars refuses the predicate
+  as written for another call it holds, one the tables allow without knowing the dtype of an
+  argument, or does not evaluate it at all, as under the length of a condition, a column of the
+  dtype that Polars gave the end of the predicate, as the predicate of the same kind. Polars
+  refuses a column of that dtype as a predicate for the reason the rule gives wherever it
+  evaluates it;
 - for a call the tables refused without knowing the dtype of an argument (a window
   whose options the tables were not measured with, or a number given no dtype), the
   part as written, alone. The tables refuse such a call only when no dtype the
