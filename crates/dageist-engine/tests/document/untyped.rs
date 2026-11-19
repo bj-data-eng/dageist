@@ -184,6 +184,74 @@ fn a_number_that_fits_the_column_it_is_used_with_gives_what_polars_gives() {
 }
 
 #[test]
+fn a_number_raised_to_a_power_or_divided_keeps_the_dtype_polars_gives_it() {
+    // A number in front of `**` is no operand that adapts: `2 ** u8` is an `Int32`, as the number
+    // is alone, and `2 ** f32` a `Float32`, which the exponent decides. A number with a fraction
+    // in front of `/` is a `Float64` beside any float, where a whole number adapts to the float:
+    // `1.5 / f32` is a `Float64` and `2 / f32` a `Float32`.
+    let number = |value: i64| call("polars.lit", json!({ "value": { "integer": value } }));
+    let fractional = |value: f64| call("polars.lit", json!({ "value": { "float": value } }));
+    let cases = [
+        (
+            chain(
+                number(2),
+                vec![call("Expr.pow", json!({ "exponent": field("u8") }))],
+            ),
+            lit(2).pow(col("u8")),
+            Representative::Int32,
+        ),
+        (
+            chain(
+                number(2),
+                vec![call("Expr.pow", json!({ "exponent": field("f32") }))],
+            ),
+            lit(2).pow(col("f32")),
+            Representative::Float32,
+        ),
+        (
+            chain(
+                fractional(1.5),
+                vec![call("Expr.pow", json!({ "exponent": field("u8") }))],
+            ),
+            lit(1.5).pow(col("u8")),
+            Representative::Float64,
+        ),
+        (
+            chain(
+                fractional(1.5),
+                vec![call("Expr.truediv", json!({ "other": field("f32") }))],
+            ),
+            lit(1.5) / col("f32"),
+            Representative::Float64,
+        ),
+        (
+            chain(
+                number(2),
+                vec![call("Expr.truediv", json!({ "other": field("f32") }))],
+            ),
+            lit(2) / col("f32"),
+            Representative::Float32,
+        ),
+        (
+            chain(
+                number(2),
+                vec![call("Expr.truediv", json!({ "other": field("u8") }))],
+            ),
+            lit(2) / col("u8"),
+            Representative::Float64,
+        ),
+    ];
+    for (item, expression, expected) in cases {
+        assert_eq!(polars(expression), Some(expected), "what Polars gives");
+        assert_eq!(
+            walked(item.clone()),
+            Some(expected),
+            "what the walk gives {item}"
+        );
+    }
+}
+
+#[test]
 fn a_comparison_with_a_number_is_a_boolean_whatever_dtype_the_number_takes() {
     // The result of a comparison does not depend on the dtype of its operand, so it is known
     // beside a column the number fits and beside one it does not.
@@ -397,6 +465,33 @@ fn a_number_beside_any_dtype_is_known_only_as_polars_gives_it() {
     // The walk knows what a number that fits gives and what a comparison gives, and not what
     // every number beside every dtype gives.
     assert!(known > 100, "the walk knew {known} of them");
+}
+
+#[test]
+fn a_number_beside_any_dtype_in_arithmetic_and_logic_is_known_only_as_polars_gives_it() {
+    let known = numbers_beside_every_dtype(&[
+        Operation::new("Expr.add", |left, right| left + right),
+        Operation::new("Expr.mul", |left, right| left * right),
+        Operation::new("Expr.truediv", |left, right| left.true_div(right)),
+        Operation::new("Expr.floordiv", |left, right| left.floor_div(right)),
+        Operation::new("Expr.mod", |left, right| left % right),
+        Operation {
+            parameter: "exponent",
+            ..Operation::new("Expr.pow", |left, right| left.pow(right))
+        },
+        Operation::new("Expr.xor", |left, right| left.xor(right)),
+        Operation {
+            parameter: "others",
+            list: true,
+            ..Operation::new("Expr.and_", |left, right| left.and(right))
+        },
+        Operation {
+            parameter: "others",
+            list: true,
+            ..Operation::new("Expr.or_", |left, right| left.or(right))
+        },
+    ]);
+    assert!(known > 500, "the walk knew {known} of them");
 }
 
 #[test]
