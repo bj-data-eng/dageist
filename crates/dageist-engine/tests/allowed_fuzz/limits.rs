@@ -2095,6 +2095,7 @@ mod tests {
                 reason: reason.to_owned(),
             }),
             expressions: Vec::new(),
+            ..Observed::default()
         };
         excuses(case, &prediction(Verdict::Allows, traced), &observed)
     }
@@ -2117,6 +2118,7 @@ mod tests {
                 reason: reason.to_owned(),
             }),
             expressions: Vec::new(),
+            ..Observed::default()
         };
         excuses(case, &prediction, &observed)
     }

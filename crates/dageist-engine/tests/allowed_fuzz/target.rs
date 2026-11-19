@@ -394,6 +394,15 @@ impl CaseTarget for AllowedTarget {
         if case.document.steps()[0].call().entry().id().as_str() == "LazyFrame.pivot" {
             tally("pivot case");
         }
+        // One column of the other table holds one dtype, so no dtype of it fits keys that Polars
+        // gives different ones, and the join is refused for that, which is no matter of the
+        // tables.
+        if observed.keys_conflict {
+            tally("join keys of different dtypes share a column");
+            return CaseOutcome::unsupported(
+                "one column of the other table is paired with keys of different dtypes",
+            );
+        }
         let allowance = Self::property(ALLOWANCE);
         let dtypes = Self::property(DTYPES);
         let seen = || {
@@ -849,6 +858,24 @@ mod tests {
         // which the tables are not asked about.
         let (outcome, _) = evaluated_and_tallied(TWO_KEYS_OF_DIFFERENT_DTYPES_SHARING_A_COLUMN);
         assert_eq!(
+            outcome.kind(),
+            dageist_fuzz::OutcomeKind::Unsupported,
+            "{outcome:?}"
+        );
+    }
+
+    #[test]
+    fn a_join_that_pairs_one_column_with_keys_of_the_same_dtype_is_still_a_case() {
+        // The same two keys, both the column `k`, paired with the one column `key`.
+        let key = r#"{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[]}}"#;
+        let bare = r#"{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["key"]}}},"then":[]}}"#;
+        let text = format!(
+            r#"{{"a":"Date","b":"Date","revision":1}}
+{{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.join","arguments":{{"other":{{"table":"other"}},"left_on":{{"many":[{key},{key}]}},"right_on":{{"many":[{bare},{bare}]}}}}}}}}]}}"#
+        );
+        let text: &'static str = Box::leak(text.into_boxed_str());
+        let (outcome, _) = evaluated_and_tallied(text);
+        assert_ne!(
             outcome.kind(),
             dageist_fuzz::OutcomeKind::Unsupported,
             "{outcome:?}"
