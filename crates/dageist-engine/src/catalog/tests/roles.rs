@@ -5,7 +5,7 @@
 use crate::catalog::{self, Role};
 
 #[test]
-fn only_the_operands_the_fill_and_the_row_count_have_a_role() {
+fn only_the_operands_the_fill_the_row_count_the_power_and_the_divisors_have_a_role() {
     let mut found: Vec<(&str, &str, Role)> = catalog::entries()
         .iter()
         .flat_map(|entry| {
@@ -20,15 +20,24 @@ fn only_the_operands_the_fill_and_the_row_count_have_a_role() {
     assert_eq!(
         found,
         [
+            ("Expr.add", "other", Role::Operand),
+            ("Expr.and_", "others", Role::Operand),
             ("Expr.eq", "other", Role::Operand),
+            ("Expr.floordiv", "other", Role::FloorDivisor),
             ("Expr.ge", "other", Role::Operand),
             ("Expr.gt", "other", Role::Operand),
             ("Expr.le", "other", Role::Operand),
             ("Expr.lt", "other", Role::Operand),
+            ("Expr.mod", "other", Role::Operand),
+            ("Expr.mul", "other", Role::Operand),
             ("Expr.ne", "other", Role::Operand),
+            ("Expr.or_", "others", Role::Operand),
+            ("Expr.pow", "exponent", Role::Exponent),
             ("Expr.shift", "fill_value", Role::Filler),
             ("Expr.shift", "n", Role::Count),
             ("Expr.sub", "other", Role::Operand),
+            ("Expr.truediv", "other", Role::Divisor),
+            ("Expr.xor", "other", Role::Operand),
         ]
     );
 }
@@ -65,4 +74,27 @@ fn a_parameter_that_holds_one_value_for_each_item_of_another_is_a_flag_or_a_choi
             ("LazyFrame.sort", "nulls_last")
         ]
     );
+}
+
+#[test]
+fn a_parameter_that_is_needed_without_being_required_is_a_starred_one() {
+    // A step always gives at least one of a starred parameter that Python takes none of, as
+    // `and_` and `or_`: the mark means nothing on any other parameter.
+    let mut marked = Vec::new();
+    for entry in catalog::entries() {
+        for parameter in entry.parameters() {
+            let required = parameter.default() == catalog::ParameterDefault::Required;
+            if parameter.is_needed() && !required {
+                assert_eq!(
+                    parameter.variadic(),
+                    Some(catalog::Variadic::Args),
+                    "{} {}",
+                    entry.id().as_str(),
+                    parameter.name()
+                );
+                marked.push((entry.id().as_str(), parameter.name()));
+            }
+        }
+    }
+    assert_eq!(marked, [("Expr.and_", "others"), ("Expr.or_", "others")]);
 }

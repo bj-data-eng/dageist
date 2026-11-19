@@ -4,7 +4,6 @@
 //! constructors, so what they refuse is not offered, and nothing is repaired.
 
 use dageist_engine::allowed::Representative;
-use dageist_engine::catalog::ParameterDefault;
 use dageist_engine::document::{Call, Document, Expression, Step, Value};
 
 use super::case::Case;
@@ -58,9 +57,10 @@ fn call_alternatives(call: &Call) -> Vec<Call> {
     for at in 0..given.len() {
         // A parameter that must be given is not left out: a call without it
         // is a different mistake, not a smaller case of the same one.
-        let required = entry.parameters().iter().any(|parameter| {
-            parameter.name() == given[at].0 && parameter.default() == ParameterDefault::Required
-        });
+        let required = entry
+            .parameters()
+            .iter()
+            .any(|parameter| parameter.name() == given[at].0 && parameter.is_needed());
         if !required {
             let mut without = given.clone();
             without.remove(at);

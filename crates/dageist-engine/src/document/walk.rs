@@ -24,7 +24,10 @@ use crate::allowed::{
     self, After, Chosen, ConditionState, Context, Ending, Literal, Nested, Outer,
     Place as OfferPlace, Position as Slot, Refusal, Representative, Shape, Unknown, Verdict,
 };
-use crate::allowed::{Loose, is_count, is_required, operand_adapts, receiver_adapts};
+use crate::allowed::{
+    Loose, Receiver, adapted_dtype, is_count, is_left_unresolved, is_required, operand_adapts,
+    receiver_beside,
+};
 use crate::catalog::{Applies, Comparison, Entry, Kind, Role};
 
 use super::error::{Place, Segment};
@@ -410,7 +413,8 @@ fn loose_number(call: &Call) -> Option<Loose> {
 }
 
 /// Whether a method takes an operand besides what it follows, which a number
-/// typed without a dtype adapts to: arithmetic, comparisons, a fill value.
+/// typed without a dtype adapts to or keeps its dtype beside: arithmetic,
+/// comparisons, a fill value, an exponent.
 fn takes_an_operand(entry: &Entry) -> bool {
     entry.applies() == Applies::Expression
         && entry.parameters().iter().any(|parameter| {
@@ -994,23 +998,44 @@ impl Walker<'_> {
         } = around;
         let entry = link.entry();
         // A number typed without a dtype that a method takes another operand beside adapts to
-        // it, as the dtype of that operand where it fits it. Where there is no such operand the
-        // tables, measured with typed columns, cannot say what it follows.
+        // it, as the dtype of that operand where it fits it, or keeps the dtype it has alone, as
+        // the base of a power does. Where there is no such operand the tables, measured with typed
+        // columns, cannot say what it follows.
         let cur = match (cur, receiver_loose) {
-            (Cur::Value { shape, .. }, Some(number)) if takes_an_operand(entry) => Cur::Value {
-                dtype: arguments
+            (
+                Cur::Value {
+                    shape,
+                    dtype: alone,
+                },
+                Some(number),
+            ) if takes_an_operand(entry) => {
+                let meetings: Vec<(Receiver, &Operand)> = arguments
                     .iter()
-                    .filter(|(name, operand)| {
-                        receiver_adapts(entry, name) && operand.loose.is_none()
+                    .filter_map(|(name, operand)| {
+                        receiver_beside(entry, name, number).map(|meeting| (meeting, operand))
                     })
-                    .map(|(_, operand)| operand.dtype)
-                    .collect::<Option<Vec<_>>>()
-                    .and_then(|dtypes| match dtypes.as_slice() {
-                        [dtype] => number.beside(*dtype),
-                        _ => None,
-                    }),
-                shape,
-            },
+                    .collect();
+                let keeps = !meetings.is_empty()
+                    && meetings
+                        .iter()
+                        .all(|(meeting, _)| *meeting == Receiver::Keeps);
+                let dtype = if keeps {
+                    alone
+                } else {
+                    meetings
+                        .iter()
+                        .filter(|(meeting, operand)| {
+                            *meeting == Receiver::Adapts && operand.loose.is_none()
+                        })
+                        .map(|(_, operand)| operand.dtype)
+                        .collect::<Option<Vec<_>>>()
+                        .and_then(|dtypes| match dtypes.as_slice() {
+                            [dtype] => number.beside(*dtype),
+                            _ => None,
+                        })
+                };
+                Cur::Value { dtype, shape }
+            }
             (other, _) => other,
         };
         let after = match &cur {
@@ -1057,7 +1082,10 @@ impl Walker<'_> {
                         .loose
                         .zip(receiver)
                         .filter(|_| operand_adapts(entry, name))
-                        .and_then(|(number, receiver)| number.beside(receiver))
+                        .filter(|(number, receiver)| {
+                            !is_left_unresolved(entry, name, *number, *receiver)
+                        })
+                        .and_then(|(number, receiver)| adapted_dtype(entry, name, number, receiver))
                 } else {
                     operand.dtype
                 };
@@ -1320,6 +1348,33 @@ fn is_a_comparison(link: &Call) -> bool {
     Comparison::of_entry(link.entry().id().as_str()).is_some()
 }
 
+/// Whether `link` is the expression it follows, as `and_` and `or_` are where they are given no
+/// operand: Polars does not make a node of the call, so what comes after it meets what comes
+/// before it.
+fn is_the_expression_it_follows(link: &Call) -> bool {
+    matches!(link.entry().id().as_str(), "Expr.and_" | "Expr.or_")
+        && match link.argument("others") {
+            None => true,
+            Some(Value::Many(items)) => items.is_empty(),
+            Some(_) => false,
+        }
+}
+
+/// Whether the calls of `expression` before the link `at` leave its start as it was, for Polars
+/// does not make a node of a call that is the expression it follows, and simplifies a not of a
+/// not away: the link `at` is then the first it meets after the start.
+fn follows_the_start(expression: &Expression, at: usize) -> bool {
+    let mut nots = 0_usize;
+    for link in &expression.links()[..at] {
+        if link.entry().id().as_str() == "Expr.not_" {
+            nots += 1;
+        } else if !is_the_expression_it_follows(link) {
+            return false;
+        }
+    }
+    nots.is_multiple_of(2)
+}
+
 /// The calls of an expression: its start, then its links.
 fn calls_of(expression: &Expression) -> impl Iterator<Item = &Call> {
     std::iter::once(expression.start())
@@ -1337,7 +1392,8 @@ fn folds_a_null(expression: &Expression) -> bool {
     let from_a_null = starts_from_a_null(expression);
     expression.links().iter().enumerate().any(|(at, link)| {
         is_a_comparison(link)
-            && ((from_a_null && at == 0) || operands(link).into_iter().any(is_a_null))
+            && ((from_a_null && follows_the_start(expression, at))
+                || operands(link).into_iter().any(is_a_null))
     }) || calls_of(expression).any(|call| operands(call).into_iter().any(folds_a_null))
 }
 
@@ -1348,7 +1404,8 @@ fn folds_a_null_before(expression: &Expression, upto: usize) -> bool {
     let links = &expression.links()[..upto];
     links.iter().enumerate().any(|(at, link)| {
         is_a_comparison(link)
-            && ((from_a_null && at == 0) || operands(link).into_iter().any(is_a_null))
+            && ((from_a_null && follows_the_start(expression, at))
+                || operands(link).into_iter().any(is_a_null))
     }) || calls_of(expression)
         .take(upto + 1)
         .any(|call| operands(call).into_iter().any(folds_a_null))
@@ -1363,7 +1420,7 @@ fn is_reached_by_a_null(expression: &Expression, at: usize) -> bool {
         && (operands(&expression.links()[at])
             .into_iter()
             .any(|operand| is_a_null(operand) || folds_a_null(operand))
-            || (starts_from_a_null(expression) && at == 0)
+            || (starts_from_a_null(expression) && follows_the_start(expression, at))
             || folds_a_null_before(expression, at))
 }
 
@@ -1434,9 +1491,11 @@ fn reads_a_column(expression: &Expression) -> bool {
         .any(|call| operands(call).into_iter().any(reads_a_column))
 }
 
-/// Whether an expression is a null literal and no more.
+/// Whether an expression is a null literal and no more, as it is where only calls that leave it
+/// as it was come after it: calls that are the expression they follow, and nots that undo each
+/// other.
 fn is_a_null(expression: &Expression) -> bool {
-    expression.links().is_empty() && starts_from_a_null(expression)
+    follows_the_start(expression, expression.links().len()) && starts_from_a_null(expression)
 }
 
 /// Whether an expression starts from a null literal.
@@ -1471,16 +1530,33 @@ fn holds_a_null_comparison(expression: &Expression) -> bool {
                 reads_a_column(operand) && !wholly_single(operand, operand.links().len(), true)
             });
             let column_before = reads && !wholly_single(expression, at, true);
-            let null_start = at == 0 && starts_from_a_null(expression);
+            let null_start = follows_the_start(expression, at) && starts_from_a_null(expression);
             if (null_given && column_before) || (null_start && column_given) {
                 return true;
             }
         }
         reads |= operands(link).into_iter().any(reads_a_column);
     }
+    // A comparison with a null that follows one value or literals alone folds into a null and
+    // drops what it follows, the calls before it and what they are given, unevaluated: a
+    // comparison of a column with a null among them is not one Polars meets.
+    let dropped = expression
+        .links()
+        .iter()
+        .enumerate()
+        .filter(|(at, link)| {
+            is_a_comparison(link)
+                && (operands(link).into_iter().any(is_a_null)
+                    || (starts_from_a_null(expression) && follows_the_start(expression, *at)))
+                && wholly_single(expression, *at, true)
+        })
+        .map(|(at, _)| at + usize::from(start.is_some()))
+        .max()
+        .unwrap_or(0);
     start
         .into_iter()
         .chain(expression.links())
+        .skip(dropped)
         .any(|call| operands(call).into_iter().any(holds_a_null_comparison))
 }
 

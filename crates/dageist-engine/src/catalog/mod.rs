@@ -83,7 +83,7 @@ pub enum Family {
     Rows,
     /// Running values: `cum_sum`, `cum_count`, `cum_max`.
     Cumulative,
-    /// Arithmetic between two values.
+    /// Arithmetic on values: `add`, `sub`, `mul`, `neg`, `abs`, and the like.
     Arithmetic,
     /// One value for a whole group: `sum`, `min`, `max`, `len`.
     Aggregate,
@@ -93,6 +93,9 @@ pub enum Family {
     Window,
     /// Comparisons and tests that give a Boolean.
     Compare,
+    /// Combining and negating truth: `and`, `or`, `xor` and `not`, which work bit
+    /// by bit on whole numbers.
+    Logic,
     /// Where an expression starts: `col`, `lit`.
     Start,
     /// Conditions: `when`, `then`, `otherwise`.
@@ -101,7 +104,7 @@ pub enum Family {
 
 impl Family {
     /// Every family, in the order they are offered.
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::Steps,
         Self::Rows,
         Self::Cumulative,
@@ -110,6 +113,7 @@ impl Family {
         Self::Temporal,
         Self::Window,
         Self::Compare,
+        Self::Logic,
         Self::Start,
         Self::Condition,
     ];
@@ -126,6 +130,7 @@ impl Family {
             Self::Temporal => "temporal",
             Self::Window => "window",
             Self::Compare => "compare",
+            Self::Logic => "logic",
             Self::Start => "start",
             Self::Condition => "condition",
         }
@@ -275,6 +280,20 @@ pub enum Role {
     /// A count or an index of rows, as `shift`'s `n` is. A whole number there is
     /// that dtype and adapts to nothing.
     Count,
+    /// The power a value is raised to, as `pow`'s `exponent` is. A number typed
+    /// without a dtype adapts to the value the method follows, but that value
+    /// does not adapt to it: a number raised to a power is the dtype it has.
+    Exponent,
+    /// What a value is divided by, as `truediv`'s `other` is. A number typed
+    /// without a dtype adapts to the value the method follows, and a whole number
+    /// that the method follows adapts to it, but a number with a fraction that
+    /// the method follows does not: it is a `Float64` divided by any float.
+    Divisor,
+    /// What a value is floor divided by, as `floordiv`'s `other` is. A number typed without
+    /// a dtype adapts as an operand's does, except that a number with a fraction beside a
+    /// Boolean is a Boolean, which Polars cannot floor divide, though it floor divides a
+    /// Boolean by a typed float.
+    FloorDivisor,
 }
 
 /// Whether the expressions a parameter holds write columns of the table the
@@ -313,6 +332,7 @@ pub struct Parameter {
     writes: Writes,
     keyword_only: bool,
     variadic: Option<Variadic>,
+    at_least_one: bool,
 }
 
 impl Parameter {
@@ -326,7 +346,20 @@ impl Parameter {
             writes: Writes::Nothing,
             keyword_only: false,
             variadic: None,
+            at_least_one: false,
         }
+    }
+
+    /// The same parameter, a starred one of which a step always gives at least one, though
+    /// Python takes none: `and_` and `or_` are the expression they follow without an operand,
+    /// which is no use to a step, so they are judged with one.
+    const fn with_at_least_one(mut self) -> Self {
+        assert!(
+            matches!(self.variadic, Some(Variadic::Args)),
+            "only a starred parameter is one of which a step gives at least one"
+        );
+        self.at_least_one = true;
+        self
     }
 
     /// The same parameter, which Python writes with the stars that make it
@@ -371,6 +404,13 @@ impl Parameter {
     #[must_use]
     pub const fn shape(&self) -> Shape {
         self.shape
+    }
+
+    /// Whether a step gives the parameter: Python requires it, or it is a starred parameter of
+    /// which a step always gives at least one. What is offered is judged with it given.
+    #[must_use]
+    pub const fn is_needed(&self) -> bool {
+        matches!(self.default, ParameterDefault::Required) || self.at_least_one
     }
 
     /// What the parameter holds when it is not given, as Python writes it.

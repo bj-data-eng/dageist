@@ -931,7 +931,7 @@ impl Gen<'_> {
                 continue;
             }
             let name = parameter.name();
-            let required = parameter.default() == ParameterDefault::Required;
+            let required = parameter.is_needed();
             let given_it = match (id, name) {
                 (_, _) if required => true,
                 ("Expr.over", "partition_by") => {
@@ -1087,6 +1087,20 @@ fn option_words(call: &Call) -> Vec<(String, String)> {
 mod tests {
     use super::*;
 
+    /// 512 bytes of entropy for each `offset`, as the output of a mixing function of the offset
+    /// and the position, so that the bytes of one input are not a pattern the size of the
+    /// catalogue's list of methods can hide a choice in.
+    fn entropy(offset: u64) -> Vec<u8> {
+        (0..512_u64)
+            .map(|at| {
+                let mut mixed = (offset << 16 | at).wrapping_add(0x9e37_79b9_7f4a_7c15);
+                mixed = (mixed ^ (mixed >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+                mixed = (mixed ^ (mixed >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+                (mixed ^ (mixed >> 31)) as u8
+            })
+            .collect()
+    }
+
     /// Whether the document of `case` holds a `shift` by a whole number below
     /// zero, which is written as a literal of the number.
     fn shifts_back(case: &Case) -> bool {
@@ -1098,14 +1112,6 @@ mod tests {
     fn the_cases_include_a_shift_back_and_a_shift_forward() {
         // The limit for what a shift leaves null follows the direction of the
         // shift, so the target must reach both for a campaign to check it.
-        let entropy = |offset: u64| -> Vec<u8> {
-            (0..512_u64)
-                .map(|at| {
-                    let mixed = (at + offset * 977 + 11).wrapping_mul(0x9e37_79b9_7f4a_7c15);
-                    (mixed >> 29) as u8
-                })
-                .collect()
-        };
         let cases: Vec<Case> = (0..6000_u64)
             .filter_map(|offset| generate(&entropy(offset)))
             .collect();
@@ -1146,14 +1152,6 @@ mod tests {
         // Polars gives a window ordered by a column and given no `partition_by` a
         // dtype, with options or without, and refuses a window given neither, so a
         // campaign checks the first and never draws the second.
-        let entropy = |offset: u64| -> Vec<u8> {
-            (0..512_u64)
-                .map(|at| {
-                    let mixed = (at + offset * 977 + 11).wrapping_mul(0x9e37_79b9_7f4a_7c15);
-                    (mixed >> 29) as u8
-                })
-                .collect()
-        };
         let mut all = Vec::new();
         for case in (0..6000_u64).filter_map(|offset| generate(&entropy(offset))) {
             let document: serde_json::Value =

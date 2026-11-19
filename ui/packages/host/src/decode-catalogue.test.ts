@@ -59,6 +59,7 @@ describe('the catalogue the host sends', () => {
       'temporal',
       'window',
       'compare',
+      'logic',
       'start',
       'condition',
     ]);

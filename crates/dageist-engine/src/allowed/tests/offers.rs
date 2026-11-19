@@ -927,6 +927,35 @@ fn a_condition_predicate_that_is_not_boolean_cannot_end_the_predicate() {
 }
 
 #[test]
+fn and_and_or_are_offered_only_where_some_operand_is_allowed() {
+    // Given no operand they are the expression they follow, so Polars allows them on any dtype,
+    // but a step always gives them one: they are judged as they stand with an operand, which
+    // some dtype of operand must fit.
+    for id in ["Expr.and_", "Expr.or_"] {
+        for refused in [
+            Representative::Float64,
+            Representative::String,
+            Representative::Date,
+            Representative::Duration,
+        ] {
+            let found = verdict(id, &select_after(refused), &[]);
+            assert!(found.refusal().is_some(), "{id} after {refused}: {found:?}");
+        }
+        for allowed in [Representative::Int64, Representative::Boolean] {
+            let found = verdict(id, &select_after(allowed), &[]);
+            assert!(found.is_allowed(), "{id} after {allowed}: {found:?}");
+        }
+        // The operands given are judged as before.
+        let given = verdict(
+            id,
+            &select_after(Representative::Boolean),
+            &[("others", Representative::Boolean)],
+        );
+        assert_eq!(result_of(&given), Some("Boolean"), "{given:?}");
+    }
+}
+
+#[test]
 fn an_argument_decides_what_a_subtraction_gives() {
     let place = select_after(Representative::Date);
     // A date less a date is a duration; less a duration, a date.

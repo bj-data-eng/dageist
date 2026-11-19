@@ -68,7 +68,7 @@ use super::case::{Case, STEP};
 use super::frames::STAND_IN;
 use super::literal::{call_with_columns, class_of, operand_causes};
 use super::observe::{
-    Observed, Refusal, Seen, Tables, is_bare_key, is_the_targets_own, observe_probe,
+    Observed, Refusal, SCHEMA_SAYS, Seen, Tables, is_bare_key, is_the_targets_own, observe_probe,
 };
 use super::predict::{Prediction, Refused, Source};
 
@@ -387,6 +387,25 @@ fn objection(reason: &str) -> String {
         .join(" ")
 }
 
+/// How Polars on one thread, which the tables are measured on, refuses a bitwise call between a
+/// whole number and text, and others that read a series as a dtype it is not.
+const UNPACKING: &str = "cannot unpack series of type";
+
+/// How the streaming engine of Polars on many threads fails where the tables' reason is a
+/// failure to unpack a list: it casts the list to the dtype of the other side.
+const CASTING_A_LIST: &str = "cannot cast List type";
+
+/// Whether `probe` is how Polars on many threads refuses what the tables' reason, a failure to
+/// unpack a series, refuses. Its streaming engine does not unpack the text as a whole number:
+/// it gives the column of the whole number where its schema says text, which is the same call
+/// refused, for it is not what the schema says. And it fails to cast a list to the dtype of the
+/// other side where Polars on one thread fails to unpack the list as that dtype.
+fn is_the_same_unpacking(tables: &str, probe: &str) -> bool {
+    tables.starts_with(UNPACKING)
+        && (probe.starts_with(SCHEMA_SAYS)
+            || (tables.contains("`list[") && probe.starts_with(CASTING_A_LIST)))
+}
+
 /// Whether `probe` is refused as the tables refused the part: for Polars' own
 /// reason the same objection, and for a rule that a predicate be a `Boolean`
 /// Polars' words for it.
@@ -395,10 +414,11 @@ pub fn same_reason(source: &Source, tables: &str, probe: &str) -> bool {
         // What the target says of a schema is no objection of Polars, so it is
         // neither the tables' reason nor one that a probe can be refused for.
         Source::Polars => {
-            !is_the_targets_own(tables)
+            (!is_the_targets_own(tables)
                 && !is_the_targets_own(probe)
                 && !objection(tables).is_empty()
-                && objection(tables) == objection(probe)
+                && objection(tables) == objection(probe))
+                || is_the_same_unpacking(tables, probe)
         }
         Source::Rule(rule) if PREDICATE_RULES.contains(rule) => {
             let probe = probe.to_ascii_lowercase();
@@ -1178,6 +1198,77 @@ mod tests {
         let found = settled("stricter-a-list-max-under-an-outer-window.case");
         assert!(found.reason.contains("not supported"), "{}", found.reason);
         assert!(found.probe.contains("Expr.max"), "{}", found.probe);
+    }
+
+    #[test]
+    fn a_bitwise_call_on_text_is_refused_alone_where_polars_gives_a_column_its_schema_does_not_say()
+    {
+        // `when(k > k).then(k).otherwise(k).or_(h)` of a whole number and text, in the value of
+        // a condition that a constant decides, so that Polars never evaluates it. The tables
+        // refuse it as Polars on one thread does, by failing to unpack the text as a whole
+        // number. On many threads Polars' streaming engine does not fail: it gives the column
+        // of the whole number where its schema says text, which the target counts as a refusal.
+        let found =
+            settled("stricter-a-bitwise-or-of-text-in-a-condition-decided-by-a-constant.case");
+        // On few threads Polars' reason is the tables' own, the failure to unpack the text.
+        assert!(
+            found.reason.starts_with("the schema says")
+                || found.reason.starts_with("cannot unpack series of type"),
+            "{}",
+            found.reason
+        );
+        assert!(found.probe.contains("Expr.or_"), "{}", found.probe);
+    }
+
+    #[test]
+    fn a_failure_to_unpack_a_series_is_matched_by_a_schema_the_rows_do_not_give_and_by_nothing_else()
+     {
+        let tables = "cannot unpack series of type `str` into `i64`";
+        let mismatch = "the schema says String and the rows give Int64";
+        assert!(same_reason(&Source::Polars, tables, mismatch));
+        // Another reason of the tables is not that mismatch, nor a mismatch the tables' own reason.
+        assert!(!same_reason(
+            &Source::Polars,
+            "cannot compare string with numeric type (i8)",
+            mismatch
+        ));
+        assert!(!same_reason(&Source::Polars, mismatch, mismatch));
+    }
+
+    #[test]
+    fn a_bitwise_call_on_a_list_in_a_key_of_one_value_is_refused_alone_where_polars_cannot_cast_it()
+    {
+        // `sort(by=when(lit(1, UInt8) | b).then(k).len())` with a list `b`: the length of the
+        // value is one number, so Polars never evaluates the call. The tables refuse it as
+        // Polars on one thread does, by failing to unpack the list as a whole number; the
+        // streaming engine on many threads fails to cast the list to that number.
+        let found = settled("stricter-a-bitwise-or-of-a-list-in-a-sort-key-of-one-value.case");
+        // On few threads Polars' reason is the tables' own, the failure to unpack the list.
+        assert!(
+            found.reason.starts_with("cannot cast List type")
+                || found.reason.starts_with("cannot unpack series of type"),
+            "{}",
+            found.reason
+        );
+        assert!(found.probe.contains("Expr.or_"), "{}", found.probe);
+    }
+
+    #[test]
+    fn a_failure_to_unpack_a_list_is_matched_by_a_failure_to_cast_the_list_and_by_nothing_else() {
+        let tables = "cannot unpack series of type `list[i64]` into `u8`";
+        let cast = "cannot cast List type (inner: 'Int64', to: 'UInt8')";
+        assert!(same_reason(&Source::Polars, tables, cast));
+        // A cast of another dtype is not it, nor is a cast the tables' reason names.
+        assert!(!same_reason(
+            &Source::Polars,
+            "cannot unpack series of type `str` into `i64`",
+            cast
+        ));
+        assert!(!same_reason(
+            &Source::Polars,
+            tables,
+            "cannot cast String type to Int64"
+        ));
     }
 
     #[test]

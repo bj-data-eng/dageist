@@ -49,6 +49,45 @@
       "argument": null
     },
     {
+      "entry": "Expr.abs",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.add",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.and_",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.cum_count",
       "verdict": {
         "kind": "refused",
@@ -167,6 +206,19 @@
     },
     {
       "entry": "Expr.first",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.floordiv",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -309,6 +361,32 @@
       "argument": null
     },
     {
+      "entry": "Expr.mod",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.mul",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.ne",
       "verdict": {
         "kind": "refused",
@@ -322,7 +400,59 @@
       "argument": null
     },
     {
+      "entry": "Expr.neg",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.not_",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.or_",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.over",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.pow",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -362,6 +492,32 @@
     },
     {
       "entry": "Expr.sum",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.truediv",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.xor",
       "verdict": {
         "kind": "refused",
         "refusal": {

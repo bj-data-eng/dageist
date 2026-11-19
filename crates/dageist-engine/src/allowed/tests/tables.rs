@@ -155,9 +155,10 @@ fn the_dtype_table_has_a_line_for_every_method_receiver_and_argument() {
             .iter()
             .filter(|parameter| matches!(parameter.kind(), Kind::Expression(_)))
             .count();
-        let must_be_given = entry.parameters().iter().any(|p| {
-            p.default() == ParameterDefault::Required && matches!(p.kind(), Kind::Expression(_))
-        });
+        let must_be_given = entry
+            .parameters()
+            .iter()
+            .any(|p| p.is_needed() && matches!(p.kind(), Kind::Expression(_)));
         let n = Representative::ALL.len();
         expected += if must_be_given { 0 } else { n } + expressions * n * n;
     }

@@ -43,6 +43,31 @@ const DATE_PART: &[Dtypes] = &[Dtypes::Datetime, Dtypes::Date];
 const TIME_PART: &[Dtypes] = &[Dtypes::Datetime, Dtypes::Time];
 const DURATION: &[Dtypes] = &[Dtypes::Duration];
 
+// What Polars accepts on the receiver of arithmetic and logic, from the functions that run
+// them: a coarse group is claimed when Polars accepts it with some dtype of operand, and the
+// tables of allowed combinations say which operands, and which members of the group, such as
+// the unsigned integers for `neg`, Polars refuses.
+//
+// `+` adds numbers, joins text, counts booleans, adds durations to each other and to dates and
+// datetimes, and has nothing for a `Time`; `*` and `/` take numbers, booleans and durations;
+// `//` and `%` take numbers and booleans, and `**` numbers; `neg` takes the signed numbers and
+// durations, `abs` numbers and durations.
+const ADDABLE: &[Dtypes] = &[
+    Dtypes::Numeric,
+    Dtypes::String,
+    Dtypes::Boolean,
+    Dtypes::Datetime,
+    Dtypes::Date,
+    Dtypes::Duration,
+];
+const SCALABLE: &[Dtypes] = &[Dtypes::Numeric, Dtypes::Boolean, Dtypes::Duration];
+const DIVISIBLE: &[Dtypes] = &[Dtypes::Numeric, Dtypes::Boolean];
+const NUMERIC: &[Dtypes] = &[Dtypes::Numeric];
+const NUMERIC_OR_DURATION: &[Dtypes] = &[Dtypes::Numeric, Dtypes::Duration];
+// `and`, `or`, `xor` and `not` combine and flip the truth of booleans, and the bits of whole
+// numbers.
+const BITWISE: &[Dtypes] = &[Dtypes::Integer, Dtypes::Boolean];
+
 const EXPRESSION: Kind = Kind::Expression(ANY);
 /// A new column's name and the expression that gives it: `**named_exprs`.
 const NAMED_EXPRESSIONS: Kind = Kind::Pairs(&Kind::Column, &EXPRESSION);
@@ -83,8 +108,15 @@ const fn flag(name: &'static str, default: &'static str) -> Parameter {
     optional(name, Kind::Flag, Shape::One, default)
 }
 
-/// The parameter every comparison, and `sub`, takes.
+/// The parameter every comparison and every method of arithmetic or logic on two values takes.
 const OTHER: Parameter = required("other", EXPRESSION, Shape::One).with_role(Role::Operand);
+
+/// The parameter `truediv` takes, which is divided by.
+const DIVISOR: Parameter = required("other", EXPRESSION, Shape::One).with_role(Role::Divisor);
+
+/// The parameter `floordiv` takes, which is floor divided by.
+const FLOOR_DIVISOR: Parameter =
+    required("other", EXPRESSION, Shape::One).with_role(Role::FloorDivisor);
 
 /// `*predicates`: conditions that must all hold, which `when` and `filter` take.
 const PREDICATES: Parameter = starred("predicates", Kind::Expression(BOOLEAN));
@@ -288,9 +320,71 @@ fn cum_max(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
     Ok(expr.cum_max(arguments.flag("reverse", false)?))
 }
 
+fn add(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let other = arguments.required_expression("other")?;
+    Ok(binary_expr(expr, Operator::Plus, other))
+}
+
 fn sub(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
     let other = arguments.required_expression("other")?;
     Ok(binary_expr(expr, Operator::Minus, other))
+}
+
+fn mul(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let other = arguments.required_expression("other")?;
+    Ok(binary_expr(expr, Operator::Multiply, other))
+}
+
+fn truediv(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let other = arguments.required_expression("other")?;
+    Ok(binary_expr(expr, Operator::TrueDivide, other))
+}
+
+fn floordiv(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let other = arguments.required_expression("other")?;
+    Ok(binary_expr(expr, Operator::FloorDivide, other))
+}
+
+fn modulo(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let other = arguments.required_expression("other")?;
+    Ok(binary_expr(expr, Operator::Modulus, other))
+}
+
+fn pow(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.pow(arguments.required_expression("exponent")?))
+}
+
+fn neg(expr: Expr, _arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(-expr)
+}
+
+fn abs(expr: Expr, _arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.abs())
+}
+
+/// As Python folds `self & *others`: each operand meets what the ones before it gave, and
+/// with none the expression is as it was.
+fn and_(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(arguments
+        .expressions("others")?
+        .into_iter()
+        .fold(expr, Expr::and))
+}
+
+/// As Python folds `self | *others`.
+fn or_(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(arguments
+        .expressions("others")?
+        .into_iter()
+        .fold(expr, Expr::or))
+}
+
+fn xor(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.xor(arguments.required_expression("other")?))
+}
+
+fn not_(expr: Expr, _arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.not())
 }
 
 fn dt_date(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
@@ -709,6 +803,32 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::ConditionStep(chained_when_then),
     },
     Entry {
+        id: EntryId("Expr.abs"),
+        family: Family::Arithmetic,
+        accepts: NUMERIC_OR_DURATION,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(abs),
+    },
+    Entry {
+        id: EntryId("Expr.add"),
+        family: Family::Arithmetic,
+        accepts: ADDABLE,
+        parameters: &[OTHER],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(add),
+    },
+    Entry {
+        id: EntryId("Expr.and_"),
+        family: Family::Logic,
+        accepts: BITWISE,
+        parameters: &[starred("others", EXPRESSION)
+            .with_role(Role::Operand)
+            .with_at_least_one()],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(and_),
+    },
+    Entry {
         id: EntryId("Expr.cum_count"),
         family: Family::Cumulative,
         accepts: ANY,
@@ -788,6 +908,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[flag("ignore_nulls", "False").keyword_only()],
         laziness: Laziness::Lazy,
         build: Build::Expression(first),
+    },
+    Entry {
+        id: EntryId("Expr.floordiv"),
+        family: Family::Arithmetic,
+        accepts: DIVISIBLE,
+        parameters: &[FLOOR_DIVISOR],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(floordiv),
     },
     Entry {
         id: EntryId("Expr.ge"),
@@ -870,12 +998,54 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(min),
     },
     Entry {
+        id: EntryId("Expr.mod"),
+        family: Family::Arithmetic,
+        accepts: DIVISIBLE,
+        parameters: &[OTHER],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(modulo),
+    },
+    Entry {
+        id: EntryId("Expr.mul"),
+        family: Family::Arithmetic,
+        accepts: SCALABLE,
+        parameters: &[OTHER],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(mul),
+    },
+    Entry {
         id: EntryId("Expr.ne"),
         family: Family::Compare,
         accepts: ANY,
         parameters: &[OTHER],
         laziness: Laziness::Lazy,
         build: Build::Expression(ne),
+    },
+    Entry {
+        id: EntryId("Expr.neg"),
+        family: Family::Arithmetic,
+        accepts: NUMERIC_OR_DURATION,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(neg),
+    },
+    Entry {
+        id: EntryId("Expr.not_"),
+        family: Family::Logic,
+        accepts: BITWISE,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(not_),
+    },
+    Entry {
+        id: EntryId("Expr.or_"),
+        family: Family::Logic,
+        accepts: BITWISE,
+        parameters: &[starred("others", EXPRESSION)
+            .with_role(Role::Operand)
+            .with_at_least_one()],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(or_),
     },
     Entry {
         id: EntryId("Expr.over"),
@@ -897,6 +1067,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         ],
         laziness: Laziness::Lazy,
         build: Build::Expression(over),
+    },
+    Entry {
+        id: EntryId("Expr.pow"),
+        family: Family::Arithmetic,
+        accepts: NUMERIC,
+        parameters: &[required("exponent", EXPRESSION, Shape::One).with_role(Role::Exponent)],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(pow),
     },
     Entry {
         id: EntryId("Expr.shift"),
@@ -926,6 +1104,22 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[],
         laziness: Laziness::Lazy,
         build: Build::Expression(sum),
+    },
+    Entry {
+        id: EntryId("Expr.truediv"),
+        family: Family::Arithmetic,
+        accepts: SCALABLE,
+        parameters: &[DIVISOR],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(truediv),
+    },
+    Entry {
+        id: EntryId("Expr.xor"),
+        family: Family::Logic,
+        accepts: BITWISE,
+        parameters: &[OTHER],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(xor),
     },
     Entry {
         id: EntryId("LazyFrame.filter"),

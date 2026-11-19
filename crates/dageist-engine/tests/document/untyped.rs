@@ -9,7 +9,7 @@ use dageist_engine::document::{Document, Inputs};
 use polars::prelude::*;
 use serde_json::{Value, json};
 
-use crate::support::{call, chain, document, field, many, step, whole};
+use crate::support::{call, chain, document, field, field_then, many, step, whole};
 
 fn source() -> DataFrame {
     df!(
@@ -184,6 +184,154 @@ fn a_number_that_fits_the_column_it_is_used_with_gives_what_polars_gives() {
 }
 
 #[test]
+fn a_number_raised_to_a_power_or_divided_keeps_the_dtype_polars_gives_it() {
+    // A number in front of `**` is no operand that adapts: `2 ** u8` is an `Int32`, as the number
+    // is alone, and `2 ** f32` a `Float32`, which the exponent decides. A number with a fraction
+    // in front of `/` is a `Float64` beside any float, where a whole number adapts to the float:
+    // `1.5 / f32` is a `Float64` and `2 / f32` a `Float32`.
+    let number = |value: i64| call("polars.lit", json!({ "value": { "integer": value } }));
+    let fractional = |value: f64| call("polars.lit", json!({ "value": { "float": value } }));
+    let cases = [
+        (
+            chain(
+                number(2),
+                vec![call("Expr.pow", json!({ "exponent": field("u8") }))],
+            ),
+            lit(2).pow(col("u8")),
+            Representative::Int32,
+        ),
+        (
+            chain(
+                number(2),
+                vec![call("Expr.pow", json!({ "exponent": field("f32") }))],
+            ),
+            lit(2).pow(col("f32")),
+            Representative::Float32,
+        ),
+        (
+            chain(
+                fractional(1.5),
+                vec![call("Expr.pow", json!({ "exponent": field("u8") }))],
+            ),
+            lit(1.5).pow(col("u8")),
+            Representative::Float64,
+        ),
+        (
+            chain(
+                fractional(1.5),
+                vec![call("Expr.truediv", json!({ "other": field("f32") }))],
+            ),
+            lit(1.5).true_div(col("f32")),
+            Representative::Float64,
+        ),
+        (
+            chain(
+                number(2),
+                vec![call("Expr.truediv", json!({ "other": field("f32") }))],
+            ),
+            lit(2).true_div(col("f32")),
+            Representative::Float32,
+        ),
+        (
+            chain(
+                number(2),
+                vec![call("Expr.truediv", json!({ "other": field("u8") }))],
+            ),
+            lit(2).true_div(col("u8")),
+            Representative::Float64,
+        ),
+    ];
+    for (item, expression, expected) in cases {
+        assert_eq!(polars(expression), Some(expected), "what Polars gives");
+        assert_eq!(
+            walked(item.clone()),
+            Some(expected),
+            "what the walk gives {item}"
+        );
+    }
+}
+
+/// The dtype class the walk gives after the last link of the item `item` of the parameter
+/// `parameter` of the step `entry`, if it knows.
+fn walked_in(entry: &str, parameter: &str, item: Value) -> Option<Representative> {
+    let text = document(vec![step(
+        "s",
+        entry,
+        json!({ parameter: many(vec![item]) }),
+    )]);
+    let document = Document::read(&text).expect("a document");
+    let walk = document.steps()[0].walk(0, source().schema(), &Inputs::new());
+    let expression = walk.expressions().last().expect("the item");
+    match expression.places().last().copied().flatten()?.after() {
+        After::Value { dtype, .. } => Some(dtype),
+        _ => None,
+    }
+}
+
+#[test]
+fn an_integer_raised_to_a_fraction_is_not_known_where_it_ends_or_is_a_key_and_a_float_it_fits_is() {
+    // Polars gives `i8 ** 1.5` the unresolved dtype of the number, which a select resolves to a
+    // `Float64` where it ends and a sort key or a join's key does not: it refuses them for it.
+    // The walk says none of them, for a call after it or an operand that meets it adapts it.
+    let power = || on_a_column("i8", call("Expr.pow", json!({ "exponent": fraction(1.5) })));
+    assert_eq!(
+        polars(col("i8").pow(lit(1.5))),
+        Some(Representative::Float64)
+    );
+    assert_eq!(walked_in("LazyFrame.select", "exprs", power()), None);
+    assert_eq!(walked_in("LazyFrame.sort", "by", power()), None);
+    // A float it fits is no unresolved number: `f32 ** 1.5` is a `Float32` everywhere.
+    let float = on_a_column(
+        "f32",
+        call("Expr.pow", json!({ "exponent": fraction(1.5) })),
+    );
+    assert_eq!(
+        walked_in("LazyFrame.sort", "by", float),
+        Some(Representative::Float32)
+    );
+}
+
+#[test]
+fn an_integer_raised_to_a_fraction_adapts_to_what_it_meets_and_is_not_said_to_be_a_float64() {
+    // The unresolved float that `i8 ** 1.5` is adapts to the operand it meets as the number does:
+    // `f32 / (i8 ** 1.5)` is a `Float32`, so the dtype of the power is not a `Float64` the walk
+    // may say, and it says none.
+    let power = field_then(
+        "i8",
+        vec![call("Expr.pow", json!({ "exponent": fraction(1.5) }))],
+    );
+    let item = on_a_column("f32", call("Expr.truediv", json!({ "other": power })));
+    let expression = col("f32").true_div(col("i8").pow(lit(1.5)));
+    assert_eq!(polars(expression.clone()), Some(Representative::Float32));
+    agrees(walked(item), polars(expression));
+}
+
+#[test]
+fn a_boolean_floor_divided_by_a_number_with_a_fraction_is_refused_as_polars_refuses_it() {
+    // Polars adapts the number to a Boolean, which it cannot floor divide, though it divides a
+    // Boolean by a typed float, and takes the whole number 1 and the other arithmetic with the
+    // number as they are: `f // 1.5` is refused, `f // 1` and `f * 1.5` are not.
+    let refused = |method: &str, number: Value| {
+        let item = on_a_column("f", call(method, json!({ "other": number })));
+        let text = document(vec![step(
+            "s",
+            "LazyFrame.select",
+            json!({ "exprs": many(vec![item]) }),
+        )]);
+        let document = Document::read(&text).expect("a document");
+        let walk = document.steps()[0].walk(0, source().schema(), &Inputs::new());
+        walk.refusal().is_some()
+    };
+    let runs = |expression: Expr| source().lazy().select([expression]).collect().is_ok();
+    assert!(!runs(col("f").floor_div(lit(1.5))));
+    assert!(refused("Expr.floordiv", fraction(1.5)));
+    assert!(runs(col("f").floor_div(lit(1))));
+    assert!(!refused("Expr.floordiv", whole(1)));
+    assert!(runs(col("f") * lit(1.5)));
+    assert!(!refused("Expr.mul", fraction(1.5)));
+}
+
+#[test]
 fn a_comparison_with_a_number_is_a_boolean_whatever_dtype_the_number_takes() {
     // The result of a comparison does not depend on the dtype of its operand, so it is known
     // beside a column the number fits and beside one it does not.
@@ -304,14 +452,10 @@ fn what_follows_a_number_beside_a_column_is_asked_of_the_tables() {
     }
 }
 
-/// How Polars combines two expressions.
-type Operation = fn(Expr, Expr) -> Expr;
-
-/// Every class as a column of the table `everywhere` reads, beside each number, in each
-/// operation, with the number behind the column and in front of it.
-#[test]
-fn a_number_beside_any_dtype_is_known_only_as_polars_gives_it() {
-    let numbers: Vec<(Value, Expr)> = vec![
+/// Numbers typed without a dtype, each as the document holds it and as Polars does: ones that
+/// fit a narrow column and ones that do not, whole and with a fraction.
+fn numbers() -> Vec<(Value, Expr)> {
+    vec![
         (whole(1), lit(1_i64)),
         (whole(-1), lit(-1_i64)),
         (whole(127), lit(127_i64)),
@@ -325,7 +469,43 @@ fn a_number_beside_any_dtype_is_known_only_as_polars_gives_it() {
         (fraction(1.5), lit(1.5_f64)),
         (fraction(1.0), lit(1.0_f64)),
         (fraction(1e40), lit(1e40_f64)),
-    ];
+    ]
+}
+
+/// How Polars combines two expressions.
+type Combine = fn(Expr, Expr) -> Expr;
+
+/// A method that takes another expression, and how Polars combines the two: the entry, the
+/// parameter that holds the other one, whether the parameter holds a list, and the combination.
+struct Operation {
+    entry: &'static str,
+    parameter: &'static str,
+    list: bool,
+    combine: Combine,
+}
+
+impl Operation {
+    const fn new(entry: &'static str, combine: Combine) -> Self {
+        Self {
+            entry,
+            parameter: "other",
+            list: false,
+            combine,
+        }
+    }
+
+    /// The call of the method given `other`.
+    fn given(&self, other: Value) -> Value {
+        let other = if self.list { many(vec![other]) } else { other };
+        call(self.entry, json!({ self.parameter: other }))
+    }
+}
+
+/// Every class as a column of the table `everywhere` reads, beside each number, in each of
+/// `operations`, with the number behind the column and in front of it. How many of the
+/// combinations the walk knows the dtype of.
+fn numbers_beside_every_dtype(operations: &[Operation]) -> usize {
+    let numbers = numbers();
     let mut known = 0;
     for class in Representative::ALL {
         let name = class.name();
@@ -334,18 +514,14 @@ fn a_number_beside_any_dtype_is_known_only_as_polars_gives_it() {
                 start if start.is_object() => start,
                 _ => unreachable!("a number is an expression"),
             };
-            let operations: [(&str, Operation); 3] = [
-                ("Expr.sub", |left, right| left - right),
-                ("Expr.gt", |left, right| left.gt(right)),
-                ("Expr.eq", |left, right| left.eq(right)),
-            ];
-            for (entry, build) in operations {
+            for operation in operations {
+                let build = operation.combine;
                 let behind = (
-                    on_a_column(name, compare(entry, number.clone())),
+                    on_a_column(name, operation.given(number.clone())),
                     build(col(name), literal.clone()),
                 );
                 let in_front = (
-                    chain(start.clone(), vec![compare(entry, field(name))]),
+                    chain(start.clone(), vec![operation.given(field(name))]),
                     build(literal.clone(), col(name)),
                 );
                 for (item, expression) in [behind, in_front] {
@@ -354,6 +530,56 @@ fn a_number_beside_any_dtype_is_known_only_as_polars_gives_it() {
                     agrees_in(&item, walk, polars);
                 }
             }
+        }
+    }
+    known
+}
+
+#[test]
+fn a_number_beside_any_dtype_is_known_only_as_polars_gives_it() {
+    let known = numbers_beside_every_dtype(&[
+        Operation::new("Expr.sub", |left, right| left - right),
+        Operation::new("Expr.gt", |left, right| left.gt(right)),
+        Operation::new("Expr.eq", |left, right| left.eq(right)),
+    ]);
+    // The walk knows what a number that fits gives and what a comparison gives, and not what
+    // every number beside every dtype gives.
+    assert!(known > 100, "the walk knew {known} of them");
+}
+
+#[test]
+fn a_number_beside_any_dtype_in_arithmetic_and_logic_is_known_only_as_polars_gives_it() {
+    let known = numbers_beside_every_dtype(&[
+        Operation::new("Expr.add", |left, right| left + right),
+        Operation::new("Expr.mul", |left, right| left * right),
+        Operation::new("Expr.truediv", |left, right| left.true_div(right)),
+        Operation::new("Expr.floordiv", |left, right| left.floor_div(right)),
+        Operation::new("Expr.mod", |left, right| left % right),
+        Operation {
+            parameter: "exponent",
+            ..Operation::new("Expr.pow", |left, right| left.pow(right))
+        },
+        Operation::new("Expr.xor", |left, right| left.xor(right)),
+        Operation {
+            parameter: "others",
+            list: true,
+            ..Operation::new("Expr.and_", |left, right| left.and(right))
+        },
+        Operation {
+            parameter: "others",
+            list: true,
+            ..Operation::new("Expr.or_", |left, right| left.or(right))
+        },
+    ]);
+    assert!(known > 500, "the walk knew {known} of them");
+}
+
+#[test]
+fn a_number_as_a_fill_value_is_known_only_as_polars_gives_it() {
+    let mut known = 0;
+    for class in Representative::ALL {
+        let name = class.name();
+        for (number, literal) in numbers() {
             let shifted = on_a_column(
                 name,
                 call("Expr.shift", json!({ "fill_value": number.clone() })),
@@ -366,8 +592,6 @@ fn a_number_beside_any_dtype_is_known_only_as_polars_gives_it() {
             agrees_in(&shifted, walk, polars);
         }
     }
-    // The walk knows what a number that fits gives and what a comparison gives, and not what
-    // every number beside every dtype gives.
     assert!(known > 100, "the walk knew {known} of them");
 }
 

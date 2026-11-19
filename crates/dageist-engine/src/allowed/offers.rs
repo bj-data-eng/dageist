@@ -3,7 +3,7 @@
 
 use std::fmt;
 
-use crate::catalog::{self, Applies, Entry, Kind, ParameterDefault};
+use crate::catalog::{self, Applies, Entry, Kind};
 
 use super::adapt::could_be_taken_by_a_number;
 use super::context::Context;
@@ -383,8 +383,7 @@ fn required_expressions(entry: &Entry) -> impl Iterator<Item = &'static str> {
         .parameters()
         .iter()
         .filter(|parameter| {
-            parameter.default() == ParameterDefault::Required
-                && matches!(parameter.kind(), Kind::Expression(_))
+            parameter.is_needed() && matches!(parameter.kind(), Kind::Expression(_))
         })
         .map(catalog::Parameter::name)
 }

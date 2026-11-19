@@ -3,7 +3,7 @@
 # entry, a parameter and a choice word is exactly Polars' name; `changed` lists the
 # names that are deliberately not, written as `Entry.id`, `Entry.id#parameter` or
 # `Entry.id#parameter#word`.
-changed = []
+changed = ["Expr.and_", "Expr.not_", "Expr.or_"]
 
 [families.steps]
 title = "Steps · change the table"
@@ -28,6 +28,9 @@ title = "Window"
 
 [families.compare]
 title = "Comparison · true or false"
+
+[families.logic]
+title = "Logic · and, or, not"
 
 [families.start]
 title = "Start · a column or a value"
@@ -103,6 +106,26 @@ hint = "the value where that condition holds"
 name = "statement"
 label = "value when it holds"
 
+[entries."Expr.abs"]
+name = "abs"
+hint = "absolute value"
+
+[entries."Expr.add"]
+name = "add"
+hint = "plus another value"
+
+[entries."Expr.add".parameters.other]
+name = "other"
+label = "plus"
+
+[entries."Expr.and_"]
+name = "and"
+hint = "true where all are true, bit by bit on whole numbers"
+
+[entries."Expr.and_".parameters.others]
+name = "others"
+label = "and"
+
 [entries."Expr.cum_count"]
 name = "cum_count"
 hint = "running count"
@@ -171,6 +194,14 @@ hint = "first value"
 name = "ignore_nulls"
 label = "skip empty values"
 
+[entries."Expr.floordiv"]
+name = "floordiv"
+hint = "divided by another value, rounded down"
+
+[entries."Expr.floordiv".parameters.other]
+name = "other"
+label = "divided by"
+
 [entries."Expr.ge"]
 name = "ge"
 hint = "at least"
@@ -219,6 +250,22 @@ hint = "less than"
 name = "other"
 label = "compared with"
 
+[entries."Expr.mod"]
+name = "mod"
+hint = "remainder of a division"
+
+[entries."Expr.mod".parameters.other]
+name = "other"
+label = "divided by"
+
+[entries."Expr.mul"]
+name = "mul"
+hint = "times another value"
+
+[entries."Expr.mul".parameters.other]
+name = "other"
+label = "times"
+
 [entries."Expr.ne"]
 name = "ne"
 hint = "not equal to"
@@ -226,6 +273,22 @@ hint = "not equal to"
 [entries."Expr.ne".parameters.other]
 name = "other"
 label = "compared with"
+
+[entries."Expr.neg"]
+name = "neg"
+hint = "the value with its sign flipped"
+
+[entries."Expr.not_"]
+name = "not"
+hint = "the opposite, bit by bit on whole numbers"
+
+[entries."Expr.or_"]
+name = "or"
+hint = "true where any is true, bit by bit on whole numbers"
+
+[entries."Expr.or_".parameters.others]
+name = "others"
+label = "or"
 
 [entries."Expr.over"]
 name = "over"
@@ -260,6 +323,14 @@ group_to_rows = "group_to_rows"
 join = "join"
 explode = "explode"
 
+[entries."Expr.pow"]
+name = "pow"
+hint = "raised to a power"
+
+[entries."Expr.pow".parameters.exponent]
+name = "exponent"
+label = "to the power of"
+
 [entries."Expr.shift"]
 name = "shift"
 hint = "value n rows earlier"
@@ -279,6 +350,22 @@ hint = "minus another value"
 [entries."Expr.sub".parameters.other]
 name = "other"
 label = "minus"
+
+[entries."Expr.truediv"]
+name = "truediv"
+hint = "divided by another value"
+
+[entries."Expr.truediv".parameters.other]
+name = "other"
+label = "divided by"
+
+[entries."Expr.xor"]
+name = "xor"
+hint = "true where exactly one is true, bit by bit on whole numbers"
+
+[entries."Expr.xor".parameters.other]
+name = "other"
+label = "exclusive or"
 
 [entries."LazyFrame.filter"]
 name = "filter"

@@ -539,3 +539,36 @@ fn a_candidate_that_stands_and_is_an_argument_may_end_as_the_expression_it_start
     assert_eq!(both.result(), argument_only.result());
     assert_eq!(both.can_end(), start_only.can_end());
 }
+
+#[test]
+fn a_candidate_fits_the_operand_of_and_and_or_only_where_some_operand_suits_the_receiver() {
+    // What they follow decides whether a candidate given as the operand fits: none fits after a
+    // float, text or a date, and a Boolean or a whole number fits after its own dtype. This is
+    // the dtype table's verdict on the operand given; judging a step that gives none as one that
+    // does is the offers' (`and_and_or_are_offered_only_where_some_operand_is_allowed`).
+    for id in ["Expr.and_", "Expr.or_"] {
+        for receiver in [
+            Representative::Float64,
+            Representative::String,
+            Representative::Date,
+        ] {
+            for candidate in [
+                Representative::Boolean,
+                Representative::Int64,
+                Representative::Float64,
+            ] {
+                let slot = argument(id, "others", receiver);
+                let found = fit(&Candidate::Field(candidate), &slot).expect("a class");
+                assert!(
+                    found.verdict().refusal().is_some(),
+                    "{candidate} after {receiver} for {id}: {found:?}"
+                );
+            }
+        }
+        for dtype in [Representative::Boolean, Representative::Int64] {
+            let slot = argument(id, "others", dtype);
+            let found = fit(&Candidate::Field(dtype), &slot).expect("a class");
+            assert!(found.verdict().is_allowed(), "{dtype} for {id}: {found:?}");
+        }
+    }
+}

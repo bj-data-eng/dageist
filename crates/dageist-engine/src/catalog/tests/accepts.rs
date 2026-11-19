@@ -5,10 +5,17 @@
 //!
 //! Polars is the authority here: an entry that claims a dtype Polars refuses,
 //! or leaves out one it needs to offer, is wrong.
+//!
+//! A method that takes an operand, such as `add`, accepts a receiver when Polars resolves it
+//! with some column of the table as the operand: a datetime has no sum with a datetime, and
+//! one with a duration. It refuses a receiver only when it refuses every column.
 
 use polars::prelude::{DataType, Expr, LazyFrame, PolarsResult, col, lit};
 
-use crate::catalog::{Applies, Argument, Arguments, Build, Dtypes, Entry, Kind, entries};
+use crate::catalog::{
+    Applies, Argument, Arguments, Build, Dtypes, Entry, Kind, ParameterDefault, Role, Variadic,
+    entries,
+};
 
 use super::build::{expression_arg, many, sample};
 
@@ -34,19 +41,48 @@ fn accepted(accepts: &[Dtypes], groups: &[Dtypes]) -> bool {
     accepts.contains(&Dtypes::Any) || groups.iter().any(|group| accepts.contains(group))
 }
 
+/// Whether `entry` takes an operand beside what it follows, a column of the table that its
+/// receiver has no say in.
+fn takes_an_operand(entry: &Entry) -> bool {
+    entry.parameters().iter().any(|parameter| {
+        matches!(
+            parameter.role(),
+            Role::Operand | Role::Exponent | Role::Divisor | Role::FloorDivisor
+        ) && matches!(parameter.kind(), Kind::Expression(_))
+    })
+}
+
 /// The arguments with which `entry` is used on `column`: its required parameters, each an
-/// expression that suits it, and those an expression method cannot do without.
-fn arguments_for(entry: &Entry, column: &str) -> Arguments {
+/// expression that suits it, and those an expression method cannot do without. An operand is
+/// `operand`, a column of the table; the other expressions are `column` itself.
+fn arguments_for(entry: &Entry, column: &str, operand: &str) -> Arguments {
     let mut given: Vec<(&str, Argument)> = entry
         .parameters()
         .iter()
-        .filter(|parameter| parameter.default() == crate::catalog::ParameterDefault::Required)
-        .map(|parameter| match parameter.kind() {
-            // `by` of `dt.offset_by` is a duration string; anything else is compared with, or
-            // taken from, the column itself, which has the dtype the method takes.
-            Kind::Expression(&[Dtypes::String]) => (parameter.name(), expression_arg(lit("1d"))),
-            Kind::Expression(_) => (parameter.name(), expression_arg(col(column))),
-            other => panic!("{} takes {other:?}", entry.id().as_str()),
+        .filter(|parameter| {
+            // `and_(*others)` is its receiver as it was without an operand, and so says nothing
+            // of the receiver's dtype.
+            parameter.default() == ParameterDefault::Required
+                || (parameter.variadic() == Some(Variadic::Args)
+                    && parameter.role() == Role::Operand)
+        })
+        .map(|parameter| {
+            let value = match parameter.kind() {
+                // `by` of `dt.offset_by` is a duration string; anything else is compared with,
+                // or taken from, a column of the table.
+                Kind::Expression(&[Dtypes::String]) => expression_arg(lit("1d")),
+                Kind::Expression(_) if parameter.role() != Role::Plain => {
+                    expression_arg(col(operand))
+                }
+                Kind::Expression(_) => expression_arg(col(column)),
+                other => panic!("{} takes {other:?}", entry.id().as_str()),
+            };
+            let value = if parameter.variadic() == Some(Variadic::Args) {
+                many(vec![value])
+            } else {
+                value
+            };
+            (parameter.name(), value)
         })
         .collect();
     // Python's `over` is refused without something to group or order by.
@@ -56,11 +92,25 @@ fn arguments_for(entry: &Entry, column: &str) -> Arguments {
     entry.arguments(given).expect("arguments that fit")
 }
 
-fn built(entry: &Entry, column: &str) -> Expr {
+fn built(entry: &Entry, column: &str, operand: &str) -> Expr {
     let Build::Expression(build) = entry.build() else {
         panic!("{} is not an expression method", entry.id().as_str());
     };
-    build(col(column), &arguments_for(entry, column)).expect("the method builds")
+    build(col(column), &arguments_for(entry, column, operand)).expect("the method builds")
+}
+
+/// The columns that are tried as the operand of `entry` beside a receiver `column`: all of them
+/// where it takes one, and otherwise `column`, which is no operand.
+fn operands(entry: &Entry, column: &str) -> Vec<&'static str> {
+    if takes_an_operand(entry) {
+        COLUMNS.iter().map(|(name, _)| *name).collect()
+    } else {
+        COLUMNS
+            .iter()
+            .map(|(name, _)| *name)
+            .filter(|name| *name == column)
+            .collect()
+    }
 }
 
 /// What Polars says of `expr` on the sample: its dtype from the schema, which reads no data,
@@ -86,13 +136,16 @@ fn polars_resolves_each_method_on_every_dtype_it_claims_to_accept() {
     {
         for (column, groups) in COLUMNS {
             if accepted(entry.accepts(), groups) {
-                let result = polars_resolves(built(entry, column));
+                let results: Vec<_> = operands(entry, column)
+                    .into_iter()
+                    .map(|operand| polars_resolves(built(entry, column, operand)))
+                    .collect();
                 assert!(
-                    result.is_ok(),
+                    results.iter().any(Result::is_ok),
                     "{} claims {:?} but Polars refuses it on {column}: {}",
                     entry.id().as_str(),
                     entry.accepts(),
-                    result.unwrap_err()
+                    results[0].as_ref().unwrap_err()
                 );
                 checked += 1;
             }
@@ -115,13 +168,15 @@ fn polars_refuses_each_method_on_a_dtype_it_does_not_accept() {
         else {
             continue;
         };
-        let result = polars_resolves(built(entry, column));
-        assert!(
-            result.is_err(),
-            "{} does not claim {column}, which Polars resolves to {:?}",
-            entry.id().as_str(),
-            result.unwrap()
-        );
+        for operand in operands(entry, column) {
+            let result = polars_resolves(built(entry, column, operand));
+            assert!(
+                result.is_err(),
+                "{} does not claim {column}, which Polars resolves to {:?} beside {operand}",
+                entry.id().as_str(),
+                result.unwrap()
+            );
+        }
         refused += 1;
     }
     assert!(refused >= 5, "{refused} methods were refused a dtype");
@@ -133,7 +188,7 @@ fn the_dtypes_a_method_claims_are_those_the_documentation_names() {
     // `dt.time` a Time, which pass through unchanged, and `cum_max` takes text and booleans.
     let resolves = |id: &str, column: &str| {
         let entry = crate::catalog::entry(id).expect("an entry");
-        polars_resolves(built(entry, column))
+        polars_resolves(built(entry, column, column))
     };
     assert_eq!(resolves("Expr.dt.date", "d").unwrap(), DataType::Date);
     assert_eq!(resolves("Expr.dt.time", "tm").unwrap(), DataType::Time);

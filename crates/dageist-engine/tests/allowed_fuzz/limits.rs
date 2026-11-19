@@ -34,6 +34,7 @@
 //! asked after the part as written and before the probes apart from the case,
 //! which cannot tell what Polars evaluates from what it skips.
 
+use dageist_engine::allowed::Representative;
 use dageist_engine::allowed::Stage as TableStage;
 use dageist_engine::catalog;
 use dageist_engine::document::{Call, Document, Expression, Place, Segment, Start, Step, Value};
@@ -46,7 +47,7 @@ use super::literal::{
 };
 use super::observe::{Observed, Refusal, SCHEMA_SAYS, Stage, Tables, observe, observe_probe};
 use super::predict::{Prediction, Refused, Source, Verdict};
-use super::probe::same_reason;
+use super::probe::{same_reason, settle_in_the_position};
 
 /// A limit of the tables, and what it says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -131,6 +132,26 @@ pub enum Limit {
     /// A debug build of Polars panics where an arithmetic overflow wraps in a
     /// release build, on keys the tables did not measure.
     AnOverflow,
+    /// Polars raises an integer to a power by taking the exponent as a `UInt32`, so
+    /// it refuses a negative whole number as the exponent of an integer when the rows
+    /// run: the number is a value, which the tables measured as the dtype and the
+    /// number 1. Polars refusing the rows with a failed conversion to `u32`, which
+    /// has no place, in a case that holds a `pow` whose exponent is a whole number
+    /// typed below zero or holds a subtraction, a negation or a not, which can take the
+    /// values of a column below zero; the sample's rows are 1, a null and 3, which a sum
+    /// or a product of them does not.
+    ANegativeExponent,
+    /// A column or a literal of the dtype Null is an operand of `and`, `or` and `xor`
+    /// that the tables allow, giving a `Boolean`, as `select` shows. Polars treats it
+    /// in ways `select` hides. It negates what a bitwise call combines operand by
+    /// operand, as the negation of a conjunction is the disjunction of the negations,
+    /// so a `not` meets each operand, which it refuses for the dtype Null. Polars
+    /// refusing the rows with the reason that the dtype Null is not supported in `not`,
+    /// which has no place, in a case that holds a `not` straight after an `and` or an
+    /// `or` that meets a null. It gives a filter's predicate the dtype Null, which Polars
+    /// refuses with the reason that a predicate must be a `Boolean`, in a filter that
+    /// holds a bitwise call that meets a null.
+    ABitwiseCallOnANull,
     /// A `UInt128` is compared with a `Decimal` by casting it to `decimal[38,0]`,
     /// which holds up to 38 digits, and a `UInt128` holds more. The sample's values
     /// are within the decimal, so the tables did not measure what a value beyond
@@ -138,6 +159,13 @@ pub enum Limit {
     /// the rows with a failed conversion of `u128` to a decimal, which has no
     /// place, in a case that holds a subtraction.
     AValueBeyondADecimal,
+    /// Polars refuses to divide a `Decimal` by zero, where a whole number divided by
+    /// zero is null and a float is infinite: the divisor is a value, which the tables
+    /// measured as the dtype and the sample's values, none of them zero. A remainder
+    /// or a difference of the sample's values can be. Polars refusing the rows with
+    /// the reason that it divides a Decimal by zero, which has no place, in a case with a
+    /// Decimal as a column, that holds a division, a floor division or a remainder.
+    ADivisionByZero,
     /// Polars panicking has no place, and is gated by its reason. A panic of
     /// Polars is an internal check that failed. The tables record
     /// one for the plan Polars made of a combination in `select`, and the plan
@@ -160,15 +188,17 @@ pub enum Limit {
     /// target's own comparison, not a refusal of Polars, which shows only where the
     /// method is the output of the step. Inside an expression that goes on from it
     /// or compares it, Polars evaluates the method and the step's rows do not show
-    /// the difference. The tables refusing, with the reason that the schema says one
-    /// dtype and the rows give another, at a call that is not the last of the
-    /// step's own expression, which Polars allows.
+    /// the difference; and a sort key or a join's key is never an output of the step,
+    /// which a probe of the call on a column in the key may show refused as well, and
+    /// then settles it. The tables refusing, with the reason that the schema says one
+    /// dtype and the rows give another, at a call that is not the last of the step's
+    /// own expression or in a key that no probe settles, which Polars allows.
     AHiddenSchema,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 16] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -177,6 +207,9 @@ impl Limit {
         Self::AShiftThatLeavesNulls,
         Self::TheLengthsOfTheRows,
         Self::AnOverflow,
+        Self::ANegativeExponent,
+        Self::ABitwiseCallOnANull,
+        Self::ADivisionByZero,
         Self::AValueBeyondADecimal,
         Self::APanic,
         Self::AWindowOverAWindow,
@@ -195,6 +228,9 @@ impl Limit {
             Self::AShiftThatLeavesNulls => "a-shift-that-leaves-nulls",
             Self::TheLengthsOfTheRows => "the-lengths-of-the-rows",
             Self::AnOverflow => "an-overflow",
+            Self::ANegativeExponent => "a-negative-exponent",
+            Self::ABitwiseCallOnANull => "a-bitwise-call-on-a-null",
+            Self::ADivisionByZero => "a-division-by-zero",
             Self::AValueBeyondADecimal => "a-value-beyond-a-decimal",
             Self::APanic => "a-panic",
             Self::AWindowOverAWindow => "a-window-over-a-window",
@@ -214,6 +250,15 @@ impl Limit {
             }
             Self::AnOverflow => {
                 "a debug build of Polars panics on an overflow of the values, which the tables measured on one sample"
+            }
+            Self::ANegativeExponent => {
+                "Polars takes the exponent of an integer as a UInt32, so a negative one fails when the rows run, which the tables measured with the number 1"
+            }
+            Self::ABitwiseCallOnANull => {
+                "Polars meets an operand of the dtype Null of a bitwise call where select does not, and refuses it, though the tables allowed the call as a Boolean"
+            }
+            Self::ADivisionByZero => {
+                "Polars refuses to divide a Decimal by zero, which the sample's values never give the tables"
             }
             Self::AValueBeyondADecimal => {
                 "a UInt128 beyond the digits of a decimal cannot be cast to it, which the tables measured on values within it"
@@ -314,6 +359,98 @@ fn any_call(expression: &Expression, found: &dyn Fn(&Call) -> bool) -> bool {
 fn is_a_single_value(call: &Call) -> bool {
     is_one_value(call)
         || (is(call, "polars.lit") && matches!(call.argument("value"), Some(Value::Flag(None))))
+}
+
+/// Whether `call` is `and`, `or` or `xor`.
+fn is_a_bitwise_call(call: &Call) -> bool {
+    matches!(
+        call.entry().id().as_str(),
+        "Expr.and_" | "Expr.or_" | "Expr.xor"
+    )
+}
+
+/// Whether `expression` starts from a null of the dtype Null the case holds: a literal null with
+/// no dtype, or the column `a` or `b` when it is the dtype Null.
+fn starts_from_a_null(case: &Case, expression: &Expression) -> bool {
+    match expression.start() {
+        Start::Call(start) if is(start, "polars.lit") => {
+            start.argument("dtype").is_none()
+                && matches!(start.argument("value"), Some(Value::Flag(None)))
+        }
+        Start::Call(start) if is(start, "polars.col") => {
+            matches!(start.argument("name"), Some(Value::Columns(names))
+                if names.len() == 1
+                    && super::frames::column_class(&names[0], case.receiver, case.argument)
+                        == Some(Representative::Null))
+        }
+        _ => false,
+    }
+}
+
+/// Whether the link `at` of `expression` is a bitwise call that meets a null: one given a null as
+/// an operand, or the first call of a chain that starts from one.
+fn meets_a_null(case: &Case, expression: &Expression, at: usize) -> bool {
+    let link = &expression.links()[at];
+    is_a_bitwise_call(link)
+        && (operands(link)
+            .into_iter()
+            .any(|(_, operand)| operand.links().is_empty() && starts_from_a_null(case, operand))
+            || (at == 0 && starts_from_a_null(case, expression)))
+}
+
+/// The calls of an expression: its start, then its links.
+fn calls_of_expression(expression: &Expression) -> impl Iterator<Item = &Call> {
+    std::iter::once(expression.start())
+        .filter_map(|start| match start {
+            Start::Call(call) => Some(call),
+            Start::Input(_) | Start::Hole => None,
+        })
+        .chain(expression.links())
+}
+
+/// Whether an expression holds, at any depth, a bitwise call that meets a null.
+fn holds_a_bitwise_call_on_a_null(case: &Case, expression: &Expression) -> bool {
+    (0..expression.links().len()).any(|at| meets_a_null(case, expression, at))
+        || calls_of_expression(expression).any(|call| {
+            operands(call)
+                .into_iter()
+                .any(|(_, inside)| holds_a_bitwise_call_on_a_null(case, inside))
+        })
+}
+
+/// Whether an expression has a `not` straight after an `and` or an `or` that meets a null, at
+/// any depth.
+fn negates_a_bitwise_call_on_a_null(case: &Case, expression: &Expression) -> bool {
+    expression.links().windows(2).enumerate().any(|(at, pair)| {
+        is(&pair[1], "Expr.not_")
+            && (is(&pair[0], "Expr.and_") || is(&pair[0], "Expr.or_"))
+            && meets_a_null(case, expression, at)
+    }) || calls_of_expression(expression).any(|call| {
+        operands(call)
+            .into_iter()
+            .any(|(_, inside)| negates_a_bitwise_call_on_a_null(case, inside))
+    })
+}
+
+/// Whether `call` is a literal that is a whole number below zero.
+fn is_a_whole_number_below_zero(call: &Call) -> bool {
+    is(call, "polars.lit")
+        && matches!(call.argument("value"), Some(Value::Integer(number)) if *number < 0)
+}
+
+/// Whether `call` is a `pow` whose exponent holds a value that may be below zero: a whole number
+/// typed below zero, or a call that can take the values of a column there, as the sample's own
+/// values are not.
+fn is_a_power_that_may_be_given_a_value_below_zero(call: &Call) -> bool {
+    is(call, "Expr.pow")
+        && matches!(call.argument("exponent"), Some(Value::Expression(exponent))
+        if any_call(exponent, &|inner| {
+            is_a_whole_number_below_zero(inner)
+                || matches!(
+                    inner.entry().id().as_str(),
+                    "Expr.sub" | "Expr.neg" | "Expr.not_"
+                )
+        }))
 }
 
 fn has_explode(call: &Call) -> bool {
@@ -656,6 +793,9 @@ fn effect(call: &Call) -> Effect {
     match call.entry().id().as_str() {
         "Expr.cum_sum"
         | "Expr.cum_max"
+        | "Expr.abs"
+        | "Expr.neg"
+        | "Expr.not_"
         | "Expr.dt.date"
         | "Expr.dt.month_start"
         | "Expr.dt.time"
@@ -667,7 +807,16 @@ fn effect(call: &Call) -> Effect {
         | "Expr.ge"
         | "Expr.lt"
         | "Expr.le"
+        | "Expr.add"
+        | "Expr.and_"
+        | "Expr.floordiv"
+        | "Expr.mod"
+        | "Expr.mul"
+        | "Expr.or_"
+        | "Expr.pow"
         | "Expr.sub"
+        | "Expr.truediv"
+        | "Expr.xor"
         | "Expr.dt.offset_by"
         | "When.then"
         | "Then.otherwise"
@@ -790,6 +939,7 @@ fn rows_after(frames: &Frames, expression: &Expression, upto: usize) -> Option<V
                 vec![one]
             }
             "Expr.len" => vec![Cell::Value],
+            id if carries_nulls(id) => carried(frames, &rows, link),
             _ => match effect(link) {
                 Effect::Keeps => rows,
                 Effect::Values => vec![Cell::Value; rows.len()],
@@ -806,6 +956,62 @@ fn rows_after(frames: &Frames, expression: &Expression, upto: usize) -> Option<V
         };
     }
     Some(rows)
+}
+
+/// Whether the call `id` gives a null in each row where it is given one, in the
+/// rows it follows or in an operand: a comparison and arithmetic do. `and` and `or` do
+/// not, for a null with a true is a true. `xor` does, and is left out, which only
+/// excuses less. A call that chooses between operands does not either.
+fn carries_nulls(id: &str) -> bool {
+    matches!(
+        id,
+        "Expr.eq"
+            | "Expr.ne"
+            | "Expr.gt"
+            | "Expr.ge"
+            | "Expr.lt"
+            | "Expr.le"
+            | "Expr.add"
+            | "Expr.sub"
+            | "Expr.mul"
+            | "Expr.truediv"
+            | "Expr.floordiv"
+            | "Expr.mod"
+            | "Expr.pow"
+    )
+}
+
+/// The rows of a call that carries nulls, which follows `rows` and is given
+/// operands: null where the rows it follows hold a null, or an operand does,
+/// and not known elsewhere. An operand of one row meets each row, and an operand of
+/// which nothing is known, or of another number of rows, carries nothing.
+fn carried(frames: &Frames, rows: &[Cell], link: &Call) -> Vec<Cell> {
+    let held: Vec<Vec<Cell>> = operands(link)
+        .into_iter()
+        .filter_map(|(_, operand)| rows_after(frames, operand, operand.links().len()))
+        .collect();
+    let count = held
+        .iter()
+        .map(Vec::len)
+        .chain(std::iter::once(rows.len()))
+        .max()
+        .map_or(SAMPLE_ROWS, |most| most.max(1));
+    let nulls_at = |cells: &[Cell], row: usize| match cells {
+        [only] => *only == Cell::Null,
+        cells => cells.get(row) == Some(&Cell::Null),
+    };
+    let fits = |cells: &Vec<Cell>| cells.len() == 1 || cells.len() == count;
+    (0..count)
+        .map(|row| {
+            if (rows.len() == 1 || rows.len() == count) && nulls_at(rows, row)
+                || held.iter().any(|cells| fits(cells) && nulls_at(cells, row))
+            {
+                Cell::Null
+            } else {
+                Cell::Unknown
+            }
+        })
+        .collect()
 }
 
 /// The name of the one column `expression` starts from, when it starts from one.
@@ -1036,7 +1242,13 @@ fn control_with_columns(
 }
 
 /// Whether the limit is why the tables and Polars disagree.
-fn applies(limit: Limit, case: &Case, disagreement: &Disagreement, observed: &Observed) -> bool {
+fn applies(
+    limit: Limit,
+    case: &Case,
+    disagreement: &Disagreement,
+    prediction: &Prediction,
+    observed: &Observed,
+) -> bool {
     let step = case.document.steps()[0].call();
     let pivot = is(step, "LazyFrame.pivot");
     let held = operands(step);
@@ -1164,6 +1376,45 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement, observed: &Ob
         (Limit::AnOverflow, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal) && refusal.reason.contains("with overflow")
         }
+        (Limit::ANegativeExponent, Disagreement::PolarsRefuses(refusal)) => {
+            // The rows hold the number; a table with no rows holds none to convert.
+            unplaced(refusal)
+                && refusal.stage == Stage::Rows
+                && refusal.reason.starts_with("conversion from `")
+                && refusal.reason.contains("` to `u32` failed")
+                && held.iter().any(|(_, held)| {
+                    any_call(held, &is_a_power_that_may_be_given_a_value_below_zero)
+                })
+        }
+        (Limit::ABitwiseCallOnANull, Disagreement::PolarsRefuses(refusal)) => {
+            let reason = refusal.reason.as_str();
+            let negated = reason.contains("dtype Null not supported in 'not' operation")
+                && held
+                    .iter()
+                    .any(|(_, held)| negates_a_bitwise_call_on_a_null(case, held));
+            let filtered = reason
+                .contains("filter predicate must be of type `Boolean`, got `Null`")
+                && is(step, "LazyFrame.filter")
+                && held
+                    .iter()
+                    .any(|(_, held)| holds_a_bitwise_call_on_a_null(case, held));
+            unplaced(refusal) && refusal.stage == Stage::Rows && (negated || filtered)
+        }
+        (Limit::ADivisionByZero, Disagreement::PolarsRefuses(refusal)) => {
+            // The rows hold the divisor; a table with no rows holds none.
+            unplaced(refusal)
+                && refusal.stage == Stage::Rows
+                && refusal.reason.contains("division by zero Decimal")
+                && [case.receiver, case.argument].contains(&Representative::Decimal)
+                && held.iter().any(|(_, held)| {
+                    any_call(held, &|call| {
+                        matches!(
+                            call.entry().id().as_str(),
+                            "Expr.truediv" | "Expr.floordiv" | "Expr.mod"
+                        )
+                    })
+                })
+        }
         (Limit::AValueBeyondADecimal, Disagreement::PolarsRefuses(refusal)) => {
             // The rows hold the values; a table with no rows holds none to fail.
             unplaced(refusal)
@@ -1191,7 +1442,15 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement, observed: &Ob
             let locus = locate(case, &refused.place);
             let last = locus.inside.last().map(|chain| chain.links().len());
             refused.reason.starts_with(SCHEMA_SAYS)
-                && (locus.inside.len() > 1 || locus.index.is_some_and(|at| Some(at + 1) != last))
+                && (locus.inside.len() > 1
+                    || locus.index.is_some_and(|at| Some(at + 1) != last)
+                    // A sort key is no output of the step, unless a probe of the call on a
+                    // column in the key settles it, which is asked of a case the limits do
+                    // not excuse.
+                    || (matches!(
+                        step.entry().id().as_str(),
+                        "LazyFrame.sort" | "LazyFrame.join"
+                    ) && settle_in_the_position(case, refused, prediction, observed).is_none()))
         }
         (Limit::AWindowOverAWindow, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
@@ -1220,7 +1479,7 @@ pub fn excuses(case: &Case, prediction: &Prediction, observed: &Observed) -> Vec
     };
     Limit::ALL
         .into_iter()
-        .filter(|limit| applies(*limit, case, &disagreement, observed))
+        .filter(|limit| applies(*limit, case, &disagreement, prediction, observed))
         .collect()
 }
 
@@ -1826,6 +2085,459 @@ mod tests {
                 "Polars panicked: should not fail"
             ),
             vec![Limit::APanic]
+        );
+    }
+
+    // ----- A negative exponent
+
+    const NEGATIVE_EXPONENT: &str =
+        "conversion from `i32` to `u32` failed in column 'literal' for 1 out of 1 values: [-1]";
+
+    /// A literal that is the whole number `number`, typed without a dtype.
+    fn whole(number: i64) -> Expression {
+        chain(
+            call("polars.lit", vec![("value", Value::Integer(number))]),
+            &[],
+        )
+    }
+
+    fn pow_of(exponent: Expression) -> Call {
+        call("Expr.pow", vec![("exponent", Value::Expression(exponent))])
+    }
+
+    #[test]
+    fn a_failed_conversion_to_a_u32_is_excused_where_a_power_is_given_a_negative_number() {
+        let case = select(vec![chain_of(column("a"), vec![pow_of(whole(-1))])]);
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Rows, NEGATIVE_EXPONENT, Vec::new()),
+            vec![Limit::ANegativeExponent]
+        );
+        // A power in an expression the chain is given reaches it too.
+        let nested = select(vec![chain_of(
+            column("a"),
+            vec![compared_with(
+                "Expr.eq",
+                chain_of(column("k"), vec![pow_of(whole(-1))]),
+            )],
+        )]);
+        assert_eq!(
+            polars_refuses(&nested, None, Stage::Rows, NEGATIVE_EXPONENT, Vec::new()),
+            vec![Limit::ANegativeExponent]
+        );
+    }
+
+    #[test]
+    fn a_failed_conversion_to_a_u32_is_excused_where_a_power_is_given_a_value_below_zero() {
+        // A subtraction, a negation, the bits of a number flipped and a number typed below zero
+        // take the values of a column below zero.
+        for exponent in [
+            chain_of(
+                column("b"),
+                vec![compared_with("Expr.sub", chain(column("k"), &[]))],
+            ),
+            chain(column("k"), &["Expr.neg"]),
+            chain(column("k"), &["Expr.not_"]),
+            chain_of(column("k"), vec![compared_with("Expr.add", whole(-3))]),
+            chain_of(column("k"), vec![compared_with("Expr.mul", whole(-1))]),
+        ] {
+            let case = select(vec![chain_of(column("a"), vec![pow_of(exponent)])]);
+            assert_eq!(
+                polars_refuses(&case, None, Stage::Rows, NEGATIVE_EXPONENT, Vec::new()),
+                vec![Limit::ANegativeExponent]
+            );
+        }
+    }
+
+    #[test]
+    fn a_failed_conversion_to_a_u32_is_not_excused_by_a_sum_or_a_product_of_columns() {
+        // The sample's rows are 1, a null and 3, so a sum or a product of columns and of numbers
+        // above zero never goes below it: something else made the number fail to convert.
+        for exponent in [
+            chain_of(
+                column("k"),
+                vec![compared_with("Expr.add", chain(column("a"), &[]))],
+            ),
+            chain_of(
+                column("k"),
+                vec![compared_with("Expr.mul", chain(column("a"), &[]))],
+            ),
+            chain_of(column("k"), vec![compared_with("Expr.add", whole(3))]),
+        ] {
+            let case = select(vec![chain_of(column("a"), vec![pow_of(exponent)])]);
+            assert_eq!(
+                polars_refuses(&case, None, Stage::Rows, NEGATIVE_EXPONENT, Vec::new()),
+                vec![]
+            );
+        }
+    }
+
+    #[test]
+    fn a_failed_conversion_to_a_u32_is_not_excused_without_a_power_of_a_negative_number() {
+        // A power of a positive number or of a column, and a negative number given to another
+        // call, are not why a number fails to become a `u32`.
+        for case in [
+            select(vec![chain_of(column("a"), vec![pow_of(whole(2))])]),
+            select(vec![chain_of(
+                column("a"),
+                vec![pow_of(chain(column("b"), &[]))],
+            )]),
+            select(vec![chain_of(
+                column("a"),
+                vec![compared_with("Expr.sub", whole(-1))],
+            )]),
+        ] {
+            assert_eq!(
+                polars_refuses(&case, None, Stage::Rows, NEGATIVE_EXPONENT, Vec::new()),
+                vec![]
+            );
+        }
+    }
+
+    #[test]
+    fn only_a_failed_conversion_to_a_u32_of_the_rows_without_a_place_is_excused_for_a_power() {
+        let case = select(vec![chain_of(column("a"), vec![pow_of(whole(-1))])]);
+        for reason in [
+            "conversion from `i32` to `u8` failed in column 'literal' for 1 out of 1 values: [-1]",
+            "`pow` operation not supported for dtype `str` as base",
+        ] {
+            assert_eq!(
+                polars_refuses(&case, None, Stage::Rows, reason, Vec::new()),
+                vec![],
+                "{reason}"
+            );
+        }
+        // A refusal that Polars places at a call is the call's.
+        assert_eq!(
+            polars_refuses(
+                &case,
+                Some(link_of("exprs", 0, 0)),
+                Stage::Rows,
+                NEGATIVE_EXPONENT,
+                Vec::new()
+            ),
+            vec![]
+        );
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Schema, NEGATIVE_EXPONENT, Vec::new()),
+            vec![]
+        );
+    }
+
+    // ----- A negated bitwise call
+
+    const NOT_OF_A_NULL: &str = "dtype Null not supported in 'not' operation";
+
+    fn and_of(operand: Expression) -> Call {
+        call("Expr.and_", vec![("others", many(vec![operand]))])
+    }
+
+    #[test]
+    fn a_not_of_the_dtype_null_is_excused_where_a_not_comes_straight_after_an_and_or_an_or() {
+        for combined in [
+            and_of(chain(column("f"), &[])),
+            call(
+                "Expr.or_",
+                vec![("others", many(vec![chain(column("f"), &[])]))],
+            ),
+        ] {
+            let case = select(vec![chain_of(
+                null(),
+                vec![
+                    combined,
+                    call("Expr.not_", Vec::new()),
+                    call("Expr.min", Vec::new()),
+                ],
+            )]);
+            assert_eq!(
+                polars_refuses(&case, None, Stage::Rows, NOT_OF_A_NULL, Vec::new()),
+                vec![Limit::ABitwiseCallOnANull]
+            );
+        }
+        // In an expression the chain is given too.
+        let nested = select(vec![chain_of(
+            column("a"),
+            vec![compared_with(
+                "Expr.eq",
+                chain_of(
+                    null(),
+                    vec![
+                        and_of(chain(column("f"), &[])),
+                        call("Expr.not_", Vec::new()),
+                    ],
+                ),
+            )],
+        )]);
+        assert_eq!(
+            polars_refuses(&nested, None, Stage::Rows, NOT_OF_A_NULL, Vec::new()),
+            vec![Limit::ABitwiseCallOnANull]
+        );
+    }
+
+    #[test]
+    fn a_not_of_the_dtype_null_is_not_excused_without_a_not_straight_after_a_bitwise_call() {
+        for case in [
+            // A not of a null, and no bitwise call.
+            select(vec![chain(null(), &["Expr.not_"])]),
+            // A bitwise call that no not follows.
+            select(vec![chain_of(
+                null(),
+                vec![
+                    and_of(chain(column("f"), &[])),
+                    call("Expr.min", Vec::new()),
+                ],
+            )]),
+            // A call between the two.
+            select(vec![chain_of(
+                null(),
+                vec![
+                    and_of(chain(column("f"), &[])),
+                    call("Expr.cum_max", vec![]),
+                    call("Expr.not_", Vec::new()),
+                ],
+            )]),
+        ] {
+            assert_eq!(
+                polars_refuses(&case, None, Stage::Rows, NOT_OF_A_NULL, Vec::new()),
+                vec![]
+            );
+        }
+    }
+
+    #[test]
+    fn a_bitwise_call_that_meets_no_null_excuses_neither_a_not_nor_a_filter_predicate_of_the_dtype_null()
+     {
+        // A conjunction of two columns, in a filter or before a not, is not what gave the dtype
+        // Null: no null reaches it.
+        let predicate = "filter predicate must be of type `Boolean`, got `Null`";
+        let filtered = |predicates: Vec<Expression>| {
+            case_of(call(
+                "LazyFrame.filter",
+                vec![("predicates", many(predicates))],
+            ))
+        };
+        let columns = || chain_of(column("f"), vec![and_of(chain(column("g"), &[]))]);
+        assert_eq!(
+            polars_refuses(
+                &filtered(vec![columns()]),
+                None,
+                Stage::Rows,
+                predicate,
+                Vec::new()
+            ),
+            vec![]
+        );
+        // A null in another predicate, which no bitwise call meets, is no cause either.
+        assert_eq!(
+            polars_refuses(
+                &filtered(vec![chain(null(), &["Expr.is_null"]), columns()]),
+                None,
+                Stage::Rows,
+                predicate,
+                Vec::new()
+            ),
+            vec![]
+        );
+        let negated = select(vec![chain_of(
+            column("f"),
+            vec![
+                and_of(chain(column("g"), &[])),
+                call("Expr.not_", Vec::new()),
+            ],
+        )]);
+        assert_eq!(
+            polars_refuses(&negated, None, Stage::Rows, NOT_OF_A_NULL, Vec::new()),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn only_a_refusal_of_a_not_of_the_dtype_null_at_the_rows_without_a_place_is_excused_for_a_not()
+    {
+        let case = select(vec![chain_of(
+            null(),
+            vec![
+                and_of(chain(column("f"), &[])),
+                call("Expr.not_", Vec::new()),
+            ],
+        )]);
+        assert_eq!(
+            polars_refuses(
+                &case,
+                None,
+                Stage::Rows,
+                "dtype Int8 not supported in 'not' operation",
+                Vec::new()
+            ),
+            vec![]
+        );
+        assert_eq!(
+            polars_refuses(
+                &case,
+                Some(link_of("exprs", 0, 1)),
+                Stage::Rows,
+                NOT_OF_A_NULL,
+                Vec::new()
+            ),
+            vec![]
+        );
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Schema, NOT_OF_A_NULL, Vec::new()),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_filter_predicate_of_the_dtype_null_is_excused_where_a_bitwise_call_is_in_the_case() {
+        // Polars gives `null & f` as a filter's predicate the dtype Null, where select shows a
+        // `Boolean`.
+        let reason = "filter predicate must be of type `Boolean`, got `Null`";
+        let filtered = |predicate: Expression| {
+            case_of(call(
+                "LazyFrame.filter",
+                vec![("predicates", many(vec![predicate]))],
+            ))
+        };
+        let case = filtered(chain_of(null(), vec![and_of(chain(column("f"), &[]))]));
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Rows, reason, Vec::new()),
+            vec![Limit::ABitwiseCallOnANull]
+        );
+        let other_side = filtered(chain_of(column("f"), vec![and_of(chain(null(), &[]))]));
+        assert_eq!(
+            polars_refuses(&other_side, None, Stage::Rows, reason, Vec::new()),
+            vec![Limit::ABitwiseCallOnANull]
+        );
+        // A predicate that holds no bitwise call, and another step, are not why.
+        let plain = filtered(chain(null(), &["Expr.is_null"]));
+        assert_eq!(
+            polars_refuses(&plain, None, Stage::Rows, reason, Vec::new()),
+            vec![]
+        );
+        let selected = select(vec![chain_of(
+            null(),
+            vec![and_of(chain(column("f"), &[]))],
+        )]);
+        assert_eq!(
+            polars_refuses(&selected, None, Stage::Rows, reason, Vec::new()),
+            vec![]
+        );
+        // Only the refusal of a predicate of the dtype Null, at the rows, without a place.
+        assert_eq!(
+            polars_refuses(
+                &case,
+                None,
+                Stage::Rows,
+                "filter predicate must be of type `Boolean`, got `Int64`",
+                Vec::new()
+            ),
+            vec![]
+        );
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Schema, reason, Vec::new()),
+            vec![]
+        );
+    }
+
+    // ----- A division by zero
+
+    const DIVISION_BY_ZERO: &str = "division by zero Decimal";
+
+    /// The case with a `Decimal` as the column `a`.
+    fn with_a_decimal(mut case: Case) -> Case {
+        case.receiver = Representative::Decimal;
+        case
+    }
+
+    #[test]
+    fn a_division_by_zero_is_excused_where_a_division_is_in_a_case_with_a_decimal() {
+        for division in ["Expr.floordiv", "Expr.truediv", "Expr.mod"] {
+            let case = with_a_decimal(select(vec![chain_of(
+                column("b"),
+                vec![compared_with(division, chain(column("a"), &[]))],
+            )]));
+            assert_eq!(
+                polars_refuses(&case, None, Stage::Rows, DIVISION_BY_ZERO, Vec::new()),
+                vec![Limit::ADivisionByZero],
+                "{division}"
+            );
+        }
+        // A division in an expression the chain is given reaches it too.
+        let nested = with_a_decimal(select(vec![chain_of(
+            column("a"),
+            vec![compared_with(
+                "Expr.eq",
+                chain_of(
+                    column("b"),
+                    vec![compared_with("Expr.floordiv", chain(column("k"), &[]))],
+                ),
+            )],
+        )]));
+        assert_eq!(
+            polars_refuses(&nested, None, Stage::Rows, DIVISION_BY_ZERO, Vec::new()),
+            vec![Limit::ADivisionByZero]
+        );
+        // The Decimal may be the argument column.
+        let mut other_side = select(vec![chain_of(
+            column("a"),
+            vec![compared_with("Expr.mod", chain(column("b"), &[]))],
+        )]);
+        other_side.argument = Representative::Decimal;
+        assert_eq!(
+            polars_refuses(&other_side, None, Stage::Rows, DIVISION_BY_ZERO, Vec::new()),
+            vec![Limit::ADivisionByZero]
+        );
+    }
+
+    #[test]
+    fn a_division_by_zero_is_not_excused_without_a_decimal_nor_a_division_nor_at_a_place() {
+        let divided = || {
+            select(vec![chain_of(
+                column("b"),
+                vec![compared_with("Expr.floordiv", chain(column("a"), &[]))],
+            )])
+        };
+        // No Decimal in the case: Polars divides whole numbers and floats by zero without refusing.
+        assert_eq!(
+            polars_refuses(&divided(), None, Stage::Rows, DIVISION_BY_ZERO, Vec::new()),
+            vec![]
+        );
+        // A refusal that is not of a Decimal.
+        assert_eq!(
+            polars_refuses(
+                &with_a_decimal(divided()),
+                None,
+                Stage::Rows,
+                "division by zero Int64",
+                Vec::new()
+            ),
+            vec![]
+        );
+        let none = with_a_decimal(select(vec![chain_of(
+            column("b"),
+            vec![compared_with("Expr.mul", chain(column("a"), &[]))],
+        )]));
+        assert_eq!(
+            polars_refuses(&none, None, Stage::Rows, DIVISION_BY_ZERO, Vec::new()),
+            vec![]
+        );
+        let case = with_a_decimal(divided());
+        assert_eq!(
+            polars_refuses(
+                &case,
+                Some(link_of("exprs", 0, 0)),
+                Stage::Rows,
+                DIVISION_BY_ZERO,
+                Vec::new()
+            ),
+            vec![]
+        );
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Schema, DIVISION_BY_ZERO, Vec::new()),
+            vec![]
+        );
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Rows, "no", Vec::new()),
+            vec![]
         );
     }
 
@@ -2464,6 +3176,87 @@ mod tests {
         );
     }
 
+    #[test]
+    fn a_null_in_an_operand_column_carries_through_a_binary_call() {
+        // Polars: `b - x` is null where `b` or `x` is, so `b.sub(k)` of the sample's `b`
+        // (a value, a null, a value) is `v, null, v`; one shift gives `null, v, null`; and
+        // `.mul(a)` of the sample's `a` (a value, a null, a value) is null in every row.
+        let shifts = [Limit::AShiftThatLeavesNulls];
+        let binary = |id: &str, operand: &str| {
+            let operand = chain(column(operand), &[]);
+            match id {
+                "Expr.and_" | "Expr.or_" => call(id, vec![("others", many(vec![operand]))]),
+                _ => compared_with(id, operand),
+            }
+        };
+        assert_eq!(
+            excused_after(
+                "b",
+                vec![
+                    binary("Expr.sub", "k"),
+                    shift_by(1),
+                    binary("Expr.mul", "a")
+                ]
+            ),
+            shifts
+        );
+        // The receiver holds the value the shift moves to the end, and the operand's null
+        // is in the middle: each row is null by one or the other.
+        assert_eq!(
+            excused_after(
+                "k",
+                vec![
+                    binary("Expr.sub", "a"),
+                    shift_by(1),
+                    binary("Expr.mul", "a")
+                ]
+            ),
+            shifts
+        );
+        // An operand that holds no null leaves the row the receiver holds a value in.
+        assert_eq!(
+            excused_after(
+                "b",
+                vec![
+                    binary("Expr.sub", "k"),
+                    shift_by(1),
+                    binary("Expr.mul", "k")
+                ]
+            ),
+            vec![]
+        );
+        // So does a literal, which is one value, and a column the sample has none of.
+        let literal = compared_with("Expr.mul", chain_with_integer(2));
+        assert_eq!(
+            excused_after("b", vec![binary("Expr.sub", "k"), shift_by(1), literal]),
+            vec![]
+        );
+        // A null in the operand alone does not empty the rows that the receiver holds.
+        assert_eq!(excused_after("k", vec![binary("Expr.mul", "a")]), vec![]);
+        // `or` and `and` do not carry a null through: a null with a true is a true. `xor`
+        // does, and is left unknown, which only excuses less.
+        for id in ["Expr.or_", "Expr.and_", "Expr.xor"] {
+            assert_eq!(
+                excused_after("k", vec![shift_by(3), binary(id, "f")]),
+                vec![],
+                "{id}"
+            );
+        }
+        // A call whose effect on the rows is not known leaves nothing known of them, so the
+        // null of the operand does not reach them.
+        assert_eq!(
+            excused_after(
+                "k",
+                vec![
+                    binary("Expr.sub", "a"),
+                    over("k", None),
+                    binary("Expr.mul", "a")
+                ]
+            ),
+            vec![]
+        );
+    }
+
     /// A whole number as an expression: a literal of it.
     fn chain_with_integer(rows: i64) -> Expression {
         chain(
@@ -2638,6 +3431,49 @@ mod tests {
         // Another reason.
         assert_eq!(
             tables_refuse(&case, link_of("exprs", 0, 0), ROWS, "no"),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_hidden_schema_is_excused_at_the_end_of_a_sort_key_which_is_no_output_of_the_step() {
+        // Polars sorts by a key without making it a column of the step's table, so a plan that
+        // says `Null` where its rows give `Float64`, as a null divided by a whole number does,
+        // is not met where the key is the last call too.
+        let reason = "the schema says Null and the rows give Float64";
+        let sorted =
+            |key: Expression| case_of(call("LazyFrame.sort", vec![("by", many(vec![key]))]));
+        let divided = chain_of(column("a"), vec![compared_with("Expr.truediv", whole(1))]);
+        assert_eq!(
+            tables_refuse(&sorted(divided.clone()), link_of("by", 0, 0), ROWS, reason),
+            vec![Limit::AHiddenSchema]
+        );
+        // The step's own schema is shown by what it selects, however the key is.
+        let selected = select(vec![divided]);
+        assert_eq!(
+            tables_refuse(&selected, link_of("exprs", 0, 0), ROWS, reason),
+            vec![]
+        );
+        // Another reason.
+        let divided = chain_of(column("a"), vec![compared_with("Expr.truediv", whole(1))]);
+        assert_eq!(
+            tables_refuse(&sorted(divided), link_of("by", 0, 0), ROWS, "no"),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_hidden_schema_is_excused_at_the_end_of_a_join_key_which_is_no_output_of_the_step() {
+        let reason = "the schema says Null and the rows give Float64";
+        let divided = chain_of(column("a"), vec![compared_with("Expr.truediv", whole(1))]);
+        let joined = join(chain(column("key"), &[]), divided.clone());
+        assert_eq!(
+            tables_refuse(&joined, link_of("right_on", 0, 0), ROWS, reason),
+            vec![Limit::AHiddenSchema]
+        );
+        let selected = select(vec![divided]);
+        assert_eq!(
+            tables_refuse(&selected, link_of("exprs", 0, 0), ROWS, reason),
             vec![]
         );
     }

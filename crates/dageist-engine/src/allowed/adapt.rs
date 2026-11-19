@@ -7,7 +7,7 @@
 //! with typed columns, so they say what a call gives only for an operand of a dtype,
 //! and this module says which dtype that is for such a number.
 
-use crate::catalog::{Entry, ParameterDefault, Role};
+use crate::catalog::{Entry, Role};
 
 use super::dtype::Representative;
 use super::literal::Literal;
@@ -136,24 +136,80 @@ pub(crate) fn is_count(entry: &Entry, name: &str) -> bool {
 
 /// Whether Polars adapts a number typed without a dtype that is the parameter
 /// `name` of the method `entry` to what the method follows, as it does the operand
-/// of arithmetic and of a comparison, and the value `shift` fills with. A method
-/// takes other expressions that do not meet what it follows as an operand does: a
-/// key to group or order by, or the duration to offset a date by.
+/// of arithmetic and of a comparison, the value `shift` fills with, an exponent and
+/// what a value is divided by. A method takes other expressions that do not meet what
+/// it follows as an operand does: a key to group or order by, or the duration to
+/// offset a date by.
 pub(crate) fn operand_adapts(entry: &Entry, name: &str) -> bool {
-    matches!(role(entry, name), Some(Role::Operand | Role::Filler))
+    matches!(
+        role(entry, name),
+        Some(Role::Operand | Role::Filler | Role::Exponent | Role::Divisor | Role::FloorDivisor)
+    )
 }
 
-/// Whether Polars adapts a number that the method `entry` follows to the operand
-/// `name` it is given: the other side of arithmetic and of a comparison. It does not
-/// for the value `shift` fills with, which stands in for what the shift leaves
-/// missing and is not combined with the receiver.
-pub(crate) fn receiver_adapts(entry: &Entry, name: &str) -> bool {
-    role(entry, name) == Some(Role::Operand)
+/// Whether the number typed without a dtype that is the parameter `name` of `entry` leaves what
+/// the method gives unresolved: an integer raised to a number with a fraction is the unresolved
+/// float the number is. A select resolves it to a `Float64` where it ends, a sort key or a join's
+/// key does not, and an operand it meets adapts it as it does the number, so `f32 / (i8 ** 1.5)`
+/// is a `Float32`: what it gives is not a dtype the tables can say.
+pub(crate) fn is_left_unresolved(
+    entry: &Entry,
+    name: &str,
+    number: Loose,
+    receiver: Representative,
+) -> bool {
+    role(entry, name) == Some(Role::Exponent) && !number.is_whole() && is_integer(receiver)
+}
+
+/// The dtype of the number typed without a dtype that is the parameter `name` of the method
+/// `entry`, beside a receiver of the dtype `receiver`, where the tables can say it: that of the
+/// receiver where it fits it, a Boolean for a number with a fraction that a Boolean is floor
+/// divided by, which Polars adapts it to and so refuses the call, and otherwise none.
+pub(crate) fn adapted_dtype(
+    entry: &Entry,
+    name: &str,
+    number: Loose,
+    receiver: Representative,
+) -> Option<Representative> {
+    if role(entry, name) == Some(Role::FloorDivisor)
+        && !number.is_whole()
+        && receiver == Representative::Boolean
+    {
+        return Some(Representative::Boolean);
+    }
+    number.beside(receiver)
+}
+
+/// What a number typed without a dtype that the method `entry` follows becomes beside the
+/// operand `name` it is given.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Receiver {
+    /// It adapts to the dtype of the operand where it fits it, as the other side of
+    /// arithmetic and of a comparison does.
+    Adapts,
+    /// It keeps the dtype it has alone: the base of a power, and a number with a
+    /// fraction that is divided.
+    Keeps,
+}
+
+/// How the number typed without a dtype that the method `entry` follows meets the operand
+/// `name`, where the operand says. `None` where Polars does not adapt it as an operand, or keep
+/// its dtype as one, that is, where the tables cannot say what it becomes: the value `shift`
+/// fills with, the rows it counts, or an expression that meets nothing.
+pub(crate) fn receiver_beside(entry: &Entry, name: &str, number: Loose) -> Option<Receiver> {
+    match role(entry, name)? {
+        Role::Operand | Role::FloorDivisor => Some(Receiver::Adapts),
+        Role::Exponent => Some(Receiver::Keeps),
+        Role::Divisor if number.is_whole() => Some(Receiver::Adapts),
+        Role::Divisor => Some(Receiver::Keeps),
+        Role::Plain | Role::Filler | Role::Count => None,
+    }
 }
 
 /// Whether the parameter `name` of `entry` must be given.
 pub(crate) fn is_required(entry: &Entry, name: &str) -> bool {
-    entry.parameters().iter().any(|parameter| {
-        parameter.name() == name && parameter.default() == ParameterDefault::Required
-    })
+    entry
+        .parameters()
+        .iter()
+        .any(|parameter| parameter.name() == name && parameter.is_needed())
 }

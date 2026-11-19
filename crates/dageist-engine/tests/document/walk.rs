@@ -740,6 +740,141 @@ fn a_join_key_with_a_comparison_of_a_column_with_a_null_at_any_depth_is_refused(
 }
 
 #[test]
+fn a_comparison_of_a_null_after_a_call_that_is_not_a_step_of_the_plan_is_still_with_a_null() {
+    // `and_` and `or_` given no operand are the expression they follow, so Polars meets
+    // `null > f` as if they were not there and folds it into a null.
+    let rule = Some(RefusalSource::Rule(Rule::KeyIsElementwise));
+    let null_start = || call("polars.lit", json!({ "value": { "flag": null } }));
+    for identity in ["Expr.and_", "Expr.or_"] {
+        let key = chain(
+            null_start(),
+            vec![call(identity, json!({})), compared("Expr.gt", field("f"))],
+        );
+        assert_eq!(joined_on(key), rule, "{identity}");
+    }
+    // The null a column is compared with is the same null followed by such a call.
+    let key = chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![field_then(
+                "a",
+                vec![compared(
+                    "Expr.gt",
+                    chain(
+                        call("polars.lit", json!({ "value": { "flag": null } })),
+                        vec![call("Expr.or_", json!({}))],
+                    ),
+                )],
+            )]) }),
+        ),
+        vec![call("When.then", json!({ "statement": field("k") }))],
+    );
+    assert_eq!(joined_on(key), rule);
+    // Given an operand they are a call of their own, which the rule does not see through.
+    let key = chain(
+        null_start(),
+        vec![
+            call("Expr.and_", json!({ "others": many(vec![field("f")]) })),
+            compared("Expr.gt", field("f")),
+        ],
+    );
+    assert_eq!(joined_on(key), None);
+}
+
+#[test]
+fn a_null_that_two_nots_undo_is_still_the_null_a_comparison_is_given() {
+    // Polars simplifies a not of a not away, so a null that an even number of nots follows is
+    // the null again, across calls that are the expression they follow, and a comparison with
+    // it folds into a null. An odd number leaves a call that Polars does not fold.
+    let rule = Some(RefusalSource::Rule(Rule::KeyIsElementwise));
+    let null_start = || {
+        call(
+            "polars.lit",
+            json!({ "value": { "flag": null }, "dtype": { "dtype": "UInt32" } }),
+        )
+    };
+    let not = || call("Expr.not_", json!({}));
+    let empty_and = || call("Expr.and_", json!({}));
+    for links in [
+        vec![not(), not(), compared("Expr.eq", field("f"))],
+        vec![not(), empty_and(), not(), compared("Expr.eq", field("f"))],
+        vec![not(), not(), not(), not(), compared("Expr.eq", field("f"))],
+    ] {
+        assert_eq!(
+            joined_on(chain(null_start(), links.clone())),
+            rule,
+            "{links:?}"
+        );
+    }
+    for links in [
+        vec![not(), compared("Expr.eq", field("f"))],
+        vec![not(), not(), not(), compared("Expr.eq", field("f"))],
+        vec![
+            not(),
+            call("Expr.abs", json!({})),
+            not(),
+            compared("Expr.eq", field("f")),
+        ],
+    ] {
+        assert_eq!(
+            joined_on(chain(null_start(), links.clone())),
+            None,
+            "{links:?}"
+        );
+    }
+    // The null a column is compared with is the same.
+    let key = field_then(
+        "k",
+        vec![compared("Expr.gt", chain(null_start(), vec![not(), not()]))],
+    );
+    assert_eq!(joined_on(key), rule);
+}
+
+#[test]
+fn a_comparison_with_a_null_drops_what_it_follows_where_that_is_one_value() {
+    // `(k - (k != null)).len() <= null` is a null that Polars folds before it meets the
+    // comparison of the column with a null inside the subtraction, so the key is allowed; a
+    // comparison with a null after what is not one value drops nothing, and its column is met.
+    let rule = Some(RefusalSource::Rule(Rule::KeyIsElementwise));
+    let in_a_condition = |predicate: Value| {
+        chain(
+            call(
+                "polars.when",
+                json!({ "predicates": many(vec![predicate]) }),
+            ),
+            vec![call("When.then", json!({ "statement": field("a") }))],
+        )
+    };
+    let inside = |method: &str| {
+        field_then(
+            "k",
+            vec![
+                call(
+                    method,
+                    json!({ "other": field_then("k", vec![compared("Expr.ne", null())]) }),
+                ),
+                call("Expr.len", json!({})),
+                compared("Expr.le", null()),
+            ],
+        )
+    };
+    for method in ["Expr.sub", "Expr.add", "Expr.mul"] {
+        assert_eq!(joined_on(in_a_condition(inside(method))), None, "{method}");
+    }
+    let evaluated = field_then(
+        "k",
+        vec![
+            call(
+                "Expr.sub",
+                json!({ "other": field_then("k", vec![compared("Expr.ne", null())]) }),
+            ),
+            compared("Expr.le", null()),
+        ],
+    );
+    assert_eq!(joined_on(in_a_condition(evaluated)), rule);
+}
+
+#[test]
 fn a_join_key_that_compares_nothing_of_a_column_with_a_null_is_not_refused() {
     let keys = [
         // A null, a comparison of two literals, a column with a whole number.
@@ -1477,4 +1612,27 @@ fn an_input_that_is_not_connected_leaves_what_follows_it_not_known() {
     );
     let walked = expression_at(&walk, &item("exprs", 0));
     assert_eq!(walked.places(), vec![None, None]);
+}
+
+#[test]
+fn and_and_or_given_no_operand_are_refused_after_a_float_as_they_are_with_one() {
+    // Polars lets them through with none, but a step always gives one, so they are judged with
+    // one: after a float no operand suits, and after a whole number or a Boolean one does.
+    let table =
+        df!("x" => [1.5_f64, 2.5], "a" => [1_i64, 2], "f" => [true, false]).expect("a table");
+    for id in ["Expr.and_", "Expr.or_"] {
+        let refused = |column: &str| {
+            let document = document_of(
+                "LazyFrame.select",
+                json!({ "exprs": many(vec![field_then(column, vec![call(id, json!({}))])]) }),
+            );
+            document.steps()[0]
+                .walk(0, table.schema(), &inputs())
+                .refusal()
+                .is_some()
+        };
+        assert!(refused("x"), "{id} after a float");
+        assert!(!refused("a"), "{id} after a whole number");
+        assert!(!refused("f"), "{id} after a Boolean");
+    }
 }
