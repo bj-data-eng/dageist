@@ -156,6 +156,13 @@ pub enum Limit {
     /// the rows with a failed conversion of `u128` to a decimal, which has no
     /// place, in a case that holds a subtraction.
     AValueBeyondADecimal,
+    /// Polars refuses to divide a `Decimal` by zero, where a whole number divided by
+    /// zero is null and a float is infinite: the divisor is a value, which the tables
+    /// measured as the dtype and the sample's values, none of them zero. A remainder
+    /// or a difference of the sample's values can be. Polars refusing the rows with
+    /// the reason that it divides by zero, which has no place, in a case that holds a
+    /// division, a floor division or a remainder.
+    ADivisionByZero,
     /// Polars panicking has no place, and is gated by its reason. A panic of
     /// Polars is an internal check that failed. The tables record
     /// one for the plan Polars made of a combination in `select`, and the plan
@@ -191,7 +198,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 16] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -202,6 +209,7 @@ impl Limit {
         Self::AnOverflow,
         Self::ANegativeExponent,
         Self::ABitwiseCallOnANull,
+        Self::ADivisionByZero,
         Self::AValueBeyondADecimal,
         Self::APanic,
         Self::AWindowOverAWindow,
@@ -222,6 +230,7 @@ impl Limit {
             Self::AnOverflow => "an-overflow",
             Self::ANegativeExponent => "a-negative-exponent",
             Self::ABitwiseCallOnANull => "a-bitwise-call-on-a-null",
+            Self::ADivisionByZero => "a-division-by-zero",
             Self::AValueBeyondADecimal => "a-value-beyond-a-decimal",
             Self::APanic => "a-panic",
             Self::AWindowOverAWindow => "a-window-over-a-window",
@@ -247,6 +256,9 @@ impl Limit {
             }
             Self::ABitwiseCallOnANull => {
                 "Polars meets an operand of the dtype Null of a bitwise call where select does not, and refuses it, though the tables allowed the call as a Boolean"
+            }
+            Self::ADivisionByZero => {
+                "Polars refuses to divide a Decimal by zero, which the sample's values never give the tables"
             }
             Self::AValueBeyondADecimal => {
                 "a UInt128 beyond the digits of a decimal cannot be cast to it, which the tables measured on values within it"
@@ -1294,6 +1306,20 @@ fn applies(
                     .any(|(_, held)| any_call(held, &is_a_bitwise_call));
             unplaced(refusal) && refusal.stage == Stage::Rows && (negated || filtered)
         }
+        (Limit::ADivisionByZero, Disagreement::PolarsRefuses(refusal)) => {
+            // The rows hold the divisor; a table with no rows holds none.
+            unplaced(refusal)
+                && refusal.stage == Stage::Rows
+                && refusal.reason.contains("division by zero")
+                && held.iter().any(|(_, held)| {
+                    any_call(held, &|call| {
+                        matches!(
+                            call.entry().id().as_str(),
+                            "Expr.truediv" | "Expr.floordiv" | "Expr.mod"
+                        )
+                    })
+                })
+        }
         (Limit::AValueBeyondADecimal, Disagreement::PolarsRefuses(refusal)) => {
             // The rows hold the values; a table with no rows holds none to fail.
             unplaced(refusal)
@@ -2250,6 +2276,74 @@ mod tests {
         );
         assert_eq!(
             polars_refuses(&case, None, Stage::Schema, reason, Vec::new()),
+            vec![]
+        );
+    }
+
+    // ----- A division by zero
+
+    const DIVISION_BY_ZERO: &str = "division by zero Decimal";
+
+    #[test]
+    fn a_division_by_zero_is_excused_where_a_division_is_in_the_case() {
+        for division in ["Expr.floordiv", "Expr.truediv", "Expr.mod"] {
+            let case = select(vec![chain_of(
+                column("b"),
+                vec![compared_with(division, chain(column("a"), &[]))],
+            )]);
+            assert_eq!(
+                polars_refuses(&case, None, Stage::Rows, DIVISION_BY_ZERO, Vec::new()),
+                vec![Limit::ADivisionByZero],
+                "{division}"
+            );
+        }
+        // A division in an expression the chain is given reaches it too.
+        let nested = select(vec![chain_of(
+            column("a"),
+            vec![compared_with(
+                "Expr.eq",
+                chain_of(
+                    column("b"),
+                    vec![compared_with("Expr.floordiv", chain(column("k"), &[]))],
+                ),
+            )],
+        )]);
+        assert_eq!(
+            polars_refuses(&nested, None, Stage::Rows, DIVISION_BY_ZERO, Vec::new()),
+            vec![Limit::ADivisionByZero]
+        );
+    }
+
+    #[test]
+    fn a_division_by_zero_is_not_excused_without_a_division_and_only_at_the_rows_without_a_place() {
+        let none = select(vec![chain_of(
+            column("b"),
+            vec![compared_with("Expr.mul", chain(column("a"), &[]))],
+        )]);
+        assert_eq!(
+            polars_refuses(&none, None, Stage::Rows, DIVISION_BY_ZERO, Vec::new()),
+            vec![]
+        );
+        let case = select(vec![chain_of(
+            column("b"),
+            vec![compared_with("Expr.floordiv", chain(column("a"), &[]))],
+        )]);
+        assert_eq!(
+            polars_refuses(
+                &case,
+                Some(link_of("exprs", 0, 0)),
+                Stage::Rows,
+                DIVISION_BY_ZERO,
+                Vec::new()
+            ),
+            vec![]
+        );
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Schema, DIVISION_BY_ZERO, Vec::new()),
+            vec![]
+        );
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Rows, "no", Vec::new()),
             vec![]
         );
     }
