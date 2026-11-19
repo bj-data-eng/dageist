@@ -24,10 +24,10 @@ impl Literal {
     /// - a whole number as its digits;
     /// - a number with a fraction as Python writes it, so that a whole one keeps its
     ///   fraction, `1.0`, and is not taken for a whole number, and one below 1e-4 or from
-    ///   1e16 on is written with an exponent, `1e+20`, as it is in the Python source;
+    ///   1e16 on is written with an exponent, `1e+20`, as a summary writes it;
     /// - text as it is, with no quotation marks and nothing escaped. The editor draws text
-    ///   between quotation marks of its own, and the Python source and a summary, which
-    ///   have no such drawing, write it as a Python string.
+    ///   between quotation marks of its own, and a summary, which has no such drawing,
+    ///   writes it as a Python string.
     #[must_use]
     pub fn shown(&self) -> String {
         match self {

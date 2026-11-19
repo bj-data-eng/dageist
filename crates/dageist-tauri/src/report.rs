@@ -18,7 +18,7 @@ use dageist_engine::allowed::{
 use dageist_engine::catalog::Laziness;
 use dageist_engine::document::{
     Change, ColumnChange, ColumnDescription, ColumnValues, ExpressionDtypes, FirstValues, Outcome,
-    Place, ReadError, Report, Resolution, RunCause, Segment, Source, StepReport, StepRows, Walk,
+    Place, ReadError, Report, Resolution, RunCause, Segment, StepReport, StepRows, Walk,
     WalkRefusal, WalkedExpression,
 };
 use serde::{Deserialize, Serialize};
@@ -595,8 +595,6 @@ fn outcome_view(outcome: &Outcome) -> OutcomeView {
 #[serde(rename_all = "camelCase")]
 pub struct StepReportView {
     id: String,
-    /// The step as the Python Polars method call it stands for.
-    source: String,
     /// What the step works on, in a few words.
     summary: String,
     /// Whether the step stays in a lazy plan; a step that does not collected
@@ -618,7 +616,6 @@ pub struct StepReportView {
 fn step_report_view(step: &StepReport) -> StepReportView {
     StepReportView {
         id: step.id().as_str().to_owned(),
-        source: step.source().to_owned(),
         summary: step.summary().to_owned(),
         lazy: matches!(step.laziness(), Laziness::Lazy),
         outcome: outcome_view(step.outcome()),
@@ -661,25 +658,6 @@ fn read_problem_view(error: &ReadError) -> ReadProblemView {
     }
 }
 
-/// One line of the Python module a document is written as.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct SourceLineView {
-    text: String,
-    /// The step the line is the call of, or the step a note on it is for.
-    step: Option<String>,
-}
-
-fn source_lines(source: &Source) -> Vec<SourceLineView> {
-    source
-        .lines()
-        .iter()
-        .map(|line| SourceLineView {
-            text: line.text().to_owned(),
-            step: line.step().map(|id| id.as_str().to_owned()),
-        })
-        .collect()
-}
-
 /// What running a document came to: its steps reported one by one, or the
 /// reason it could not be read.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -691,8 +669,6 @@ pub enum RunView {
         source: Vec<FieldView>,
         /// One report for each step, in the document's order.
         steps: Vec<StepReportView>,
-        /// The Python Polars module the document is written as, line by line.
-        python: Vec<SourceLineView>,
     },
     /// The text is not a document the engine reads.
     Unreadable { problem: ReadProblemView },
@@ -706,13 +682,11 @@ impl RunView {
         }
     }
 
-    /// The view of what running a document reported, with the module the
-    /// document is written as.
-    pub fn of_report(report: &Report, module: &Source) -> Self {
+    /// The view of what running a document reported.
+    pub fn of_report(report: &Report) -> Self {
         Self::Run {
             source: FieldView::of_columns(&ColumnDescription::of_schema(report.source())),
             steps: report.steps().iter().map(step_report_view).collect(),
-            python: source_lines(module),
         }
     }
 }

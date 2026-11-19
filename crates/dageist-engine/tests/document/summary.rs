@@ -223,17 +223,40 @@ fn a_column_that_is_added_is_named_and_several_are_listed() {
     assert_eq!(added(&["a", "b", "c", "d"]), "4 fields");
 }
 #[test]
-fn a_step_report_carries_the_source_and_the_summary_of_its_step() {
+fn a_step_report_carries_the_summary_of_its_step() {
     let sample = ClaimTiming::new().expect("the sample node");
     let report = sample.run(sample.steps()).expect("a run");
     for (reported, step) in report.steps().iter().zip(sample.steps().steps()) {
-        assert_eq!(reported.source(), step.source(sample.inputs()));
         assert_eq!(
             reported.summary(),
             step.summary(dageist_engine::catalog::english())
         );
     }
-    assert_eq!(report.steps()[0].source(), ".sort(\"dcn\", \"timestamp\")");
+    assert_eq!(report.steps()[0].summary(), "by dcn, timestamp");
+}
+
+#[test]
+fn a_typed_value_is_written_as_python_writes_it() {
+    // Worked out by hand: text is quoted with its quotation marks, backslashes and control
+    // characters escaped; a flag is `True`, `False` or `None`; a whole float keeps its `.0`.
+    let literal = |value: Value| chain(call("polars.lit", json!({ "value": value })), vec![]);
+    let summarised = |value: Value| {
+        summary(step(
+            "s",
+            "LazyFrame.select",
+            json!({ "exprs": many(vec![literal(value)]) }),
+        ))
+    };
+    assert_eq!(
+        summarised(json!({ "string": "say \"hi\"\n\\ é\t\u{1}" })),
+        "\"say \\\"hi\\\"\\n\\\\ é\\t\\x01\""
+    );
+    assert_eq!(summarised(json!({ "integer": -3 })), "-3");
+    assert_eq!(summarised(json!({ "float": 1.0 })), "1.0");
+    assert_eq!(summarised(json!({ "float": 1e20 })), "1e+20");
+    assert_eq!(summarised(json!({ "flag": true })), "True");
+    assert_eq!(summarised(json!({ "flag": false })), "False");
+    assert_eq!(summarised(json!({ "flag": null })), "None");
 }
 
 #[test]

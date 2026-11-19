@@ -177,7 +177,6 @@ pub enum Outcome {
 #[derive(Debug)]
 pub struct StepReport {
     id: StepId,
-    source: String,
     summary: String,
     laziness: Laziness,
     expressions: Vec<ExpressionDtypes>,
@@ -192,13 +191,6 @@ impl StepReport {
     #[must_use]
     pub const fn id(&self) -> &StepId {
         &self.id
-    }
-
-    /// The step as the Python Polars method call it stands for: see
-    /// [`Step::source`].
-    #[must_use]
-    pub fn source(&self) -> &str {
-        &self.source
     }
 
     /// What the step works on, in a few English words: see
@@ -348,7 +340,6 @@ impl Document {
             if let Some(blocked_by) = &blocked_by {
                 steps.push(StepReport {
                     id,
-                    source: step.source(inputs),
                     summary: step.summary(english()),
                     laziness,
                     expressions: Vec::new(),
@@ -383,7 +374,6 @@ impl Document {
             };
             steps.push(StepReport {
                 id,
-                source: step.source(inputs),
                 summary: step.summary(english()),
                 laziness,
                 expressions: run.expressions,

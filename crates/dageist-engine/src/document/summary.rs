@@ -10,7 +10,7 @@
 use crate::catalog::{Comparison, SummaryPhrase, Words};
 
 use super::model::{Expression, Start, Step, Value};
-use super::source::{field_alone, scalar};
+use super::wording::{field_alone, scalar};
 
 /// How many names a list names before it says how many there are instead.
 const NAMED: usize = 3;

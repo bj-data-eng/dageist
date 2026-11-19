@@ -737,75 +737,24 @@ fn a_refused_step_is_rejected_as_refused_and_the_step_after_it_as_not_run() {
     assert!(message.starts_with("previewing the rows"), "{message}");
 }
 
-/// The `text` and the `step` of each line of the module a run reports.
-fn module_lines(run: &Value) -> Vec<(String, Option<String>)> {
-    run["python"]
-        .as_array()
-        .expect("a run reports the module written from its document")
-        .iter()
-        .map(|line| {
-            (
-                line["text"].as_str().expect("a line of text").to_owned(),
-                line["step"].as_str().map(str::to_owned),
-            )
-        })
-        .collect()
-}
-
 #[test]
-fn a_run_reports_each_steps_source_and_summary_and_the_module_written_from_the_document() {
+fn a_run_reports_the_summary_of_each_step() {
     let run = json(&run_view(steps_text()).expect("a report"));
     let steps = run["steps"].as_array().expect("steps");
     let said = |id: &str| {
-        let step = steps
+        steps
             .iter()
             .find(|step| step["id"] == id)
-            .unwrap_or_else(|| panic!("no step {id}"));
-        (
-            step["source"].as_str().expect("a source").to_owned(),
-            step["summary"].as_str().expect("a summary").to_owned(),
-        )
+            .unwrap_or_else(|| panic!("no step {id}"))["summary"]
+            .as_str()
+            .expect("a summary")
+            .to_owned()
     };
-    // Worked out by hand from the sample's steps: Python's method call, and what it works on.
-    assert_eq!(
-        said("sort"),
-        (
-            ".sort(\"dcn\", \"timestamp\")".to_owned(),
-            "by dcn, timestamp".to_owned()
-        )
-    );
-    assert_eq!(
-        said("step_index"),
-        (
-            ".with_columns(pl.col(\"dcn\").cum_count().over(pl.col(\"dcn\")).alias(\"step_index\"))"
-                .to_owned(),
-            "step_index".to_owned()
-        )
-    );
-    assert_eq!(
-        said("join"),
-        (
-            ".join(step_sla, how=\"left\", left_on=\"step_to\", right_on=\"step\", maintain_order=\"left\")"
-                .to_owned(),
-            "step_sla on step_to".to_owned()
-        )
-    );
-    assert_eq!(said("pivot").1, "on step_to");
-
-    // The module is the document's own, line by line, each step's line naming its step.
-    let lines = module_lines(&run);
-    assert_eq!(lines[0], ("from datetime import date".to_owned(), None));
-    assert!(lines.contains(&("def run(".to_owned(), None)));
-    assert!(lines.contains(&("    claims: pl.LazyFrame,".to_owned(), None)));
-    assert!(lines.contains(&("    holidays: pl.Series,".to_owned(), None)));
-    assert!(lines.contains(&(
-        "        .sort(\"dcn\", \"timestamp\")".to_owned(),
-        Some("sort".to_owned())
-    )));
-    assert_eq!(
-        lines.iter().filter(|(_, step)| step.is_some()).count(),
-        steps.len()
-    );
+    // Worked out by hand from the sample's steps: what each works on.
+    assert_eq!(said("sort"), "by dcn, timestamp");
+    assert_eq!(said("step_index"), "step_index");
+    assert_eq!(said("join"), "step_sla on step_to");
+    assert_eq!(said("pivot"), "on step_to");
 }
 
 #[test]
@@ -834,24 +783,9 @@ fn a_run_reports_the_arguments_of_each_step_that_are_at_their_default() {
 }
 
 #[test]
-fn a_run_marks_the_module_it_writes_for_a_step_that_is_not_finished() {
-    let run = json(&run_view(&incomplete_text()).expect("a report"));
-    let lines = module_lines(&run);
-    assert_eq!(
-        lines[0],
-        (
-            "# Not runnable as written: step \"later\", something in it is still to be picked."
-                .to_owned(),
-            Some("later".to_owned())
-        )
-    );
-}
-
-#[test]
-fn text_that_is_not_a_document_has_no_module() {
+fn text_that_is_not_a_document_is_reported_as_unreadable() {
     let run = json(&run_view(r#"{"version":2,"steps":[]}"#).expect("an answer"));
     assert_eq!(run["status"], "unreadable");
-    assert!(run.get("python").is_none());
 }
 
 #[test]

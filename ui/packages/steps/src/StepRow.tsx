@@ -509,7 +509,10 @@ export function StepRow({
             remove={{ label: `Remove ${name}`, onPress: onRemove }}
             add={{ label: `Add a step after ${name}`, onPress: setAdding }}
           >
-            <Hint lines={result.source === null ? [] : [result.source]} code>
+            <Hint
+              lines={result.summary === null || result.summary === '' ? [] : [result.summary]}
+              code={false}
+            >
               <Slot
                 label={name}
                 tone="verb"

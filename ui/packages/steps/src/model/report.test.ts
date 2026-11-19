@@ -80,11 +80,9 @@ function timestampRun(changes: ReadonlyArray<{ name: string; change: string }>):
     run: decodeRun({
       status: 'run',
       source,
-      python: [],
       steps: [
         {
           id: 'timestamp',
-          source: '.with_columns(pl.col("timestamp").alias("timestamp"))',
           summary: 'timestamp',
           lazy: true,
           outcome: { status: 'valid', columns: source, changes },
@@ -168,10 +166,8 @@ function counted(count: unknown): ReturnType<typeof decodeRun> {
   return decodeRun({
     status: 'run',
     source,
-    python: [],
     steps: ['sort', 'step_index'].map((id) => ({
       id,
-      source: `.step(${id})`,
       summary: id,
       lazy: true,
       outcome: { status: 'valid', columns: source, changes: [] },
@@ -700,22 +696,14 @@ describe('a step with something still to be picked', () => {
   });
 });
 
-describe('the source and the summary the engine wrote of the steps', () => {
-  it('are shown for each step the report is of, and the module for the document it is of', () => {
+describe('the summary the engine wrote of the steps', () => {
+  it('is shown for each step the report is of', () => {
     const prepared = started();
-    expect(stepOf(prepared, 'sort')).toMatchObject({
-      source: '.sort("dcn", "timestamp")',
-      summary: 'by dcn, timestamp',
-    });
+    expect(stepOf(prepared, 'sort')).toMatchObject({ summary: 'by dcn, timestamp' });
     expect(stepOf(prepared, 'join')).toMatchObject({ summary: 'step_sla on step_to' });
-    expect(prepared).toMatchObject({
-      module: expect.arrayContaining([
-        { text: '        .sort("dcn", "timestamp")', step: 'sort' },
-      ]) as unknown,
-    });
   });
 
-  it('are not shown for a step an edit has changed, nor for the steps after it, until the engine answers', () => {
+  it('is not shown for a step an edit has changed, nor for the steps after it, until the engine answers', () => {
     const changedSteps: Step[] = START.map((step) =>
       step.id === 'step_index' && step.verb === 'with_columns'
         ? { ...step, alias: 'renamed_index' }
@@ -728,12 +716,11 @@ describe('the source and the summary the engine wrote of the steps', () => {
       source,
     );
     expect(stepOf(prepared, 'sort')).toMatchObject({ summary: 'by dcn, timestamp' });
-    expect(stepOf(prepared, 'step_index')).toMatchObject({ source: null, summary: null });
-    expect(stepOf(prepared, 'resolved_at')).toMatchObject({ source: null, summary: null });
-    expect(prepared).toMatchObject({ module: [] });
+    expect(stepOf(prepared, 'step_index')).toMatchObject({ summary: null });
+    expect(stepOf(prepared, 'resolved_at')).toMatchObject({ summary: null });
   });
 
-  it('are not shown for a step that cannot be written as a document yet', () => {
+  it('is not shown for a step that cannot be written as a document yet', () => {
     const held: Step[] = [
       {
         id: 'nothing',
@@ -744,8 +731,7 @@ describe('the source and the summary the engine wrote of the steps', () => {
       },
     ];
     const prepared = prepareRun(held, translate(catalogue, held), null, source);
-    expect(stepOf(prepared, 'nothing')).toMatchObject({ source: null, summary: null });
-    expect(prepared).toMatchObject({ module: [] });
+    expect(stepOf(prepared, 'nothing')).toMatchObject({ summary: null });
   });
 });
 
@@ -778,11 +764,9 @@ describe('the options of a step and of its methods that are at their default', (
     const reported = decodeRun({
       status: 'run',
       source,
-      python: [],
       steps: [
         {
           id: 'order',
-          source: '.sort("dcn", descending=False)',
           summary: 'by dcn',
           lazy: true,
           outcome: { status: 'valid', columns: source, changes: [] },
