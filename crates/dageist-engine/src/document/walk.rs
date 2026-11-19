@@ -1342,6 +1342,26 @@ fn is_a_comparison(link: &Call) -> bool {
     Comparison::of_entry(link.entry().id().as_str()).is_some()
 }
 
+/// Whether `link` is the expression it follows, as `and_` and `or_` are where they are given no
+/// operand: Polars does not make a node of the call, so what comes after it meets what comes
+/// before it.
+fn is_the_expression_it_follows(link: &Call) -> bool {
+    matches!(link.entry().id().as_str(), "Expr.and_" | "Expr.or_")
+        && match link.argument("others") {
+            None => true,
+            Some(Value::Many(items)) => items.is_empty(),
+            Some(_) => false,
+        }
+}
+
+/// Whether the link `at` of `expression` is the first that Polars meets after its start, which
+/// the links before it that are the expression they follow do not change.
+fn follows_the_start(expression: &Expression, at: usize) -> bool {
+    expression.links()[..at]
+        .iter()
+        .all(is_the_expression_it_follows)
+}
+
 /// The calls of an expression: its start, then its links.
 fn calls_of(expression: &Expression) -> impl Iterator<Item = &Call> {
     std::iter::once(expression.start())
@@ -1359,7 +1379,8 @@ fn folds_a_null(expression: &Expression) -> bool {
     let from_a_null = starts_from_a_null(expression);
     expression.links().iter().enumerate().any(|(at, link)| {
         is_a_comparison(link)
-            && ((from_a_null && at == 0) || operands(link).into_iter().any(is_a_null))
+            && ((from_a_null && follows_the_start(expression, at))
+                || operands(link).into_iter().any(is_a_null))
     }) || calls_of(expression).any(|call| operands(call).into_iter().any(folds_a_null))
 }
 
@@ -1370,7 +1391,8 @@ fn folds_a_null_before(expression: &Expression, upto: usize) -> bool {
     let links = &expression.links()[..upto];
     links.iter().enumerate().any(|(at, link)| {
         is_a_comparison(link)
-            && ((from_a_null && at == 0) || operands(link).into_iter().any(is_a_null))
+            && ((from_a_null && follows_the_start(expression, at))
+                || operands(link).into_iter().any(is_a_null))
     }) || calls_of(expression)
         .take(upto + 1)
         .any(|call| operands(call).into_iter().any(folds_a_null))
@@ -1385,7 +1407,7 @@ fn is_reached_by_a_null(expression: &Expression, at: usize) -> bool {
         && (operands(&expression.links()[at])
             .into_iter()
             .any(|operand| is_a_null(operand) || folds_a_null(operand))
-            || (starts_from_a_null(expression) && at == 0)
+            || (starts_from_a_null(expression) && follows_the_start(expression, at))
             || folds_a_null_before(expression, at))
 }
 
@@ -1493,7 +1515,7 @@ fn holds_a_null_comparison(expression: &Expression) -> bool {
                 reads_a_column(operand) && !wholly_single(operand, operand.links().len(), true)
             });
             let column_before = reads && !wholly_single(expression, at, true);
-            let null_start = at == 0 && starts_from_a_null(expression);
+            let null_start = follows_the_start(expression, at) && starts_from_a_null(expression);
             if (null_given && column_before) || (null_start && column_given) {
                 return true;
             }
