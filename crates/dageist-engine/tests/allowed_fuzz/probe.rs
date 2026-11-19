@@ -620,6 +620,28 @@ fn dtype_reaching(
     predicted: &Prediction,
     observed: &Observed,
 ) -> Option<Representative> {
+    dtype_given(held, link, predicted, observed, false)
+}
+
+/// As [`dtype_reaching`], where the tables made no claim of the dtype too: Polars gives a condition
+/// with no `otherwise` the dtype of its values, and the tables say nothing of one that is not
+/// finished, so there is no dtype of theirs for it to differ from.
+fn dtype_polars_gave(
+    held: &Place,
+    link: usize,
+    predicted: &Prediction,
+    observed: &Observed,
+) -> Option<Representative> {
+    dtype_given(held, link, predicted, observed, true)
+}
+
+fn dtype_given(
+    held: &Place,
+    link: usize,
+    predicted: &Prediction,
+    observed: &Observed,
+    unsaid_is_free: bool,
+) -> Option<Representative> {
     let seen = observed
         .expressions
         .iter()
@@ -633,7 +655,11 @@ fn dtype_reaching(
         Some(before) => (seen.links.get(before)?, *traced.links.get(before)?),
     };
     match found {
-        Seen::Dtype(_, _, Some(class)) if Some(*class) == said => Some(*class),
+        Seen::Dtype(_, _, Some(class))
+            if Some(*class) == said || (unsaid_is_free && said.is_none()) =>
+        {
+            Some(*class)
+        }
         _ => None,
     }
 }
@@ -808,7 +834,7 @@ fn call_on_columns(
     let classes = placed_operands(call, at)
         .into_iter()
         .map(|(_, place, operand)| {
-            dtype_reaching(&place, operand.links().len(), predicted, observed)
+            dtype_polars_gave(&place, operand.links().len(), predicted, observed)
         })
         .collect::<Option<Vec<_>>>()?;
     if classes.is_empty() {
@@ -1419,6 +1445,25 @@ mod tests {
             found.reason
         );
         assert!(!found.probe.contains("polars.when"), "{}", found.probe);
+    }
+
+    #[test]
+    fn a_condition_is_not_asked_on_a_column_where_the_tables_gave_it_another_dtype() {
+        // The tables made no claim of the condition above, so Polars' dtype stands; where they
+        // claim another, the case is a disagreement about the dtype and nothing is asked.
+        let case = kept("stricter-a-condition-with-no-otherwise-that-no-row-takes.case");
+        let mut wrong = predict(&case);
+        for traced in &mut wrong.expressions {
+            for held in &mut traced.links {
+                if held.is_none() {
+                    *held = Some(Representative::String);
+                }
+            }
+        }
+        assert_eq!(
+            settle_apart(&case, &refusal(&case), &wrong, &observe(&case)),
+            None
+        );
     }
 
     #[test]
