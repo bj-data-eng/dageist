@@ -931,7 +931,7 @@ what surrounds it, after the limits, in these ways:
   and the tables both gave, so that nothing an argument holds, as a comparison the tables
   allow without knowing the dtype of a number, is refused before the call is;
 - for a refusal that a join's key is not elementwise, the part that holds the refused
-  call as the whole key of the same join, for the refusal is of the position and
+  call as the whole key of the same join, the only one where the join has several, for the refusal is of the position and
   Polars skips it where the key is folded away; and, where that part is one value, as
   an aggregate and a running value of it are, which Polars allows as a key whatever it
   holds, the refused call on a column as the key;
