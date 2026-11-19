@@ -29,6 +29,8 @@
 //!   column of the dtype that Polars gave what reaches it, which Polars cannot fold;
 //!   and again with each literal it is given a column of its dtype too, for a
 //!   literal hides what Polars skips as it hides what it evaluates.
+//!   And once more with the receiver and every argument a column of the dtype that reaches it,
+//!   so that nothing an argument holds is refused before the call is.
 //! - [`settle_as_a_key`]: a refusal that a join's key is not elementwise is of the
 //!   position, so the part that holds the refused call is the whole key of the
 //!   same join, and what comes before the call as a key is not refused for it:
@@ -70,8 +72,8 @@ use dageist_engine::document::{
 };
 
 use super::case::{Case, STEP};
-use super::frames::STAND_IN;
-use super::literal::{call_with_columns, class_of, operand_causes};
+use super::frames::{STAND_IN, stand_in_column};
+use super::literal::{call_with_columns, class_of, operand_causes, placed_operands};
 use super::observe::{
     Observed, Refusal, SCHEMA_SAYS, Seen, Tables, is_bare_key, is_the_targets_own, observe_probe,
 };
@@ -693,6 +695,14 @@ pub fn settle_on_a_value(
             attempts.push((columns, [vec![class], literal_classes].concat()));
         }
     }
+    // And with every argument a column of the dtype that reaches its end, so that nothing an
+    // argument holds, as a call the tables allow without knowing a dtype, is refused before the
+    // call is.
+    if let Some((columns, argument_classes)) =
+        call_on_columns(refused_call, &refused.place, predicted, observed)
+    {
+        attempts.push((columns, [vec![class], argument_classes].concat()));
+    }
     attempts.into_iter().find_map(|(link_call, classes)| {
         let part = Expression::new(Start::Call(name.clone()), vec![link_call]).ok()?;
         let probed = Case {
@@ -758,6 +768,59 @@ pub fn settle_a_predicate_on_a_value(
         reason: refusal.reason,
         showing: Showing::TheSameReason,
     })
+}
+
+/// `call`, which is at `at`, with every expression it is given a column of the class that reaches
+/// its end, as Polars and the tables both gave it, and those classes in the order of the columns,
+/// which are [`stand_in_column`]s from the second: the first stands for what the call follows.
+/// `None` for a call given nothing, or an argument whose dtype is not known to both.
+fn call_on_columns(
+    call: &Call,
+    at: &Place,
+    predicted: &Prediction,
+    observed: &Observed,
+) -> Option<(Call, Vec<Representative>)> {
+    fn columns_in(value: &Value, next: &mut usize) -> Option<Value> {
+        Some(match value {
+            Value::Expression(_) => {
+                *next += 1;
+                let name = self::call(
+                    "polars.col",
+                    vec![("name", Value::Columns(vec![stand_in_column(*next)]))],
+                )?;
+                Value::Expression(Expression::new(Start::Call(name), Vec::new()).ok()?)
+            }
+            Value::Many(items) => Value::Many(
+                items
+                    .iter()
+                    .map(|item| columns_in(item, next))
+                    .collect::<Option<Vec<_>>>()?,
+            ),
+            Value::Pairs(pairs) => Value::Pairs(
+                pairs
+                    .iter()
+                    .map(|(key, entry)| Some((columns_in(key, next)?, columns_in(entry, next)?)))
+                    .collect::<Option<Vec<_>>>()?,
+            ),
+            other => other.clone(),
+        })
+    }
+    let classes = placed_operands(call, at)
+        .into_iter()
+        .map(|(_, place, operand)| {
+            dtype_reaching(&place, operand.links().len(), predicted, observed)
+        })
+        .collect::<Option<Vec<_>>>()?;
+    if classes.is_empty() {
+        return None;
+    }
+    let mut next = 0;
+    let given = call
+        .arguments()
+        .iter()
+        .map(|given| Some((given.parameter(), columns_in(given.value(), &mut next)?)))
+        .collect::<Option<Vec<_>>>()?;
+    Some((self::call(call.entry().id().as_str(), given)?, classes))
 }
 
 /// The parameters of a join that hold its keys.
