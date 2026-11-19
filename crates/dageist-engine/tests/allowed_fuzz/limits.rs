@@ -171,11 +171,11 @@ pub enum Limit {
     /// target's own comparison, not a refusal of Polars, which shows only where the
     /// method is the output of the step. Inside an expression that goes on from it
     /// or compares it, Polars evaluates the method and the step's rows do not show
-    /// the difference; and a sort key is never an output of the step, which a probe
-    /// of the call on a column in the key may show refused as well, and then settles
-    /// it. The tables refusing, with the reason that the schema says one dtype and
-    /// the rows give another, at a call that is not the last of the step's own
-    /// expression or in a sort key that no probe settles, which Polars allows.
+    /// the difference; and a sort key or a join's key is never an output of the step,
+    /// which a probe of the call on a column in the key may show refused as well, and
+    /// then settles it. The tables refusing, with the reason that the schema says one
+    /// dtype and the rows give another, at a call that is not the last of the step's
+    /// own expression or in a key that no probe settles, which Polars allows.
     AHiddenSchema,
 }
 
@@ -1278,8 +1278,10 @@ fn applies(
                     // A sort key is no output of the step, unless a probe of the call on a
                     // column in the key settles it, which is asked of a case the limits do
                     // not excuse.
-                    || (is(step, "LazyFrame.sort")
-                        && settle_in_the_position(case, refused, prediction, observed).is_none()))
+                    || (matches!(
+                        step.entry().id().as_str(),
+                        "LazyFrame.sort" | "LazyFrame.join"
+                    ) && settle_in_the_position(case, refused, prediction, observed).is_none()))
         }
         (Limit::AWindowOverAWindow, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
