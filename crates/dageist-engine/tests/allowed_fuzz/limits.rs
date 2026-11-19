@@ -3658,6 +3658,25 @@ mod tests {
             ),
             vec![]
         );
+        // A call that select accepts, with another bitwise call that it refuses in what the call
+        // is given: the refusal of the tables is of the outer call, whose dtypes select accepts,
+        // so that other call is not why.
+        assert_eq!(
+            refused_in_a_right_key(
+                chain_of(
+                    column("rk"),
+                    vec![compared_with(
+                        "Expr.xor",
+                        chain_of(
+                            column("rb"),
+                            vec![compared_with("Expr.xor", chain(column("rf"), &[]))],
+                        ),
+                    )],
+                ),
+                "^ not allowed on i64 and i64"
+            ),
+            vec![]
+        );
         // The same refusal where the step is no join, which Polars refuses as the tables do.
         let selected = select(vec![xor("a", "f")]);
         assert_eq!(
