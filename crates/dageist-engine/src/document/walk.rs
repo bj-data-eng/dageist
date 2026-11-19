@@ -1846,7 +1846,7 @@ fn holds_a_null_comparison(expression: &Expression) -> bool {
 /// null literal, which only the comparison with a null reads.
 fn is_not_elementwise(key: &Expression, with_nulls_for_null_columns: &Expression) -> bool {
     !wholly_single(key, key.links().len(), true)
-        && !holds_an_interval_that_polars_may_fold(key)
+        && !holds_a_comparison_that_polars_may_fold(key)
         && (holds_an_aggregate(key)
             || holds_a_null_comparison(with_nulls_for_null_columns)
             || holds_a_replacement_of_columns(key))
@@ -1923,14 +1923,24 @@ fn with_null_columns_as_literals(expression: &Expression, schema: &Schema) -> Op
     changed.then_some(rebuilt)
 }
 
-/// Whether an expression holds, at any depth, an interval that Polars may fold: one with a null
-/// bound of a dtype, which it folds into a null for some dtypes of what it bounds and not for
-/// others, or one with a negative whole number as a bound, which it decides at once where what it
-/// bounds is unsigned, as a count is, and keeps where it is not. The fold leaves nothing in the
-/// key that is not elementwise. The document does not decide which dtype it is, so what a key that
-/// holds one is judged to be is left to a limit.
-fn holds_an_interval_that_polars_may_fold(expression: &Expression) -> bool {
-    calls_of(expression).any(|call| {
+/// Whether an expression holds, at any depth, a comparison that Polars may fold: an interval with
+/// a null bound of a dtype, which it folds into a null for some dtypes of what it bounds and not
+/// for others, or with a negative whole number as a bound, which it decides at once where what it
+/// bounds is unsigned, as a count is, and keeps where it is not; or an `eq_missing` or an
+/// `ne_missing` of a value and a whole number that some dtype cannot hold, which it decides at
+/// once where the value's dtype cannot hold it, as a count's cannot hold a number below zero, and
+/// keeps where it can. The other comparisons are kept whatever the number is. The fold leaves
+/// nothing in the key that is not elementwise. The document does not decide which dtype it is, so
+/// what a key that holds one is judged to be is left to a limit.
+fn holds_a_comparison_that_polars_may_fold(expression: &Expression) -> bool {
+    let starts_from_a_number = matches!(expression.start(), Start::Call(start)
+        if start.entry().id().as_str() == "polars.lit"
+            && matches!(start.argument("value"), Some(Value::Integer(number)) if some_dtype_lacks(*number)));
+    expression.links().iter().enumerate().any(|(at, link)| {
+        is_a_comparison_of_missing_values(link)
+            && (operands(link).into_iter().any(is_a_number_some_dtype_lacks)
+                || (starts_from_a_number && follows_the_start(expression, at)))
+    }) || calls_of(expression).any(|call| {
         (call.entry().id().as_str() == "Expr.is_between"
             && operands(call).into_iter().any(|operand| {
                 (is_a_null(operand)
@@ -1939,8 +1949,32 @@ fn holds_an_interval_that_polars_may_fold(expression: &Expression) -> bool {
             }))
             || operands(call)
                 .into_iter()
-                .any(holds_an_interval_that_polars_may_fold)
+                .any(holds_a_comparison_that_polars_may_fold)
     })
+}
+
+/// Whether `link` is an `eq_missing` or an `ne_missing`, which compare a missing value as a
+/// value.
+fn is_a_comparison_of_missing_values(link: &Call) -> bool {
+    matches!(
+        link.entry().id().as_str(),
+        "Expr.eq_missing" | "Expr.ne_missing"
+    )
+}
+
+/// Whether a whole number is one that some dtype cannot hold: one below zero, which no unsigned
+/// dtype holds, or above 127, which an `Int8` does not. A number from zero to 127 is held by
+/// every dtype, and Polars never decides a comparison with one at once.
+fn some_dtype_lacks(number: i64) -> bool {
+    !(0..=127).contains(&number)
+}
+
+/// Whether an expression is a whole number that some dtype cannot hold and no more.
+fn is_a_number_some_dtype_lacks(expression: &Expression) -> bool {
+    expression.links().is_empty()
+        && matches!(expression.start(), Start::Call(start)
+            if start.entry().id().as_str() == "polars.lit"
+                && matches!(start.argument("value"), Some(Value::Integer(number)) if some_dtype_lacks(*number)))
 }
 
 /// Whether an expression is a whole number below zero and no more.

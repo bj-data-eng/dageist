@@ -112,9 +112,12 @@ pub enum Limit {
     /// measure and the named rule, which holds what the evidence settles, does
     /// not model: a column compared with a null is refused by the rule, and an
     /// aggregate compared with a null, or a comparison that follows one, is
-    /// found by running. Polars refusing the join as not elementwise, with no
-    /// place, in a case whose join key holds a comparison with a null literal at
-    /// any depth.
+    /// found by running. It decides at once, too, an `eq_missing` or an `ne_missing`
+    /// of a value and a whole number that some dtype cannot hold, below zero or
+    /// above 127, where the dtype of the value cannot hold it, as an unsigned
+    /// count cannot, and so leaves a literal where an aggregate was. Polars
+    /// refusing the join as not elementwise, with no place, in a case whose join
+    /// key holds a comparison with a null literal, or one of those, at any depth.
     ANullComparisonInAKey,
     /// The tables ran every call on columns that hold values, so what Polars does
     /// with a call that has only nulls to meet was not measured: it does not meet
@@ -985,9 +988,19 @@ fn holds_a_null_comparison(key: &Expression) -> bool {
             && matches!(expression.start(), Start::Call(start)
                 if is(start, "polars.lit") && matches!(start.argument("value"), Some(Value::Integer(number)) if *number < 0))
     };
+    // A whole number that some dtype cannot hold, below zero or above what an `Int8` holds, is
+    // one that Polars decides at once for a comparison of missing values where the dtype of what
+    // it is compared with cannot hold it, so it folds the comparison as it does a null.
+    let is_a_number_some_dtype_lacks = |expression: &Expression| {
+        expression.links().is_empty()
+            && matches!(expression.start(), Start::Call(start)
+                if is(start, "polars.lit") && matches!(start.argument("value"), Some(Value::Integer(number)) if !(0..=127).contains(number)))
+    };
     let compares = |expression: &Expression| {
         let null_start = matches!(expression.start(), Start::Call(start)
             if is(start, "polars.lit") && matches!(start.argument("value"), Some(Value::Flag(None))));
+        let number_start = matches!(expression.start(), Start::Call(start)
+            if is(start, "polars.lit") && matches!(start.argument("value"), Some(Value::Integer(number)) if !(0..=127).contains(number)));
         expression.links().iter().enumerate().any(|(at, link)| {
             let id = link.entry().id().as_str();
             // `is_between` compares each of its bounds with what it follows, so a bound that is
@@ -1008,6 +1021,11 @@ fn holds_a_null_comparison(key: &Expression) -> bool {
                     && operands(link)
                         .into_iter()
                         .any(|(_, operand)| is_below_zero(operand)))
+                || (matches!(id, "Expr.eq_missing" | "Expr.ne_missing")
+                    && (operands(link)
+                        .into_iter()
+                        .any(|(_, operand)| is_a_number_some_dtype_lacks(operand))
+                        || (number_start && expression.links()[..at].is_empty())))
         })
     };
     fn walk(expression: &Expression, compares: &dyn Fn(&Expression) -> bool) -> bool {
@@ -5127,6 +5145,48 @@ mod tests {
             ),
             vec![Limit::ANullComparisonInAKey]
         );
+        // A comparison of missing values with a whole number below zero, which Polars decides for
+        // what is unsigned and keeps for what is not; one with a number every dtype holds, which
+        // it never decides, is no such comparison.
+        let compared_by = |entry: &str, number: i64| {
+            join(
+                chain_of(
+                    column("rb"),
+                    vec![
+                        call("Expr.max", Vec::new()),
+                        compared_with(entry, whole(number)),
+                        call(
+                            "Expr.sub",
+                            vec![("other", Value::Expression(chain(column("rk"), &[])))],
+                        ),
+                    ],
+                ),
+                chain(column("key"), &[]),
+            )
+        };
+        assert_eq!(
+            polars_refuses(
+                &compared_by("Expr.ne_missing", -1),
+                Some(step_place()),
+                Stage::Schema,
+                reason,
+                Vec::new()
+            ),
+            vec![Limit::ANullComparisonInAKey]
+        );
+        for (entry, number) in [("Expr.ne_missing", 1), ("Expr.ne", -1)] {
+            assert_eq!(
+                polars_refuses(
+                    &compared_by(entry, number),
+                    Some(step_place()),
+                    Stage::Schema,
+                    reason,
+                    Vec::new()
+                ),
+                vec![],
+                "{entry}"
+            );
+        }
         // A key that compares nothing with a null, and another reason.
         let plain = join(
             chain(column("a"), &["Expr.cum_max"]),
