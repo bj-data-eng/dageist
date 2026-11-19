@@ -136,7 +136,8 @@ pub enum Limit {
     /// run: the number is a value, which the tables measured as the dtype and the
     /// number 1. Polars refusing the rows with a failed conversion to `u32`, which
     /// has no place, in a case that holds a `pow` whose exponent is a whole number
-    /// typed below zero.
+    /// typed below zero or holds a subtraction, a negation, a sum or a product, which
+    /// can take the values of a column below zero.
     ANegativeExponent,
     /// A `UInt128` is compared with a `Decimal` by casting it to `decimal[38,0]`,
     /// which holds up to 38 digits, and a `UInt128` holds more. The sample's values
@@ -331,14 +332,25 @@ fn is_a_single_value(call: &Call) -> bool {
         || (is(call, "polars.lit") && matches!(call.argument("value"), Some(Value::Flag(None))))
 }
 
-/// Whether `call` is a `pow` whose exponent is a whole number typed below zero.
-fn is_a_power_of_a_negative_number(call: &Call) -> bool {
+/// Whether `call` is a literal that is a whole number below zero.
+fn is_a_whole_number_below_zero(call: &Call) -> bool {
+    is(call, "polars.lit")
+        && matches!(call.argument("value"), Some(Value::Integer(number)) if *number < 0)
+}
+
+/// Whether `call` is a `pow` whose exponent holds a value that may be below zero: a whole number
+/// typed below zero, or a call that can take the values of a column there, as the sample's own
+/// values are not.
+fn is_a_power_that_may_be_given_a_value_below_zero(call: &Call) -> bool {
     is(call, "Expr.pow")
         && matches!(call.argument("exponent"), Some(Value::Expression(exponent))
-            if exponent.links().is_empty()
-                && matches!(exponent.start(), Start::Call(start)
-                    if is(start, "polars.lit")
-                        && matches!(start.argument("value"), Some(Value::Integer(number)) if *number < 0)))
+        if any_call(exponent, &|inner| {
+            is_a_whole_number_below_zero(inner)
+                || matches!(
+                    inner.entry().id().as_str(),
+                    "Expr.sub" | "Expr.neg" | "Expr.add" | "Expr.mul"
+                )
+        }))
 }
 
 /// Whether `call` is a `pow` whose exponent is a number with a fraction typed without a dtype.
@@ -1218,9 +1230,9 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement, observed: &Ob
                 && refusal.stage == Stage::Rows
                 && refusal.reason.starts_with("conversion from `")
                 && refusal.reason.contains("` to `u32` failed")
-                && held
-                    .iter()
-                    .any(|(_, held)| any_call(held, &is_a_power_of_a_negative_number))
+                && held.iter().any(|(_, held)| {
+                    any_call(held, &is_a_power_that_may_be_given_a_value_below_zero)
+                })
         }
         (Limit::AValueBeyondADecimal, Disagreement::PolarsRefuses(refusal)) => {
             // The rows hold the values; a table with no rows holds none to fail.
