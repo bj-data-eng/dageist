@@ -75,3 +75,26 @@ fn a_parameter_that_holds_one_value_for_each_item_of_another_is_a_flag_or_a_choi
         ]
     );
 }
+
+#[test]
+fn a_parameter_that_is_needed_without_being_required_is_a_starred_one() {
+    // A step always gives at least one of a starred parameter that Python takes none of, as
+    // `and_` and `or_`: the mark means nothing on any other parameter.
+    let mut marked = Vec::new();
+    for entry in catalog::entries() {
+        for parameter in entry.parameters() {
+            let required = parameter.default() == catalog::ParameterDefault::Required;
+            if parameter.is_needed() && !required {
+                assert_eq!(
+                    parameter.variadic(),
+                    Some(catalog::Variadic::Args),
+                    "{} {}",
+                    entry.id().as_str(),
+                    parameter.name()
+                );
+                marked.push((entry.id().as_str(), parameter.name()));
+            }
+        }
+    }
+    assert_eq!(marked, [("Expr.and_", "others"), ("Expr.or_", "others")]);
+}

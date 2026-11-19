@@ -361,3 +361,31 @@ fn an_entry_is_found_by_its_identifier_and_nothing_else_is() {
     assert!(entry("Expr.not_a_method").is_none());
     assert!(entry("").is_none());
 }
+
+#[test]
+fn every_dunder_method_of_expr_is_python_syntax_that_is_never_offered_and_is_no_entry() {
+    // Python's operators spell operations that have entries of their own, so offering both
+    // would show one operation twice.
+    let dunders: Vec<String> = items()
+        .into_iter()
+        .map(|item| item.id)
+        .filter(|id| {
+            id.strip_prefix("Expr.").is_some_and(|rest| {
+                rest.starts_with("__") && rest.ends_with("__") && !rest.contains('.')
+            })
+        })
+        .collect();
+    assert!(
+        dunders.len() >= 30,
+        "{} dunder methods of Expr",
+        dunders.len()
+    );
+    for id in dunders {
+        assert!(entry(&id).is_none(), "{id} is an entry");
+        let reason = left_out()
+            .iter()
+            .find(|item| item.id() == id)
+            .map(|item| item.reason());
+        assert_eq!(reason, Some(Reason::NeverOffered), "{id}");
+    }
+}

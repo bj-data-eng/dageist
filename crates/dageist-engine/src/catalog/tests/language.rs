@@ -430,3 +430,44 @@ fn a_language_file_with_a_summary_word_missing_or_in_the_wrong_place_is_refused(
         }
     );
 }
+
+#[test]
+fn the_shown_names_of_and_or_and_not_are_those_without_pythons_underscore() {
+    let words = english();
+    let shown = |id: &str| {
+        let entry = crate::catalog::entry(id).expect("an entry");
+        words.entry_name(entry.id())
+    };
+    assert_eq!(shown("Expr.and_"), Some("and"));
+    assert_eq!(shown("Expr.or_"), Some("or"));
+    assert_eq!(shown("Expr.not_"), Some("not"));
+}
+
+#[test]
+fn every_name_listed_as_changed_is_shown_differently_from_polars() {
+    let words = english();
+    assert!(!words.changed().is_empty());
+    for name in words.changed() {
+        let mut parts = name.split('#');
+        let id = parts.next().expect("an entry");
+        let entry = crate::catalog::entry(id).unwrap_or_else(|| panic!("{name} names no entry"));
+        let polars_name = id.split_once('.').expect("an owner").1;
+        match (parts.next(), parts.next()) {
+            (None, _) => assert_ne!(
+                words.entry_name(entry.id()),
+                Some(polars_name),
+                "{name} is listed as changed and shown as Polars names it"
+            ),
+            (Some(parameter), None) => assert_ne!(
+                words.parameter_name(entry.id(), parameter),
+                Some(parameter),
+                "{name} is listed as changed and shown as Polars names it"
+            ),
+            (Some(parameter), Some(word)) => assert_ne!(
+                words.choice_word(entry.id(), parameter, word),
+                Some(word),
+                "{name} is listed as changed and shown as Polars names it"
+            ),
+        }
+    }
+}
