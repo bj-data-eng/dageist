@@ -1618,16 +1618,21 @@ fn an_input_that_is_not_connected_leaves_what_follows_it_not_known() {
 fn and_and_or_given_no_operand_are_refused_after_a_float_as_they_are_with_one() {
     // Polars lets them through with none, but a step always gives one, so they are judged with
     // one: after a float no operand suits, and after a whole number or a Boolean one does.
+    let table =
+        df!("x" => [1.5_f64, 2.5], "a" => [1_i64, 2], "f" => [true, false]).expect("a table");
     for id in ["Expr.and_", "Expr.or_"] {
         let refused = |column: &str| {
-            let walk = walk_of(
+            let document = document_of(
                 "LazyFrame.select",
                 json!({ "exprs": many(vec![field_then(column, vec![call(id, json!({}))])]) }),
             );
-            walk.refusal().is_some()
+            document.steps()[0]
+                .walk(0, table.schema(), &inputs())
+                .refusal()
+                .is_some()
         };
-        assert!(refused("f32"), "{id} after a float");
-        assert!(!refused("i8"), "{id} after a whole number");
+        assert!(refused("x"), "{id} after a float");
+        assert!(!refused("a"), "{id} after a whole number");
         assert!(!refused("f"), "{id} after a Boolean");
     }
 }
