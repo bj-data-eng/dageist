@@ -782,6 +782,55 @@ fn a_comparison_of_a_null_after_a_call_that_is_not_a_step_of_the_plan_is_still_w
 }
 
 #[test]
+fn a_null_that_two_nots_undo_is_still_the_null_a_comparison_is_given() {
+    // Polars simplifies a not of a not away, so a null that an even number of nots follows is
+    // the null again, across calls that are the expression they follow, and a comparison with
+    // it folds into a null. An odd number leaves a call that Polars does not fold.
+    let rule = Some(RefusalSource::Rule(Rule::KeyIsElementwise));
+    let null_start = || {
+        call(
+            "polars.lit",
+            json!({ "value": { "flag": null }, "dtype": { "dtype": "UInt32" } }),
+        )
+    };
+    let not = || call("Expr.not_", json!({}));
+    let empty_and = || call("Expr.and_", json!({}));
+    for links in [
+        vec![not(), not(), compared("Expr.eq", field("f"))],
+        vec![not(), empty_and(), not(), compared("Expr.eq", field("f"))],
+        vec![not(), not(), not(), not(), compared("Expr.eq", field("f"))],
+    ] {
+        assert_eq!(
+            joined_on(chain(null_start(), links.clone())),
+            rule,
+            "{links:?}"
+        );
+    }
+    for links in [
+        vec![not(), compared("Expr.eq", field("f"))],
+        vec![not(), not(), not(), compared("Expr.eq", field("f"))],
+        vec![
+            not(),
+            call("Expr.abs", json!({})),
+            not(),
+            compared("Expr.eq", field("f")),
+        ],
+    ] {
+        assert_eq!(
+            joined_on(chain(null_start(), links.clone())),
+            None,
+            "{links:?}"
+        );
+    }
+    // The null a column is compared with is the same.
+    let key = field_then(
+        "k",
+        vec![compared("Expr.gt", chain(null_start(), vec![not(), not()]))],
+    );
+    assert_eq!(joined_on(key), rule);
+}
+
+#[test]
 fn a_join_key_that_compares_nothing_of_a_column_with_a_null_is_not_refused() {
     let keys = [
         // A null, a comparison of two literals, a column with a whole number.
