@@ -76,7 +76,8 @@ pub enum Limit {
     /// A pivot's aggregate is run on the values of each group, not on a
     /// column in `select`, and Polars uses other kernels for them: it takes the
     /// `max` of a `Struct` there, which `select` refuses, and compares, casts
-    /// and windows what `select` does not. A table with no rows has no groups,
+    /// and windows what `select` does not, and casts the nulls of a group where
+    /// it refuses the text of the sample's rows. A table with no rows has no groups,
     /// and the values of an aggregate over none have no dtype. The empty table's
     /// refusal is gated by its reason, which has no place; the tables refusing
     /// is placed, in the aggregate, with a reason about a kernel.
@@ -1371,6 +1372,9 @@ fn applies(
                     "lengths don't match",
                     "must specify one field",
                     "cannot cast",
+                    // The sample's rows hold text that a number does not read, which the tables
+                    // measured a bound with and a group of nulls does not hold.
+                    "conversion from",
                 ]
                 .iter()
                 .any(|words| refused.reason.contains(words))
@@ -3679,6 +3683,24 @@ mod tests {
         let selected = select(vec![divided]);
         assert_eq!(
             tables_refuse(&selected, link_of("exprs", 0, 0), ROWS, reason),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_failed_conversion_of_the_samples_text_is_excused_at_a_call_of_a_pivots_aggregate_only() {
+        // The tables measured a bound of the dtype `String` as the sample's column, whose text
+        // is a duration that no number reads; a group of nulls holds none.
+        let reason = "conversion from `str` to `i32` failed in column 'b' for 2 out of 3 values: [\"1d\", \"2d\"]";
+        let clipped = chain_of(column("a"), vec![clip_with(Some(whole(1)), None)]);
+        let at_the_call = at(&[parameter("aggregate_function"), Segment::Link(0)]);
+        assert_eq!(
+            tables_refuse(&pivot(clipped.clone()), at_the_call, ROWS, reason),
+            vec![Limit::AGroupAggregate]
+        );
+        // A step that is no pivot runs the sample's rows, which do hold the text.
+        assert_eq!(
+            tables_refuse(&select(vec![clipped]), link_of("exprs", 0, 0), ROWS, reason),
             vec![]
         );
     }
