@@ -931,7 +931,7 @@ impl Gen<'_> {
                 continue;
             }
             let name = parameter.name();
-            let required = parameter.default() == ParameterDefault::Required;
+            let required = parameter.is_needed();
             let given_it = match (id, name) {
                 (_, _) if required => true,
                 ("Expr.over", "partition_by") => {

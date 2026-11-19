@@ -818,7 +818,9 @@ pub(super) const ENTRIES: &[Entry] = &[
         id: EntryId("Expr.and_"),
         family: Family::Logic,
         accepts: BITWISE,
-        parameters: &[starred("others", EXPRESSION).with_role(Role::Operand)],
+        parameters: &[starred("others", EXPRESSION)
+            .with_role(Role::Operand)
+            .with_at_least_one()],
         laziness: Laziness::Lazy,
         build: Build::Expression(and_),
     },
@@ -1035,7 +1037,9 @@ pub(super) const ENTRIES: &[Entry] = &[
         id: EntryId("Expr.or_"),
         family: Family::Logic,
         accepts: BITWISE,
-        parameters: &[starred("others", EXPRESSION).with_role(Role::Operand)],
+        parameters: &[starred("others", EXPRESSION)
+            .with_role(Role::Operand)
+            .with_at_least_one()],
         laziness: Laziness::Lazy,
         build: Build::Expression(or_),
     },

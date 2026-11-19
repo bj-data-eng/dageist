@@ -327,6 +327,7 @@ pub struct Parameter {
     writes: Writes,
     keyword_only: bool,
     variadic: Option<Variadic>,
+    at_least_one: bool,
 }
 
 impl Parameter {
@@ -340,7 +341,16 @@ impl Parameter {
             writes: Writes::Nothing,
             keyword_only: false,
             variadic: None,
+            at_least_one: false,
         }
+    }
+
+    /// The same parameter, a starred one of which a step always gives at least one, though
+    /// Python takes none: `and_` and `or_` are the expression they follow without an operand,
+    /// which is no use to a step, so they are judged with one.
+    const fn with_at_least_one(mut self) -> Self {
+        self.at_least_one = true;
+        self
     }
 
     /// The same parameter, which Python writes with the stars that make it
@@ -385,6 +395,13 @@ impl Parameter {
     #[must_use]
     pub const fn shape(&self) -> Shape {
         self.shape
+    }
+
+    /// Whether a step gives the parameter: Python requires it, or it is a starred parameter of
+    /// which a step always gives at least one. What is offered is judged with it given.
+    #[must_use]
+    pub const fn is_needed(&self) -> bool {
+        matches!(self.default, ParameterDefault::Required) || self.at_least_one
     }
 
     /// What the parameter holds when it is not given, as Python writes it.

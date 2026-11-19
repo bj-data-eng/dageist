@@ -310,8 +310,9 @@ numbers, so they have a family of their own, Logic, and are not swapped for a
 comparison, and the editor shows `and`, `or` and `not` without Python's trailing
 underscore, which the language file lists as changed. `and_` and `or_` take any
 number of operands and fold them from the left as Python does; given none they are
-the expression they follow, so the tables allow them on every dtype until an operand
-is given. The tables judge each operand beside what the method follows, as they do
+the expression they follow, which is no use to a step, so the catalogue marks the
+operands as needed and the tables, the offers and `fit` judge them with at least one:
+`and` is offered after a whole number or a Boolean and refused after a float. The tables judge each operand beside what the method follows, as they do
 for any method with more than one expression parameter, and not beside what the
 operands before it gave.
 

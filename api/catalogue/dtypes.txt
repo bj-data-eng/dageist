@@ -28,7 +28,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 15444 combinations: 7942 allowed; 2748 refused when Polars resolved the schema, 4754 when it ran the rows, 0 when it ran the empty table.
+# 15392 combinations: 7890 allowed; 2748 refused when Polars resolved the schema, 4754 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.abs | - | Array(Int64, 2) | - | refused rows: `abs` operation not supported for dtype `array[i64, 2]`
 Expr.abs | - | Boolean | - | refused rows: `abs` operation not supported for dtype `bool`
@@ -732,32 +732,6 @@ Expr.add | other | UInt8 | UInt16 | allowed UInt16 many
 Expr.add | other | UInt8 | UInt32 | allowed UInt32 many
 Expr.add | other | UInt8 | UInt64 | allowed UInt64 many
 Expr.add | other | UInt8 | UInt8 | allowed UInt8 many
-Expr.and_ | - | Array(Int64, 2) | - | allowed Array(Int64, 2) many
-Expr.and_ | - | Boolean | - | allowed Boolean many
-Expr.and_ | - | Date | - | allowed Date many
-Expr.and_ | - | Datetime(us) | - | allowed Datetime(us) many
-Expr.and_ | - | Datetime(us, UTC) | - | allowed Datetime(us, UTC) many
-Expr.and_ | - | Decimal(10, 2) | - | allowed Decimal(10, 2) many
-Expr.and_ | - | Duration(us) | - | allowed Duration(us) many
-Expr.and_ | - | Float16 | - | allowed Float16 many
-Expr.and_ | - | Float32 | - | allowed Float32 many
-Expr.and_ | - | Float64 | - | allowed Float64 many
-Expr.and_ | - | Int128 | - | allowed Int128 many
-Expr.and_ | - | Int16 | - | allowed Int16 many
-Expr.and_ | - | Int32 | - | allowed Int32 many
-Expr.and_ | - | Int64 | - | allowed Int64 many
-Expr.and_ | - | Int8 | - | allowed Int8 many
-Expr.and_ | - | List(Int64) | - | allowed List(Int64) many
-Expr.and_ | - | List(String) | - | allowed List(String) many
-Expr.and_ | - | Null | - | allowed Null many
-Expr.and_ | - | String | - | allowed String many
-Expr.and_ | - | Struct(x: Int64, y: String) | - | allowed Struct(x: Int64, y: String) many
-Expr.and_ | - | Time | - | allowed Time many
-Expr.and_ | - | UInt128 | - | allowed UInt128 many
-Expr.and_ | - | UInt16 | - | allowed UInt16 many
-Expr.and_ | - | UInt32 | - | allowed UInt32 many
-Expr.and_ | - | UInt64 | - | allowed UInt64 many
-Expr.and_ | - | UInt8 | - | allowed UInt8 many
 Expr.and_ | others | Array(Int64, 2) | Array(Int64, 2) | refused rows: `bitand` operation not supported for dtype `array[i64, 2]`
 Expr.and_ | others | Array(Int64, 2) | Boolean | refused rows: `bitand` operation not supported for dtype `array[i64, 2]`
 Expr.and_ | others | Array(Int64, 2) | Date | refused schema: & not allowed on array[i64, 2] and date
@@ -8610,32 +8584,6 @@ Expr.not_ | - | UInt16 | - | allowed UInt16 many
 Expr.not_ | - | UInt32 | - | allowed UInt32 many
 Expr.not_ | - | UInt64 | - | allowed UInt64 many
 Expr.not_ | - | UInt8 | - | allowed UInt8 many
-Expr.or_ | - | Array(Int64, 2) | - | allowed Array(Int64, 2) many
-Expr.or_ | - | Boolean | - | allowed Boolean many
-Expr.or_ | - | Date | - | allowed Date many
-Expr.or_ | - | Datetime(us) | - | allowed Datetime(us) many
-Expr.or_ | - | Datetime(us, UTC) | - | allowed Datetime(us, UTC) many
-Expr.or_ | - | Decimal(10, 2) | - | allowed Decimal(10, 2) many
-Expr.or_ | - | Duration(us) | - | allowed Duration(us) many
-Expr.or_ | - | Float16 | - | allowed Float16 many
-Expr.or_ | - | Float32 | - | allowed Float32 many
-Expr.or_ | - | Float64 | - | allowed Float64 many
-Expr.or_ | - | Int128 | - | allowed Int128 many
-Expr.or_ | - | Int16 | - | allowed Int16 many
-Expr.or_ | - | Int32 | - | allowed Int32 many
-Expr.or_ | - | Int64 | - | allowed Int64 many
-Expr.or_ | - | Int8 | - | allowed Int8 many
-Expr.or_ | - | List(Int64) | - | allowed List(Int64) many
-Expr.or_ | - | List(String) | - | allowed List(String) many
-Expr.or_ | - | Null | - | allowed Null many
-Expr.or_ | - | String | - | allowed String many
-Expr.or_ | - | Struct(x: Int64, y: String) | - | allowed Struct(x: Int64, y: String) many
-Expr.or_ | - | Time | - | allowed Time many
-Expr.or_ | - | UInt128 | - | allowed UInt128 many
-Expr.or_ | - | UInt16 | - | allowed UInt16 many
-Expr.or_ | - | UInt32 | - | allowed UInt32 many
-Expr.or_ | - | UInt64 | - | allowed UInt64 many
-Expr.or_ | - | UInt8 | - | allowed UInt8 many
 Expr.or_ | others | Array(Int64, 2) | Array(Int64, 2) | refused rows: `bitor` operation not supported for dtype `array[i64, 2]`
 Expr.or_ | others | Array(Int64, 2) | Boolean | refused rows: `bitor` operation not supported for dtype `array[i64, 2]`
 Expr.or_ | others | Array(Int64, 2) | Date | refused schema: | not allowed on array[i64, 2] and date

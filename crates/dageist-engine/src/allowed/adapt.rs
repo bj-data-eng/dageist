@@ -196,7 +196,8 @@ pub(crate) fn receiver_beside(entry: &Entry, name: &str, number: Loose) -> Optio
 
 /// Whether the parameter `name` of `entry` must be given.
 pub(crate) fn is_required(entry: &Entry, name: &str) -> bool {
-    entry.parameters().iter().any(|parameter| {
-        parameter.name() == name && parameter.default() == ParameterDefault::Required
-    })
+    entry
+        .parameters()
+        .iter()
+        .any(|parameter| parameter.name() == name && parameter.is_needed())
 }

@@ -383,8 +383,7 @@ fn required_expressions(entry: &Entry) -> impl Iterator<Item = &'static str> {
         .parameters()
         .iter()
         .filter(|parameter| {
-            parameter.default() == ParameterDefault::Required
-                && matches!(parameter.kind(), Kind::Expression(_))
+            parameter.is_needed() && matches!(parameter.kind(), Kind::Expression(_))
         })
         .map(catalog::Parameter::name)
 }

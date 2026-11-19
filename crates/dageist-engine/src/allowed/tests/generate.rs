@@ -159,7 +159,7 @@ fn dtype_jobs() -> Vec<DtypeJob> {
         let parameters = expression_parameters(entry);
         let required: Vec<_> = parameters
             .iter()
-            .filter(|parameter| parameter.default() == ParameterDefault::Required)
+            .filter(|parameter| parameter.is_needed())
             .map(|parameter| parameter.name())
             .collect();
         if required.is_empty() {
@@ -263,7 +263,7 @@ impl DtypeIndex {
         );
         let required: Vec<&'static str> = expression_parameters(entry)
             .into_iter()
-            .filter(|parameter| parameter.default() == ParameterDefault::Required)
+            .filter(|parameter| parameter.is_needed())
             .map(Parameter::name)
             .collect();
         let id = entry.id().as_str();
