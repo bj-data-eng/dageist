@@ -260,6 +260,15 @@ pub enum Limit {
     /// its chain, which Polars allows; the drop is why where Polars, asked again with each drop
     /// a fill of nulls forward, refuses the case for that reason.
     ADropLeavesNoRows,
+    /// A condition whose values are one expression is taken by Polars for that expression, and
+    /// its predicates are dropped, so what a predicate holds is never evaluated, and the tables
+    /// refuse a part of it that Polars does not meet. The part as written alone is refused by
+    /// Polars for another reason where an argument of it is, so no probe of it settles the
+    /// refusal. The tables refusing with a refusal of Polars's own, at a call inside a predicate
+    /// of a condition that has an `otherwise`, which Polars allows; the predicates being dropped
+    /// is why where Polars, asked again with each `otherwise` a fill forward of what it was, so
+    /// that the values differ, refuses the case for the tables' reason.
+    APredicateThatIsDropped,
     /// Polars refuses some dtypes of `and`, `or` and `xor` when it works out the schema of a
     /// select, a filter or a sort key, and accepts them in a join's key, as `date ^ int64` and
     /// `bool | int64`: the docs list the pairs measured. The tables measured a bitwise call in
@@ -335,7 +344,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 27] = [
+    pub const ALL: [Self; 28] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -356,6 +365,7 @@ impl Limit {
         Self::ABoundWithValuesOfItsOwn,
         Self::AWindowOverALiteral,
         Self::ADropLeavesNoRows,
+        Self::APredicateThatIsDropped,
         Self::ABitwiseCallInAJoinKey,
         Self::ACastOfAValueTheDtypeCannotHold,
         Self::ADropChangesTheLengths,
@@ -388,6 +398,7 @@ impl Limit {
             Self::ABoundWithValuesOfItsOwn => "a-bound-with-values-of-its-own",
             Self::AWindowOverALiteral => "a-window-over-a-literal",
             Self::ADropLeavesNoRows => "a-drop-leaves-no-rows",
+            Self::APredicateThatIsDropped => "a-predicate-that-is-dropped",
             Self::ABitwiseCallInAJoinKey => "a-bitwise-call-in-a-join-key",
             Self::ACastOfAValueTheDtypeCannotHold => "a-cast-of-a-value-the-dtype-cannot-hold",
             Self::ADropChangesTheLengths => "a-drop-changes-the-lengths",
@@ -454,6 +465,9 @@ impl Limit {
             }
             Self::ADropLeavesNoRows => {
                 "a drop of nulls can leave no rows, so the rows do not show the plan of what follows it"
+            }
+            Self::APredicateThatIsDropped => {
+                "a condition whose values are one expression drops its predicates, so Polars never meets what they hold"
             }
             Self::ABitwiseCallInAJoinKey => {
                 "Polars does not check the dtypes of a bitwise call in a join's key as it does in select, so it accepts a call the tables refuse for them"
@@ -6927,5 +6941,14 @@ mod tests {
         assert!(!excused_by(&case).contains(&Limit::ADropLeavesNoRows));
         let case = select_of_a_null_literal(&["Expr.cbrt", "Expr.drop_nulls"]);
         assert!(!excused_by(&case).contains(&Limit::ADropLeavesNoRows));
+    }
+    #[test]
+    fn a_predicate_that_polars_drops_is_excused_where_values_that_differ_have_it_refused() {
+        // `when(f.clip(..)).then(a).when(..).then(a).otherwise(a)`: the values are one expression,
+        // so Polars drops the predicates, and the tables refuse the clip of a `Boolean`.
+        assert_eq!(
+            excused_by_kept("uncovered-a-predicate-that-is-dropped.case"),
+            vec![Limit::APredicateThatIsDropped]
+        );
     }
 }
