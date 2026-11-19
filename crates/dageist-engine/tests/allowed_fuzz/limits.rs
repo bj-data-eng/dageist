@@ -131,6 +131,13 @@ pub enum Limit {
     /// A debug build of Polars panics where an arithmetic overflow wraps in a
     /// release build, on keys the tables did not measure.
     AnOverflow,
+    /// Polars raises an integer to a power by taking the exponent as a `UInt32`, so
+    /// it refuses a negative whole number as the exponent of an integer when the rows
+    /// run: the number is a value, which the tables measured as the dtype and the
+    /// number 1. Polars refusing the rows with a failed conversion to `u32`, which
+    /// has no place, in a case that holds a `pow` whose exponent is a whole number
+    /// typed below zero.
+    ANegativeExponent,
     /// A `UInt128` is compared with a `Decimal` by casting it to `decimal[38,0]`,
     /// which holds up to 38 digits, and a `UInt128` holds more. The sample's values
     /// are within the decimal, so the tables did not measure what a value beyond
@@ -168,7 +175,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 14] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -177,6 +184,7 @@ impl Limit {
         Self::AShiftThatLeavesNulls,
         Self::TheLengthsOfTheRows,
         Self::AnOverflow,
+        Self::ANegativeExponent,
         Self::AValueBeyondADecimal,
         Self::APanic,
         Self::AWindowOverAWindow,
@@ -195,6 +203,7 @@ impl Limit {
             Self::AShiftThatLeavesNulls => "a-shift-that-leaves-nulls",
             Self::TheLengthsOfTheRows => "the-lengths-of-the-rows",
             Self::AnOverflow => "an-overflow",
+            Self::ANegativeExponent => "a-negative-exponent",
             Self::AValueBeyondADecimal => "a-value-beyond-a-decimal",
             Self::APanic => "a-panic",
             Self::AWindowOverAWindow => "a-window-over-a-window",
@@ -214,6 +223,9 @@ impl Limit {
             }
             Self::AnOverflow => {
                 "a debug build of Polars panics on an overflow of the values, which the tables measured on one sample"
+            }
+            Self::ANegativeExponent => {
+                "Polars takes the exponent of an integer as a UInt32, so a negative one fails when the rows run, which the tables measured with the number 1"
             }
             Self::AValueBeyondADecimal => {
                 "a UInt128 beyond the digits of a decimal cannot be cast to it, which the tables measured on values within it"
@@ -314,6 +326,16 @@ fn any_call(expression: &Expression, found: &dyn Fn(&Call) -> bool) -> bool {
 fn is_a_single_value(call: &Call) -> bool {
     is_one_value(call)
         || (is(call, "polars.lit") && matches!(call.argument("value"), Some(Value::Flag(None))))
+}
+
+/// Whether `call` is a `pow` whose exponent is a whole number typed below zero.
+fn is_a_power_of_a_negative_number(call: &Call) -> bool {
+    is(call, "Expr.pow")
+        && matches!(call.argument("exponent"), Some(Value::Expression(exponent))
+            if exponent.links().is_empty()
+                && matches!(exponent.start(), Start::Call(start)
+                    if is(start, "polars.lit")
+                        && matches!(start.argument("value"), Some(Value::Integer(number)) if *number < 0)))
 }
 
 fn has_explode(call: &Call) -> bool {
@@ -1164,6 +1186,16 @@ fn applies(limit: Limit, case: &Case, disagreement: &Disagreement, observed: &Ob
         (Limit::AnOverflow, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal) && refusal.reason.contains("with overflow")
         }
+        (Limit::ANegativeExponent, Disagreement::PolarsRefuses(refusal)) => {
+            // The rows hold the number; a table with no rows holds none to convert.
+            unplaced(refusal)
+                && refusal.stage == Stage::Rows
+                && refusal.reason.starts_with("conversion from `")
+                && refusal.reason.contains("` to `u32` failed")
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &is_a_power_of_a_negative_number))
+        }
         (Limit::AValueBeyondADecimal, Disagreement::PolarsRefuses(refusal)) => {
             // The rows hold the values; a table with no rows holds none to fail.
             unplaced(refusal)
@@ -1826,6 +1858,96 @@ mod tests {
                 "Polars panicked: should not fail"
             ),
             vec![Limit::APanic]
+        );
+    }
+
+    // ----- A negative exponent
+
+    const NEGATIVE_EXPONENT: &str =
+        "conversion from `i32` to `u32` failed in column 'literal' for 1 out of 1 values: [-1]";
+
+    /// A literal that is the whole number `number`, typed without a dtype.
+    fn whole(number: i64) -> Expression {
+        chain(
+            call("polars.lit", vec![("value", Value::Integer(number))]),
+            &[],
+        )
+    }
+
+    fn pow_of(exponent: Expression) -> Call {
+        call("Expr.pow", vec![("exponent", Value::Expression(exponent))])
+    }
+
+    #[test]
+    fn a_failed_conversion_to_a_u32_is_excused_where_a_power_is_given_a_negative_number() {
+        let case = select(vec![chain_of(column("a"), vec![pow_of(whole(-1))])]);
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Rows, NEGATIVE_EXPONENT, Vec::new()),
+            vec![Limit::ANegativeExponent]
+        );
+        // A power in an expression the chain is given reaches it too.
+        let nested = select(vec![chain_of(
+            column("a"),
+            vec![compared_with(
+                "Expr.eq",
+                chain_of(column("k"), vec![pow_of(whole(-1))]),
+            )],
+        )]);
+        assert_eq!(
+            polars_refuses(&nested, None, Stage::Rows, NEGATIVE_EXPONENT, Vec::new()),
+            vec![Limit::ANegativeExponent]
+        );
+    }
+
+    #[test]
+    fn a_failed_conversion_to_a_u32_is_not_excused_without_a_power_of_a_negative_number() {
+        // A power of a positive number or of a column, and a negative number given to another
+        // call, are not why a number fails to become a `u32`.
+        for case in [
+            select(vec![chain_of(column("a"), vec![pow_of(whole(2))])]),
+            select(vec![chain_of(
+                column("a"),
+                vec![pow_of(chain(column("b"), &[]))],
+            )]),
+            select(vec![chain_of(
+                column("a"),
+                vec![compared_with("Expr.sub", whole(-1))],
+            )]),
+        ] {
+            assert_eq!(
+                polars_refuses(&case, None, Stage::Rows, NEGATIVE_EXPONENT, Vec::new()),
+                vec![]
+            );
+        }
+    }
+
+    #[test]
+    fn only_a_failed_conversion_to_a_u32_of_the_rows_without_a_place_is_excused_for_a_power() {
+        let case = select(vec![chain_of(column("a"), vec![pow_of(whole(-1))])]);
+        for reason in [
+            "conversion from `i32` to `u8` failed in column 'literal' for 1 out of 1 values: [-1]",
+            "`pow` operation not supported for dtype `str` as base",
+        ] {
+            assert_eq!(
+                polars_refuses(&case, None, Stage::Rows, reason, Vec::new()),
+                vec![],
+                "{reason}"
+            );
+        }
+        // A refusal that Polars places at a call is the call's.
+        assert_eq!(
+            polars_refuses(
+                &case,
+                Some(link_of("exprs", 0, 0)),
+                Stage::Rows,
+                NEGATIVE_EXPONENT,
+                Vec::new()
+            ),
+            vec![]
+        );
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Schema, NEGATIVE_EXPONENT, Vec::new()),
+            vec![]
         );
     }
 
