@@ -5,8 +5,8 @@
  * can itself be a chain, so chains nest.
  *
  * What the editor holds here is what the step document is written from. The
- * engine checks it, works out its dtypes and its rows, and writes it as Polars
- * code; nothing here writes text for a person to read.
+ * engine checks it and works out its dtypes and its rows; nothing here writes
+ * text for a person to read.
  */
 
 import type { Method } from './expr';

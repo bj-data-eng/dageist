@@ -38,12 +38,12 @@ mod model;
 mod preview;
 mod read;
 mod run;
-mod source;
 mod summary;
 #[cfg(test)]
 mod tests;
 mod values;
 mod walk;
+mod wording;
 mod write;
 
 pub use changes::{Change, ColumnChange};
@@ -59,10 +59,9 @@ pub use preview::Preview;
 pub use run::{
     ExpressionDtypes, Outcome, Report, Resolution, RowsError, RunCause, StepRefusal, StepReport,
 };
-pub(crate) use source::float;
-pub use source::{NotRunnable, NotRunnableReason, Source, SourceLine};
 pub use values::{FIRST_VALUES, FirstValues};
 pub use walk::{Standing, Walk, WalkRefusal, WalkedExpression};
+pub(crate) use wording::float;
 
 /// The version of the document format this engine reads and writes.
 pub const VERSION: u32 = 1;

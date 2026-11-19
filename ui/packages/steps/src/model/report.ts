@@ -18,7 +18,6 @@ import type {
   ResolutionView,
   RowsView,
   RunView,
-  SourceLineView,
   StepReportView,
 } from '@dageist/host';
 import { HostError } from '@dageist/host';
@@ -73,12 +72,10 @@ export interface PreparedStep {
   /** The columns the step gives; those it is given when it cannot be run. */
   readonly after: Frame;
   /**
-   * The Python Polars call the step stands for, as the engine wrote it, or `null` where the
-   * engine has not written it of the step as it is: it is not in the document, or an edit has
-   * changed it since.
+   * What the step works on in a few words, as the engine wrote it, or `null` where the engine
+   * has not written it of the step as it is: it is not in the document, or an edit has changed
+   * it since.
    */
-  readonly source: string | null;
-  /** What the step works on in a few words, as the engine wrote it, or `null` as `source` is. */
   readonly summary: string | null;
   /** The columns the step added or replaced, as the engine reports them. */
   readonly changes: readonly ColumnChangeView[];
@@ -108,11 +105,6 @@ export interface PreparedStep {
 export interface PreparedRun {
   /** The columns of the table the steps start from. */
   readonly source: Frame;
-  /**
-   * The Python module the engine wrote of the document the steps now are, line by line, or
-   * nothing where the engine has not answered for that document yet.
-   */
-  readonly module: readonly SourceLineView[];
   /** One for each step of the editor, in its order. */
   readonly steps: readonly PreparedStep[];
 }
@@ -123,7 +115,6 @@ const NO_WORDS: ReadonlySet<string> = new Set();
 export function atDefaultKey(ownerId: string, parameter: string): string {
   return `${ownerId}:${parameter}`;
 }
-const NO_MODULE: readonly SourceLineView[] = [];
 const NO_CHAINS: ReadonlyMap<string, ChainDtypes> = new Map();
 const NO_FIRST: ReadonlyMap<string, string> = new Map();
 
@@ -318,7 +309,6 @@ export function prepareRun(
       status,
       before,
       after: before,
-      source: null,
       summary: null,
       changes: [],
       rows: null,
@@ -362,9 +352,7 @@ export function prepareRun(
     prepared.push(result);
     before = result.after;
   }
-  const module =
-    run?.status === 'run' && answered?.document === translation.text ? run.python : NO_MODULE;
-  return { source, module, steps: prepared };
+  return { source, steps: prepared };
 }
 
 /** Prepares one step from what the engine reported of it. */
@@ -379,7 +367,6 @@ function fromReport(
   const base = {
     id: step.id,
     before,
-    source: report.source,
     summary: report.summary,
     lazy: report.lazy,
     chains: chainDtypes(report, sent),

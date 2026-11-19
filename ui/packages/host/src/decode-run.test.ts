@@ -220,39 +220,18 @@ describe('the report of running the claim-timing steps', () => {
   });
 });
 
-describe('the Python source and the summary of each step', () => {
+describe('the summary of each step', () => {
   const run = decodeRun(report);
 
-  it('gives each step the call it stands for and what it works on, as the engine wrote them', () => {
-    expect(stepNamed(run, 'sort')).toMatchObject({
-      source: '.sort("dcn", "timestamp")',
-      summary: 'by dcn, timestamp',
-    });
-    expect(stepNamed(run, 'step_index')).toMatchObject({
-      source: '.with_columns(pl.col("dcn").cum_count().over(pl.col("dcn")).alias("step_index"))',
-      summary: 'step_index',
-    });
-    expect(stepNamed(run, 'join')).toMatchObject({
-      source:
-        '.join(step_sla, how="left", left_on="step_to", right_on="step", maintain_order="left")',
-      summary: 'step_sla on step_to',
-    });
+  it('gives each step what it works on, as the engine wrote it', () => {
+    expect(stepNamed(run, 'sort')).toMatchObject({ summary: 'by dcn, timestamp' });
+    expect(stepNamed(run, 'step_index')).toMatchObject({ summary: 'step_index' });
+    expect(stepNamed(run, 'join')).toMatchObject({ summary: 'step_sla on step_to' });
     expect(stepNamed(run, 'pivot')).toMatchObject({ summary: 'on step_to' });
   });
 
-  it('gives the module the document is written as, line by line, each step line naming its step', () => {
-    if (run.status !== 'run') throw new Error('the document was not read');
-    expect(run).toMatchObject({
-      python: expect.arrayContaining([
-        { text: 'from datetime import date', step: null },
-        { text: '    claims: pl.LazyFrame,', step: null },
-        { text: '        .sort("dcn", "timestamp")', step: 'sort' },
-      ]) as unknown,
-    });
-  });
-
-  it('refuses a step that lacks its source or has one that is not text', () => {
-    expect(() => decodeRun(without(report, ['steps', 0], 'source'))).toThrow(DecodeError);
+  it('refuses a step that lacks its summary or has one that is not text', () => {
+    expect(() => decodeRun(without(report, ['steps', 0], 'summary'))).toThrow(DecodeError);
     expect(() => decodeRun(replaced(report, ['steps', 0, 'summary'], 3))).toThrow(DecodeError);
   });
 });
@@ -553,7 +532,6 @@ describe('a report that is not what the host sends', () => {
 function handWrittenStep(count: unknown): unknown {
   return {
     id: 'add',
-    source: '.with_columns(pl.col("owner").alias("slow"))',
     summary: 'slow',
     lazy: true,
     outcome: {
@@ -582,7 +560,7 @@ const COUNTED = {
 };
 
 function runOf(count: unknown): unknown {
-  return { status: 'run', source: [], python: [], steps: [handWrittenStep(count)] };
+  return { status: 'run', source: [], steps: [handWrittenStep(count)] };
 }
 
 describe('the columns a step changed and how its rows were counted', () => {

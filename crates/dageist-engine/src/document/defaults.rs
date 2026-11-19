@@ -3,7 +3,7 @@
 //! Python calls a method the same whether a parameter is left out or given its
 //! default, so an argument equal to the default says nothing a call without it
 //! does not. Whether it is one is a rule about Polars' defaults, which the
-//! engine holds: the step editor shows it, and the source does not write it.
+//! engine holds: the step editor shows it.
 
 use crate::catalog::{DefaultValue, Role, Shape, Variadic};
 

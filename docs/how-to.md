@@ -584,52 +584,6 @@ another reason is no finding: the allowance is right, but Polars never judged wh
 the tables refused, so it is not counted as agreement, and its outcome names both
 reasons.
 
-## Check The Python Source
-
-The engine writes a step document as Python Polars source, as
-[the explanation](explanation.md#the-step-document) describes. Two checks hold it
-to Python Polars. Both use the cases in
-`crates/dageist-engine/tests/document/python/`: the claim-timing sample, and
-single steps that between them use every entry of the catalogue with the
-arguments each parameter takes, on rows that hold every dtype the entries work
-on.
-
-The structural check runs with the engine's tests. It reads every call of every
-case with a small parser, and holds it to `api/polars/python.txt` and the
-catalogue: the call names an item Python Polars has, each keyword is one of its
-parameters, each parameter is bound once, none that is required is left out,
-and each argument is of the kind the catalogue gives the parameter. A test
-refuses source that breaks each of those, and another that the cases use every
-entry.
-
-The execution check runs the source in Python Polars and compares its table
-with the engine's own run of the same document on the same rows, the schema and
-every row. It needs a Python with Polars, so it is ignored unless asked for,
-and `DAGEIST_PYTHON` names the Python. Create the environment in `tmp/`, which
-Git ignores, with the Polars release that `vendor/polars` is at; the
-[reference](reference.md#vendored-sources) names its tag, such as `py-2.1.0`,
-and the version is the tag without `py-`:
-
-```sh
-python3 -m venv tmp/python
-tmp/python/bin/pip install polars==2.1.0
-```
-
-Then run the check:
-
-```sh
-DAGEIST_PYTHON=tmp/python/bin/python cargo test --offline --locked -p dageist-engine --test document python_polars_gives_what_the_engine_gives_for_the_source -- --ignored
-```
-
-For each case the test writes the rows, the inputs, the source and the
-engine's table as Arrow files into `target/tmp/python_source/<case>/`, and
-`tests/document/python/execute.py` imports the module, calls `run` with the
-same inputs and compares what it gives with the engine's table. A case that
-passes removes its files. A difference names the case, shows the source and
-Python's complaint, and keeps the files. It is a finding about the generator of
-the source in `crates/dageist-engine/src/document/source.rs`: settle it there,
-and never loosen the comparison.
-
 ## Check The Build Against The Polars Release
 
 The engine builds Polars from `vendor/polars` with the same features, crate
@@ -737,13 +691,9 @@ build into line with the new release:
 8. [Refresh the step report snapshots](#refresh-the-step-report-snapshots) and
    review them: they hold Polars' own refusal text, which a new release can
    word differently, and the tables' verdicts on the steps of the sample.
-9. Install the new release into the Python environment, as
-   [the check of the Python source](#check-the-python-source) says, with
-   `tmp/python/bin/pip install polars==<release version>`, and run the execution
-   check. A parameter the release renamed, moved or made keyword-only changes
-   what the source must write, so a difference is settled in the generator, and
-   the catalogue's keyword-only marks are held to the refreshed
-   `api/polars/python.txt` by an engine test.
+9. A parameter the release renamed, moved or made keyword-only is held to the
+   refreshed `api/polars/python.txt` by an engine test: the catalogue's
+   keyword-only and starred marks are those of Python's signature.
 
 Update the tag and commit in the [reference](reference.md#vendored-sources),
 and name the tag in the commit message.

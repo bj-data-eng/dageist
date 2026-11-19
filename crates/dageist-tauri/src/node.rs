@@ -157,8 +157,7 @@ pub fn run_view(document: &str) -> Result<RunView, ErrorView> {
     let report = node
         .run(&document)
         .map_err(|error| failed("running the document", error))?;
-    let module = document.source(ClaimTiming::SOURCE_NAME, node.inputs());
-    Ok(RunView::of_report(&report, &module))
+    Ok(RunView::of_report(&report))
 }
 
 /// The rows after the step `step` of `document`, at most `limit` of them.

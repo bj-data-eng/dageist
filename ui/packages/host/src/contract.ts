@@ -188,8 +188,6 @@ export interface ParameterView {
   readonly defaultSetting: SettingView | null;
   /** What the parameter is set to when it is first added, which differs from its default. */
   readonly start: SettingView;
-  /** Polars' default as Python writes it, or `null` when it must be given. */
-  readonly python: string | null;
   /**
    * Where the expression the parameter holds stands, when a named position
    * holds it; the engine's tables are asked at that place.
@@ -581,8 +579,6 @@ export type OutcomeView =
 /** What running one step reported. Mirrors `StepReportView` in crates/dageist-tauri/src/report.rs. */
 export interface StepReportView {
   readonly id: string;
-  /** The step as the Python Polars method call it stands for, written by the engine. */
-  readonly source: string;
   /** What the step works on, in a few words written by the engine, such as `by dcn, timestamp`. */
   readonly summary: string;
   /** Whether the step stays in a lazy plan; a step that does not collected the data it needs when it was built. */
@@ -614,16 +610,6 @@ export type ReadProblemView =
   | { readonly kind: 'refused'; readonly place: PlaceView; readonly reason: string };
 
 /**
- * One line of the Python module a document is written as. Mirrors
- * `SourceLineView` in crates/dageist-tauri/src/report.rs.
- */
-export interface SourceLineView {
-  readonly text: string;
-  /** The step the line is the call of, or the step a note on it is for; `null` for any other line. */
-  readonly step: string | null;
-}
-
-/**
  * What running a document came to: its steps reported one by one, or the
  * reason it could not be read. Mirrors `RunView` in
  * crates/dageist-tauri/src/report.rs.
@@ -635,8 +621,6 @@ export type RunView =
       readonly source: readonly FieldView[];
       /** One report for each step, in the document's order. */
       readonly steps: readonly StepReportView[];
-      /** The Python Polars module the document is written as, line by line. */
-      readonly python: readonly SourceLineView[];
     }
   | { readonly status: 'unreadable'; readonly problem: ReadProblemView };
 

@@ -4,7 +4,6 @@
   "steps": [
     {
       "id": "variants",
-      "source": ".with_columns(pl.col(\"a\").alias(\"b\"))",
       "summary": "b",
       "lazy": false,
       "outcome": {
@@ -208,7 +207,6 @@
     },
     {
       "id": "unknown_table",
-      "source": ".sort(\"a\")",
       "summary": "by a",
       "lazy": true,
       "outcome": {
@@ -240,7 +238,6 @@
     },
     {
       "id": "unknown_input",
-      "source": ".sort(\"a\")",
       "summary": "by a",
       "lazy": true,
       "outcome": {
@@ -272,7 +269,6 @@
     },
     {
       "id": "build",
-      "source": ".sort(\"a\")",
       "summary": "by a",
       "lazy": true,
       "outcome": {
@@ -304,7 +300,6 @@
     },
     {
       "id": "rule",
-      "source": ".sort(\"a\")",
       "summary": "by a",
       "lazy": true,
       "outcome": {
@@ -342,7 +337,6 @@
     },
     {
       "id": "rows_stage",
-      "source": ".sort(\"a\")",
       "summary": "by a",
       "lazy": false,
       "outcome": {
@@ -380,7 +374,6 @@
     },
     {
       "id": "failed",
-      "source": ".sort(\"a\")",
       "summary": "by a",
       "lazy": true,
       "outcome": {
@@ -399,16 +392,6 @@
         "notKnown": null
       },
       "atDefault": []
-    }
-  ],
-  "python": [
-    {
-      "text": "# Not runnable as written: step \"variants\", something in it is still to be picked.",
-      "step": "variants"
-    },
-    {
-      "text": "import polars as pl",
-      "step": null
     }
   ]
 }

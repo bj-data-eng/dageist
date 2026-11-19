@@ -216,8 +216,8 @@ Three rules keep this workable as the application grows:
   is selected or which menu is open. Values and validation come from the host.
   The step editor holds its steps and writes them as a step document; the
   engine runs the document and reports the columns, the dtypes and the
-  refusals, the rows after a step as text, and the Python source and the short
-  summary of each step, and the view shows them.
+  refusals, the rows after a step as text, and the short summary of each step,
+  and the view shows them.
 
 The view reaches Tauri through the `window.__TAURI__` global that
 `app.withGlobalTauri` injects. The host package declares the global's types by
@@ -307,10 +307,10 @@ it, and draws every parameter by its kind. A method's first expression
 parameter is written inline. Any other parameter of a method or step is an
 option: the list its name opens offers the rest by name. The editor writes
 every option that is set into the document; the engine decides which are at
-their default, and leaves those out of its Python source. A step's
-own parameters are drawn by kind too: sort's keys and their per-item
-`descending`, select's expressions, join's table, keys and `how`, a rename's
-pairs, and a pivot's aggregate, which is a chain from `pl.element()`. A new
+their default. A step's own parameters are drawn by kind too: sort's keys and
+their per-item `descending`, select's expressions, join's table, keys and
+`how`, a rename's pairs, and a pivot's aggregate, which is a chain from
+`pl.element()`. A new
 column's name and chain and a filter's conditions keep the lines the
 storyboard settled, which lay out an expression list one item to a line. A
 pivot takes its output columns from a connected table, its `on_columns`.
@@ -389,13 +389,14 @@ decides them and the editor applies them. The catalogue carries each
 parameter's default and its first setting, and a step report names the
 arguments of the step, and of the calls inside its expressions, that are what
 their parameter holds when it is not given, which the editor shows as "same as
-the default". Python calls a method the same with a parameter left out or
-given its default, so the Python source leaves out a named argument that is at
-its default. A list for each item, such as sort's `descending`, is at its
+the default". Polars calls a method the same with a parameter left out or
+given its default. A list for each item, such as sort's `descending`, is at its
 default only when it holds one value for each key; Polars refuses a list of
-another length, so it is written. An option that cannot be added says why, with
-the refusal of the first word it could be set to, or that there is no other
-word.
+another length, so it is not at its default. An option that cannot be added
+says why, with the refusal of the first word it could be set to, or that there
+is no other word. The catalogue also records which parameters Python takes only
+by name and which it takes as starred, and an engine test holds those marks to
+the signatures in `api/polars/python.txt`.
 
 The catalogue gives each expression parameter the position the tables name for
 it, so the editor says where a slot stands and the engine works out the context.
@@ -480,15 +481,14 @@ elsewhere ([Literal::shown](../crates/dageist-engine/src/allowed/literal.rs)):
 
 - A whole number is its digits.
 - A number with a fraction is written as Python's `repr` writes it, which is also
-  how the Python source writes it, so a whole one keeps its fraction (`1.0`, not
-  `1`), the shortest digits that read back are used, and an exponent, with a sign
-  and two digits at least, is written only below 1e-4 and from 1e16 on (`1e+20`,
+  how a summary writes it, so a whole one keeps its fraction (`1.0`, not `1`), the
+  shortest digits that read back are used, and an exponent, with a sign and two
+  digits at least, is written only below 1e-4 and from 1e16 on (`1e+20`,
   `1e-05`).
 - Text is written as it is, with no quotation marks and nothing escaped. The
   editor draws a block that holds text between quotation marks of its own, so
   adding them to the words would show them twice, and escaping is for a Python
-  string. The Python source and a summary have no such drawing, and write text as
-  a Python string.
+  string. A summary has no such drawing, and writes text as a Python string.
 
 The comparisons a test makes are the catalogue's entries `Expr.eq`, `Expr.ne`,
 `Expr.gt`, `Expr.ge`, `Expr.lt` and `Expr.le`, which the engine lists in the order
@@ -616,27 +616,16 @@ the rest as the step is built, and when it refuses a pivot because of a column i
 its aggregate, it refuses the step, not the expression. The contexts the tables
 are measured in also say which table a join's `right_on` is read against.
 
-A document is also written as Python Polars source, and each step as a short
-summary, by the engine; the view composes neither. `Document::source` writes a
-module with a function `run` that is given the table the document starts from
-and each connected input its steps name, typed, and gives the lazy frame the
-steps build. A step is the method call it stands for, such as
-`.sort("dcn", "timestamp")`, which is also its line of the function. What is
-written follows from the entry a call uses and the arguments it was given:
-Python's names, its order of parameters, with the first by position and a
-parameter after a bare `*` or a starred one only by its name, which the
-catalogue records, and Python's literals, so that a whole float keeps its `.0`
-and a connected value is a literal of its dtype. A table is a lazy frame, and a
-pivot's `on_columns`, which Python takes as a data frame, is collected. What
-cannot run as written, a hole, an input that is not connected, or two names
-that are one Python name, is written as the closest readable form and marked by
-a comment at the top of the module. A step's summary is what it works on, such
-as `by dcn, timestamp` or `step_sla on step_to`; its words are in the language
-file's `summary` table, and what is worked out is `…`. The report of each step
-carries both, and a run carries the module with each line naming its step, so
-the Polars tab and the hints show what the engine wrote. Whether the source
-runs in Python Polars is checked, not assumed: see
-[how to check the Python source](how-to.md#check-the-python-source).
+Each step is also said as a short summary by the engine; the view composes none.
+A summary is what the step works on, such as `by dcn, timestamp` or
+`step_sla on step_to`; its words are in the language file's `summary` table, and
+what is worked out is `…`. A name is written as the document holds it, and a typed
+value as Python writes it, as above. The report of each step carries its summary,
+and the step list and the editor's step menu show it. The engine does not write a
+step as Python Polars source: Dageist adds functions of its own beside Polars', and
+a Python rendering of every step would either not run as written or give slightly
+different results, so the blocks, the summaries and the previews are what say what
+a step does.
 
 The claim-timing steps the step editor opens with, the seven claim rows they run
 on and the inputs connected to them are one sample node in the engine,
