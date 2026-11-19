@@ -7,7 +7,8 @@
     "filter-predicate-is-boolean",
     "join-key-names-are-not-repeated",
     "key-is-elementwise",
-    "pivot-aggregate-gives-one-value"
+    "pivot-aggregate-gives-one-value",
+    "replacement-values-match-in-number"
   ],
   "stages": ["schema", "rows", "empty"],
   "conditionStates": ["when", "then", "chainedWhen", "chainedThen"],

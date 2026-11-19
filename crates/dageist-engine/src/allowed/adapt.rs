@@ -138,6 +138,17 @@ fn role(entry: &Entry, name: &str) -> Option<Role> {
         .map(crate::catalog::Parameter::role)
 }
 
+/// Whether a number typed without a dtype that is the parameter `name` of `entry` adapts only to
+/// the dtype of a number that the method follows: beside another dtype Polars refuses it as
+/// ambiguous, which the tables, measured with numbers of a dtype, do not say.
+pub(crate) fn adapts_numbers_only(entry: &Entry, name: &str) -> bool {
+    entry
+        .parameters()
+        .iter()
+        .find(|parameter| parameter.name() == name)
+        .is_some_and(crate::catalog::Parameter::adapts_numbers_only)
+}
+
 /// Whether the parameter `name` of `entry` counts or indexes, which a whole
 /// number is the dtype of whatever it adapts to: `shift`'s rows.
 pub(crate) fn is_count(entry: &Entry, name: &str) -> bool {

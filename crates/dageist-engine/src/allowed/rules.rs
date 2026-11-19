@@ -34,19 +34,23 @@ pub enum Rule {
     /// was paired with, makes the same pair again.
     JoinKeyNamesAreNotRepeated,
     /// A join's own key is elementwise: it holds no aggregate beside a column,
-    /// and no column compared with a null.
+    /// no column compared with a null, and no replacement of values that are not literals.
     KeyIsElementwise,
+    /// A replacement is given as many new values as old ones, or one, and a strict one a
+    /// default of as many values as what it follows, or one.
+    ReplacementValuesMatchInNumber,
 }
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::ConditionPredicateIsBoolean,
         Self::ElementOnlyInPivotAggregate,
         Self::FilterPredicateIsBoolean,
         Self::JoinKeyNamesAreNotRepeated,
         Self::KeyIsElementwise,
         Self::PivotAggregateGivesOneValue,
+        Self::ReplacementValuesMatchInNumber,
     ];
 
     /// The name the tables give the rule.
@@ -59,6 +63,7 @@ impl Rule {
             Self::FilterPredicateIsBoolean => "filter-predicate-is-boolean",
             Self::JoinKeyNamesAreNotRepeated => "join-key-names-are-not-repeated",
             Self::KeyIsElementwise => "key-is-elementwise",
+            Self::ReplacementValuesMatchInNumber => "replacement-values-match-in-number",
         }
     }
 
@@ -84,7 +89,10 @@ impl Rule {
                 "a join may not pair the same two output column names twice: where two keys on one side are named alike, the keys they are paired with must be named differently"
             }
             Self::KeyIsElementwise => {
-                "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a column be compared with a null"
+                "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a column be compared with a null, nor a replacement take a value that reads a column"
+            }
+            Self::ReplacementValuesMatchInNumber => {
+                "a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one"
             }
         }
     }
@@ -99,6 +107,8 @@ impl Rule {
             Self::ElementOnlyInPivotAggregate => entry == "polars.element",
             Self::PivotAggregateGivesOneValue => context == Context::step(Outer::PivotAggregate),
             Self::JoinKeyNamesAreNotRepeated | Self::KeyIsElementwise => context.is_join_key(),
+            // A matter of the values a call is given, whatever context it stands in.
+            Self::ReplacementValuesMatchInNumber => false,
             Self::ConditionPredicateIsBoolean | Self::FilterPredicateIsBoolean => {
                 self.needs_boolean_end(context)
             }
@@ -192,7 +202,8 @@ impl Rule {
             Self::PivotAggregateGivesOneValue
             | Self::ElementOnlyInPivotAggregate
             | Self::JoinKeyNamesAreNotRepeated
-            | Self::KeyIsElementwise => false,
+            | Self::KeyIsElementwise
+            | Self::ReplacementValuesMatchInNumber => false,
         }
     }
 }

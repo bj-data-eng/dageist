@@ -79,6 +79,7 @@ impl ConditionState {
 pub struct Chosen<'a> {
     arguments: &'a [(&'a str, Representative)],
     options: &'a [(&'a str, &'a str)],
+    unclassed: &'a [&'a str],
     gives: Option<Representative>,
     many: bool,
 }
@@ -89,6 +90,15 @@ impl<'a> Chosen<'a> {
     #[must_use]
     pub const fn with_arguments(mut self, arguments: &'a [(&'a str, Representative)]) -> Self {
         self.arguments = arguments;
+        self
+    }
+
+    /// The expression parameters that are given and whose dtype is not known, by name. The tables
+    /// are not asked of them, but that they are given may decide what another is: `replace_strict`
+    /// converts what replaces leniently where it is given a default.
+    #[must_use]
+    pub const fn with_unclassed(mut self, unclassed: &'a [&'a str]) -> Self {
+        self.unclassed = unclassed;
         self
     }
 
@@ -412,9 +422,11 @@ fn on_receiver(
     entry: &'static Entry,
     receiver: Representative,
     arguments: &[(&str, Representative)],
+    options: &[(&str, &str)],
 ) -> Result<Fit, Refusal> {
     let tables = Tables::committed();
     let id = entry.id().as_str();
+    let stood_in_for = stood_in_for(entry, options);
     let missing = || Refusal::structure(format!("the tables hold nothing for {id} on {receiver}"));
     let line = |parameter: Option<&'static str>, argument: Option<Representative>| match tables
         .dtypes
@@ -425,8 +437,12 @@ fn on_receiver(
         Some(Outcome::Allowed(produces)) => Ok(Fit::of(produces.as_ref())),
     };
     let mut fit = None;
-    let required: Vec<&'static str> = required_expressions(entry).collect();
-    if required.is_empty() {
+    // What a chosen option is given in place of is not given, so the lines of the dtype table
+    // that give it say nothing of the call: the option table does.
+    let required: Vec<&'static str> = required_expressions(entry)
+        .filter(|parameter| !stood_in_for.contains(parameter))
+        .collect();
+    if required.is_empty() && stood_in_for.is_empty() {
         fit = Some(line(None, None)?);
     }
     // What the arguments given decide: each is measured on its own, so what
@@ -483,7 +499,45 @@ fn on_receiver(
             shape: if same_shape { first.shape } else { Shape::Many },
         });
     }
-    fit.ok_or_else(missing)
+    match fit {
+        Some(fit) => Ok(fit),
+        // The option table says what the call gives.
+        None if !stood_in_for.is_empty() => Ok(Fit::of(None)),
+        None => Err(missing()),
+    }
+}
+
+/// The parameters of `entry` that a chosen option is given in place of: they are not given.
+fn stood_in_for(entry: &Entry, options: &[(&str, &str)]) -> Vec<&'static str> {
+    entry
+        .parameters()
+        .iter()
+        .filter_map(|parameter| {
+            let instead = parameter.in_place_of()?;
+            let set = options.iter().any(|(name, word)| {
+                *name == parameter.name() && default_word(parameter).as_deref() != Some(*word)
+            });
+            set.then_some(instead)
+        })
+        .collect()
+}
+
+/// The options chosen that are given in place of another parameter, which a method with them
+/// stands in a context in the form of.
+fn form_of(entry: &Entry, options: &[(&str, &str)]) -> Vec<(&'static str, String)> {
+    entry
+        .parameters()
+        .iter()
+        .filter(|parameter| parameter.in_place_of().is_some())
+        .filter_map(|parameter| {
+            let word = options
+                .iter()
+                .find(|(name, _)| *name == parameter.name())?
+                .1;
+            (default_word(parameter).as_deref() != Some(word))
+                .then(|| (parameter.name(), word.to_owned()))
+        })
+        .collect()
 }
 
 /// What the option table says the options chosen give.
@@ -491,12 +545,8 @@ enum OptionsGive {
     /// They change nothing the table records: no option is set to other than its
     /// default.
     Nothing,
-    /// The lines that bear on them agree on this, measured on a receiver of this
-    /// dtype.
-    Gives {
-        produces: Produces,
-        measured_on: Option<Representative>,
-    },
+    /// The lines that bear on them agree on this.
+    Gives(Produces),
     /// The lines that bear on them give different results.
     Unknown,
 }
@@ -517,7 +567,11 @@ pub(super) fn default_word(parameter: &catalog::Parameter) -> Option<String> {
 /// that set it with every other option at its default, and more from the line
 /// of each pair of them; where those lines give different results, the result
 /// is not known.
-fn read_options(entry: &Entry, chosen: &[(&str, &str)]) -> OptionsGive {
+fn read_options(
+    entry: &Entry,
+    receiver: Option<Representative>,
+    chosen: &[(&str, &str)],
+) -> OptionsGive {
     let tables = Tables::committed();
     let id = entry.id().as_str();
     let parameter = |name: &str| entry.parameters().iter().find(|found| found.name() == name);
@@ -536,8 +590,8 @@ fn read_options(entry: &Entry, chosen: &[(&str, &str)]) -> OptionsGive {
             .iter()
             .any(|(chosen_name, chosen_word)| chosen_name == name && chosen_word == word)
     };
-    let mut gives: Vec<(&Produces, Option<Representative>)> = Vec::new();
-    for ((line_id, line), cell) in &tables.options {
+    let mut gives: Vec<&Produces> = Vec::new();
+    for ((line_id, line_receiver, line), outcome) in &tables.options {
         let bears = match changed.as_slice() {
             [] => false,
             [_] => {
@@ -549,20 +603,18 @@ fn read_options(entry: &Entry, chosen: &[(&str, &str)]) -> OptionsGive {
             _ => line.len() > 1 && line.iter().all(is_chosen),
         };
         if *line_id == id
+            && *line_receiver == receiver
             && bears
-            && let Outcome::Allowed(Some(produces)) = &cell.outcome
+            && let Outcome::Allowed(Some(produces)) = outcome
         {
-            gives.push((produces, cell.receiver));
+            gives.push(produces);
         }
     }
-    let Some((first, measured_on)) = gives.first().copied() else {
+    let Some(first) = gives.first().copied() else {
         return OptionsGive::Nothing;
     };
-    if gives.iter().all(|(produces, _)| *produces == first) {
-        OptionsGive::Gives {
-            produces: first.clone(),
-            measured_on,
-        }
+    if gives.iter().all(|produces| *produces == first) {
+        OptionsGive::Gives(first.clone())
     } else {
         OptionsGive::Unknown
     }
@@ -578,31 +630,6 @@ fn measured_with(entry: &Entry) -> &'static [&'static str] {
         "Expr.over" => &["partition_by", "order_by"],
         _ => &[],
     }
-}
-
-/// The result an option gives where the method follows `receiver`, from the
-/// result `option` the table measured on `measured_on`, and the results the
-/// method gives at its default options on each. The option table was measured
-/// on one dtype: where the receiver is another, the option is read as it
-/// changes what the method gives there, which is to leave it, or to make a
-/// list of it, and not known where it does otherwise.
-fn changed_result(
-    receiver: Representative,
-    measured_on: Option<Representative>,
-    option: &ResultDtype,
-    default_there: Option<&ResultDtype>,
-    default_here: Option<&ResultDtype>,
-) -> Option<ResultDtype> {
-    if measured_on == Some(receiver) {
-        return Some(option.clone());
-    }
-    let there = default_there?;
-    if option == there {
-        return default_here.cloned();
-    }
-    (option.name() == format!("List({})", there.name()))
-        .then(|| default_here.map(|here| ResultDtype::from_name(&format!("List({})", here.name()))))
-        .flatten()
 }
 
 /// Whether the entry `entry` may stand at `place`, given what has been
@@ -722,9 +749,14 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     if let Some(rule) = Rule::forbids(id, place.context) {
         return Err(Refusal::rule(rule));
     }
-    // What the options set are refused for.
+    // What the options set are refused for, on the dtype of the value the method follows.
     if is_method(entry) {
-        options(entry, chosen.options)?;
+        let receiver = match place.after {
+            After::Value { dtype, .. } => Some(dtype),
+            _ => None,
+        };
+        check_options(entry, receiver, chosen.options)?;
+        check_conversions(entry, chosen)?;
     }
     // What the dtype table says of a method on the value it follows.
     let (mut result, mut shape) = (None, Shape::Many);
@@ -736,29 +768,15 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         true,
     ) = (place.after, is_method(entry))
     {
-        let fit = on_receiver(entry, dtype, chosen.arguments)?;
+        let fit = on_receiver(entry, dtype, chosen.arguments, chosen.options)?;
         (result, shape) = (fit.result.clone(), fit.shape);
         // And of the options chosen, which the option table says what they give
-        // on the dtype it was measured on.
-        match read_options(entry, chosen.options) {
+        // on the dtype of the value the method follows.
+        match read_options(entry, Some(dtype), chosen.options) {
             OptionsGive::Nothing => {}
             OptionsGive::Unknown => result = None,
-            OptionsGive::Gives {
-                produces,
-                measured_on,
-            } => {
-                let there = measured_on.and_then(|measured| {
-                    on_receiver(entry, measured, chosen.arguments)
-                        .ok()
-                        .and_then(|fit| fit.result)
-                });
-                result = changed_result(
-                    dtype,
-                    measured_on,
-                    &produces.result,
-                    there.as_ref(),
-                    fit.result.as_ref(),
-                );
+            OptionsGive::Gives(produces) => {
+                result = Some(produces.result.clone());
                 // The option table was measured on a column. What follows one
                 // value is another matter: a window that joins gives that value
                 // again, not a list of it. Where the option changes what the
@@ -768,6 +786,29 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
                 }
                 shape = produces.shape;
             }
+        }
+        // The dtype that values are converted to is what the call gives.
+        for parameter in entry.parameters() {
+            if let Some((_, word)) = chosen
+                .options
+                .iter()
+                .find(|(name, _)| !parameter.converts().is_empty() && *name == parameter.name())
+            {
+                result = Some(ResultDtype::from_name(word));
+            }
+        }
+        // A call that is given the dtype it gives, as a cast is, gives nothing until it is told
+        // one: the dtype table measured it converting to the dtype it follows.
+        let needs_a_dtype = entry.parameters().iter().any(|parameter| {
+            parameter.kind() == Kind::Dtype
+                && parameter.default() == catalog::ParameterDefault::Required
+                && !chosen
+                    .options
+                    .iter()
+                    .any(|(name, _)| *name == parameter.name())
+        });
+        if needs_a_dtype {
+            result = None;
         }
         // A call that was not given what Polars needs to run it gives nothing
         // whatever its options: Polars refuses a window given neither key.
@@ -790,7 +831,14 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     // The entry stands there when the chain may go on from it: what Polars
     // refuses of an entry that is continued is refused whatever follows.
     let mut ends = Outcome::Allowed(None);
-    if let Some(cell) = tables.contexts.get(&(id, place.context)) {
+    // An option given in place of a parameter makes the method another form, which the table
+    // measured apart where it differs: a fill by a strategy is not a fill by a value.
+    let form = form_of(entry, chosen.options);
+    let cell = tables
+        .contexts
+        .get(&(id, form, place.context))
+        .or_else(|| tables.contexts.get(&(id, Vec::new(), place.context)));
+    if let Some(cell) = cell {
         match &cell.continues {
             Outcome::Refused(reason) => return Err(Refusal::polars(reason)),
             Outcome::Allowed(produces) => {
@@ -893,6 +941,18 @@ pub fn rule_forbids_a_key_known_not_elementwise(context: Context) -> Result<(), 
     Rule::forbids_non_elementwise_key(context).map_or(Ok(()), |rule| Err(Refusal::rule(rule)))
 }
 
+/// The refusal of a replacement that the caller has found is given values in other numbers than
+/// the rule allows: `new` of many values beside an `old` of one, or a strict one's `default` of
+/// many beside a value of one. How many values an expression gives is the walk's to say, so the
+/// caller finds it, and this does not.
+///
+/// # Errors
+///
+/// The rule, as a refusal that says it in its words.
+pub fn rule_forbids_replacement_values_of_other_numbers() -> Result<(), Refusal> {
+    Err(Refusal::rule(Rule::ReplacementValuesMatchInNumber))
+}
+
 /// The refusal of a key that the caller has already found repeats a pair of
 /// output names, where `context` holds one of a join's own keys, if the rule
 /// refuses it there. Polars refuses a join that pairs the same two names twice:
@@ -957,12 +1017,86 @@ pub fn argument_dtypes(
 /// Whether the options `chosen` of the entry `entry`, each by the parameter's
 /// name and the value as the tables write it (`true`, `false`, `unset`, or the
 /// word of a choice), may be set together: the table is read for every pair
-/// of them, or for the one when only one is chosen.
+/// of them, or for the one when only one is chosen. A method is measured on
+/// each dtype of the value it follows, which this does not know: the options
+/// are refused when Polars refuses them on every one of them, and allowed
+/// when it allows them on any. A call at a place is asked on its own dtype.
 ///
 /// # Errors
 ///
 /// The first pair, or single option, Polars refused, with its reason.
 pub fn options(entry: &Entry, chosen: &[(&str, &str)]) -> Result<(), Refusal> {
+    if !is_method(entry) {
+        return check_options(entry, None, chosen);
+    }
+    let mut refusal = None;
+    for receiver in Representative::ALL {
+        match check_options(entry, Some(receiver), chosen) {
+            Ok(()) => return Ok(()),
+            Err(error) => {
+                refusal.get_or_insert(error);
+            }
+        }
+    }
+    refusal.map_or(Ok(()), Err)
+}
+
+/// Whether the values that a method converts to the dtype it was given may be, as a cast of each
+/// of them: the dtype table says what a cast does to each dtype, and the arguments chosen say what
+/// dtype each value has.
+fn check_conversions(entry: &Entry, chosen: &Chosen<'_>) -> Result<(), Refusal> {
+    let tables = Tables::committed();
+    for parameter in entry.parameters() {
+        let Some((_, word)) = chosen
+            .options
+            .iter()
+            .find(|(name, _)| !parameter.converts().is_empty() && *name == parameter.name())
+        else {
+            continue;
+        };
+        // Values of two dtypes meet in a supertype before they are converted, which the tables
+        // do not give, so what is converted is judged only where they have one dtype.
+        let classes: Vec<Representative> = parameter
+            .converts()
+            .iter()
+            .filter_map(|converted| {
+                chosen
+                    .arguments
+                    .iter()
+                    .find(|(name, _)| name == converted)
+                    .map(|(_, class)| *class)
+            })
+            .collect();
+        if classes.windows(2).any(|pair| pair[0] != pair[1]) {
+            continue;
+        }
+        // Beside the parameter that makes the conversion lenient, a value that does not convert
+        // is a null, as a cast that is not strict gives one.
+        let lenient = parameter.lenient_beside().is_some_and(|other| {
+            chosen.arguments.iter().any(|(name, _)| *name == other)
+                || chosen.unclassed.contains(&other)
+        });
+        for class in &classes {
+            let mut options = vec![("dtype", (*word).to_owned())];
+            if lenient {
+                options.push(("strict", "false".to_owned()));
+            }
+            let key = ("Expr.cast", Some(*class), options);
+            if let Some(Outcome::Refused(reason)) = tables.options.get(&key) {
+                return Err(Refusal::polars(reason));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Whether the options `chosen` of `entry` may be set together where a method follows a value
+/// of the dtype `receiver`, or for a step, which follows none.
+fn check_options(
+    entry: &Entry,
+    receiver: Option<Representative>,
+    chosen: &[(&str, &str)],
+) -> Result<(), Refusal> {
     let tables = Tables::committed();
     let id = entry.id().as_str();
     let named: Vec<(&'static str, String)> = {
@@ -986,17 +1120,32 @@ pub fn options(entry: &Entry, chosen: &[(&str, &str)]) -> Result<(), Refusal> {
         named.sort_by_key(|(name, _)| position(name));
         named
     };
-    let check = |key: Vec<(&'static str, String)>| match tables.options.get(&(id, key)) {
-        Some(cell) => match &cell.outcome {
-            Outcome::Refused(reason) => Err(Refusal::polars(reason)),
-            Outcome::Allowed(_) => Ok(()),
-        },
-        None => Ok(()),
+    let check = |key: Vec<(&'static str, String)>| match tables.options.get(&(id, receiver, key)) {
+        Some(Outcome::Refused(reason)) => Err(Refusal::polars(reason)),
+        Some(Outcome::Allowed(_)) | None => Ok(()),
     };
     match named.as_slice() {
         [] => Ok(()),
         [one] => check(vec![one.clone()]),
         many => {
+            // An option that a call needs, as a cast needs its dtype, has a line of its own, which
+            // options at their defaults beside it do not leave unasked. Another option that is not
+            // at its default changes what it means, and its pair is asked.
+            let changed: Vec<&(&'static str, String)> = many
+                .iter()
+                .filter(|(name, word)| {
+                    entry
+                        .parameters()
+                        .iter()
+                        .find(|parameter| parameter.name() == *name)
+                        .is_some_and(|parameter| {
+                            default_word(parameter).as_deref() != Some(word.as_str())
+                        })
+                })
+                .collect();
+            if let [one] = changed.as_slice() {
+                check(vec![(*one).clone()])?;
+            }
             for (at, first) in many.iter().enumerate() {
                 for second in &many[at + 1..] {
                     check(vec![first.clone(), second.clone()])?;

@@ -38,8 +38,17 @@ title = "Window"
 [families.compare]
 title = "Comparison · true or false"
 
+[families.checks]
+title = "Checks · NaN, infinite, repeated"
+
 [families.logic]
 title = "Logic · and, or, not"
+
+[families.nulls]
+title = "Nulls · fill, drop, count"
+
+[families.conversion]
+title = "Conversion · dtype, swapped values"
 
 [families.start]
 title = "Start · a column or a value"
@@ -819,6 +828,209 @@ hint = "lowest value"
 [entries."Expr.sum"]
 name = "sum"
 hint = "total"
+
+[entries."Expr.backward_fill"]
+name = "backward_fill"
+hint = "empty values filled from the next value"
+
+[entries."Expr.backward_fill".parameters.limit]
+name = "limit"
+label = "at most this many in a row"
+
+[entries."Expr.cast"]
+name = "cast"
+hint = "converted to another dtype"
+
+[entries."Expr.cast".parameters.dtype]
+name = "dtype"
+label = "to"
+
+[entries."Expr.cast".parameters.strict]
+name = "strict"
+label = "refuse a value that does not convert"
+
+[entries."Expr.cast".parameters.wrap_numerical]
+name = "wrap_numerical"
+label = "wrap numbers that overflow"
+
+[entries."Expr.drop_nans"]
+name = "drop_nans"
+hint = "removes the NaNs, leaving fewer values"
+
+[entries."Expr.drop_nulls"]
+name = "drop_nulls"
+hint = "removes the empty values, leaving fewer values"
+
+[entries."Expr.eq_missing"]
+name = "eq_missing"
+hint = "equal to, an empty value equal to another"
+
+[entries."Expr.eq_missing".parameters.other]
+name = "other"
+label = "compared with"
+
+[entries."Expr.fill_nan"]
+name = "fill_nan"
+hint = "NaN replaced by a value"
+
+[entries."Expr.fill_nan".parameters.value]
+name = "value"
+label = "with"
+
+[entries."Expr.fill_null"]
+name = "fill_null"
+hint = "empty values replaced"
+
+[entries."Expr.fill_null".parameters.value]
+name = "value"
+label = "with"
+
+[entries."Expr.fill_null".parameters.strategy]
+name = "strategy"
+label = "or by"
+
+[entries."Expr.fill_null".parameters.strategy.choices]
+forward = "forward"
+backward = "backward"
+min = "min"
+max = "max"
+mean = "mean"
+zero = "zero"
+one = "one"
+
+[entries."Expr.fill_null".parameters.limit]
+name = "limit"
+label = "at most this many in a row"
+
+[entries."Expr.forward_fill"]
+name = "forward_fill"
+hint = "empty values filled from the value before"
+
+[entries."Expr.forward_fill".parameters.limit]
+name = "limit"
+label = "at most this many in a row"
+
+[entries."Expr.has_nulls"]
+name = "has_nulls"
+hint = "true if any value is empty"
+
+[entries."Expr.is_between"]
+name = "is_between"
+hint = "between a lower and an upper bound"
+
+[entries."Expr.is_between".parameters.lower_bound]
+name = "lower_bound"
+label = "from"
+
+[entries."Expr.is_between".parameters.upper_bound]
+name = "upper_bound"
+label = "to"
+
+[entries."Expr.is_between".parameters.closed]
+name = "closed"
+label = "bounds included"
+
+[entries."Expr.is_between".parameters.closed.choices]
+both = "both"
+left = "left"
+right = "right"
+none = "none"
+
+[entries."Expr.is_close"]
+name = "is_close"
+hint = "equal within a tolerance"
+
+[entries."Expr.is_close".parameters.other]
+name = "other"
+label = "compared with"
+
+[entries."Expr.is_close".parameters.abs_tol]
+name = "abs_tol"
+label = "absolute tolerance"
+
+[entries."Expr.is_close".parameters.rel_tol]
+name = "rel_tol"
+label = "relative tolerance"
+
+[entries."Expr.is_close".parameters.nans_equal]
+name = "nans_equal"
+label = "NaNs equal each other"
+
+[entries."Expr.is_duplicated"]
+name = "is_duplicated"
+hint = "true where the value occurs more than once"
+
+[entries."Expr.is_finite"]
+name = "is_finite"
+hint = "true for a number that is neither infinite nor NaN"
+
+[entries."Expr.is_first_distinct"]
+name = "is_first_distinct"
+hint = "true at the first of each value"
+
+[entries."Expr.is_infinite"]
+name = "is_infinite"
+hint = "true for an infinite number"
+
+[entries."Expr.is_last_distinct"]
+name = "is_last_distinct"
+hint = "true at the last of each value"
+
+[entries."Expr.is_nan"]
+name = "is_nan"
+hint = "true for NaN"
+
+[entries."Expr.is_not_nan"]
+name = "is_not_nan"
+hint = "true unless NaN"
+
+[entries."Expr.is_unique"]
+name = "is_unique"
+hint = "true where the value occurs once"
+
+[entries."Expr.ne_missing"]
+name = "ne_missing"
+hint = "not equal to, an empty value equal to another"
+
+[entries."Expr.ne_missing".parameters.other]
+name = "other"
+label = "compared with"
+
+[entries."Expr.null_count"]
+name = "null_count"
+hint = "number of empty values"
+
+[entries."Expr.replace"]
+name = "replace"
+hint = "values swapped for others of the same dtype"
+
+[entries."Expr.replace".parameters.old]
+name = "old"
+label = "values to replace"
+
+[entries."Expr.replace".parameters.new]
+name = "new"
+label = "with"
+
+[entries."Expr.replace_strict"]
+name = "replace_strict"
+hint = "values swapped for others, whatever their dtype"
+
+[entries."Expr.replace_strict".parameters.old]
+name = "old"
+label = "values to replace"
+
+[entries."Expr.replace_strict".parameters.new]
+name = "new"
+label = "with"
+
+[entries."Expr.replace_strict".parameters.default]
+name = "default"
+label = "any other value becomes"
+
+[entries."Expr.replace_strict".parameters.return_dtype]
+name = "return_dtype"
+label = "result dtype"
 
 # The words of a step's short summary, as a list of steps shows it. A `{name}` is filled
 # when the summary is written.

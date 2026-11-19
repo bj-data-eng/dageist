@@ -332,6 +332,7 @@ fn polars_words(rule: &str) -> &'static [&'static str] {
             "is not allowed in this context",
         ],
         "join-key-names-are-not-repeated" => &["repeated key names"],
+        "replacement-values-match-in-number" => &["must have the same length as"],
         _ => &[],
     }
 }

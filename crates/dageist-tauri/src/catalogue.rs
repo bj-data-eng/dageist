@@ -921,7 +921,10 @@ mod tests {
                 "temporal",
                 "window",
                 "compare",
+                "checks",
                 "logic",
+                "nulls",
+                "conversion",
                 "start",
                 "condition"
             ]

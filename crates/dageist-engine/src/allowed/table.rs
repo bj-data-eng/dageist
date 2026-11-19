@@ -176,6 +176,69 @@ fn parameter_named(entry: &'static catalog::Entry, name: &str) -> Result<&'stati
         .ok_or_else(|| format!("{name:?} is not a parameter of {}", entry.id().as_str()))
 }
 
+/// The text that follows an entry on a line of the context table where it was measured in the
+/// form that an option gives, such as `[strategy=forward]`.
+#[cfg(test)]
+fn render_form(form: &[OptionValue]) -> String {
+    if form.is_empty() {
+        return String::new();
+    }
+    let options: Vec<String> = form
+        .iter()
+        .map(|(name, word)| format!("{name}={word}"))
+        .collect();
+    format!("[{}]", options.join(", "))
+}
+
+/// An entry and the form it was measured in, as the first field of a line of the context table
+/// writes them: `Expr.fill_null`, or `Expr.fill_null[strategy=forward]`.
+fn entry_and_form(field: &str) -> Result<(&'static catalog::Entry, Vec<OptionValue>), String> {
+    let Some((name, rest)) = field.split_once('[') else {
+        return Ok((entry_named(field)?, Vec::new()));
+    };
+    let entry = entry_named(name)?;
+    let options = rest
+        .strip_suffix(']')
+        .ok_or_else(|| format!("{field:?} does not close its form"))?;
+    let form = split_options(options)
+        .into_iter()
+        .map(|option| {
+            let (name, word) = option
+                .split_once('=')
+                .ok_or_else(|| format!("{option:?} is not name=value"))?;
+            Ok((parameter_named(entry, name)?, word.to_owned()))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    Ok((entry, form))
+}
+
+/// The options a field writes, each as `name=word`, apart. A word may hold a comma, as the name
+/// of a dtype does (`Datetime(us, UTC)`), so a comma separates two options only where what
+/// follows it is the name of one, written `name=`.
+fn split_options(field: &str) -> Vec<&str> {
+    let mut options = Vec::new();
+    let mut start = 0;
+    let bytes = field.as_bytes();
+    for at in 0..bytes.len() {
+        if !field[at..].starts_with(", ") {
+            continue;
+        }
+        let rest = &field[at + 2..];
+        let name = rest.find('=').is_some_and(|end| {
+            end > 0
+                && rest[..end]
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b == b'_')
+        });
+        if name {
+            options.push(&field[start..at]);
+            start = at + 2;
+        }
+    }
+    options.push(&field[start..]);
+    options
+}
+
 fn dtype_named(name: &str) -> Result<Representative, String> {
     Representative::from_name(name).ok_or_else(|| format!("{name:?} is not a representative dtype"))
 }
@@ -279,6 +342,9 @@ impl Chain {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct ContextLine {
     pub entry: &'static str,
+    /// The option given in place of another parameter that the line was measured with, such as
+    /// the strategy a fill takes instead of a value: empty for an entry measured as it is.
+    pub form: Vec<OptionValue>,
     pub context: Context,
     pub chain: Chain,
     pub receiver: Option<Representative>,
@@ -300,8 +366,9 @@ impl ContextLine {
                 .join(",")
         };
         format!(
-            "{} | {} | {} | {} | {} | {} | {}",
+            "{}{} | {} | {} | {} | {} | {} | {}",
             self.entry,
+            render_form(&self.form),
             self.context,
             self.chain.name(),
             self.receiver
@@ -315,6 +382,7 @@ impl ContextLine {
 
     pub(super) fn parse(line: &str) -> Result<Self, String> {
         let fields = fields(line, 7)?;
+        let (entry, form) = entry_and_form(fields[0])?;
         let rules = if fields[5] == "-" {
             Vec::new()
         } else {
@@ -324,7 +392,8 @@ impl ContextLine {
                 .collect::<Result<_, _>>()?
         };
         Ok(Self {
-            entry: entry_named(fields[0])?.id().as_str(),
+            entry: entry.id().as_str(),
+            form,
             context: Context::from_name(fields[1])
                 .ok_or_else(|| format!("{:?} is not a context", fields[1]))?,
             chain: Chain::from_name(fields[2])?,
@@ -369,8 +438,8 @@ impl OptionLine {
     pub(super) fn parse(line: &str) -> Result<Self, String> {
         let fields = fields(line, 4)?;
         let entry = entry_named(fields[0])?;
-        let options = fields[2]
-            .split(", ")
+        let options = split_options(fields[2])
+            .into_iter()
             .map(|option| {
                 let (name, value) = option
                     .split_once('=')
@@ -447,6 +516,9 @@ pub(super) struct ContextCell {
     pub rules: Vec<Rule>,
 }
 
+/// The key of the cell of the context table for an entry in a form, in a context.
+pub(super) type ContextKey = (&'static str, Vec<OptionValue>, Context);
+
 /// The two lines of the context table for an entry in a context, as far as
 /// they have been read.
 #[derive(Default)]
@@ -458,12 +530,11 @@ struct HalfCell {
 
 /// The cells of the lines of the context table: each entry in each context
 /// has a line for each [`Chain`], and the rules that govern the two agree.
-fn cells(
-    lines: Vec<(usize, ContextLine)>,
-) -> Result<HashMap<(&'static str, Context), ContextCell>, TableError> {
-    let mut halves: HashMap<(&'static str, Context), (usize, HalfCell)> = HashMap::new();
+fn cells(lines: Vec<(usize, ContextLine)>) -> Result<HashMap<ContextKey, ContextCell>, TableError> {
+    let mut halves: HashMap<ContextKey, (usize, HalfCell)> = HashMap::new();
     for (at, line) in lines {
-        let (first, half) = halves.entry((line.entry, line.context)).or_insert_with(|| {
+        let key = (line.entry, line.form.clone(), line.context);
+        let (first, half) = halves.entry(key).or_insert_with(|| {
             (
                 at,
                 HalfCell {
@@ -495,9 +566,9 @@ fn cells(
     halves
         .into_iter()
         .map(
-            |((entry, context), (at, half))| match (half.continues, half.ends) {
+            |((entry, form, context), (at, half))| match (half.continues, half.ends) {
                 (Some(continues), Some(ends)) => Ok((
-                    (entry, context),
+                    (entry, form, context),
                     ContextCell {
                         continues,
                         ends,
@@ -513,20 +584,16 @@ fn cells(
         .collect()
 }
 
-/// What the option table says of an entry with options set: the dtype it was
-/// measured on, for a method, and what came of it.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct OptionCell {
-    pub receiver: Option<Representative>,
-    pub outcome: Outcome,
-}
+/// The key of a line of the option table: the entry, the dtype of the value a method
+/// follows (none for a step), and the options set.
+pub(super) type OptionKey = (&'static str, Option<Representative>, Vec<OptionValue>);
 
 /// The committed tables, read.
 #[derive(Debug)]
 pub(super) struct Tables {
     pub dtypes: HashMap<DtypeKey, Outcome>,
-    pub contexts: HashMap<(&'static str, Context), ContextCell>,
-    pub options: HashMap<(&'static str, Vec<OptionValue>), OptionCell>,
+    pub contexts: HashMap<ContextKey, ContextCell>,
+    pub options: HashMap<OptionKey, Outcome>,
 }
 
 impl Tables {
@@ -552,15 +619,7 @@ impl Tables {
         let options = lines(options, OptionLine::parse)
             .map_err(named("options.txt"))?
             .into_iter()
-            .map(|line| {
-                (
-                    (line.entry, line.options),
-                    OptionCell {
-                        receiver: line.receiver,
-                        outcome: line.outcome,
-                    },
-                )
-            })
+            .map(|line| ((line.entry, line.receiver, line.options), line.outcome))
             .collect();
         Ok(Self {
             dtypes,

@@ -73,6 +73,7 @@ use dageist_engine::document::{
 
 use super::case::{Case, STEP};
 use super::frames::{STAND_IN, key_column, stand_in_column};
+use super::limits::judges_its_values_apart;
 use super::literal::{call_with_columns, class_of, operand_causes, placed_operands};
 use super::observe::{
     Observed, Refusal, SCHEMA_SAYS, Seen, Tables, is_bare_key, is_the_targets_own, observe_probe,
@@ -417,6 +418,18 @@ fn is_the_same_unpacking(tables: &str, probe: &str) -> bool {
             || (tables.contains("`array[") && probe.starts_with(CASTING_AN_ARRAY)))
 }
 
+/// Whether both reasons are the refusal of one comparison between two series that Polars cannot
+/// compare, in the words of its two engines: one says it could not evaluate the comparison, the
+/// other that it cannot perform it, and each names the comparison's symbol.
+pub fn is_the_same_comparison(tables: &str, probe: &str) -> bool {
+    let symbol = |reason: &str| reason.split('\'').nth(1).map(str::to_owned);
+    let comparing = |reason: &str| {
+        (reason.starts_with("could not evaluate '") || reason.starts_with("cannot perform '"))
+            && reason.contains("' comparison between series")
+    };
+    comparing(tables) && comparing(probe) && symbol(tables) == symbol(probe)
+}
+
 /// Whether `probe` is refused as the tables refused the part: for Polars' own
 /// reason the same objection, and for a rule that a predicate be a `Boolean`
 /// Polars' words for it.
@@ -435,6 +448,7 @@ pub fn same_reason(source: &Source, tables: &str, probe: &str) -> bool {
             let probe = probe.to_ascii_lowercase();
             probe.contains("boolean") && (probe.contains("expected") || probe.contains("must be"))
         }
+        Source::Rule(rule) if *rule == COUNT_RULE => probe.contains("must have the same length as"),
         _ => false,
     }
 }
@@ -501,35 +515,43 @@ fn predicate_probe(found: &Found, rule: &str, predicate: Expression) -> Option<P
 /// The probe of the part the tables refused, by who refused it.
 fn probe_of_the_part(found: &Found, source: &Source) -> Option<Probe> {
     match source {
-        Source::Polars => {
-            let part = chain_through(found)?;
-            let held = place_of_the_part(found, false);
-            let (at, before) = match found.rest.first() {
-                None => (held, None),
-                Some(Segment::Start) => (held.then(Segment::Start), None),
-                Some(Segment::Link(link)) => {
-                    let links = found.expression.links();
-                    let before = Expression::new(
-                        found.expression.start().clone(),
-                        links.get(..*link)?.to_vec(),
-                    )
-                    .ok()?;
-                    (held.then(Segment::Link(*link)), Some(before))
-                }
-                Some(_) => return None,
-            };
-            Some(Probe {
-                part,
-                filter: false,
-                before,
-                at: vec![at],
-            })
-        }
+        Source::Polars => chain_probe(found),
+        Source::Rule(rule) if *rule == COUNT_RULE => chain_probe(found),
         Source::Rule(rule) if PREDICATE_RULES.contains(rule) => {
             predicate_probe(found, rule, found_predicate(found)?)
         }
         _ => None,
     }
+}
+
+/// The rule that a replacement take as many values as it is given the number of, whose refusal
+/// Polars shows by the lengths it refuses the call for.
+const COUNT_RULE: &str = "replacement-values-match-in-number";
+
+/// The probe of the chain through the refused call, selected alone.
+fn chain_probe(found: &Found) -> Option<Probe> {
+    let part = chain_through(found)?;
+    let held = place_of_the_part(found, false);
+    let (at, before) = match found.rest.first() {
+        None => (held, None),
+        Some(Segment::Start) => (held.then(Segment::Start), None),
+        Some(Segment::Link(link)) => {
+            let links = found.expression.links();
+            let before = Expression::new(
+                found.expression.start().clone(),
+                links.get(..*link)?.to_vec(),
+            )
+            .ok()?;
+            (held.then(Segment::Link(*link)), Some(before))
+        }
+        Some(_) => return None,
+    };
+    Some(Probe {
+        part,
+        filter: false,
+        before,
+        at: vec![at],
+    })
 }
 
 /// Whether a refusal lies where the probe's part is refused. Polars says where
@@ -553,13 +575,28 @@ const ATTEMPTS: usize = 16;
 /// [`ATTEMPTS`] times, before it is taken for one that is not refused as the
 /// tables' reason says. A probe that Polars allows is allowed every time.
 fn refused_as(probed: &Case, tables: Tables, refused: &Refused, at: &[Place]) -> Option<Refusal> {
+    // A call that the tables judge by its values apart, as a replacement and an interval, is
+    // refused for the first value they refuse, and Polars names whichever it meets, so a refusal
+    // of the call itself is the tables' right whatever words it has, where it is refused at the
+    // call and not before it.
+    let by_parts = refused.place.path().is_empty()
+        || at
+            .iter()
+            .any(|place| judges_its_values_apart(probed, place));
     (0..ATTEMPTS).find_map(|_| {
         // `None` ends the search with the probe allowed, which is no refusal.
         let refusal = observe_probe(probed, tables).refusal;
         match refusal {
             Some(refusal)
-                if same_reason(&refused.source, &refused.reason, &refusal.reason)
-                    && lies_at(&refusal, at) =>
+                if (same_reason(&refused.source, &refused.reason, &refusal.reason)
+                    && lies_at(&refusal, at))
+                    || (by_parts
+                        && refusal.place.as_ref().is_none_or(|place| {
+                            place.path().is_empty()
+                                || at
+                                    .iter()
+                                    .any(|probed| place.path().starts_with(probed.path()))
+                        })) =>
             {
                 Some(Some(refusal))
             }
@@ -1280,7 +1317,10 @@ pub fn is_a_predicate_rule(rule: &str) -> bool {
 /// nothing to ask, or Polars allows the probe, refuses it elsewhere or refuses the
 /// part before the call.
 pub fn settle_given_no_known_dtype(case: &Case, refused: &Refused) -> Option<Settled> {
-    if !refused.argument_unknown
+    // A call that the tables judge by its values apart, as a replacement, is refused by them for
+    // the first value they refuse, beside a companion, and Polars names whichever it meets: the
+    // reason is not compared either.
+    if !(refused.argument_unknown || judges_its_values_apart(case, &refused.place))
         || !matches!(refused.source, Source::Polars)
         || is_the_targets_own(&refused.reason)
     {
@@ -1328,6 +1368,21 @@ mod tests {
     use super::super::observe::observe;
     use super::super::predict::{Source, Verdict, predict};
     use super::*;
+
+    #[test]
+    fn a_comparison_of_two_series_is_the_same_refusal_in_the_words_of_either_engine() {
+        let could_not = "could not evaluate '>=' comparison between series 'a' of dtype: List(String) and series 'b' of dtype: Int8";
+        let cannot = "cannot perform '>=' comparison between series 'p' of dtype: list[str] and series 'b' of dtype: list[str]";
+        assert!(is_the_same_comparison(could_not, cannot));
+        assert!(is_the_same_comparison(cannot, could_not));
+        // Another comparison is another refusal, and so is another objection of the same words.
+        let other = "cannot perform '<' comparison between series 'p' of dtype: list[str] and series 'b' of dtype: list[str]";
+        assert!(!is_the_same_comparison(could_not, other));
+        assert!(!is_the_same_comparison(
+            could_not,
+            "cannot cast List type (inner: 'String', to: 'String')"
+        ));
+    }
 
     fn kept(name: &str) -> Case {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -2125,6 +2180,47 @@ mod tests {
         assert!(found.probe.contains("LazyFrame.select"), "{}", found.probe);
         assert!(found.reason.contains("comparison"), "{}", found.reason);
         assert_eq!(found.showing, Showing::ForAnyDtypeOfTheArgument);
+    }
+
+    #[test]
+    fn a_replacement_is_settled_by_polars_refusing_it_whatever_value_it_names() {
+        // `sort(by=f // a.replace(1, 1).len())` of `List(Int64)`: the tables refuse the
+        // replacement for the values it lists apart, beside a companion that is a list, and Polars
+        // drops a sort key that is one value; asked as written, it refuses the replacement for
+        // the dtypes the values really have, and for another reason than the companion's.
+        let case = kept("stricter-a-replacement-of-a-list-in-a-sort-key-of-one-value.case");
+        let refused = refusal(&case);
+        assert!(!refused.argument_unknown);
+        let found = settle(&case, &refused).expect("a replacement that Polars refuses");
+        assert!(found.probe.contains("Expr.replace"), "{}", found.probe);
+        assert_ne!(found.reason, refused.reason);
+        assert_eq!(found.showing, Showing::TheSameReason);
+        // A call that is no replacement or interval is settled for the tables' reason only.
+        let other =
+            kept("stricter-a-comparison-given-no-known-dtype-in-a-sort-key-of-one-value.case");
+        assert_eq!(settle(&other, &refusal(&other)), None);
+    }
+
+    #[test]
+    fn a_replacement_the_rule_refuses_is_settled_by_polars_refusing_the_part_for_its_lengths() {
+        // `sort(by=lit(1).replace_strict(1.0, "1d", default=g).max())`: the rule refuses a default
+        // of many values beside a receiver of one, and Polars drops a sort key that is one value;
+        // asked as written, it refuses the replacement for the lengths.
+        let case = kept("stricter-a-replacement-of-values-in-a-sort-key-of-one-value.case");
+        let refused = refusal(&case);
+        assert!(matches!(refused.source, Source::Rule(_)));
+        let found = settle(&case, &refused).expect("a replacement that Polars refuses alone");
+        assert!(
+            found.probe.contains("Expr.replace_strict"),
+            "{}",
+            found.probe
+        );
+        assert!(
+            found.reason.contains("must have the same length as"),
+            "{}",
+            found.reason
+        );
+        assert_eq!(found.showing, Showing::TheSameReason);
     }
 
     #[test]

@@ -166,6 +166,32 @@
       "argument": null
     },
     {
+      "entry": "Expr.backward_fill",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.cast",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.cbrt",
       "verdict": {
         "kind": "refused",
@@ -296,6 +322,32 @@
       "argument": null
     },
     {
+      "entry": "Expr.drop_nans",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.drop_nulls",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.dt.date",
       "verdict": {
         "kind": "refused",
@@ -374,6 +426,19 @@
       "argument": null
     },
     {
+      "entry": "Expr.eq_missing",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.erf",
       "verdict": {
         "kind": "refused",
@@ -401,6 +466,32 @@
     },
     {
       "entry": "Expr.exp",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.fill_nan",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.fill_null",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -452,6 +543,19 @@
       "argument": null
     },
     {
+      "entry": "Expr.forward_fill",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.ge",
       "verdict": {
         "kind": "refused",
@@ -478,6 +582,136 @@
       "argument": null
     },
     {
+      "entry": "Expr.has_nulls",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_between",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_close",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_duplicated",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_finite",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_first_distinct",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_infinite",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_last_distinct",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_nan",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_not_nan",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.is_not_null",
       "verdict": {
         "kind": "refused",
@@ -492,6 +726,19 @@
     },
     {
       "entry": "Expr.is_null",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_unique",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -647,6 +894,19 @@
       "argument": null
     },
     {
+      "entry": "Expr.ne_missing",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.neg",
       "verdict": {
         "kind": "refused",
@@ -661,6 +921,19 @@
     },
     {
       "entry": "Expr.not_",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.null_count",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -713,6 +986,32 @@
     },
     {
       "entry": "Expr.radians",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.replace",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.replace_strict",
       "verdict": {
         "kind": "refused",
         "refusal": {

@@ -48,7 +48,7 @@ use super::literal::{
 };
 use super::observe::{Observed, Refusal, SCHEMA_SAYS, Stage, Tables, observe, observe_probe};
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
-use super::probe::{same_reason, settle_in_the_position};
+use super::probe::{is_the_same_comparison, same_reason, settle_in_the_position};
 
 /// A limit of the tables, and what it says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -199,15 +199,17 @@ pub enum Limit {
     /// dtype and the rows give another, at a call that is not the last of the step's
     /// own expression or in a key that no probe settles, which Polars allows.
     AHiddenSchema,
-    /// Polars casts a bound of `clip` to the dtype it clips as strictly as it can, and refuses
-    /// the rows when a bound holds a value that dtype cannot hold: a number typed without a dtype
+    /// Polars casts a bound of `clip` to the dtype it clips, and the values `replace` and
+    /// `replace_strict` list to the dtype they replace in, as strictly as it can, and refuses
+    /// the rows when one holds a value that dtype cannot hold: a number typed without a dtype
     /// that is out of its range or negative beside an unsigned dtype, or a value of a float
     /// that is not a whole number it can hold, as the infinity and the not-a-number that a
     /// logarithm to the base 1 or a root of a negative number gives, or a value out of its
-    /// range. The tables measured a bound as a column of the sample's rows, whose numbers every
-    /// number dtype holds. Polars refusing the rows, with a failed conversion that has no
-    /// place, in a case whose refusal is the bound's: the case run again with the bounds of
-    /// every `clip` undone is not refused for a failed conversion.
+    /// range. The tables measured a bound and a listed value as a column of the sample's rows,
+    /// whose numbers every number dtype holds. Polars refusing the rows, with a failed
+    /// conversion that has no place, in a case whose refusal is the bound's or the listed
+    /// value's: the case run again with the bounds of every `clip` undone and the values of
+    /// every replacement made null is not refused for a failed conversion.
     ABoundTheDtypeCannotHold,
     /// Polars casts a bound of `clip` to the dtype it clips, and a bound whose values that dtype
     /// holds is cast whatever its dtype is: text that reads as the number, a list or another
@@ -238,11 +240,60 @@ pub enum Limit {
     /// the key is why where Polars, asked to select the refused call on a column of each of the
     /// two dtypes, refuses it at the call for the tables' reason.
     ABitwiseCallInAJoinKey,
+    /// A strict `cast`, a test of closeness and a fill by a value, which convert what they meet to
+    /// the dtype that holds both as one does, and a `replace_strict` asked for a dtype, which
+    /// converts what replaces to it as one, refuse the rows when a value of the column they
+    /// follow or give is one the dtype
+    /// cannot hold: a number out of its range, or below zero beside an unsigned dtype, the
+    /// infinity or the not-a-number of a float beside a whole number, or text that does not read
+    /// as the number. The tables measured a cast on the sample's rows, whose values every dtype
+    /// that can hold a number holds, and a column computed from them holds what they did not,
+    /// and so may a table with no rows, where the sum of nothing is a value for a root or a
+    /// logarithm to give an infinity. Polars refusing the rows, the empty table's too, with a
+    /// failed conversion that has no place, in a case with a strict `cast`, a test of closeness or
+    /// a fill by a value: the case run again with each cast made not strict, each test a
+    /// comparison and each fill a fill forward is not refused for a failed conversion.
+    ACastOfAValueTheDtypeCannotHold,
+    /// `drop_nulls` and `drop_nans` leave the values that are not null or not NaN, so a column
+    /// that holds one has fewer values than the table has rows, which Polars refuses to meet the
+    /// table's rows or another expression's values. The tables measure the two in a context on
+    /// a column that holds no null, where they drop nothing: how many values a column has is for
+    /// its rows to say. Polars refusing the rows, with a reason about lengths that has no place,
+    /// in a case with a `drop_nulls` or a `drop_nans`: the case run again with each of them
+    /// made a call that fills nulls forward, which keeps every value, is not refused for lengths.
+    ADropChangesTheLengths,
+    /// A window evaluates what it follows once for each group, and what a replacement lists as
+    /// the values of a column is then a list for each group, which Polars refuses as a
+    /// replacement pattern per row where what it replaces is one value for each group, as an
+    /// aggregate is, and as an output of the length of the column where what it replaces is one
+    /// value, as a literal is. The tables measure a replacement in a context with the receiver's
+    /// own rows, where the columns are one list. Polars refusing the rows, with a reason that
+    /// names a pattern per row or an output of another length than its input, in a case that
+    /// has a window and a replacement that lists the values of a column: the case run again with
+    /// the values of each replacement made null literals is not refused for it.
+    AReplacementOfColumnsInAWindow,
+    /// `drop_nans` is a filter by the test for NaN, which Polars leaves out of a plan for a dtype
+    /// that is no float, where it has nothing to drop, and keeps where an aggregate of what it
+    /// drops is evaluated for each group of a window, and refuses there for the dtype it cannot
+    /// test. The tables measure the call where it is left out. Polars refusing the rows, with the
+    /// refusal that the test for NaN is not supported for a dtype, which has no place, in a case
+    /// with a `drop_nans` and a window: the case run again with each drop made a fill of nulls
+    /// forward is not refused for it.
+    ADropOfNansInAWindow,
+    /// A fill by a strategy refuses a `Struct` only where it meets a null to fill, and the
+    /// sample's `Struct` holds none. A shift leaves nulls, and the first, the last, the minimum
+    /// and the maximum of a table with no rows, or of a group of a pivot that holds nulls alone,
+    /// are one null, where those of the sample's rows are a value. Polars refusing the rows or
+    /// the empty table with the refusal that a strategy of a fill is not supported for a struct,
+    /// which has no place, in a case with a fill by a strategy that follows one of the five: the
+    /// case run again with each of the five made a fill of nulls forward, which leaves the nulls
+    /// of the column and no more, is not refused for it.
+    ANullStructToFill,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 20] = [
+    pub const ALL: [Self; 25] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -263,6 +314,11 @@ impl Limit {
         Self::ABoundWithValuesOfItsOwn,
         Self::AWindowOverALiteral,
         Self::ABitwiseCallInAJoinKey,
+        Self::ACastOfAValueTheDtypeCannotHold,
+        Self::ADropChangesTheLengths,
+        Self::AReplacementOfColumnsInAWindow,
+        Self::ADropOfNansInAWindow,
+        Self::ANullStructToFill,
     ];
 
     /// The name a kept case is filed under.
@@ -288,6 +344,11 @@ impl Limit {
             Self::ABoundWithValuesOfItsOwn => "a-bound-with-values-of-its-own",
             Self::AWindowOverALiteral => "a-window-over-a-literal",
             Self::ABitwiseCallInAJoinKey => "a-bitwise-call-in-a-join-key",
+            Self::ACastOfAValueTheDtypeCannotHold => "a-cast-of-a-value-the-dtype-cannot-hold",
+            Self::ADropChangesTheLengths => "a-drop-changes-the-lengths",
+            Self::AReplacementOfColumnsInAWindow => "a-replacement-of-columns-in-a-window",
+            Self::ADropOfNansInAWindow => "a-drop-of-nans-in-a-window",
+            Self::ANullStructToFill => "a-null-struct-to-fill",
         }
     }
 
@@ -340,7 +401,7 @@ impl Limit {
                 "a method whose plan and rows differ in dtype is hidden by what goes on from it"
             }
             Self::ABoundTheDtypeCannotHold => {
-                "Polars casts a bound of clip to the dtype it clips and refuses a value that dtype cannot hold, which the tables measured only with values it holds"
+                "Polars casts a bound of clip, and the values a replacement lists, to the dtype of what they follow and refuses a value that dtype cannot hold, which the tables measured only with values it holds"
             }
             Self::AWindowOverALiteral => {
                 "a window over a literal partition gives no rows, so the rows do not show the plan of what follows it"
@@ -350,6 +411,21 @@ impl Limit {
             }
             Self::ABoundWithValuesOfItsOwn => {
                 "Polars casts the values of a bound of clip to the dtype it clips, which the tables measured as the sample's rows, and a bound with others passes"
+            }
+            Self::ACastOfAValueTheDtypeCannotHold => {
+                "a strict cast, which a test of closeness and a fill by a value make of what they meet, refuses a value its dtype cannot hold, which the tables measured only with the sample's rows, whose values every number dtype holds"
+            }
+            Self::ADropChangesTheLengths => {
+                "a drop of nulls or of NaNs leaves fewer values where the rows hold one, which the tables measured on a column that holds none"
+            }
+            Self::ANullStructToFill => {
+                "a shift, and the first, the last, the minimum and the maximum of nothing, give a null, which a fill by a strategy refuses a struct for, where the sample's struct holds none"
+            }
+            Self::ADropOfNansInAWindow => {
+                "a window keeps a drop of NaNs that Polars leaves out of a plan for a dtype that is no float, and refuses the test for NaN for it, where the tables measured the call left out"
+            }
+            Self::AReplacementOfColumnsInAWindow => {
+                "a window gives a replacement of columns a list of values for each group, which Polars refuses as a pattern per row, where the tables measured it in select"
             }
         }
     }
@@ -364,7 +440,9 @@ fn is(call: &Call, id: &str) -> bool {
     call.entry().id().as_str() == id
 }
 
-const ONE_VALUE: [&str; 6] = [
+const ONE_VALUE: [&str; 8] = [
+    "Expr.has_nulls",
+    "Expr.null_count",
     "Expr.sum",
     "Expr.min",
     "Expr.max",
@@ -423,6 +501,22 @@ fn any_call(expression: &Expression, found: &dyn Fn(&Call) -> bool) -> bool {
 fn is_a_single_value(call: &Call) -> bool {
     is_one_value(call)
         || (is(call, "polars.lit") && matches!(call.argument("value"), Some(Value::Flag(None))))
+}
+
+/// Whether `call` is a comparison or an arithmetic given the null literal, which is a null in each
+/// row, whatever the rows hold.
+fn compares_with_a_null(call: &Call) -> bool {
+    carries_nulls(call.entry().id().as_str())
+        && operands(call)
+            .into_iter()
+            .any(|(_, operand)| is_the_bare_null_literal(operand))
+}
+
+/// Whether `expression` is the null literal and no more.
+fn is_the_bare_null_literal(expression: &Expression) -> bool {
+    expression.links().is_empty()
+        && matches!(expression.start(), Start::Call(start)
+            if is(start, "polars.lit") && matches!(start.argument("value"), Some(Value::Flag(None))))
 }
 
 /// Whether `call` is `and`, `or` or `xor`.
@@ -607,9 +701,13 @@ fn reached_by_an_explode(holder: &Expression, reach: Reach) -> bool {
 fn wholly_single(expression: &Expression, upto: usize, literals: bool) -> bool {
     let links = &expression.links()[..upto.min(expression.links().len())];
     let single = |call: &Call| {
-        operands(call)
-            .into_iter()
-            .all(|(_, inside)| wholly_single(inside, inside.links().len(), true))
+        // What a replacement lists is a table of values, which gives no more values than what it
+        // follows.
+        is(call, "Expr.replace")
+            || is(call, "Expr.replace_strict")
+            || operands(call)
+                .into_iter()
+                .all(|(_, inside)| wholly_single(inside, inside.links().len(), true))
     };
     if let Some(last) = links.iter().rposition(is_one_value) {
         return links[last + 1..].iter().all(single);
@@ -656,6 +754,19 @@ enum Node<'a> {
     Call(&'a Call),
     Value(&'a Value),
     Expression(&'a Expression),
+}
+
+/// Whether the call at `place` is one that the tables judge by its values apart, each beside a
+/// companion that stands for the others: a replacement and an interval. Polars refuses the call
+/// for any of them, so what it says of the part is not the reason the tables gave for the first
+/// they refused.
+pub fn judges_its_values_apart(case: &Case, place: &Place) -> bool {
+    locate(case, place).call.is_some_and(|call| {
+        matches!(
+            call.entry().id().as_str(),
+            "Expr.replace" | "Expr.replace_strict" | "Expr.is_between"
+        )
+    })
 }
 
 /// Follows `place` through the document.
@@ -747,7 +858,10 @@ enum Disagreement<'a> {
 }
 
 fn is_lengths(reason: &str) -> bool {
-    reason.contains("lengths don't match") || reason.contains("lengths differed")
+    reason.contains("lengths don't match")
+        || reason.contains("lengths differed")
+        || reason.contains("must have the same length as `old`")
+        || reason.contains("does not match that of the base")
 }
 
 fn is_panic(reason: &str) -> bool {
@@ -819,9 +933,19 @@ fn holds_a_null_comparison(key: &Expression) -> bool {
         let null_start = matches!(expression.start(), Start::Call(start)
             if is(start, "polars.lit") && matches!(start.argument("value"), Some(Value::Flag(None))));
         expression.links().iter().enumerate().any(|(at, link)| {
-            comparisons.contains(&link.entry().id().as_str())
-                && ((null_start && at == 0)
-                    || operands(link)
+            let id = link.entry().id().as_str();
+            // `is_between` compares each of its bounds with what it follows, so a bound that is
+            // a null is a comparison with one, and a null it follows is not.
+            // Casts after the null literal leave a null, which a comparison that follows them
+            // folds for the dtype Null and not always for another, which the document does not
+            // decide.
+            (comparisons.contains(&id)
+                && null_start
+                && expression.links()[..at]
+                    .iter()
+                    .all(|before| is(before, "Expr.cast")))
+                || ((comparisons.contains(&id) || id == "Expr.is_between")
+                    && operands(link)
                         .into_iter()
                         .any(|(_, operand)| is_null(operand)))
         })
@@ -1019,22 +1143,31 @@ fn picked(rows: &[Cell], skipping: bool, from_the_end: bool) -> Cell {
 /// The rows after the first `upto` links of `expression`, taken from the sample:
 /// what each holds, by what the calls do to it. `None` when what the calls did to
 /// the rows is not known.
-fn rows_after(frames: &Frames, expression: &Expression, upto: usize) -> Option<Vec<Cell>> {
+fn rows_after(
+    frames: &Frames,
+    expression: &Expression,
+    upto: usize,
+    receiver: bool,
+) -> Option<Vec<Cell>> {
     // A chain that starts from one column of the sample has the rows it holds, a
     // value or a null in each; any other start is the sample's number of rows, of
     // nothing known.
-    let mut rows: Vec<Cell> = (0..SAMPLE_ROWS)
-        .map(|row| {
-            starting_column(expression)
-                .and_then(|name| frames.holds_a_null_at(name, row))
-                .map_or(
-                    Cell::Unknown,
-                    |null| {
-                        if null { Cell::Null } else { Cell::Value }
-                    },
-                )
-        })
-        .collect();
+    let mut rows: Vec<Cell> = if receiver && starts_from_a_null_literal(expression) {
+        vec![Cell::Null]
+    } else {
+        (0..SAMPLE_ROWS)
+            .map(|row| {
+                starting_column(expression)
+                    .and_then(|name| frames.holds_a_null_at(name, row))
+                    .map_or(
+                        Cell::Unknown,
+                        |null| {
+                            if null { Cell::Null } else { Cell::Value }
+                        },
+                    )
+            })
+            .collect()
+    };
     for link in &expression.links()[..upto.min(expression.links().len())] {
         let skipping = matches!(link.argument("ignore_nulls"), Some(Value::Flag(Some(true))));
         rows = match link.entry().id().as_str() {
@@ -1057,6 +1190,10 @@ fn rows_after(frames: &Frames, expression: &Expression, upto: usize) -> Option<V
                 vec![one]
             }
             "Expr.len" => vec![Cell::Value],
+            // A fill of NaN keeps the null of a row that is one, and gives the value or the row
+            // itself to the others; a cast keeps a null too, and gives a null or a value to the
+            // others.
+            "Expr.fill_nan" | "Expr.cast" => receiver_nulls_stay(frames, &rows, link),
             id if carries_nulls(id) => carried(frames, &rows, link),
             _ => match effect(link) {
                 Effect::Keeps => rows,
@@ -1106,7 +1243,7 @@ fn carries_nulls(id: &str) -> bool {
 fn carried(frames: &Frames, rows: &[Cell], link: &Call) -> Vec<Cell> {
     let held: Vec<Vec<Cell>> = operands(link)
         .into_iter()
-        .filter_map(|(_, operand)| rows_after(frames, operand, operand.links().len()))
+        .filter_map(|(_, operand)| rows_after(frames, operand, operand.links().len(), false))
         .collect();
     let count = held
         .iter()
@@ -1132,6 +1269,38 @@ fn carried(frames: &Frames, rows: &[Cell], link: &Call) -> Vec<Cell> {
         .collect()
 }
 
+/// Whether `expression` is the null literal, which is one null that every row meets, filled for
+/// NaN as its first call: that fill keeps the null of what it follows whatever it is given, so
+/// the rows are nulls, which are the sample's only where a column of `Null` is the start.
+fn starts_from_a_null_literal(expression: &Expression) -> bool {
+    matches!(expression.start(), Start::Call(start)
+        if is(start, "polars.lit") && matches!(start.argument("value"), Some(Value::Flag(None))))
+        && expression
+            .links()
+            .first()
+            .is_some_and(|link| is(link, "Expr.fill_nan"))
+}
+
+/// The rows of a call that keeps the nulls of what it follows, as a fill of NaN and a cast do,
+/// and gives another row something not known: a null where `rows` hold one. An operand that is
+/// the value it fills with sets the number of rows, which `rows` of one row meet each of.
+fn receiver_nulls_stay(frames: &Frames, rows: &[Cell], link: &Call) -> Vec<Cell> {
+    let count = operands(link)
+        .into_iter()
+        .filter_map(|(_, operand)| rows_after(frames, operand, operand.links().len(), false))
+        .map(|held| held.len())
+        .chain(std::iter::once(rows.len()))
+        .max()
+        .map_or(SAMPLE_ROWS, |most| most.max(1));
+    (0..count)
+        .map(|row| match rows {
+            [only] if *only == Cell::Null => Cell::Null,
+            rows if rows.len() == count && rows[row] == Cell::Null => Cell::Null,
+            _ => Cell::Unknown,
+        })
+        .collect()
+}
+
 /// The name of the one column `expression` starts from, when it starts from one.
 fn starting_column(expression: &Expression) -> Option<&str> {
     match expression.start() {
@@ -1153,8 +1322,13 @@ fn starting_column(expression: &Expression) -> Option<&str> {
 /// the sample's columns hold their values and a null in the middle, or none, and a
 /// call that is not known to keep the rows where they are, or the nulls in them,
 /// leaves nothing known).
-fn leaves_only_nulls(frames: &Frames, expression: &Expression, upto: usize) -> bool {
-    rows_after(frames, expression, upto)
+fn leaves_only_nulls(
+    frames: &Frames,
+    expression: &Expression,
+    upto: usize,
+    receiver: bool,
+) -> bool {
+    rows_after(frames, expression, upto, receiver)
         .is_some_and(|rows| !rows.is_empty() && rows.iter().all(|cell| *cell == Cell::Null))
 }
 
@@ -1224,10 +1398,263 @@ fn case_without_explodes(case: &Case) -> Option<Case> {
     })
 }
 
-/// The case with no bound given to any `clip`, which is then the expression it follows.
+/// A null literal, which every dtype holds, as an expression.
+fn a_null_literal() -> Option<Expression> {
+    let literal = Call::new(
+        catalog::entry("polars.lit")?,
+        vec![("value", Value::Flag(None))],
+    )
+    .ok()?;
+    Expression::new(Start::Call(literal), Vec::new()).ok()
+}
+
+/// Whether `parameter` of the call is a value that Polars casts to the dtype of what the call
+/// follows, as the values a replacement lists are.
+fn is_a_replaced_value(call: &Call, parameter: &str) -> bool {
+    matches!(
+        call.entry().id().as_str(),
+        "Expr.replace" | "Expr.replace_strict"
+    ) && matches!(parameter, "old" | "new")
+}
+
+/// The case with no bound given to any `clip`, which is then the expression it follows, and the
+/// values of every replacement made null, which every dtype holds, for a replacement is no
+/// expression without them.
 fn case_without_bounds(case: &Case) -> Option<Case> {
-    case_without(case, &|call, parameter| {
-        is(call, "Expr.clip") && matches!(parameter, "lower_bound" | "upper_bound")
+    case_changed(case, &|call| {
+        let replaced = is_a_replaced_value(call, "old");
+        let clipped = is(call, "Expr.clip");
+        if !replaced && !clipped {
+            return None;
+        }
+        let given: Vec<(&str, Value)> = call
+            .arguments()
+            .iter()
+            .filter(|given| {
+                !(clipped && matches!(given.parameter(), "lower_bound" | "upper_bound"))
+            })
+            .map(|given| {
+                if replaced && is_a_replaced_value(call, given.parameter()) {
+                    let null = a_null_literal().expect("a null literal");
+                    (given.parameter(), Value::Expression(null))
+                } else {
+                    (given.parameter(), given.value().clone())
+                }
+            })
+            .collect();
+        Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
+    })
+}
+
+/// `call` and the calls it holds, each made into what `change` gives it, which is the call itself
+/// where it is `None`.
+fn call_changed(call: &Call, change: &dyn Fn(&Call) -> Option<Call>) -> Option<Call> {
+    let given: Vec<(&str, Value)> = call
+        .arguments()
+        .iter()
+        .map(|given| (given.parameter(), value_changed(given.value(), change)))
+        .collect();
+    let rebuilt = Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()?;
+    Some(change(&rebuilt).unwrap_or(rebuilt))
+}
+
+fn value_changed(value: &Value, change: &dyn Fn(&Call) -> Option<Call>) -> Value {
+    match value {
+        Value::Expression(expression) => Value::Expression(
+            expression_changed(expression, change).unwrap_or_else(|| expression.clone()),
+        ),
+        Value::Many(items) => Value::Many(
+            items
+                .iter()
+                .map(|item| value_changed(item, change))
+                .collect(),
+        ),
+        Value::Pairs(pairs) => Value::Pairs(
+            pairs
+                .iter()
+                .map(|(key, entry)| (value_changed(key, change), value_changed(entry, change)))
+                .collect(),
+        ),
+        other => other.clone(),
+    }
+}
+
+fn expression_changed(
+    expression: &Expression,
+    change: &dyn Fn(&Call) -> Option<Call>,
+) -> Option<Expression> {
+    let start = match expression.start() {
+        Start::Call(call) => Start::Call(call_changed(call, change)?),
+        other => other.clone(),
+    };
+    let links = expression
+        .links()
+        .iter()
+        .map(|link| call_changed(link, change))
+        .collect::<Option<Vec<_>>>()?;
+    Expression::new(start, links).ok()
+}
+
+/// The case with every call that `change` gives another call made into it, the same in all else.
+fn case_changed(case: &Case, change: &dyn Fn(&Call) -> Option<Call>) -> Option<Case> {
+    let step = &case.document.steps()[0];
+    let rebuilt = Step::new(step.id().clone(), call_changed(step.call(), change)?).ok()?;
+    Some(Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        document: Document::new(vec![rebuilt]).ok()?,
+    })
+}
+
+/// Whether the call converts strictly, so that it refuses a value its dtype cannot hold: a `cast`
+/// that is neither told to wrap numbers that overflow nor to give a null where a value does not
+/// convert, and a test of closeness and a fill by a value, which convert what they meet to the one
+/// dtype that holds both as a strict cast does.
+fn is_a_strict_cast(call: &Call) -> bool {
+    is(call, "Expr.is_close")
+        || (is(call, "Expr.fill_null") && call.argument("value").is_some())
+        || (is(call, "Expr.cast")
+            && !matches!(
+                call.argument("wrap_numerical"),
+                Some(Value::Flag(Some(true)))
+            )
+            && !matches!(call.argument("strict"), Some(Value::Flag(Some(false)))))
+}
+
+/// The case with no strict cast: each gives a null where a value does not convert, a test of
+/// closeness is the comparison of what it compares and a fill by a value a fill forward, which
+/// convert nothing, and a replacement is not asked for a dtype, which converts nothing.
+fn case_without_strict_casts(case: &Case) -> Option<Case> {
+    case_changed(case, &|call| {
+        if !is_a_strict_cast(call) {
+            return None;
+        }
+        if is(call, "Expr.is_close") {
+            let other = call.argument("other")?.clone();
+            return Call::new(catalog::entry("Expr.gt")?, vec![("other", other)]).ok();
+        }
+        if is(call, "Expr.fill_null") {
+            return Call::new(catalog::entry("Expr.forward_fill")?, Vec::new()).ok();
+        }
+        let strict = is(call, "Expr.cast");
+        let given: Vec<(&str, Value)> = call
+            .arguments()
+            .iter()
+            .filter(|given| given.parameter() != if strict { "strict" } else { "return_dtype" })
+            .map(|given| (given.parameter(), given.value().clone()))
+            .chain(strict.then(|| ("strict", Value::Flag(Some(false)))))
+            .collect();
+        Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
+    })
+}
+
+/// Whether Polars refuses the case for a failed conversion still when no cast is strict: the
+/// cast is then no cause of it. Which of two failures of a plan Polars names depends on which
+/// thread gets there first, so the case is run again.
+fn refused_for_a_failed_conversion_without_strict_casts(case: &Case) -> bool {
+    case_without_strict_casts(case).is_some_and(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control).refusal.is_some_and(|refusal| {
+                unplaced(&refusal) && is_a_failed_conversion(&refusal.reason)
+            })
+        })
+    })
+}
+
+/// Whether the call drops the nulls or the NaNs of what it follows.
+fn is_a_drop(call: &Call) -> bool {
+    is(call, "Expr.drop_nulls") || is(call, "Expr.drop_nans")
+}
+
+/// The case with each drop made a fill of nulls forward, which gives as many values as it is
+/// given, of the dtype it is given.
+fn case_without_drops(case: &Case) -> Option<Case> {
+    case_changed(case, &|call| {
+        is_a_drop(call)
+            .then(|| Call::new(catalog::entry("Expr.forward_fill")?, Vec::new()).ok())
+            .flatten()
+    })
+}
+
+/// Whether Polars refuses the case for lengths still when no call drops: the drop is then no cause
+/// of the refusal, which the rows' lengths are.
+fn refused_for_lengths_without_drops(case: &Case) -> bool {
+    case_without_drops(case).is_some_and(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| unplaced(&refusal) && is_lengths(&refusal.reason))
+        })
+    })
+}
+
+/// Whether Polars refuses the case for the test for NaN still when no call drops: the drop is
+/// then no cause of it, and the dtype the test is not supported for is.
+fn refused_for_a_test_of_nan_without_drops(case: &Case) -> bool {
+    case_without_drops(case).is_some_and(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control).refusal.is_some_and(|refusal| {
+                refusal.reason.contains("operation not supported for dtype")
+                    && refusal.reason.contains("is_not_nan")
+            })
+        })
+    })
+}
+
+/// Whether the call is a shift, or the first, the last, the minimum or the maximum, which the table
+/// with no rows gives as one null.
+fn makes_a_null(call: &Call) -> bool {
+    matches!(
+        call.entry().id().as_str(),
+        "Expr.shift" | "Expr.first" | "Expr.last" | "Expr.min" | "Expr.max"
+    )
+}
+
+/// Whether an expression holds, at any depth, a fill by a strategy that follows one of those five
+/// in its chain, not necessarily next to it.
+fn holds_a_fill_after_a_null_is_made(expression: &Expression) -> bool {
+    let mut made = false;
+    for link in expression.links() {
+        if makes_a_null(link) {
+            made = true;
+        } else if made && is(link, "Expr.fill_null") && link.argument("strategy").is_some() {
+            return true;
+        }
+    }
+    let calls = std::iter::once(expression.start())
+        .filter_map(|start| match start {
+            Start::Call(call) => Some(call),
+            Start::Input(_) | Start::Hole => None,
+        })
+        .chain(expression.links());
+    calls.into_iter().any(|call| {
+        operands(call)
+            .into_iter()
+            .any(|(_, inside)| holds_a_fill_after_a_null_is_made(inside))
+    })
+}
+
+/// The case with each of the five a fill of nulls forward, which leaves the nulls of what it is
+/// given and no more.
+fn case_without_nulls_made(case: &Case) -> Option<Case> {
+    case_changed(case, &|call| {
+        makes_a_null(call)
+            .then(|| Call::new(catalog::entry("Expr.forward_fill")?, Vec::new()).ok())
+            .flatten()
+    })
+}
+
+/// Whether Polars refuses the case for the strategy of a fill still when none of the five is one:
+/// the null is then no cause of it.
+fn refused_for_a_strategy_without_nulls_made(case: &Case) -> bool {
+    case_without_nulls_made(case).is_some_and(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control).refusal.is_some_and(|refusal| {
+                refusal
+                    .reason
+                    .contains("fill null strategy not yet supported")
+            })
+        })
     })
 }
 
@@ -1235,12 +1662,16 @@ fn case_without_bounds(case: &Case) -> Option<Case> {
 /// a plan Polars names depends on which thread gets there first.
 const RUNS: usize = 8;
 
-/// Whether the call is a `clip` that has a bound.
+/// Whether the call is a `clip` that has a bound, or a replacement that lists values, which
+/// Polars casts to the dtype of what the call follows.
 fn has_a_bound(call: &Call) -> bool {
-    is(call, "Expr.clip")
+    (is(call, "Expr.clip")
         && ["lower_bound", "upper_bound"]
             .iter()
-            .any(|bound| call.argument(bound).is_some())
+            .any(|bound| call.argument(bound).is_some()))
+        || ["old", "new"]
+            .iter()
+            .any(|value| is_a_replaced_value(call, value) && call.argument(value).is_some())
 }
 
 /// Whether the call is a window whose partition holds no column: it has `partition_by`, and each
@@ -1442,6 +1873,64 @@ fn refused_for_a_failed_conversion_without_bounds(case: &Case) -> bool {
     })
 }
 
+/// Whether the reason is how Polars refuses a replacement that lists the values of a column where
+/// it meets the values of a group: as a pattern for each row, or as a call whose output is the
+/// length of the column and not of what it follows.
+fn says_a_replacement_of_a_group_is_refused(reason: &str) -> bool {
+    reason.contains("replacement pattern per row") || reason.contains("output length of `map`")
+}
+
+/// Whether the call is a replacement that lists what it replaces, or what replaces it, as the
+/// values of a column.
+fn is_a_replacement_of_columns(call: &Call) -> bool {
+    matches!(
+        call.entry().id().as_str(),
+        "Expr.replace" | "Expr.replace_strict"
+    ) && ["old", "new"].iter().any(|parameter| {
+        matches!(
+            call.argument(parameter),
+            Some(Value::Expression(listed))
+                if any_call(listed, &|inside| is(inside, "polars.col"))
+        )
+    })
+}
+
+/// The case with what each replacement of columns lists made null literals, which every dtype
+/// holds.
+fn case_without_columns_in_replacements(case: &Case) -> Option<Case> {
+    case_changed(case, &|call| {
+        if !is_a_replacement_of_columns(call) {
+            return None;
+        }
+        let given: Vec<(&str, Value)> = call
+            .arguments()
+            .iter()
+            .map(|given| {
+                if is_a_replaced_value(call, given.parameter()) {
+                    let null = a_null_literal().expect("a null literal");
+                    (given.parameter(), Value::Expression(null))
+                } else {
+                    (given.parameter(), given.value().clone())
+                }
+            })
+            .collect();
+        Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
+    })
+}
+
+/// Whether Polars refuses the case for a pattern per row still when no replacement lists the
+/// values of a column: the columns are then no cause of it. Which of two refusals of a plan
+/// Polars names depends on which thread gets there first, so the case is run again.
+fn refused_for_a_pattern_per_row_without_columns(case: &Case) -> bool {
+    case_without_columns_in_replacements(case).is_some_and(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control).refusal.is_some_and(|refusal| {
+                unplaced(&refusal) && says_a_replacement_of_a_group_is_refused(&refusal.reason)
+            })
+        })
+    })
+}
+
 /// Whether Polars refuses the case for lengths still when no window explodes: the
 /// explode is then no cause of the refusal, which the rows' lengths are.
 fn refused_for_lengths_without_explodes(case: &Case) -> bool {
@@ -1497,6 +1986,18 @@ fn literal_causes<'a>(case: &'a Case, refused: &Refused, pivot: bool) -> Vec<Lit
     found
 }
 
+/// What Polars' refusal of the case with columns for the literals must match for the literals to
+/// be why it allows the case as it is.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Matching {
+    /// The reason the tables gave.
+    TheReason,
+    /// The call the tables refused, where Polars places its refusal, and any refusal of the rows:
+    /// a call that is given two values that the tables refuse is refused by Polars for either,
+    /// and which it names is not the tables' to say.
+    TheCall,
+}
+
 /// Whether Polars refuses the case for the tables' reason when each of `causes` is
 /// a column of its dtype and nothing else is changed. Polars allows the case as it
 /// is, so a refusal is of what the literals were; the tables are then right about a
@@ -1504,11 +2005,33 @@ fn literal_causes<'a>(case: &'a Case, refused: &Refused, pivot: bool) -> Vec<Lit
 /// allows still, or refuses for another reason, shows no such thing: the part is
 /// skipped or the tables are wrong about the column as well, which no literal
 /// explains. `false` where a literal has no class to stand in with.
-fn refused_with_columns_for_the_literals(
+///
+/// `matching` says what Polars' refusal must match.
+fn refused_with_columns(
     causes: &[LiteralCause<'_>],
     case: &Case,
     refused: &Refused,
     observed: &Observed,
+    matching: Matching,
+) -> bool {
+    // Every literal a column, and then each alone, for a call given two literals that the tables
+    // refuse may be refused by Polars for the one and not the other once both are columns.
+    let alone: Vec<&[LiteralCause<'_>]> = if causes.len() > 1 {
+        causes.chunks(1).collect()
+    } else {
+        Vec::new()
+    };
+    std::iter::once(causes)
+        .chain(alone)
+        .any(|standing| refused_with_these_columns(standing, case, refused, observed, matching))
+}
+
+fn refused_with_these_columns(
+    causes: &[LiteralCause<'_>],
+    case: &Case,
+    refused: &Refused,
+    observed: &Observed,
+    matching: Matching,
 ) -> bool {
     let Some(classes) = causes
         .iter()
@@ -1527,7 +2050,20 @@ fn refused_with_columns_for_the_literals(
     (0..RUNS).any(|_| {
         observe_probe(&control, tables)
             .refusal
-            .is_some_and(|refusal| same_reason(&refused.source, &refused.reason, &refusal.reason))
+            .is_some_and(|refusal| match matching {
+                // The two engines word the refusal of a comparison of two series of dtypes it
+                // cannot compare differently, and a literal control runs in the other.
+                Matching::TheReason => {
+                    same_reason(&refused.source, &refused.reason, &refusal.reason)
+                        || is_the_same_comparison(&refused.reason, &refusal.reason)
+                }
+                // A refusal of the rows has no place, and a refusal that has one is at the call, or
+                // in what the call is given, which a literal that the call follows makes Polars
+                // skip with the call.
+                Matching::TheCall => refusal.place.as_ref().is_none_or(|place| {
+                    *place == refused.place || place.path().starts_with(refused.place.path())
+                }),
+            })
     })
 }
 
@@ -1755,18 +2291,79 @@ fn applies(
         }
         (Limit::TheLengthsOfTheRows, Disagreement::PolarsRefuses(refusal)) => {
             // The rows' lengths are the cause where no window explodes, or Polars
-            // refuses for lengths still when none does.
+            // refuses for lengths still when none does, and no drop is the cause either.
             unplaced(refusal)
                 && is_lengths(&refusal.reason)
                 && (!held.iter().any(|(_, held)| explodes_in(held))
                     || refused_for_lengths_without_explodes(case))
+                && (!held.iter().any(|(_, held)| any_call(held, &is_a_drop))
+                    || refused_for_lengths_without_drops(case))
+        }
+        (Limit::ANullStructToFill, Disagreement::PolarsRefuses(refusal)) => {
+            // The null is the cause where Polars stops refusing the strategy of a fill once
+            // none of the five makes one.
+            unplaced(refusal)
+                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                && refusal
+                    .reason
+                    .contains("fill null strategy not yet supported for dtype: struct[")
+                && held
+                    .iter()
+                    .any(|(_, held)| holds_a_fill_after_a_null_is_made(held))
+                && !refused_for_a_strategy_without_nulls_made(case)
+        }
+        (Limit::ADropOfNansInAWindow, Disagreement::PolarsRefuses(refusal)) => {
+            // The drop is the cause where Polars stops refusing the test for NaN once no call
+            // drops.
+            unplaced(refusal)
+                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                && refusal.reason.contains("operation not supported for dtype")
+                && refusal.reason.contains("is_not_nan")
+                && held.iter().any(|(_, held)| {
+                    any_call(held, &|call| is(call, "Expr.over"))
+                        && any_call(held, &|call| is(call, "Expr.drop_nans"))
+                })
+                && !refused_for_a_test_of_nan_without_drops(case)
+        }
+        (Limit::AReplacementOfColumnsInAWindow, Disagreement::PolarsRefuses(refusal)) => {
+            // The columns are the cause where Polars stops refusing for a pattern per row once
+            // what each replacement lists is a null literal.
+            unplaced(refusal)
+                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                && says_a_replacement_of_a_group_is_refused(&refusal.reason)
+                && held.iter().any(|(_, held)| {
+                    any_call(held, &|call| is(call, "Expr.over"))
+                        && any_call(held, &is_a_replacement_of_columns)
+                })
+                && !refused_for_a_pattern_per_row_without_columns(case)
+        }
+        (Limit::ADropChangesTheLengths, Disagreement::PolarsRefuses(refusal)) => {
+            // The drop is the cause where Polars stops refusing for lengths once no call drops.
+            unplaced(refusal)
+                && is_lengths(&refusal.reason)
+                && held.iter().any(|(_, held)| any_call(held, &is_a_drop))
+                && !refused_for_lengths_without_drops(case)
         }
         (Limit::ALiteral, Disagreement::PolarsAllows(refused)) => {
             // The literal is the cause where Polars refuses the case for the tables'
             // reason once each literal that could be is a column of its dtype.
             let causes = literal_causes(case, refused, pivot);
-            !causes.is_empty()
-                && refused_with_columns_for_the_literals(&causes, case, refused, observed)
+            // A call that is given values that the tables refuse apart, as a replacement is given
+            // what it replaces and what replaces it, and an interval its two bounds, is refused
+            // by Polars for any of them once they are columns, and which it names is not the
+            // tables' to say. An interval names the comparison of its `closed` too, which the
+            // tables measured with the default.
+            let matching = if locate(case, &refused.place).call.is_some_and(|call| {
+                matches!(
+                    call.entry().id().as_str(),
+                    "Expr.replace" | "Expr.replace_strict" | "Expr.is_between"
+                )
+            }) {
+                Matching::TheCall
+            } else {
+                Matching::TheReason
+            };
+            !causes.is_empty() && refused_with_columns(&causes, case, refused, observed, matching)
         }
         (Limit::AGroupAggregate, Disagreement::PolarsRefuses(refusal)) => {
             // A table with no rows has no groups, and the values of an
@@ -1775,7 +2372,8 @@ fn applies(
                 && refusal.stage == Stage::Empty
                 && (refusal.reason.contains("not supported")
                     || refusal.reason.contains("got `null`")
-                    || refusal.reason.contains("got null"))
+                    || refusal.reason.contains("got null")
+                    || refusal.reason.contains("` to `null` failed"))
         }
         (Limit::AGroupAggregate, Disagreement::PolarsAllows(refused)) => {
             // The kernels that take the values of a group accept what the ones of
@@ -1791,10 +2389,34 @@ fn applies(
                     "lengths don't match",
                     "must specify one field",
                     "cannot cast",
+                    "with a replacement pattern per row",
+                    "failed to determine supertype",
+                    "must not contain duplicates",
+                    "fill null strategy not yet supported",
+                    "fill-null strategy",
+                    SCHEMA_SAYS,
                 ]
                 .iter()
                 .any(|words| refused.reason.contains(words))
                 && locate(case, &refused.place).call.is_some()
+                // A replacement casts the values it lists, which are a pivot's literals, and a
+                // cast converts a literal that it follows, and a text that reads as the number
+                // converts where the sample's text, which the tables measured, does not.
+                || (pivot
+                    && is_a_failed_conversion(&refused.reason)
+                    && {
+                        let locus = locate(case, &refused.place);
+                        locus.call.is_some_and(|call| {
+                            matches!(
+                                call.entry().id().as_str(),
+                                "Expr.replace" | "Expr.replace_strict"
+                            ) || (is(call, "Expr.cast")
+                                && locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
+                                    starts_from_a_literal(chain)
+                                        || chain.links()[..at].iter().any(compares_with_a_null)
+                                }))
+                        })
+                    })
         }
         (Limit::ANullComparisonInAKey, Disagreement::PolarsRefuses(refusal)) => {
             is(step, "LazyFrame.join")
@@ -1834,10 +2456,10 @@ fn applies(
                 && (locus
                     .chain
                     .zip(locus.index)
-                    .is_some_and(|(chain, at)| leaves_only_nulls(&frames, chain, at))
+                    .is_some_and(|(chain, at)| leaves_only_nulls(&frames, chain, at, true))
                     || locus.call.is_some_and(|call| {
                         operands(call).into_iter().any(|(_, operand)| {
-                            leaves_only_nulls(&frames, operand, operand.links().len())
+                            leaves_only_nulls(&frames, operand, operand.links().len(), false)
                         })
                     }))
         }
@@ -1980,6 +2602,18 @@ fn applies(
                         && chain.links()[..at].iter().any(partitions_by_a_literal)
                 })
                 && refused_with_columns_to_partition_by(case, refused)
+        }
+        (Limit::ACastOfAValueTheDtypeCannotHold, Disagreement::PolarsRefuses(refusal)) => {
+            // The rows hold the value, and so may a table with no rows, where an aggregate of
+            // nothing, as the sum, is a value of its own for the cast to meet. The cast is the
+            // cause where Polars stops refusing for a failed conversion once no cast is strict.
+            unplaced(refusal)
+                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                && is_a_failed_conversion(&refusal.reason)
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &is_a_strict_cast))
+                && !refused_for_a_failed_conversion_without_strict_casts(case)
         }
         (Limit::AWindowOverAWindow, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
@@ -2420,6 +3054,116 @@ mod tests {
         ]);
         assert_eq!(
             tables_refuse(&select(vec![plain]), inside, ROWS, "no"),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_pivot_aggregate_is_excused_for_a_fill_by_a_strategy_and_for_a_replacement_of_nothing() {
+        let case = pivot(chain(column("a"), &["Expr.forward_fill"]));
+        let at_the_call = at(&[parameter("aggregate_function"), Segment::Link(0)]);
+        // The kernels of a group fill a list that select does not.
+        assert_eq!(
+            tables_refuse(
+                &case,
+                at_the_call,
+                Some(TableStage::Rows),
+                "fill null strategy not yet supported for dtype: list[i64]"
+            ),
+            vec![Limit::AGroupAggregate]
+        );
+        assert_eq!(
+            tables_refuse(
+                &case,
+                at(&[parameter("aggregate_function"), Segment::Link(0)]),
+                Some(TableStage::Rows),
+                "fill-null strategy Mean is not supported"
+            ),
+            vec![Limit::AGroupAggregate]
+        );
+        // The plan of a call that Polars does not compare with its rows in a group's kernels.
+        assert_eq!(
+            tables_refuse(
+                &case,
+                at(&[parameter("aggregate_function"), Segment::Link(0)]),
+                Some(TableStage::Rows),
+                "the schema says Float16 and the rows give Struct(x: Float16, y: Float16)"
+            ),
+            vec![Limit::AGroupAggregate]
+        );
+        // A cast of a literal that reads as the number converts, where the sample's text, which
+        // the tables measured, does not.
+        let literal = pivot(chain_of(
+            call("polars.lit", vec![("value", Value::Integer(1))]),
+            vec![cast_to(Representative::UInt16, Vec::new())],
+        ));
+        assert_eq!(
+            tables_refuse(
+                &literal,
+                at(&[parameter("aggregate_function"), Segment::Link(0)]),
+                Some(TableStage::Rows),
+                "conversion from `str` to `u16` failed in column 'a' for 2 out of 3 values: [\"1d\", \"2d\"]"
+            ),
+            vec![Limit::AGroupAggregate]
+        );
+        // A cast of a comparison, or an arithmetic, with a null converts the nulls it is.
+        let compared = pivot(chain_of(
+            call("polars.element", Vec::new()),
+            vec![
+                compared_with("Expr.eq", chain(null(), &[])),
+                cast_to(Representative::Null, Vec::new()),
+            ],
+        ));
+        assert_eq!(
+            tables_refuse(
+                &compared,
+                at(&[parameter("aggregate_function"), Segment::Link(1)]),
+                Some(TableStage::Rows),
+                "conversion from `bool` to `null` failed in column 'a' for 2 out of 3 values: [true, false]"
+            ),
+            vec![Limit::AGroupAggregate]
+        );
+        let divided = pivot(chain_of(
+            call("polars.element", Vec::new()),
+            vec![
+                compared_with("Expr.truediv", chain(null(), &[])),
+                cast_to(Representative::Null, Vec::new()),
+            ],
+        ));
+        assert_eq!(
+            tables_refuse(
+                &divided,
+                at(&[parameter("aggregate_function"), Segment::Link(1)]),
+                Some(TableStage::Rows),
+                "conversion from `f64` to `null` failed in column 'a' for 2 out of 3 values: [1.0, 3.0]"
+            ),
+            vec![Limit::AGroupAggregate]
+        );
+        // A cast of the values of the group is refused as the tables refuse it.
+        let group = pivot(chain_of(
+            call("polars.element", Vec::new()),
+            vec![cast_to(Representative::UInt16, Vec::new())],
+        ));
+        assert_eq!(
+            tables_refuse(
+                &group,
+                at(&[parameter("aggregate_function"), Segment::Link(0)]),
+                Some(TableStage::Rows),
+                "conversion from `str` to `u16` failed in column 'a' for 2 out of 3 values: [\"1d\", \"2d\"]"
+            ),
+            vec![]
+        );
+        // A table with no rows has no groups, so what an aggregate of none replaces is a null
+        // that no number converts to.
+        let reason =
+            "conversion from `i32` to `null` failed in column 'literal' for 1 out of 1 values: [1]";
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Empty, reason, Vec::new()),
+            vec![Limit::AGroupAggregate]
+        );
+        let select = select(vec![chain(column("a"), &["Expr.forward_fill"])]);
+        assert_eq!(
+            polars_refuses(&select, None, Stage::Empty, reason, Vec::new()),
             vec![]
         );
     }
@@ -4044,6 +4788,27 @@ mod tests {
                 vec![Limit::ANullComparisonInAKey]
             );
         }
+        // A comparison after the null literal with casts between them.
+        let after_a_cast = join(
+            chain_of(
+                null(),
+                vec![
+                    cast_to(Representative::Null, Vec::new()),
+                    compared_with("Expr.lt", chain(column("a"), &[])),
+                ],
+            ),
+            chain(column("key"), &[]),
+        );
+        assert_eq!(
+            polars_refuses(
+                &after_a_cast,
+                Some(step_place()),
+                Stage::Schema,
+                reason,
+                Vec::new()
+            ),
+            vec![Limit::ANullComparisonInAKey]
+        );
         // A key that compares nothing with a null, and another reason.
         let plain = join(
             chain(column("a"), &["Expr.cum_max"]),
@@ -4919,5 +5684,651 @@ mod tests {
             ),
             vec![]
         );
+    }
+    // ----- A cast of a value the dtype cannot hold
+
+    const CAST_NOT_HELD: &str =
+        "conversion from `f64` to `u32` failed in column 'a' for 1 out of 1 values: [-7.015253]";
+
+    /// A `cast` to `class`, with the arguments `extra`.
+    fn cast_to(class: Representative, extra: Vec<(&str, Value)>) -> Call {
+        let dtype = Dtype::new(class.dtype()).expect("a dtype");
+        let mut given = vec![("dtype", Value::Dtype(dtype))];
+        given.extend(extra);
+        call("Expr.cast", given)
+    }
+
+    #[test]
+    fn a_failed_conversion_is_excused_where_a_strict_cast_is_why() {
+        // The cast that is told nothing, and the one told to be strict, refuse a value that its
+        // dtype cannot hold; Polars stops refusing once no cast is strict.
+        for cast in [
+            cast_to(Representative::UInt8, Vec::new()),
+            cast_to(
+                Representative::UInt8,
+                vec![("strict", Value::Flag(Some(true)))],
+            ),
+        ] {
+            let case = select(vec![chain_of(column("a"), vec![cast])]);
+            assert_eq!(
+                refused_for_a_bound(&case, None, Stage::Rows, CAST_NOT_HELD),
+                vec![Limit::ACastOfAValueTheDtypeCannotHold]
+            );
+        }
+        // A cast in what another call is given is the same.
+        let nested = select(vec![chain_of(
+            column("a"),
+            vec![compared_with(
+                "Expr.eq",
+                chain_of(
+                    column("k"),
+                    vec![cast_to(Representative::UInt8, Vec::new())],
+                ),
+            )],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&nested, None, Stage::Rows, CAST_NOT_HELD),
+            vec![Limit::ACastOfAValueTheDtypeCannotHold]
+        );
+    }
+
+    #[test]
+    fn a_failed_conversion_is_not_excused_by_a_cast_that_gives_a_null_or_wraps_or_by_no_cast() {
+        let nothing = [
+            // A cast told to give a null where a value does not convert, and one told to wrap.
+            select(vec![chain_of(
+                column("a"),
+                vec![cast_to(
+                    Representative::UInt8,
+                    vec![("strict", Value::Flag(Some(false)))],
+                )],
+            )]),
+            select(vec![chain_of(
+                column("a"),
+                vec![cast_to(
+                    Representative::UInt8,
+                    vec![("wrap_numerical", Value::Flag(Some(true)))],
+                )],
+            )]),
+            // A case with no cast at all.
+            select(vec![chain(column("a"), &["Expr.sqrt"])]),
+        ];
+        for case in nothing {
+            assert_eq!(
+                refused_for_a_bound(&case, None, Stage::Rows, CAST_NOT_HELD),
+                vec![]
+            );
+        }
+    }
+
+    #[test]
+    fn a_failed_conversion_that_remains_without_a_strict_cast_is_not_the_casts() {
+        // A negative exponent fails to become a `u32` whether or not a cast is strict, so the
+        // cast is no cause, and the power's limit excuses it alone.
+        let case = select(vec![chain_of(
+            column("a"),
+            vec![
+                cast_to(Representative::UInt8, Vec::new()),
+                pow_of(whole(-1)),
+            ],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, NEGATIVE_EXPONENT),
+            vec![Limit::ANegativeExponent]
+        );
+    }
+
+    #[test]
+    fn only_a_failed_conversion_without_a_place_that_is_not_the_schemas_is_excused_for_a_cast() {
+        let case = select(vec![chain_of(
+            column("a"),
+            vec![cast_to(Representative::UInt8, Vec::new())],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(
+                &case,
+                None,
+                Stage::Rows,
+                "cannot compare string with numeric type (i64)"
+            ),
+            vec![]
+        );
+        // A refusal that Polars places at a call is the call's, and one of the schema is no
+        // value that fails to convert.
+        assert_eq!(
+            refused_for_a_bound(
+                &case,
+                Some(link_of("exprs", 0, 0)),
+                Stage::Rows,
+                CAST_NOT_HELD
+            ),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Schema, CAST_NOT_HELD),
+            vec![]
+        );
+        // A table with no rows meets the value that an aggregate of nothing is.
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Empty, CAST_NOT_HELD),
+            vec![Limit::ACastOfAValueTheDtypeCannotHold]
+        );
+    }
+
+    const CLOSE_NOT_HELD: &str = "conversion from `u128` to `i128` failed in column 'a' for 1 out of 1 values: [340282366920938463463374607431768211454]";
+
+    #[test]
+    fn a_failed_conversion_is_excused_where_a_test_of_closeness_is_why() {
+        // The test of closeness converts what it compares to the dtype that holds both, strictly,
+        // and Polars stops refusing once the comparison is one that converts nothing.
+        let close =
+            |other: Expression| call("Expr.is_close", vec![("other", Value::Expression(other))]);
+        let case = select(vec![chain_of(
+            column("a"),
+            vec![close(chain(column("k"), &["Expr.sqrt"]))],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, CLOSE_NOT_HELD),
+            vec![Limit::ACastOfAValueTheDtypeCannotHold]
+        );
+        // A comparison that is no test of closeness is no cause of the failure.
+        let comparison = select(vec![chain_of(
+            column("a"),
+            vec![compared_with("Expr.gt", chain(column("k"), &["Expr.sqrt"]))],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&comparison, None, Stage::Rows, CLOSE_NOT_HELD),
+            vec![]
+        );
+    }
+
+    // ----- A replacement of columns in a window
+
+    const PATTERN_PER_ROW: &str =
+        "not yet implemented: `replace` with a replacement pattern per row";
+
+    fn replace_by(old: Expression, new: Expression) -> Call {
+        call(
+            "Expr.replace",
+            vec![
+                ("old", Value::Expression(old)),
+                ("new", Value::Expression(new)),
+            ],
+        )
+    }
+
+    #[test]
+    fn a_pattern_per_row_is_excused_where_a_window_follows_a_replacement_of_columns() {
+        let windowed = select(vec![chain_of(
+            column("a"),
+            vec![
+                replace_by(chain(column("k"), &[]), chain(column("k"), &[])),
+                call(
+                    "Expr.over",
+                    vec![("partition_by", many(vec![chain(column("k"), &[])]))],
+                ),
+            ],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&windowed, None, Stage::Rows, PATTERN_PER_ROW),
+            vec![Limit::AReplacementOfColumnsInAWindow]
+        );
+    }
+
+    #[test]
+    fn an_output_of_another_length_is_excused_where_a_window_follows_a_replacement_of_columns() {
+        let windowed = select(vec![chain_of(
+            null(),
+            vec![
+                replace_by(chain(column("k"), &[]), chain(column("k"), &[])),
+                call(
+                    "Expr.over",
+                    vec![("partition_by", many(vec![chain(column("k"), &[])]))],
+                ),
+            ],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(
+                &windowed,
+                None,
+                Stage::Rows,
+                "output length of `map` (3) must be equal to the input length (1); consider using `apply` instead"
+            ),
+            vec![Limit::AReplacementOfColumnsInAWindow]
+        );
+    }
+
+    #[test]
+    fn a_pattern_per_row_is_not_excused_without_a_window_or_without_columns_in_the_replacement() {
+        // No window: the columns are one list, which Polars takes.
+        let plain = select(vec![chain_of(
+            column("a"),
+            vec![replace_by(chain(column("k"), &[]), chain(column("k"), &[]))],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&plain, None, Stage::Rows, PATTERN_PER_ROW),
+            vec![]
+        );
+        // A window and a replacement of values that are no column: Polars refuses it for no
+        // columns, so they are no cause.
+        let literals = select(vec![chain_of(
+            column("a"),
+            vec![
+                replace_by(whole(1), whole(2)),
+                call(
+                    "Expr.over",
+                    vec![("partition_by", many(vec![chain(column("k"), &[])]))],
+                ),
+            ],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&literals, None, Stage::Rows, PATTERN_PER_ROW),
+            vec![]
+        );
+    }
+
+    // ----- A null struct to fill
+
+    const STRATEGY_OF_NOTHING: &str = "fill null strategy not yet supported for dtype: struct[2]";
+
+    fn filled_by(strategy: &str) -> Call {
+        call(
+            "Expr.fill_null",
+            vec![("strategy", Value::Choice(strategy.to_owned()))],
+        )
+    }
+
+    #[test]
+    fn a_fill_by_a_strategy_after_a_call_that_makes_a_null_is_excused_for_a_struct() {
+        for maker in [
+            "Expr.shift",
+            "Expr.first",
+            "Expr.last",
+            "Expr.min",
+            "Expr.max",
+        ] {
+            let case = select(vec![chain_of(
+                column("a"),
+                vec![call(maker, Vec::new()), filled_by("one")],
+            )]);
+            for rows in [true, false] {
+                let stage = if rows { Stage::Rows } else { Stage::Empty };
+                assert_eq!(
+                    polars_refuses(&case, None, stage, STRATEGY_OF_NOTHING, Vec::new()),
+                    vec![Limit::ANullStructToFill],
+                    "{maker} rows: {rows}"
+                );
+            }
+        }
+        // And in a pivot's aggregate, after the last of a group.
+        let aggregate = chain_of(
+            column("a"),
+            vec![call("Expr.last", Vec::new()), filled_by("one")],
+        );
+        assert_eq!(
+            polars_refuses(
+                &pivot(aggregate),
+                None,
+                Stage::Rows,
+                STRATEGY_OF_NOTHING,
+                Vec::new()
+            ),
+            vec![Limit::ANullStructToFill]
+        );
+    }
+
+    #[test]
+    fn a_fill_by_a_strategy_is_not_excused_without_a_call_that_makes_a_null_before_it_or_for_a_dtype_that_is_no_struct()
+     {
+        let plain = select(vec![chain_of(column("a"), vec![filled_by("one")])]);
+        assert_eq!(
+            polars_refuses(&plain, None, Stage::Empty, STRATEGY_OF_NOTHING, Vec::new()),
+            vec![]
+        );
+        let after = select(vec![chain_of(
+            column("a"),
+            vec![call("Expr.last", Vec::new()), filled_by("one")],
+        )]);
+        assert_eq!(
+            polars_refuses(
+                &after,
+                None,
+                Stage::Rows,
+                "fill null strategy not yet supported for dtype: list[i64]",
+                Vec::new()
+            ),
+            vec![]
+        );
+    }
+    // ----- A drop of NaNs in a window
+
+    const NAN_OF_TEXT: &str = "`is_not_nan` operation not supported for dtype `str`";
+
+    #[test]
+    fn a_test_for_nan_of_a_dtype_is_excused_where_a_drop_of_nans_is_aggregated_in_a_window() {
+        let case = select(vec![chain_of(
+            column("g"),
+            vec![
+                call("Expr.drop_nans", Vec::new()),
+                call("Expr.len", Vec::new()),
+                call(
+                    "Expr.over",
+                    vec![("partition_by", many(vec![chain(column("k"), &[])]))],
+                ),
+            ],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, NAN_OF_TEXT),
+            vec![Limit::ADropOfNansInAWindow]
+        );
+    }
+
+    #[test]
+    fn a_test_for_nan_of_a_dtype_is_not_excused_without_a_window_or_where_it_is_asked_without_a_drop()
+     {
+        // No window: Polars leaves the drop out, so a refusal is no drop's.
+        let plain = select(vec![chain(column("g"), &["Expr.drop_nans", "Expr.len"])]);
+        assert_eq!(
+            refused_for_a_bound(&plain, None, Stage::Rows, NAN_OF_TEXT),
+            vec![]
+        );
+        // A test for NaN that is asked of text without a drop is refused with or without it.
+        let asked = select(vec![chain_of(
+            column("g"),
+            vec![
+                call("Expr.is_not_nan", Vec::new()),
+                call(
+                    "Expr.over",
+                    vec![("partition_by", many(vec![chain(column("k"), &[])]))],
+                ),
+            ],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&asked, None, Stage::Rows, NAN_OF_TEXT),
+            vec![]
+        );
+        // The same test asked of text beside a drop in a window is refused without the drop,
+        // which is then no cause.
+        let beside = select(vec![
+            chain_of(
+                column("g"),
+                vec![
+                    call("Expr.drop_nans", Vec::new()),
+                    call("Expr.len", Vec::new()),
+                    call(
+                        "Expr.over",
+                        vec![("partition_by", many(vec![chain(column("k"), &[])]))],
+                    ),
+                ],
+            ),
+            chain(column("h"), &["Expr.is_not_nan"]),
+        ]);
+        assert_eq!(
+            refused_for_a_bound(&beside, None, Stage::Rows, NAN_OF_TEXT),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_failed_conversion_is_excused_where_a_fill_by_a_value_is_why() {
+        let fill = call(
+            "Expr.fill_null",
+            vec![("value", Value::Expression(whole(1)))],
+        );
+        let case = select(vec![chain_of(column("a"), vec![fill])]);
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, CLOSE_NOT_HELD),
+            vec![Limit::ACastOfAValueTheDtypeCannotHold]
+        );
+        // A fill by a strategy meets no value, so it converts nothing.
+        let by_a_strategy = select(vec![chain_of(
+            column("a"),
+            vec![call(
+                "Expr.fill_null",
+                vec![("strategy", Value::Choice("forward".to_owned()))],
+            )],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&by_a_strategy, None, Stage::Rows, CLOSE_NOT_HELD),
+            vec![]
+        );
+    }
+    // ----- An interval of null bounds
+
+    fn is_between(lower: Expression, upper: Expression) -> Call {
+        call(
+            "Expr.is_between",
+            vec![
+                ("lower_bound", Value::Expression(lower)),
+                ("upper_bound", Value::Expression(upper)),
+            ],
+        )
+    }
+
+    #[test]
+    fn an_interval_of_null_bounds_is_excused_as_a_literal_where_polars_refuses_columns_of_its_dtype()
+     {
+        // The null literal of a list dtype as both bounds of a text: Polars folds the interval
+        // into a null, and refuses it when the bounds are columns.
+        assert_eq!(
+            excused_by_kept("uncovered-a-literal--an-interval-of-null-bounds.case"),
+            vec![Limit::ALiteral]
+        );
+    }
+
+    #[test]
+    fn an_interval_that_follows_a_null_literal_is_excused_as_a_literal_whatever_its_closed_says() {
+        // Polars folds the comparisons of a null literal into nulls, so the interval is allowed
+        // where the tables refuse a list for the comparison of its `closed`.
+        assert_eq!(
+            excused_by_kept("uncovered-a-literal--an-interval-that-follows-a-null-literal.case"),
+            vec![Limit::ALiteral]
+        );
+    }
+
+    #[test]
+    fn an_interval_is_not_excused_by_a_bound_that_is_not_a_null_or_by_a_null_beside_another_call() {
+        let at_the_interval = link_of("exprs", 0, 0);
+        let nothing = [
+            // No bound is a null literal.
+            (
+                select(vec![chain_of(
+                    column("a"),
+                    vec![is_between(chain(column("b"), &[]), chain(column("k"), &[]))],
+                )]),
+                at_the_interval.clone(),
+            ),
+            // A bound that is a number, which is no null.
+            (
+                select(vec![chain_of(
+                    column("a"),
+                    vec![is_between(whole(1), chain(column("k"), &[]))],
+                )]),
+                at_the_interval.clone(),
+            ),
+            // A null literal that is the operand of a comparison, not of an interval.
+            (
+                select(vec![chain_of(
+                    column("a"),
+                    vec![compared_with("Expr.eq", chain(null(), &[]))],
+                )]),
+                at_the_interval.clone(),
+            ),
+            // A null bound of an interval that the tables refuse nothing at: the call refused
+            // follows it.
+            (
+                select(vec![chain_of(
+                    column("a"),
+                    vec![
+                        is_between(chain(null(), &[]), chain(column("k"), &[])),
+                        call("Expr.sum", Vec::new()),
+                    ],
+                )]),
+                link_of("exprs", 0, 1),
+            ),
+        ];
+        for (case, place) in nothing {
+            assert_eq!(
+                tables_refuse(
+                    &case,
+                    place,
+                    ROWS,
+                    "cannot cast List type (inner: 'String', to: 'String')"
+                ),
+                vec![]
+            );
+        }
+    }
+    // ----- A value a replacement lists
+
+    fn replace_with(id: &str, old: Expression, new: Expression) -> Call {
+        let mut given = vec![
+            ("old", Value::Expression(old)),
+            ("new", Value::Expression(new)),
+        ];
+        if id == "Expr.replace_strict" {
+            given.push(("default", Value::Expression(chain(column("k"), &[]))));
+        }
+        call(id, given)
+    }
+
+    #[test]
+    fn a_failed_conversion_is_excused_where_a_value_a_replacement_lists_is_why() {
+        // The values a replacement lists are cast to the dtype it follows, a number out of range
+        // is refused, and Polars stops refusing once they are null.
+        for id in ["Expr.replace", "Expr.replace_strict"] {
+            for replacement in [
+                replace_with(id, whole(300), whole(1)),
+                replace_with(id, whole(1), whole(-1)),
+            ] {
+                let case = select(vec![chain_of(column("a"), vec![replacement])]);
+                assert_eq!(
+                    refused_for_a_bound(&case, None, Stage::Rows, BOUND_NOT_HELD),
+                    vec![Limit::ABoundTheDtypeCannotHold],
+                    "{id}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_failed_conversion_that_remains_without_the_listed_values_is_not_a_replacements() {
+        // A negative exponent fails to become a `u32` whether or not a replacement lists a value.
+        let case = select(vec![chain_of(
+            column("a"),
+            vec![
+                replace_with("Expr.replace", whole(1), whole(2)),
+                pow_of(whole(-1)),
+            ],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, NEGATIVE_EXPONENT),
+            vec![Limit::ANegativeExponent]
+        );
+    }
+    // ----- A drop of nulls or of NaNs
+
+    /// A lengths refusal that an `Expr.over` of a literal has, with a drop in the second predicate:
+    /// the refusal stays when the drop is made a call that keeps every value.
+    const LENGTHS_BESIDE_A_DROP: &str = r#"{"a":"Date","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.filter","arguments":{"predicates":{"many":[{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":1},"dtype":{"dtype":"Datetime(time_unit='us', time_zone=None)"}}},"then":[{"entry":"Expr.over","arguments":{"order_by":{"many":[{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"flag":null}}},"then":[]}}]}}},{"entry":"Expr.lt","arguments":{"other":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":1},"dtype":{"dtype":"Int32"}}},"then":[]}}}}]}},{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["f"]}}},"then":[{"entry":"Expr.drop_nulls","arguments":{}},{"entry":"Expr.first","arguments":{}}]}}]}}}}]}"#;
+
+    fn refused_for_lengths(case: &Case) -> Vec<Limit> {
+        std::thread::scope(|scope| {
+            std::thread::Builder::new()
+                .stack_size(256 << 20)
+                .spawn_scoped(scope, || {
+                    polars_refuses(case, None, Stage::Rows, LENGTHS, Vec::new())
+                })
+                .expect("a thread")
+                .join()
+                .expect("the limits are asked")
+        })
+    }
+
+    #[test]
+    fn a_refusal_about_lengths_is_the_drops_where_polars_stops_refusing_once_no_call_drops() {
+        // A column that holds a null, with the nulls dropped, is fewer values than the table's
+        // rows, beside the columns another item of `with_columns` is.
+        for drop in ["Expr.drop_nulls", "Expr.drop_nans"] {
+            let case = case_of(call(
+                "LazyFrame.with_columns",
+                vec![("exprs", many(vec![chain(column("a"), &[drop])]))],
+            ));
+            assert_eq!(
+                refused_for_lengths(&case),
+                vec![Limit::ADropChangesTheLengths],
+                "{drop}"
+            );
+        }
+        // A drop inside what a call is given is the same.
+        let nested = case_of(call(
+            "LazyFrame.with_columns",
+            vec![(
+                "exprs",
+                many(vec![chain_of(
+                    column("a"),
+                    vec![compared_with(
+                        "Expr.eq",
+                        chain(column("a"), &["Expr.drop_nulls"]),
+                    )],
+                )]),
+            )],
+        ));
+        assert_eq!(
+            refused_for_lengths(&nested),
+            vec![Limit::ADropChangesTheLengths]
+        );
+    }
+
+    #[test]
+    fn an_exponent_of_another_length_than_its_base_is_a_refusal_about_lengths() {
+        // A power given an exponent of as many values as the table has rows, after a drop that
+        // left its base fewer, is refused for the lengths, as a window or another call is.
+        let case = case_of(call(
+            "LazyFrame.with_columns",
+            vec![(
+                "exprs",
+                many(vec![chain_of(
+                    column("a"),
+                    vec![
+                        call("Expr.drop_nulls", Vec::new()),
+                        call(
+                            "Expr.pow",
+                            vec![("exponent", Value::Expression(chain(column("a"), &[])))],
+                        ),
+                    ],
+                )]),
+            )],
+        ));
+        assert!(is_lengths(
+            "exponent shape: 3 in `pow` expression does not match that of the base: 2"
+        ));
+        assert_eq!(
+            refused_for_a_bound(
+                &case,
+                None,
+                Stage::Rows,
+                "exponent shape: 3 in `pow` expression does not match that of the base: 2"
+            ),
+            vec![Limit::ADropChangesTheLengths]
+        );
+    }
+
+    #[test]
+    fn a_refusal_about_lengths_that_remains_without_the_drops_is_the_rows_and_not_the_drops() {
+        // The same refusal is Polars' for the window over a literal whether or not the second
+        // predicate drops, so the rows' lengths are the cause.
+        let case = Case::decode(LENGTHS_BESIDE_A_DROP.as_bytes()).expect("a case");
+        assert_eq!(refused_for_lengths(&case), vec![Limit::TheLengthsOfTheRows]);
+    }
+
+    #[test]
+    fn a_refusal_about_lengths_is_not_the_drops_where_the_case_has_none() {
+        let case = case_of(call(
+            "LazyFrame.with_columns",
+            vec![("exprs", many(vec![chain(column("a"), &["Expr.cum_sum"])]))],
+        ));
+        assert!(!refused_for_lengths(&case).contains(&Limit::ADropChangesTheLengths));
     }
 }

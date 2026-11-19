@@ -25,10 +25,10 @@ use crate::allowed::{
     Place as OfferPlace, Position as Slot, Refusal, Representative, Shape, Unknown, Verdict,
 };
 use crate::allowed::{
-    Loose, Receiver, adapted_dtype, is_count, is_left_unresolved, is_required, operand_adapts,
-    receiver_beside,
+    Loose, Receiver, adapted_dtype, adapts_numbers_only, could_be_taken_by_a_number, is_count,
+    is_left_unresolved, is_required, operand_adapts, receiver_beside,
 };
-use crate::catalog::{Applies, Comparison, Entry, Kind, Role};
+use crate::catalog::{Applies, AsManyAs, Comparison, Entry, Kind, Role};
 
 use super::error::{Place, Segment};
 use super::inputs::Inputs;
@@ -240,6 +240,10 @@ struct Operand {
     /// Whether the expression was walked to its end: a refused or unwalked one
     /// has no shape either.
     known: bool,
+    /// Whether how many values it gives can be counted on: not where a condition has one
+    /// expression for all its values, whose predicate Polars drops where it optimizes the plan
+    /// and not where a call that is no elementwise one follows it.
+    counted: bool,
 }
 
 /// The class of one value of a condition, and whether it is a number typed
@@ -365,22 +369,34 @@ fn option_word(value: &Value) -> Option<String> {
     }
 }
 
-/// The options `call` was given, each by the parameter and its word as the
-/// option table writes it.
-fn option_words(call: &Call) -> Vec<(String, String)> {
+/// The options `call` was given, each by the parameter and its word as the option table writes
+/// it: a flag, a choice, and a dtype, which the table writes as the name of its class, such as
+/// `Int64`. A dtype that is none of the classes has no word, and is reported apart: what the
+/// call gives depends on it, and the tables say nothing of it.
+fn option_words(call: &Call) -> (Vec<(String, String)>, bool) {
     let entry = call.entry();
-    call.arguments()
-        .iter()
-        .filter(|given| {
-            entry.parameters().iter().any(|parameter| {
-                parameter.name() == given.parameter()
-                    && matches!(parameter.kind(), Kind::Flag | Kind::Choice(_))
-            })
-        })
-        .filter_map(|given| {
-            option_word(given.value()).map(|word| (given.parameter().to_owned(), word))
-        })
-        .collect()
+    let mut unknown = false;
+    let mut words = Vec::new();
+    for given in call.arguments() {
+        let Some(parameter) = entry
+            .parameters()
+            .iter()
+            .find(|parameter| parameter.name() == given.parameter())
+        else {
+            continue;
+        };
+        let word = match (parameter.kind(), given.value()) {
+            (Kind::Flag | Kind::Choice(_), value) => option_word(value),
+            (Kind::Dtype, Value::Dtype(dtype)) => {
+                let class = Representative::of(dtype.as_polars());
+                unknown |= class.is_none();
+                class.map(|class| class.name().to_owned())
+            }
+            _ => None,
+        };
+        words.extend(word.map(|word| (given.parameter().to_owned(), word)));
+    }
+    (words, unknown)
 }
 
 /// The class a literal has, when its dtype is known without another operand:
@@ -485,7 +501,7 @@ impl Walker<'_> {
     /// The options a step was given, asked of the option table. The options of
     /// a method are asked of [`allowed::offer`], with the call.
     fn step_options(&mut self, step: &Call) {
-        let chosen = option_words(step);
+        let (chosen, _) = option_words(step);
         let chosen: Vec<(&str, &str)> = chosen
             .iter()
             .map(|(name, word)| (name.as_str(), word.as_str()))
@@ -740,6 +756,7 @@ impl Walker<'_> {
             loose: None,
             shape: Shape::Many,
             known: false,
+            counted: false,
         };
         let mut calls: Vec<Standing> = Vec::new();
         let mut last_end: Option<Ending> = None;
@@ -839,7 +856,7 @@ impl Walker<'_> {
                 _ => None,
             })
             .collect();
-        let branches_are_one =
+        let mut branches_are_one =
             statements.len() > 1 && statements.windows(2).all(|pair| pair[0] == pair[1]);
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
@@ -861,6 +878,20 @@ impl Walker<'_> {
                     receiver_loose,
                 },
             );
+            // A method that gives one value of the many that a condition of identical values may
+            // give is one value however the optimizer treats the condition.
+            if branches_are_one
+                && link.entry().applies() == Applies::Expression
+                && matches!(
+                    next,
+                    Cur::Value {
+                        shape: Shape::One,
+                        ..
+                    }
+                )
+            {
+                branches_are_one = false;
+            }
             cur = next;
             calls.push(standing);
             self.path.pop();
@@ -924,12 +955,14 @@ impl Walker<'_> {
                 shape,
                 // What was not asked has no shape that can be counted on.
                 known: dtype.is_some(),
+                counted: dtype.is_some() && !branches_are_one,
             },
             Cur::Condition { values, .. } => Operand {
                 dtype: unify(&values),
                 loose: None,
                 shape: Shape::Many,
                 known: true,
+                counted: !branches_are_one,
             },
             Cur::Dead => unsaid,
         }
@@ -1110,19 +1143,49 @@ impl Walker<'_> {
                     .any(|(given, _, number)| given == name && number.is_some())
                     && operand_adapts(entry, name)
                     && is_required(entry, name)
+                    // A number that adapts to numbers only is no number of any dtype beside
+                    // another, which Polars refuses for some methods.
+                    && (!adapts_numbers_only(entry, name)
+                        || receiver.is_some_and(could_be_taken_by_a_number))
             }
             _ => false,
         };
-        let words = option_words(link);
+        let (words, unrepresented) = option_words(link);
         let words: Vec<(&str, &str)> = words
             .iter()
             .map(|(name, word)| (name.as_str(), word.as_str()))
             .collect();
         let place = OfferPlace::new(context, after);
+        // Two arguments that meet in the supertype of their dtypes are judged each apart, so
+        // where their dtypes differ, whether Polars finds a supertype is not known, and what
+        // the tables say of either beside a companion of the dtype of the other is not
+        // what Polars says of the two.
+        let class_of_given = |name: &str| {
+            given
+                .iter()
+                .find(|(given, _)| *given == name)
+                .map(|(_, class)| *class)
+        };
+        let meeting: Vec<&str> = entry
+            .parameters()
+            .iter()
+            .filter_map(|parameter| {
+                let other = parameter.shares_a_dtype_with()?;
+                match (class_of_given(parameter.name()), class_of_given(other)) {
+                    (Some(first), Some(second)) if first != second => {
+                        Some([parameter.name(), other])
+                    }
+                    _ => None,
+                }
+            })
+            .flatten()
+            .collect();
+        let supertyped = !meeting.is_empty();
         // What the tables are not told is not guessed: an argument whose dtype
         // is not known leaves the call to be offered for any dtype that fits,
-        // which says it stands, not that this argument fits.
-        if given.len() < arguments.len() {
+        // which says it stands, not that this argument fits. The dtype a call is given is
+        // an argument too, which a cast to a dtype the tables do not cover leaves unknown.
+        if given.len() < arguments.len() || unrepresented || supertyped {
             self.blind(format!(
                 "the dtype of an argument of {} is not known",
                 entry.id().as_str()
@@ -1130,11 +1193,22 @@ impl Walker<'_> {
             *last_end = None;
             // The call is still offered, for a refusal is a refusal whatever
             // the argument, but nothing is said of what it gives.
+            let judged: Vec<(&str, Representative)> = given
+                .iter()
+                .filter(|(name, _)| !meeting.contains(name))
+                .copied()
+                .collect();
+            let unjudged: Vec<&str> = arguments
+                .iter()
+                .map(|(name, _)| name.as_str())
+                .filter(|name| !judged.iter().any(|(judged, _)| judged == name))
+                .collect();
             let verdict = allowed::offer(
                 entry,
                 &place,
                 &Chosen::default()
-                    .with_arguments(&given)
+                    .with_arguments(&judged)
+                    .with_unclassed(&unjudged)
                     .with_options(&words),
             );
             let standing = Standing {
@@ -1194,8 +1268,14 @@ impl Walker<'_> {
             }
             _ => None,
         };
+        let unclassed: Vec<&str> = arguments
+            .iter()
+            .map(|(name, _)| name.as_str())
+            .filter(|name| !given.iter().any(|(given, _)| given == name))
+            .collect();
         let chosen = Chosen::default()
             .with_arguments(&given)
+            .with_unclassed(&unclassed)
             .with_options(&words);
         let chosen = match gives {
             Some(dtype) => chosen.giving(dtype),
@@ -1213,11 +1293,27 @@ impl Walker<'_> {
             }
             Verdict::Allowed(allowance) => allowance,
         };
+        // Polars refuses the rows of a replacement given values of other numbers than it takes,
+        // which the shapes of the arguments say.
+        if let Cur::Value { shape, .. } = &cur
+            && !branches_are_one
+            && gives_other_numbers_of_values(entry, arguments, *shape)
+            && let Err(refusal) = allowed::rule_forbids_replacement_values_of_other_numbers()
+        {
+            self.refuse(&refusal, false);
+            return (
+                Cur::Dead,
+                Standing {
+                    follows: standing.follows,
+                    verdict: Some(Verdict::Refused(refusal)),
+                },
+            );
+        }
         *last_end = Some(allowance.can_end().clone());
         let next = match (entry.applies(), cur) {
             (Applies::Expression, _) => Cur::Value {
                 dtype: allowance.result().and_then(allowed::ResultDtype::class),
-                shape: allowance.shape(),
+                shape: broadcast(entry, arguments, allowance.shape()),
             },
             (
                 Applies::Condition,
@@ -1282,6 +1378,55 @@ impl Walker<'_> {
     }
 }
 
+/// The number of values a method gives, which is many where it gives one value of the value it
+/// follows and is given an operand of many: the one value is met by each of them, as the count of
+/// nulls is by the base of a logarithm that is a column.
+fn broadcast(entry: &Entry, arguments: &[(String, Operand)], shape: Shape) -> Shape {
+    // What a replacement lists is a table of values, which gives no more values than what it
+    // follows, as many values as that table holds.
+    let given_many = !matches!(entry.id().as_str(), "Expr.replace" | "Expr.replace_strict")
+        && arguments.iter().any(|(name, operand)| {
+            operand.shape == Shape::Many && operand_adapts(entry, name) && !is_count(entry, name)
+        });
+    if shape == Shape::One && given_many {
+        Shape::Many
+    } else {
+        shape
+    }
+}
+
+/// Whether the call `entry` is given an expression that gives many values for a parameter that
+/// takes as many as another, or one, where that is one value: `new` beside an `old` of one, and a
+/// strict replacement's `default` beside a value of one. An expression that was not walked to its
+/// end has no shape that can be counted on, and is not judged.
+fn gives_other_numbers_of_values(
+    entry: &Entry,
+    arguments: &[(String, Operand)],
+    receiver: Shape,
+) -> bool {
+    let operand = |name: &str| {
+        arguments
+            .iter()
+            .find(|(given, _)| given == name)
+            .map(|(_, operand)| operand)
+            .filter(|operand| operand.known && operand.counted)
+    };
+    entry.parameters().iter().any(|parameter| {
+        let gives_many = parameter.as_many_as().is_some()
+            && operand(parameter.name()).is_some_and(|mine| mine.shape == Shape::Many);
+        if !gives_many {
+            return false;
+        }
+        match parameter.as_many_as() {
+            Some(AsManyAs::TheReceiver) => receiver == Shape::One,
+            Some(AsManyAs::Parameter(other)) => {
+                operand(other).is_some_and(|other| other.shape == Shape::One)
+            }
+            None => false,
+        }
+    })
+}
+
 // ---------------------------------------------------------------------------
 // Keys
 
@@ -1305,13 +1450,15 @@ fn operands(call: &Call) -> Vec<&Expression> {
     found
 }
 
-const ONE_VALUE: [&str; 6] = [
+const ONE_VALUE: [&str; 8] = [
     "Expr.sum",
     "Expr.min",
     "Expr.max",
     "Expr.len",
     "Expr.first",
     "Expr.last",
+    "Expr.has_nulls",
+    "Expr.null_count",
 ];
 
 fn is_one_value(call: &Call) -> bool {
@@ -1325,9 +1472,16 @@ fn is_one_value(call: &Call) -> bool {
 fn wholly_single(expression: &Expression, upto: usize, literals: bool) -> bool {
     let links = &expression.links()[..upto.min(expression.links().len())];
     let single = |call: &Call| {
-        operands(call)
-            .into_iter()
-            .all(|inside| wholly_single(inside, inside.links().len(), true))
+        // What a replacement lists is a table of values, which gives no more values than what it
+        // follows, and its default is as many as that or one.
+        is_a_replacement(call)
+            // An interval with a null bound that has no dtype is folded whole into a null, and
+            // what its other bound reads is not met.
+            || (call.entry().id().as_str() == "Expr.is_between"
+                && operands(call).into_iter().any(is_an_untyped_null))
+            || operands(call)
+                .into_iter()
+                .all(|inside| wholly_single(inside, inside.links().len(), true))
     };
     if let Some(last) = links.iter().rposition(is_one_value) {
         return links[last + 1..].iter().all(single);
@@ -1343,8 +1497,27 @@ fn wholly_single(expression: &Expression, upto: usize, literals: bool) -> bool {
     }
 }
 
-/// Whether `link` is a comparison, which with a null literal gives a null.
+/// Whether `link` is a comparison, which with a null literal gives a null. `is_between` is two: the
+/// value compared with each of its bounds, so a bound that is a null literal with no dtype is a
+/// comparison with one. A null bound of a dtype is one Polars folds for some dtypes of what it
+/// bounds and not for others, which the document does not decide, so it is left to a limit.
+/// `eq_missing` and `ne_missing` are not comparisons: they take a null as a value.
 fn is_a_comparison(link: &Call) -> bool {
+    is_a_comparison_of_its_receiver(link)
+        || (link.entry().id().as_str() == "Expr.is_between"
+            && operands(link).into_iter().any(is_an_untyped_null))
+}
+
+/// Whether an expression is a null literal and no more, which is given no dtype.
+fn is_an_untyped_null(expression: &Expression) -> bool {
+    is_a_null(expression)
+        && matches!(expression.start(), Start::Call(start) if start.argument("dtype").is_none())
+}
+
+/// Whether `link` compares what it follows with what it is given, so that a null literal it
+/// follows, and not only one it is given, gives a null: the six comparisons do, and `is_between`,
+/// which compares each of its bounds with what it follows, does not.
+fn is_a_comparison_of_its_receiver(link: &Call) -> bool {
     Comparison::of_entry(link.entry().id().as_str()).is_some()
 }
 
@@ -1391,9 +1564,8 @@ fn calls_of(expression: &Expression) -> impl Iterator<Item = &Call> {
 fn folds_a_null(expression: &Expression) -> bool {
     let from_a_null = starts_from_a_null(expression);
     expression.links().iter().enumerate().any(|(at, link)| {
-        is_a_comparison(link)
-            && ((from_a_null && follows_the_start(expression, at))
-                || operands(link).into_iter().any(is_a_null))
+        (is_a_comparison_of_its_receiver(link) && from_a_null && follows_the_start(expression, at))
+            || (is_a_comparison(link) && operands(link).into_iter().any(is_a_null))
     }) || calls_of(expression).any(|call| operands(call).into_iter().any(folds_a_null))
 }
 
@@ -1403,9 +1575,8 @@ fn folds_a_null_before(expression: &Expression, upto: usize) -> bool {
     let from_a_null = starts_from_a_null(expression);
     let links = &expression.links()[..upto];
     links.iter().enumerate().any(|(at, link)| {
-        is_a_comparison(link)
-            && ((from_a_null && follows_the_start(expression, at))
-                || operands(link).into_iter().any(is_a_null))
+        (is_a_comparison_of_its_receiver(link) && from_a_null && follows_the_start(expression, at))
+            || (is_a_comparison(link) && operands(link).into_iter().any(is_a_null))
     }) || calls_of(expression)
         .take(upto + 1)
         .any(|call| operands(call).into_iter().any(folds_a_null))
@@ -1420,7 +1591,9 @@ fn is_reached_by_a_null(expression: &Expression, at: usize) -> bool {
         && (operands(&expression.links()[at])
             .into_iter()
             .any(|operand| is_a_null(operand) || folds_a_null(operand))
-            || (starts_from_a_null(expression) && follows_the_start(expression, at))
+            || (is_a_comparison_of_its_receiver(&expression.links()[at])
+                && starts_from_a_null(expression)
+                && follows_the_start(expression, at))
             || folds_a_null_before(expression, at))
 }
 
@@ -1464,9 +1637,13 @@ fn holds_an_aggregate(expression: &Expression) -> bool {
     // value or literals alone, and what is not reached is evaluated.
     let after = links[first..].iter().enumerate().any(|(at, link)| {
         if is_reached_by_a_null(expression, first + at) {
-            operands(link).into_iter().any(|operand| {
-                !wholly_single(operand, operand.links().len(), true) && holds_an_aggregate(operand)
-            })
+            // An interval with a null bound is folded whole, so what its other bound holds is
+            // not met, where a comparison evaluates what it is given that is more than one value.
+            link.entry().id().as_str() != "Expr.is_between"
+                && operands(link).into_iter().any(|operand| {
+                    !wholly_single(operand, operand.links().len(), true)
+                        && holds_an_aggregate(operand)
+                })
         } else {
             evaluated(link)
         }
@@ -1532,7 +1709,9 @@ fn holds_a_null_comparison(expression: &Expression) -> bool {
         .filter(|(at, link)| {
             is_a_comparison(link)
                 && (operands(link).into_iter().any(is_a_null)
-                    || (starts_from_a_null(expression) && follows_the_start(expression, *at)))
+                    || (is_a_comparison_of_its_receiver(link)
+                        && starts_from_a_null(expression)
+                        && follows_the_start(expression, *at)))
                 && wholly_single(expression, *at, true)
         })
         .map(|(at, _)| at + usize::from(start.is_some()))
@@ -1552,7 +1731,9 @@ fn holds_a_null_comparison(expression: &Expression) -> bool {
                 reads_a_column(operand) && !wholly_single(operand, operand.links().len(), true)
             });
             let column_before = reads && !wholly_single(expression, at, true);
-            let null_start = follows_the_start(expression, at) && starts_from_a_null(expression);
+            let null_start = is_a_comparison_of_its_receiver(link)
+                && follows_the_start(expression, at)
+                && starts_from_a_null(expression);
             if (null_given && column_before) || (null_start && column_given) {
                 return true;
             }
@@ -1565,7 +1746,9 @@ fn holds_a_null_comparison(expression: &Expression) -> bool {
     let folds = |at: usize, link: &Call| {
         is_a_comparison(link)
             && (operands(link).into_iter().any(is_a_null)
-                || (starts_from_a_null(expression) && follows_the_start(expression, at)))
+                || (is_a_comparison_of_its_receiver(link)
+                    && starts_from_a_null(expression)
+                    && follows_the_start(expression, at)))
     };
     start
         .into_iter()
@@ -1593,5 +1776,47 @@ fn holds_a_null_comparison(expression: &Expression) -> bool {
 /// aggregate as not.
 fn is_not_elementwise(key: &Expression) -> bool {
     !wholly_single(key, key.links().len(), true)
-        && (holds_an_aggregate(key) || holds_a_null_comparison(key))
+        && !holds_an_interval_with_a_typed_null_bound(key)
+        && (holds_an_aggregate(key)
+            || holds_a_null_comparison(key)
+            || holds_a_replacement_of_columns(key))
+}
+
+/// Whether an expression holds, at any depth, an interval with a null bound of a dtype. Polars
+/// folds such an interval into a null for some dtypes of what it bounds, and the null leaves
+/// nothing in the key that is not elementwise; for others it does not. The document does not
+/// decide which, so what a key that holds one is judged to be is left to a limit.
+fn holds_an_interval_with_a_typed_null_bound(expression: &Expression) -> bool {
+    calls_of(expression).any(|call| {
+        (call.entry().id().as_str() == "Expr.is_between"
+            && operands(call).into_iter().any(|operand| {
+                is_a_null(operand)
+                    && matches!(operand.start(), Start::Call(start) if start.argument("dtype").is_some())
+            }))
+            || operands(call)
+                .into_iter()
+                .any(holds_an_interval_with_a_typed_null_bound)
+    })
+}
+
+/// Whether `call` is a replacement of values.
+fn is_a_replacement(call: &Call) -> bool {
+    matches!(
+        call.entry().id().as_str(),
+        "Expr.replace" | "Expr.replace_strict"
+    )
+}
+
+/// Whether an expression holds, at any depth, a replacement given what it replaces, or what
+/// replaces it, that reads a column. Polars calls a replacement elementwise only where they are
+/// literals, which is how one is written, and refuses a join's key that is given a column. Its
+/// default may be a column, which it takes a value of for each row.
+fn holds_a_replacement_of_columns(expression: &Expression) -> bool {
+    calls_of(expression).any(|call| {
+        (is_a_replacement(call) && ["old", "new"].iter().any(|name| {
+            matches!(call.argument(name), Some(Value::Expression(value)) if reads_a_column(value))
+        })) || operands(call)
+            .into_iter()
+            .any(holds_a_replacement_of_columns)
+    })
 }

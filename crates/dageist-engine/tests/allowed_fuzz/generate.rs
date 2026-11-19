@@ -407,6 +407,8 @@ impl Gen<'_> {
             .filter(|parameter| {
                 !(entry.id().as_str() == "LazyFrame.join" && parameter.name() == "validate")
             })
+            // A fill takes a strategy in place of a value, which `method_call` decides.
+            .filter(|parameter| parameter.in_place_of().is_none())
             .collect();
         if !matches!(entry.applies(), Applies::Expression | Applies::Frame)
             || parameters.is_empty()
@@ -931,6 +933,12 @@ impl Gen<'_> {
         // Which bounds a `clip` is given: one of them, or both, for a step gives at least one and
         // Polars builds each alone differently.
         let bounds = self.draw.below(3);
+        // Whether a fill is given a strategy, in place of a value: Python takes one of them and
+        // refuses both and neither.
+        let fill_by_strategy = id == "Expr.fill_null" && self.draw.chance(45);
+        // Whether what a replacement replaces is a literal, which is one value, so what it is
+        // replaced by must be one value too: Polars refuses values of two other lengths.
+        let mut replaces_a_literal = self.host == Host::Pivot;
         for parameter in entry.parameters() {
             if !matches!(parameter.kind(), Kind::Expression(_)) {
                 continue;
@@ -940,6 +948,10 @@ impl Gen<'_> {
             let given_it = match (id, name) {
                 ("Expr.clip", "lower_bound") => bounds != 1,
                 ("Expr.clip", "upper_bound") => bounds != 0,
+                ("Expr.fill_null", "value") => !fill_by_strategy,
+                // A strict replacement without a default is refused where a value is not listed,
+                // which depends on the rows.
+                ("Expr.replace_strict", "default") => true,
                 (_, _) if required => true,
                 ("Expr.over", "partition_by") => {
                     partitioned = self.draw.chance(80);
@@ -958,6 +970,21 @@ impl Gen<'_> {
             slots.extend(position);
             let built: Vec<Built> = match (id, name) {
                 ("Expr.shift", _) => vec![self.scalar(name == "n")],
+                ("Expr.replace" | "Expr.replace_strict", "old") => {
+                    let built = self.replaced();
+                    replaces_a_literal = built.expression.links().is_empty()
+                        && matches!(built.expression.start(), Start::Call(start)
+                            if start.entry().id().as_str() == "polars.lit");
+                    vec![built]
+                }
+                ("Expr.replace" | "Expr.replace_strict", "new") if replaces_a_literal => {
+                    let literal = self.literal();
+                    vec![Built {
+                        expression: Expression::new(Start::Call(literal.0), Vec::new())
+                            .expect("a start"),
+                        class: literal.1,
+                    }]
+                }
                 ("Expr.dt.offset_by", "by") => {
                     // The durations are text of the table's: `b`, whose rows
                     // are durations where it is text, as the tables measured it.
@@ -1008,8 +1035,21 @@ impl Gen<'_> {
             };
             given.push((name, value));
         }
-        given.extend(self.whole_numbers(entry));
         given.extend(self.options(entry));
+        if fill_by_strategy
+            && let Some(Kind::Choice(words)) = entry
+                .parameters()
+                .iter()
+                .find(|parameter| parameter.name() == "strategy")
+                .map(catalog::Parameter::kind)
+        {
+            given.push((
+                "strategy",
+                Value::Choice((*self.draw.pick(words)).to_owned()),
+            ));
+        }
+        given.extend(self.dtype_arguments(entry));
+        given.extend(self.numbers(entry, &given));
         if id == "Expr.over" {
             let ordered = given.iter().any(|(name, _)| *name == "order_by");
             let optioned = given
@@ -1046,28 +1086,90 @@ impl Gen<'_> {
         Some((call, dtypes))
     }
 
-    /// The whole numbers a method is given for the parameters that take one, as the places a
-    /// rounding keeps and the significant figures it keeps. The values are those that Polars
-    /// accepts: a number of significant figures below one is refused when rows run, for every
-    /// dtype alike, which the tables, measured with two, do not say. They include the places
-    /// from which Polars leaves a float as it is, which differ for each width of float.
-    fn whole_numbers(&mut self, entry: &'static Entry) -> Vec<(&'static str, Value)> {
-        let mut given = Vec::new();
+    /// The numbers a method is given for the parameters that take one: the places a rounding
+    /// keeps and the significant figures it keeps, how many nulls in a row a fill fills, and
+    /// the tolerances of a comparison. The values are those that Polars accepts: a number of
+    /// significant figures below one is refused when rows run, for every dtype alike, and so is
+    /// a tolerance below zero, which the tables, measured with two figures and the defaults, do
+    /// not say. The places include those from which Polars leaves a float as it is, which differ
+    /// for each width of float. A limit is given only to a fill that takes one: a fill by a
+    /// strategy that moves along the rows, which Python refuses it beside any other.
+    fn numbers(
+        &mut self,
+        entry: &'static Entry,
+        given: &[(&'static str, Value)],
+    ) -> Vec<(&'static str, Value)> {
+        let moves_along = given.iter().any(|(name, value)| {
+            *name == "strategy"
+                && matches!(value, Value::Choice(word) if word == "forward" || word == "backward")
+        });
+        let mut numbers = Vec::new();
         for parameter in entry.parameters() {
-            if parameter.kind() != Kind::Value(ValueType::Integer) {
+            let kind = parameter.kind();
+            if kind != Kind::Value(ValueType::Integer) && kind != Kind::Value(ValueType::Float) {
                 continue;
             }
             if !parameter.is_needed() && !self.draw.chance(40) {
                 continue;
             }
-            let values: &[i64] = match parameter.name() {
-                "digits" => &[1, 2, 3, 6, 15, 40],
-                "decimals" => &[0, 1, 2, 3, 5, 12, 50, 310, 400],
+            let name = parameter.name();
+            if entry.id().as_str() == "Expr.fill_null" && name == "limit" && !moves_along {
+                continue;
+            }
+            let value = match name {
+                "digits" => Value::Integer(self.draw.pick(&[1, 2, 3, 6, 15, 40])),
+                "decimals" => Value::Integer(self.draw.pick(&[0, 1, 2, 3, 5, 12, 50, 310, 400])),
+                "limit" => Value::Integer(self.draw.pick(&[0, 1, 2, 5])),
+                "abs_tol" | "rel_tol" => Value::Float(self.draw.pick(&[0.0, 0.5, 1e-9, 1.0])),
                 other => panic!("the generator does not know what to give {other}"),
             };
-            given.push((parameter.name(), Value::Integer(self.draw.pick(values))));
+            numbers.push((name, value));
         }
-        given
+        numbers
+    }
+
+    /// The dtypes a method is given for the parameters that take one: the dtype a cast gives,
+    /// which it must be given, and the dtype a replacement is asked to give, which it sometimes is.
+    fn dtype_arguments(&mut self, entry: &'static Entry) -> Vec<(&'static str, Value)> {
+        let mut dtypes = Vec::new();
+        for parameter in entry.parameters() {
+            if parameter.kind() != Kind::Dtype {
+                continue;
+            }
+            if !parameter.is_needed() && !self.draw.chance(25) {
+                continue;
+            }
+            let class = self.draw.pick(&literal_classes());
+            dtypes.push((
+                parameter.name(),
+                dtype_value(class).expect("a class of the document"),
+            ));
+        }
+        dtypes
+    }
+
+    /// What a replacement replaces: a column of the table whose values are all different, which
+    /// is the only kind Polars accepts as what is replaced, or a literal. A literal is one
+    /// value. A column that holds a value twice is refused when rows run, which depends on them.
+    fn replaced(&mut self) -> Built {
+        let names: &[&str] = match self.host {
+            Host::JoinRight => &["ra", "rb"],
+            Host::JoinOn => &["u", "a"],
+            Host::Pivot => &[],
+            _ => &["a", "b", "u"],
+        };
+        if names.is_empty() || self.draw.chance(40) {
+            let literal = self.literal();
+            return Built {
+                expression: Expression::new(Start::Call(literal.0), Vec::new()).expect("a start"),
+                class: literal.1,
+            };
+        }
+        let name: &str = self.draw.pick(names);
+        Built {
+            expression: Expression::new(Start::Call(column(name)), Vec::new()).expect("a column"),
+            class: self.class_of(name).or(Some(Representative::Int64)),
+        }
     }
 
     fn literal_loose_text(&mut self) -> (Call, Option<Representative>) {
@@ -1091,7 +1193,8 @@ fn unify(values: &[Option<Representative>]) -> Option<Representative> {
 }
 
 /// The options `call` was given, each by the parameter and its word as the
-/// option table writes it, which `offer` is asked with.
+/// option table writes it, which `offer` is asked with: a flag, a choice, and a dtype by the name
+/// of its class.
 fn option_words(call: &Call) -> Vec<(String, String)> {
     let entry = call.entry();
     call.arguments()
@@ -1099,7 +1202,7 @@ fn option_words(call: &Call) -> Vec<(String, String)> {
         .filter(|given| {
             entry.parameters().iter().any(|parameter| {
                 parameter.name() == given.parameter()
-                    && matches!(parameter.kind(), Kind::Flag | Kind::Choice(_))
+                    && matches!(parameter.kind(), Kind::Flag | Kind::Choice(_) | Kind::Dtype)
             })
         })
         .filter_map(|given| {
@@ -1108,6 +1211,7 @@ fn option_words(call: &Call) -> Vec<(String, String)> {
                 Value::Flag(Some(false)) => "false".to_owned(),
                 Value::Flag(None) => "unset".to_owned(),
                 Value::Choice(word) => word.clone(),
+                Value::Dtype(dtype) => Representative::of(dtype.as_polars())?.name().to_owned(),
                 _ => return None,
             };
             Some((given.parameter().to_owned(), word))

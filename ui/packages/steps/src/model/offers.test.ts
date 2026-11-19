@@ -51,20 +51,23 @@ describe('the methods the engine offers after a timestamp', () => {
     families.flatMap((family) => family.offers).find((offer) => offer.name === name);
 
   it('are grouped by family, the shortest group first, and those of a length in the catalogue order', () => {
-    // The methods of each family: window one, rows and cumulative three, aggregate and logic
-    // four, rounding and temporal five, maths seven, compare eight, arithmetic eleven and
-    // trigonometry fifteen.
+    // The methods of each family: window one, rows, cumulative and conversion three, aggregate and
+    // logic four, rounding and temporal five, maths seven, checks and nulls eight, arithmetic
+    // eleven, compare twelve and trigonometry fifteen.
     expect(families.map((family) => [family.key, family.offers.length])).toEqual([
       ['window', 1],
       ['rows', 3],
       ['cumulative', 3],
+      ['conversion', 3],
       ['aggregate', 4],
       ['logic', 4],
       ['rounding', 5],
       ['temporal', 5],
       ['maths', 7],
-      ['compare', 8],
+      ['checks', 8],
+      ['nulls', 8],
       ['arithmetic', 11],
+      ['compare', 12],
       ['trigonometry', 15],
     ]);
     expect(families[0]?.title).toBe('Window');
@@ -82,6 +85,23 @@ describe('the methods the engine offers after a timestamp', () => {
     expect(refused?.stoppedBy).toBe('engine');
     expect(refused?.reason).toContain('`cum_sum` operation not supported for dtype');
     expect(offerNamed('dt.date')).toMatchObject({ reason: null, stoppedBy: null });
+  });
+
+  it('hold the nulls, checks and conversions under Polars’ names, with the plain words in the hints', () => {
+    expect(offerNamed('fill_null')).toMatchObject({ family: 'nulls', reason: null });
+    expect(offerNamed('fill_null')?.hint).toBe('empty values replaced');
+    expect(offerNamed('null_count')?.hint).toBe('number of empty values');
+    expect(offerNamed('drop_nulls')).toMatchObject({ family: 'nulls', stoppedBy: null });
+    expect(offerNamed('is_unique')).toMatchObject({ family: 'checks', stoppedBy: null });
+    // `eq_missing` and `is_between` compare a value with others, so they stand with `eq`.
+    expect(offerNamed('eq_missing')).toMatchObject({ family: 'compare', stoppedBy: null });
+    expect(offerNamed('is_between')).toMatchObject({ family: 'compare', stoppedBy: null });
+    expect(offerNamed('cast')).toMatchObject({ family: 'conversion', stoppedBy: null });
+    // A timestamp is no number, so the engine refuses the tests of NaN and the fill of it.
+    for (const name of ['is_nan', 'is_finite', 'fill_nan']) {
+      expect(offerNamed(name)).toMatchObject({ stoppedBy: 'engine' });
+    }
+    expect(offerNamed('is_nan')?.reason).toContain('is_nan');
   });
 
   it('hold the maths and rounding under Polars’ names, with the plain words in the hints', () => {

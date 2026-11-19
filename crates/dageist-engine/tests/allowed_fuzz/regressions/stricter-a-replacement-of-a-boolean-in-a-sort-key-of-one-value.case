@@ -1,0 +1,2 @@
+{"a":"Int8","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.sort","arguments":{"by":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["h"]}}},"then":[{"entry":"Expr.last","arguments":{}},{"entry":"Expr.is_first_distinct","arguments":{}},{"entry":"Expr.replace","arguments":{"old":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[]}},"new":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["h"]}}},"then":[]}}}}]}}]}}}}]}

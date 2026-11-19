@@ -45,8 +45,20 @@
       "title": "Comparison · true or false"
     },
     {
+      "key": "checks",
+      "title": "Checks · NaN, infinite, repeated"
+    },
+    {
       "key": "logic",
       "title": "Logic · and, or, not"
+    },
+    {
+      "key": "nulls",
+      "title": "Nulls · fill, drop, count"
+    },
+    {
+      "key": "conversion",
+      "title": "Conversion · dtype, swapped values"
     },
     {
       "key": "start",
@@ -370,6 +382,115 @@
       "parameters": []
     },
     {
+      "id": "Expr.backward_fill",
+      "applies": "expression",
+      "family": "nulls",
+      "name": "backward_fill",
+      "hint": "empty values filled from the next value",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "limit",
+          "shown": "limit",
+          "label": "at most this many in a row",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.cast",
+      "applies": "expression",
+      "family": "conversion",
+      "name": "cast",
+      "hint": "converted to another dtype",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "dtype",
+          "shown": "dtype",
+          "label": "to",
+          "kind": {
+            "kind": "dtype"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "strict",
+          "shown": "strict",
+          "label": "refuse a value that does not convert",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": true
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": true
+          },
+          "start": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null
+        },
+        {
+          "name": "wrap_numerical",
+          "shown": "wrap_numerical",
+          "label": "wrap numbers that overflow",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null
+        }
+      ]
+    },
+    {
       "id": "Expr.cbrt",
       "applies": "expression",
       "family": "maths",
@@ -584,6 +705,26 @@
       "parameters": []
     },
     {
+      "id": "Expr.drop_nans",
+      "applies": "expression",
+      "family": "nulls",
+      "name": "drop_nans",
+      "hint": "removes the NaNs, leaving fewer values",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.drop_nulls",
+      "applies": "expression",
+      "family": "nulls",
+      "name": "drop_nulls",
+      "hint": "removes the empty values, leaving fewer values",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
       "id": "Expr.dt.date",
       "applies": "expression",
       "family": "temporal",
@@ -709,6 +850,36 @@
       ]
     },
     {
+      "id": "Expr.eq_missing",
+      "applies": "expression",
+      "family": "compare",
+      "name": "eq_missing",
+      "hint": "equal to, an empty value equal to another",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "other",
+          "shown": "other",
+          "label": "compared with",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
       "id": "Expr.erf",
       "applies": "expression",
       "family": "maths",
@@ -737,6 +908,136 @@
       "head": null,
       "lazy": true,
       "parameters": []
+    },
+    {
+      "id": "Expr.fill_nan",
+      "applies": "expression",
+      "family": "nulls",
+      "name": "fill_nan",
+      "hint": "NaN replaced by a value",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "value",
+          "shown": "value",
+          "label": "with",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.fill_null",
+      "applies": "expression",
+      "family": "nulls",
+      "name": "fill_null",
+      "hint": "empty values replaced",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "value",
+          "shown": "value",
+          "label": "with",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "strategy",
+          "shown": "strategy",
+          "label": "or by",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "forward",
+                "shown": "forward"
+              },
+              {
+                "word": "backward",
+                "shown": "backward"
+              },
+              {
+                "word": "min",
+                "shown": "min"
+              },
+              {
+                "word": "max",
+                "shown": "max"
+              },
+              {
+                "word": "mean",
+                "shown": "mean"
+              },
+              {
+                "word": "zero",
+                "shown": "zero"
+              },
+              {
+                "word": "one",
+                "shown": "one"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "word",
+            "value": "forward"
+          },
+          "position": null
+        },
+        {
+          "name": "limit",
+          "shown": "limit",
+          "label": "at most this many in a row",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
     },
     {
       "id": "Expr.first",
@@ -814,6 +1115,37 @@
       ]
     },
     {
+      "id": "Expr.forward_fill",
+      "applies": "expression",
+      "family": "nulls",
+      "name": "forward_fill",
+      "hint": "empty values filled from the value before",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "limit",
+          "shown": "limit",
+          "label": "at most this many in a row",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
       "id": "Expr.ge",
       "applies": "expression",
       "family": "compare",
@@ -874,6 +1206,281 @@
       ]
     },
     {
+      "id": "Expr.has_nulls",
+      "applies": "expression",
+      "family": "nulls",
+      "name": "has_nulls",
+      "hint": "true if any value is empty",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.is_between",
+      "applies": "expression",
+      "family": "compare",
+      "name": "is_between",
+      "hint": "between a lower and an upper bound",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "lower_bound",
+          "shown": "lower_bound",
+          "label": "from",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "upper_bound",
+          "shown": "upper_bound",
+          "label": "to",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "closed",
+          "shown": "closed",
+          "label": "bounds included",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "both",
+                "shown": "both"
+              },
+              {
+                "word": "left",
+                "shown": "left"
+              },
+              {
+                "word": "right",
+                "shown": "right"
+              },
+              {
+                "word": "none",
+                "shown": "none"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "both"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "both"
+          },
+          "start": {
+            "kind": "word",
+            "value": "left"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.is_close",
+      "applies": "expression",
+      "family": "compare",
+      "name": "is_close",
+      "hint": "equal within a tolerance",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "other",
+          "shown": "other",
+          "label": "compared with",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "abs_tol",
+          "shown": "abs_tol",
+          "label": "absolute tolerance",
+          "kind": {
+            "kind": "value",
+            "type": "float"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "float",
+            "value": 0.0
+          },
+          "defaultSetting": {
+            "kind": "float",
+            "value": 0.0,
+            "shown": "0.0"
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "rel_tol",
+          "shown": "rel_tol",
+          "label": "relative tolerance",
+          "kind": {
+            "kind": "value",
+            "type": "float"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "float",
+            "value": 1e-9
+          },
+          "defaultSetting": {
+            "kind": "float",
+            "value": 1e-9,
+            "shown": "1e-09"
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "nans_equal",
+          "shown": "nans_equal",
+          "label": "NaNs equal each other",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.is_duplicated",
+      "applies": "expression",
+      "family": "checks",
+      "name": "is_duplicated",
+      "hint": "true where the value occurs more than once",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.is_finite",
+      "applies": "expression",
+      "family": "checks",
+      "name": "is_finite",
+      "hint": "true for a number that is neither infinite nor NaN",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.is_first_distinct",
+      "applies": "expression",
+      "family": "checks",
+      "name": "is_first_distinct",
+      "hint": "true at the first of each value",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.is_infinite",
+      "applies": "expression",
+      "family": "checks",
+      "name": "is_infinite",
+      "hint": "true for an infinite number",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.is_last_distinct",
+      "applies": "expression",
+      "family": "checks",
+      "name": "is_last_distinct",
+      "hint": "true at the last of each value",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.is_nan",
+      "applies": "expression",
+      "family": "checks",
+      "name": "is_nan",
+      "hint": "true for NaN",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.is_not_nan",
+      "applies": "expression",
+      "family": "checks",
+      "name": "is_not_nan",
+      "hint": "true unless NaN",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
       "id": "Expr.is_not_null",
       "applies": "expression",
       "family": "compare",
@@ -889,6 +1496,16 @@
       "family": "compare",
       "name": "is_null",
       "hint": "has no value",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.is_unique",
+      "applies": "expression",
+      "family": "checks",
+      "name": "is_unique",
+      "hint": "true where the value occurs once",
       "head": null,
       "lazy": true,
       "parameters": []
@@ -1154,6 +1771,36 @@
       ]
     },
     {
+      "id": "Expr.ne_missing",
+      "applies": "expression",
+      "family": "compare",
+      "name": "ne_missing",
+      "hint": "not equal to, an empty value equal to another",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "other",
+          "shown": "other",
+          "label": "compared with",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
       "id": "Expr.neg",
       "applies": "expression",
       "family": "arithmetic",
@@ -1169,6 +1816,16 @@
       "family": "logic",
       "name": "not",
       "hint": "the opposite, bit by bit on whole numbers",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.null_count",
+      "applies": "expression",
+      "family": "nulls",
+      "name": "null_count",
+      "hint": "number of empty values",
       "head": null,
       "lazy": true,
       "parameters": []
@@ -1425,6 +2082,142 @@
       "head": null,
       "lazy": true,
       "parameters": []
+    },
+    {
+      "id": "Expr.replace",
+      "applies": "expression",
+      "family": "conversion",
+      "name": "replace",
+      "hint": "values swapped for others of the same dtype",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "old",
+          "shown": "old",
+          "label": "values to replace",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "new",
+          "shown": "new",
+          "label": "with",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.replace_strict",
+      "applies": "expression",
+      "family": "conversion",
+      "name": "replace_strict",
+      "hint": "values swapped for others, whatever their dtype",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "old",
+          "shown": "old",
+          "label": "values to replace",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "new",
+          "shown": "new",
+          "label": "with",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "default",
+          "shown": "default",
+          "label": "any other value becomes",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "return_dtype",
+          "shown": "return_dtype",
+          "label": "result dtype",
+          "kind": {
+            "kind": "dtype"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
     },
     {
       "id": "Expr.round",

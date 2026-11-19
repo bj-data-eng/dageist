@@ -172,12 +172,26 @@ fn the_context_table_has_a_line_for_every_entry_that_is_not_a_step_in_every_cont
         .filter(|entry| entry.applies() != Applies::Frame)
         .collect();
     let tables = Tables::committed();
-    assert_eq!(tables.contexts.len(), entries.len() * Context::all().len());
+    // A method that takes an option in place of a parameter has a cell for each word of it, in
+    // each context, besides the one for the method as it is.
+    let forms: usize = entries
+        .iter()
+        .flat_map(|entry| entry.parameters())
+        .filter(|parameter| parameter.in_place_of().is_some())
+        .map(|parameter| match parameter.kind() {
+            Kind::Choice(words) => words.len(),
+            other => panic!("{other:?} is given in place of a parameter and is no choice"),
+        })
+        .sum();
+    assert_eq!(
+        tables.contexts.len(),
+        (entries.len() + forms) * Context::all().len()
+    );
     for entry in entries {
         for context in Context::all() {
             let cell = tables
                 .contexts
-                .get(&(entry.id().as_str(), context))
+                .get(&(entry.id().as_str(), Vec::new(), context))
                 .unwrap_or_else(|| panic!("{} in {context}", entry.id().as_str()));
             // The line names the rules that govern it, as the rules say.
             assert_eq!(
@@ -190,38 +204,70 @@ fn the_context_table_has_a_line_for_every_entry_that_is_not_a_step_in_every_cont
     }
 }
 
-/// The values of each option of `entry`, by the words the table uses.
-fn option_values(entry: &catalog::Entry) -> Vec<usize> {
+/// What each option of `entry` may be set to, by the words the table uses: how many, and whether
+/// the call needs it, as a cast needs the dtype it gives. A dtype is one word for each class a
+/// document can hold.
+fn option_values(entry: &catalog::Entry) -> Vec<(usize, bool, bool)> {
+    let classes = Representative::ALL
+        .into_iter()
+        .filter(|class| crate::document::Dtype::new(class.dtype()).is_ok())
+        .count();
     entry
         .parameters()
         .iter()
+        // The dtype a method converts values to is measured by the cast.
+        .filter(|parameter| parameter.converts().is_empty())
         .filter_map(|parameter| match parameter.kind() {
-            Kind::Flag => {
-                Some(2 + usize::from(parameter.default() == ParameterDefault::Python("None")))
-            }
-            Kind::Choice(words) => Some(words.len()),
+            Kind::Flag => Some((
+                2 + usize::from(parameter.default() == ParameterDefault::Python("None")),
+                false,
+                true,
+            )),
+            Kind::Choice(words) => Some((words.len(), false, true)),
+            Kind::Dtype => Some((
+                classes,
+                parameter.default() == ParameterDefault::Required,
+                false,
+            )),
             _ => None,
         })
         .collect()
 }
 
 #[test]
-fn the_option_table_covers_each_option_of_one_and_each_pair_of_values_of_more() {
+fn the_option_table_covers_each_option_of_one_and_each_pair_of_values_of_more_on_each_dtype() {
     let mut expected = 0;
     for entry in catalog::entries()
         .iter()
         .filter(|entry| matches!(entry.applies(), Applies::Expression | Applies::Frame))
     {
         let values = option_values(entry);
-        expected += match values.as_slice() {
+        let sets = match values.as_slice() {
             [] => 0,
-            [only] => *only,
+            // A call that needs a dtype has a line for each dtype alone and for each with each
+            // value of another option that is not that option's default.
+            _ if values.iter().any(|(_, needed, _)| *needed) => {
+                let (needed, others): (Vec<_>, Vec<_>) =
+                    values.iter().partition(|(_, needed, _)| *needed);
+                let [(dtypes, _, _)] = needed.as_slice() else {
+                    panic!("{} needs more than one option", entry.id().as_str())
+                };
+                dtypes * (1 + others.iter().map(|(count, _, _)| count - 1).sum::<usize>())
+            }
+            [(only, _, _)] => *only,
             many => {
-                let sum: usize = many.iter().sum();
-                let squares: usize = many.iter().map(|count| count * count).sum();
+                let sum: usize = many.iter().map(|(count, _, _)| count).sum();
+                let squares: usize = many.iter().map(|(count, _, _)| count * count).sum();
                 (sum * sum - squares) / 2
             }
         };
+        // A method is measured on each dtype, a step on none.
+        let receivers = if entry.applies() == Applies::Expression {
+            Representative::ALL.len()
+        } else {
+            1
+        };
+        expected += sets * receivers;
     }
     assert_eq!(Tables::committed().options.len(), expected);
 }
@@ -306,7 +352,7 @@ fn an_entry_may_stand_in_a_context_where_it_may_not_end_a_chain() {
     let cell = |entry: &'static str, context| {
         tables
             .contexts
-            .get(&(entry, context))
+            .get(&(entry, Vec::new(), context))
             .unwrap_or_else(|| panic!("{entry} in {context}"))
     };
     // A sum is no `Boolean`, so it does not end a filter's predicate, and
@@ -379,4 +425,48 @@ fn an_end_rule_about_a_dtype_does_not_refuse_what_it_does_not_know() {
         Some(Rule::PivotAggregateGivesOneValue)
     );
     assert_eq!(Rule::forbids_end(aggregate, None, Shape::One), None);
+}
+
+#[test]
+fn an_option_that_is_a_dtype_with_a_comma_in_its_name_does_not_end_the_option_it_is() {
+    let written = [
+        (
+            "Expr.cast | Int64 | dtype=Datetime(us, UTC), strict=false | allowed Datetime(us, UTC) many",
+            vec![("dtype", "Datetime(us, UTC)"), ("strict", "false")],
+        ),
+        (
+            "Expr.cast | Int64 | dtype=Struct(x: Int64, y: String) | refused rows: no",
+            vec![("dtype", "Struct(x: Int64, y: String)")],
+        ),
+        (
+            "Expr.cast | Int64 | dtype=Array(Int64, 2), wrap_numerical=true | refused rows: no",
+            vec![("dtype", "Array(Int64, 2)"), ("wrap_numerical", "true")],
+        ),
+    ];
+    for (line, options) in written {
+        let read = OptionLine::parse(line).expect("a line of the option table");
+        let found: Vec<(&str, &str)> = read
+            .options
+            .iter()
+            .map(|(name, word)| (*name, word.as_str()))
+            .collect();
+        assert_eq!(found, options, "{line}");
+        assert_eq!(read.render(), line);
+    }
+}
+
+#[test]
+fn a_context_line_of_a_form_names_the_option_given_in_place_of_a_parameter_after_the_entry() {
+    let line = "Expr.fill_null[strategy=forward] | join_left | continues | Int64 | - | \
+                join-key-names-are-not-repeated,key-is-elementwise | refused schema: \
+                all join key expressions must be elementwise.";
+    let read = ContextLine::parse(line).expect("a line of the context table");
+    assert_eq!(read.entry, "Expr.fill_null");
+    assert_eq!(read.form, vec![("strategy", "forward".to_owned())]);
+    assert_eq!(read.render(), line);
+    // The method as it is has no form, and a form of an option the entry lacks is no line.
+    let plain = line.replace("[strategy=forward]", "");
+    assert_eq!(ContextLine::parse(&plain).expect("a line").form, Vec::new());
+    assert!(ContextLine::parse(&line.replace("strategy", "stratagem")).is_err());
+    assert!(ContextLine::parse(&line.replace("forward]", "forward")).is_err());
 }

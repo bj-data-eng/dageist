@@ -23,6 +23,16 @@ fn typed_sample() -> LazyFrame {
     sample().with_columns([col("ts").dt().time().alias("tm")])
 }
 
+/// The dtype of the column `name` of the table.
+fn dtype_of(name: &str) -> DataType {
+    typed_sample()
+        .collect_schema()
+        .expect("the table has a schema")
+        .get(name)
+        .expect("the table has the column")
+        .clone()
+}
+
 /// Each column of the table, and the groups of dtypes its dtype belongs to.
 const COLUMNS: &[(&str, &[Dtypes])] = &[
     ("i", &[Dtypes::Numeric, Dtypes::Integer]),
@@ -47,6 +57,7 @@ fn takes_an_operand(entry: &Entry) -> bool {
         matches!(
             parameter.role(),
             Role::Operand
+                | Role::Filler
                 | Role::Exponent
                 | Role::Divisor
                 | Role::FloorDivisor
@@ -77,6 +88,8 @@ fn arguments_for(entry: &Entry, column: &str, operand: &str) -> Arguments {
                 Kind::Expression(_) => expression_arg(col(column)),
                 // `round_sig_figs`'s `digits`: any whole number it takes will do.
                 Kind::Value(ValueType::Integer) => Argument::Integer(2),
+                // `cast`'s `dtype`: the dtype the column has, which converts to itself.
+                Kind::Dtype => Argument::Dtype(dtype_of(column)),
                 other => panic!("{} takes {other:?}", entry.id().as_str()),
             };
             let value = if parameter.variadic() == Some(Variadic::Args) {
@@ -87,6 +100,17 @@ fn arguments_for(entry: &Entry, column: &str, operand: &str) -> Arguments {
             (parameter.name(), value)
         })
         .collect();
+    // A replacement is refused where what it replaces holds a value twice, as the sample's text
+    // and booleans do, and where it replaces too few values and gives no default, so each is a
+    // single value, one of the column and the one it is replaced by.
+    if matches!(entry.id().as_str(), "Expr.replace" | "Expr.replace_strict") {
+        given.retain(|(name, _)| !matches!(*name, "old" | "new"));
+        given.push(("old", expression_arg(col(column).first())));
+        given.push(("new", expression_arg(col(operand).first())));
+        if entry.id().as_str() == "Expr.replace_strict" {
+            given.push(("default", expression_arg(col(operand).first())));
+        }
+    }
     // Python's `over` is refused without something to group or order by.
     if entry.id().as_str() == "Expr.over" {
         given.push(("partition_by", many(vec![expression_arg(col("s"))])));
@@ -105,7 +129,14 @@ fn built(entry: &Entry, column: &str, operand: &str) -> Expr {
 /// where it takes one, and otherwise `column`, which is no operand.
 fn operands(entry: &Entry, column: &str) -> Vec<&'static str> {
     if takes_an_operand(entry) {
-        COLUMNS.iter().map(|(name, _)| *name).collect()
+        COLUMNS
+            .iter()
+            .map(|(name, _)| *name)
+            // Polars drops the test for NaN that `fill_nan` is made of where the value is the
+            // expression it follows, as it drops the predicate of a condition whose two values
+            // are one expression, so a column beside itself says nothing of what it accepts.
+            .filter(|name| entry.id().as_str() != "Expr.fill_nan" || *name != column)
+            .collect()
     } else {
         COLUMNS
             .iter()

@@ -1,0 +1,684 @@
+//! What the walk says of the nulls, checks and conversions, against what Polars does with the
+//! same step, which each test asks by running it.
+//!
+//! The table has `a` (`Int64` with no null), `b` (`String`), `f` (`Boolean`) and `k` (`Int64`),
+//! and the table it joins `ra` and `rk` (`Int64`), so that what the walk predicts of a value is
+//! worked out by hand from what Polars is documented to do with each.
+
+use dageist_engine::allowed::{
+    After, Context, Outer, Place as OfferPlace, RefusalSource, Representative, Rule, Shape,
+};
+use dageist_engine::document::{
+    Document, Inputs, Outcome, Report, RunCause, Segment, StepRows, Walk,
+};
+use polars::prelude::*;
+use serde_json::{Value, json};
+
+use crate::support::{call, chain, col_call, document, field, field_then, many, step, whole};
+
+fn source() -> DataFrame {
+    df!(
+        "a" => [1_i64, 2, 3],
+        "b" => ["x", "y", "z"],
+        "f" => [true, false, true],
+        "k" => [1_i64, 1, 2],
+    )
+    .expect("the table")
+}
+
+fn other() -> DataFrame {
+    df!("ra" => [1_i64, 2, 3], "rk" => [1_i64, 2, 3]).expect("the other table")
+}
+
+fn inputs() -> Inputs {
+    let mut inputs = Inputs::new();
+    inputs
+        .add_table("other", "Other", other().lazy())
+        .expect("a first input");
+    inputs
+}
+
+fn report_of(entry: &str, arguments: Value) -> Report {
+    let mut given = arguments;
+    if entry == "LazyFrame.join" {
+        given["other"] = json!({ "table": "other" });
+    }
+    Document::read(&document(vec![step("s", entry, given)]))
+        .expect("a document")
+        .run_on(&inputs(), &source())
+        .expect("the table has a schema")
+}
+
+fn walk(report: &Report) -> &Walk {
+    report.steps()[0].walk()
+}
+
+fn outcome(report: &Report) -> &Outcome {
+    report.steps()[0].outcome()
+}
+
+/// What Polars said when it refused the step, whether it worked out the schema or ran the three
+/// rows of the table.
+fn polars_says(report: &Report) -> Option<String> {
+    let step = &report.steps()[0];
+    match (step.outcome(), step.rows()) {
+        (Outcome::Refused(refusal), _) if matches!(refusal.cause(), RunCause::Polars(_)) => {
+            Some(refusal.to_string())
+        }
+        (_, StepRows::Failed(error)) => Some(error.to_string()),
+        _ => None,
+    }
+}
+
+fn select(items: Vec<Value>) -> Value {
+    json!({ "exprs": many(items) })
+}
+
+fn item(at: usize) -> Vec<Segment> {
+    vec![Segment::Parameter("exprs".to_owned()), Segment::Item(at)]
+}
+
+fn dtype(word: &str) -> Value {
+    json!({ "dtype": word })
+}
+
+fn choice(word: &str) -> Value {
+    json!({ "choice": word })
+}
+
+/// The Polars dtype of the one column `report` gives, which the step must have run for.
+fn dtype_of_the_column(report: &Report) -> DataType {
+    let step = &report.steps()[0];
+    assert!(
+        matches!(step.outcome(), Outcome::Valid { .. }),
+        "{:?}",
+        step.outcome()
+    );
+    step.schema()
+        .expect("a schema")
+        .iter()
+        .next()
+        .map(|(_, dtype)| dtype.clone())
+        .expect("a column")
+}
+
+#[test]
+fn a_replacement_given_many_new_values_beside_one_old_value_is_refused_by_a_rule_as_polars_does() {
+    // The sum of a column is one value, and the column `a` is three.
+    let one_old = call(
+        "Expr.replace",
+        json!({ "old": field_then("k", vec![call("Expr.sum", json!({}))]), "new": field("a") }),
+    );
+    let report = report_of(
+        "LazyFrame.select",
+        select(vec![chain(
+            json!({ "entry": "polars.col", "arguments": { "name": { "columns": ["b"] } } }),
+            vec![one_old],
+        )]),
+    );
+    let refusal = walk(&report).refusal().expect("the walk refuses it");
+    assert_eq!(
+        refusal.refusal().source(),
+        RefusalSource::Rule(Rule::ReplacementValuesMatchInNumber)
+    );
+    assert_eq!(
+        refusal.place().path(),
+        [item(0), vec![Segment::Link(0)]].concat()
+    );
+    assert!(
+        polars_says(&report)
+            .is_some_and(|reason| reason.contains("must have the same length as `old`")),
+        "{:?}",
+        polars_says(&report)
+    );
+}
+
+#[test]
+fn a_replacement_given_one_new_value_beside_many_old_values_or_equally_many_is_not_refused() {
+    for (old, new) in [
+        (field("a"), whole(7)),
+        (field("a"), field("a")),
+        (
+            field_then("k", vec![call("Expr.sum", json!({}))]),
+            field_then("a", vec![call("Expr.sum", json!({}))]),
+        ),
+    ] {
+        let replace = call("Expr.replace", json!({ "old": old, "new": new }));
+        let report = report_of(
+            "LazyFrame.select",
+            select(vec![field_then("a", vec![replace])]),
+        );
+        assert_eq!(walk(&report).refusal(), None);
+        assert!(polars_says(&report).is_none(), "{:?}", outcome(&report));
+    }
+}
+
+#[test]
+fn a_strict_replacement_given_a_default_of_many_values_beside_one_value_is_refused_as_polars_does()
+{
+    let strict = |default: Value| {
+        call(
+            "Expr.replace_strict",
+            json!({ "old": field("a"), "new": field("a"), "default": default }),
+        )
+    };
+    // What the sum of `a` is replaced in is one value, and the default is three.
+    let many_beside_one = report_of(
+        "LazyFrame.select",
+        select(vec![field_then(
+            "a",
+            vec![call("Expr.sum", json!({})), strict(field("k"))],
+        )]),
+    );
+    assert_eq!(
+        walk(&many_beside_one)
+            .refusal()
+            .map(|refusal| refusal.refusal().source()),
+        Some(RefusalSource::Rule(Rule::ReplacementValuesMatchInNumber))
+    );
+    assert!(
+        polars_says(&many_beside_one)
+            .is_some_and(|reason| reason.contains("must have the same length as the input")),
+        "{:?}",
+        outcome(&many_beside_one)
+    );
+    // One value of a default is the same beside any number of values.
+    let one_beside_many = report_of(
+        "LazyFrame.select",
+        select(vec![field_then("a", vec![strict(whole(0))])]),
+    );
+    assert_eq!(walk(&one_beside_many).refusal(), None);
+    assert!(polars_says(&one_beside_many).is_none());
+}
+
+#[test]
+fn a_new_value_and_a_default_of_other_dtypes_are_not_known_to_have_a_supertype() {
+    // `new` is whole numbers and the default is text; each is judged apart, so whether Polars
+    // finds a dtype for both is not said, and nothing is refused.
+    let replace = call(
+        "Expr.replace_strict",
+        json!({ "old": field("a"), "new": field("a"), "default": field("b") }),
+    );
+    let walked = report_of(
+        "LazyFrame.select",
+        select(vec![field_then("a", vec![replace])]),
+    );
+    assert_eq!(walk(&walked).refusal(), None);
+    assert!(walk(&walked).not_known().is_some());
+}
+
+#[test]
+fn the_bounds_of_an_interval_of_other_dtypes_are_not_known_to_have_a_supertype() {
+    // The receiver and both bounds meet in one dtype, so a bound of another dtype than the other
+    // is not judged beside the receiver alone: a whole number and a truth value find none beside a
+    // decimal, where each finds one beside it apart. Nothing is refused, and what follows is not
+    // known.
+    let interval = call(
+        "Expr.is_between",
+        json!({ "lower_bound": field("a"), "upper_bound": field("f") }),
+    );
+    let walked = report_of(
+        "LazyFrame.select",
+        select(vec![field_then("f", vec![interval])]),
+    );
+    assert_eq!(walk(&walked).refusal(), None);
+    assert!(walk(&walked).not_known().is_some());
+    // Bounds of one dtype are judged as they are.
+    let same = call(
+        "Expr.is_between",
+        json!({ "lower_bound": field("a"), "upper_bound": field("k") }),
+    );
+    let known = report_of(
+        "LazyFrame.select",
+        select(vec![field_then("a", vec![same])]),
+    );
+    assert_eq!(walk(&known).refusal(), None);
+    assert!(walk(&known).not_known().is_none());
+}
+
+#[test]
+fn bounds_of_other_dtypes_are_not_refused_for_what_one_refuses_beside_a_bound_of_the_receivers_dtype()
+ {
+    // A duration between a whole number and a date: the date as the only bound is refused for a
+    // duration, and Polars, which finds one dtype for all three, runs the interval.
+    let interval = call(
+        "Expr.is_between",
+        json!({
+            "lower_bound": field("a"),
+            "upper_bound": chain(
+                call(
+                    "polars.lit",
+                    json!({ "value": { "integer": 1 }, "dtype": dtype("Date") }),
+                ),
+                vec![],
+            ),
+        }),
+    );
+    let as_a_duration = call(
+        "Expr.cast",
+        json!({ "dtype": dtype("Duration(time_unit='us')") }),
+    );
+    let walked = report_of(
+        "LazyFrame.select",
+        select(vec![field_then("a", vec![as_a_duration, interval])]),
+    );
+    assert_eq!(walk(&walked).refusal(), None);
+    assert!(polars_says(&walked).is_none());
+}
+
+#[test]
+fn a_test_of_closeness_given_a_number_without_a_dtype_beside_a_date_does_not_say_what_it_gives() {
+    // Polars refuses a date and a number typed without a dtype as ambiguous for this test, where
+    // it takes a typed number, so what the test gives of them is not said, as it is beside a
+    // number, which the number adapts to.
+    let close = call("Expr.is_close", json!({ "other": whole(1) }));
+    let as_a_date = call("Expr.cast", json!({ "dtype": dtype("Date") }));
+    let after_a_date = report_of(
+        "LazyFrame.select",
+        select(vec![field_then(
+            "a",
+            vec![as_a_date, close.clone(), call("Expr.is_null", json!({}))],
+        )]),
+    );
+    let outer = walk(&after_a_date)
+        .expressions()
+        .last()
+        .expect("the expression");
+    assert_eq!(outer.places()[2], None);
+    let after_a_number = report_of(
+        "LazyFrame.select",
+        select(vec![field_then(
+            "a",
+            vec![close, call("Expr.is_null", json!({}))],
+        )]),
+    );
+    assert_eq!(
+        walk(&after_a_number)
+            .expressions()
+            .last()
+            .expect("the expression")
+            .places()[1],
+        Some(OfferPlace::new(
+            Context::step(Outer::Select),
+            After::Value {
+                dtype: Representative::Boolean,
+                shape: Shape::Many
+            }
+        ))
+    );
+}
+
+#[test]
+fn one_value_given_an_operand_of_many_values_is_many_values_for_what_follows_it() {
+    // The count of nulls is one value, and a logarithm of it to the base of a column is as many
+    // values as the column, so a default of as many values is the number of values it follows.
+    let log = call("Expr.log", json!({ "base": field("k") }));
+    let replace = call(
+        "Expr.replace_strict",
+        json!({ "old": field("a"), "new": field("f"), "default": field("f") }),
+    );
+    let report = report_of(
+        "LazyFrame.with_columns",
+        json!({ "exprs": many(vec![field_then(
+            "a",
+            vec![call("Expr.has_nulls", json!({})), log, replace],
+        )]) }),
+    );
+    assert!(polars_says(&report).is_none(), "{:?}", outcome(&report));
+    assert_eq!(walk(&report).refusal(), None);
+}
+
+#[test]
+fn a_cast_gives_the_dtype_it_is_told_and_the_walk_follows_it() {
+    let cast = call(
+        "Expr.cast",
+        json!({ "dtype": dtype("Int32"), "strict": { "flag": true } }),
+    );
+    let report = report_of(
+        "LazyFrame.select",
+        select(vec![field_then(
+            "a",
+            vec![cast, call("Expr.is_null", json!({}))],
+        )]),
+    );
+    let places = walk(&report).expressions()[0].places();
+    // After the cast the chain has the dtype it was told, and a test for a null follows it.
+    assert_eq!(
+        places[1],
+        Some(OfferPlace::new(
+            Context::step(Outer::Select),
+            After::Value {
+                dtype: Representative::Int32,
+                shape: Shape::Many
+            }
+        ))
+    );
+    assert_eq!(walk(&report).refusal(), None);
+    let only = report_of(
+        "LazyFrame.select",
+        select(vec![field_then(
+            "a",
+            vec![call("Expr.cast", json!({ "dtype": dtype("Int32") }))],
+        )]),
+    );
+    assert_eq!(dtype_of_the_column(&only), DataType::Int32);
+}
+
+#[test]
+fn a_cast_to_a_dtype_the_tables_do_not_cover_leaves_what_follows_not_known() {
+    // A list of floats is no representative dtype, so nothing is said of what a cast to it gives.
+    let cast = call("Expr.cast", json!({ "dtype": dtype("List(Float64)") }));
+    let report = report_of(
+        "LazyFrame.select",
+        select(vec![field_then(
+            "a",
+            vec![cast, call("Expr.is_null", json!({}))],
+        )]),
+    );
+    assert_eq!(walk(&report).refusal(), None);
+    assert!(walk(&report).not_known().is_some());
+}
+
+#[test]
+fn a_cast_that_polars_refuses_for_the_dtypes_is_refused_at_the_cast() {
+    // Text that is a name converts to no number, as the cast is strict.
+    let cast = call("Expr.cast", json!({ "dtype": dtype("UInt8") }));
+    let report = report_of(
+        "LazyFrame.select",
+        select(vec![field_then("b", vec![cast])]),
+    );
+    // The tables were measured on text that is a duration, so they refuse what the rows of this
+    // table do too.
+    assert!(polars_says(&report).is_some());
+    assert!(walk(&report).refusal().is_some());
+    let lenient = call(
+        "Expr.cast",
+        json!({ "dtype": dtype("UInt8"), "strict": { "flag": false } }),
+    );
+    let report = report_of(
+        "LazyFrame.select",
+        select(vec![field_then("b", vec![lenient])]),
+    );
+    assert_eq!(walk(&report).refusal(), None);
+    assert!(polars_says(&report).is_none());
+}
+
+fn join_on(key: Value) -> Report {
+    report_of(
+        "LazyFrame.join",
+        json!({ "left_on": many(vec![key]), "right_on": many(vec![field("rk")]) }),
+    )
+}
+
+#[test]
+fn a_fill_by_a_strategy_that_looks_at_other_rows_is_refused_in_a_joins_key_and_one_by_zero_is_not()
+{
+    let cast = || call("Expr.cast", json!({ "dtype": dtype("Int64") }));
+    let fill = |word: &str| {
+        field_then(
+            "k",
+            vec![
+                call("Expr.fill_null", json!({ "strategy": choice(word) })),
+                cast(),
+            ],
+        )
+    };
+    for word in ["forward", "mean"] {
+        let report = join_on(fill(word));
+        assert!(polars_says(&report).is_some(), "{word}");
+        assert!(
+            walk(&report)
+                .refusal()
+                .is_some_and(|refusal| refusal.refusal().reason().contains("elementwise")),
+            "{word}"
+        );
+    }
+    let report = join_on(fill("zero"));
+    assert!(polars_says(&report).is_none());
+    assert_eq!(walk(&report).refusal(), None);
+}
+
+#[test]
+fn a_count_of_nulls_may_be_a_joins_key_alone_and_not_beside_a_column() {
+    let count = || call("Expr.null_count", json!({}));
+    let cast = || call("Expr.cast", json!({ "dtype": dtype("Int64") }));
+    let alone = join_on(field_then("k", vec![count(), cast()]));
+    assert!(polars_says(&alone).is_none(), "{:?}", outcome(&alone));
+    assert_eq!(walk(&alone).refusal(), None);
+    // Beside a column it is not elementwise.
+    let beside = join_on(field_then(
+        "k",
+        vec![call(
+            "Expr.add",
+            json!({ "other": field_then("a", vec![count(), cast()]) }),
+        )],
+    ));
+    assert!(polars_says(&beside).is_some());
+    assert_eq!(
+        walk(&beside)
+            .refusal()
+            .map(|refusal| refusal.refusal().source()),
+        Some(RefusalSource::Rule(Rule::KeyIsElementwise))
+    );
+}
+
+#[test]
+fn an_interval_with_a_null_bound_is_a_comparison_with_a_null_in_a_joins_key_and_a_null_it_follows_is_not()
+ {
+    let null = || {
+        chain(
+            json!({ "entry": "polars.lit", "arguments": { "value": { "flag": null } } }),
+            Vec::new(),
+        )
+    };
+    let between = |lower: Value, upper: Value| {
+        call(
+            "Expr.is_between",
+            json!({ "lower_bound": lower, "upper_bound": upper }),
+        )
+    };
+    let key_of = |start: Value, lower: Value, upper: Value| {
+        chain(
+            start,
+            vec![
+                between(lower, upper),
+                call("Expr.cast", json!({ "dtype": dtype("Int64") })),
+            ],
+        )
+    };
+    let column = |name: &str| json!({ "entry": "polars.col", "arguments": { "name": { "columns": [name] } } });
+    // A column compared with a null bound is not elementwise.
+    let bound = join_on(key_of(column("a"), whole(1), null()));
+    assert!(polars_says(&bound).is_some());
+    assert!(
+        walk(&bound)
+            .refusal()
+            .is_some_and(|refusal| refusal.refusal().reason().contains("elementwise")),
+        "{:?}",
+        walk(&bound).refusal()
+    );
+    // A null that has columns for bounds is not a comparison Polars folds.
+    let start = join_on(key_of(
+        json!({ "entry": "polars.lit", "arguments": { "value": { "flag": null } } }),
+        field("a"),
+        field("k"),
+    ));
+    assert!(polars_says(&start).is_none(), "{:?}", outcome(&start));
+    assert_eq!(walk(&start).refusal(), None);
+    // A null bound of the dtype of what it bounds is not one Polars folds in a key: it keeps the
+    // interval a value of each row, so the walk does not refuse it, where a null with no dtype is
+    // refused.
+    let typed = join_on(key_of(
+        column("a"),
+        whole(1),
+        chain(
+            json!({
+                "entry": "polars.lit",
+                "arguments": { "value": { "flag": null }, "dtype": dtype("Int64") },
+            }),
+            Vec::new(),
+        ),
+    ));
+    assert!(polars_says(&typed).is_none(), "{:?}", outcome(&typed));
+    assert_eq!(walk(&typed).refusal(), None);
+    // A null bound of another dtype than what it bounds folds the interval whole, so an aggregate
+    // beside a column inside it leaves the key elementwise, which the rule does not refuse.
+    let sum = call("Expr.max", json!({}));
+    let folded = join_on(chain(
+        column("a"),
+        vec![
+            sum,
+            call(
+                "Expr.is_between",
+                json!({
+                    "lower_bound": field("k"),
+                    "upper_bound": chain(
+                        json!({
+                            "entry": "polars.lit",
+                            "arguments": { "value": { "flag": null }, "dtype": dtype("Int32") },
+                        }),
+                        Vec::new(),
+                    ),
+                }),
+            ),
+            call("Expr.cast", json!({ "dtype": dtype("Int64") })),
+        ],
+    ));
+    assert!(polars_says(&folded).is_none(), "{:?}", outcome(&folded));
+    assert_eq!(walk(&folded).refusal(), None);
+    // A null bound with no dtype folds the interval whole: what the other bound holds is not met,
+    // so an aggregate beside a column there is no reason for the key not to be elementwise.
+    let given = |bound: Value| {
+        join_on(chain(
+            json!({ "entry": "polars.lit", "arguments": { "value": { "integer": 1 } } }),
+            vec![
+                call(
+                    "Expr.is_between",
+                    json!({ "lower_bound": bound, "upper_bound": null_literal() }),
+                ),
+                call("Expr.cast", json!({ "dtype": dtype("Int64") })),
+            ],
+        ))
+    };
+    let aggregate_beside_a_column = chain(
+        col_call("f"),
+        vec![
+            call("Expr.min", json!({})),
+            call("Expr.mul", json!({ "other": field("a") })),
+        ],
+    );
+    let dropped = given(aggregate_beside_a_column);
+    assert!(polars_says(&dropped).is_none(), "{:?}", outcome(&dropped));
+    assert_eq!(walk(&dropped).refusal(), None);
+    // The folded interval is one value, so an aggregate that decides a condition beside it, and
+    // the column its other bound reads, leave the key elementwise.
+    let condition = join_on(chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![field_then("a", vec![call("Expr.has_nulls", json!({}))])]) }),
+        ),
+        vec![
+            call(
+                "When.then",
+                json!({ "statement": field_then(
+                    "k",
+                    vec![
+                        call("Expr.has_nulls", json!({})),
+                        call(
+                            "Expr.is_between",
+                            json!({ "lower_bound": field("k"), "upper_bound": null_literal() }),
+                        ),
+                    ],
+                ) }),
+            ),
+            call("Expr.cast", json!({ "dtype": dtype("Int64") })),
+        ],
+    ));
+    assert!(
+        polars_says(&condition).is_none(),
+        "{:?}",
+        outcome(&condition)
+    );
+    assert_eq!(walk(&condition).refusal(), None);
+}
+
+fn null_literal() -> Value {
+    chain(
+        json!({ "entry": "polars.lit", "arguments": { "value": { "flag": null } } }),
+        Vec::new(),
+    )
+}
+
+#[test]
+fn a_default_of_many_values_after_an_aggregate_of_a_condition_of_identical_values_is_refused() {
+    // The values of the condition are one expression, so Polars may drop the predicate and give
+    // the values' own number, which an aggregate that follows makes one value whatever it was; a
+    // default of many values beside it is then refused as for any other one value.
+    let condition = |links: Vec<Value>| {
+        chain(
+            call(
+                "polars.when",
+                json!({ "predicates": many(vec![field_then(
+                    "a",
+                    vec![call("Expr.null_count", json!({})), call("Expr.is_infinite", json!({}))],
+                )]) }),
+            ),
+            [
+                vec![
+                    call("When.then", json!({ "statement": field("k") })),
+                    call("Then.otherwise", json!({ "statement": field("k") })),
+                ],
+                links,
+            ]
+            .concat(),
+        )
+    };
+    let replace = call(
+        "Expr.replace_strict",
+        json!({ "old": field("a"), "new": field("a"), "default": field("a") }),
+    );
+    let report = report_of(
+        "LazyFrame.select",
+        select(vec![condition(vec![call("Expr.last", json!({})), replace])]),
+    );
+    assert!(polars_says(&report).is_some(), "{:?}", outcome(&report));
+    assert!(
+        walk(&report)
+            .refusal()
+            .is_some_and(|refusal| matches!(refusal.refusal().source(), RefusalSource::Rule(_))),
+        "{:?}",
+        walk(&report).refusal()
+    );
+}
+
+#[test]
+fn a_replacement_of_one_value_by_a_table_of_values_is_one_value_and_a_default_of_many_is_refused() {
+    // What a replacement lists is a table that it looks the value up in, so replacing the one
+    // value of an aggregate by columns gives one value, and a default of many values beside it
+    // is refused for the lengths.
+    let replace = |old: &str, new: &str| {
+        call(
+            "Expr.replace",
+            json!({ "old": field(old), "new": field(new) }),
+        )
+    };
+    let strict = call(
+        "Expr.replace_strict",
+        json!({ "old": field("a"), "new": field("a"), "default": field("a") }),
+    );
+    let report = report_of(
+        "LazyFrame.select",
+        select(vec![field_then(
+            "k",
+            vec![call("Expr.max", json!({})), replace("a", "k"), strict],
+        )]),
+    );
+    assert!(polars_says(&report).is_some(), "{:?}", outcome(&report));
+    assert!(
+        walk(&report)
+            .refusal()
+            .is_some_and(|refusal| matches!(refusal.refusal().source(), RefusalSource::Rule(_))),
+        "{:?}",
+        walk(&report).refusal()
+    );
+}

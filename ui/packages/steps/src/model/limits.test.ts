@@ -35,7 +35,7 @@ describe('the places the engine was asked about', () => {
   });
 
   it('hold every entry that stands in an expression, and no step', () => {
-    expect(grid.entries).toHaveLength(76);
+    expect(grid.entries).toHaveLength(99);
     expect(grid.entries.filter((id) => id.startsWith('LazyFrame.'))).toEqual([]);
     for (const id of grid.entries) {
       expect(catalogue.entries.has(id), id).toBe(true);
