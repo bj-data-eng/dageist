@@ -215,11 +215,21 @@ pub enum Limit {
     /// refuse a clip. A bound that is a bare column holds the sample's rows, as the tables
     /// measured it, so a refusal that is its own is not this, whatever the other bound is.
     ABoundWithValuesOfItsOwn,
+    /// A window whose partition is a literal alone gives Polars' streaming engine no rows, so
+    /// what follows it in a chain that starts from a literal is never evaluated, and the rows
+    /// do not show a plan that they contradict. The tables hold the schema of a method and what
+    /// its rows give as one thing, and refuse a root of a date whose schema names the date and
+    /// whose rows are a float, which is the target's own comparison and shows only where rows
+    /// are given. The tables refusing, when they run rows, with the reason that the schema says
+    /// one dtype and the rows give another, at a call after such a window in a chain that
+    /// starts from a literal, which Polars allows; the window is why where Polars, asked again
+    /// with each literal partition a column, refuses the case for that reason.
+    AWindowOverALiteral,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 18] = [
+    pub const ALL: [Self; 19] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -238,6 +248,7 @@ impl Limit {
         Self::AHiddenSchema,
         Self::ABoundTheDtypeCannotHold,
         Self::ABoundWithValuesOfItsOwn,
+        Self::AWindowOverALiteral,
     ];
 
     /// The name a kept case is filed under.
@@ -261,6 +272,7 @@ impl Limit {
             Self::AHiddenSchema => "a-hidden-schema",
             Self::ABoundTheDtypeCannotHold => "a-bound-the-dtype-cannot-hold",
             Self::ABoundWithValuesOfItsOwn => "a-bound-with-values-of-its-own",
+            Self::AWindowOverALiteral => "a-window-over-a-literal",
         }
     }
 
@@ -314,6 +326,9 @@ impl Limit {
             }
             Self::ABoundTheDtypeCannotHold => {
                 "Polars casts a bound of clip to the dtype it clips and refuses a value that dtype cannot hold, which the tables measured only with values it holds"
+            }
+            Self::AWindowOverALiteral => {
+                "a window over a literal partition gives no rows, so the rows do not show the plan of what follows it"
             }
             Self::ABoundWithValuesOfItsOwn => {
                 "Polars casts the values of a bound of clip to the dtype it clips, which the tables measured as the sample's rows, and a bound with others passes"
@@ -1156,6 +1171,133 @@ fn has_a_bound(call: &Call) -> bool {
             .any(|bound| call.argument(bound).is_some())
 }
 
+/// Whether the call is a window whose partition is literals alone: it has `partition_by`, and
+/// each key, and each of `more_exprs`, is a literal and nothing else.
+fn partitions_by_a_literal(call: &Call) -> bool {
+    let keys = |parameter: &str| -> Vec<&Expression> {
+        match call.argument(parameter) {
+            Some(Value::Expression(key)) => vec![key],
+            Some(Value::Many(items)) => items
+                .iter()
+                .filter_map(|item| match item {
+                    Value::Expression(key) => Some(key),
+                    _ => None,
+                })
+                .collect(),
+            _ => Vec::new(),
+        }
+    };
+    let literal = |key: &&Expression| key.links().is_empty() && starts_from_a_literal(key);
+    is(call, "Expr.over")
+        && call.argument("partition_by").is_some()
+        && keys("partition_by").iter().all(literal)
+        && keys("more_exprs").iter().all(literal)
+}
+
+/// `value` with the partition of every window that partitions by a literal made the column
+/// `column`, in the calls it holds.
+fn value_partitioned_by(value: &Value, column: &str) -> Value {
+    match value {
+        Value::Expression(expression) => Value::Expression(
+            expression_partitioned_by(expression, column).unwrap_or_else(|| expression.clone()),
+        ),
+        Value::Many(items) => Value::Many(
+            items
+                .iter()
+                .map(|item| value_partitioned_by(item, column))
+                .collect(),
+        ),
+        Value::Pairs(pairs) => Value::Pairs(
+            pairs
+                .iter()
+                .map(|(key, entry)| {
+                    (
+                        value_partitioned_by(key, column),
+                        value_partitioned_by(entry, column),
+                    )
+                })
+                .collect(),
+        ),
+        other => other.clone(),
+    }
+}
+
+fn call_partitioned_by(call: &Call, column: &str) -> Option<Call> {
+    let windowed = partitions_by_a_literal(call);
+    let given: Vec<(&str, Value)> = call
+        .arguments()
+        .iter()
+        .map(|given| {
+            let value = if windowed && given.parameter() == "partition_by" {
+                let key = Call::new(
+                    catalog::entry("polars.col")?,
+                    vec![("name", Value::Columns(vec![column.to_owned()]))],
+                )
+                .ok()?;
+                Value::Many(vec![Value::Expression(
+                    Expression::new(Start::Call(key), Vec::new()).ok()?,
+                )])
+            } else if windowed && given.parameter() == "more_exprs" {
+                Value::Many(Vec::new())
+            } else {
+                value_partitioned_by(given.value(), column)
+            };
+            Some((given.parameter(), value))
+        })
+        .collect::<Option<Vec<_>>>()?;
+    Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
+}
+
+fn expression_partitioned_by(expression: &Expression, column: &str) -> Option<Expression> {
+    let start = match expression.start() {
+        Start::Call(call) => Start::Call(call_partitioned_by(call, column)?),
+        other => other.clone(),
+    };
+    let links = expression
+        .links()
+        .iter()
+        .map(|link| call_partitioned_by(link, column))
+        .collect::<Option<Vec<_>>>()?;
+    Expression::new(start, links).ok()
+}
+
+/// The case with the partition of every window that partitions by a literal made a column of
+/// the table the expression is read against, the same in all else. None in a pivot's
+/// aggregate, which has no column to stand in.
+fn case_with_columns_to_partition_by(case: &Case, refused: &Refused) -> Option<Case> {
+    let step = &case.document.steps()[0];
+    if is(step.call(), "LazyFrame.pivot") {
+        return None;
+    }
+    let column = match (
+        is(step.call(), "LazyFrame.join"),
+        refused.place.path().first(),
+    ) {
+        (true, Some(Segment::Parameter(name))) if name == "right_on" => "rk",
+        (true, Some(Segment::Parameter(name))) if name == "on" => "u",
+        _ => "k",
+    };
+    let rebuilt = Step::new(step.id().clone(), call_partitioned_by(step.call(), column)?).ok()?;
+    Some(Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        document: Document::new(vec![rebuilt]).ok()?,
+    })
+}
+
+/// Whether Polars refuses the case for the reason the tables gave once each window that
+/// partitions by a literal partitions by a column: the rows are then given, and show the plan
+/// that they contradict, so the window was why they did not. Polars allows the case as it is.
+fn refused_with_columns_to_partition_by(case: &Case, refused: &Refused) -> bool {
+    case_with_columns_to_partition_by(case, refused).is_some_and(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| refusal.reason == refused.reason)
+        })
+    })
+}
+
 /// Whether the expression is a column and nothing else, which holds the sample's rows.
 fn is_a_bare_column(expression: &Expression) -> bool {
     expression.links().is_empty()
@@ -1599,6 +1741,19 @@ fn applies(
                 // The computed bound is why where the tables allow the clip without it: a bare
                 // bound that the tables refuse is refused as Polars refuses it.
                 && !the_bare_bounds_alone_are_refused(case)
+        }
+        (Limit::AWindowOverALiteral, Disagreement::PolarsAllows(refused)) => {
+            // The rows are none where a window partitions a literal by a literal, so the target's
+            // own comparison of a plan with rows is not shown for a call that follows one in a
+            // chain that starts from a literal.
+            let locus = locate(case, &refused.place);
+            refused.stage == Some(TableStage::Rows)
+                && refused.reason.starts_with(SCHEMA_SAYS)
+                && locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
+                    starts_from_a_literal(chain)
+                        && chain.links()[..at].iter().any(partitions_by_a_literal)
+                })
+                && refused_with_columns_to_partition_by(case, refused)
         }
         (Limit::AWindowOverAWindow, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
@@ -2625,6 +2780,94 @@ mod tests {
             tables_refuse(&case, link_of("exprs", 0, 1), ROWS, TEXT_CAST),
             vec![]
         );
+    }
+
+    // ----- A window over a literal
+
+    const SCHEMA_SAYS_FLOAT: &str = "the schema says Datetime(us, UTC) and the rows give Float64";
+    const LITERAL_START: &str = r#"{"entry":"polars.lit","arguments":{"value":{"flag":null},"dtype":{"dtype":"Datetime(time_unit='us', time_zone='UTC')"}}}"#;
+    const LITERAL_KEY: &str = r#"{"entry":"polars.lit","arguments":{"value":{"flag":null}}}"#;
+    const COLUMN_K: &str = r#"{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}}"#;
+    const WINDOW: &str = r#"{"entry":"Expr.over","arguments":{"partition_by":{"many":[{"expression":{"start":KEY,"then":[]}}]}}},"#;
+
+    /// `select(start.over(key).cbrt())` on a sample where `a` and `b` are dates, as text.
+    fn root_after_a_window(start: &str, key: &str, windowed: bool) -> Case {
+        let window = if windowed {
+            WINDOW.replace("KEY", key)
+        } else {
+            String::new()
+        };
+        let text = format!(
+            r#"{{"a":"Date","b":"Date","revision":1}}
+{{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.select","arguments":{{"exprs":{{"many":[{{"expression":{{"start":{start},"then":[{window}{{"entry":"Expr.cbrt","arguments":{{}}}}]}}}}]}}}}}}}}]}}"#
+        );
+        Case::decode(text.as_bytes()).expect("a case")
+    }
+
+    /// What the limits make of the tables refusing at link `link` with the plan and rows saying
+    /// two dtypes, asked on a stack that Polars' plans fit on: the limit runs Polars again.
+    fn excused_for_a_root(case: &Case, link: usize, reason: &str) -> Vec<Limit> {
+        std::thread::scope(|scope| {
+            std::thread::Builder::new()
+                .stack_size(256 << 20)
+                .spawn_scoped(scope, || {
+                    tables_refuse(case, link_of("exprs", 0, link), ROWS, reason)
+                })
+                .expect("a thread")
+                .join()
+                .expect("the limits are asked")
+        })
+    }
+
+    #[test]
+    fn a_root_after_a_window_over_a_literal_is_excused_where_the_literal_starts_the_chain() {
+        let case = root_after_a_window(LITERAL_START, LITERAL_KEY, true);
+        assert_eq!(
+            excused_for_a_root(&case, 1, SCHEMA_SAYS_FLOAT),
+            vec![Limit::AWindowOverALiteral]
+        );
+    }
+
+    #[test]
+    fn a_root_is_not_excused_by_a_window_that_is_not_over_a_literal_in_a_chain_of_a_literal() {
+        // The same root after a column start, after a window over a column, with no window, at
+        // the window itself, or refused for another reason, is not excused by this limit: rows
+        // are given, and the comparison of the plan with them is the tables' to make.
+        let cases = [
+            (
+                root_after_a_window(COLUMN_K, LITERAL_KEY, true),
+                1,
+                SCHEMA_SAYS_FLOAT,
+            ),
+            (
+                root_after_a_window(LITERAL_START, COLUMN_K, true),
+                1,
+                SCHEMA_SAYS_FLOAT,
+            ),
+            (
+                root_after_a_window(LITERAL_START, LITERAL_KEY, false),
+                0,
+                SCHEMA_SAYS_FLOAT,
+            ),
+            (
+                root_after_a_window(LITERAL_START, LITERAL_KEY, true),
+                0,
+                SCHEMA_SAYS_FLOAT,
+            ),
+            (
+                root_after_a_window(LITERAL_START, LITERAL_KEY, true),
+                1,
+                "no",
+            ),
+        ];
+        for (case, link, reason) in cases {
+            // Another limit may excuse a call that is not the last of the chain, which this one
+            // is not asked to.
+            assert!(
+                !excused_for_a_root(&case, link, reason).contains(&Limit::AWindowOverALiteral),
+                "{reason} at {link}"
+            );
+        }
     }
 
     // ----- A negated bitwise call
