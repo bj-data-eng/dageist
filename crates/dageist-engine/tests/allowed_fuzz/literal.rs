@@ -101,16 +101,53 @@ pub struct LiteralCause<'a> {
     pub expression: &'a Expression,
 }
 
-/// The expressions that `call`, at `at`, is given and that start from a literal,
-/// except the literals the tables measured.
+/// The expressions that `call`, at `at`, is given and that start from a literal, except the
+/// literals the tables measured, and those inside what it is given, at any depth: Polars folds
+/// `b / null` into a null as it does a null that is given to a comparison, and a literal that
+/// the call it is given to is an operand of is as much a value of one as one that starts the
+/// operand.
 pub fn operand_causes<'a>(call: &'a Call, at: &Place, pivot: bool) -> Vec<LiteralCause<'a>> {
-    placed_operands(call, at)
-        .into_iter()
-        .filter(|(parameter, _, operand)| {
-            !measured_literal(call, parameter, pivot) && starts_from_a_literal(operand)
-        })
-        .map(|(_, place, expression)| LiteralCause { place, expression })
-        .collect()
+    let mut found = Vec::new();
+    for (parameter, place, operand) in placed_operands(call, at) {
+        if !measured_literal(call, parameter, pivot) {
+            causes_inside(operand, place, pivot, &mut found);
+        }
+    }
+    found
+}
+
+/// `expression`, at `place`, if it starts from a literal, and the expressions inside it that do.
+/// What stands for a literal is replaced whole, with the links that belong to it, so only the links
+/// after those are looked into.
+fn causes_inside<'a>(
+    expression: &'a Expression,
+    place: Place,
+    pivot: bool,
+    found: &mut Vec<LiteralCause<'a>>,
+) {
+    let belonging = if starts_from_a_literal(expression) {
+        found.push(LiteralCause {
+            place: place.clone(),
+            expression,
+        });
+        links_of_the_literal(expression)
+    } else {
+        if let Start::Call(start) = expression.start() {
+            found.extend(operand_causes(
+                start,
+                &place.clone().then(Segment::Start),
+                pivot,
+            ));
+        }
+        0
+    };
+    for (at, link) in expression.links().iter().enumerate().skip(belonging) {
+        found.extend(operand_causes(
+            link,
+            &place.clone().then(Segment::Link(at)),
+            pivot,
+        ));
+    }
 }
 
 /// How many links of a chain that starts from a literal belong to what stands for
@@ -121,7 +158,9 @@ pub fn links_of_the_literal(expression: &Expression) -> usize {
         Start::Call(start) if is(start, "polars.when") => expression
             .links()
             .iter()
-            .take_while(|link| is_a_value_link(link) || is(link, "Then.when"))
+            .take_while(|link| {
+                is_a_value_link(link) || is(link, "Then.when") || is(link, "ChainedThen.when")
+            })
             .count(),
         _ => 0,
     }
