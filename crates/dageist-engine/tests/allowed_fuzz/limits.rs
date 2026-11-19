@@ -46,7 +46,7 @@ use super::literal::{
     placed_operands, starts_from_a_literal,
 };
 use super::observe::{Observed, Refusal, SCHEMA_SAYS, Stage, Tables, observe, observe_probe};
-use super::predict::{Prediction, Refused, Source, Verdict};
+use super::predict::{Prediction, Refused, Source, Verdict, predict};
 use super::probe::{same_reason, settle_in_the_position};
 
 /// A limit of the tables, and what it says.
@@ -210,9 +210,10 @@ pub enum Limit {
     /// sample's rows, whose text is a duration no number reads and whose lists no dtype holds,
     /// so they refuse the cast of a dtype to another that the values of another bound pass. The
     /// tables refusing, when they run rows, with a failed conversion or a failed cast of a
-    /// dtype, at a `clip` that has a bound that is not a bare column, which Polars allows. A
-    /// bound that is a bare column holds the sample's rows, as the tables measured it, so it is
-    /// not this.
+    /// dtype, at a `clip` that has a bound that is not a bare column, which Polars allows, and
+    /// where the tables, asked again with the computed bounds of every clip undone, no longer
+    /// refuse a clip. A bound that is a bare column holds the sample's rows, as the tables
+    /// measured it, so a refusal that is its own is not this, whatever the other bound is.
     ABoundWithValuesOfItsOwn,
 }
 
@@ -1170,6 +1171,35 @@ fn has_a_bound_of_its_own(call: &Call) -> bool {
         })
 }
 
+/// The case with the computed bounds of every `clip` undone, which are the bounds that hold
+/// values of their own; a bound that is a bare column stays.
+fn case_without_computed_bounds(case: &Case) -> Option<Case> {
+    case_without(case, &|call, parameter| {
+        is(call, "Expr.clip")
+            && matches!(parameter, "lower_bound" | "upper_bound")
+            && matches!(
+                call.argument(parameter),
+                Some(Value::Expression(expression)) if !is_a_bare_column(expression)
+            )
+    })
+}
+
+/// Whether the tables still refuse a failed cast at a `clip` once its computed bounds are undone:
+/// the refusal is then a bare column's, which holds the sample's rows as the tables measured it,
+/// and no bound with values of its own is why. The tables are asked and Polars is not.
+fn the_bare_bounds_alone_are_refused(case: &Case) -> bool {
+    case_without_computed_bounds(case).is_some_and(|control| match predict(&control).verdict {
+        Verdict::Refuses(refused) => {
+            refused.stage == Some(TableStage::Rows)
+                && is_a_failed_cast(&refused.reason)
+                && locate(&control, &refused.place)
+                    .call
+                    .is_some_and(|call| is(call, "Expr.clip"))
+        }
+        _ => false,
+    })
+}
+
 /// Whether the reason is that a dtype could not be cast to another, in Polars' words for a
 /// failed conversion of values or of a list's type.
 fn is_a_failed_cast(reason: &str) -> bool {
@@ -1559,12 +1589,16 @@ fn applies(
         }
         (Limit::ABoundWithValuesOfItsOwn, Disagreement::PolarsAllows(refused)) => {
             // A clip casts nothing but its bounds, so a failed cast of the rows at the clip is
-            // the bound's, which holds values of its own where it is no bare column.
+            // a bound's, and it is the one with values of its own where it is no bare column and
+            // the tables do not refuse the clip without it.
             refused.stage == Some(TableStage::Rows)
                 && is_a_failed_cast(&refused.reason)
                 && locate(case, &refused.place)
                     .call
                     .is_some_and(has_a_bound_of_its_own)
+                // The computed bound is why where the tables allow the clip without it: a bare
+                // bound that the tables refuse is refused as Polars refuses it.
+                && !the_bare_bounds_alone_are_refused(case)
         }
         (Limit::AWindowOverAWindow, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
@@ -2519,6 +2553,30 @@ mod tests {
                 ROWS,
                 TEXT_CAST
             ),
+            vec![Limit::ABoundWithValuesOfItsOwn]
+        );
+    }
+
+    #[test]
+    fn a_failed_cast_at_a_clip_is_not_excused_by_a_computed_bound_beside_a_bare_one_the_tables_refuse()
+     {
+        // Beside a bound of `lit(1)`, the bare column `b` of text is refused by the tables for
+        // the sample's duration text, as Polars refuses it: the refusal is the bare bound's, and
+        // the computed one is no cause. Where `b` is a number the tables allow it, and the
+        // computed bound is why.
+        let at_the_clip = link_of("exprs", 0, 0);
+        let mixed = select(vec![chain_of(
+            column("a"),
+            vec![clip_with(Some(chain(column("b"), &[])), Some(whole(1)))],
+        )]);
+        let mut text = mixed.clone();
+        text.argument = Representative::String;
+        assert_eq!(
+            tables_refuse(&text, at_the_clip.clone(), ROWS, TEXT_CAST),
+            vec![]
+        );
+        assert_eq!(
+            tables_refuse(&mixed, at_the_clip, ROWS, TEXT_CAST),
             vec![Limit::ABoundWithValuesOfItsOwn]
         );
     }
