@@ -13,7 +13,7 @@ use dageist_fuzz::{
 use super::case::Case;
 use super::generate::generate;
 use super::limits::{excuses, strict};
-use super::observe::{Observed, Refusal, Seen, is_the_targets_own, observe};
+use super::observe::{Observed, Refusal, Seen, Stage, is_the_targets_own, observe};
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
 use super::probe::{Settled, is_a_predicate_rule, same_reason, settle, settle_apart};
 use super::reduce::candidates;
@@ -254,8 +254,17 @@ fn dtype_difference(case: &Case, prediction: &Prediction, observed: &Observed) -
     // aggregate that holds `element` in a nested expression is not Polars'
     // verdict on the pivot.
     // A refusal predicted anywhere explains a prefix that Polars refuses: the
-    // case is refused, and the prefix is one place where it is.
-    let refused_anyway = matches!(prediction.verdict, Verdict::Refuses(_));
+    // case is refused, and the prefix is one place where it is. So does a refusal
+    // that Polars gives when it works out the schema at the very call the tables
+    // said they could not be asked about: an expression that holds the call has the
+    // dtype its own calls give, and the tables did not say the call allows it.
+    let refused_anyway = match &prediction.verdict {
+        Verdict::Refuses(_) => true,
+        Verdict::Undetermined(why) => observed.refusal.as_ref().is_some_and(|refusal| {
+            refusal.stage == Stage::Schema && why.starts_with(&format!("{}: ", refusal.at))
+        }),
+        Verdict::Allows => false,
+    };
     let pivot = case.document.steps()[0].call().entry().id().as_str() == "LazyFrame.pivot";
     for expected in &prediction.expressions {
         let Some(seen) = observed
@@ -570,7 +579,6 @@ impl CaseTarget for AllowedTarget {
 mod tests {
     use dageist_engine::allowed::Representative;
 
-    use super::super::observe::Stage;
     use super::*;
 
     /// The outcome of `text` and what was tallied while it was evaluated.
