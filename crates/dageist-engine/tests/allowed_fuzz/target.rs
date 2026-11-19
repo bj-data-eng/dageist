@@ -837,6 +837,24 @@ mod tests {
         assert!(dtype_difference(&case, &prediction, &at_the_rows).is_some());
     }
 
+    /// A join whose two right keys are the one column `key`, beside left keys that Polars gives
+    /// different dtypes: `array[f64, 2]` and `array[i64, 2]`, which the tables give the one class
+    /// Array. One column of the other table cannot hold both.
+    const TWO_KEYS_OF_DIFFERENT_DTYPES_SHARING_A_COLUMN: &str = r#"{"a":"Array(Int64, 2)","b":"Decimal(10, 2)","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.join","arguments":{"other":{"table":"other"},"left_on":{"many":[{"expression":{"start":{"entry":"polars.when","arguments":{"predicates":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["f"]}}},"then":[{"entry":"Expr.le","arguments":{"other":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[]}}}},{"entry":"Expr.erf","arguments":{}},{"entry":"Expr.is_not_null","arguments":{}}]}}]}}},"then":[{"entry":"When.then","arguments":{"statement":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[{"entry":"Expr.cosh","arguments":{}},{"entry":"Expr.floordiv","arguments":{"other":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"flag":null}}},"then":[]}}}},{"entry":"Expr.sinh","arguments":{}},{"entry":"Expr.truediv","arguments":{"other":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[]}}}}]}}}}]}},{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[]}}]},"right_on":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["key"]}}},"then":[]}},{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["key"]}}},"then":[]}}]}}}}]}"#;
+
+    #[test]
+    fn a_join_that_pairs_one_column_with_keys_of_different_dtypes_is_not_a_case_for_the_tables() {
+        // Polars refuses the join, as it must, for no dtype of the column `key` fits both keys,
+        // which the tables are not asked about.
+        let (outcome, _) = evaluated_and_tallied(TWO_KEYS_OF_DIFFERENT_DTYPES_SHARING_A_COLUMN);
+        assert_eq!(
+            outcome.kind(),
+            dageist_fuzz::OutcomeKind::Unsupported,
+            "{outcome:?}"
+        );
+    }
+
     #[test]
     fn a_refusal_at_the_call_the_tables_could_not_judge_explains_only_the_prefixes_that_hold_it() {
         // Another item of the same step, which the tables gave a dtype and Polars refuses, is
