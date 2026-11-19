@@ -51,6 +51,44 @@
       "argument": null
     },
     {
+      "entry": "Expr.abs",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "`abs` operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.add",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.and_",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.cum_count",
       "verdict": {
         "kind": "allowed",
@@ -170,6 +208,20 @@
         "shape": "one",
         "ending": {
           "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.floordiv",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "// not allowed on datetime[μs] and i8"
         }
       },
       "argument": null
@@ -295,10 +347,78 @@
       "argument": null
     },
     {
+      "entry": "Expr.mod",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "% not allowed on datetime[μs] and i8"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.mul",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "* not allowed on datetime[μs] and i8"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.ne",
       "verdict": {
         "kind": "allowed",
         "result": "Boolean",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.neg",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "`neg` operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.not_",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "dtype Datetime('μs') not supported in 'not' operation"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.or_",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
         "shape": "many",
         "ending": {
           "kind": "allowed"
@@ -314,6 +434,20 @@
         "shape": "many",
         "ending": {
           "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.pow",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "`pow` operation not supported for dtype `datetime[μs]` as base"
         }
       },
       "argument": null
@@ -359,6 +493,34 @@
             "stage": "rows"
           },
           "reason": "`sum` operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.truediv",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "division of 'Datetime' datatype is not allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.xor",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "^ not allowed on datetime[μs] and i8"
         }
       },
       "argument": null

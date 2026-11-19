@@ -33,6 +33,10 @@
       "title": "Comparison · true or false"
     },
     {
+      "key": "logic",
+      "title": "Logic · and, or, not"
+    },
+    {
       "key": "start",
       "title": "Start · a column or a value"
     },
@@ -215,6 +219,81 @@
             "kind": "nested",
             "name": "condition.value"
           }
+        }
+      ]
+    },
+    {
+      "id": "Expr.abs",
+      "applies": "expression",
+      "family": "arithmetic",
+      "name": "abs",
+      "hint": "absolute value",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.add",
+      "applies": "expression",
+      "family": "arithmetic",
+      "name": "add",
+      "hint": "plus another value",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "other",
+          "shown": "other",
+          "label": "plus",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.and_",
+      "applies": "expression",
+      "family": "logic",
+      "name": "and",
+      "hint": "true where all are true, bit by bit on whole numbers",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "others",
+          "shown": "others",
+          "label": "and",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": {
+            "kind": "empty"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
+          },
+          "position": null
         }
       ]
     },
@@ -484,6 +563,36 @@
       ]
     },
     {
+      "id": "Expr.floordiv",
+      "applies": "expression",
+      "family": "arithmetic",
+      "name": "floordiv",
+      "hint": "divided by another value, rounded down",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "other",
+          "shown": "other",
+          "label": "divided by",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
       "id": "Expr.ge",
       "applies": "expression",
       "family": "compare",
@@ -689,6 +798,66 @@
       "parameters": []
     },
     {
+      "id": "Expr.mod",
+      "applies": "expression",
+      "family": "arithmetic",
+      "name": "mod",
+      "hint": "remainder of a division",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "other",
+          "shown": "other",
+          "label": "divided by",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.mul",
+      "applies": "expression",
+      "family": "arithmetic",
+      "name": "mul",
+      "hint": "times another value",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "other",
+          "shown": "other",
+          "label": "times",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
       "id": "Expr.ne",
       "applies": "expression",
       "family": "compare",
@@ -713,6 +882,61 @@
           "defaultSetting": null,
           "start": {
             "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.neg",
+      "applies": "expression",
+      "family": "arithmetic",
+      "name": "neg",
+      "hint": "the value with its sign flipped",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.not_",
+      "applies": "expression",
+      "family": "logic",
+      "name": "not",
+      "hint": "the opposite, bit by bit on whole numbers",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.or_",
+      "applies": "expression",
+      "family": "logic",
+      "name": "or",
+      "hint": "true where any is true, bit by bit on whole numbers",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "others",
+          "shown": "others",
+          "label": "or",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": {
+            "kind": "empty"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
           },
           "position": null
         }
@@ -897,6 +1121,36 @@
       ]
     },
     {
+      "id": "Expr.pow",
+      "applies": "expression",
+      "family": "arithmetic",
+      "name": "pow",
+      "hint": "raised to a power",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "exponent",
+          "shown": "exponent",
+          "label": "to the power of",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
       "id": "Expr.shift",
       "applies": "expression",
       "family": "rows",
@@ -989,6 +1243,66 @@
       "head": null,
       "lazy": true,
       "parameters": []
+    },
+    {
+      "id": "Expr.truediv",
+      "applies": "expression",
+      "family": "arithmetic",
+      "name": "truediv",
+      "hint": "divided by another value",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "other",
+          "shown": "other",
+          "label": "divided by",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.xor",
+      "applies": "expression",
+      "family": "logic",
+      "name": "xor",
+      "hint": "true where exactly one is true, bit by bit on whole numbers",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "other",
+          "shown": "other",
+          "label": "exclusive or",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
     },
     {
       "id": "LazyFrame.filter",
