@@ -48,7 +48,7 @@ use super::literal::{
 };
 use super::observe::{Observed, Refusal, SCHEMA_SAYS, Stage, Tables, observe, observe_probe};
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
-use super::probe::{is_the_same_comparison, same_reason, settle_in_the_position};
+use super::probe::{is_the_same_comparison, same_reason, settle_apart, settle_in_the_position};
 
 /// A limit of the tables, and what it says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1763,6 +1763,49 @@ fn refused_with_each_drop_a_fill(case: &Case, reason: &str) -> bool {
     })
 }
 
+/// The case with the last value of every condition that has an `otherwise` made a fill forward of
+/// what it was, which gives as many values of the dtype it had, so that the values of the
+/// condition are no longer one expression.
+fn case_with_values_that_differ(case: &Case) -> Option<Case> {
+    case_changed(case, &|call| {
+        if !matches!(
+            call.entry().id().as_str(),
+            "Then.otherwise" | "ChainedThen.otherwise"
+        ) {
+            return None;
+        }
+        let Some(Value::Expression(statement)) = call.argument("statement") else {
+            return None;
+        };
+        let fill = Call::new(catalog::entry("Expr.forward_fill")?, Vec::new()).ok()?;
+        let links: Vec<Call> = statement
+            .links()
+            .iter()
+            .cloned()
+            .chain(std::iter::once(fill))
+            .collect();
+        let statement = Expression::new(statement.start().clone(), links).ok()?;
+        Call::new(
+            catalog::entry(call.entry().id().as_str())?,
+            vec![("statement", Value::Expression(statement))],
+        )
+        .ok()
+    })
+}
+
+/// Whether Polars refuses the case for the reason the tables gave once the values of each
+/// condition differ: the predicates are then evaluated, so their being dropped was why they were
+/// not. Polars allows the case as it is.
+fn refused_with_values_that_differ(case: &Case, reason: &str) -> bool {
+    changed(case_with_values_that_differ(case), case).is_some_and(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| refusal.reason == reason)
+        })
+    })
+}
+
 /// Whether Polars refuses the case for the test for NaN still when no call drops: the drop is
 /// then no cause of it, and the dtype the test is not supported for is.
 fn refused_for_a_test_of_nan_without_drops(case: &Case) -> Option<bool> {
@@ -2924,6 +2967,18 @@ fn applies(
                         .any(|call| is(call, "Expr.drop_nulls"))
                 })
                 && refused_with_each_drop_a_fill(case, &refused.reason)
+        }
+        (Limit::APredicateThatIsDropped, Disagreement::PolarsAllows(refused)) => {
+            // The refusal is Polars' own, at a call inside a predicate, which Polars drops where the
+            // values of the condition are one expression.
+            matches!(refused.source, Source::Polars)
+                && refused.place.path().iter().any(
+                    |segment| matches!(segment, Segment::Parameter(name) if name == "predicates"),
+                )
+                && refused_with_values_that_differ(case, &refused.reason)
+                // A probe of the part alone that Polars refuses settles it, which is asked of a
+                // case the limits do not excuse.
+                && settle_apart(case, refused, prediction, observed).is_none()
         }
         (Limit::ACastOfAValueTheDtypeCannotHold, Disagreement::PolarsRefuses(refusal)) => {
             // The rows hold the value, and so may a table with no rows, where an aggregate of
@@ -6950,5 +7005,25 @@ mod tests {
             excused_by_kept("uncovered-a-predicate-that-is-dropped.case"),
             vec![Limit::APredicateThatIsDropped]
         );
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/allowed_fuzz/regressions/uncovered-a-predicate-that-is-dropped.case");
+        let text = std::fs::read_to_string(path).expect("a kept case");
+        let case = Case::decode(text.as_bytes()).expect("a case");
+        let reason =
+            "`clip` operation not supported for dtype `bool` (expected: numeric or temporal)";
+        assert!(refused_with_values_that_differ(&case, reason));
+        // A clip of a column that holds a number is refused by no one, so the predicates being
+        // dropped is no cause of a refusal.
+        let number = text.replacen(
+            r#"{"entry":"polars.col","arguments":{"name":{"columns":["f"]}}},"then":[{"entry":"Expr.clip""#,
+            r#"{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[{"entry":"Expr.clip""#,
+            1,
+        );
+        assert_ne!(number, text);
+        let case = Case::decode(number.as_bytes()).expect("a case");
+        assert!(!refused_with_values_that_differ(&case, reason));
+        // A case with no condition that has an `otherwise` has no values to make differ.
+        let case = select_of_a_null_literal(&["Expr.cbrt"]);
+        assert!(!refused_with_values_that_differ(&case, reason));
     }
 }
