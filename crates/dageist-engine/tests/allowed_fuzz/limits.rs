@@ -2126,6 +2126,37 @@ mod tests {
     }
 
     #[test]
+    fn a_literal_nested_in_an_operand_of_the_refused_call_is_excused_where_a_column_is_refused() {
+        // `a <= b / lit(null, Int64)`, `h > a * lit(null, Duration)` and
+        // `g == null - lit(null, List(Int64))`: Polars folds the arithmetic with the literal into a
+        // null and never meets the dtype the tables refuse the comparison for. Every literal the
+        // operand holds is a column in the case run again, and the start of the operand is not
+        // the only one. A condition of three branches stands for a column as one of one does.
+        for name in [
+            "uncovered-a-literal--given-to-a-call-of-an-operand.case",
+            "uncovered-a-literal--given-to-a-call-of-an-operand-of-a-comparison-with-text.case",
+            "uncovered-a-literal--a-literal-given-to-a-call-after-a-literal.case",
+            "uncovered-a-literal--a-condition-of-three-branches.case",
+        ] {
+            assert_eq!(excused_by_kept(name), vec![Limit::ALiteral], "{name}");
+        }
+    }
+
+    #[test]
+    fn a_literal_nested_in_an_operand_is_no_cause_where_polars_allows_the_column_of_its_dtype_too()
+    {
+        // `sort(by=(a <= b / lit(null, Int64)).len())`: the key is one value, which Polars
+        // drops whatever the comparison holds, so the column in the literal's place is allowed
+        // as well and the literal is not why. A probe of the comparison settles it.
+        assert_eq!(
+            excused_by_kept(
+                "stricter-a-literal-given-to-a-call-of-an-operand-in-a-sort-key-of-one-value.case"
+            ),
+            vec![]
+        );
+    }
+
+    #[test]
     fn what_follows_an_aggregate_compared_with_the_length_of_a_literal_over_a_window_is_no_limit() {
         // `a.min() <= 1.len().over(order_by=[true])` then `.total_days()`: Polars
         // takes the length of a literal over a window for a constant, and does not

@@ -223,3 +223,105 @@ pub fn expression_with_columns(
         .collect::<Option<Vec<_>>>()?;
     Expression::new(start, links).ok()
 }
+
+#[cfg(test)]
+mod tests {
+    use dageist_engine::document::Place;
+
+    use super::*;
+
+    fn call(id: &str, given: Vec<(&str, Value)>) -> Call {
+        Call::new(catalog::entry(id).expect("an entry"), given).expect("a call")
+    }
+
+    fn chain(start: Call, links: Vec<Call>) -> Expression {
+        Expression::new(Start::Call(start), links).expect("a chain")
+    }
+
+    fn column(name: &str) -> Call {
+        call(
+            "polars.col",
+            vec![("name", Value::Columns(vec![name.to_owned()]))],
+        )
+    }
+
+    fn null() -> Call {
+        call("polars.lit", vec![("value", Value::Flag(None))])
+    }
+
+    fn given(id: &str, operand: Expression) -> Call {
+        call(id, vec![("other", Value::Expression(operand))])
+    }
+
+    #[test]
+    fn a_condition_of_literals_stands_for_a_column_whatever_the_number_of_its_branches() {
+        // `when(f).then(null).when(f).then(null).when(f).then(null)`: the links of the condition,
+        // chained ones included, all go, and the column has none.
+        let predicates =
+            |name: &str| Value::Many(vec![Value::Expression(chain(column(name), Vec::new()))]);
+        let then = || {
+            call(
+                "When.then",
+                vec![("statement", Value::Expression(chain(null(), Vec::new())))],
+            )
+        };
+        let chained_then = || {
+            call(
+                "ChainedWhen.then",
+                vec![("statement", Value::Expression(chain(null(), Vec::new())))],
+            )
+        };
+        let condition = chain(
+            call("polars.when", vec![("predicates", predicates("f"))]),
+            vec![
+                then(),
+                call("Then.when", vec![("predicates", predicates("f"))]),
+                chained_then(),
+                call("ChainedThen.when", vec![("predicates", predicates("f"))]),
+                chained_then(),
+            ],
+        );
+        assert!(starts_from_a_literal(&condition));
+        assert_eq!(links_of_the_literal(&condition), 5);
+        let replaced = expression_with_columns(&condition, &[&condition], 0)
+            .expect("the condition stands for a column");
+        assert!(replaced.links().is_empty());
+    }
+
+    #[test]
+    fn the_literals_inside_an_operand_are_causes_at_any_depth_and_the_measured_ones_are_not() {
+        // `a <= b / null`: the null is given to a call of the operand, not the start of it.
+        let operand = chain(
+            column("b"),
+            vec![given("Expr.truediv", chain(null(), Vec::new()))],
+        );
+        let refused = given("Expr.le", operand);
+        let at = Place::default();
+        let causes = operand_causes(&refused, &at, false);
+        assert_eq!(causes.len(), 1);
+        assert!(starts_from_a_literal(causes[0].expression));
+        // In a pivot's aggregate every argument was measured.
+        assert!(operand_causes(&refused, &at, true).is_empty());
+        // A fill value of a shift was measured as a literal, and what it holds goes with it.
+        let shifted = call(
+            "Expr.shift",
+            vec![(
+                "fill_value",
+                Value::Expression(chain(
+                    column("b"),
+                    vec![given("Expr.add", chain(null(), Vec::new()))],
+                )),
+            )],
+        );
+        assert!(operand_causes(&shifted, &at, false).is_empty());
+        // No literal, no cause.
+        let plain = given(
+            "Expr.le",
+            chain(
+                column("b"),
+                vec![given("Expr.add", chain(column("a"), Vec::new()))],
+            ),
+        );
+        assert!(operand_causes(&plain, &at, false).is_empty());
+    }
+}
