@@ -248,15 +248,14 @@ pub enum Limit {
     /// starts from a literal, which Polars allows; the window is why where Polars, asked again
     /// with each literal partition a column, refuses the case for that reason.
     AWindowOverALiteral,
-    /// A drop of nulls of a value of the dtype Null, a null literal or a column of it, leaves
-    /// no rows, so the rows do not show a plan that they contradict. The tables hold the schema
-    /// of a method and what its rows give as one thing, and refuse a method whose schema says
-    /// the dtype Null and whose rows give another, as the cube root of a null does, which is
-    /// the target's own comparison and shows only where rows are given. The tables refusing,
-    /// when they run rows, with the reason that the schema says one dtype and the rows give
-    /// another, at a call after a `drop_nulls` in its chain, which Polars allows; the drop is
-    /// why where Polars, asked again with each drop a fill of nulls forward, refuses the case
-    /// for that reason.
+    /// A drop of nulls can leave no rows, as one of a null literal does, so the rows do not show
+    /// a plan that they contradict. The tables hold the schema of a method and what its rows
+    /// give as one thing, and refuse a method whose schema says one dtype and whose rows give
+    /// another, as the cube root of a null does, which is the target's own comparison and shows
+    /// only where rows are given. The tables refusing, when they run rows, with the reason that
+    /// the schema says one dtype and the rows give another, at a call after a `drop_nulls` in
+    /// its chain, which Polars allows; the drop is why where Polars, asked again with each drop
+    /// a fill of nulls forward, refuses the case for that reason.
     ADropLeavesNoRows,
     /// Polars refuses some dtypes of `and`, `or` and `xor` when it works out the schema of a
     /// select, a filter or a sort key, and accepts them in a join's key, as `date ^ int64` and
@@ -451,7 +450,7 @@ impl Limit {
                 "a window over a literal partition gives no rows, so the rows do not show the plan of what follows it"
             }
             Self::ADropLeavesNoRows => {
-                "a drop of the nulls of a value of the dtype Null leaves no rows, so the rows do not show the plan of what follows it"
+                "a drop of nulls can leave no rows, so the rows do not show the plan of what follows it"
             }
             Self::ABitwiseCallInAJoinKey => {
                 "Polars does not check the dtypes of a bitwise call in a join's key as it does in select, so it accepts a call the tables refuse for them"
