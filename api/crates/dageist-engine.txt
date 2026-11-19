@@ -404,6 +404,7 @@ pub dageist_engine::catalog::Role::Count
 pub dageist_engine::catalog::Role::Divisor
 pub dageist_engine::catalog::Role::Exponent
 pub dageist_engine::catalog::Role::Filler
+pub dageist_engine::catalog::Role::FloorDivisor
 pub dageist_engine::catalog::Role::Operand
 pub dageist_engine::catalog::Role::Plain
 pub enum dageist_engine::catalog::Setting
