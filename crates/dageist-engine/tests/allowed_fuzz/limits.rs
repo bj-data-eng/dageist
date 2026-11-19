@@ -2885,6 +2885,33 @@ mod tests {
     }
 
     #[test]
+    fn a_hidden_schema_is_excused_at_the_end_of_a_sort_key_which_is_no_output_of_the_step() {
+        // Polars sorts by a key without making it a column of the step's table, so a plan that
+        // says `Null` where its rows give `Float64`, as a null divided by a whole number does,
+        // is not met where the key is the last call too.
+        let reason = "the schema says Null and the rows give Float64";
+        let sorted =
+            |key: Expression| case_of(call("LazyFrame.sort", vec![("by", many(vec![key]))]));
+        let divided = chain_of(column("a"), vec![compared_with("Expr.truediv", whole(1))]);
+        assert_eq!(
+            tables_refuse(&sorted(divided.clone()), link_of("by", 0, 0), ROWS, reason),
+            vec![Limit::AHiddenSchema]
+        );
+        // The step's own schema is shown by what it selects, however the key is.
+        let selected = select(vec![divided]);
+        assert_eq!(
+            tables_refuse(&selected, link_of("exprs", 0, 0), ROWS, reason),
+            vec![]
+        );
+        // Another reason.
+        let divided = chain_of(column("a"), vec![compared_with("Expr.truediv", whole(1))]);
+        assert_eq!(
+            tables_refuse(&sorted(divided), link_of("by", 0, 0), ROWS, "no"),
+            vec![]
+        );
+    }
+
+    #[test]
     fn a_pivot_aggregate_is_excused_by_the_kernel_reason_and_by_the_empty_table_with_one() {
         let case = pivot(chain(column("a"), &["Expr.cum_sum"]));
         let at_the_call = at(&[parameter("aggregate_function"), Segment::Link(0)]);
