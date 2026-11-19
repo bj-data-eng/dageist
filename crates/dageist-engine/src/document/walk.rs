@@ -1657,18 +1657,27 @@ fn is_reached_by_a_null(expression: &Expression, at: usize) -> bool {
             || folds_a_null_before(expression, at))
 }
 
-/// Whether an expression holds an aggregate that Polars evaluates. A comparison
-/// that a null reaches is a null. The first of them drops what it follows and is
-/// given where that is one value or literals alone, and the comparisons after it
-/// compare a null, so they drop only what they are given where it is one value or
-/// literals alone, except one that is given a null, which drops what it follows
-/// too where that is one value or literals alone: what comes before the last that
-/// does is not evaluated. A side that is more is evaluated, and its aggregate counts.
-/// Where a join's key is judged elementwise a subtraction with a null drops
-/// nothing: the key `k != f.len() - null` is not elementwise.
+/// Whether an expression holds an aggregate that Polars evaluates. See
+/// [`holds_what_polars_evaluates`]. Where a join's key is judged elementwise a subtraction with a
+/// null drops nothing: the key `k != f.len() - null` is not elementwise.
 fn holds_an_aggregate(expression: &Expression) -> bool {
-    let evaluated =
-        |call: &Call| is_one_value(call) || operands(call).into_iter().any(holds_an_aggregate);
+    holds_what_polars_evaluates(expression, &is_one_value)
+}
+
+/// Whether an expression holds a call that `is_held` says yes to and that Polars evaluates, at any
+/// depth. A comparison that a null reaches is a null. The first of them drops what it follows and
+/// is given where that is one value or literals alone, and the comparisons after it compare a
+/// null, so they drop only what they are given where it is one value or literals alone, except
+/// one that is given a null, which drops what it follows too where that is one value or literals
+/// alone: what comes before the last that does is not evaluated. A side that is more is
+/// evaluated, and what it holds counts.
+fn holds_what_polars_evaluates(expression: &Expression, is_held: &dyn Fn(&Call) -> bool) -> bool {
+    let evaluated = |call: &Call| {
+        is_held(call)
+            || operands(call)
+                .into_iter()
+                .any(|operand| holds_what_polars_evaluates(operand, is_held))
+    };
     let start = match expression.start() {
         Start::Call(call) => Some(call),
         Start::Input(_) | Start::Hole => None,
@@ -1702,7 +1711,7 @@ fn holds_an_aggregate(expression: &Expression) -> bool {
             link.entry().id().as_str() != "Expr.is_between"
                 && operands(link).into_iter().any(|operand| {
                     !wholly_single(operand, operand.links().len(), true)
-                        && holds_an_aggregate(operand)
+                        && holds_what_polars_evaluates(operand, is_held)
                 })
         } else {
             evaluated(link)
@@ -1951,15 +1960,16 @@ fn is_a_replacement(call: &Call) -> bool {
 }
 
 /// Whether an expression holds, at any depth, a replacement given what it replaces, or what
-/// replaces it, that reads a column. Polars calls a replacement elementwise only where they are
-/// literals, which is how one is written, and refuses a join's key that is given a column. Its
-/// default may be a column, which it takes a value of for each row.
+/// replaces it, that reads a column, and that Polars evaluates. Polars calls a replacement
+/// elementwise only where they are literals, which is how one is written, and refuses a join's
+/// key that is given a column. Its default may be a column, which it takes a value of for each
+/// row. A comparison with a null that Polars folds drops what it follows and is given where
+/// that is one value, as it does an aggregate, so a replacement there is never met.
 fn holds_a_replacement_of_columns(expression: &Expression) -> bool {
-    calls_of(expression).any(|call| {
-        (is_a_replacement(call) && ["old", "new"].iter().any(|name| {
-            matches!(call.argument(name), Some(Value::Expression(value)) if reads_a_column(value))
-        })) || operands(call)
-            .into_iter()
-            .any(holds_a_replacement_of_columns)
+    holds_what_polars_evaluates(expression, &|call| {
+        is_a_replacement(call)
+            && ["old", "new"].iter().any(|name| {
+                matches!(call.argument(name), Some(Value::Expression(value)) if reads_a_column(value))
+            })
     })
 }
