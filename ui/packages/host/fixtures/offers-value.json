@@ -91,6 +91,172 @@
       "argument": null
     },
     {
+      "entry": "Expr.arccos",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.arccosh",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.arcsin",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.arcsinh",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.arctan",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.arctanh",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.cbrt",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "the schema says Datetime(us) and the rows give Float64"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.ceil",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "`ceil` operation not supported for dtype `datetime[μs]` (expected: numeric)"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.clip",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.cos",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.cosh",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.cot",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.cum_count",
       "verdict": {
         "kind": "allowed",
@@ -124,6 +290,20 @@
             "stage": "rows"
           },
           "reason": "`cum_sum` operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.degrees",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
         }
       },
       "argument": null
@@ -203,6 +383,48 @@
       "argument": null
     },
     {
+      "entry": "Expr.erf",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "`erf` operation not supported for dtype `datetime[μs]` as argument 0"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.erfc",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "`erfc` operation not supported for dtype `datetime[μs]` as argument 0"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.exp",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "`exp` operation not supported for dtype `datetime[μs]` as argument 0"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.first",
       "verdict": {
         "kind": "allowed",
@@ -210,6 +432,20 @@
         "shape": "one",
         "ending": {
           "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.floor",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "`floor` operation not supported for dtype `datetime[μs]` (expected: numeric)"
         }
       },
       "argument": null
@@ -308,6 +544,34 @@
         "shape": "one",
         "ending": {
           "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.log",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "`log` operation not supported for dtype `datetime[μs]` as argument 0"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.log1p",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "`log1p` operation not supported for dtype `datetime[μs]` as argument 0"
         }
       },
       "argument": null
@@ -457,6 +721,48 @@
       "argument": null
     },
     {
+      "entry": "Expr.radians",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.round",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "rounding ('half_to_even') operation not supported for dtype `datetime[μs]` (expected: numeric)"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.round_sig_figs",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "`round_sig_figs` operation not supported for dtype `datetime[μs]` (expected: numeric)"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.shift",
       "verdict": {
         "kind": "allowed",
@@ -474,6 +780,62 @@
           "shown": "1"
         }
       }
+    },
+    {
+      "entry": "Expr.sign",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "`sign` operation not supported for dtype `datetime[μs]` as argument 0"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.sin",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.sinh",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.sqrt",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "the schema says Datetime(us) and the rows give Float64"
+        }
+      },
+      "argument": null
     },
     {
       "entry": "Expr.sub",
@@ -502,6 +864,34 @@
       "argument": null
     },
     {
+      "entry": "Expr.tan",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.tanh",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.truediv",
       "verdict": {
         "kind": "refused",
@@ -511,6 +901,20 @@
             "stage": "schema"
           },
           "reason": "division of 'Datetime' datatype is not allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.truncate",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "truncation ('to_zero') operation not supported for dtype `datetime[μs]` (expected: numeric)"
         }
       },
       "argument": null

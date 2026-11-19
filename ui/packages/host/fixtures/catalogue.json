@@ -17,6 +17,18 @@
       "title": "Arithmetic"
     },
     {
+      "key": "maths",
+      "title": "Maths · roots, logarithms"
+    },
+    {
+      "key": "trigonometry",
+      "title": "Trigonometry · angles"
+    },
+    {
+      "key": "rounding",
+      "title": "Rounding · places, whole numbers"
+    },
+    {
       "key": "aggregate",
       "title": "Aggregate · one value"
     },
@@ -298,6 +310,165 @@
       ]
     },
     {
+      "id": "Expr.arccos",
+      "applies": "expression",
+      "family": "trigonometry",
+      "name": "arccos",
+      "hint": "angle in radians whose cosine is the value",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.arccosh",
+      "applies": "expression",
+      "family": "trigonometry",
+      "name": "arccosh",
+      "hint": "inverse hyperbolic cosine",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.arcsin",
+      "applies": "expression",
+      "family": "trigonometry",
+      "name": "arcsin",
+      "hint": "angle in radians whose sine is the value",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.arcsinh",
+      "applies": "expression",
+      "family": "trigonometry",
+      "name": "arcsinh",
+      "hint": "inverse hyperbolic sine",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.arctan",
+      "applies": "expression",
+      "family": "trigonometry",
+      "name": "arctan",
+      "hint": "angle in radians whose tangent is the value",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.arctanh",
+      "applies": "expression",
+      "family": "trigonometry",
+      "name": "arctanh",
+      "hint": "inverse hyperbolic tangent",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.cbrt",
+      "applies": "expression",
+      "family": "maths",
+      "name": "cube_root",
+      "hint": "cube root, cbrt in Polars",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.ceil",
+      "applies": "expression",
+      "family": "rounding",
+      "name": "ceil",
+      "hint": "rounded up to a whole number",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.clip",
+      "applies": "expression",
+      "family": "arithmetic",
+      "name": "clip",
+      "hint": "limited to a lower and an upper bound",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "lower_bound",
+          "shown": "lower_bound",
+          "label": "not below",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "upper_bound",
+          "shown": "upper_bound",
+          "label": "not above",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.cos",
+      "applies": "expression",
+      "family": "trigonometry",
+      "name": "cos",
+      "hint": "cosine of an angle in radians",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.cosh",
+      "applies": "expression",
+      "family": "trigonometry",
+      "name": "cosh",
+      "hint": "hyperbolic cosine",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.cot",
+      "applies": "expression",
+      "family": "trigonometry",
+      "name": "cot",
+      "hint": "cotangent of an angle in radians",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
       "id": "Expr.cum_count",
       "applies": "expression",
       "family": "cumulative",
@@ -401,6 +572,16 @@
           "position": null
         }
       ]
+    },
+    {
+      "id": "Expr.degrees",
+      "applies": "expression",
+      "family": "trigonometry",
+      "name": "degrees",
+      "hint": "an angle in radians, in degrees",
+      "head": null,
+      "lazy": true,
+      "parameters": []
     },
     {
       "id": "Expr.dt.date",
@@ -528,6 +709,36 @@
       ]
     },
     {
+      "id": "Expr.erf",
+      "applies": "expression",
+      "family": "maths",
+      "name": "error_function",
+      "hint": "error function, erf in Polars",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.erfc",
+      "applies": "expression",
+      "family": "maths",
+      "name": "complementary_error_function",
+      "hint": "complementary error function, erfc in Polars",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.exp",
+      "applies": "expression",
+      "family": "maths",
+      "name": "exp",
+      "hint": "e raised to the value",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
       "id": "Expr.first",
       "applies": "expression",
       "family": "rows",
@@ -561,6 +772,16 @@
           "position": null
         }
       ]
+    },
+    {
+      "id": "Expr.floor",
+      "applies": "expression",
+      "family": "rounding",
+      "name": "floor",
+      "hint": "rounded down to a whole number",
+      "head": null,
+      "lazy": true,
+      "parameters": []
     },
     {
       "id": "Expr.floordiv",
@@ -743,6 +964,51 @@
       "family": "aggregate",
       "name": "len",
       "hint": "number of values",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.log",
+      "applies": "expression",
+      "family": "maths",
+      "name": "log",
+      "hint": "logarithm to a base, e unless another is given",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "base",
+          "shown": "base",
+          "label": "to the base",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "float",
+            "value": 2.718281828459045
+          },
+          "defaultSetting": {
+            "kind": "float",
+            "value": 2.718281828459045,
+            "shown": "2.718281828459045"
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.log1p",
+      "applies": "expression",
+      "family": "maths",
+      "name": "log1p",
+      "hint": "natural logarithm of one plus the value",
       "head": null,
       "lazy": true,
       "parameters": []
@@ -1151,6 +1417,117 @@
       ]
     },
     {
+      "id": "Expr.radians",
+      "applies": "expression",
+      "family": "trigonometry",
+      "name": "radians",
+      "hint": "an angle in degrees, in radians",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.round",
+      "applies": "expression",
+      "family": "rounding",
+      "name": "round",
+      "hint": "rounded to a number of decimal places",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "decimals",
+          "shown": "decimals",
+          "label": "decimal places",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 0
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 0,
+            "shown": "0"
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "mode",
+          "shown": "mode",
+          "label": "ties go",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "half_to_even",
+                "shown": "half_to_even"
+              },
+              {
+                "word": "half_away_from_zero",
+                "shown": "half_away_from_zero"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "half_to_even"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "half_to_even"
+          },
+          "start": {
+            "kind": "word",
+            "value": "half_away_from_zero"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.round_sig_figs",
+      "applies": "expression",
+      "family": "rounding",
+      "name": "round_significant_figures",
+      "hint": "rounded to a number of significant figures, round_sig_figs in Polars",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "digits",
+          "shown": "digits",
+          "label": "significant figures",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
       "id": "Expr.shift",
       "applies": "expression",
       "family": "rows",
@@ -1205,6 +1582,46 @@
       ]
     },
     {
+      "id": "Expr.sign",
+      "applies": "expression",
+      "family": "arithmetic",
+      "name": "sign",
+      "hint": "-1, 0 or 1 by the sign of the value",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.sin",
+      "applies": "expression",
+      "family": "trigonometry",
+      "name": "sin",
+      "hint": "sine of an angle in radians",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.sinh",
+      "applies": "expression",
+      "family": "trigonometry",
+      "name": "sinh",
+      "hint": "hyperbolic sine",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.sqrt",
+      "applies": "expression",
+      "family": "maths",
+      "name": "sqrt",
+      "hint": "square root",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
       "id": "Expr.sub",
       "applies": "expression",
       "family": "arithmetic",
@@ -1245,6 +1662,26 @@
       "parameters": []
     },
     {
+      "id": "Expr.tan",
+      "applies": "expression",
+      "family": "trigonometry",
+      "name": "tan",
+      "hint": "tangent of an angle in radians",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.tanh",
+      "applies": "expression",
+      "family": "trigonometry",
+      "name": "tanh",
+      "hint": "hyperbolic tangent",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
       "id": "Expr.truediv",
       "applies": "expression",
       "family": "arithmetic",
@@ -1267,6 +1704,42 @@
             "kind": "required"
           },
           "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.truncate",
+      "applies": "expression",
+      "family": "rounding",
+      "name": "truncate",
+      "hint": "cut off after a number of decimal places",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "decimals",
+          "shown": "decimals",
+          "label": "decimal places",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 0
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 0,
+            "shown": "0"
+          },
           "start": {
             "kind": "unset"
           },

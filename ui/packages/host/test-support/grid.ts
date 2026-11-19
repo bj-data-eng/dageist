@@ -16,8 +16,11 @@ export interface Grid {
   readonly entries: readonly string[];
   readonly contexts: readonly ContextView[];
   readonly afters: readonly AfterView[];
-  /** For each context, for each of `afters`, a number with a bit set for each entry that may stand. */
-  readonly allowed: ReadonlyArray<readonly number[]>;
+  /**
+   * For each context, for each of `afters`, words of 32 bits with a bit set for each entry that may
+   * stand: the bit `entry % 32` of the word `entry / 32`.
+   */
+  readonly allowed: ReadonlyArray<ReadonlyArray<readonly number[]>>;
 }
 
 const readGrid: Decode<Grid> = readRecord(
@@ -26,7 +29,7 @@ const readGrid: Decode<Grid> = readRecord(
     entries: readField(fields, path, 'entries', readList(readString)),
     contexts: readField(fields, path, 'contexts', readList(readContext)),
     afters: readField(fields, path, 'afters', readList(readAfter)),
-    allowed: readField(fields, path, 'allowed', readList(readList(readCount))),
+    allowed: readField(fields, path, 'allowed', readList(readList(readList(readCount)))),
   }),
 );
 
@@ -37,6 +40,9 @@ export function decodeGrid(value: unknown): Grid {
 
 /** Returns the entries that may stand at the place of the context `context` and the kind `after` of the grid. */
 export function allowedAt(grid: Grid, context: number, after: number): readonly string[] {
-  const mask = grid.allowed[context]?.[after] ?? 0;
-  return grid.entries.filter((_entry, bit) => Math.floor(mask / 2 ** bit) % 2 === 1);
+  const words = grid.allowed[context]?.[after] ?? [];
+  return grid.entries.filter((_entry, bit) => {
+    const word = words[Math.floor(bit / 32)] ?? 0;
+    return Math.floor(word / 2 ** (bit % 32)) % 2 === 1;
+  });
 }
