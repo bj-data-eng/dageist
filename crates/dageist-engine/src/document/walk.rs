@@ -867,6 +867,9 @@ impl Walker<'_> {
                 Start::Call(start) if at == 0 => loose_number(start),
                 _ => None,
             };
+            // A condition whose predicates and values are all one value gives one value whether
+            // or not Polars drops its predicates, so what follows it need not wait on that.
+            let all_single = matches!(&cur, Cur::Condition { single: true, .. });
             let (next, standing) = self.link(
                 link,
                 &arguments,
@@ -878,6 +881,15 @@ impl Walker<'_> {
                     receiver_loose,
                 },
             );
+            if branches_are_one
+                && all_single
+                && matches!(
+                    link.entry().id().as_str(),
+                    "Then.otherwise" | "ChainedThen.otherwise"
+                )
+            {
+                branches_are_one = false;
+            }
             // A method that gives one value of the many that a condition of identical values may
             // give is one value however the optimizer treats the condition.
             if branches_are_one
@@ -920,7 +932,13 @@ impl Walker<'_> {
             // A join's key that holds an aggregate beside a column, or a column
             // compared with a null, is not elementwise, which only the whole key
             // shows.
-            if is_not_elementwise(expression)
+            // A column of the dtype Null holds a null in every row, so what compares it with a
+            // null or a column leaves no value to replace, though it is a column to an aggregate
+            // beside it.
+            let as_read = self
+                .read_against()
+                .and_then(|schema| with_null_columns_as_literals(expression, schema));
+            if is_not_elementwise(expression, as_read.as_ref().unwrap_or(expression))
                 && let Err(refusal) = allowed::rule_forbids_a_key_known_not_elementwise(context)
             {
                 self.refuse(&refusal, true);
@@ -1773,30 +1791,113 @@ fn holds_a_null_comparison(expression: &Expression) -> bool {
 /// beside what is not one value, or a column compared with a null. A key that is
 /// wholly one value is the whole key, which the tables measured, and Polars
 /// allows it. It takes the null literal beside a column as elementwise, and an
-/// aggregate as not.
-fn is_not_elementwise(key: &Expression) -> bool {
+/// aggregate as not. The second expression is the key with each column of the dtype Null made the
+/// null literal, which only the comparison with a null reads.
+fn is_not_elementwise(key: &Expression, with_nulls_for_null_columns: &Expression) -> bool {
     !wholly_single(key, key.links().len(), true)
-        && !holds_an_interval_with_a_typed_null_bound(key)
+        && !holds_an_interval_that_polars_may_fold(key)
         && (holds_an_aggregate(key)
-            || holds_a_null_comparison(key)
+            || holds_a_null_comparison(with_nulls_for_null_columns)
             || holds_a_replacement_of_columns(key))
 }
 
-/// Whether an expression holds, at any depth, an interval with a null bound of a dtype. Polars
-/// folds such an interval into a null for some dtypes of what it bounds, and the null leaves
-/// nothing in the key that is not elementwise; for others it does not. The document does not
-/// decide which, so what a key that holds one is judged to be is left to a limit.
-fn holds_an_interval_with_a_typed_null_bound(expression: &Expression) -> bool {
+/// `expression` with each column of the dtype Null made a literal, which reads no column, in the
+/// calls it holds and what they are given: every value of such a column is a null, so what Polars
+/// compares it with a null or with a column leaves no value of it to be replaced. `None` when
+/// there is no such column in it, or an expression cannot be rebuilt.
+fn with_null_columns_as_literals(expression: &Expression, schema: &Schema) -> Option<Expression> {
+    fn value_of(value: &Value, schema: &Schema, changed: &mut bool) -> Option<Value> {
+        Some(match value {
+            Value::Expression(inside) => Value::Expression(expression_of(inside, schema, changed)?),
+            Value::Many(items) => Value::Many(
+                items
+                    .iter()
+                    .map(|item| value_of(item, schema, changed))
+                    .collect::<Option<Vec<_>>>()?,
+            ),
+            Value::Pairs(pairs) => Value::Pairs(
+                pairs
+                    .iter()
+                    .map(|(key, entry)| {
+                        Some((
+                            value_of(key, schema, changed)?,
+                            value_of(entry, schema, changed)?,
+                        ))
+                    })
+                    .collect::<Option<Vec<_>>>()?,
+            ),
+            other => other.clone(),
+        })
+    }
+    fn call_of(call: &Call, schema: &Schema, changed: &mut bool) -> Option<Call> {
+        if call.entry().id().as_str() == "polars.col"
+            && let Some(Value::Columns(names)) = call.argument("name")
+            && let [name] = names.as_slice()
+            && schema
+                .get(name)
+                .is_some_and(|dtype| matches!(dtype, polars::prelude::DataType::Null))
+        {
+            *changed = true;
+            return Call::new(
+                crate::catalog::entry("polars.lit")?,
+                [("value", Value::Integer(1))],
+            )
+            .ok();
+        }
+        let given = call
+            .arguments()
+            .iter()
+            .map(|given| Some((given.parameter(), value_of(given.value(), schema, changed)?)))
+            .collect::<Option<Vec<_>>>()?;
+        Call::new(call.entry(), given).ok()
+    }
+    fn expression_of(
+        expression: &Expression,
+        schema: &Schema,
+        changed: &mut bool,
+    ) -> Option<Expression> {
+        let start = match expression.start() {
+            Start::Call(call) => Start::Call(call_of(call, schema, changed)?),
+            other => other.clone(),
+        };
+        let links = expression
+            .links()
+            .iter()
+            .map(|link| call_of(link, schema, changed))
+            .collect::<Option<Vec<_>>>()?;
+        Expression::new(start, links).ok()
+    }
+    let mut changed = false;
+    let rebuilt = expression_of(expression, schema, &mut changed)?;
+    changed.then_some(rebuilt)
+}
+
+/// Whether an expression holds, at any depth, an interval that Polars may fold: one with a null
+/// bound of a dtype, which it folds into a null for some dtypes of what it bounds and not for
+/// others, or one with a negative whole number as a bound, which it decides at once where what it
+/// bounds is unsigned, as a count is, and keeps where it is not. The fold leaves nothing in the
+/// key that is not elementwise. The document does not decide which dtype it is, so what a key that
+/// holds one is judged to be is left to a limit.
+fn holds_an_interval_that_polars_may_fold(expression: &Expression) -> bool {
     calls_of(expression).any(|call| {
         (call.entry().id().as_str() == "Expr.is_between"
             && operands(call).into_iter().any(|operand| {
-                is_a_null(operand)
-                    && matches!(operand.start(), Start::Call(start) if start.argument("dtype").is_some())
+                (is_a_null(operand)
+                    && matches!(operand.start(), Start::Call(start) if start.argument("dtype").is_some()))
+                    || is_a_negative_whole_number(operand)
             }))
             || operands(call)
                 .into_iter()
-                .any(holds_an_interval_with_a_typed_null_bound)
+                .any(holds_an_interval_that_polars_may_fold)
     })
+}
+
+/// Whether an expression is a whole number below zero and no more.
+fn is_a_negative_whole_number(expression: &Expression) -> bool {
+    expression.links().is_empty()
+        && matches!(expression.start(), Start::Call(start)
+            if start.entry().id().as_str() == "polars.lit"
+                && matches!(start.argument("value"), Some(Value::Integer(number)) if *number < 0))
 }
 
 /// Whether `call` is a replacement of values.
