@@ -2926,6 +2926,22 @@ mod tests {
     }
 
     #[test]
+    fn a_hidden_schema_is_excused_at_the_end_of_a_join_key_which_is_no_output_of_the_step() {
+        let reason = "the schema says Null and the rows give Float64";
+        let divided = chain_of(column("a"), vec![compared_with("Expr.truediv", whole(1))]);
+        let joined = join(chain(column("key"), &[]), divided.clone());
+        assert_eq!(
+            tables_refuse(&joined, link_of("right_on", 0, 0), ROWS, reason),
+            vec![Limit::AHiddenSchema]
+        );
+        let selected = select(vec![divided]);
+        assert_eq!(
+            tables_refuse(&selected, link_of("exprs", 0, 0), ROWS, reason),
+            vec![]
+        );
+    }
+
+    #[test]
     fn a_pivot_aggregate_is_excused_by_the_kernel_reason_and_by_the_empty_table_with_one() {
         let case = pivot(chain(column("a"), &["Expr.cum_sum"]));
         let at_the_call = at(&[parameter("aggregate_function"), Segment::Link(0)]);
