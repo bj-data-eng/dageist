@@ -1108,7 +1108,11 @@ of 157 or 158 pivot cases. The test asserts none of those.
 A case that the tables cannot be asked about, because the dtype of an argument or
 before a method is not known, is not predicted past that point and is counted. An
 expression that holds such a call has the dtype of its own calls, and Polars refusing it
-at that call, when it works out the schema, is no dtype the tables got wrong. The
+at that call, when it works out the schema, is no dtype the tables got wrong. A join that
+pairs one column of the other table with two keys that Polars gives different dtypes, as
+an array of whole numbers and the array of floats that a division of it gives, which the
+tables take for one class, is no case at all: no dtype of the column fits both, and the
+target counts it apart and does not compare it. The
 generator keeps to what the tables measured where a value, not a dtype, decides: a
 `shift` by the number 1 of a dtype, or the number -1 of a signed integer dtype (the
 tables measured the dtype, which the sign does not change), a number of significant figures
