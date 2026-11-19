@@ -146,7 +146,8 @@ pub enum Limit {
     /// so a `not` meets each operand, which it refuses for the dtype Null. Polars
     /// refusing the rows with the reason that the dtype Null is not supported in `not`,
     /// which has no place, in a case that holds a `not` straight after an `and` or an
-    /// `or`.
+    /// `or`. It gives a filter's predicate the dtype Null, which Polars refuses with
+    /// the reason that a predicate must be a `Boolean`, in a filter that holds one.
     ABitwiseCallOnANull,
     /// A `UInt128` is compared with a `Decimal` by casting it to `decimal[38,0]`,
     /// which holds up to 38 digits, and a `UInt128` holds more. The sample's values
@@ -346,6 +347,14 @@ fn any_call(expression: &Expression, found: &dyn Fn(&Call) -> bool) -> bool {
 fn is_a_single_value(call: &Call) -> bool {
     is_one_value(call)
         || (is(call, "polars.lit") && matches!(call.argument("value"), Some(Value::Flag(None))))
+}
+
+/// Whether `call` is `and`, `or` or `xor`.
+fn is_a_bitwise_call(call: &Call) -> bool {
+    matches!(
+        call.entry().id().as_str(),
+        "Expr.and_" | "Expr.or_" | "Expr.xor"
+    )
 }
 
 /// Whether an expression has a `not` straight after an `and` or an `or`, at any depth.
@@ -1274,12 +1283,16 @@ fn applies(
                 })
         }
         (Limit::ABitwiseCallOnANull, Disagreement::PolarsRefuses(refusal)) => {
-            unplaced(refusal)
-                && refusal.stage == Stage::Rows
-                && refusal
-                    .reason
-                    .contains("dtype Null not supported in 'not' operation")
-                && held.iter().any(|(_, held)| negates_a_bitwise_call(held))
+            let reason = refusal.reason.as_str();
+            let negated = reason.contains("dtype Null not supported in 'not' operation")
+                && held.iter().any(|(_, held)| negates_a_bitwise_call(held));
+            let filtered = reason
+                .contains("filter predicate must be of type `Boolean`, got `Null`")
+                && is(step, "LazyFrame.filter")
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &is_a_bitwise_call));
+            unplaced(refusal) && refusal.stage == Stage::Rows && (negated || filtered)
         }
         (Limit::AValueBeyondADecimal, Disagreement::PolarsRefuses(refusal)) => {
             // The rows hold the values; a table with no rows holds none to fail.
