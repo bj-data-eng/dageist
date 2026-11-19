@@ -354,6 +354,10 @@ impl Parameter {
     /// Python takes none: `and_` and `or_` are the expression they follow without an operand,
     /// which is no use to a step, so they are judged with one.
     const fn with_at_least_one(mut self) -> Self {
+        assert!(
+            matches!(self.variadic, Some(Variadic::Args)),
+            "only a starred parameter is one of which a step gives at least one"
+        );
         self.at_least_one = true;
         self
     }
