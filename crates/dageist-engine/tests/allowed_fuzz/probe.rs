@@ -2202,6 +2202,19 @@ mod tests {
     }
 
     #[test]
+    fn a_test_of_closeness_is_settled_by_polars_refusing_it_whichever_value_it_names() {
+        // `when(k is null).then(f).when(h is close to b).then(f).otherwise(f)`: the values of the
+        // condition are one expression, so Polars drops its predicates, and the tables refuse
+        // the test for text, as Polars does where it evaluates it, which names the text or the
+        // list it is given first by how many threads it has.
+        let case = kept("stricter-a-test-of-closeness-in-a-condition-of-identical-values.case");
+        let refused = refusal(&case);
+        let found = settle_apart(&case, &refused, &predict(&case), &observe(&case))
+            .expect("a test of closeness that Polars refuses");
+        assert!(found.probe.contains("Expr.is_close"), "{}", found.probe);
+    }
+
+    #[test]
     fn a_replacement_the_rule_refuses_is_settled_by_polars_refusing_the_part_for_its_lengths() {
         // `sort(by=lit(1).replace_strict(1.0, "1d", default=g).max())`: the rule refuses a default
         // of many values beside a receiver of one, and Polars drops a sort key that is one value;
