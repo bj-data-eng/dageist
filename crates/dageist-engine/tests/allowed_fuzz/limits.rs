@@ -3118,6 +3118,99 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_not_after_a_run_of_and_and_or_is_excused_where_any_call_of_the_run_meets_a_null() {
+        // `f & a & true` then `not`, with `a` a null: the null is met by the first call and
+        // stays in what the run combines, which the negation reaches through the calls after it.
+        let and_then_and = |first: Call, second: Call| {
+            chain_of(
+                column("f"),
+                vec![first, second, not(), call("Expr.min", vec![])],
+            )
+        };
+        for expression in [
+            and_then_and(
+                and_of(chain(typed_null(), &[])),
+                and_of(chain(truth(), &[])),
+            ),
+            and_then_and(and_of(chain(typed_null(), &[])), or_of(chain(truth(), &[]))),
+            and_then_and(or_of(chain(typed_null(), &[])), and_of(chain(truth(), &[]))),
+            and_then_and(and_of(chain(truth(), &[])), or_of(chain(typed_null(), &[]))),
+            // A null that a call gives the dtype, and a null the run starts from.
+            and_then_and(and_of(null_plus_null()), or_of(chain(truth(), &[]))),
+            chain_of(
+                typed_null(),
+                vec![
+                    and_of(chain(truth(), &[])),
+                    and_of(chain(truth(), &[])),
+                    not(),
+                    call("Expr.min", vec![]),
+                ],
+            ),
+        ] {
+            let case = select(vec![expression]);
+            assert_eq!(
+                polars_refuses_what_the_tables_allow(&case, None, Stage::Rows, NOT_OF_A_NULL),
+                vec![Limit::ABitwiseCallOnANull],
+                "{}",
+                case.document.write()
+            );
+        }
+    }
+
+    #[test]
+    fn a_not_after_bitwise_calls_that_meet_no_null_or_a_run_that_a_call_breaks_is_not_excused() {
+        for expression in [
+            // No null at all.
+            chain_of(
+                column("f"),
+                vec![
+                    and_of(chain(truth(), &[])),
+                    or_of(chain(truth(), &[])),
+                    not(),
+                ],
+            ),
+            // The null is in an operand whose own dtype is a `Boolean`.
+            chain_of(
+                column("f"),
+                vec![
+                    and_of(chain(null(), &["Expr.is_null"])),
+                    and_of(chain(truth(), &[])),
+                    not(),
+                ],
+            ),
+            // A call that is no `and` or `or` between the null and the negation ends the run.
+            chain_of(
+                column("f"),
+                vec![
+                    and_of(chain(typed_null(), &[])),
+                    call("Expr.is_null", Vec::new()),
+                    and_of(chain(truth(), &[])),
+                    not(),
+                ],
+            ),
+            chain_of(
+                column("f"),
+                vec![
+                    and_of(chain(typed_null(), &[])),
+                    xor_of(chain(truth(), &[])),
+                    and_of(chain(truth(), &[])),
+                    not(),
+                ],
+            ),
+            // An `xor` is not what the negation is pushed through.
+            chain_of(column("f"), vec![xor_of(chain(typed_null(), &[])), not()]),
+        ] {
+            let case = select(vec![expression]);
+            assert_eq!(
+                polars_refuses_what_the_tables_allow(&case, None, Stage::Rows, NOT_OF_A_NULL),
+                vec![],
+                "{}",
+                case.document.write()
+            );
+        }
+    }
+
     fn filtered(predicate: Expression) -> Case {
         case_of(call(
             "LazyFrame.filter",
