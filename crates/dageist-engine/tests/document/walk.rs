@@ -740,6 +740,30 @@ fn a_join_key_with_a_comparison_of_a_column_with_a_null_at_any_depth_is_refused(
 }
 
 #[test]
+fn a_comparison_of_a_null_after_a_call_that_is_not_a_step_of_the_plan_is_still_with_a_null() {
+    // `and_` and `or_` given no operand are the expression they follow, so Polars meets
+    // `null > f` as if they were not there and folds it into a null.
+    let rule = Some(RefusalSource::Rule(Rule::KeyIsElementwise));
+    let null_start = || call("polars.lit", json!({ "value": { "flag": null } }));
+    for identity in ["Expr.and_", "Expr.or_"] {
+        let key = chain(
+            null_start(),
+            vec![call(identity, json!({})), compared("Expr.gt", field("f"))],
+        );
+        assert_eq!(joined_on(key), rule, "{identity}");
+    }
+    // Given an operand they are a call of their own, which the rule does not see through.
+    let key = chain(
+        null_start(),
+        vec![
+            call("Expr.and_", json!({ "others": many(vec![field("f")]) })),
+            compared("Expr.gt", field("f")),
+        ],
+    );
+    assert_eq!(joined_on(key), None);
+}
+
+#[test]
 fn a_join_key_that_compares_nothing_of_a_column_with_a_null_is_not_refused() {
     let keys = [
         // A null, a comparison of two literals, a column with a whole number.
