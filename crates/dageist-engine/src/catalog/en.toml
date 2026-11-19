@@ -3,15 +3,7 @@
 # entry, a parameter and a choice word is exactly Polars' name; `changed` lists the
 # names that are deliberately not, written as `Entry.id`, `Entry.id#parameter` or
 # `Entry.id#parameter#word`.
-changed = [
-    "Expr.and_",
-    "Expr.cbrt",
-    "Expr.erf",
-    "Expr.erfc",
-    "Expr.not_",
-    "Expr.or_",
-    "Expr.round_sig_figs",
-]
+changed = ["Expr.and_", "Expr.not_", "Expr.or_"]
 
 [families.steps]
 title = "Steps · change the table"
@@ -168,8 +160,8 @@ name = "arctanh"
 hint = "inverse hyperbolic tangent"
 
 [entries."Expr.cbrt"]
-name = "cube_root"
-hint = "cube root, cbrt in Polars"
+name = "cbrt"
+hint = "cube root"
 
 [entries."Expr.ceil"]
 name = "ceil"
@@ -264,12 +256,12 @@ name = "other"
 label = "compared with"
 
 [entries."Expr.erf"]
-name = "error_function"
-hint = "error function, erf in Polars"
+name = "erf"
+hint = "error function"
 
 [entries."Expr.erfc"]
-name = "complementary_error_function"
-hint = "complementary error function, erfc in Polars"
+name = "erfc"
+hint = "complementary error function"
 
 [entries."Expr.exp"]
 name = "exp"
@@ -457,8 +449,8 @@ half_to_even = "half_to_even"
 half_away_from_zero = "half_away_from_zero"
 
 [entries."Expr.round_sig_figs"]
-name = "round_significant_figures"
-hint = "rounded to a number of significant figures, round_sig_figs in Polars"
+name = "round_sig_figs"
+hint = "rounded to a number of significant figures"
 
 [entries."Expr.round_sig_figs".parameters.digits]
 name = "digits"
