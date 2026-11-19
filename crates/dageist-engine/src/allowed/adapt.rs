@@ -7,7 +7,7 @@
 //! with typed columns, so they say what a call gives only for an operand of a dtype,
 //! and this module says which dtype that is for such a number.
 
-use crate::catalog::{Entry, ParameterDefault, Role};
+use crate::catalog::{Entry, Role};
 
 use super::dtype::Representative;
 use super::literal::Literal;

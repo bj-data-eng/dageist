@@ -3,7 +3,7 @@
 
 use std::fmt;
 
-use crate::catalog::{self, Applies, Entry, Kind, ParameterDefault};
+use crate::catalog::{self, Applies, Entry, Kind};
 
 use super::adapt::could_be_taken_by_a_number;
 use super::context::Context;

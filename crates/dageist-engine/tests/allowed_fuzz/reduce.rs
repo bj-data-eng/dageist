@@ -4,7 +4,6 @@
 //! constructors, so what they refuse is not offered, and nothing is repaired.
 
 use dageist_engine::allowed::Representative;
-use dageist_engine::catalog::ParameterDefault;
 use dageist_engine::document::{Call, Document, Expression, Step, Value};
 
 use super::case::Case;
