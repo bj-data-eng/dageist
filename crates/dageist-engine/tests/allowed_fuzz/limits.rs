@@ -76,8 +76,7 @@ pub enum Limit {
     /// A pivot's aggregate is run on the values of each group, not on a
     /// column in `select`, and Polars uses other kernels for them: it takes the
     /// `max` of a `Struct` there, which `select` refuses, and compares, casts
-    /// and windows what `select` does not, and casts the nulls of a group where
-    /// it refuses the text of the sample's rows. A table with no rows has no groups,
+    /// and windows what `select` does not. A table with no rows has no groups,
     /// and the values of an aggregate over none have no dtype. The empty table's
     /// refusal is gated by its reason, which has no place; the tables refusing
     /// is placed, in the aggregate, with a reason about a kernel.
@@ -205,11 +204,21 @@ pub enum Limit {
     /// place, in a case whose refusal is the bound's: the case run again with the bounds of
     /// every `clip` undone is not refused for a failed conversion.
     ABoundTheDtypeCannotHold,
+    /// Polars casts a bound of `clip` to the dtype it clips, and a bound whose values that dtype
+    /// holds is cast whatever its dtype is: text that reads as the number, a list or another
+    /// dtype that holds nothing but nulls. The tables measured a bound as a column of the
+    /// sample's rows, whose text is a duration no number reads and whose lists no dtype holds,
+    /// so they refuse the cast of a dtype to another that the values of another bound pass. The
+    /// tables refusing, when they run rows, with a failed conversion or a failed cast of a
+    /// dtype, at a `clip` that has a bound that is not a bare column, which Polars allows. A
+    /// bound that is a bare column holds the sample's rows, as the tables measured it, so it is
+    /// not this.
+    ABoundWithValuesOfItsOwn,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 18] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -227,6 +236,7 @@ impl Limit {
         Self::AJoinKeyDtype,
         Self::AHiddenSchema,
         Self::ABoundTheDtypeCannotHold,
+        Self::ABoundWithValuesOfItsOwn,
     ];
 
     /// The name a kept case is filed under.
@@ -249,6 +259,7 @@ impl Limit {
             Self::AJoinKeyDtype => "a-join-key-dtype",
             Self::AHiddenSchema => "a-hidden-schema",
             Self::ABoundTheDtypeCannotHold => "a-bound-the-dtype-cannot-hold",
+            Self::ABoundWithValuesOfItsOwn => "a-bound-with-values-of-its-own",
         }
     }
 
@@ -302,6 +313,9 @@ impl Limit {
             }
             Self::ABoundTheDtypeCannotHold => {
                 "Polars casts a bound of clip to the dtype it clips and refuses a value that dtype cannot hold, which the tables measured only with values it holds"
+            }
+            Self::ABoundWithValuesOfItsOwn => {
+                "Polars casts the values of a bound of clip to the dtype it clips, which the tables measured as the sample's rows, and a bound with others passes"
             }
         }
     }
@@ -1141,6 +1155,27 @@ fn has_a_bound(call: &Call) -> bool {
             .any(|bound| call.argument(bound).is_some())
 }
 
+/// Whether the expression is a column and nothing else, which holds the sample's rows.
+fn is_a_bare_column(expression: &Expression) -> bool {
+    expression.links().is_empty()
+        && matches!(expression.start(), Start::Call(call) if is(call, "polars.col"))
+}
+
+/// Whether the call is a `clip` with a bound that is not a bare column: one that may hold other
+/// values than the sample's rows.
+fn has_a_bound_of_its_own(call: &Call) -> bool {
+    is(call, "Expr.clip")
+        && ["lower_bound", "upper_bound"].iter().any(|bound| {
+            matches!(call.argument(bound), Some(Value::Expression(expression)) if !is_a_bare_column(expression))
+        })
+}
+
+/// Whether the reason is that a dtype could not be cast to another, in Polars' words for a
+/// failed conversion of values or of a list's type.
+fn is_a_failed_cast(reason: &str) -> bool {
+    is_a_failed_conversion(reason) || reason.starts_with("cannot cast ")
+}
+
 /// Whether the reason is that of a value that could not be cast: Polars' words for it, which
 /// name the dtypes.
 fn is_a_failed_conversion(reason: &str) -> bool {
@@ -1372,9 +1407,6 @@ fn applies(
                     "lengths don't match",
                     "must specify one field",
                     "cannot cast",
-                    // The sample's rows hold text that a number does not read, which the tables
-                    // measured a bound with and a group of nulls does not hold.
-                    "conversion from",
                 ]
                 .iter()
                 .any(|words| refused.reason.contains(words))
@@ -1524,6 +1556,15 @@ fn applies(
                 && is_a_failed_conversion(&refusal.reason)
                 && held.iter().any(|(_, held)| any_call(held, &has_a_bound))
                 && !refused_for_a_failed_conversion_without_bounds(case)
+        }
+        (Limit::ABoundWithValuesOfItsOwn, Disagreement::PolarsAllows(refused)) => {
+            // A clip casts nothing but its bounds, so a failed cast of the rows at the clip is
+            // the bound's, which holds values of its own where it is no bare column.
+            refused.stage == Some(TableStage::Rows)
+                && is_a_failed_cast(&refused.reason)
+                && locate(case, &refused.place)
+                    .call
+                    .is_some_and(has_a_bound_of_its_own)
         }
         (Limit::AWindowOverAWindow, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
@@ -2430,6 +2471,102 @@ mod tests {
                 vec![]
             );
         }
+    }
+
+    // ----- A bound with values of its own
+
+    const TEXT_CAST: &str = "conversion from `str` to `i8` failed in column 'b' for 2 out of 3 values: [\"1d\", \"2d\"]";
+    const LIST_CAST: &str = "cannot cast List type (inner: 'Int64', to: 'Date')";
+
+    #[test]
+    fn a_failed_cast_at_a_clip_is_excused_where_a_bound_is_no_bare_column() {
+        let at_the_clip = link_of("exprs", 0, 0);
+        for bound in [
+            whole(1),
+            chain(null(), &[]),
+            chain(column("k"), &["Expr.sqrt"]),
+        ] {
+            let case = select(vec![chain_of(
+                column("a"),
+                vec![clip_with(Some(bound), None)],
+            )]);
+            for reason in [TEXT_CAST, LIST_CAST] {
+                assert_eq!(
+                    tables_refuse(&case, at_the_clip.clone(), ROWS, reason),
+                    vec![Limit::ABoundWithValuesOfItsOwn],
+                    "{reason}"
+                );
+            }
+        }
+        // The other bound is the one with values of its own, and a pivot's aggregate is the same.
+        let upper = chain_of(
+            column("a"),
+            vec![clip_with(Some(chain(column("b"), &[])), Some(whole(1)))],
+        );
+        assert_eq!(
+            tables_refuse(
+                &select(vec![upper.clone()]),
+                at_the_clip.clone(),
+                ROWS,
+                TEXT_CAST
+            ),
+            vec![Limit::ABoundWithValuesOfItsOwn]
+        );
+        assert_eq!(
+            tables_refuse(
+                &pivot(upper),
+                at(&[parameter("aggregate_function"), Segment::Link(0)]),
+                ROWS,
+                TEXT_CAST
+            ),
+            vec![Limit::ABoundWithValuesOfItsOwn]
+        );
+    }
+
+    #[test]
+    fn a_failed_cast_at_a_clip_is_not_excused_by_a_bound_that_is_a_bare_column_or_absent() {
+        // A bare column holds the sample's rows as the tables measured them, and Polars refuses
+        // it the same way; a clip with no bound casts nothing.
+        let at_the_clip = link_of("exprs", 0, 0);
+        for clip in [
+            clip_with(Some(chain(column("b"), &[])), Some(chain(column("k"), &[]))),
+            clip_with(None, None),
+        ] {
+            let case = select(vec![chain_of(column("a"), vec![clip])]);
+            assert_eq!(
+                tables_refuse(&case, at_the_clip.clone(), ROWS, TEXT_CAST),
+                vec![]
+            );
+        }
+    }
+
+    #[test]
+    fn only_a_failed_cast_of_the_rows_at_the_clip_itself_is_excused_for_a_bound_of_its_own() {
+        let case = select(vec![chain_of(
+            column("a"),
+            vec![
+                clip_with(Some(whole(1)), None),
+                compared_with("Expr.sub", whole(1)),
+            ],
+        )]);
+        // Another reason, another stage, and another call of the chain.
+        assert_eq!(
+            tables_refuse(&case, link_of("exprs", 0, 0), ROWS, "no"),
+            vec![]
+        );
+        assert_eq!(
+            tables_refuse(
+                &case,
+                link_of("exprs", 0, 0),
+                Some(TableStage::Schema),
+                TEXT_CAST
+            ),
+            vec![]
+        );
+        assert_eq!(
+            tables_refuse(&case, link_of("exprs", 0, 1), ROWS, TEXT_CAST),
+            vec![]
+        );
     }
 
     // ----- A negated bitwise call
@@ -3688,21 +3825,37 @@ mod tests {
     }
 
     #[test]
-    fn a_failed_conversion_of_the_samples_text_is_excused_at_a_call_of_a_pivots_aggregate_only() {
-        // The tables measured a bound of the dtype `String` as the sample's column, whose text
-        // is a duration that no number reads; a group of nulls holds none.
-        let reason = "conversion from `str` to `i32` failed in column 'b' for 2 out of 3 values: [\"1d\", \"2d\"]";
-        let clipped = chain_of(column("a"), vec![clip_with(Some(whole(1)), None)]);
+    fn an_unrelated_failed_conversion_is_not_excused_in_a_pivots_aggregate() {
+        // The pivot's limit is for what a group runs with kernels of its own, not for any
+        // conversion that fails: a struct that cannot become a struct, or a schema that cannot
+        // be cast to the dtype Null, is no kernel of a group.
+        let aggregate = chain_of(column("a"), vec![compared_with("Expr.sub", whole(1))]);
         let at_the_call = at(&[parameter("aggregate_function"), Segment::Link(0)]);
-        assert_eq!(
-            tables_refuse(&pivot(clipped.clone()), at_the_call, ROWS, reason),
-            vec![Limit::AGroupAggregate]
-        );
-        // A step that is no pivot runs the sample's rows, which do hold the text.
-        assert_eq!(
-            tables_refuse(&select(vec![clipped]), link_of("exprs", 0, 0), ROWS, reason),
-            vec![]
-        );
+        for (stage, reason) in [
+            (
+                Some(TableStage::Rows),
+                "conversion from `struct[2]` to `struct[2]` failed in column 'b' for 2 out of 3 values: [{1,\"a\"}, {3,\"c\"}]",
+            ),
+            (
+                Some(TableStage::Schema),
+                "conversion from `i64` to `null` failed in column 'b'",
+            ),
+            (
+                Some(TableStage::Rows),
+                "conversion from `str` to `i32` failed in column 'b' for 2 out of 3 values: [\"1d\", \"2d\"]",
+            ),
+        ] {
+            assert_eq!(
+                tables_refuse(
+                    &pivot(aggregate.clone()),
+                    at_the_call.clone(),
+                    stage,
+                    reason
+                ),
+                vec![],
+                "{reason}"
+            );
+        }
     }
 
     #[test]
