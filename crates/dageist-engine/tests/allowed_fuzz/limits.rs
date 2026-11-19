@@ -3119,6 +3119,80 @@ mod tests {
         );
     }
 
+    #[test]
+    fn a_null_in_an_operand_column_carries_through_a_binary_call() {
+        // Polars: `b - x` is null where `b` or `x` is, so `b.sub(k)` of the sample's `b`
+        // (a value, a null, a value) is `v, null, v`; one shift gives `null, v, null`; and
+        // `.mul(a)` of the sample's `a` (a value, a null, a value) is null in every row.
+        let shifts = [Limit::AShiftThatLeavesNulls];
+        let binary = |id: &str, operand: &str| compared_with(id, chain(column(operand), &[]));
+        assert_eq!(
+            excused_after(
+                "b",
+                vec![
+                    binary("Expr.sub", "k"),
+                    shift_by(1),
+                    binary("Expr.mul", "a")
+                ]
+            ),
+            shifts
+        );
+        // The receiver holds the value the shift moves to the end, and the operand's null
+        // is in the middle: each row is null by one or the other.
+        assert_eq!(
+            excused_after(
+                "k",
+                vec![
+                    binary("Expr.sub", "a"),
+                    shift_by(1),
+                    binary("Expr.mul", "a")
+                ]
+            ),
+            shifts
+        );
+        // An operand that holds no null leaves the row the receiver holds a value in.
+        assert_eq!(
+            excused_after(
+                "b",
+                vec![
+                    binary("Expr.sub", "k"),
+                    shift_by(1),
+                    binary("Expr.mul", "k")
+                ]
+            ),
+            vec![]
+        );
+        // So does a literal, which is one value, and a column the sample has none of.
+        let literal = compared_with("Expr.mul", chain_with_integer(2));
+        assert_eq!(
+            excused_after("b", vec![binary("Expr.sub", "k"), shift_by(1), literal]),
+            vec![]
+        );
+        // A null in the operand alone does not empty the rows that the receiver holds.
+        assert_eq!(excused_after("k", vec![binary("Expr.mul", "a")]), vec![]);
+        // `or` and `and` do not carry a null through: a null or a true is a true.
+        for id in ["Expr.or_", "Expr.and_", "Expr.xor"] {
+            assert_eq!(
+                excused_after("k", vec![shift_by(3), binary(id, "f")]),
+                vec![],
+                "{id}"
+            );
+        }
+        // A call whose effect on the rows is not known leaves nothing known of them, so the
+        // null of the operand does not reach them.
+        assert_eq!(
+            excused_after(
+                "k",
+                vec![
+                    binary("Expr.sub", "a"),
+                    over("k", None),
+                    binary("Expr.mul", "a")
+                ]
+            ),
+            vec![]
+        );
+    }
+
     /// A whole number as an expression: a literal of it.
     fn chain_with_integer(rows: i64) -> Expression {
         chain(
