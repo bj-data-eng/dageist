@@ -41,6 +41,7 @@ use dageist_engine::document::{Call, Document, Expression, Place, Segment, Start
 
 use super::case::Case;
 use super::frames::Frames;
+use super::frames::stand_in_column;
 use super::literal::{
     LiteralCause, call_with_columns, class_of, expression_with_columns, operand_causes,
     placed_operands, starts_from_a_literal,
@@ -149,11 +150,12 @@ pub enum Limit {
     /// which it refuses for the dtype Null. Polars refusing the rows with the reason that
     /// the dtype Null is not supported in `not`, which has no place, in a case that holds
     /// a `not` after a run of `and` and `or`, any call of which meets a null, as the tables
-    /// give the dtypes and as a null goes on through the `and` and the `or` after it. It gives a filter's predicate the dtype Null, which Polars refuses with
-    /// the reason that a predicate must be a `Boolean`: an `and` that meets a null does,
-    /// as does an `or` of nulls, and the dtype goes on through the `and` and the `or` that
-    /// follow it, so the predicate is one that ends in bitwise calls the first of which
-    /// meets a null. An `or` or an `xor` of a `Boolean` and a null is a `Boolean`.
+    /// give the dtypes and as a null goes on through the `and` and the `or` after it. It
+    /// gives a filter's predicate the dtype Null, which Polars refuses with the reason that
+    /// a predicate must be a `Boolean`: an `and` that meets a null does, as does an `or` of
+    /// nulls, and the dtype goes on through the `and` and the `or` that follow it, so the
+    /// predicate is one that ends in bitwise calls the first of which meets a null. An `or`
+    /// or an `xor` of a `Boolean` and a null is a `Boolean`.
     ABitwiseCallOnANull,
     /// A `UInt128` is compared with a `Decimal` by casting it to `decimal[38,0]`,
     /// which holds up to 38 digits, and a `UInt128` holds more. The sample's values
@@ -228,12 +230,13 @@ pub enum Limit {
     /// starts from a literal, which Polars allows; the window is why where Polars, asked again
     /// with each literal partition a column, refuses the case for that reason.
     AWindowOverALiteral,
-    /// Polars refuses `date ^ int64` and `bool | int64` when it works out the schema of a
-    /// select, a filter or a sort key, and accepts the same call in a join's key, where it
-    /// evaluates it on the physical values. The tables measured a bitwise call in select, with
-    /// the dtypes the call needs. The tables refusing, for the dtypes it is given, at a bitwise
-    /// call in a join's key, which Polars allows; the key is why where Polars, asked to select
-    /// the key, refuses it as the call's dtypes say.
+    /// Polars refuses some dtypes of `and`, `or` and `xor` when it works out the schema of a
+    /// select, a filter or a sort key, and accepts them in a join's key, as `date ^ int64` and
+    /// `bool | int64`: the docs list the pairs measured. The tables measured a bitwise call in
+    /// select, and refuse it for the dtypes it is given. The tables refusing, with a reason that
+    /// names the two dtypes, at a bitwise call in one of a join's own keys, which Polars allows;
+    /// the key is why where Polars, asked to select the refused call on a column of each of the
+    /// two dtypes, refuses it at the call for the tables' reason.
     ABitwiseCallInAJoinKey,
 }
 
@@ -1580,41 +1583,119 @@ fn control_with_columns(
     ))
 }
 
-/// Whether `reason` is what Polars objects to of the dtypes of a bitwise call: `^ not allowed on
-/// date and i64`, `| on Boolean and Int64 is not supported`, or that the operation is not supported
-/// for a dtype.
-fn is_a_bitwise_objection(reason: &str) -> bool {
-    ["^", "|", "&"].iter().any(|symbol| {
-        reason.starts_with(&format!("{symbol} not allowed on"))
-            || reason.starts_with(&format!("{symbol} on "))
-    }) || ["bitand", "bitor", "bitxor"]
-        .iter()
-        .any(|name| reason.contains(&format!("`{name}` operation not supported")))
+/// The class that Polars' name for a dtype, as its objections spell it, stands for.
+fn class_of_polars_name(name: &str) -> Option<Representative> {
+    Some(match name.trim().to_ascii_lowercase().as_str() {
+        "i8" | "int8" => Representative::Int8,
+        "i16" | "int16" => Representative::Int16,
+        "i32" | "int32" => Representative::Int32,
+        "i64" | "int64" => Representative::Int64,
+        "u8" | "uint8" => Representative::UInt8,
+        "u16" | "uint16" => Representative::UInt16,
+        "u32" | "uint32" => Representative::UInt32,
+        "u64" | "uint64" => Representative::UInt64,
+        "f32" | "float32" => Representative::Float32,
+        "f64" | "float64" => Representative::Float64,
+        "bool" | "boolean" => Representative::Boolean,
+        "str" | "string" => Representative::String,
+        "date" => Representative::Date,
+        "time" => Representative::Time,
+        _ => return None,
+    })
 }
 
-/// Whether Polars refuses the join key that holds the refused call, when it is the only item of a
-/// `select` on the table it is read against, as a bitwise call's dtypes say: the position is then
-/// why it allows the key.
-fn refused_when_the_key_is_selected(case: &Case, refused: &Refused) -> bool {
-    let Some(key) = locate(case, &refused.place).top else {
+/// The dtypes that Polars' objection to a bitwise call names, which are the receiver's and the
+/// argument's: `^ not allowed on date and i8`, or `| on Boolean and Int64 is not supported`.
+fn dtypes_of_a_bitwise_objection(reason: &str) -> Option<(Representative, Representative)> {
+    let symbol = reason
+        .chars()
+        .next()
+        .filter(|symbol| "^|&".contains(*symbol))?;
+    let rest = reason[symbol.len_utf8()..].trim_start();
+    let named = rest
+        .strip_prefix("not allowed on ")
+        .or_else(|| {
+            rest.strip_prefix("on ")
+                .and_then(|rest| rest.strip_suffix(" is not supported"))
+        })
+        .or_else(|| {
+            rest.strip_prefix("on ")
+                .and_then(|rest| rest.split(" is not supported").next())
+        })?;
+    let (receiver, argument) = named.split_once(" and ")?;
+    Some((
+        class_of_polars_name(receiver)?,
+        class_of_polars_name(argument)?,
+    ))
+}
+
+/// `call` with every expression it is given a column that stands in for it, the first for the
+/// second dtype of the objection and so on, and how many there are.
+fn call_on_stand_ins(call: &Call) -> Option<Call> {
+    fn columns_in(value: &Value, next: &mut usize) -> Option<Value> {
+        Some(match value {
+            Value::Expression(_) => {
+                *next += 1;
+                let name = Call::new(
+                    catalog::entry("polars.col")?,
+                    vec![("name", Value::Columns(vec![stand_in_column(*next)]))],
+                )
+                .ok()?;
+                Value::Expression(Expression::new(Start::Call(name), Vec::new()).ok()?)
+            }
+            Value::Many(items) => Value::Many(
+                items
+                    .iter()
+                    .map(|item| columns_in(item, next))
+                    .collect::<Option<Vec<_>>>()?,
+            ),
+            other => other.clone(),
+        })
+    }
+    let mut next = 0;
+    let given = call
+        .arguments()
+        .iter()
+        .map(|given| Some((given.parameter(), columns_in(given.value(), &mut next)?)))
+        .collect::<Option<Vec<_>>>()?;
+    Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
+}
+
+/// Whether Polars refuses the refused call as a select does, on columns of the two dtypes that
+/// the tables' objection names, for the objection the tables gave and at the call: the call is then
+/// one that select refuses for those dtypes, so the join key is why Polars allows it. A key that
+/// holds another call that select refuses, or a call whose dtypes select accepts, is no cause.
+fn refused_on_columns_as_a_select(case: &Case, refused: &Refused) -> bool {
+    let Some((receiver, argument)) = dtypes_of_a_bitwise_objection(&refused.reason) else {
         return false;
     };
-    let on_the_other_table = matches!(refused.place.path().first(),
-        Some(Segment::Parameter(name)) if name == "right_on");
+    let Some(link) = locate(case, &refused.place).call else {
+        return false;
+    };
+    let (Some(on_columns), Some(entry), Some(tables)) = (
+        call_on_stand_ins(link),
+        catalog::entry("LazyFrame.select"),
+        Tables::standing(false, &[receiver, argument, argument]),
+    ) else {
+        return false;
+    };
+    let Ok(start) = Call::new(
+        catalog::entry("polars.col").expect("an entry"),
+        vec![("name", Value::Columns(vec![stand_in_column(0)]))],
+    ) else {
+        return false;
+    };
+    let Ok(chain) = Expression::new(Start::Call(start), vec![on_columns]) else {
+        return false;
+    };
     let step = &case.document.steps()[0];
-    let Some(entry) = catalog::entry("LazyFrame.select") else {
-        return false;
-    };
     let Ok(select) = Call::new(
         entry,
-        vec![("exprs", Value::Many(vec![Value::Expression(key.clone())]))],
+        vec![("exprs", Value::Many(vec![Value::Expression(chain)]))],
     ) else {
         return false;
     };
-    let (Ok(rebuilt), Some(tables)) = (
-        Step::new(step.id().clone(), select),
-        Tables::standing(on_the_other_table, &[]),
-    ) else {
+    let Ok(rebuilt) = Step::new(step.id().clone(), select) else {
         return false;
     };
     let Ok(document) = Document::new(vec![rebuilt]) else {
@@ -1625,10 +1706,17 @@ fn refused_when_the_key_is_selected(case: &Case, refused: &Refused) -> bool {
         argument: case.argument,
         document,
     };
+    let at = Place::of_step(0, Some(step.id().clone()))
+        .then(Segment::Parameter("exprs".to_owned()))
+        .then(Segment::Item(0))
+        .then(Segment::Link(0));
     (0..RUNS).any(|_| {
         observe_probe(&control, tables)
             .refusal
-            .is_some_and(|refusal| is_a_bitwise_objection(&refusal.reason))
+            .is_some_and(|refusal| {
+                same_reason(&refused.source, &refused.reason, &refusal.reason)
+                    && refusal.place.as_ref().is_none_or(|place| *place == at)
+            })
     })
 }
 
@@ -1795,16 +1883,15 @@ fn applies(
             unplaced(refusal) && refusal.stage == Stage::Rows && (negated || filtered)
         }
         (Limit::ABitwiseCallInAJoinKey, Disagreement::PolarsAllows(refused)) => {
-            // A bitwise call in one of the join's own keys, refused for what a bitwise call
-            // objects to, and refused as that when the key is selected.
+            // A bitwise call in one of the join's own keys, refused for the dtypes it names, which
+            // select refuses the call on columns of too.
             is(step, "LazyFrame.join")
-                && is_a_bitwise_objection(&refused.reason)
                 && matches!(refused.place.path().first(), Some(Segment::Parameter(name))
                     if ["on", "left_on", "right_on"].contains(&name.as_str()))
                 && locate(case, &refused.place)
                     .call
                     .is_some_and(is_a_bitwise_call)
-                && refused_when_the_key_is_selected(case, refused)
+                && refused_on_columns_as_a_select(case, refused)
         }
         (Limit::ADivisionByZero, Disagreement::PolarsRefuses(refusal)) => {
             // The rows hold the divisor; a table with no rows holds none.
@@ -3586,7 +3673,7 @@ mod tests {
 
     // ----- A bitwise call in a join's key
 
-    const A_BITWISE_OBJECTION: &str = "^ not allowed on i64 and bool";
+    const A_BITWISE_OBJECTION: &str = "^ on Int64 and Boolean is not supported Hint: cast the Boolean to Int64 using pl.Expr.cast().";
 
     fn right_key_link() -> Place {
         at(&[parameter("right_on"), Segment::Item(0), Segment::Link(0)])
@@ -3642,7 +3729,7 @@ mod tests {
         };
         // A call that select accepts, so the position is not why Polars allows it.
         assert_eq!(
-            refused_in_a_right_key(xor("rk", "rk"), A_BITWISE_OBJECTION),
+            refused_in_a_right_key(xor("rk", "rk"), "^ not allowed on i64 and i64"),
             vec![]
         );
         // A refusal that is not about a bitwise call's dtypes.

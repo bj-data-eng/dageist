@@ -4,6 +4,7 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
+use dageist_engine::document::Place;
 use dageist_fuzz::registry::FuzzManifest;
 use dageist_fuzz::{
     CaseOutcome, CaseTarget, FailureClass, FailureKey, FuzzError, FuzzErrorKind, Generation,
@@ -13,8 +14,6 @@ use dageist_fuzz::{
 use super::case::Case;
 use super::generate::generate;
 use super::limits::{excuses, strict};
-use dageist_engine::document::Place;
-
 use super::observe::{Observed, Refusal, Seen, Stage, is_the_targets_own, observe};
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
 use super::probe::{Settled, is_a_predicate_rule, same_reason, settle, settle_apart};
