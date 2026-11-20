@@ -1,7 +1,7 @@
 //! What the tables and the offers say of the methods of text, against what Polars does when its
 //! own API is called straight, which is the oracle of each test.
 
-use polars::prelude::{col, lit};
+use polars::prelude::{DataType, JoinType, col, lit};
 
 use crate::allowed::dtype::Representative;
 use crate::allowed::offers::RefusalSource;
@@ -331,4 +331,50 @@ fn text_a_join_makes_may_stand_in_a_select_beside_a_column_and_not_as_a_joins_ow
         &Chosen::default(),
     );
     assert_eq!(key.is_allowed(), sum.is_allowed(), "{key:?} {sum:?}");
+}
+
+/// Whether Polars accepts a join on `left` and `right` as the keys of tables whose column `a`, and
+/// `ra`, are text, when it works out the schema and runs the rows.
+fn joins_on(left: polars::prelude::Expr, right: polars::prelude::Expr) -> bool {
+    use super::sample::Frames;
+    let frames = Frames::new(
+        Representative::String,
+        Representative::String,
+        &DataType::Int64,
+    );
+    crate::startup::ensure();
+    let Ok(mut joined) = frames
+        .left(false)
+        .join_builder()
+        .with(frames.other(false))
+        .left_on([left])
+        .right_on([right])
+        .how(JoinType::Inner)
+        .finish()
+    else {
+        return false;
+    };
+    joined.collect_schema().is_ok() && joined.collect().is_ok()
+}
+
+#[test]
+fn a_split_may_stand_in_a_join_key_as_polars_joins_on_a_list_of_text() {
+    // Polars joins on lists, so a split of text is a key whose other side is a list of text too.
+    let split = || col("a").str().split(lit(","));
+    let other_split = || col("ra").str().split(lit(","));
+    assert!(joins_on(split(), other_split()));
+    for outer in [Outer::JoinLeft, Outer::JoinRight] {
+        let verdict = offer(
+            entry("Expr.str.split"),
+            &at(Context::step(outer), Representative::String, Shape::Many),
+            &Chosen::default().with_arguments(&[("by", Representative::String)]),
+        );
+        assert!(verdict.is_allowed(), "{outer:?}: {verdict:?}");
+    }
+    // A cast of text to a whole number is no way to meet it: the key that the other table has is
+    // a list of the same text, and the list is not cast.
+    assert!(!joins_on(
+        split().cast(DataType::Int64),
+        col("ra").cast(DataType::Int64)
+    ));
 }
