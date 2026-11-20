@@ -6446,6 +6446,56 @@ mod tests {
         );
     }
 
+    const LITERAL_COUNT_NOT_HELD: &str =
+        "conversion from `i128` to `u64` failed in column 'scalar' for 1 out of 1 values: [-1]";
+
+    #[test]
+    fn a_failed_conversion_of_a_literal_count_is_excused_at_the_schema_where_a_count_is_why() {
+        // A literal is one value that Polars converts when it works out the schema, where a column
+        // is converted when the rows run, so the refusal is of the schema and names the scalar.
+        for (id, parameter) in [
+            ("Expr.str.pad_start", "length"),
+            ("Expr.str.zfill", "length"),
+            ("Expr.str.slice", "length"),
+        ] {
+            let mut given = vec![(parameter, Value::Expression(whole(-1)))];
+            if parameter == "length" && id == "Expr.str.slice" {
+                given.push(("offset", Value::Expression(whole(1))));
+            }
+            let case = select(vec![chain_of(column("g"), vec![call(id, given)])]);
+            assert_eq!(
+                refused_for_a_bound(&case, None, Stage::Schema, LITERAL_COUNT_NOT_HELD),
+                vec![Limit::ACastOfAValueTheDtypeCannotHold],
+                "{id}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_failed_conversion_at_the_schema_is_excused_only_for_the_scalar_of_a_case_with_a_count() {
+        let counted = call(
+            "Expr.str.zfill",
+            vec![("length", Value::Expression(whole(-1)))],
+        );
+        let case = select(vec![chain_of(column("g"), vec![counted])]);
+        // A column that a conversion fails for is the rows', and Polars names it when it runs them.
+        let of_a_column =
+            "conversion from `i128` to `u64` failed in column 'k' for 1 out of 1 values: [-1]";
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Schema, of_a_column),
+            vec![]
+        );
+        // A scalar that no count or cast is why: the text is not asked to count anything.
+        let plain = select(vec![chain_of(
+            column("g"),
+            vec![call("Expr.str.to_uppercase", Vec::new())],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&plain, None, Stage::Schema, LITERAL_COUNT_NOT_HELD),
+            vec![]
+        );
+    }
+
     // ----- A replacement of columns in a window
 
     const PATTERN_PER_ROW: &str =
