@@ -362,13 +362,13 @@ pub enum Limit {
     /// place, in a case with a `str.replace` that is given a count above one: the case run again
     /// with each count left out is not refused for it.
     AReplacementOfMoreThanTheFirstMatch,
-    /// A literal text is one value that Polars broadcasts over the rows of a table and does not over
-    /// a table with no rows, so a replacement of it given many values is refused for the empty table
-    /// where the column of text the tables measured it with is not: the rows of the table and the
-    /// column's agree. Polars refusing the empty table with the refusal that the value's length
-    /// does not match the text's, which has no place, in a case with a replacement in a chain that
-    /// starts from a literal: the case run again with each such literal a column of text is not
-    /// refused for it.
+    /// A literal text is one value that Polars broadcasts over the rows of a table only where it runs
+    /// them in pieces, as it does at four threads and more, and never over a table with no rows, so a
+    /// replacement of it given many values is refused where the column of text the tables measured it
+    /// with is not: the rows of the table and the column's agree. Polars refusing the rows, or the
+    /// empty table, with the refusal that the value's length does not match the text's, which has no
+    /// place, in a case with a replacement in a chain that starts from a literal: the case run again
+    /// with each such literal a column of text is not refused for it.
     ALiteralTextBesideManyReplacementValues,
 }
 
@@ -525,7 +525,7 @@ impl Limit {
                 "a replacement of every match refuses a value that is null where Polars reads it as one value, a literal or a piece of one row, where the tables measured the value as a column of three rows in one piece"
             }
             Self::ALiteralTextBesideManyReplacementValues => {
-                "a literal text is one value that Polars does not broadcast over a table with no rows, where the tables measured the text as a column of the table's rows"
+                "a literal text is one value that Polars does not broadcast over a table with no rows, nor over the rows at every thread count, where the tables measured the text as a column of the table's rows"
             }
             Self::AReplacementOfMoreThanTheFirstMatch => {
                 "Polars replaces more than the first match only of plain text and of one value, and refuses a pattern or many values, where the tables measured the replacement of the first match"
@@ -2999,7 +2999,7 @@ fn applies(
             // The literal is the cause where Polars stops refusing the empty table once the
             // text of each replacement is a column.
             unplaced(refusal)
-                && refusal.stage == Stage::Empty
+                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
                 && refusal.reason.contains(A_VALUE_OF_ANOTHER_LENGTH)
                 && held
                     .iter()
@@ -7205,7 +7205,7 @@ mod tests {
     }
 
     #[test]
-    fn a_value_of_another_length_is_not_excused_for_a_column_nor_at_the_rows_nor_at_a_place() {
+    fn a_value_of_another_length_is_not_excused_for_a_column_nor_at_the_schema_nor_at_a_place() {
         let text = || {
             call(
                 "polars.lit",
