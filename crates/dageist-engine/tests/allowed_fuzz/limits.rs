@@ -290,7 +290,9 @@ pub enum Limit {
     /// a fill by a value or of NaN, a count of characters, or a strict replacement given a dtype
     /// and no default: the case run again with each cast made not strict, each test a comparison,
     /// each fill a fill forward, each count the whole number 1 and each replacement not asked for
-    /// a dtype is not refused for a failed conversion.
+    /// a dtype is not refused for a failed conversion. A literal is one value that Polars converts
+    /// when it works out the schema, so the refusal may be the schema's, and then it names the
+    /// scalar the literal is.
     ACastOfAValueTheDtypeCannotHold,
     /// `drop_nulls` and `drop_nans` leave the values that are not null or not NaN, so a column
     /// that holds one has fewer values than the table has rows, which Polars refuses to meet the
@@ -2242,6 +2244,13 @@ fn is_a_failed_cast(reason: &str) -> bool {
     is_a_failed_conversion(reason) || reason.starts_with("cannot cast ")
 }
 
+/// Whether Polars refused a literal that it converts when it works out the schema, as it does one
+/// value that it can fold, not a column that it converts when the rows run: it names the scalar
+/// the literal is, and says it of the schema.
+fn is_a_literal_that_failed_to_convert(refusal: &Refusal) -> bool {
+    refusal.stage == Stage::Schema && refusal.reason.contains("failed in column 'scalar'")
+}
+
 /// Whether the reason is that of a value that could not be cast: Polars' words for it, which
 /// name the dtypes.
 fn is_a_failed_conversion(reason: &str) -> bool {
@@ -3071,10 +3080,13 @@ fn applies(
         }
         (Limit::ACastOfAValueTheDtypeCannotHold, Disagreement::PolarsRefuses(refusal)) => {
             // The rows hold the value, and so may a table with no rows, where an aggregate of
-            // nothing, as the sum, is a value of its own for the cast to meet. The cast is the
-            // cause where Polars stops refusing for a failed conversion once no cast is strict.
+            // nothing, as the sum, is a value of its own for the cast to meet. A literal is
+            // converted when the schema is worked out, so the refusal is the schema's, naming the
+            // scalar. The cast is the cause where Polars stops refusing for a failed conversion
+            // once no cast is strict.
             unplaced(refusal)
-                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                && (matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                    || is_a_literal_that_failed_to_convert(refusal))
                 && is_a_failed_conversion(&refusal.reason)
                 && held
                     .iter()
