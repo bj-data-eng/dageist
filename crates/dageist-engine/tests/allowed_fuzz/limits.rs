@@ -350,8 +350,9 @@ pub enum Limit {
     /// pieces, as it does at more threads than the tables were measured with. The tables measured
     /// the value as a column of three rows in one piece, which Polars meets row by row and leaves
     /// a null row of unchanged. Polars refusing the rows or the empty table with the refusal that
-    /// the value cannot be null, which has no place, in a case with a `str.replace_all`: the case
-    /// run again with the value of each made a text literal is not refused for it.
+    /// the value cannot be null, which has no place, in a case with a `str.replace_all`, or a
+    /// `str.replace` given a count below zero, which replaces every match: the case run again with
+    /// the value of each made a text literal is not refused for it.
     AReplacementOfEveryMatchGivenANullValue,
     /// Polars replaces more than the first match only of plain text and of one value: a pattern
     /// that is a regular expression, or a value that is many, is refused for a count above one.
@@ -1798,6 +1799,14 @@ fn refused_for_an_incomplete_mapping_with_defaults(case: &Case, reason: &str) ->
     })
 }
 
+/// Whether the call replaces every match: `str.replace_all`, and `str.replace` given a count below
+/// zero, which Polars takes to be all of them.
+fn replaces_every_match(call: &Call) -> bool {
+    is(call, "Expr.str.replace_all")
+        || (is(call, "Expr.str.replace")
+            && matches!(call.argument("n"), Some(Value::Integer(count)) if *count < 0))
+}
+
 /// What Polars says of a replacement of every match whose value is null where it reads it as one.
 const A_NULL_VALUE_OF_A_REPLACEMENT: &str = "value cannot be 'null' in 'replace' expression";
 
@@ -1846,7 +1855,7 @@ fn a_text_literal() -> Option<Expression> {
 /// The case with the value of each replacement of every match made a text literal.
 fn case_with_text_values(case: &Case) -> Option<Case> {
     case_changed(case, &|call| {
-        if !is(call, "Expr.str.replace_all") {
+        if !replaces_every_match(call) {
             return None;
         }
         let given: Vec<(&str, Value)> = call
@@ -1861,7 +1870,7 @@ fn case_with_text_values(case: &Case) -> Option<Case> {
                 Some((given.parameter(), value))
             })
             .collect::<Option<_>>()?;
-        Call::new(catalog::entry("Expr.str.replace_all")?, given).ok()
+        Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
     })
 }
 
@@ -2894,7 +2903,7 @@ fn applies(
                 && refusal.reason.contains(A_NULL_VALUE_OF_A_REPLACEMENT)
                 && held
                     .iter()
-                    .any(|(_, held)| any_call(held, &|call| is(call, "Expr.str.replace_all")))
+                    .any(|(_, held)| any_call(held, &replaces_every_match))
                 && refused_for_a_null_value_with_text_values(case) == Some(false)
         }
         (Limit::AStrictReplacementGivenNoDefault, Disagreement::PolarsRefuses(refusal)) => {
