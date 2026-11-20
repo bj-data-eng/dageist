@@ -7,7 +7,7 @@ use polars::prelude::{DataFrame, DataType, IntoLazy, TimeUnit, col, df, lit};
 
 use crate::catalog::{Arguments, entry};
 
-use super::build::{choice, expression_arg, flag, method, none, run};
+use super::build::{choice, expression_arg, flag, method, none, run, text};
 
 /// 2024-02-29 13:45:30.123456 (a Thursday, in a leap year) and 2023-02-10, which are
 /// 1,709,214,330,123,456 microseconds and 19,398 days after the start of 1970, each beside a null.
@@ -302,4 +302,176 @@ fn a_moment_is_cut_to_the_start_of_its_period_and_rounded_to_the_nearest_one() {
     assert_eq!(values, [Some(19_389), None]);
     let (_, values) = cut("Expr.dt.round", "d", "1mo");
     assert_eq!(values, [Some(19_389), None]);
+}
+
+/// 2023-02-10 and 2024-02-29, each beside the time of day 13:45:30.123456 and 01:02:03, and a null
+/// date beside midnight, as dates and times of day.
+fn dates_and_times() -> DataFrame {
+    df!(
+        "d" => [Some(19_398_i32), Some(19_782), None],
+        "tm" => [Some(49_530_123_456_000_i64), Some(3_723_000_000_000), Some(0)],
+    )
+    .expect("a table")
+    .lazy()
+    .with_columns([
+        col("d").cast(DataType::Date),
+        col("tm").cast(DataType::Time),
+        col("d")
+            .cast(DataType::Datetime(TimeUnit::Microseconds, None))
+            .alias("t"),
+    ])
+    .collect()
+    .expect("a table")
+}
+
+#[test]
+fn a_date_or_a_moment_is_given_the_time_of_day_it_is_combined_with() {
+    let combined = |column: &str, time_unit: Option<&str>| {
+        let mut given = Arguments::new().with("time", expression_arg(col("tm")));
+        if let Some(unit) = time_unit {
+            given = given.with("time_unit", choice(unit));
+        }
+        let expr = method("Expr.dt.combine", col(column), &given).expect("the method builds");
+        let out = run(dates_and_times().lazy().select([expr.alias("out")]));
+        let column = out.column("out").expect("a column");
+        let values: Vec<_> = column
+            .cast(&DataType::Int64)
+            .expect("whole numbers")
+            .i64()
+            .expect("whole numbers")
+            .iter()
+            .collect();
+        (column.dtype().clone(), values)
+    };
+    // The date and the time of day make a moment, in microseconds unless another unit is asked
+    // for; where the receiver is a moment, its time of day is replaced.
+    let microseconds = [
+        Some(1_676_036_730_123_456),
+        Some(1_709_168_523_000_000),
+        None,
+    ];
+    for column in ["d", "t"] {
+        let (dtype, values) = combined(column, None);
+        assert_eq!(
+            dtype,
+            DataType::Datetime(TimeUnit::Microseconds, None),
+            "{column}"
+        );
+        assert_eq!(values, microseconds, "{column}");
+    }
+    let (dtype, values) = combined("d", Some("ms"));
+    assert_eq!(dtype, DataType::Datetime(TimeUnit::Milliseconds, None));
+    assert_eq!(
+        values,
+        [Some(1_676_036_730_123), Some(1_709_168_523_000), None]
+    );
+    let (dtype, values) = combined("d", Some("ns"));
+    assert_eq!(dtype, DataType::Datetime(TimeUnit::Nanoseconds, None));
+    assert_eq!(
+        values,
+        [
+            Some(1_676_036_730_123_456_000),
+            Some(1_709_168_523_000_000_000),
+            None
+        ]
+    );
+    // Its unit is one of the words Polars takes, as `timestamp`'s is.
+    let parameter = entry("Expr.dt.combine")
+        .expect("an entry")
+        .parameters()
+        .iter()
+        .find(|parameter| parameter.name() == "time_unit")
+        .expect("a time unit");
+    assert_eq!(
+        parameter.kind(),
+        crate::catalog::Kind::Choice(&["ns", "us", "ms"])
+    );
+}
+
+#[test]
+fn a_moment_is_written_by_a_format_and_by_iso_where_none_is_given() {
+    let written = |id: &str, column: &str, format: Option<&str>| {
+        let given = match format {
+            Some(format) => Arguments::new().with("format", text(format)),
+            None => none(),
+        };
+        let expr = method(id, col(column), &given).expect("the method builds");
+        let out = run(moments().lazy().select([expr.alias("out")]));
+        let column = out.column("out").expect("a column");
+        assert_eq!(column.dtype(), &DataType::String, "{id}");
+        column
+            .str()
+            .expect("text")
+            .iter()
+            .map(|value| value.map(str::to_owned))
+            .collect::<Vec<_>>()
+    };
+    // 2024-02-29 is a Thursday and 2023-02-10 a Friday.
+    for id in ["Expr.dt.strftime", "Expr.dt.to_string"] {
+        assert_eq!(
+            written(id, "t", Some("%Y-%m-%d %H:%M:%S")),
+            [Some("2024-02-29 13:45:30".to_owned()), None],
+            "{id}"
+        );
+        assert_eq!(
+            written(id, "d", Some("%A %d/%m/%Y")),
+            [Some("Friday 10/02/2023".to_owned()), None],
+            "{id}"
+        );
+    }
+    // Python's `to_string` writes ISO where it is given no format.
+    assert_eq!(
+        written("Expr.dt.to_string", "d", None),
+        [Some("2023-02-10".to_owned()), None]
+    );
+    assert_eq!(
+        written("Expr.dt.to_string", "t", None),
+        [Some("2024-02-29T13:45:30.123456".to_owned()), None]
+    );
+}
+
+#[test]
+fn the_parts_of_a_moment_are_replaced_by_the_ones_given_and_the_rest_is_kept() {
+    let replaced = |column: &str, parts: Vec<(&'static str, i32)>| {
+        let mut given = Arguments::new();
+        for (name, value) in parts {
+            given = given.with(name, expression_arg(lit(value)));
+        }
+        let expr = method("Expr.dt.replace", col(column), &given).expect("the method builds");
+        let out = run(moments().lazy().select([expr.alias("out")]));
+        let column = out.column("out").expect("a column");
+        let dtype = column.dtype().clone();
+        let values: Vec<_> = column
+            .cast(&DataType::Int64)
+            .expect("whole numbers")
+            .i64()
+            .expect("whole numbers")
+            .iter()
+            .collect();
+        (dtype, values)
+    };
+    let datetime = DataType::Datetime(TimeUnit::Microseconds, None);
+    // 2000-02-29 13:45:30.123456 and 2024-02-29 01:02:03.000004.
+    let (dtype, values) = replaced("t", vec![("year", 2000)]);
+    assert_eq!(dtype, datetime);
+    assert_eq!(values, [Some(951_831_930_123_456), None]);
+    let (_, values) = replaced(
+        "t",
+        vec![
+            ("hour", 1),
+            ("minute", 2),
+            ("second", 3),
+            ("microsecond", 4),
+        ],
+    );
+    assert_eq!(values, [Some(1_709_168_523_000_004), None]);
+    // A date keeps its dtype: 2023-02-01 and 2023-03-10 are 19,389 and 19,426 days from 1970.
+    let (dtype, values) = replaced("d", vec![("day", 1)]);
+    assert_eq!(dtype, DataType::Date);
+    assert_eq!(values, [Some(19_389), None]);
+    let (_, values) = replaced("d", vec![("month", 3)]);
+    assert_eq!(values, [Some(19_426), None]);
+    // Given nothing it is what it was.
+    let (_, values) = replaced("d", vec![]);
+    assert_eq!(values, [Some(19_398), None]);
 }
