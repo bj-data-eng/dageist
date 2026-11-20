@@ -1319,3 +1319,25 @@ fn a_part_given_to_replace_is_refused_for_what_polars_says_of_the_call_that_has_
         refusal.reason()
     );
 }
+
+#[test]
+fn a_part_given_to_replace_beside_an_option_is_refused_as_converted_too() {
+    // The option is measured with the value it follows alone, which is refused as no moment; the
+    // part it is given beside is converted first, which is what Polars says of the call.
+    let chosen = Chosen::default()
+        .with_arguments(&[("month", Representative::String)])
+        .with_options(&[("ambiguous", "raise")]);
+    let refused = offer(
+        entry("Expr.dt.replace"),
+        &select_after(Representative::String),
+        &chosen,
+    );
+    let refusal = refused.refusal().expect("refused after text");
+    assert!(
+        refusal
+            .reason()
+            .contains("conversion from `str` to `i8` failed"),
+        "{}",
+        refusal.reason()
+    );
+}
