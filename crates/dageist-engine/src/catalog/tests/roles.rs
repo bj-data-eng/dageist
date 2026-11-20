@@ -25,17 +25,27 @@ fn only_the_operands_the_fill_the_row_count_the_power_and_the_divisors_have_a_ro
             ("Expr.clip", "lower_bound", Role::Bound),
             ("Expr.clip", "upper_bound", Role::Bound),
             ("Expr.eq", "other", Role::Operand),
+            ("Expr.eq_missing", "other", Role::Operand),
+            ("Expr.fill_nan", "value", Role::Filler),
+            ("Expr.fill_null", "value", Role::Filler),
             ("Expr.floordiv", "other", Role::FloorDivisor),
             ("Expr.ge", "other", Role::Operand),
             ("Expr.gt", "other", Role::Operand),
+            ("Expr.is_between", "lower_bound", Role::Operand),
+            ("Expr.is_between", "upper_bound", Role::Operand),
+            ("Expr.is_close", "other", Role::Operand),
             ("Expr.le", "other", Role::Operand),
             ("Expr.log", "base", Role::Base),
             ("Expr.lt", "other", Role::Operand),
             ("Expr.mod", "other", Role::Operand),
             ("Expr.mul", "other", Role::Operand),
             ("Expr.ne", "other", Role::Operand),
+            ("Expr.ne_missing", "other", Role::Operand),
             ("Expr.or_", "others", Role::Operand),
             ("Expr.pow", "exponent", Role::Exponent),
+            ("Expr.replace", "new", Role::Bound),
+            ("Expr.replace", "old", Role::Bound),
+            ("Expr.replace_strict", "old", Role::Bound),
             ("Expr.shift", "fill_value", Role::Filler),
             ("Expr.shift", "n", Role::Count),
             ("Expr.sub", "other", Role::Operand),
@@ -83,7 +93,10 @@ fn a_parameter_that_holds_one_value_for_each_item_of_another_is_a_flag_or_a_choi
 fn a_parameter_that_is_needed_without_being_required_is_one_of_which_a_step_gives_at_least_one() {
     // A step always gives at least one of a starred parameter that Python takes none of, as
     // `and_` and `or_`, and of the two bounds of `clip`, which are the expression they follow
-    // without one: the mark means nothing on any other parameter.
+    // without one. `fill_null` is refused without a value or a strategy, which is given in place
+    // of it, and a replacement without what it replaces by: Python's `new` is `NO_DEFAULT` only
+    // for a mapping, which the catalogue does not hold. The mark means nothing on any other
+    // parameter.
     let mut marked = Vec::new();
     for entry in catalog::entries() {
         for parameter in entry.parameters() {
@@ -99,7 +112,10 @@ fn a_parameter_that_is_needed_without_being_required_is_one_of_which_a_step_give
             ("Expr.and_", "others"),
             ("Expr.clip", "lower_bound"),
             ("Expr.clip", "upper_bound"),
-            ("Expr.or_", "others")
+            ("Expr.fill_null", "value"),
+            ("Expr.or_", "others"),
+            ("Expr.replace", "new"),
+            ("Expr.replace_strict", "new")
         ]
     );
 }

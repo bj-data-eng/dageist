@@ -99,11 +99,19 @@ pub enum Family {
     Temporal,
     /// Working within groups: `over`.
     Window,
-    /// Comparisons and tests that give a Boolean.
+    /// Comparisons and tests that give a Boolean: `eq`, `gt`, `eq_missing`, `is_between`,
+    /// `is_close`, `is_null`, and the like.
     Compare,
+    /// Tests of what a value is, or of whether it is repeated: `is_nan`, `is_infinite`,
+    /// `is_unique`, `is_first_distinct`, and the like, which give a Boolean.
+    Checks,
     /// Combining and negating truth: `and`, `or`, `xor` and `not`, which work bit
     /// by bit on whole numbers.
     Logic,
+    /// Nulls and NaNs: `fill_null`, `forward_fill`, `drop_nulls`, `null_count`, and the like.
+    Nulls,
+    /// Changing what a value is: `cast`, `replace` and `replace_strict`.
+    Conversion,
     /// Where an expression starts: `col`, `lit`.
     Start,
     /// Conditions: `when`, `then`, `otherwise`.
@@ -112,7 +120,7 @@ pub enum Family {
 
 impl Family {
     /// Every family, in the order they are offered.
-    pub const ALL: [Self; 14] = [
+    pub const ALL: [Self; 17] = [
         Self::Steps,
         Self::Rows,
         Self::Cumulative,
@@ -124,7 +132,10 @@ impl Family {
         Self::Temporal,
         Self::Window,
         Self::Compare,
+        Self::Checks,
         Self::Logic,
+        Self::Nulls,
+        Self::Conversion,
         Self::Start,
         Self::Condition,
     ];
@@ -144,7 +155,10 @@ impl Family {
             Self::Temporal => "temporal",
             Self::Window => "window",
             Self::Compare => "compare",
+            Self::Checks => "checks",
             Self::Logic => "logic",
+            Self::Nulls => "nulls",
+            Self::Conversion => "conversion",
             Self::Start => "start",
             Self::Condition => "condition",
         }
@@ -323,6 +337,15 @@ pub enum Role {
     Bound,
 }
 
+/// What a parameter that gives a number of values is given as many of as.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AsManyAs {
+    /// The values of the value the method follows.
+    TheReceiver,
+    /// The values of the named parameter of the same entry.
+    Parameter(&'static str),
+}
+
 /// Whether the expressions a parameter holds write columns of the table the
 /// step gives. A column an expression writes is replaced, when the table the
 /// step was given had it, even when the expression gives it the dtype it had;
@@ -360,6 +383,12 @@ pub struct Parameter {
     keyword_only: bool,
     variadic: Option<Variadic>,
     at_least_one: bool,
+    in_place_of: Option<&'static str>,
+    shares_a_dtype_with: Option<&'static str>,
+    as_many_as: Option<AsManyAs>,
+    converts: &'static [&'static str],
+    lenient_beside: Option<&'static str>,
+    adapts_numbers_only: bool,
 }
 
 impl Parameter {
@@ -374,6 +403,12 @@ impl Parameter {
             keyword_only: false,
             variadic: None,
             at_least_one: false,
+            in_place_of: None,
+            shares_a_dtype_with: None,
+            as_many_as: None,
+            converts: &[],
+            lenient_beside: None,
+            adapts_numbers_only: false,
         }
     }
 
@@ -388,6 +423,61 @@ impl Parameter {
             "only an optional parameter that holds expressions is one of which a step gives at least one"
         );
         self.at_least_one = true;
+        self
+    }
+
+    /// The same parameter, of a dtype that the values of the expression parameters `named` are
+    /// converted to, as `cast` converts what it follows: `replace_strict`'s `return_dtype` is
+    /// what its `new` and its `default` are converted to. What Polars accepts of the conversion
+    /// is what it accepts of a cast, which the tables measure for `cast` and not again for each
+    /// method that converts.
+    const fn converting(mut self, named: &'static [&'static str]) -> Self {
+        self.converts = named;
+        self
+    }
+
+    /// The same parameter, whose conversion is strict only where the expression parameter `other`
+    /// is not given: given it, Polars converts the values as a `cast` that gives a null where a
+    /// value does not convert, as `replace_strict` converts what replaces and its default to
+    /// `return_dtype`.
+    const fn converting_leniently_beside(mut self, other: &'static str) -> Self {
+        self.lenient_beside = Some(other);
+        self
+    }
+
+    /// The same parameter, which gives as many values as `meets` or one: Polars refuses a
+    /// replacement whose `new` has other numbers of values than its `old` and is not one value,
+    /// and a strict one whose `default` has other numbers than the value it follows.
+    const fn given_as_many_as(mut self, meets: AsManyAs) -> Self {
+        self.as_many_as = Some(meets);
+        self
+    }
+
+    /// The same parameter, whose value meets the one the expression parameter `other` holds in a
+    /// dtype that is the supertype of both, as `replace_strict`'s `default` meets its `new`, and
+    /// `is_between`'s upper bound its lower one and the receiver. Polars refuses two dtypes that
+    /// have none, and the tables, which judge each parameter apart, cannot say which pairs those
+    /// are, so a call whose two dtypes differ is not judged.
+    const fn sharing_a_dtype_with(mut self, other: &'static str) -> Self {
+        self.shares_a_dtype_with = Some(other);
+        self
+    }
+
+    /// The same parameter, which Python takes in place of the optional expression `other`: one
+    /// of the two is given and not both, as `fill_null`'s `strategy` is given in place of its
+    /// `value`. A step that gives it does not give `other`, so what the tables measured of the
+    /// method with `other` does not judge it.
+    const fn given_in_place_of(mut self, other: &'static str) -> Self {
+        self.in_place_of = Some(other);
+        self
+    }
+
+    /// The same parameter, which Polars gives a number typed without a dtype the dtype of the
+    /// number it follows and no other: beside a date or a duration Polars refuses it as
+    /// ambiguous, where it takes a number of a dtype, so the tables, which measured numbers of
+    /// a dtype, say nothing of what the method gives with it.
+    const fn adapting_numbers_only(mut self) -> Self {
+        self.adapts_numbers_only = true;
         self
     }
 
@@ -468,6 +558,47 @@ impl Parameter {
     #[must_use]
     pub const fn variadic(&self) -> Option<Variadic> {
         self.variadic
+    }
+
+    /// The expression parameters whose values are converted to the dtype this parameter holds,
+    /// none for a parameter that converts nothing.
+    #[must_use]
+    pub const fn converts(&self) -> &'static [&'static str] {
+        self.converts
+    }
+
+    /// What the parameter is given as many values as, or one, if Polars holds it to a number.
+    #[must_use]
+    pub const fn as_many_as(&self) -> Option<AsManyAs> {
+        self.as_many_as
+    }
+
+    /// The expression parameter that makes the conversion of this one lenient when it is given.
+    #[must_use]
+    pub const fn lenient_beside(&self) -> Option<&'static str> {
+        self.lenient_beside
+    }
+
+    /// Whether a number typed without a dtype that is given to the parameter takes the dtype of
+    /// a number the method follows and, beside any other dtype, is refused by Polars as
+    /// ambiguous where a number of a dtype is not.
+    #[must_use]
+    pub const fn adapts_numbers_only(&self) -> bool {
+        self.adapts_numbers_only
+    }
+
+    /// The expression parameter whose value this one meets in the supertype of both dtypes, if
+    /// it meets one.
+    #[must_use]
+    pub const fn shares_a_dtype_with(&self) -> Option<&'static str> {
+        self.shares_a_dtype_with
+    }
+
+    /// The optional expression parameter this one is given in place of, when Python takes one of
+    /// the two and refuses both: the parameter named is then not given.
+    #[must_use]
+    pub const fn in_place_of(&self) -> Option<&'static str> {
+        self.in_place_of
     }
 
     /// Whether Python takes the parameter only by its name, because it follows

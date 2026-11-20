@@ -10,17 +10,18 @@
 
 use std::sync::Arc;
 
+use polars::chunked_array::cast::CastOptions;
 use polars::frame::PivotColumnNaming;
 use polars::prelude::{
-    AnyValue, DataType, Expr, JoinBuildSide, JoinCoalesce, JoinType, JoinValidation, LazyFrame,
-    MaintainOrderJoin, NULL, NamedFrom, Operator, PolarsError, RoundMode, Scalar, Series,
-    SortMultipleOptions, SortOptions, WindowMapping, all, all_horizontal, binary_expr, col, cols,
-    element, lit, when,
+    AnyValue, ClosedInterval, DataType, Expr, FillNullStrategy, JoinBuildSide, JoinCoalesce,
+    JoinType, JoinValidation, LazyFrame, MaintainOrderJoin, NULL, NamedFrom, Operator, PolarsError,
+    RoundMode, Scalar, Series, SortMultipleOptions, SortOptions, WindowMapping, all,
+    all_horizontal, binary_expr, col, cols, element, lit, when,
 };
 
 use super::{
-    Argument, Arguments, Build, BuildError, Conditional, Dtypes, Entry, EntryId, Family, Kind,
-    Laziness, Parameter, ParameterDefault, Role, Shape, ValueType, Variadic, Writes,
+    Argument, Arguments, AsManyAs, Build, BuildError, Conditional, Dtypes, Entry, EntryId, Family,
+    Kind, Laziness, Parameter, ParameterDefault, Role, Shape, ValueType, Variadic, Writes,
 };
 
 const ANY: &[Dtypes] = &[Dtypes::Any];
@@ -69,6 +70,14 @@ const NUMERIC_OR_DURATION: &[Dtypes] = &[Dtypes::Numeric, Dtypes::Duration];
 // numbers.
 const BITWISE: &[Dtypes] = &[Dtypes::Integer, Dtypes::Boolean];
 
+// What Polars accepts on the receiver of the nulls, checks and conversions, from the functions
+// that run them: `is_nan`, `is_finite` and the like take numbers, as does `fill_nan`, which is
+// a condition on `is_not_nan`; `is_close` takes numbers, and a date, a time or a duration, a
+// boolean and a decimal beside a number; `is_between` orders what `cum_max` orders. The rest take
+// every dtype, and the tables of allowed combinations say which a given argument or option, such
+// as the dtype a cast gives or the strategy a fill takes, Polars refuses.
+const CLOSE: &[Dtypes] = &[Dtypes::Numeric, Dtypes::Temporal, Dtypes::Boolean];
+
 // What Polars accepts on the receiver of the maths of one value, from the functions that run
 // them: roots, logarithms, the exponential and `erf` take numbers and booleans and give a float,
 // a `Float32` staying one and every other dtype being a `Float64`; the trigonometric functions
@@ -99,6 +108,11 @@ const MAPPING_STRATEGY: &[&str] = &["group_to_rows", "join", "explode"];
 // The words Python's binding takes for `mode`. Polars' enum also has `to_zero`, which the
 // documentation lists and the binding refuses, as `truncate` does it.
 const ROUND_MODE: &[&str] = &["half_to_even", "half_away_from_zero"];
+// The words Python's `is_between` takes for `closed`, which sides of the interval hold their bound.
+const CLOSED: &[&str] = &["both", "left", "right", "none"];
+// The words Python's `fill_null` takes for `strategy`, which `parse_fill_null_strategy` in the
+// binding reads. `forward` and `backward` are the strategies `limit` bounds.
+const FILL_STRATEGY: &[&str] = &["forward", "backward", "min", "max", "mean", "zero", "one"];
 
 const fn required(name: &'static str, kind: Kind, shape: Shape) -> Parameter {
     Parameter::new(name, kind, shape, ParameterDefault::Required)
@@ -126,6 +140,9 @@ const fn flag(name: &'static str, default: &'static str) -> Parameter {
 /// The parameter every comparison and every method of arithmetic or logic on two values takes.
 const OTHER: Parameter = required("other", EXPRESSION, Shape::One).with_role(Role::Operand);
 
+/// The parameter `is_close` takes, which only a number adapts to the one it follows.
+const CLOSE_OTHER: Parameter = OTHER.adapting_numbers_only();
+
 /// The parameter `truediv` takes, which is divided by.
 const DIVISOR: Parameter = required("other", EXPRESSION, Shape::One).with_role(Role::Divisor);
 
@@ -144,6 +161,15 @@ const fn bound(name: &'static str) -> Parameter {
 /// `decimals`: how many places after the point a value is rounded or truncated to, which
 /// Python passes on as an unsigned 32-bit number.
 const DECIMALS: Parameter = optional("decimals", Kind::Value(ValueType::Integer), Shape::One, "0");
+
+/// `limit`: how many consecutive nulls a forward or backward fill fills, which Python passes on
+/// as an unsigned 32-bit number. Unset, it fills them all.
+const LIMIT: Parameter = optional("limit", Kind::Value(ValueType::Integer), Shape::One, "None");
+
+/// A tolerance `is_close` takes: a number from zero, which Python passes on as a float.
+const fn tolerance(name: &'static str, default: &'static str) -> Parameter {
+    optional(name, Kind::Value(ValueType::Float), Shape::One, default).keyword_only()
+}
 
 /// `*predicates`: conditions that must all hold, which `when` and `filter` take.
 const PREDICATES: Parameter = starred("predicates", Kind::Expression(BOOLEAN));
@@ -212,6 +238,42 @@ fn unsigned(
             })
         }
         Some(other) => Err(Arguments::wrong(parameter, "a whole number", other)),
+    }
+}
+
+/// The whole number given for `parameter` as a `u32`, as Python's binding takes it, or `None`
+/// when it was not given.
+fn optional_unsigned(
+    arguments: &Arguments,
+    parameter: &'static str,
+) -> Result<Option<u32>, BuildError> {
+    match arguments.get(parameter) {
+        None => Ok(None),
+        Some(_) => unsigned(arguments, parameter, 0).map(Some),
+    }
+}
+
+/// The number with a fraction given for `parameter`, or `default` when it was not given. A whole
+/// number is the number with a fraction it equals, as Python's `float` takes it.
+fn float(arguments: &Arguments, parameter: &'static str, default: f64) -> Result<f64, BuildError> {
+    match arguments.get(parameter) {
+        None => Ok(default),
+        Some(Argument::Float(value)) => Ok(*value),
+        #[allow(clippy::cast_precision_loss)]
+        Some(Argument::Integer(value)) => Ok(*value as f64),
+        Some(other) => Err(Arguments::wrong(parameter, "a number", other)),
+    }
+}
+
+/// The dtype given for `parameter`, if one was.
+fn optional_dtype(
+    arguments: &Arguments,
+    parameter: &'static str,
+) -> Result<Option<DataType>, BuildError> {
+    match arguments.get(parameter) {
+        None => Ok(None),
+        Some(Argument::Dtype(dtype)) => Ok(Some(dtype.clone())),
+        Some(other) => Err(Arguments::wrong(parameter, "a dtype", other)),
     }
 }
 
@@ -460,8 +522,42 @@ macro_rules! unary {
 }
 
 unary!(
-    sqrt, cbrt, exp, log1p, sign, ceil, floor, sin, cos, tan, cot, arcsin, arccos, arctan, sinh,
-    cosh, tanh, arcsinh, arccosh, arctanh, degrees, radians, erf, erfc,
+    sqrt,
+    cbrt,
+    exp,
+    log1p,
+    sign,
+    ceil,
+    floor,
+    sin,
+    cos,
+    tan,
+    cot,
+    arcsin,
+    arccos,
+    arctan,
+    sinh,
+    cosh,
+    tanh,
+    arcsinh,
+    arccosh,
+    arctanh,
+    degrees,
+    radians,
+    erf,
+    erfc,
+    drop_nulls,
+    drop_nans,
+    is_nan,
+    is_not_nan,
+    is_finite,
+    is_infinite,
+    is_duplicated,
+    is_unique,
+    is_first_distinct,
+    is_last_distinct,
+    has_nulls,
+    null_count,
 );
 
 /// The base defaults to `math.e`, which Python makes a number of no dtype, as it does a base
@@ -508,6 +604,125 @@ fn clip(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
             (None, None) => expr,
         },
     )
+}
+
+/// As Python's `fill_null` takes its arguments: a value or a strategy, and not both, and a limit
+/// only with the strategy `forward` or `backward`; each refusal is Python's own.
+fn fill_null(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let value = arguments.expression("value")?;
+    let strategy = match arguments.get("strategy") {
+        None => None,
+        Some(_) => Some(arguments.choice("strategy", FILL_STRATEGY, "forward")?),
+    };
+    let limit = optional_unsigned(arguments, "limit")?;
+    if value.is_some() && strategy.is_some() {
+        return Err(refused("cannot specify both `value` and `strategy`"));
+    }
+    if value.is_none() && strategy.is_none() {
+        return Err(refused("must specify either a fill `value` or `strategy`"));
+    }
+    if !matches!(strategy, Some("forward" | "backward")) && limit.is_some() {
+        return Err(refused(
+            "can only specify `limit` when strategy is set to 'backward' or 'forward'",
+        ));
+    }
+    Ok(match (value, strategy) {
+        (Some(value), _) => expr.fill_null(value),
+        (None, Some(strategy)) => expr.fill_null_with_strategy(match strategy {
+            "forward" => FillNullStrategy::Forward(limit),
+            "backward" => FillNullStrategy::Backward(limit),
+            "min" => FillNullStrategy::Min,
+            "max" => FillNullStrategy::Max,
+            "mean" => FillNullStrategy::Mean,
+            "zero" => FillNullStrategy::Zero,
+            _ => FillNullStrategy::One,
+        }),
+        (None, None) => expr,
+    })
+}
+
+fn forward_fill(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(
+        expr.fill_null_with_strategy(FillNullStrategy::Forward(optional_unsigned(
+            arguments, "limit",
+        )?)),
+    )
+}
+
+fn backward_fill(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(
+        expr.fill_null_with_strategy(FillNullStrategy::Backward(optional_unsigned(
+            arguments, "limit",
+        )?)),
+    )
+}
+
+fn fill_nan(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.fill_nan(arguments.required_expression("value")?))
+}
+
+/// As the binding does: `wrap_numerical` wraps what overflows, and otherwise `strict` says
+/// whether a value that cannot be converted is refused or becomes a null.
+fn cast(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let dtype =
+        optional_dtype(arguments, "dtype")?.ok_or(BuildError::Missing { parameter: "dtype" })?;
+    let options = if arguments.flag("wrap_numerical", false)? {
+        CastOptions::Overflowing
+    } else if arguments.flag("strict", true)? {
+        CastOptions::Strict
+    } else {
+        CastOptions::NonStrict
+    };
+    Ok(expr.cast_with_options(dtype, options))
+}
+
+/// As the binding does, from the expressions the step gives: Python's mapping and its sequences
+/// are sugar for two expressions, which the catalogue holds as they are.
+fn replace(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.replace(
+        arguments.required_expression("old")?,
+        arguments.required_expression("new")?,
+    ))
+}
+
+fn replace_strict(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.replace_strict(
+        arguments.required_expression("old")?,
+        arguments.required_expression("new")?,
+        arguments.expression("default")?,
+        optional_dtype(arguments, "return_dtype")?,
+    ))
+}
+
+fn is_between(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let closed = match arguments.choice("closed", CLOSED, "both")? {
+        "left" => ClosedInterval::Left,
+        "right" => ClosedInterval::Right,
+        "none" => ClosedInterval::None,
+        _ => ClosedInterval::Both,
+    };
+    Ok(expr.is_between(
+        arguments.required_expression("lower_bound")?,
+        arguments.required_expression("upper_bound")?,
+        closed,
+    ))
+}
+
+fn is_close(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.is_close(
+        arguments.required_expression("other")?,
+        float(arguments, "abs_tol", 0.0)?,
+        float(arguments, "rel_tol", 1e-9)?,
+        arguments.flag("nans_equal", false)?,
+    ))
+}
+
+fn eq_missing(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.eq_missing(arguments.required_expression("other")?))
+}
+
+fn ne_missing(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.neq_missing(arguments.required_expression("other")?))
 }
 
 fn dt_date(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
@@ -1000,6 +1215,26 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(arctanh),
     },
     Entry {
+        id: EntryId("Expr.backward_fill"),
+        family: Family::Nulls,
+        accepts: ANY,
+        parameters: &[LIMIT],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(backward_fill),
+    },
+    Entry {
+        id: EntryId("Expr.cast"),
+        family: Family::Conversion,
+        accepts: ANY,
+        parameters: &[
+            required("dtype", Kind::Dtype, Shape::One),
+            flag("strict", "True").keyword_only(),
+            flag("wrap_numerical", "False").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(cast),
+    },
+    Entry {
         id: EntryId("Expr.cbrt"),
         family: Family::Maths,
         accepts: NUMERIC_OR_BOOLEAN,
@@ -1080,6 +1315,22 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(degrees),
     },
     Entry {
+        id: EntryId("Expr.drop_nans"),
+        family: Family::Nulls,
+        accepts: ANY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(drop_nans),
+    },
+    Entry {
+        id: EntryId("Expr.drop_nulls"),
+        family: Family::Nulls,
+        accepts: ANY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(drop_nulls),
+    },
+    Entry {
         id: EntryId("Expr.dt.date"),
         family: Family::Temporal,
         accepts: DATE_PART,
@@ -1129,6 +1380,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(eq),
     },
     Entry {
+        id: EntryId("Expr.eq_missing"),
+        family: Family::Compare,
+        accepts: ANY,
+        parameters: &[OTHER],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(eq_missing),
+    },
+    Entry {
         id: EntryId("Expr.erf"),
         family: Family::Maths,
         accepts: NUMERIC_OR_BOOLEAN,
@@ -1151,6 +1410,29 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[],
         laziness: Laziness::Lazy,
         build: Build::Expression(exp),
+    },
+    Entry {
+        id: EntryId("Expr.fill_nan"),
+        family: Family::Nulls,
+        accepts: NUMERIC,
+        parameters: &[required("value", EXPRESSION, Shape::One).with_role(Role::Filler)],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(fill_nan),
+    },
+    Entry {
+        id: EntryId("Expr.fill_null"),
+        family: Family::Nulls,
+        accepts: ANY,
+        parameters: &[
+            optional("value", EXPRESSION, Shape::One, "None")
+                .with_role(Role::Filler)
+                .with_at_least_one(),
+            optional("strategy", Kind::Choice(FILL_STRATEGY), Shape::One, "None")
+                .given_in_place_of("value"),
+            LIMIT,
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(fill_null),
     },
     Entry {
         id: EntryId("Expr.first"),
@@ -1177,6 +1459,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(floordiv),
     },
     Entry {
+        id: EntryId("Expr.forward_fill"),
+        family: Family::Nulls,
+        accepts: ANY,
+        parameters: &[LIMIT],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(forward_fill),
+    },
+    Entry {
         id: EntryId("Expr.ge"),
         family: Family::Compare,
         accepts: ANY,
@@ -1193,6 +1483,97 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(gt),
     },
     Entry {
+        id: EntryId("Expr.has_nulls"),
+        family: Family::Nulls,
+        accepts: ANY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(has_nulls),
+    },
+    Entry {
+        id: EntryId("Expr.is_between"),
+        family: Family::Compare,
+        accepts: CUM_MAX,
+        parameters: &[
+            required("lower_bound", EXPRESSION, Shape::One).with_role(Role::Operand),
+            required("upper_bound", EXPRESSION, Shape::One)
+                .with_role(Role::Operand)
+                .sharing_a_dtype_with("lower_bound"),
+            optional("closed", Kind::Choice(CLOSED), Shape::One, "'both'"),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(is_between),
+    },
+    Entry {
+        id: EntryId("Expr.is_close"),
+        family: Family::Compare,
+        accepts: CLOSE,
+        parameters: &[
+            CLOSE_OTHER,
+            tolerance("abs_tol", "0.0"),
+            tolerance("rel_tol", "1e-09"),
+            flag("nans_equal", "False").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(is_close),
+    },
+    Entry {
+        id: EntryId("Expr.is_duplicated"),
+        family: Family::Checks,
+        accepts: ANY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(is_duplicated),
+    },
+    Entry {
+        id: EntryId("Expr.is_finite"),
+        family: Family::Checks,
+        accepts: NUMERIC,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(is_finite),
+    },
+    Entry {
+        id: EntryId("Expr.is_first_distinct"),
+        family: Family::Checks,
+        accepts: ANY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(is_first_distinct),
+    },
+    Entry {
+        id: EntryId("Expr.is_infinite"),
+        family: Family::Checks,
+        accepts: NUMERIC,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(is_infinite),
+    },
+    Entry {
+        id: EntryId("Expr.is_last_distinct"),
+        family: Family::Checks,
+        accepts: ANY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(is_last_distinct),
+    },
+    Entry {
+        id: EntryId("Expr.is_nan"),
+        family: Family::Checks,
+        accepts: NUMERIC,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(is_nan),
+    },
+    Entry {
+        id: EntryId("Expr.is_not_nan"),
+        family: Family::Checks,
+        accepts: NUMERIC,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(is_not_nan),
+    },
+    Entry {
         id: EntryId("Expr.is_not_null"),
         family: Family::Compare,
         accepts: ANY,
@@ -1207,6 +1588,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[],
         laziness: Laziness::Lazy,
         build: Build::Expression(is_null),
+    },
+    Entry {
+        id: EntryId("Expr.is_unique"),
+        family: Family::Checks,
+        accepts: ANY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(is_unique),
     },
     Entry {
         id: EntryId("Expr.last"),
@@ -1297,6 +1686,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(ne),
     },
     Entry {
+        id: EntryId("Expr.ne_missing"),
+        family: Family::Compare,
+        accepts: ANY,
+        parameters: &[OTHER],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(ne_missing),
+    },
+    Entry {
         id: EntryId("Expr.neg"),
         family: Family::Arithmetic,
         accepts: NUMERIC_OR_DURATION,
@@ -1311,6 +1708,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[],
         laziness: Laziness::Lazy,
         build: Build::Expression(not_),
+    },
+    Entry {
+        id: EntryId("Expr.null_count"),
+        family: Family::Nulls,
+        accepts: ANY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(null_count),
     },
     Entry {
         id: EntryId("Expr.or_"),
@@ -1358,6 +1763,41 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[],
         laziness: Laziness::Lazy,
         build: Build::Expression(radians),
+    },
+    Entry {
+        id: EntryId("Expr.replace"),
+        family: Family::Conversion,
+        accepts: ANY,
+        parameters: &[
+            required("old", EXPRESSION, Shape::One).with_role(Role::Bound),
+            optional("new", EXPRESSION, Shape::One, "NO_DEFAULT")
+                .with_role(Role::Bound)
+                .with_at_least_one()
+                .given_as_many_as(AsManyAs::Parameter("old")),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(replace),
+    },
+    Entry {
+        id: EntryId("Expr.replace_strict"),
+        family: Family::Conversion,
+        accepts: ANY,
+        parameters: &[
+            required("old", EXPRESSION, Shape::One).with_role(Role::Bound),
+            optional("new", EXPRESSION, Shape::One, "NO_DEFAULT")
+                .with_at_least_one()
+                .given_as_many_as(AsManyAs::Parameter("old")),
+            optional("default", EXPRESSION, Shape::One, "NO_DEFAULT")
+                .keyword_only()
+                .sharing_a_dtype_with("new")
+                .given_as_many_as(AsManyAs::TheReceiver),
+            optional("return_dtype", Kind::Dtype, Shape::One, "None")
+                .keyword_only()
+                .converting(&["new", "default"])
+                .converting_leniently_beside("default"),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(replace_strict),
     },
     Entry {
         id: EntryId("Expr.round"),

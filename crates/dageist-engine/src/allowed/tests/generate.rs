@@ -11,6 +11,7 @@ use polars::prelude::{DataType, Expr, IntoLazy, LazyFrame};
 
 use crate::allowed::context::{Context, Nested, Outer};
 use crate::allowed::dtype::Representative;
+use crate::allowed::offers::default_word;
 use crate::allowed::rules::Rule;
 use crate::allowed::table::{
     Chain, ContextLine, DtypeKey, DtypeLine, OptionLine, OptionValue, Outcome, Produces, Reason,
@@ -71,8 +72,8 @@ fn in_parallel<T: Sync, R: Send>(items: &[T], work: impl Fn(&T) -> R + Sync) -> 
 pub(super) fn generate() -> Generated {
     let dtypes = dtype_lines();
     let index = DtypeIndex::new(&dtypes);
-    let contexts = context_lines(&index);
     let options = option_lines(&index);
+    let contexts = context_lines(&index, &OptionIndex::new(&options));
     Generated {
         dtypes,
         contexts,
@@ -109,6 +110,18 @@ fn argument_for(entry: &Entry, parameter: &str, value: Expr) -> Argument {
 /// The parameters Polars takes only as a single value, not as a column.
 const SCALAR_ONLY: [(&str, &str); 2] = [("Expr.shift", "n"), ("Expr.shift", "fill_value")];
 
+/// The parameters whose values a context is measured with as literals: Polars calls a replacement
+/// elementwise, as a join's key must be, only where what it replaces and replaces by, and the
+/// default of a strict one, are literals, which is how a replacement is written, and refuses one
+/// given a column. The dtype table measures them as columns, as every argument is.
+const LITERAL_IN_CONTEXTS: [(&str, &str); 5] = [
+    ("Expr.replace", "old"),
+    ("Expr.replace", "new"),
+    ("Expr.replace_strict", "old"),
+    ("Expr.replace_strict", "new"),
+    ("Expr.replace_strict", "default"),
+];
+
 /// The expression that stands for an argument of `dtype` for `parameter` of
 /// the entry `entry`: a column of that dtype; the number 1 of that dtype where
 /// Polars takes one value only; or a null of that dtype where the expression
@@ -121,7 +134,9 @@ fn argument_expression(
 ) -> Result<Expr, BuildError> {
     if scope.group {
         null_of(&dtype.dtype())
-    } else if SCALAR_ONLY.contains(&(entry, parameter)) {
+    } else if SCALAR_ONLY.contains(&(entry, parameter))
+        || (scope.literals && LITERAL_IN_CONTEXTS.contains(&(entry, parameter)))
+    {
         one_of(&dtype.dtype())
     } else {
         Ok(column(scope.argument))
@@ -132,14 +147,69 @@ fn argument_expression(
 /// Python's `over` is refused without something to group or order by, and
 /// `*more_exprs` extends `partition_by`, so unless `partition_by` or `order_by`
 /// is what is tested, which each stand alone, it is given the key. A rounding to significant
-/// figures is given two, which a number of the dtypes has.
-fn companions(entry: &str, parameter: Option<&str>, key: &Expr) -> Vec<(&'static str, Argument)> {
-    match (entry, parameter) {
+/// figures is given two, which a number of the dtypes has. A cast is given the dtype of its
+/// receiver, which it converts to itself. A replacement is given what it replaces by and what it
+/// replaces, columns of the receiver's dtype, and a default where it is strict, as the column
+/// that stands for an argument, so that a value the columns do not list is not refused; an
+/// interval is given the bound that is not tested. What a strict replacement of an array is given
+/// that replaces it is not an array, for Polars finds no dtype for an array and a default that
+/// is one, which would refuse every dtype that is tested for what it replaces.
+fn companions(
+    entry: &str,
+    parameter: Option<&str>,
+    scope: Scope,
+    receiver: Representative,
+    argument: Representative,
+) -> Vec<(&'static str, Argument)> {
+    let own = || expression(scope.start());
+    let stands_in = |name: &'static str| argument_expression(entry, name, argument, scope);
+    // The value that stands for what replaces the dtype of the receiver, or for its default.
+    let value = || {
+        if receiver == Representative::Array && entry == "Expr.replace_strict" {
+            expression(scope.partition())
+        } else {
+            own()
+        }
+    };
+    // What replaces, where what is replaced is tested: one value for a `Boolean`, which Polars
+    // replaces by without the join it makes of many. That join meets the values of what is
+    // replaced cast to the `Boolean` twice where they are the same there, as whole numbers are,
+    // and refuses for it, which no value that is listed shows.
+    let replacing = || {
+        if receiver == Representative::Boolean {
+            one_of(&receiver.dtype()).map_or_else(|_| value(), expression)
+        } else {
+            value()
+        }
+    };
+    let mut given: Vec<(&'static str, Argument)> = match (entry, parameter) {
         ("Expr.over", Some("partition_by" | "order_by")) => Vec::new(),
-        ("Expr.over", _) => vec![("partition_by", expressions(vec![key.clone()]))],
+        ("Expr.over", _) => vec![("partition_by", expressions(vec![scope.partition()]))],
         ("Expr.round_sig_figs", _) => vec![("digits", Argument::Integer(2))],
+        ("Expr.cast", _) => vec![("dtype", Argument::Dtype(receiver.dtype()))],
+        ("Expr.replace" | "Expr.replace_strict", Some("old")) => vec![("new", replacing())],
+        ("Expr.replace" | "Expr.replace_strict", Some("new")) => vec![("old", own())],
+        // The default and what replaces meet in one dtype, so each is tested with the other of
+        // the dtype the argument has.
+        ("Expr.replace_strict", Some("default")) => vec![("old", own())],
+        ("Expr.is_between", Some("lower_bound")) => vec![("upper_bound", own())],
+        ("Expr.is_between", Some("upper_bound")) => vec![("lower_bound", own())],
         _ => Vec::new(),
+    };
+    if entry == "Expr.replace_strict" {
+        // Where what is replaced is tested, the default is the dtype of the receiver, as what
+        // replaces it is.
+        let default = match parameter {
+            Some("old") => Some(value()),
+            Some("default") => None,
+            _ => stands_in("default").ok().map(expression),
+        };
+        given.extend(default.map(|default| ("default", default)));
+        if parameter == Some("default") {
+            given.extend(stands_in("new").ok().map(|new| ("new", expression(new))));
+        }
     }
+    given
 }
 
 // ---------------------------------------------------------------------------
@@ -182,8 +252,22 @@ fn dtype_jobs() -> Vec<DtypeJob> {
             .map(|parameter| parameter.name())
             .collect();
         for parameter in &parameters {
+            // A parameter that Python requires and that is not the one varied is given a fitting
+            // default, which `companions` says.
+            let supplied: Vec<&str> = companions(
+                entry.id().as_str(),
+                Some(parameter.name()),
+                LEFT,
+                Representative::Int64,
+                Representative::Int64,
+            )
+            .iter()
+            .map(|(name, _)| *name)
+            .collect();
             assert!(
-                python_required.iter().all(|name| *name == parameter.name()),
+                python_required
+                    .iter()
+                    .all(|name| *name == parameter.name() || supplied.contains(name)),
                 "{} has two parameters that must be given; teach the generator a fitting default \
                  for the one it does not vary",
                 entry.id().as_str()
@@ -207,7 +291,13 @@ fn dtype_line(job: &DtypeJob) -> DtypeLine {
     let argument = job.argument.unwrap_or(job.receiver);
     let frames = Frames::new(job.receiver, argument, &DataType::Int64);
     let plan = |frames: &Frames, empty: bool| -> Result<LazyFrame, BuildError> {
-        let mut given = companions(job.entry.id().as_str(), job.parameter, &column("k"));
+        let mut given = companions(
+            job.entry.id().as_str(),
+            job.parameter,
+            LEFT,
+            job.receiver,
+            argument,
+        );
         if let (Some(parameter), Some(dtype)) = (job.parameter, job.argument) {
             let value = argument_expression(job.entry.id().as_str(), parameter, dtype, LEFT)?;
             given.push((parameter, argument_for(job.entry, parameter, value)));
@@ -315,6 +405,43 @@ impl DtypeIndex {
                 produces,
             });
         }
+        // What a method gives may depend on the dtype of its argument, as `fill_nan` of a `Null`
+        // gives the dtype of what fills it, so the receivers and arguments that give a `Boolean`
+        // follow, for a context that needs one measures such a method where it gives one. They
+        // come last, where the ones that fit best are still found first.
+        if let [parameter] = required.as_slice() {
+            let booleans: Vec<Candidate> = Representative::ALL
+                .into_iter()
+                .flat_map(|receiver| {
+                    Representative::ALL
+                        .into_iter()
+                        .map(move |argument| (receiver, argument))
+                })
+                .filter_map(|(receiver, argument)| {
+                    match self
+                        .lines
+                        .get(&(id, Some(*parameter), receiver, Some(argument)))
+                    {
+                        Some(Outcome::Allowed(Some(allowed)))
+                            if allowed.result.class() == Some(Representative::Boolean)
+                                && !found.iter().any(|candidate| {
+                                    candidate.receiver == receiver
+                                        && candidate.arguments == [(*parameter, argument)]
+                                }) =>
+                        {
+                            Some(Candidate {
+                                receiver,
+                                arguments: vec![(*parameter, argument)],
+                                produces: Some(allowed.clone()),
+                            })
+                        }
+                        _ => None,
+                    }
+                })
+                .take(1)
+                .collect();
+            found.extend(booleans);
+        }
         found
     }
 }
@@ -333,6 +460,8 @@ struct Scope {
     /// The expression starts from `element()`, and its arguments are nulls of
     /// their dtype, as a group has no other column.
     group: bool,
+    /// The values of a replacement are literals, which a context is measured with.
+    literals: bool,
 }
 
 const LEFT: Scope = Scope {
@@ -341,6 +470,7 @@ const LEFT: Scope = Scope {
     boolean: "f",
     key: "k",
     group: false,
+    literals: false,
 };
 const OTHER: Scope = Scope {
     receiver: "ra",
@@ -348,6 +478,7 @@ const OTHER: Scope = Scope {
     boolean: "rf",
     key: "rk",
     group: false,
+    literals: false,
 };
 const GROUP: Scope = Scope {
     group: true,
@@ -382,7 +513,13 @@ fn method_on(
     extra: Vec<(&'static str, Argument)>,
 ) -> Result<Expr, BuildError> {
     let id = entry.id().as_str();
-    let mut given = companions(id, None, &scope.partition());
+    let argument = candidate
+        .arguments
+        .first()
+        .map_or(candidate.receiver, |(_, dtype)| *dtype);
+    let mut given = companions(id, None, scope, candidate.receiver, argument);
+    // What is given for a parameter stands in place of what it would be given otherwise.
+    given.retain(|(name, _)| !extra.iter().any(|(given, _)| given == name));
     given.extend(extra);
     for (parameter, dtype) in &candidate.arguments {
         let value = argument_expression(id, parameter, *dtype, scope)?;
@@ -600,15 +737,117 @@ fn held_dtype(context: Context, subject: Subject<'_>, probe: &Frames) -> DataTyp
 // ---------------------------------------------------------------------------
 // The context table
 
-fn context_lines(index: &DtypeIndex) -> Vec<ContextLine> {
+/// The lines of the option table, by what they measured, which the context table reads to find
+/// the dtype a form of an entry runs on.
+struct OptionIndex {
+    lines: HashMap<(&'static str, Option<Representative>, Vec<OptionValue>), Outcome>,
+}
+
+impl OptionIndex {
+    fn new(lines: &[OptionLine]) -> Self {
+        Self {
+            lines: lines
+                .iter()
+                .map(|line| {
+                    (
+                        (line.entry, line.receiver, line.options.clone()),
+                        line.outcome.clone(),
+                    )
+                })
+                .collect(),
+        }
+    }
+}
+
+/// An option given in place of another parameter, and the word it is set to.
+type Form = (&'static str, &'static str);
+
+/// The forms of an entry that the context table measures apart, for each of them differs from the
+/// entry measured with the parameter it takes the place of: Polars runs a fill by a strategy
+/// that looks at other rows, such as `forward`, where a join's key must not, and a fill by a value
+/// where it may.
+fn forms(entry: &'static Entry) -> Vec<Form> {
+    let mut forms = Vec::new();
+    for parameter in entry.parameters() {
+        if parameter.in_place_of().is_none() {
+            continue;
+        }
+        let Kind::Choice(words) = parameter.kind() else {
+            panic!(
+                "{} {} is given in place of another parameter and is no choice",
+                entry.id().as_str(),
+                parameter.name()
+            );
+        };
+        forms.extend(words.iter().map(|word| (parameter.name(), *word)));
+    }
+    forms
+}
+
+/// The receivers a form of `entry` is measured on in a context: those the option table allows
+/// the form on, `Int64` before the others, with what it gives on each.
+fn form_candidates_of(entry: &'static Entry, form: Form, options: &OptionIndex) -> Vec<Candidate> {
+    let order = std::iter::once(Representative::Int64).chain(
+        Representative::ALL
+            .into_iter()
+            .filter(|dtype| *dtype != Representative::Int64),
+    );
+    order
+        .into_iter()
+        .filter_map(|receiver| {
+            let key = (
+                entry.id().as_str(),
+                Some(receiver),
+                vec![(form.0, form.1.to_owned())],
+            );
+            match options.lines.get(&key) {
+                Some(Outcome::Allowed(produces)) => Some(Candidate {
+                    receiver,
+                    arguments: Vec::new(),
+                    produces: produces.clone(),
+                }),
+                _ => None,
+            }
+        })
+        .collect()
+}
+
+/// Whether Polars drops a value from what the entry follows when it holds a null, so that the
+/// column has fewer values than the table has rows: `drop_nulls` and `drop_nans`. The tables
+/// measure the entry in a context on a column that holds none, which they drop nothing from:
+/// how many rows a column has is for the rows to say, and a column that holds a null in a step
+/// whose other values are as long as the table is refused by Polars for its lengths.
+fn drops_values(entry: &Entry) -> bool {
+    matches!(entry.id().as_str(), "Expr.drop_nulls" | "Expr.drop_nans")
+}
+
+/// The column of the sample that has no null in it and is of the dtype `class`, if it has one: `u`
+/// holds whole numbers and `f` and its twin on the other table booleans.
+fn without_nulls(scope: Scope, class: Representative) -> Option<&'static str> {
+    match class {
+        Representative::Int64 => Some("u"),
+        Representative::Boolean => Some(scope.boolean),
+        _ => None,
+    }
+}
+
+fn context_lines(index: &DtypeIndex, options: &OptionIndex) -> Vec<ContextLine> {
     let mut jobs = Vec::new();
     for entry in catalog::entries()
         .iter()
         .filter(|entry| entry.applies() != Applies::Frame)
     {
+        let forms = if entry.applies() == Applies::Expression {
+            forms(entry)
+        } else {
+            Vec::new()
+        };
         for context in Context::all() {
             for chain in Chain::ALL {
-                jobs.push((entry, context, chain));
+                jobs.push((entry, None, context, chain));
+                for form in &forms {
+                    jobs.push((entry, Some(*form), context, chain));
+                }
             }
         }
     }
@@ -617,22 +856,50 @@ fn context_lines(index: &DtypeIndex) -> Vec<ContextLine> {
         .filter(|entry| entry.applies() == Applies::Expression)
         .map(|entry| (entry.id().as_str(), index.candidates(entry)))
         .collect();
-    in_parallel(&jobs, |(entry, context, chain)| {
-        context_line(entry, *context, *chain, &candidates)
+    let form_candidates: HashMap<(&'static str, Form), Vec<Candidate>> = catalog::entries()
+        .iter()
+        .filter(|entry| entry.applies() == Applies::Expression)
+        .flat_map(|entry| {
+            forms(entry).into_iter().map(|form| {
+                (
+                    (entry.id().as_str(), form),
+                    form_candidates_of(entry, form, options),
+                )
+            })
+        })
+        .collect();
+    in_parallel(&jobs, |(entry, form, context, chain)| {
+        context_line(
+            entry,
+            *form,
+            *context,
+            *chain,
+            &candidates,
+            &form_candidates,
+        )
     })
 }
 
 fn context_line(
     entry: &'static Entry,
+    form: Option<Form>,
     context: Context,
     chain: Chain,
     candidates: &HashMap<&'static str, Vec<Candidate>>,
+    form_candidates: &HashMap<(&'static str, Form), Vec<Candidate>>,
 ) -> ContextLine {
     let id = entry.id().as_str();
     let rules = Rule::governing(id, context);
+    let form_options: Vec<OptionValue> = form
+        .into_iter()
+        .map(|(name, word)| (name, word.to_owned()))
+        .collect();
     let (candidate, subject): (Option<Candidate>, Maker) = match entry.applies() {
         Applies::Expression => {
-            let all = &candidates[id];
+            let all = match form {
+                Some(form) => &form_candidates[&(id, form)],
+                None => &candidates[id],
+            };
             // Where the chain ends, a context that needs a `Boolean` is given
             // a method that gives one. Where it goes on, a test for a value
             // follows, so the method that fits best is measured.
@@ -650,6 +917,7 @@ fn context_line(
             let Some(chosen) = chosen.cloned() else {
                 return ContextLine {
                     entry: id,
+                    form: form_options,
                     context,
                     chain,
                     receiver: None,
@@ -662,9 +930,25 @@ fn context_line(
                 };
             };
             let for_subject = chosen.clone();
+            let given: Vec<(&'static str, Argument)> = form
+                .into_iter()
+                .map(|(name, word)| (name, Argument::Choice(word.to_owned())))
+                .collect();
             (
                 Some(chosen),
-                Box::new(move |scope| method_on(entry, &for_subject, scope, Vec::new())),
+                Box::new(move |scope| {
+                    let receiver = without_nulls(scope, for_subject.receiver)
+                        .filter(|_| drops_values(entry) && !scope.group);
+                    let scope = match receiver {
+                        Some(receiver) => Scope { receiver, ..scope },
+                        None => scope,
+                    };
+                    let scope = Scope {
+                        literals: LITERAL_IN_CONTEXTS.iter().any(|(owner, _)| *owner == id),
+                        ..scope
+                    };
+                    method_on(entry, &for_subject, scope, given.clone())
+                }),
             )
         }
         Applies::Function => (
@@ -714,6 +998,7 @@ fn context_line(
     };
     ContextLine {
         entry: id,
+        form: form_options,
         context,
         chain,
         receiver,
@@ -745,12 +1030,27 @@ fn standalone(subject: Subject<'_>, frames: &Frames) -> Option<Produces> {
 struct OptionParameter {
     name: &'static str,
     values: Vec<(String, Argument)>,
+    /// Whether every call needs it to mean anything, as a cast needs the dtype it gives.
+    needed: bool,
+    /// The word of the option that leaves the call as it is when it is not given.
+    default: Option<String>,
+}
+
+/// The classes a document can hold as a dtype, which a parameter of a dtype takes as its words.
+fn dtype_classes() -> Vec<Representative> {
+    Representative::ALL
+        .into_iter()
+        .filter(|class| crate::document::Dtype::new(class.dtype()).is_ok())
+        .collect()
 }
 
 fn option_parameters(entry: &'static Entry) -> Vec<OptionParameter> {
     entry
         .parameters()
         .iter()
+        // The dtype a method converts values to is measured by the cast, for what it accepts is
+        // what a cast accepts.
+        .filter(|parameter| parameter.converts().is_empty())
         .filter_map(|parameter| {
             let values = match parameter.kind() {
                 Kind::Flag => {
@@ -767,26 +1067,62 @@ fn option_parameters(entry: &'static Entry) -> Vec<OptionParameter> {
                     .iter()
                     .map(|word| ((*word).to_owned(), Argument::Choice((*word).to_owned())))
                     .collect(),
+                // The dtype a call gives is a word of its own, which the class names.
+                Kind::Dtype => dtype_classes()
+                    .into_iter()
+                    .map(|class| (class.name().to_owned(), Argument::Dtype(class.dtype())))
+                    .collect(),
                 _ => return None,
             };
             Some(OptionParameter {
                 name: parameter.name(),
                 values,
+                needed: parameter.kind() == Kind::Dtype
+                    && parameter.default() == ParameterDefault::Required,
+                default: default_word(parameter),
             })
         })
         .collect()
 }
 
+/// One set of options, each by the parameter, the word the table writes and the argument.
+type OptionSet = Vec<(&'static str, String, Argument)>;
+
 /// The sets of options to run: every value of the option when an entry has
-/// one, every pair of values of two options when it has more.
-fn option_sets(parameters: &[OptionParameter]) -> Vec<Vec<(&'static str, String, Argument)>> {
-    let single = |parameter: &OptionParameter| -> Vec<Vec<(&'static str, String, Argument)>> {
+/// one, every pair of values of two options when it has more. An option that a call needs, as a
+/// cast needs its dtype, is in every set, alone and with each value that is not the default of
+/// each of the other options.
+fn option_sets(parameters: &[OptionParameter]) -> Vec<OptionSet> {
+    let single = |parameter: &OptionParameter| -> Vec<OptionSet> {
         parameter
             .values
             .iter()
             .map(|(text, argument)| vec![(parameter.name, text.clone(), argument.clone())])
             .collect()
     };
+    let (needed, others): (Vec<_>, Vec<_>) =
+        parameters.iter().partition(|parameter| parameter.needed);
+    if let [needed] = needed.as_slice() {
+        let with = |first: &OptionSet, other: Option<(&OptionParameter, &(String, Argument))>| {
+            let mut set = first.clone();
+            if let Some((parameter, (text, argument))) = other {
+                set.push((parameter.name, text.clone(), argument.clone()));
+            }
+            set
+        };
+        let mut sets = Vec::new();
+        for first in single(needed) {
+            sets.push(with(&first, None));
+            for other in &others {
+                for value in &other.values {
+                    if other.default.as_deref() != Some(value.0.as_str()) {
+                        sets.push(with(&first, Some((other, value))));
+                    }
+                }
+            }
+        }
+        return sets;
+    }
     if let [only] = parameters {
         return single(only);
     }
@@ -839,6 +1175,29 @@ fn option_step(
     step(id, frames.left(empty), given)
 }
 
+/// The candidate of `entry` that follows `receiver` for the option table: the one the dtype table
+/// says runs there, and otherwise one whose arguments are of the receiver's own dtype, for the
+/// option table measures a method on every dtype, whether or not it runs there without options.
+fn option_candidate(
+    entry: &'static Entry,
+    receiver: Representative,
+    index: &DtypeIndex,
+) -> Candidate {
+    index
+        .candidates(entry)
+        .into_iter()
+        .find(|candidate| candidate.receiver == receiver)
+        .unwrap_or_else(|| Candidate {
+            receiver,
+            arguments: expression_parameters(entry)
+                .into_iter()
+                .filter(|parameter| parameter.is_needed())
+                .map(|parameter| (parameter.name(), receiver))
+                .collect(),
+            produces: None,
+        })
+}
+
 fn option_line(
     entry: &'static Entry,
     set: &[(&'static str, String, Argument)],
@@ -855,8 +1214,24 @@ fn option_line(
         .iter()
         .map(|(name, _, argument)| (*name, argument.clone()))
         .collect();
+    // What an option is given in place of is not given with it.
+    let stood_in: Vec<&str> = entry
+        .parameters()
+        .iter()
+        .filter(|parameter| chosen.iter().any(|(name, _)| *name == parameter.name()))
+        .filter_map(|parameter| parameter.in_place_of())
+        .collect();
+    let candidate = candidate.map(|candidate| Candidate {
+        arguments: candidate
+            .arguments
+            .iter()
+            .filter(|(name, _)| !stood_in.contains(name))
+            .copied()
+            .collect(),
+        ..candidate.clone()
+    });
     let plan = |frames: &Frames, empty: bool| -> Result<LazyFrame, BuildError> {
-        if let Some(candidate) = candidate {
+        if let Some(candidate) = &candidate {
             let mut extra = chosen.clone();
             if id == "Expr.over" {
                 extra.push(("order_by", expressions(vec![column("k")])));
@@ -872,7 +1247,7 @@ fn option_line(
         }
     };
     let outcome = match measure(&plan, &frames) {
-        Ok(measured) => Outcome::Allowed(candidate.and_then(|_| measured.produces())),
+        Ok(measured) => Outcome::Allowed(candidate.as_ref().and_then(|_| measured.produces())),
         Err(reason) => Outcome::Refused(reason),
     };
     let options: Vec<OptionValue> = set
@@ -897,15 +1272,21 @@ fn option_lines(index: &DtypeIndex) -> Vec<OptionLine> {
         if parameters.is_empty() {
             continue;
         }
-        let candidate = (entry.applies() == Applies::Expression).then(|| {
-            index
-                .candidates(entry)
+        let sets = option_sets(&parameters);
+        // A method is measured on each dtype, for what an option allows depends on it, as the
+        // strategy of a fill and the dtype of a cast do; a step follows none.
+        let candidates: Vec<Option<Candidate>> = if entry.applies() == Applies::Expression {
+            Representative::ALL
                 .into_iter()
-                .next()
-                .unwrap_or_else(|| panic!("{} runs on no dtype", entry.id().as_str()))
-        });
-        for set in option_sets(&parameters) {
-            jobs.push((entry, set, candidate.clone()));
+                .map(|receiver| Some(option_candidate(entry, receiver, index)))
+                .collect()
+        } else {
+            vec![None]
+        };
+        for candidate in candidates {
+            for set in &sets {
+                jobs.push((entry, set.clone(), candidate.clone()));
+            }
         }
     }
     in_parallel(&jobs, |(entry, set, candidate)| {

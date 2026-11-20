@@ -332,6 +332,7 @@ fn polars_words(rule: &str) -> &'static [&'static str] {
             "is not allowed in this context",
         ],
         "join-key-names-are-not-repeated" => &["repeated key names"],
+        "replacement-values-match-in-number" => &["must have the same length as"],
         _ => &[],
     }
 }
@@ -803,6 +804,28 @@ mod tests {
         let detail = outcome.detail().expect("a detail");
         assert!(detail.starts_with(STRICTER_WHERE_UNEVALUATED), "{detail}");
         assert!(detail.len() <= 4096 && !detail.chars().any(char::is_control));
+    }
+
+    #[test]
+    fn a_predicate_that_polars_drops_is_a_part_it_does_not_evaluate_and_no_limit() {
+        // `when(f.clip(..)).then(a).when(..).then(a).otherwise(a)`: the values are one expression,
+        // so Polars drops the predicates and never evaluates the clip of a `Boolean`, which the
+        // tables refuse. The editor holds every part to its types, so the tables are stricter
+        // where Polars does not evaluate the part, which is shown by the case with the values
+        // made to differ, and no limit says Polars accepts it.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/allowed_fuzz/regressions/stricter-a-predicate-that-is-dropped.case");
+        let case = Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case");
+        let outcome = std::thread::Builder::new()
+            .stack_size(256 << 20)
+            .spawn(move || AllowedTarget::new().evaluate(&case))
+            .expect("a thread")
+            .join()
+            .expect("the case is evaluated")
+            .expect("an outcome");
+        assert_eq!(outcome.kind(), dageist_fuzz::OutcomeKind::ExpectedRejection);
+        let detail = outcome.detail().expect("a detail");
+        assert!(detail.starts_with(STRICTER_WHERE_UNEVALUATED), "{detail}");
     }
 
     #[test]

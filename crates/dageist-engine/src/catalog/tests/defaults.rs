@@ -63,6 +63,14 @@ fn the_constant_python_names_math_e_is_read_as_the_number_it_is() {
 }
 
 #[test]
+fn the_sentinel_no_default_is_read_as_a_parameter_that_is_not_given() {
+    // Polars' signatures write `NO_DEFAULT` where `None` is a value that can be given, as the
+    // `new` of a replacement is, and leave the parameter unset.
+    assert_eq!(read("NO_DEFAULT"), DefaultValue::Unset);
+    assert_eq!(read("no_default"), DefaultValue::Other);
+}
+
+#[test]
 fn what_python_writes_otherwise_is_not_read_as_a_value() {
     let others = [
         // Names, attributes and calls.
@@ -173,6 +181,24 @@ fn the_catalogue_defaults_read_to_the_values_of_the_python_signatures() {
     // `Expr.shift(n=1, *, fill_value=None)`
     assert_eq!(default("Expr.shift", "n"), DefaultValue::Integer(1));
     assert_eq!(default("Expr.shift", "fill_value"), DefaultValue::Unset);
+    // `Expr.replace(old, new=NO_DEFAULT)` and `Expr.replace_strict(old, new=NO_DEFAULT, *,
+    // default=NO_DEFAULT, return_dtype=None)`: `NO_DEFAULT` is a parameter that is not given.
+    assert_eq!(default("Expr.replace", "new"), DefaultValue::Unset);
+    assert_eq!(
+        default("Expr.replace_strict", "default"),
+        DefaultValue::Unset
+    );
+    // `Expr.fill_null(value=None, strategy=None, limit=None)` and `Expr.is_close(other, *,
+    // abs_tol=0.0, rel_tol=1e-09, nans_equal=False)`
+    assert_eq!(default("Expr.fill_null", "strategy"), DefaultValue::Unset);
+    assert_eq!(
+        default("Expr.is_close", "abs_tol"),
+        DefaultValue::Float(0.0)
+    );
+    assert_eq!(
+        default("Expr.is_close", "rel_tol"),
+        DefaultValue::Float(1e-9)
+    );
     // `LazyFrame.join(other, on=None, how='inner', ..., suffix='_right', ..., coalesce=None,
     // ..., allow_parallel=True, force_parallel=False)`
     assert_eq!(default("LazyFrame.join", "other"), DefaultValue::Required);
@@ -214,12 +240,17 @@ fn every_default_of_the_inventory_that_python_writes_as_a_literal_is_read() {
             // Only a literal begins with a digit, a sign, a dot or a quote; a name, a call, a
             // tuple or a list begins with something else. What is not read must not be one.
             let literal = first.is_ascii_digit() || matches!(first, '-' | '+' | '.' | '\'' | '"');
-            // `math.e` is the one name that is read, as the number it is.
+            // `math.e` is the one name that is read, as the number it is, and `NO_DEFAULT` is
+            // read as unset.
             let literal = literal || python == "math.e";
             let value = read(python);
             assert_eq!(
                 value == DefaultValue::Other,
-                !literal && !matches!(python, "None" | "True" | "False" | "()" | "{}"),
+                !literal
+                    && !matches!(
+                        python,
+                        "None" | "NO_DEFAULT" | "True" | "False" | "()" | "{}"
+                    ),
                 "{} {name}={python}: read as {value:?}",
                 item.id
             );

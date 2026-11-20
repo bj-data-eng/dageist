@@ -20,7 +20,9 @@ pub enum ParameterDefault {
 pub enum DefaultValue {
     /// The parameter has no default: it must be given.
     Required,
-    /// Python's `None`: unset, which leaves the choice to Polars.
+    /// Python's `None`: unset, which leaves the choice to Polars. Also Polars' `NO_DEFAULT`, the
+    /// name Python's signature gives a parameter that is not given where `None` is a value that
+    /// can be: `replace`'s `new` and `replace_strict`'s `default`.
     Unset,
     /// `True` or `False`.
     Flag(bool),
@@ -55,14 +57,14 @@ impl DefaultValue {
     /// `False`; decimal integers and floats, signed, with the underscores
     /// Python allows between digits; single- or double-quoted text, with the
     /// escapes `\\`, `\'`, `\"`, `\n`, `\t` and `\r`; the empty `()` and
-    /// `{}`; and the one name of the inventory's defaults that is a number,
-    /// `math.e`, as Euler's number. Text with any other escape, or with an
+    /// `{}`; `NO_DEFAULT` as unset; and the one name of the inventory's defaults that is a
+    /// number, `math.e`, as Euler's number. Text with any other escape, or with an
     /// unescaped quote inside, is [`DefaultValue::Other`], as is a number
     /// outside `i64` or `f64`.
     #[must_use]
     pub fn from_python(text: &str) -> Self {
         match text {
-            "None" => Self::Unset,
+            "None" | "NO_DEFAULT" => Self::Unset,
             "True" => Self::Flag(true),
             "False" => Self::Flag(false),
             "()" | "{}" => Self::Empty,

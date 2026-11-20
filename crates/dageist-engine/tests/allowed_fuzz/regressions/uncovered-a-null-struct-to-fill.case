@@ -1,0 +1,2 @@
+{"a":"Date","b":"Struct(x: Int64, y: String)","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.select","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["b"]}}},"then":[{"entry":"Expr.last","arguments":{}},{"entry":"Expr.fill_null","arguments":{"strategy":{"choice":"one"}}}]}}]}}}}]}

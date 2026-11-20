@@ -439,6 +439,7 @@ export const RULE_NAMES = [
   'filter-predicate-is-boolean',
   'join-key-names-are-not-repeated',
   'key-is-elementwise',
+  'replacement-values-match-in-number',
 ] as const;
 
 /** The name of a rule the engine holds that Polars does not. */

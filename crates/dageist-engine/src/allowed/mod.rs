@@ -44,8 +44,8 @@ mod tests;
 mod typed;
 
 pub(crate) use adapt::{
-    Loose, Receiver, adapted_dtype, is_count, is_left_unresolved, is_required, operand_adapts,
-    receiver_beside,
+    Loose, Receiver, adapted_dtype, adapts_numbers_only, could_be_taken_by_a_number, is_count,
+    is_left_unresolved, is_required, operand_adapts, receiver_beside,
 };
 pub use candidates::{
     ArgumentSlot, Candidate, DefaultArgument, Fit, OptionOffer, OptionWord, Slot, default_argument,
@@ -59,6 +59,7 @@ pub use offers::{
     After, Allowance, Chosen, ConditionState, Ending, Offer, Place, Refusal, RefusalSource,
     Unknown, Verdict, argument_dtypes, offer, offer_input, offers, options, rule_forbids,
     rule_forbids_a_key_known_not_elementwise, rule_forbids_a_repeated_pair_of_key_names,
+    rule_forbids_replacement_values_of_other_numbers,
 };
 pub use rules::Rule;
 pub use table::{Outcome, Produces, Reason, Shape, Stage};

@@ -175,6 +175,30 @@
       "argument": null
     },
     {
+      "entry": "Expr.backward_fill",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.cast",
+      "verdict": {
+        "kind": "allowed",
+        "result": null,
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.cbrt",
       "verdict": {
         "kind": "refused",
@@ -309,6 +333,30 @@
       "argument": null
     },
     {
+      "entry": "Expr.drop_nans",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.drop_nulls",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.dt.date",
       "verdict": {
         "kind": "allowed",
@@ -383,6 +431,18 @@
       "argument": null
     },
     {
+      "entry": "Expr.eq_missing",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Boolean",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.erf",
       "verdict": {
         "kind": "refused",
@@ -420,6 +480,32 @@
             "stage": "schema"
           },
           "reason": "`exp` operation not supported for dtype `datetime[μs]` as argument 0"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.fill_nan",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "failed to determine supertype of datetime[μs] and i8"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.fill_null",
+      "verdict": {
+        "kind": "allowed",
+        "result": null,
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
         }
       },
       "argument": null
@@ -465,6 +551,18 @@
       "argument": null
     },
     {
+      "entry": "Expr.forward_fill",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.ge",
       "verdict": {
         "kind": "allowed",
@@ -489,6 +587,134 @@
       "argument": null
     },
     {
+      "entry": "Expr.has_nulls",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Boolean",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_between",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Boolean",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_close",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Boolean",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_duplicated",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Boolean",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_finite",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "`is_finite` operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_first_distinct",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Boolean",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_infinite",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "`is_infinite` operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_last_distinct",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Boolean",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_nan",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "`is_nan` operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_not_nan",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "`is_not_nan` operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.is_not_null",
       "verdict": {
         "kind": "allowed",
@@ -502,6 +728,18 @@
     },
     {
       "entry": "Expr.is_null",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Boolean",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.is_unique",
       "verdict": {
         "kind": "allowed",
         "result": "Boolean",
@@ -653,6 +891,18 @@
       "argument": null
     },
     {
+      "entry": "Expr.ne_missing",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Boolean",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
       "entry": "Expr.neg",
       "verdict": {
         "kind": "refused",
@@ -676,6 +926,18 @@
             "stage": "schema"
           },
           "reason": "dtype Datetime('μs') not supported in 'not' operation"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.null_count",
+      "verdict": {
+        "kind": "allowed",
+        "result": "UInt32",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
         }
       },
       "argument": null
@@ -730,6 +992,30 @@
             "stage": "rows"
           },
           "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.replace",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null
+    },
+    {
+      "entry": "Expr.replace_strict",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
         }
       },
       "argument": null
