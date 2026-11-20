@@ -88,6 +88,8 @@ pub enum Value {
     Duration(String),
     /// A regular expression, as typed.
     Pattern(String),
+    /// A time zone, as typed, or none.
+    TimeZone(Option<String>),
     /// The name of a connected table.
     Table(String),
     /// A file, folder or cloud location.
@@ -115,6 +117,7 @@ impl Value {
             Self::Dtype(dtype) => Argument::Dtype(dtype.as_polars().clone()),
             Self::Duration(text) => Argument::Duration(text.clone()),
             Self::Pattern(text) => Argument::Pattern(text.clone()),
+            Self::TimeZone(zone) => Argument::TimeZone(zone.clone()),
             Self::Table(_) => Argument::Table(polars::prelude::LazyFrame::default()),
             Self::Path(text) => Argument::Path(text.clone()),
             Self::Pairs(pairs) => Argument::Pairs(
@@ -270,6 +273,20 @@ impl Call {
             .collect()
     }
 
+    /// The time zones the call was given, each by its parameter's name and as typed. A call given
+    /// no zone has none to be read, and one that is not given the parameter is not here.
+    pub(crate) fn time_zones(&self) -> Vec<(&'static str, Option<&str>)> {
+        self.entry
+            .parameters()
+            .iter()
+            .filter(|parameter| parameter.kind() == Kind::TimeZone)
+            .filter_map(|parameter| match self.argument(parameter.name())? {
+                Value::TimeZone(zone) => Some((parameter.name(), zone.as_deref())),
+                _ => None,
+            })
+            .collect()
+    }
+
     /// The argument given for `parameter`, if there is one.
     #[must_use]
     pub fn argument(&self, parameter: &str) -> Option<&Value> {
@@ -293,7 +310,8 @@ fn arguments_refused(
         | BuildError::Missing { parameter }
         | BuildError::OutOfRange { parameter, .. }
         | BuildError::NotAPattern { parameter, .. }
-        | BuildError::NotADuration { parameter, .. } => (Some((*parameter).to_owned()), Vec::new()),
+        | BuildError::NotADuration { parameter, .. }
+        | BuildError::NotATimeZone { parameter, .. } => (Some((*parameter).to_owned()), Vec::new()),
         BuildError::WrongKind { parameter, .. } | BuildError::UnknownChoice { parameter, .. } => {
             let found = entry
                 .parameters()
@@ -332,6 +350,7 @@ fn fits(kind: Kind, value: &Value) -> bool {
         | (Kind::Dtype, Value::Dtype(_))
         | (Kind::Duration, Value::Duration(_))
         | (Kind::Pattern, Value::Pattern(_))
+        | (Kind::TimeZone, Value::TimeZone(_))
         | (Kind::Table, Value::Table(_))
         | (Kind::Path, Value::Path(_)) => true,
         (Kind::Choice(words), Value::Choice(word)) => words.contains(&word.as_str()),

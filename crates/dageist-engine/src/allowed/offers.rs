@@ -84,6 +84,7 @@ pub struct Chosen<'a> {
     unclassed: &'a [&'a str],
     patterns: &'a [(&'a str, &'a str)],
     durations: &'a [(&'a str, &'a str, DurationUse)],
+    time_zones: &'a [(&'a str, Option<&'a str>)],
     gives: Option<Representative>,
     many: bool,
 }
@@ -135,6 +136,16 @@ impl<'a> Chosen<'a> {
         durations: &'a [(&'a str, &'a str, DurationUse)],
     ) -> Self {
         self.durations = durations;
+        self
+    }
+
+    /// The time zones given to parameters that take one, each by the parameter's name and the text
+    /// as typed, or none for a call given no zone. A text Polars does not read as a time zone is
+    /// refused in Polars' words, whatever follows it, and a call gives a moment in the zone, or in
+    /// none where it is given none.
+    #[must_use]
+    pub const fn with_time_zones(mut self, time_zones: &'a [(&'a str, Option<&'a str>)]) -> Self {
+        self.time_zones = time_zones;
         self
     }
 
@@ -806,6 +817,14 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
             return Err(Refusal::rule_because(Rule::DurationIsValid, &said));
         }
     }
+    // A time zone Polars does not read is refused in Polars' words, whatever follows it.
+    for (_, zone) in chosen.time_zones {
+        if let Some(text) = zone
+            && let Err(said) = catalog::check_time_zone(text)
+        {
+            return Err(Refusal::rule_because(Rule::TimeZoneIsValid, &said));
+        }
+    }
     // What the options set are refused for, on the dtype of the value the method follows.
     if is_method(entry) {
         let receiver = match place.after {
@@ -881,6 +900,32 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
                 .find(|(name, _)| *name == parameter.name())
                 .and_then(|(_, text)| catalog::groups_dtype(text).ok())
                 .map(|dtype| ResultDtype::from_name(&dtype_name(&dtype)));
+        }
+        // A call that is given a time zone gives a moment in it, and one given none a moment of no
+        // zone, where the tables, measured with the zone UTC, say only that a moment is given: it
+        // gives nothing until it is told the zone, where a call may be given none.
+        if let Some(parameter) = entry
+            .parameters()
+            .iter()
+            .find(|parameter| parameter.kind() == Kind::TimeZone)
+            && result
+                .as_ref()
+                .is_some_and(|result| result.name().starts_with("Datetime("))
+        {
+            result = match chosen
+                .time_zones
+                .iter()
+                .find(|(name, _)| *name == parameter.name())
+            {
+                Some((_, Some(text))) => catalog::check_time_zone(text)
+                    .ok()
+                    .flatten()
+                    .map(|zone| ResultDtype::from_name(&format!("Datetime(us, {zone})")))
+                    .or_else(|| Some(ResultDtype::from_name("Datetime(us)"))),
+                Some((_, None)) => Some(ResultDtype::from_name("Datetime(us)")),
+                None if parameter.takes_no_time_zone() => None,
+                None => result,
+            };
         }
         // A call that was not given what Polars needs to run it gives nothing
         // whatever its options: Polars refuses a window given neither key.

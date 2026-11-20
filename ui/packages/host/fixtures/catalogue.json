@@ -752,6 +752,16 @@
       "parameters": []
     },
     {
+      "id": "Expr.dt.base_utc_offset",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.base_utc_offset",
+      "hint": "the offset of the zone from UTC, without daylight saving",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
       "id": "Expr.dt.cast_time_unit",
       "applies": "expression",
       "family": "temporal",
@@ -808,6 +818,38 @@
       "parameters": []
     },
     {
+      "id": "Expr.dt.convert_time_zone",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.convert_time_zone",
+      "hint": "the same instant, in another time zone",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "time_zone",
+          "shown": "time_zone",
+          "label": "to",
+          "kind": {
+            "kind": "timeZone",
+            "takesNone": false
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "Expr.dt.date",
       "applies": "expression",
       "family": "temporal",
@@ -833,6 +875,16 @@
       "family": "temporal",
       "name": "dt.days_in_month",
       "hint": "how many days the month has",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.dt.dst_offset",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.dst_offset",
+      "hint": "the daylight saving the zone adds",
       "head": null,
       "lazy": true,
       "parameters": []
@@ -1055,6 +1107,116 @@
       "head": null,
       "lazy": true,
       "parameters": []
+    },
+    {
+      "id": "Expr.dt.replace_time_zone",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.replace_time_zone",
+      "hint": "the same clock, in another time zone",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "time_zone",
+          "shown": "time_zone",
+          "label": "in",
+          "kind": {
+            "kind": "timeZone",
+            "takesNone": true
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "ambiguous",
+          "shown": "ambiguous",
+          "label": "a clock read twice is",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "earliest",
+                "shown": "earliest"
+              },
+              {
+                "word": "latest",
+                "shown": "latest"
+              },
+              {
+                "word": "raise",
+                "shown": "raise"
+              },
+              {
+                "word": "null",
+                "shown": "null"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "raise"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "raise"
+          },
+          "start": {
+            "kind": "word",
+            "value": "earliest"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "non_existent",
+          "shown": "non_existent",
+          "label": "a clock never read is",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "raise",
+                "shown": "raise"
+              },
+              {
+                "word": "null",
+                "shown": "null"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "raise"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "raise"
+          },
+          "start": {
+            "kind": "word",
+            "value": "null"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
     },
     {
       "id": "Expr.dt.round",

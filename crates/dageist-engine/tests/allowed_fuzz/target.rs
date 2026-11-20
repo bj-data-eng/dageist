@@ -318,8 +318,18 @@ const KEYS_DO_NOT_MATCH: &str = "datatypes of join keys don't match";
 /// How a refusal of the tables is worded when it is of where an expression may end.
 const CANNOT_END: &str = "it cannot end here: ";
 
+/// What Polars said, which the step words after the parameter it is about and `marker`, up to its
+/// first blank line.
+fn said_after<'a>(reason: &'a str, marker: &str) -> &'a str {
+    let said = reason.split_once(marker).map_or(reason, |(_, said)| said);
+    said.split("\n\n").next().unwrap_or(said)
+}
+
 /// The rule that a duration typed in be one Polars reads.
 const DURATION_RULE: &str = "duration-is-valid";
+
+/// The rule that a time zone be one Polars reads.
+const TIME_ZONE_RULE: &str = "time-zone-is-valid";
 
 /// What Polars says of what a named rule is about, where it refuses the same: any
 /// of these words. The rule that a pivot's aggregate give one value is not Polars':
@@ -359,13 +369,15 @@ fn refused_for_the_same_reason(refused: &Refused, refusal: &Refusal) -> bool {
     match &refused.source {
         Source::Polars => same_reason(&refused.source, tables, &refusal.reason),
         // The engine words a duration it refuses with Polars' own reason after its own statement.
+        // Polars says which of the two dtypes it cut, which is the one it holds the moments as.
         Source::Rule(rule) if *rule == DURATION_RULE => {
-            let said = refusal
-                .reason
-                .split("\n\n")
-                .next()
-                .unwrap_or(&refusal.reason);
-            tables.ends_with(said)
+            let said = said_after(&refusal.reason, " is not a duration: ");
+            let alike = |text: &str| text.replace("a Datetime", "a Date");
+            alike(tables).ends_with(&alike(said))
+        }
+        // The engine words a time zone it refuses with Polars' own reason after its own statement.
+        Source::Rule(rule) if *rule == TIME_ZONE_RULE => {
+            tables.ends_with(said_after(&refusal.reason, " is not a time zone: "))
         }
         Source::Rule(rule) => match polars_words(rule) {
             [] => same_reason(&refused.source, tables, &refusal.reason),

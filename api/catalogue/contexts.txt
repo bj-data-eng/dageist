@@ -54,6 +54,7 @@
 #   pattern-is-valid: a pattern must be a valid regular expression.
 #   pivot-aggregate-gives-one-value: a pivot's aggregate must give one value for each group.
 #   replacement-values-match-in-number: a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one.
+#   time-zone-is-valid: a time zone must be one Polars reads.
 #
 # An outcome is `allowed <dtype of the result> <one|many>` (`-` for a step), or
 # `refused <stage>: <Polars' reason>`. A combination is allowed only when Polars resolved
@@ -63,7 +64,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 9960 combinations: 6865 allowed; 1790 refused when Polars resolved the schema, 1305 when it ran the rows, 0 when it ran the empty table.
+# 10200 combinations: 7025 allowed; 1830 refused when Polars resolved the schema, 1345 when it ran the rows, 0 when it ran the empty table.
 #
 ChainedThen.otherwise | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 ChainedThen.otherwise | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
@@ -1625,6 +1626,66 @@ Expr.drop_nulls | sort > over.partition_by | continues | Int64 | - | - | allowed
 Expr.drop_nulls | sort > over.partition_by | ends | Int64 | - | - | allowed Int64 many
 Expr.drop_nulls | sort | continues | Int64 | - | - | allowed Int64 many
 Expr.drop_nulls | sort | ends | Int64 | - | - | allowed Int64 many
+Expr.dt.base_utc_offset | filter > condition.predicate | continues | Datetime(us, UTC) | - | condition-predicate-is-boolean | allowed Duration(ms) many
+Expr.dt.base_utc_offset | filter > condition.predicate | ends | Datetime(us, UTC) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `duration[ms]` for series with name `a`
+Expr.dt.base_utc_offset | filter > condition.value | continues | Datetime(us, UTC) | - | filter-predicate-is-boolean | allowed Duration(ms) many
+Expr.dt.base_utc_offset | filter > condition.value | ends | Datetime(us, UTC) | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Duration('ms')`
+Expr.dt.base_utc_offset | filter > over.order_by | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | filter > over.order_by | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | filter > over.partition_by | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | filter > over.partition_by | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | filter | continues | Datetime(us, UTC) | - | filter-predicate-is-boolean | allowed Duration(ms) many
+Expr.dt.base_utc_offset | filter | ends | Datetime(us, UTC) | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Duration('ms')`
+Expr.dt.base_utc_offset | join_left > condition.predicate | continues | Datetime(us, UTC) | - | condition-predicate-is-boolean | allowed Duration(ms) many
+Expr.dt.base_utc_offset | join_left > condition.predicate | ends | Datetime(us, UTC) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `duration[ms]` for series with name `a`
+Expr.dt.base_utc_offset | join_left > condition.value | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | join_left > condition.value | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | join_left > over.order_by | continues | Datetime(us, UTC) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.base_utc_offset | join_left > over.order_by | ends | Datetime(us, UTC) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.base_utc_offset | join_left > over.partition_by | continues | Datetime(us, UTC) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.base_utc_offset | join_left > over.partition_by | ends | Datetime(us, UTC) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.base_utc_offset | join_left | continues | Datetime(us, UTC) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Duration(ms) many
+Expr.dt.base_utc_offset | join_left | ends | Datetime(us, UTC) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Duration(ms) many
+Expr.dt.base_utc_offset | join_right > condition.predicate | continues | Datetime(us, UTC) | - | condition-predicate-is-boolean | allowed Duration(ms) many
+Expr.dt.base_utc_offset | join_right > condition.predicate | ends | Datetime(us, UTC) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `duration[ms]` for series with name `ra`
+Expr.dt.base_utc_offset | join_right > condition.value | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | join_right > condition.value | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | join_right > over.order_by | continues | Datetime(us, UTC) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.base_utc_offset | join_right > over.order_by | ends | Datetime(us, UTC) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.base_utc_offset | join_right > over.partition_by | continues | Datetime(us, UTC) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.base_utc_offset | join_right > over.partition_by | ends | Datetime(us, UTC) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.base_utc_offset | join_right | continues | Datetime(us, UTC) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Duration(ms) many
+Expr.dt.base_utc_offset | join_right | ends | Datetime(us, UTC) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Duration(ms) many
+Expr.dt.base_utc_offset | pivot_aggregate > condition.predicate | continues | Datetime(us, UTC) | - | condition-predicate-is-boolean | allowed Duration(ms) many
+Expr.dt.base_utc_offset | pivot_aggregate > condition.predicate | ends | Datetime(us, UTC) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `duration[ms]` for series with name `a`
+Expr.dt.base_utc_offset | pivot_aggregate > condition.value | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | pivot_aggregate > condition.value | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | pivot_aggregate > over.order_by | continues | Datetime(us, UTC) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.base_utc_offset | pivot_aggregate > over.order_by | ends | Datetime(us, UTC) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.base_utc_offset | pivot_aggregate > over.partition_by | continues | Datetime(us, UTC) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.base_utc_offset | pivot_aggregate > over.partition_by | ends | Datetime(us, UTC) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.base_utc_offset | pivot_aggregate | continues | Datetime(us, UTC) | - | pivot-aggregate-gives-one-value | allowed Duration(ms) many
+Expr.dt.base_utc_offset | pivot_aggregate | ends | Datetime(us, UTC) | - | pivot-aggregate-gives-one-value | allowed Duration(ms) many
+Expr.dt.base_utc_offset | select > condition.predicate | continues | Datetime(us, UTC) | - | condition-predicate-is-boolean | allowed Duration(ms) many
+Expr.dt.base_utc_offset | select > condition.predicate | ends | Datetime(us, UTC) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `duration[ms]` for series with name `a`
+Expr.dt.base_utc_offset | select > condition.value | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | select > condition.value | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | select > over.order_by | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | select > over.order_by | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | select > over.partition_by | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | select > over.partition_by | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | select | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | select | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | sort > condition.predicate | continues | Datetime(us, UTC) | - | condition-predicate-is-boolean | allowed Duration(ms) many
+Expr.dt.base_utc_offset | sort > condition.predicate | ends | Datetime(us, UTC) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `duration[ms]` for series with name `a`
+Expr.dt.base_utc_offset | sort > condition.value | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | sort > condition.value | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | sort > over.order_by | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | sort > over.order_by | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | sort > over.partition_by | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | sort > over.partition_by | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | sort | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | sort | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
 Expr.dt.cast_time_unit | filter > condition.predicate | continues | Datetime(us) | - | condition-predicate-is-boolean | allowed Datetime(ns) many
 Expr.dt.cast_time_unit | filter > condition.predicate | ends | Datetime(us) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[ns]` for series with name `a`
 Expr.dt.cast_time_unit | filter > condition.value | continues | Datetime(us) | - | filter-predicate-is-boolean | allowed Datetime(ns) many
@@ -1745,6 +1806,66 @@ Expr.dt.century | sort > over.partition_by | continues | Date | - | - | allowed 
 Expr.dt.century | sort > over.partition_by | ends | Date | - | - | allowed Int32 many
 Expr.dt.century | sort | continues | Date | - | - | allowed Int32 many
 Expr.dt.century | sort | ends | Date | - | - | allowed Int32 many
+Expr.dt.convert_time_zone | filter > condition.predicate | continues | Datetime(us) | - | condition-predicate-is-boolean | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | filter > condition.predicate | ends | Datetime(us) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.convert_time_zone | filter > condition.value | continues | Datetime(us) | - | filter-predicate-is-boolean | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | filter > condition.value | ends | Datetime(us) | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Datetime('μs', 'UTC')`
+Expr.dt.convert_time_zone | filter > over.order_by | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | filter > over.order_by | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | filter > over.partition_by | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | filter > over.partition_by | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | filter | continues | Datetime(us) | - | filter-predicate-is-boolean | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | filter | ends | Datetime(us) | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Datetime('μs', 'UTC')`
+Expr.dt.convert_time_zone | join_left > condition.predicate | continues | Datetime(us) | - | condition-predicate-is-boolean | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | join_left > condition.predicate | ends | Datetime(us) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.convert_time_zone | join_left > condition.value | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | join_left > condition.value | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | join_left > over.order_by | continues | Datetime(us) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.convert_time_zone | join_left > over.order_by | ends | Datetime(us) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.convert_time_zone | join_left > over.partition_by | continues | Datetime(us) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.convert_time_zone | join_left > over.partition_by | ends | Datetime(us) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.convert_time_zone | join_left | continues | Datetime(us) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | join_left | ends | Datetime(us) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | join_right > condition.predicate | continues | Datetime(us) | - | condition-predicate-is-boolean | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | join_right > condition.predicate | ends | Datetime(us) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs, UTC]` for series with name `ra`
+Expr.dt.convert_time_zone | join_right > condition.value | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | join_right > condition.value | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | join_right > over.order_by | continues | Datetime(us) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.convert_time_zone | join_right > over.order_by | ends | Datetime(us) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.convert_time_zone | join_right > over.partition_by | continues | Datetime(us) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.convert_time_zone | join_right > over.partition_by | ends | Datetime(us) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.convert_time_zone | join_right | continues | Datetime(us) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | join_right | ends | Datetime(us) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | pivot_aggregate > condition.predicate | continues | Datetime(us) | - | condition-predicate-is-boolean | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | pivot_aggregate > condition.predicate | ends | Datetime(us) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.convert_time_zone | pivot_aggregate > condition.value | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | pivot_aggregate > condition.value | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | pivot_aggregate > over.order_by | continues | Datetime(us) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.convert_time_zone | pivot_aggregate > over.order_by | ends | Datetime(us) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.convert_time_zone | pivot_aggregate > over.partition_by | continues | Datetime(us) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.convert_time_zone | pivot_aggregate > over.partition_by | ends | Datetime(us) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.convert_time_zone | pivot_aggregate | continues | Datetime(us) | - | pivot-aggregate-gives-one-value | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | pivot_aggregate | ends | Datetime(us) | - | pivot-aggregate-gives-one-value | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | select > condition.predicate | continues | Datetime(us) | - | condition-predicate-is-boolean | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | select > condition.predicate | ends | Datetime(us) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.convert_time_zone | select > condition.value | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | select > condition.value | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | select > over.order_by | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | select > over.order_by | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | select > over.partition_by | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | select > over.partition_by | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | select | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | select | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | sort > condition.predicate | continues | Datetime(us) | - | condition-predicate-is-boolean | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | sort > condition.predicate | ends | Datetime(us) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.convert_time_zone | sort > condition.value | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | sort > condition.value | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | sort > over.order_by | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | sort > over.order_by | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | sort > over.partition_by | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | sort > over.partition_by | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | sort | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | sort | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
 Expr.dt.date | filter > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed Date many
 Expr.dt.date | filter > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `a`
 Expr.dt.date | filter > condition.value | continues | Date | - | filter-predicate-is-boolean | allowed Date many
@@ -1925,6 +2046,66 @@ Expr.dt.days_in_month | sort > over.partition_by | continues | Date | - | - | al
 Expr.dt.days_in_month | sort > over.partition_by | ends | Date | - | - | allowed Int8 many
 Expr.dt.days_in_month | sort | continues | Date | - | - | allowed Int8 many
 Expr.dt.days_in_month | sort | ends | Date | - | - | allowed Int8 many
+Expr.dt.dst_offset | filter > condition.predicate | continues | Datetime(us, UTC) | - | condition-predicate-is-boolean | allowed Duration(ms) many
+Expr.dt.dst_offset | filter > condition.predicate | ends | Datetime(us, UTC) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `duration[ms]` for series with name `a`
+Expr.dt.dst_offset | filter > condition.value | continues | Datetime(us, UTC) | - | filter-predicate-is-boolean | allowed Duration(ms) many
+Expr.dt.dst_offset | filter > condition.value | ends | Datetime(us, UTC) | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Duration('ms')`
+Expr.dt.dst_offset | filter > over.order_by | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | filter > over.order_by | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | filter > over.partition_by | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | filter > over.partition_by | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | filter | continues | Datetime(us, UTC) | - | filter-predicate-is-boolean | allowed Duration(ms) many
+Expr.dt.dst_offset | filter | ends | Datetime(us, UTC) | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Duration('ms')`
+Expr.dt.dst_offset | join_left > condition.predicate | continues | Datetime(us, UTC) | - | condition-predicate-is-boolean | allowed Duration(ms) many
+Expr.dt.dst_offset | join_left > condition.predicate | ends | Datetime(us, UTC) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `duration[ms]` for series with name `a`
+Expr.dt.dst_offset | join_left > condition.value | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | join_left > condition.value | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | join_left > over.order_by | continues | Datetime(us, UTC) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.dst_offset | join_left > over.order_by | ends | Datetime(us, UTC) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.dst_offset | join_left > over.partition_by | continues | Datetime(us, UTC) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.dst_offset | join_left > over.partition_by | ends | Datetime(us, UTC) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.dst_offset | join_left | continues | Datetime(us, UTC) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Duration(ms) many
+Expr.dt.dst_offset | join_left | ends | Datetime(us, UTC) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Duration(ms) many
+Expr.dt.dst_offset | join_right > condition.predicate | continues | Datetime(us, UTC) | - | condition-predicate-is-boolean | allowed Duration(ms) many
+Expr.dt.dst_offset | join_right > condition.predicate | ends | Datetime(us, UTC) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `duration[ms]` for series with name `ra`
+Expr.dt.dst_offset | join_right > condition.value | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | join_right > condition.value | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | join_right > over.order_by | continues | Datetime(us, UTC) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.dst_offset | join_right > over.order_by | ends | Datetime(us, UTC) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.dst_offset | join_right > over.partition_by | continues | Datetime(us, UTC) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.dst_offset | join_right > over.partition_by | ends | Datetime(us, UTC) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.dst_offset | join_right | continues | Datetime(us, UTC) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Duration(ms) many
+Expr.dt.dst_offset | join_right | ends | Datetime(us, UTC) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Duration(ms) many
+Expr.dt.dst_offset | pivot_aggregate > condition.predicate | continues | Datetime(us, UTC) | - | condition-predicate-is-boolean | allowed Duration(ms) many
+Expr.dt.dst_offset | pivot_aggregate > condition.predicate | ends | Datetime(us, UTC) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `duration[ms]` for series with name `a`
+Expr.dt.dst_offset | pivot_aggregate > condition.value | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | pivot_aggregate > condition.value | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | pivot_aggregate > over.order_by | continues | Datetime(us, UTC) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.dst_offset | pivot_aggregate > over.order_by | ends | Datetime(us, UTC) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.dst_offset | pivot_aggregate > over.partition_by | continues | Datetime(us, UTC) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.dst_offset | pivot_aggregate > over.partition_by | ends | Datetime(us, UTC) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.dst_offset | pivot_aggregate | continues | Datetime(us, UTC) | - | pivot-aggregate-gives-one-value | allowed Duration(ms) many
+Expr.dt.dst_offset | pivot_aggregate | ends | Datetime(us, UTC) | - | pivot-aggregate-gives-one-value | allowed Duration(ms) many
+Expr.dt.dst_offset | select > condition.predicate | continues | Datetime(us, UTC) | - | condition-predicate-is-boolean | allowed Duration(ms) many
+Expr.dt.dst_offset | select > condition.predicate | ends | Datetime(us, UTC) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `duration[ms]` for series with name `a`
+Expr.dt.dst_offset | select > condition.value | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | select > condition.value | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | select > over.order_by | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | select > over.order_by | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | select > over.partition_by | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | select > over.partition_by | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | select | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | select | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | sort > condition.predicate | continues | Datetime(us, UTC) | - | condition-predicate-is-boolean | allowed Duration(ms) many
+Expr.dt.dst_offset | sort > condition.predicate | ends | Datetime(us, UTC) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `duration[ms]` for series with name `a`
+Expr.dt.dst_offset | sort > condition.value | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | sort > condition.value | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | sort > over.order_by | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | sort > over.order_by | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | sort > over.partition_by | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | sort > over.partition_by | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | sort | continues | Datetime(us, UTC) | - | - | allowed Duration(ms) many
+Expr.dt.dst_offset | sort | ends | Datetime(us, UTC) | - | - | allowed Duration(ms) many
 Expr.dt.epoch | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed Int64 many
 Expr.dt.epoch | filter > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `i64` for series with name `a`
 Expr.dt.epoch | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed Int64 many
@@ -2825,6 +3006,66 @@ Expr.dt.quarter | sort > over.partition_by | continues | Date | - | - | allowed 
 Expr.dt.quarter | sort > over.partition_by | ends | Date | - | - | allowed Int8 many
 Expr.dt.quarter | sort | continues | Date | - | - | allowed Int8 many
 Expr.dt.quarter | sort | ends | Date | - | - | allowed Int8 many
+Expr.dt.replace_time_zone | filter > condition.predicate | continues | Datetime(us) | - | condition-predicate-is-boolean | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | filter > condition.predicate | ends | Datetime(us) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.replace_time_zone | filter > condition.value | continues | Datetime(us) | - | filter-predicate-is-boolean | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | filter > condition.value | ends | Datetime(us) | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Datetime('μs', 'UTC')`
+Expr.dt.replace_time_zone | filter > over.order_by | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | filter > over.order_by | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | filter > over.partition_by | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | filter > over.partition_by | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | filter | continues | Datetime(us) | - | filter-predicate-is-boolean | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | filter | ends | Datetime(us) | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Datetime('μs', 'UTC')`
+Expr.dt.replace_time_zone | join_left > condition.predicate | continues | Datetime(us) | - | condition-predicate-is-boolean | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | join_left > condition.predicate | ends | Datetime(us) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.replace_time_zone | join_left > condition.value | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | join_left > condition.value | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | join_left > over.order_by | continues | Datetime(us) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.replace_time_zone | join_left > over.order_by | ends | Datetime(us) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.replace_time_zone | join_left > over.partition_by | continues | Datetime(us) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.replace_time_zone | join_left > over.partition_by | ends | Datetime(us) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.replace_time_zone | join_left | continues | Datetime(us) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | join_left | ends | Datetime(us) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | join_right > condition.predicate | continues | Datetime(us) | - | condition-predicate-is-boolean | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | join_right > condition.predicate | ends | Datetime(us) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs, UTC]` for series with name `ra`
+Expr.dt.replace_time_zone | join_right > condition.value | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | join_right > condition.value | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | join_right > over.order_by | continues | Datetime(us) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.replace_time_zone | join_right > over.order_by | ends | Datetime(us) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.replace_time_zone | join_right > over.partition_by | continues | Datetime(us) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.replace_time_zone | join_right > over.partition_by | ends | Datetime(us) | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.replace_time_zone | join_right | continues | Datetime(us) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | join_right | ends | Datetime(us) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | pivot_aggregate > condition.predicate | continues | Datetime(us) | - | condition-predicate-is-boolean | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | pivot_aggregate > condition.predicate | ends | Datetime(us) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.replace_time_zone | pivot_aggregate > condition.value | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | pivot_aggregate > condition.value | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | pivot_aggregate > over.order_by | continues | Datetime(us) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.replace_time_zone | pivot_aggregate > over.order_by | ends | Datetime(us) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.replace_time_zone | pivot_aggregate > over.partition_by | continues | Datetime(us) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.replace_time_zone | pivot_aggregate > over.partition_by | ends | Datetime(us) | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.replace_time_zone | pivot_aggregate | continues | Datetime(us) | - | pivot-aggregate-gives-one-value | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | pivot_aggregate | ends | Datetime(us) | - | pivot-aggregate-gives-one-value | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | select > condition.predicate | continues | Datetime(us) | - | condition-predicate-is-boolean | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | select > condition.predicate | ends | Datetime(us) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.replace_time_zone | select > condition.value | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | select > condition.value | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | select > over.order_by | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | select > over.order_by | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | select > over.partition_by | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | select > over.partition_by | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | select | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | select | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | sort > condition.predicate | continues | Datetime(us) | - | condition-predicate-is-boolean | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | sort > condition.predicate | ends | Datetime(us) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.replace_time_zone | sort > condition.value | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | sort > condition.value | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | sort > over.order_by | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | sort > over.order_by | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | sort > over.partition_by | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | sort > over.partition_by | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | sort | continues | Datetime(us) | - | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | sort | ends | Datetime(us) | - | - | allowed Datetime(us, UTC) many
 Expr.dt.round | filter > condition.predicate | continues | Date | String | condition-predicate-is-boolean | allowed Date many
 Expr.dt.round | filter > condition.predicate | ends | Date | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `a`
 Expr.dt.round | filter > condition.value | continues | Date | String | filter-predicate-is-boolean | allowed Date many

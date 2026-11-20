@@ -65,6 +65,13 @@ const readKind: Decode<KindView> = readTagged<KindView>('kind', {
       plainTextFlag: readField(fields, path, 'plainTextFlag', readNullable(readString)),
     }),
   },
+  timeZone: {
+    fields: ['takesNone'],
+    read: (fields, path) => ({
+      kind: 'timeZone',
+      takesNone: readField(fields, path, 'takesNone', readBoolean),
+    }),
+  },
   table: { fields: [], read: () => ({ kind: 'table' }) },
   path: { fields: [], read: () => ({ kind: 'path' }) },
   pairs: {

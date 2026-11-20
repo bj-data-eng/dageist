@@ -14,9 +14,9 @@ use polars::chunked_array::cast::CastOptions;
 use polars::frame::PivotColumnNaming;
 use polars::prelude::{
     AnyValue, ClosedInterval, DataType, Expr, FillNullStrategy, JoinBuildSide, JoinCoalesce,
-    JoinType, JoinValidation, LazyFrame, MaintainOrderJoin, NULL, NamedFrom, Operator, PolarsError,
-    RoundMode, Scalar, Series, SortMultipleOptions, SortOptions, TimeUnit, WindowMapping, all,
-    all_horizontal, binary_expr, col, cols, element, lit, when,
+    JoinType, JoinValidation, LazyFrame, MaintainOrderJoin, NULL, NamedFrom, NonExistent, Operator,
+    PolarsError, RoundMode, Scalar, Series, SortMultipleOptions, SortOptions, TimeUnit, TimeZone,
+    WindowMapping, all, all_horizontal, binary_expr, col, cols, element, lit, when,
 };
 
 use super::{
@@ -47,6 +47,9 @@ const TIME_PART: &[Dtypes] = &[Dtypes::Datetime, Dtypes::Time];
 const DURATION: &[Dtypes] = &[Dtypes::Duration];
 // What Polars takes a time unit of: a `Datetime` and a `Duration` are held in one, and changed to
 // another by `cast_time_unit`.
+// What Polars takes a time zone of: a `Datetime`, which it gives one it has none, converts to another
+// and, where it has one, reads the offsets of. A `Datetime` with none is refused the offsets.
+const ZONED: &[Dtypes] = &[Dtypes::Datetime];
 const HAS_A_UNIT: &[Dtypes] = &[Dtypes::Datetime, Dtypes::Duration];
 // What Polars counts since the start of 1970: a moment, and a number or a `Boolean`, which it
 // reads as the count of microseconds a moment is. A time of day, a duration and text it refuses.
@@ -135,6 +138,12 @@ const TIME_UNIT: &[&str] = &["ns", "us", "ms"];
 // The words Python's `epoch` takes for `time_unit`: the three units of a `TimeUnit`, and seconds
 // and days, which `epoch` works out of them.
 const EPOCH_UNIT: &[&str] = &["ns", "us", "ms", "s", "d"];
+// The words Python's `Ambiguous` takes: which of the two times a clock that is read twice, as it is
+// where the clocks go back, stands for, and what to do where no word is given.
+const AMBIGUOUS: &[&str] = &["earliest", "latest", "raise", "null"];
+// The words Python's `replace_time_zone` takes for `non_existent`: what a clock that is never read,
+// as where the clocks go forward, gives.
+const NON_EXISTENT: &[&str] = &["raise", "null"];
 const COLUMN_NAMING: &[&str] = &["auto", "combine"];
 const MAPPING_STRATEGY: &[&str] = &["group_to_rows", "join", "explode"];
 // The words Python's binding takes for `mode`. Polars' enum also has `to_zero`, which the
@@ -1251,6 +1260,37 @@ fn time_unit(
     })
 }
 
+fn dt_base_utc_offset(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().base_utc_offset())
+}
+
+fn dt_dst_offset(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().dst_offset())
+}
+
+/// A moment in the zone, which keeps its instant and changes the clock it is read by. Python takes
+/// a zone only, so none is refused.
+fn dt_convert_time_zone(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let zone = arguments
+        .time_zone("time_zone", false)?
+        .unwrap_or(TimeZone::UTC);
+    Ok(expr.dt().convert_time_zone(zone))
+}
+
+/// A moment in the zone that keeps its clock and changes its instant, or in none where the zone is
+/// none. A clock that is read twice or never is resolved by the words given.
+fn dt_replace_time_zone(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let zone = arguments.time_zone("time_zone", true)?;
+    let ambiguous = arguments.choice("ambiguous", AMBIGUOUS, "raise")?;
+    let non_existent = match arguments.choice("non_existent", NON_EXISTENT, "raise")? {
+        "null" => NonExistent::Null,
+        _ => NonExistent::Raise,
+    };
+    Ok(expr
+        .dt()
+        .replace_time_zone(zone, lit(ambiguous), non_existent))
+}
+
 fn dt_cast_time_unit(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
     Ok(expr
         .dt()
@@ -1864,6 +1904,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         laziness: Laziness::Lazy,
         build: Build::Expression(drop_nulls),
     },
+    temporal("Expr.dt.base_utc_offset", ZONED, &[], dt_base_utc_offset),
     temporal(
         "Expr.dt.cast_time_unit",
         HAS_A_UNIT,
@@ -1871,6 +1912,12 @@ pub(super) const ENTRIES: &[Entry] = &[
         dt_cast_time_unit,
     ),
     temporal("Expr.dt.century", DATE_PART, &[], dt_century),
+    temporal(
+        "Expr.dt.convert_time_zone",
+        ZONED,
+        &[required("time_zone", Kind::TimeZone, Shape::One)],
+        dt_convert_time_zone,
+    ),
     Entry {
         id: EntryId("Expr.dt.date"),
         family: Family::Temporal,
@@ -1881,6 +1928,7 @@ pub(super) const ENTRIES: &[Entry] = &[
     },
     temporal("Expr.dt.day", DATE_PART, &[], dt_day),
     temporal("Expr.dt.days_in_month", DATE_PART, &[], dt_days_in_month),
+    temporal("Expr.dt.dst_offset", ZONED, &[], dt_dst_offset),
     temporal(
         "Expr.dt.epoch",
         COUNTED_SINCE_1970,
@@ -1922,6 +1970,22 @@ pub(super) const ENTRIES: &[Entry] = &[
     },
     temporal("Expr.dt.ordinal_day", DATE_PART, &[], dt_ordinal_day),
     temporal("Expr.dt.quarter", DATE_PART, &[], dt_quarter),
+    temporal(
+        "Expr.dt.replace_time_zone",
+        ZONED,
+        &[
+            required("time_zone", Kind::TimeZone, Shape::One).or_no_time_zone(),
+            optional("ambiguous", Kind::Choice(AMBIGUOUS), Shape::One, "'raise'").keyword_only(),
+            optional(
+                "non_existent",
+                Kind::Choice(NON_EXISTENT),
+                Shape::One,
+                "'raise'",
+            )
+            .keyword_only(),
+        ],
+        dt_replace_time_zone,
+    ),
     temporal(
         "Expr.dt.round",
         DATE_PART,

@@ -401,6 +401,21 @@
       "slots": []
     },
     {
+      "entry": "Expr.dt.base_utc_offset",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.dt.cast_time_unit",
       "verdict": {
         "kind": "refused",
@@ -417,6 +432,21 @@
     },
     {
       "entry": "Expr.dt.century",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.convert_time_zone",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -462,6 +492,21 @@
     },
     {
       "entry": "Expr.dt.days_in_month",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.dst_offset",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -687,6 +732,21 @@
     },
     {
       "entry": "Expr.dt.quarter",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.replace_time_zone",
       "verdict": {
         "kind": "refused",
         "refusal": {

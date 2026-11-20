@@ -409,6 +409,22 @@
       "slots": []
     },
     {
+      "entry": "Expr.dt.base_utc_offset",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "`base_utc_offset` operation not supported for dtype `datetime[μs]` (expected: time-zone-aware datetime)"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.dt.cast_time_unit",
       "verdict": {
         "kind": "allowed",
@@ -435,6 +451,20 @@
       "argument": null,
       "leftOut": null,
       "slots": []
+    },
+    {
+      "entry": "Expr.dt.convert_time_zone",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us, UTC)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": ["time_zone"]
     },
     {
       "entry": "Expr.dt.date",
@@ -472,6 +502,22 @@
         "shape": "many",
         "ending": {
           "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.dst_offset",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "`dst_offset` operation not supported for dtype `datetime[μs]` (expected: time-zone-aware datetime)"
         }
       },
       "argument": null,
@@ -687,6 +733,20 @@
       "argument": null,
       "leftOut": null,
       "slots": []
+    },
+    {
+      "entry": "Expr.dt.replace_time_zone",
+      "verdict": {
+        "kind": "allowed",
+        "result": null,
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": ["time_zone"]
     },
     {
       "entry": "Expr.dt.round",

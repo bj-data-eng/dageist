@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 40664 combinations: 14670 allowed; 6870 refused when Polars resolved the schema, 19124 when it ran the rows, 0 when it ran the empty table.
+# 40768 combinations: 14676 allowed; 6918 refused when Polars resolved the schema, 19174 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.abs | - | Array(Int64, 2) | - | refused rows: `abs` operation not supported for dtype `array[i64, 2]`
 Expr.abs | - | Boolean | - | refused rows: `abs` operation not supported for dtype `bool`
@@ -3258,6 +3258,32 @@ Expr.drop_nulls | - | UInt16 | - | allowed UInt16 many
 Expr.drop_nulls | - | UInt32 | - | allowed UInt32 many
 Expr.drop_nulls | - | UInt64 | - | allowed UInt64 many
 Expr.drop_nulls | - | UInt8 | - | allowed UInt8 many
+Expr.dt.base_utc_offset | - | Array(Int64, 2) | - | refused rows: `base_utc_offset` operation not supported for dtype `array[i64, 2]` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | Boolean | - | refused rows: `base_utc_offset` operation not supported for dtype `bool` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | Date | - | refused rows: `base_utc_offset` operation not supported for dtype `date` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | Datetime(us) | - | refused rows: `base_utc_offset` operation not supported for dtype `datetime[μs]` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | Datetime(us, UTC) | - | allowed Duration(ms) many
+Expr.dt.base_utc_offset | - | Decimal(10, 2) | - | refused rows: `base_utc_offset` operation not supported for dtype `decimal[10,2]` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | Duration(us) | - | refused rows: `base_utc_offset` operation not supported for dtype `duration[μs]` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | Float16 | - | refused rows: `base_utc_offset` operation not supported for dtype `f16` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | Float32 | - | refused rows: `base_utc_offset` operation not supported for dtype `f32` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | Float64 | - | refused rows: `base_utc_offset` operation not supported for dtype `f64` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | Int128 | - | refused rows: `base_utc_offset` operation not supported for dtype `i128` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | Int16 | - | refused rows: `base_utc_offset` operation not supported for dtype `i16` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | Int32 | - | refused rows: `base_utc_offset` operation not supported for dtype `i32` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | Int64 | - | refused rows: `base_utc_offset` operation not supported for dtype `i64` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | Int8 | - | refused rows: `base_utc_offset` operation not supported for dtype `i8` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | List(Int64) | - | refused rows: `base_utc_offset` operation not supported for dtype `list[i64]` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | List(String) | - | refused rows: `base_utc_offset` operation not supported for dtype `list[str]` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | Null | - | refused rows: `base_utc_offset` operation not supported for dtype `null` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | String | - | refused rows: `base_utc_offset` operation not supported for dtype `str` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | Struct(x: Int64, y: String) | - | refused rows: `base_utc_offset` operation not supported for dtype `struct[2]` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | Time | - | refused rows: `base_utc_offset` operation not supported for dtype `time` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | UInt128 | - | refused rows: `base_utc_offset` operation not supported for dtype `u128` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | UInt16 | - | refused rows: `base_utc_offset` operation not supported for dtype `u16` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | UInt32 | - | refused rows: `base_utc_offset` operation not supported for dtype `u32` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | UInt64 | - | refused rows: `base_utc_offset` operation not supported for dtype `u64` (expected: time-zone-aware datetime)
+Expr.dt.base_utc_offset | - | UInt8 | - | refused rows: `base_utc_offset` operation not supported for dtype `u8` (expected: time-zone-aware datetime)
 Expr.dt.cast_time_unit | - | Array(Int64, 2) | - | refused schema: expected duration or datetime, got array[i64, 2]
 Expr.dt.cast_time_unit | - | Boolean | - | refused schema: expected duration or datetime, got bool
 Expr.dt.cast_time_unit | - | Date | - | refused schema: expected duration or datetime, got date
@@ -3310,6 +3336,32 @@ Expr.dt.century | - | UInt16 | - | refused rows: `century` operation not support
 Expr.dt.century | - | UInt32 | - | refused rows: `century` operation not supported for dtype `u32`
 Expr.dt.century | - | UInt64 | - | refused rows: `century` operation not supported for dtype `u64`
 Expr.dt.century | - | UInt8 | - | refused rows: `century` operation not supported for dtype `u8`
+Expr.dt.convert_time_zone | - | Array(Int64, 2) | - | refused schema: expected Datetime, got array[i64, 2]
+Expr.dt.convert_time_zone | - | Boolean | - | refused schema: expected Datetime, got bool
+Expr.dt.convert_time_zone | - | Date | - | refused schema: expected Datetime, got date
+Expr.dt.convert_time_zone | - | Datetime(us) | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | - | Datetime(us, UTC) | - | allowed Datetime(us, UTC) many
+Expr.dt.convert_time_zone | - | Decimal(10, 2) | - | refused schema: expected Datetime, got decimal[10,2]
+Expr.dt.convert_time_zone | - | Duration(us) | - | refused schema: expected Datetime, got duration[μs]
+Expr.dt.convert_time_zone | - | Float16 | - | refused schema: expected Datetime, got f16
+Expr.dt.convert_time_zone | - | Float32 | - | refused schema: expected Datetime, got f32
+Expr.dt.convert_time_zone | - | Float64 | - | refused schema: expected Datetime, got f64
+Expr.dt.convert_time_zone | - | Int128 | - | refused schema: expected Datetime, got i128
+Expr.dt.convert_time_zone | - | Int16 | - | refused schema: expected Datetime, got i16
+Expr.dt.convert_time_zone | - | Int32 | - | refused schema: expected Datetime, got i32
+Expr.dt.convert_time_zone | - | Int64 | - | refused schema: expected Datetime, got i64
+Expr.dt.convert_time_zone | - | Int8 | - | refused schema: expected Datetime, got i8
+Expr.dt.convert_time_zone | - | List(Int64) | - | refused schema: expected Datetime, got list[i64]
+Expr.dt.convert_time_zone | - | List(String) | - | refused schema: expected Datetime, got list[str]
+Expr.dt.convert_time_zone | - | Null | - | refused schema: expected Datetime, got null
+Expr.dt.convert_time_zone | - | String | - | refused schema: expected Datetime, got str
+Expr.dt.convert_time_zone | - | Struct(x: Int64, y: String) | - | refused schema: expected Datetime, got struct[2]
+Expr.dt.convert_time_zone | - | Time | - | refused schema: expected Datetime, got time
+Expr.dt.convert_time_zone | - | UInt128 | - | refused schema: expected Datetime, got u128
+Expr.dt.convert_time_zone | - | UInt16 | - | refused schema: expected Datetime, got u16
+Expr.dt.convert_time_zone | - | UInt32 | - | refused schema: expected Datetime, got u32
+Expr.dt.convert_time_zone | - | UInt64 | - | refused schema: expected Datetime, got u64
+Expr.dt.convert_time_zone | - | UInt8 | - | refused schema: expected Datetime, got u8
 Expr.dt.date | - | Array(Int64, 2) | - | refused rows: expected Datetime or Date, got array[i64, 2]
 Expr.dt.date | - | Boolean | - | refused rows: expected Datetime or Date, got bool
 Expr.dt.date | - | Date | - | allowed Date many
@@ -3388,6 +3440,32 @@ Expr.dt.days_in_month | - | UInt16 | - | refused rows: `days_in_month` operation
 Expr.dt.days_in_month | - | UInt32 | - | refused rows: `days_in_month` operation not supported for dtype `u32`
 Expr.dt.days_in_month | - | UInt64 | - | refused rows: `days_in_month` operation not supported for dtype `u64`
 Expr.dt.days_in_month | - | UInt8 | - | refused rows: `days_in_month` operation not supported for dtype `u8`
+Expr.dt.dst_offset | - | Array(Int64, 2) | - | refused rows: `dst_offset` operation not supported for dtype `array[i64, 2]` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | Boolean | - | refused rows: `dst_offset` operation not supported for dtype `bool` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | Date | - | refused rows: `dst_offset` operation not supported for dtype `date` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | Datetime(us) | - | refused rows: `dst_offset` operation not supported for dtype `datetime[μs]` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | Datetime(us, UTC) | - | allowed Duration(ms) many
+Expr.dt.dst_offset | - | Decimal(10, 2) | - | refused rows: `dst_offset` operation not supported for dtype `decimal[10,2]` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | Duration(us) | - | refused rows: `dst_offset` operation not supported for dtype `duration[μs]` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | Float16 | - | refused rows: `dst_offset` operation not supported for dtype `f16` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | Float32 | - | refused rows: `dst_offset` operation not supported for dtype `f32` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | Float64 | - | refused rows: `dst_offset` operation not supported for dtype `f64` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | Int128 | - | refused rows: `dst_offset` operation not supported for dtype `i128` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | Int16 | - | refused rows: `dst_offset` operation not supported for dtype `i16` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | Int32 | - | refused rows: `dst_offset` operation not supported for dtype `i32` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | Int64 | - | refused rows: `dst_offset` operation not supported for dtype `i64` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | Int8 | - | refused rows: `dst_offset` operation not supported for dtype `i8` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | List(Int64) | - | refused rows: `dst_offset` operation not supported for dtype `list[i64]` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | List(String) | - | refused rows: `dst_offset` operation not supported for dtype `list[str]` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | Null | - | refused rows: `dst_offset` operation not supported for dtype `null` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | String | - | refused rows: `dst_offset` operation not supported for dtype `str` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | Struct(x: Int64, y: String) | - | refused rows: `dst_offset` operation not supported for dtype `struct[2]` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | Time | - | refused rows: `dst_offset` operation not supported for dtype `time` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | UInt128 | - | refused rows: `dst_offset` operation not supported for dtype `u128` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | UInt16 | - | refused rows: `dst_offset` operation not supported for dtype `u16` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | UInt32 | - | refused rows: `dst_offset` operation not supported for dtype `u32` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | UInt64 | - | refused rows: `dst_offset` operation not supported for dtype `u64` (expected: time-zone-aware datetime)
+Expr.dt.dst_offset | - | UInt8 | - | refused rows: `dst_offset` operation not supported for dtype `u8` (expected: time-zone-aware datetime)
 Expr.dt.epoch | - | Array(Int64, 2) | - | refused rows: cannot cast Array type (inner: 'Int64', to: 'Datetime('μs')')
 Expr.dt.epoch | - | Boolean | - | allowed Int64 many
 Expr.dt.epoch | - | Date | - | allowed Int64 many
@@ -4428,6 +4506,32 @@ Expr.dt.quarter | - | UInt16 | - | refused rows: `quarter` operation not support
 Expr.dt.quarter | - | UInt32 | - | refused rows: `quarter` operation not supported for dtype `u32`
 Expr.dt.quarter | - | UInt64 | - | refused rows: `quarter` operation not supported for dtype `u64`
 Expr.dt.quarter | - | UInt8 | - | refused rows: `quarter` operation not supported for dtype `u8`
+Expr.dt.replace_time_zone | - | Array(Int64, 2) | - | refused schema: replace-time-zone operation not supported for dtype `array[i64, 2]` (expected: Datetime)
+Expr.dt.replace_time_zone | - | Boolean | - | refused schema: replace-time-zone operation not supported for dtype `bool` (expected: Datetime)
+Expr.dt.replace_time_zone | - | Date | - | refused schema: replace-time-zone operation not supported for dtype `date` (expected: Datetime)
+Expr.dt.replace_time_zone | - | Datetime(us) | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | - | Datetime(us, UTC) | - | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | - | Decimal(10, 2) | - | refused schema: replace-time-zone operation not supported for dtype `decimal[10,2]` (expected: Datetime)
+Expr.dt.replace_time_zone | - | Duration(us) | - | refused schema: replace-time-zone operation not supported for dtype `duration[μs]` (expected: Datetime)
+Expr.dt.replace_time_zone | - | Float16 | - | refused schema: replace-time-zone operation not supported for dtype `f16` (expected: Datetime)
+Expr.dt.replace_time_zone | - | Float32 | - | refused schema: replace-time-zone operation not supported for dtype `f32` (expected: Datetime)
+Expr.dt.replace_time_zone | - | Float64 | - | refused schema: replace-time-zone operation not supported for dtype `f64` (expected: Datetime)
+Expr.dt.replace_time_zone | - | Int128 | - | refused schema: replace-time-zone operation not supported for dtype `i128` (expected: Datetime)
+Expr.dt.replace_time_zone | - | Int16 | - | refused schema: replace-time-zone operation not supported for dtype `i16` (expected: Datetime)
+Expr.dt.replace_time_zone | - | Int32 | - | refused schema: replace-time-zone operation not supported for dtype `i32` (expected: Datetime)
+Expr.dt.replace_time_zone | - | Int64 | - | refused schema: replace-time-zone operation not supported for dtype `i64` (expected: Datetime)
+Expr.dt.replace_time_zone | - | Int8 | - | refused schema: replace-time-zone operation not supported for dtype `i8` (expected: Datetime)
+Expr.dt.replace_time_zone | - | List(Int64) | - | refused schema: replace-time-zone operation not supported for dtype `list[i64]` (expected: Datetime)
+Expr.dt.replace_time_zone | - | List(String) | - | refused schema: replace-time-zone operation not supported for dtype `list[str]` (expected: Datetime)
+Expr.dt.replace_time_zone | - | Null | - | refused schema: replace-time-zone operation not supported for dtype `null` (expected: Datetime)
+Expr.dt.replace_time_zone | - | String | - | refused schema: replace-time-zone operation not supported for dtype `str` (expected: Datetime)
+Expr.dt.replace_time_zone | - | Struct(x: Int64, y: String) | - | refused schema: replace-time-zone operation not supported for dtype `struct[2]` (expected: Datetime)
+Expr.dt.replace_time_zone | - | Time | - | refused schema: replace-time-zone operation not supported for dtype `time` (expected: Datetime)
+Expr.dt.replace_time_zone | - | UInt128 | - | refused schema: replace-time-zone operation not supported for dtype `u128` (expected: Datetime)
+Expr.dt.replace_time_zone | - | UInt16 | - | refused schema: replace-time-zone operation not supported for dtype `u16` (expected: Datetime)
+Expr.dt.replace_time_zone | - | UInt32 | - | refused schema: replace-time-zone operation not supported for dtype `u32` (expected: Datetime)
+Expr.dt.replace_time_zone | - | UInt64 | - | refused schema: replace-time-zone operation not supported for dtype `u64` (expected: Datetime)
+Expr.dt.replace_time_zone | - | UInt8 | - | refused schema: replace-time-zone operation not supported for dtype `u8` (expected: Datetime)
 Expr.dt.round | every | Array(Int64, 2) | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
 Expr.dt.round | every | Array(Int64, 2) | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
 Expr.dt.round | every | Array(Int64, 2) | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`

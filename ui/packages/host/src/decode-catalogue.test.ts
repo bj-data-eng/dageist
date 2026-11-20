@@ -152,6 +152,25 @@ describe('the catalogue the host sends', () => {
     expect(offered('Expr.str.split', 'strict')).toBe(true);
   });
 
+  it('is read with the time zone of a method as a kind of its own and whether it may be none', () => {
+    const entries = decodeCatalogue(catalogue).entries;
+    const kindOf = (id: string, name: string) =>
+      entries
+        .find((entry) => entry.id === id)
+        ?.parameters.find((parameter) => parameter.name === name)?.kind;
+    // Python's `replace_time_zone` takes `None` to take the zone off, and `convert_time_zone` a zone.
+    expect(kindOf('Expr.dt.replace_time_zone', 'time_zone')).toEqual({
+      kind: 'timeZone',
+      takesNone: true,
+    });
+    expect(kindOf('Expr.dt.convert_time_zone', 'time_zone')).toEqual({
+      kind: 'timeZone',
+      takesNone: false,
+    });
+    // How a clock that is read twice is resolved is a choice of Polars' words.
+    expect(kindOf('Expr.dt.replace_time_zone', 'ambiguous')).toMatchObject({ kind: 'choice' });
+  });
+
   it('is read with the position of an expression parameter that a named position holds', () => {
     const entries = decodeCatalogue(catalogue).entries;
     const position = (id: string, name: string) =>
@@ -230,7 +249,7 @@ describe('the catalogue the host sends', () => {
     );
     expect(refused.path).toBe(`$.entries[${String(shift)}].parameters[0].kind.kind`);
     expect(refused.problem).toBe(
-      'must be one of "expression", "column", "value", "flag", "choice", "dtype", "duration", "pattern", "table", "path", "pairs", not "map"',
+      'must be one of "expression", "column", "value", "flag", "choice", "dtype", "duration", "pattern", "timeZone", "table", "path", "pairs", not "map"',
     );
   });
 

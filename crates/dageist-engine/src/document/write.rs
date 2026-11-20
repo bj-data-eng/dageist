@@ -155,6 +155,11 @@ fn value(value: &Value) -> Json {
         Value::Dtype(dtype) => ("dtype", Json::String(dtype.to_string())),
         Value::Duration(text) => ("duration", Json::String(text.clone())),
         Value::Pattern(text) => ("pattern", Json::String(text.clone())),
+        Value::TimeZone(zone) => (
+            "time_zone",
+            zone.as_ref()
+                .map_or(Json::Null, |zone| Json::String(zone.clone())),
+        ),
         Value::Table(name) => ("table", Json::String(name.clone())),
         Value::Path(text) => ("path", Json::String(text.clone())),
         Value::Pairs(pairs) => (

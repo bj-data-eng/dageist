@@ -1155,6 +1155,7 @@ impl Gen<'_> {
         given.extend(self.numbers(entry, &given));
         given.extend(self.texts(entry));
         given.extend(self.patterns(entry));
+        given.extend(self.time_zones(entry));
         if id == "Expr.over" {
             let ordered = given.iter().any(|(name, _)| *name == "order_by");
             let optioned = given
@@ -1280,6 +1281,27 @@ impl Gen<'_> {
             .collect()
     }
 
+    /// The time zones a method is given for the parameters that take one, which it must be given:
+    /// names of the database and fixed offsets that Polars reads, text that it does not, and none,
+    /// for a method that takes it off.
+    fn time_zones(&mut self, entry: &'static Entry) -> Vec<(&'static str, Value)> {
+        entry
+            .parameters()
+            .iter()
+            .filter(|parameter| parameter.kind() == Kind::TimeZone)
+            .map(|parameter| {
+                let value = if parameter.takes_no_time_zone() && self.draw.chance(15) {
+                    Value::TimeZone(None)
+                } else if self.draw.chance(18) {
+                    Value::TimeZone(Some(self.draw.pick(&INVALID_TIME_ZONES).to_owned()))
+                } else {
+                    Value::TimeZone(Some(self.draw.pick(&VALID_TIME_ZONES).to_owned()))
+                };
+                (parameter.name(), value)
+            })
+            .collect()
+    }
+
     /// The dtypes a method is given for the parameters that take one: the dtype a cast gives,
     /// which it must be given, and the dtype a replacement is asked to give, which it sometimes is.
     fn dtype_arguments(&mut self, entry: &'static Entry) -> Vec<(&'static str, Value)> {
@@ -1391,6 +1413,23 @@ const INVALID_DURATIONS: [&str; 9] = [
     "1d ",
     "99999999999y",
 ];
+
+/// Time zones Polars reads: with and without daylight saving, with a half hour, as a fixed offset
+/// and as the zone of the database that has it.
+const VALID_TIME_ZONES: [&str; 8] = [
+    "UTC",
+    "Europe/Berlin",
+    "America/New_York",
+    "Asia/Kolkata",
+    "Australia/Lord_Howe",
+    "Etc/GMT+5",
+    "+01:00",
+    "EST",
+];
+
+/// Time zones Polars does not read: a name that is none, one in the wrong case, one with a space
+/// and one that is the letter of an offset.
+const INVALID_TIME_ZONES: [&str; 4] = ["Not/AZone", "europe/berlin", "America/New_York ", "Z"];
 
 /// The class every value of a condition has, when they have the same one.
 fn unify(values: &[Option<Representative>]) -> Option<Representative> {

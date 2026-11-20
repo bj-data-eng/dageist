@@ -30,6 +30,9 @@
 //!   regular expression a method looks for. Whether it is one, which depends on the flag that may
 //!   make it plain text, is for the step to say where it is built, with the reason, at the
 //!   pattern's place.
+//! - **A time zone** as it is typed, with no dtype: it is the name of a zone and not a value of
+//!   any dtype. Whether Polars reads it is for the step to say where it is built, with the
+//!   reason, at the parameter.
 //! - **Text** as it is, with the dtype `String`, or none where the text is a
 //!   path, which is not a value of any dtype.
 //!
@@ -63,6 +66,8 @@ pub enum Typed {
     Duration,
     /// A parameter that takes a regular expression.
     Pattern,
+    /// A parameter that takes a time zone.
+    TimeZone,
     /// A parameter that takes a file, folder or cloud location.
     Path,
 }
@@ -170,7 +175,9 @@ pub fn read_typed(text: &str, typed: Typed) -> Vec<Result<Read, Unread>> {
         }
         Typed::Value(ValueType::Date) => vec![date(text)],
         Typed::Duration => vec![duration(text)],
-        Typed::Pattern | Typed::Path => vec![Ok(Read::untyped(Literal::String(text.to_owned())))],
+        Typed::Pattern | Typed::TimeZone | Typed::Path => {
+            vec![Ok(Read::untyped(Literal::String(text.to_owned())))]
+        }
     }
 }
 

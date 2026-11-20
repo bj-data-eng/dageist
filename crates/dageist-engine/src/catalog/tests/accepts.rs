@@ -10,7 +10,9 @@
 //! with some column of the table as the operand: a datetime has no sum with a datetime, and
 //! one with a duration. It refuses a receiver only when it refuses every column.
 
-use polars::prelude::{DataType, Expr, LazyFrame, PolarsError, PolarsResult, col, lit};
+use polars::prelude::{
+    DataType, Expr, LazyFrame, NonExistent, PolarsError, PolarsResult, TimeZone, col, lit,
+};
 
 use crate::catalog::{
     Applies, Argument, Arguments, Build, Dtypes, Entry, Kind, Role, ValueType, Variadic, entries,
@@ -18,9 +20,20 @@ use crate::catalog::{
 
 use super::build::{expression_arg, many, sample};
 
-/// The sample table with a column of `Time`, which it lacks.
+/// The sample table with a column of `Time`, and one of a `Datetime` in a time zone, which it
+/// lacks.
 fn typed_sample() -> LazyFrame {
-    sample().with_columns([col("ts").dt().time().alias("tm")])
+    sample().with_columns([
+        col("ts").dt().time().alias("tm"),
+        col("ts")
+            .dt()
+            .replace_time_zone(
+                TimeZone::opt_try_new(Some("UTC")).expect("a zone"),
+                lit("raise"),
+                NonExistent::Raise,
+            )
+            .alias("tz"),
+    ])
 }
 
 /// The dtype of the column `name` of the table.
@@ -38,12 +51,17 @@ const COLUMNS: &[(&str, &[Dtypes])] = &[
     ("i", &[Dtypes::Numeric, Dtypes::Integer]),
     ("f", &[Dtypes::Numeric]),
     ("ts", &[Dtypes::Temporal, Dtypes::Datetime]),
+    ("tz", &[Dtypes::Temporal, Dtypes::Datetime]),
     ("d", &[Dtypes::Temporal, Dtypes::Date]),
     ("tm", &[Dtypes::Temporal, Dtypes::Time]),
     ("dur", &[Dtypes::Temporal, Dtypes::Duration]),
     ("s", &[Dtypes::String]),
     ("b", &[Dtypes::Boolean]),
 ];
+
+/// The methods that read a time zone a `Datetime` has: Polars refuses the sample's `ts`, which has
+/// none, and the sample's `tz` is the column of the group they take.
+const ONLY_WITH_A_ZONE: [&str; 2] = ["Expr.dt.base_utc_offset", "Expr.dt.dst_offset"];
 
 /// Whether a column of the groups `groups` is one an entry accepting `accepts` takes.
 fn accepted(accepts: &[Dtypes], groups: &[Dtypes]) -> bool {
@@ -92,6 +110,8 @@ fn arguments_for(entry: &Entry, column: &str, operand: &str) -> Arguments {
                 Kind::Value(ValueType::Integer) => Argument::Integer(2),
                 // `cast`'s `dtype`: the dtype the column has, which converts to itself.
                 Kind::Dtype => Argument::Dtype(dtype_of(column)),
+                // A time zone Polars reads.
+                Kind::TimeZone => Argument::TimeZone(Some("UTC".to_owned())),
                 // A time unit that Polars counts a moment in: the first of the words.
                 Kind::Choice(words) => Argument::Choice(words[0].to_owned()),
                 // A pattern that every method of text that takes one accepts: a group of `a`.
@@ -182,6 +202,9 @@ fn polars_resolves_each_method_on_every_dtype_it_claims_to_accept() {
         .filter(|entry| entry.applies() == Applies::Expression)
     {
         for (column, groups) in COLUMNS {
+            if *column == "ts" && ONLY_WITH_A_ZONE.contains(&entry.id().as_str()) {
+                continue;
+            }
             if accepted(entry.accepts(), groups) {
                 let results: Vec<_> = operands(entry, column)
                     .into_iter()

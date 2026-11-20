@@ -23,6 +23,7 @@ mod pattern;
 mod starting;
 #[cfg(test)]
 mod tests;
+mod timezone;
 mod words;
 
 pub use arguments::{Argument, Arguments, BuildError, PatternMeans};
@@ -33,6 +34,7 @@ pub use duration::{DurationError, DurationUse, any_moment, check_duration};
 pub use left_out::{LeftOut, Reason, left_out};
 pub use pattern::{PatternError, check_pattern, groups_dtype};
 pub use starting::{Setting, StepFrame, StepStart, start_step};
+pub use timezone::{TimeZoneError, check_time_zone};
 pub use words::{SummaryPhrase, SummaryWord, Words, WordsError, english};
 
 use polars::prelude::{Expr, LazyFrame};
@@ -298,6 +300,12 @@ pub enum Kind {
     /// reason, when it is built. Where the parameter has a flag that makes it plain text, as
     /// `literal` does, see [`Parameter::plain_text_flag`].
     Pattern,
+    /// A time zone, as Polars reads one: a name of the time zone database such as `Europe/Berlin`,
+    /// or a fixed offset. It is text typed in, and a document that holds one that is none is still a
+    /// document: the step is refused at the parameter, with Polars' reason, when it is built. A
+    /// parameter that [takes none](Parameter::takes_no_time_zone) may also be given no zone at all,
+    /// which is Python's `None`.
+    TimeZone,
     /// A frame from the graph.
     Table,
     /// A file, folder or cloud location.
@@ -434,6 +442,7 @@ pub struct Parameter {
     names_the_fields_of_the_result: bool,
     offered: bool,
     duration_string: Option<DurationUse>,
+    takes_no_time_zone: bool,
 }
 
 impl Parameter {
@@ -459,6 +468,7 @@ impl Parameter {
             names_the_fields_of_the_result: false,
             offered: true,
             duration_string: None,
+            takes_no_time_zone: false,
         }
     }
 
@@ -573,6 +583,17 @@ impl Parameter {
             "only an expression may hold a duration string typed in"
         );
         self.duration_string = Some(using);
+        self
+    }
+
+    /// The same parameter, a time zone that may also be none, which takes a zone off a moment, as
+    /// Python's `replace_time_zone` is given `None`.
+    const fn or_no_time_zone(mut self) -> Self {
+        assert!(
+            matches!(self.kind, Kind::TimeZone),
+            "only a time zone may be none"
+        );
+        self.takes_no_time_zone = true;
         self
     }
 
@@ -718,6 +739,13 @@ impl Parameter {
     #[must_use]
     pub const fn names_the_fields_of_the_result(&self) -> bool {
         self.names_the_fields_of_the_result
+    }
+
+    /// Whether the time zone the parameter holds may be none: no zone at all, which a moment of no
+    /// zone has, as `replace_time_zone` takes a zone off with.
+    #[must_use]
+    pub const fn takes_no_time_zone(&self) -> bool {
+        self.takes_no_time_zone
     }
 
     /// The method that reads the expression the parameter holds as a duration string where it is

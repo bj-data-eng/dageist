@@ -44,11 +44,13 @@ pub enum Rule {
     /// A replacement is given as many new values as old ones, or one, and a strict one a
     /// default of as many values as what it follows, or one.
     ReplacementValuesMatchInNumber,
+    /// A time zone is one Polars reads: a name of the time zone database, or a fixed offset.
+    TimeZoneIsValid,
 }
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::ConditionPredicateIsBoolean,
         Self::DurationIsValid,
         Self::ElementOnlyInPivotAggregate,
@@ -58,6 +60,7 @@ impl Rule {
         Self::PatternIsValid,
         Self::PivotAggregateGivesOneValue,
         Self::ReplacementValuesMatchInNumber,
+        Self::TimeZoneIsValid,
     ];
 
     /// The name the tables give the rule.
@@ -73,6 +76,7 @@ impl Rule {
             Self::KeyIsElementwise => "key-is-elementwise",
             Self::PatternIsValid => "pattern-is-valid",
             Self::ReplacementValuesMatchInNumber => "replacement-values-match-in-number",
+            Self::TimeZoneIsValid => "time-zone-is-valid",
         }
     }
 
@@ -101,6 +105,7 @@ impl Rule {
                 "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a column be compared with a null, nor a replacement take a value that reads a column"
             }
             Self::DurationIsValid => "a duration typed in must be a duration string Polars reads",
+            Self::TimeZoneIsValid => "a time zone must be one Polars reads",
             Self::PatternIsValid => "a pattern must be a valid regular expression",
             Self::ReplacementValuesMatchInNumber => {
                 "a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one"
@@ -119,9 +124,10 @@ impl Rule {
             Self::PivotAggregateGivesOneValue => context == Context::step(Outer::PivotAggregate),
             Self::JoinKeyNamesAreNotRepeated | Self::KeyIsElementwise => context.is_join_key(),
             // A matter of the values a call is given, whatever context it stands in.
-            Self::DurationIsValid | Self::PatternIsValid | Self::ReplacementValuesMatchInNumber => {
-                false
-            }
+            Self::DurationIsValid
+            | Self::PatternIsValid
+            | Self::ReplacementValuesMatchInNumber
+            | Self::TimeZoneIsValid => false,
             Self::ConditionPredicateIsBoolean | Self::FilterPredicateIsBoolean => {
                 self.needs_boolean_end(context)
             }
@@ -218,7 +224,8 @@ impl Rule {
             | Self::KeyIsElementwise
             | Self::DurationIsValid
             | Self::PatternIsValid
-            | Self::ReplacementValuesMatchInNumber => false,
+            | Self::ReplacementValuesMatchInNumber
+            | Self::TimeZoneIsValid => false,
         }
     }
 }

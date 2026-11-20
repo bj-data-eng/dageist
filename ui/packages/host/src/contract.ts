@@ -76,6 +76,11 @@ export type KindView =
    * that makes the text plain text where it is true, such as `literal`, or is `null`.
    */
   | { readonly kind: 'pattern'; readonly plainTextFlag: string | null }
+  /**
+   * A time zone, as Polars reads one. `takesNone` is set where the parameter may also be given no
+   * zone at all, which is Python's `None`.
+   */
+  | { readonly kind: 'timeZone'; readonly takesNone: boolean }
   | { readonly kind: 'table' }
   | { readonly kind: 'path' }
   | { readonly kind: 'pairs'; readonly key: KindView; readonly value: KindView };
@@ -452,6 +457,7 @@ export const RULE_NAMES = [
   'key-is-elementwise',
   'pattern-is-valid',
   'replacement-values-match-in-number',
+  'time-zone-is-valid',
 ] as const;
 
 /** The name of a rule the engine holds that Polars does not. */
@@ -688,7 +694,7 @@ export interface FitsRequest {
 
 /**
  * What a text is typed into, as the catalogue writes the kind of a parameter that takes a typed
- * value: an expression, a literal of a type, a duration, a pattern or a path. The engine reads the text as
+ * value: an expression, a literal of a type, a duration, a pattern, a time zone or a path. The engine reads the text as
  * that slot takes it.
  */
 export type TypedKind =
@@ -696,6 +702,7 @@ export type TypedKind =
   | { readonly kind: 'value'; readonly type: ValueTypeView }
   | { readonly kind: 'duration' }
   | { readonly kind: 'pattern' }
+  | { readonly kind: 'timeZone' }
   | { readonly kind: 'path' };
 
 /**

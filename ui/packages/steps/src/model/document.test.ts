@@ -39,6 +39,20 @@ const replacing = (options: Options) =>
     },
   });
 
+/** A step that adds a column that is the timestamps in a time zone, as `options` set `dt.replace_time_zone`. */
+const zoned = (options: Options) =>
+  adding('x', {
+    kind: 'chain',
+    id: 'c1',
+    chain: {
+      source: { kind: 'column', column: 'timestamp' },
+      methods: [{ id: 'm1', name: 'dt.replace_time_zone', argument: null, options }],
+    },
+  });
+
+/** The document that `zoned` is written as, as text. */
+const zonedText = (options: Options): string => JSON.stringify(written([zoned(options)]));
+
 /** A step that adds a column holding `value`. */
 function adding(id: string, value: Value): Step {
   return { id, verb: 'with_columns', alias: id, value, options: NO_OPTIONS };
@@ -293,6 +307,16 @@ describe('what the document cannot hold', () => {
         ],
       ]),
     });
+  });
+
+  it('writes a time zone typed in as the zone and the word None as no zone', () => {
+    expect(
+      zonedText({ time_zone: { kind: 'text', value: 'Europe/Berlin', shown: 'Europe/Berlin' } }),
+    ).toContain('"time_zone":{"time_zone":"Europe/Berlin"}');
+    // The word `None` is Python's `None`, which takes the zone off.
+    expect(zonedText({ time_zone: { kind: 'word', value: 'None' } })).toContain(
+      '"time_zone":{"time_zone":null}',
+    );
   });
 
   it('holds back a when with more than one case, which the document has no place for', () => {

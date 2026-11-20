@@ -264,7 +264,7 @@ dtypes are not stored, because Polars works them out from a schema without
 reading data; which combinations Polars allows is kept in
 [tables](#which-combinations-polars-allows) beside it.
 
-Every parameter is one of eleven kinds, and the view has one way of drawing
+Every parameter is one of twelve kinds, and the view has one way of drawing
 each, so a new operation needs data rather than a new look:
 
 | Kind | Holds |
@@ -277,6 +277,7 @@ each, so a new operation needs data rather than a new look:
 | dtype | A Polars dtype. |
 | duration | A Polars duration such as `1mo`. |
 | pattern | A regular expression, in the syntax of Rust's `regex` crate that Polars uses, typed in; see [the pattern kind](#the-pattern-kind). |
+| time zone | A name of the time zone database such as `Europe/Berlin`, or a fixed offset, typed in, and for a method that takes a zone off, none; see [the time zone kind](#the-time-zone-kind). |
 | table | A frame from the graph. |
 | path | A file, folder or cloud location. |
 | pairs | Key and value entries, each side of its own kind. |
@@ -729,6 +730,35 @@ choice that is already set shows a word Polars refuses beside the other options
 as a refusal when the steps run, not in its list; only the list that adds an
 option asks. The values of `is_in` are connected lists the engine has no entry
 to judge yet, so that list offers them unjudged.
+
+### The Time Zone Kind
+
+`dt.replace_time_zone` and `dt.convert_time_zone` take a time zone, which is a parameter of a kind
+of its own: a name of the time zone database, such as `Europe/Berlin` or `UTC`, or a fixed offset
+such as `+01:00`, which Polars reads as the zone of the database that has it. It is typed in, and
+the engine does not know the database: it asks Polars, which reads a zone before it builds a
+method of a moment, and `check_time_zone` gives the zone or Polars' reason, up to the first blank
+line, where the text is none: the name, how to look the names up, and nothing of the hint at what was
+meant, which is not about the text.
+
+- A text that is no time zone is refused where the step is built, at the parameter, with Polars'
+  reason, and where the walk asks, by the named rule `time-zone-is-valid`, whatever follows it.
+- Python's `replace_time_zone` takes `None` for the zone, which takes the zone off a moment and keeps
+  its clock. The parameter says so, `takes_no_time_zone`, and the document writes it as a time
+  zone that is null, which the editor draws as the word `None` below the typed zones. `convert_time_zone`
+  takes a zone only, and a document that gives it none is refused at the parameter.
+- A moment is held in a zone or in none, so what the method gives depends on the zone it is given:
+  a moment in the zone, and in none where it is given none. The tables, which were measured with the
+  zone `UTC`, say only that a moment is given, so the walk says the rest: the dtype of the call is
+  not known until the zone is, for a method that takes none, and is then a `Datetime` with the
+  zone as Polars reads it, or without one.
+- `base_utc_offset` and `dst_offset` read the offsets of the zone a moment has, so Polars refuses
+  a moment that has none, when the rows run.
+- `ambiguous` of `replace_time_zone` says which of the two times a clock that is read twice stands
+  for, where the clocks go back, or that it is refused or none, and `non_existent` what a clock that
+  is never read, where they go forward, gives. Both are choices of Polars' words. The tables
+  measured them with a zone that has neither gap nor repeat, so what they say of the words is that
+  Polars takes them; a step that meets a clock Polars refuses is refused when the rows run.
 
 ### The Duration String
 
@@ -1474,7 +1504,14 @@ cannot, an unclosed group or class, a repetition that ends before it begins, a g
 none or is named twice, a flag or a property that does not exist, an escape with nothing after it, a repetition of nothing and
 an unopened group, so that the refusal of a pattern is checked as the pattern is, with the rule that
 asks Polars, a replacement's value is often text with a reference to a group, and a split's separator is often text drawn from the same two sets, and the groups of a pattern are often tested for unique values. `n` and a group
-number are drawn from a few values, and a limit holds the count that Polars refuses.
+number are drawn from a few values, and a limit holds the count that Polars refuses. A duration that
+a method reads as a duration string is text typed in, drawn from twelve that Polars reads, which include
+a sign and two units, and nine that it does not, with no amount, no unit, a fraction, a unit that does not
+exist, one in the wrong case, a second sign, a space and an amount too large to hold, and otherwise
+the column of the table that stands for an argument, whose text is the durations the tables were measured
+with. A time zone is drawn from eight names and offsets that Polars reads, four texts that it does not,
+and, for a method that takes a zone off, none, and a method that must be given a time zone or a unit
+is always given one.
 
 ## What The Step Editor Storyboard Has Settled
 

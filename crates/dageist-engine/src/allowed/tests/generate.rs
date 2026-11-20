@@ -203,6 +203,10 @@ fn companions(
         ("Expr.replace_strict", Some("default")) => vec![("old", own())],
         // A slice that is tested for its length starts at a place: the second character.
         ("Expr.str.slice", Some("length")) => vec![("offset", expression(integer(1)))],
+        // A time zone every moment is given, or converted to: one that has no gap or repeat.
+        ("Expr.dt.replace_time_zone" | "Expr.dt.convert_time_zone", _) => {
+            vec![("time_zone", Argument::TimeZone(Some("UTC".to_owned())))]
+        }
         // The format that every dtype of a date or a time takes.
         ("Expr.dt.strftime", _) => vec![("format", Argument::String("iso".to_owned()))],
         ("Expr.is_between", Some("lower_bound")) => vec![("upper_bound", own())],

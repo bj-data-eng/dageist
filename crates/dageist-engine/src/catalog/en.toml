@@ -237,6 +237,10 @@ label = "from the end"
 name = "degrees"
 hint = "an angle in radians, in degrees"
 
+[entries."Expr.dt.base_utc_offset"]
+name = "dt.base_utc_offset"
+hint = "the offset of the zone from UTC, without daylight saving"
+
 [entries."Expr.dt.cast_time_unit"]
 name = "dt.cast_time_unit"
 hint = "count in another time unit"
@@ -254,6 +258,14 @@ ms = "ms"
 name = "dt.century"
 hint = "the century"
 
+[entries."Expr.dt.convert_time_zone"]
+name = "dt.convert_time_zone"
+hint = "the same instant, in another time zone"
+
+[entries."Expr.dt.convert_time_zone".parameters.time_zone]
+name = "time_zone"
+label = "to"
+
 [entries."Expr.dt.date"]
 name = "dt.date"
 hint = "the date part"
@@ -265,6 +277,10 @@ hint = "the day of the month"
 [entries."Expr.dt.days_in_month"]
 name = "dt.days_in_month"
 hint = "how many days the month has"
+
+[entries."Expr.dt.dst_offset"]
+name = "dt.dst_offset"
+hint = "the daylight saving the zone adds"
 
 [entries."Expr.dt.epoch"]
 name = "dt.epoch"
@@ -340,6 +356,32 @@ hint = "the day of the year"
 [entries."Expr.dt.quarter"]
 name = "dt.quarter"
 hint = "the quarter of the year"
+
+[entries."Expr.dt.replace_time_zone"]
+name = "dt.replace_time_zone"
+hint = "the same clock, in another time zone"
+
+[entries."Expr.dt.replace_time_zone".parameters.time_zone]
+name = "time_zone"
+label = "in"
+
+[entries."Expr.dt.replace_time_zone".parameters.ambiguous]
+name = "ambiguous"
+label = "a clock read twice is"
+
+[entries."Expr.dt.replace_time_zone".parameters.ambiguous.choices]
+earliest = "earliest"
+latest = "latest"
+raise = "raise"
+null = "null"
+
+[entries."Expr.dt.replace_time_zone".parameters.non_existent]
+name = "non_existent"
+label = "a clock never read is"
+
+[entries."Expr.dt.replace_time_zone".parameters.non_existent.choices]
+raise = "raise"
+null = "null"
 
 [entries."Expr.dt.round"]
 name = "dt.round"

@@ -119,8 +119,9 @@ pub dageist_engine::allowed::Rule::KeyIsElementwise
 pub dageist_engine::allowed::Rule::PatternIsValid
 pub dageist_engine::allowed::Rule::PivotAggregateGivesOneValue
 pub dageist_engine::allowed::Rule::ReplacementValuesMatchInNumber
+pub dageist_engine::allowed::Rule::TimeZoneIsValid
 impl dageist_engine::allowed::Rule
-pub const dageist_engine::allowed::Rule::ALL: [Self; 9]
+pub const dageist_engine::allowed::Rule::ALL: [Self; 10]
 pub fn dageist_engine::allowed::Rule::from_name(name: &str) -> core::option::Option<Self>
 pub const fn dageist_engine::allowed::Rule::name(self) -> &'static str
 pub const fn dageist_engine::allowed::Rule::statement(self) -> &'static str
@@ -143,6 +144,7 @@ pub dageist_engine::allowed::Typed::Duration
 pub dageist_engine::allowed::Typed::Expression
 pub dageist_engine::allowed::Typed::Path
 pub dageist_engine::allowed::Typed::Pattern
+pub dageist_engine::allowed::Typed::TimeZone
 pub dageist_engine::allowed::Typed::Value(dageist_engine::catalog::ValueType)
 pub enum dageist_engine::allowed::Unknown
 pub dageist_engine::allowed::Unknown::TheResultsDtype
@@ -183,6 +185,7 @@ pub const fn dageist_engine::allowed::Chosen<'a>::with_arguments(self, arguments
 pub const fn dageist_engine::allowed::Chosen<'a>::with_durations(self, durations: &'a [(&'a str, &'a str, dageist_engine::catalog::DurationUse)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_options(self, options: &'a [(&'a str, &'a str)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_patterns(self, patterns: &'a [(&'a str, &'a str)]) -> Self
+pub const fn dageist_engine::allowed::Chosen<'a>::with_time_zones(self, time_zones: &'a [(&'a str, core::option::Option<&'a str>)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_unclassed(self, unclassed: &'a [&'a str]) -> Self
 pub struct dageist_engine::allowed::Context
 impl dageist_engine::allowed::Context
@@ -291,6 +294,7 @@ pub dageist_engine::catalog::Argument::Path(alloc::string::String)
 pub dageist_engine::catalog::Argument::Pattern(alloc::string::String)
 pub dageist_engine::catalog::Argument::String(alloc::string::String)
 pub dageist_engine::catalog::Argument::Table(polars_lazy::frame::LazyFrame)
+pub dageist_engine::catalog::Argument::TimeZone(core::option::Option<alloc::string::String>)
 pub enum dageist_engine::catalog::AsManyAs
 pub dageist_engine::catalog::AsManyAs::Parameter(&'static str)
 pub dageist_engine::catalog::AsManyAs::TheReceiver
@@ -312,6 +316,9 @@ pub dageist_engine::catalog::BuildError::NotADuration::parameter: &'static str
 pub dageist_engine::catalog::BuildError::NotAPattern
 pub dageist_engine::catalog::BuildError::NotAPattern::error: dageist_engine::catalog::PatternError
 pub dageist_engine::catalog::BuildError::NotAPattern::parameter: &'static str
+pub dageist_engine::catalog::BuildError::NotATimeZone
+pub dageist_engine::catalog::BuildError::NotATimeZone::error: dageist_engine::catalog::TimeZoneError
+pub dageist_engine::catalog::BuildError::NotATimeZone::parameter: &'static str
 pub dageist_engine::catalog::BuildError::OutOfOrder
 pub dageist_engine::catalog::BuildError::OutOfOrder::expected: &'static str
 pub dageist_engine::catalog::BuildError::OutOfOrder::found: &'static str
@@ -421,6 +428,7 @@ pub dageist_engine::catalog::Kind::Pairs(&'static dageist_engine::catalog::Kind,
 pub dageist_engine::catalog::Kind::Path
 pub dageist_engine::catalog::Kind::Pattern
 pub dageist_engine::catalog::Kind::Table
+pub dageist_engine::catalog::Kind::TimeZone
 pub dageist_engine::catalog::Kind::Value(dageist_engine::catalog::ValueType)
 pub enum dageist_engine::catalog::Laziness
 pub dageist_engine::catalog::Laziness::Lazy
@@ -574,6 +582,7 @@ pub fn dageist_engine::catalog::Arguments::pattern(&self, parameter: &'static st
 pub fn dageist_engine::catalog::Arguments::required_expression(&self, parameter: &'static str) -> core::result::Result<polars_plan::dsl::expr::Expr, dageist_engine::catalog::BuildError>
 pub fn dageist_engine::catalog::Arguments::string(&self, parameter: &'static str) -> core::result::Result<core::option::Option<alloc::string::String>, dageist_engine::catalog::BuildError>
 pub fn dageist_engine::catalog::Arguments::table(&self, parameter: &'static str) -> core::result::Result<polars_lazy::frame::LazyFrame, dageist_engine::catalog::BuildError>
+pub fn dageist_engine::catalog::Arguments::time_zone(&self, parameter: &'static str, takes_none: bool) -> core::result::Result<core::option::Option<polars_core::datatypes::temporal::time_zone::TimeZone>, dageist_engine::catalog::BuildError>
 pub struct dageist_engine::catalog::DurationError
 impl dageist_engine::catalog::DurationError
 pub fn dageist_engine::catalog::DurationError::reason(&self) -> &str
@@ -618,6 +627,7 @@ pub const fn dageist_engine::catalog::Parameter::plain_text_flag(&self) -> core:
 pub const fn dageist_engine::catalog::Parameter::role(&self) -> dageist_engine::catalog::Role
 pub const fn dageist_engine::catalog::Parameter::shape(&self) -> dageist_engine::catalog::Shape
 pub const fn dageist_engine::catalog::Parameter::shares_a_dtype_with(&self) -> core::option::Option<&'static str>
+pub const fn dageist_engine::catalog::Parameter::takes_no_time_zone(&self) -> bool
 pub const fn dageist_engine::catalog::Parameter::variadic(&self) -> core::option::Option<dageist_engine::catalog::Variadic>
 pub const fn dageist_engine::catalog::Parameter::writes(&self) -> dageist_engine::catalog::Writes
 impl dageist_engine::catalog::Parameter
@@ -637,6 +647,12 @@ pub struct dageist_engine::catalog::StepStart
 impl dageist_engine::catalog::StepStart
 pub fn dageist_engine::catalog::StepStart::argument(&self, name: &str) -> core::option::Option<&dageist_engine::catalog::Setting>
 pub fn dageist_engine::catalog::StepStart::arguments(&self) -> &[(&'static str, dageist_engine::catalog::Setting)]
+pub struct dageist_engine::catalog::TimeZoneError
+impl dageist_engine::catalog::TimeZoneError
+pub fn dageist_engine::catalog::TimeZoneError::reason(&self) -> &str
+impl core::error::Error for dageist_engine::catalog::TimeZoneError
+impl core::fmt::Display for dageist_engine::catalog::TimeZoneError
+pub fn dageist_engine::catalog::TimeZoneError::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub struct dageist_engine::catalog::Words
 impl dageist_engine::catalog::Words
 pub fn dageist_engine::catalog::Words::changed(&self) -> &[alloc::string::String]
@@ -655,6 +671,7 @@ pub fn dageist_engine::catalog::Words::sign(&self, comparison: dageist_engine::c
 pub const fn dageist_engine::catalog::any_moment() -> polars_core::datatypes::dtype::DataType
 pub fn dageist_engine::catalog::check_duration(text: &str, using: dageist_engine::catalog::DurationUse, on: &polars_core::datatypes::dtype::DataType) -> core::result::Result<(), dageist_engine::catalog::DurationError>
 pub fn dageist_engine::catalog::check_pattern(text: &str) -> core::result::Result<(), dageist_engine::catalog::PatternError>
+pub fn dageist_engine::catalog::check_time_zone(text: &str) -> core::result::Result<core::option::Option<polars_core::datatypes::temporal::time_zone::TimeZone>, dageist_engine::catalog::TimeZoneError>
 pub fn dageist_engine::catalog::english() -> &'static dageist_engine::catalog::Words
 pub fn dageist_engine::catalog::entries() -> &'static [dageist_engine::catalog::Entry]
 pub fn dageist_engine::catalog::entry(id: &str) -> core::option::Option<&'static dageist_engine::catalog::Entry>
@@ -839,6 +856,7 @@ pub dageist_engine::document::Value::Path(alloc::string::String)
 pub dageist_engine::document::Value::Pattern(alloc::string::String)
 pub dageist_engine::document::Value::String(alloc::string::String)
 pub dageist_engine::document::Value::Table(alloc::string::String)
+pub dageist_engine::document::Value::TimeZone(core::option::Option<alloc::string::String>)
 pub struct dageist_engine::document::Call
 impl dageist_engine::document::Call
 pub fn dageist_engine::document::Call::argument(&self, parameter: &str) -> core::option::Option<&dageist_engine::document::Value>

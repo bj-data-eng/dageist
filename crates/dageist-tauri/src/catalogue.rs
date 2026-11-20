@@ -74,6 +74,12 @@ enum KindView {
         #[serde(rename = "plainTextFlag")]
         plain_text_flag: Option<&'static str>,
     },
+    /// A time zone, as Polars reads one. A parameter that may also be given none, as
+    /// `replace_time_zone`'s is, says so.
+    TimeZone {
+        #[serde(rename = "takesNone")]
+        takes_none: bool,
+    },
     Table,
     Path,
     Pairs {
@@ -424,6 +430,9 @@ fn kind_of(
         Kind::Duration => KindView::Duration,
         Kind::Pattern => KindView::Pattern {
             plain_text_flag: parameter.plain_text_flag(),
+        },
+        Kind::TimeZone => KindView::TimeZone {
+            takes_none: parameter.takes_no_time_zone(),
         },
         Kind::Table => KindView::Table,
         Kind::Path => KindView::Path,

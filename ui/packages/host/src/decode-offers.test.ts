@@ -64,7 +64,7 @@ describe('the offers at a place', () => {
 
   it('offer every entry that stands in an expression, and no step', () => {
     const entries = decodeOffers(offersValue).entries;
-    expect(entries).toHaveLength(159);
+    expect(entries).toHaveLength(163);
     expect(entries.some((entry) => entry.entry.startsWith('LazyFrame.'))).toBe(false);
   });
 

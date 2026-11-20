@@ -237,6 +237,8 @@ pub(crate) enum TypedRequest {
     Duration,
     /// A regular expression.
     Pattern,
+    /// A time zone.
+    TimeZone,
     /// A file, folder or cloud location.
     Path,
 }
@@ -248,6 +250,7 @@ impl From<TypedRequest> for Typed {
             TypedRequest::Value { value_type } => Self::Value(value_type.into()),
             TypedRequest::Duration => Self::Duration,
             TypedRequest::Pattern => Self::Pattern,
+            TypedRequest::TimeZone => Self::TimeZone,
             TypedRequest::Path => Self::Path,
         }
     }

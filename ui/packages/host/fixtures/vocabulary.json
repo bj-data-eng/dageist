@@ -10,7 +10,8 @@
     "key-is-elementwise",
     "pattern-is-valid",
     "pivot-aggregate-gives-one-value",
-    "replacement-values-match-in-number"
+    "replacement-values-match-in-number",
+    "time-zone-is-valid"
   ],
   "stages": ["schema", "rows", "empty"],
   "conditionStates": ["when", "then", "chainedWhen", "chainedThen"],
