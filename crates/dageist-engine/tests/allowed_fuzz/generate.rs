@@ -711,6 +711,21 @@ impl Gen<'_> {
                 }
                 None => alive = false,
             }
+            // The groups of a pattern are a struct that is often tested for unique values, which a
+            // struct with no fields, as the groups of a pattern with none are, cannot be.
+            if alive
+                && links
+                    .last()
+                    .is_some_and(|link| link.entry().id().as_str() == "Expr.str.extract_groups")
+                && self.draw.chance(35)
+            {
+                links.push(call(
+                    self.draw.pick(&["Expr.is_unique", "Expr.is_duplicated"]),
+                    Vec::new(),
+                ));
+                cur_class = Some(Representative::Boolean);
+                shape = Shape::Many;
+            }
         }
         if goal == Goal::Boolean
             && alive

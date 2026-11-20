@@ -370,11 +370,18 @@ pub enum Limit {
     /// place, in a case with a replacement in a chain that starts from a literal: the case run again
     /// with each such literal a column of text is not refused for it.
     ALiteralTextBesideManyReplacementValues,
+    /// A struct with no fields, which `str.extract_groups` gives of a pattern that has no group,
+    /// cannot be grouped by: Polars refuses a test for a value that is unique or duplicated of it
+    /// with the refusal that at least one key is required. The tables measured the struct on two
+    /// fields. Polars refusing the rows or the empty table with that refusal, which has no place, in
+    /// a case with an `str.extract_groups` of a pattern with no group: the case run again with each
+    /// such pattern given a group is not refused for it.
+    AStructWithNoFields,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 30] = [
+    pub const ALL: [Self; 31] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -405,6 +412,7 @@ impl Limit {
         Self::AReplacementOfEveryMatchGivenANullValue,
         Self::AReplacementOfMoreThanTheFirstMatch,
         Self::ALiteralTextBesideManyReplacementValues,
+        Self::AStructWithNoFields,
     ];
 
     /// The name a kept case is filed under.
@@ -446,6 +454,7 @@ impl Limit {
             Self::ALiteralTextBesideManyReplacementValues => {
                 "a-literal-text-beside-many-replacement-values"
             }
+            Self::AStructWithNoFields => "a-struct-with-no-fields",
         }
     }
 
@@ -523,6 +532,9 @@ impl Limit {
             }
             Self::AReplacementOfEveryMatchGivenANullValue => {
                 "a replacement of every match refuses a value that is null where Polars reads it as one value, a literal or a piece of one row, where the tables measured the value as a column of three rows in one piece"
+            }
+            Self::AStructWithNoFields => {
+                "a struct with no fields cannot be grouped by, where the tables measured the struct on two fields"
             }
             Self::ALiteralTextBesideManyReplacementValues => {
                 "a literal text is one value that Polars does not broadcast over a table with no rows, nor over the rows at every thread count, where the tables measured the text as a column of the table's rows"
@@ -1825,6 +1837,47 @@ fn replaces_every_match(call: &Call) -> bool {
 /// What Polars says of a replacement of every match whose value is null where it reads it as one.
 const A_NULL_VALUE_OF_A_REPLACEMENT: &str = "value cannot be 'null' in 'replace' expression";
 
+/// What Polars says of a group by that has no key, as a test for a unique value of a struct with
+/// no fields is.
+const A_GROUP_BY_WITHOUT_A_KEY: &str = "at least one key is required in a group_by operation";
+
+/// Whether the call extracts the groups of a pattern that has none, which is a struct with no fields.
+fn is_an_extraction_of_no_groups(call: &Call) -> bool {
+    is(call, "Expr.str.extract_groups")
+        && matches!(
+            call.argument("pattern"),
+            Some(Value::Pattern(text))
+                if catalog::groups_dtype(text)
+                    .is_ok_and(|dtype| dageist_engine::allowed::dtype_name(&dtype) == "Struct()")
+        )
+}
+
+/// The case with the pattern of each extraction of no groups given a group.
+fn case_with_groups(case: &Case) -> Option<Case> {
+    case_changed(case, &|call| {
+        if !is_an_extraction_of_no_groups(call) {
+            return None;
+        }
+        Call::new(
+            catalog::entry("Expr.str.extract_groups")?,
+            vec![("pattern", Value::Pattern("(x)".to_owned()))],
+        )
+        .ok()
+    })
+}
+
+/// Whether Polars refuses the case for a group by with no key still when each pattern has a group:
+/// the lack of one is then no cause. `None` where no pattern lacks one.
+fn refused_for_no_key_with_groups(case: &Case) -> Option<bool> {
+    changed(case_with_groups(case), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| refusal.reason.contains(A_GROUP_BY_WITHOUT_A_KEY))
+        })
+    })
+}
+
 /// What Polars says of a replacement whose value has other numbers of values than the text it
 /// follows.
 const A_VALUE_OF_ANOTHER_LENGTH: &str = "does not match string column length";
@@ -2994,6 +3047,17 @@ fn applies(
                         .iter()
                         .any(|(_, held)| holds_a_fill_by_a_strategy_in_a_condition(held))
                         && refused_for_a_strategy_without_strategies(case) == Some(false))
+        }
+        (Limit::AStructWithNoFields, Disagreement::PolarsRefuses(refusal)) => {
+            // The missing group is the cause where Polars stops refusing the key once each pattern
+            // that has none is given one.
+            unplaced(refusal)
+                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                && refusal.reason.contains(A_GROUP_BY_WITHOUT_A_KEY)
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &is_an_extraction_of_no_groups))
+                && refused_for_no_key_with_groups(case) == Some(false)
         }
         (Limit::ALiteralTextBesideManyReplacementValues, Disagreement::PolarsRefuses(refusal)) => {
             // The literal is the cause where Polars stops refusing the empty table once the
@@ -7140,6 +7204,75 @@ mod tests {
                 "{count}"
             );
         }
+    }
+
+    // ----- A struct with no fields
+
+    const NO_KEY: &str = "at least one key is required in a group_by operation";
+
+    fn tested_after_extracting(pattern: &str, test: &str) -> Case {
+        let extract = call(
+            "Expr.str.extract_groups",
+            vec![("pattern", Value::Pattern(pattern.to_owned()))],
+        );
+        select(vec![chain_of(
+            column("g"),
+            vec![extract, call(test, Vec::new())],
+        )])
+    }
+
+    #[test]
+    fn a_test_for_unique_values_is_excused_for_a_struct_with_no_fields() {
+        for name in [
+            "uncovered-a-struct-with-no-fields.case",
+            "uncovered-a-struct-with-no-fields--a-test-for-a-duplicate.case",
+        ] {
+            assert_eq!(
+                excused_by_kept(name),
+                vec![Limit::AStructWithNoFields],
+                "{name}"
+            );
+        }
+        for test in ["Expr.is_unique", "Expr.is_duplicated"] {
+            for stage in [Stage::Rows, Stage::Empty] {
+                assert_eq!(
+                    refused_for_a_bound(&tested_after_extracting("x", test), None, stage, NO_KEY),
+                    vec![Limit::AStructWithNoFields],
+                    "{test}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_group_by_without_a_key_is_not_excused_for_a_struct_with_a_field_nor_at_a_place() {
+        // The pattern has a group, so the control is the case itself, which shows nothing.
+        for pattern in ["(x)", "(?<n>x)"] {
+            assert_eq!(
+                refused_for_a_bound(
+                    &tested_after_extracting(pattern, "Expr.is_unique"),
+                    None,
+                    Stage::Rows,
+                    NO_KEY
+                ),
+                vec![],
+                "{pattern}"
+            );
+        }
+        // A refusal at a place, or the schema, or another reason is not this one.
+        let case = tested_after_extracting("x", "Expr.is_unique");
+        assert_eq!(
+            refused_for_a_bound(&case, Some(link_of("exprs", 0, 1)), Stage::Rows, NO_KEY),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Schema, NO_KEY),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, "invalid series dtype"),
+            vec![]
+        );
     }
 
     // ----- A literal text beside many replacement values
