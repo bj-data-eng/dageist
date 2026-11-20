@@ -48,7 +48,7 @@ use super::literal::{
 };
 use super::observe::{Observed, Refusal, SCHEMA_SAYS, Stage, Tables, observe, observe_probe};
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
-use super::probe::{is_the_same_comparison, same_reason, settle_apart, settle_in_the_position};
+use super::probe::{is_the_same_comparison, same_reason, settle_in_the_position};
 
 /// A limit of the tables, and what it says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -266,15 +266,6 @@ pub enum Limit {
     /// its chain, which Polars allows; the drop is why where Polars, asked again with each drop
     /// a fill of nulls forward, refuses the case for that reason.
     ADropLeavesNoRows,
-    /// A condition whose values are one expression is taken by Polars for that expression, and
-    /// its predicates are dropped, so what a predicate holds is never evaluated, and the tables
-    /// refuse a part of it that Polars does not meet. The part as written alone is refused by
-    /// Polars for another reason where an argument of it is, so no probe of it settles the
-    /// refusal. The tables refusing with a refusal of Polars's own, at a call inside a predicate
-    /// of a condition that has an `otherwise`, which Polars allows; the predicates being dropped
-    /// is why where Polars, asked again with each `otherwise` a fill forward of what it was, so
-    /// that the values differ, refuses the case for the tables' reason.
-    APredicateThatIsDropped,
     /// Polars refuses some dtypes of `and`, `or` and `xor` when it works out the schema of a
     /// select, a filter or a sort key, and accepts them in a join's key, as `date ^ int64` and
     /// `bool | int64`: the docs list the pairs measured. The tables measured a bitwise call in
@@ -350,7 +341,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 28] = [
+    pub const ALL: [Self; 27] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -371,7 +362,6 @@ impl Limit {
         Self::ABoundWithValuesOfItsOwn,
         Self::AWindowOverALiteral,
         Self::ADropLeavesNoRows,
-        Self::APredicateThatIsDropped,
         Self::ABitwiseCallInAJoinKey,
         Self::ACastOfAValueTheDtypeCannotHold,
         Self::ADropChangesTheLengths,
@@ -404,7 +394,6 @@ impl Limit {
             Self::ABoundWithValuesOfItsOwn => "a-bound-with-values-of-its-own",
             Self::AWindowOverALiteral => "a-window-over-a-literal",
             Self::ADropLeavesNoRows => "a-drop-leaves-no-rows",
-            Self::APredicateThatIsDropped => "a-predicate-that-is-dropped",
             Self::ABitwiseCallInAJoinKey => "a-bitwise-call-in-a-join-key",
             Self::ACastOfAValueTheDtypeCannotHold => "a-cast-of-a-value-the-dtype-cannot-hold",
             Self::ADropChangesTheLengths => "a-drop-changes-the-lengths",
@@ -471,9 +460,6 @@ impl Limit {
             }
             Self::ADropLeavesNoRows => {
                 "a drop of nulls can leave no rows, so the rows do not show the plan of what follows it"
-            }
-            Self::APredicateThatIsDropped => {
-                "a condition whose values are one expression drops its predicates, so Polars never meets what they hold"
             }
             Self::ABitwiseCallInAJoinKey => {
                 "Polars does not check the dtypes of a bitwise call in a join's key as it does in select, so it accepts a call the tables refuse for them"
@@ -1594,7 +1580,7 @@ fn expression_changed(
 }
 
 /// The case with every call that `change` gives another call made into it, the same in all else.
-fn case_changed(case: &Case, change: &dyn Fn(&Call) -> Option<Call>) -> Option<Case> {
+pub fn case_changed(case: &Case, change: &dyn Fn(&Call) -> Option<Call>) -> Option<Case> {
     let step = &case.document.steps()[0];
     let rebuilt = Step::new(step.id().clone(), call_changed(step.call(), change)?).ok()?;
     Some(Case {
@@ -1668,7 +1654,7 @@ fn refused_for_a_failed_conversion_without_strict_casts(case: &Case) -> Option<b
 
 /// The control, if it is a case other than the one asked about: where nothing in the case is
 /// what the control undoes, it is the case itself, which shows nothing of its cause.
-fn changed(control: Option<Case>, case: &Case) -> Option<Case> {
+pub fn changed(control: Option<Case>, case: &Case) -> Option<Case> {
     control.filter(|control| control.document.write() != case.document.write())
 }
 
@@ -1761,49 +1747,6 @@ fn refused_for_lengths_without_drops_as(case: &Case, reason: &str) -> Option<boo
 /// was why they did not. Polars allows the case as it is.
 fn refused_with_each_drop_a_fill(case: &Case, reason: &str) -> bool {
     changed(case_without_drops(case), case).is_some_and(|control| {
-        (0..RUNS).any(|_| {
-            observe(&control)
-                .refusal
-                .is_some_and(|refusal| refusal.reason == reason)
-        })
-    })
-}
-
-/// The case with the last value of every condition that has an `otherwise` made a fill forward of
-/// what it was, which gives as many values of the dtype it had, so that the values of the
-/// condition are no longer one expression.
-fn case_with_values_that_differ(case: &Case) -> Option<Case> {
-    case_changed(case, &|call| {
-        if !matches!(
-            call.entry().id().as_str(),
-            "Then.otherwise" | "ChainedThen.otherwise"
-        ) {
-            return None;
-        }
-        let Some(Value::Expression(statement)) = call.argument("statement") else {
-            return None;
-        };
-        let fill = Call::new(catalog::entry("Expr.forward_fill")?, Vec::new()).ok()?;
-        let links: Vec<Call> = statement
-            .links()
-            .iter()
-            .cloned()
-            .chain(std::iter::once(fill))
-            .collect();
-        let statement = Expression::new(statement.start().clone(), links).ok()?;
-        Call::new(
-            catalog::entry(call.entry().id().as_str())?,
-            vec![("statement", Value::Expression(statement))],
-        )
-        .ok()
-    })
-}
-
-/// Whether Polars refuses the case for the reason the tables gave once the values of each
-/// condition differ: the predicates are then evaluated, so their being dropped was why they were
-/// not. Polars allows the case as it is.
-fn refused_with_values_that_differ(case: &Case, reason: &str) -> bool {
-    changed(case_with_values_that_differ(case), case).is_some_and(|control| {
         (0..RUNS).any(|_| {
             observe(&control)
                 .refusal
@@ -1965,7 +1908,7 @@ fn refused_for_a_strategy_without_nulls_made(case: &Case) -> Option<bool> {
 
 /// How often the case without its explodes is run again: which of two failures of
 /// a plan Polars names depends on which thread gets there first.
-const RUNS: usize = 8;
+pub const RUNS: usize = 8;
 
 /// Whether the call is a `clip` that has a bound, or a replacement that lists values, which
 /// Polars casts to the dtype of what the call follows.
@@ -3056,18 +2999,6 @@ fn applies(
                         .any(|call| is(call, "Expr.drop_nulls"))
                 })
                 && refused_with_each_drop_a_fill(case, &refused.reason)
-        }
-        (Limit::APredicateThatIsDropped, Disagreement::PolarsAllows(refused)) => {
-            // The refusal is Polars' own, at a call inside a predicate, which Polars drops where the
-            // values of the condition are one expression.
-            matches!(refused.source, Source::Polars)
-                && refused.place.path().iter().any(
-                    |segment| matches!(segment, Segment::Parameter(name) if name == "predicates"),
-                )
-                && refused_with_values_that_differ(case, &refused.reason)
-                // A probe of the part alone that Polars refuses settles it, which is asked of a
-                // case the limits do not excuse.
-                && settle_apart(case, refused, prediction, observed).is_none()
         }
         (Limit::ACastOfAValueTheDtypeCannotHold, Disagreement::PolarsRefuses(refusal)) => {
             // The rows hold the value, and so may a table with no rows, where an aggregate of

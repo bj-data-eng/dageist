@@ -55,6 +55,13 @@
 //! call it holds, or not evaluated at all, so a column of the dtype that reaches its end stands
 //! as the predicate, and Polars refusing it as the rule says shows the rule right about it.
 //!
+//! A refusal in a predicate of a condition whose values are one expression, which Polars drops
+//! and never evaluates, is asked of the case itself ([`settle_by_values_that_differ`]): the last
+//! value of each condition is made a fill forward of what it was, so that the values differ, and
+//! Polars refusing that case for the tables' reason shows the predicate is one it skips
+//! ([`Showing::WhereTheValuesDiffer`]). A probe of the part alone is no better, for an argument
+//! of it may be refused first.
+//!
 //! The last has no reason to match. [`settle_in_the_position`] is for a refusal
 //! that is the target's own comparison of a call's plan with its rows, which is no
 //! refusal of Polars and so is neither the tables' reason nor one a probe is refused
@@ -73,10 +80,11 @@ use dageist_engine::document::{
 
 use super::case::{Case, STEP};
 use super::frames::{STAND_IN, key_column, stand_in_column};
-use super::limits::judges_its_values_apart;
+use super::limits::{RUNS, case_changed, changed, judges_its_values_apart};
 use super::literal::{call_with_columns, class_of, operand_causes, placed_operands};
 use super::observe::{
-    Observed, Refusal, SCHEMA_SAYS, Seen, Tables, is_bare_key, is_the_targets_own, observe_probe,
+    Observed, Refusal, SCHEMA_SAYS, Seen, Tables, is_bare_key, is_the_targets_own, observe,
+    observe_probe,
 };
 use super::predict::{Prediction, Refused, Source};
 
@@ -94,6 +102,11 @@ pub enum Showing {
     /// know might have, and Polars refuses the part as written at the call, for
     /// the dtype the argument has.
     ForAnyDtypeOfTheArgument,
+    /// The tables refused a part of a predicate of a condition that Polars allows, because the
+    /// values of the condition are one expression and Polars drops its predicates. The case with
+    /// the values made to differ is refused by Polars for the tables' reason, so the predicate is
+    /// evaluated there, and it is the dropping that Polars allows the case for.
+    WhereTheValuesDiffer,
 }
 
 /// What a probe found: the document it ran, why Polars refused it, and what that
@@ -119,6 +132,10 @@ impl Settled {
             ),
             Showing::ForAnyDtypeOfTheArgument => format!(
                 "the probe {} is refused by Polars at the call the tables refused for every dtype of an argument they did not know: {}",
+                self.probe, self.reason
+            ),
+            Showing::WhereTheValuesDiffer => format!(
+                "Polars drops the predicate, for the values of the condition are one expression, and refuses the case {} where they differ, for the tables' reason: {}",
                 self.probe, self.reason
             ),
         }
@@ -1282,6 +1299,69 @@ pub fn settle_in_the_position(
     })
 }
 
+/// The case with the last value of every condition that has an `otherwise` made a fill forward of
+/// what it was, which gives as many values of the dtype it had, so that the values of the
+/// condition are no longer one expression and Polars does not drop its predicates.
+fn case_with_values_that_differ(case: &Case) -> Option<Case> {
+    case_changed(case, &|call| {
+        if !matches!(
+            call.entry().id().as_str(),
+            "Then.otherwise" | "ChainedThen.otherwise"
+        ) {
+            return None;
+        }
+        let Some(Value::Expression(statement)) = call.argument("statement") else {
+            return None;
+        };
+        let fill = Call::new(catalog::entry("Expr.forward_fill")?, Vec::new()).ok()?;
+        let links: Vec<Call> = statement
+            .links()
+            .iter()
+            .cloned()
+            .chain(std::iter::once(fill))
+            .collect();
+        let statement = Expression::new(statement.start().clone(), links).ok()?;
+        Call::new(
+            catalog::entry(call.entry().id().as_str())?,
+            vec![("statement", Value::Expression(statement))],
+        )
+        .ok()
+    })
+}
+
+/// Asks Polars about a refusal of Polars' own words, at a call inside a predicate of a condition
+/// that has an `otherwise`, which Polars allows: it takes a condition whose values are one
+/// expression for that expression and drops the predicates, so it never evaluates the part. The
+/// case is run again with the last value of each condition made a fill forward of what it was,
+/// so that the values differ and the predicates are evaluated, and Polars refusing it for the
+/// tables' reason shows that the part is one it skips. A probe of the part alone cannot ask it,
+/// for what the part holds may be refused first for another reason. `None` where the refusal is
+/// a rule's, is not in a predicate, or the case has no `otherwise` to make differ, and where
+/// Polars allows the control or refuses it for another reason.
+pub fn settle_by_values_that_differ(case: &Case, refused: &Refused) -> Option<Settled> {
+    if !matches!(refused.source, Source::Polars)
+        || !refused
+            .place
+            .path()
+            .iter()
+            .any(|segment| matches!(segment, Segment::Parameter(name) if name == "predicates"))
+    {
+        return None;
+    }
+    let control = changed(case_with_values_that_differ(case), case)?;
+    (0..RUNS)
+        .find_map(|_| {
+            observe(&control)
+                .refusal
+                .filter(|refusal| refusal.reason == refused.reason)
+        })
+        .map(|refusal| Settled {
+            probe: control.document.write(),
+            reason: refusal.reason,
+            showing: Showing::WhereTheValuesDiffer,
+        })
+}
+
 /// Asks Polars about the part the tables refused apart from what surrounds it
 /// in the case, where the part as written is not asked: the refused call on a
 /// value of the dtype that reaches it, or a join's key by itself as the key, or
@@ -1298,6 +1378,7 @@ pub fn settle_apart(
         .or_else(|| settle_in_the_position(case, refused, predicted, observed))
         .or_else(|| settle_given_no_known_dtype(case, refused))
         .or_else(|| settle_a_predicate_on_a_value(case, refused, predicted, observed))
+        .or_else(|| settle_by_values_that_differ(case, refused))
 }
 
 /// Whether `rule` is one that a predicate be a `Boolean`, which a probe of the predicate apart
@@ -2395,5 +2476,57 @@ mod tests {
         for id in ["LazyFrame.select", "LazyFrame.pivot", "LazyFrame.filter"] {
             assert!(catalog::entry(id).is_some(), "{id}");
         }
+    }
+    #[test]
+    fn a_predicate_that_polars_drops_is_settled_by_the_case_with_the_values_made_to_differ() {
+        // `when(f.clip(..)).then(a).when(..).then(a).otherwise(a)`: Polars drops the predicates,
+        // and refuses the clip of a `Boolean` once the last value differs.
+        let case = kept("stricter-a-predicate-that-is-dropped.case");
+        let refused = refusal(&case);
+        let found = settle_by_values_that_differ(&case, &refused)
+            .expect("a predicate that Polars refuses where the values differ");
+        assert_eq!(found.showing, Showing::WhereTheValuesDiffer);
+        assert_eq!(found.reason, refused.reason);
+        assert!(found.probe.contains("Expr.forward_fill"), "{}", found.probe);
+        // Asked of the whole case, as the target asks it.
+        assert!(
+            settle_apart(&case, &refused, &predict(&case), &observe(&case))
+                .is_some_and(|found| found.showing == Showing::WhereTheValuesDiffer)
+        );
+    }
+
+    #[test]
+    fn a_predicate_is_not_settled_where_the_values_made_to_differ_are_not_refused_for_its_reason() {
+        let case = kept("stricter-a-predicate-that-is-dropped.case");
+        let refused = refusal(&case);
+        // Another reason than the one Polars refuses the control for.
+        let other = Refused {
+            reason: "`clip` operation not supported for dtype `date`".to_owned(),
+            ..refused.clone()
+        };
+        assert_eq!(settle_by_values_that_differ(&case, &other), None);
+        // A refusal that is a rule's, which is no refusal of Polars' own words.
+        let rule = Refused {
+            source: Source::Rule("condition-predicate-is-boolean"),
+            ..refused.clone()
+        };
+        assert_eq!(settle_by_values_that_differ(&case, &rule), None);
+        // A refusal that is not inside a predicate.
+        let outside = Refused {
+            place: Place::of_step(0, StepId::new(STEP).ok()),
+            ..refused.clone()
+        };
+        assert_eq!(settle_by_values_that_differ(&case, &outside), None);
+        // A condition with no `otherwise` has no value to make differ.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/allowed_fuzz/regressions/stricter-a-predicate-that-is-dropped.case");
+        let text = std::fs::read_to_string(path).expect("a kept case");
+        let start = text
+            .find(r#",{"entry":"ChainedThen.otherwise""#)
+            .expect("an otherwise");
+        let end = text[start..].find("}}}}").expect("its end") + start + "}}}}".len();
+        let without = format!("{}{}", &text[..start], &text[end..]);
+        let case = Case::decode(without.as_bytes()).expect("a case without an otherwise");
+        assert_eq!(settle_by_values_that_differ(&case, &refused), None);
     }
 }

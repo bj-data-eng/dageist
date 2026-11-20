@@ -541,7 +541,11 @@ Polars by hand, and decide which it is:
   refused without knowing the dtype of an argument, whose reason is Polars' for
   another dtype, the part as written, where Polars refusing it at the refused call
   counts without the reason being compared, and the part before the call alone is
-  allowed. A call that the tables judge by each of its values beside a companion,
+  allowed; and, for a refusal of Polars' own words inside a predicate of a condition that
+  has an `otherwise`, which Polars drops where the values of the condition are one
+  expression, the case with the last value of each condition made a fill forward of what
+  it was, where Polars refusing it for the tables' reason shows that the predicate is one
+  it skips. A call that the tables judge by each of its values beside a companion,
   `replace`, `replace_strict`, `is_between` and `is_close`, counts when Polars refuses
   the part at the call, or in what the call is given, whatever words it uses, for the
   value the tables refused first is not always the one Polars meets; the limit for a
