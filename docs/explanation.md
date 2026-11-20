@@ -498,17 +498,16 @@ What Polars does with each is what the tables say, and some of it is not what a 
   continuation that casts the key to the dtype of the other table's key, which a list, an array or
   a struct cannot be, so such a call is measured as the end of the chain, with the other key the
   dtype the key has.
-- `str.split` is offered with `literal` true only. A split by a pattern waits for the kind of
-  parameter that holds a pattern, which the next batch of text methods adds with `contains` and
-  `replace`, and until then the build refuses `literal` set to false with the reason that it
-  waits, which the option table records at the schema, so the editor refuses the word with that
-  reason. `strict` is for a pattern, so beside a literal split it changes nothing, as in Python.
-  When the kind exists, `literal` false builds `split_regex` and `split_regex_inclusive`, and the
-  refusal and the table lines it left go with it. The table has no line for an option of a method
-  that has several alone, only for each pair of them, so an option set alone is judged by the
-  lines that pair its word with the others at their defaults, and refused when Polars refuses the
-  pair; a step's lines are not read so, for they are measured with the arguments the harness
-  gives the step.
+- `str.split` splits at plain text where `literal` is true, as Python's default has it, and at each
+  match of a pattern where it is false, which Polars builds as its regex split, with the match kept
+  by `inclusive`. `strict` is for a pattern: where the separator is no regex, a strict split is
+  refused when rows run and one that is not strict gives a null, so beside plain text `strict`
+  changes nothing, as in Python. The separator is an expression, which may be a column of patterns,
+  so it is not a parameter of the pattern kind, and Polars checks it when the rows run, not when
+  the step is built. The table has no line for an option of a method that has several alone, only
+  for each pair of them, so an option set alone is judged by the lines that pair its word with the
+  others at their defaults, and refused when Polars refuses the pair; a step's lines are not read
+  so, for they are measured with the arguments the harness gives the step.
 
 The catalogue holds the seven steps, the expression methods the storyboard
 uses, the aggregates `sum`, `min`, `max` and `len`, the six comparisons and the six

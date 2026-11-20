@@ -1282,24 +1282,18 @@ mod tests {
     #[test]
     fn a_method_with_several_options_is_judged_the_same_every_time_by_the_pairs_of_each() {
         // `over` has several options and no line for one alone, and Polars refuses none of its
-        // words: each is allowed, as often as it is asked.
+        // words: each is allowed, as often as it is asked. What the pairs of a word say is
+        // chosen by the options, not by the order of a map: see the tests of `first_refusal`.
         for word in ["group_to_rows", "join", "explode"] {
             for _ in 0..3 {
                 assert!(options(entry("Expr.over"), &[("mapping_strategy", word)]).is_ok());
             }
         }
-        // A split by a pattern is refused with the same reason every time.
-        let reasons: Vec<String> = (0..4)
-            .map(|_| {
-                options(entry("Expr.str.split"), &[("literal", "false")])
-                    .expect_err("refused")
-                    .reason()
-                    .to_owned()
-            })
-            .collect();
-        assert!(
-            reasons.windows(2).all(|pair| pair[0] == pair[1]),
-            "{reasons:?}"
-        );
+        // A split has several options too, and Polars refuses neither word of `literal`.
+        for word in ["true", "false"] {
+            for _ in 0..3 {
+                assert!(options(entry("Expr.str.split"), &[("literal", word)]).is_ok());
+            }
+        }
     }
 }

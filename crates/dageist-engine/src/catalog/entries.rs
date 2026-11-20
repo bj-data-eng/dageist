@@ -889,20 +889,26 @@ fn str_zfill(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
     Ok(expr.str().zfill(arguments.required_expression("length")?))
 }
 
-/// As Python's `split` takes its arguments, but for a split by a pattern, which waits for the kind
-/// of parameter that holds a pattern: `literal` is true, and so `strict`, which only a pattern
-/// uses, changes nothing.
+/// As Python's `split` takes its arguments: by plain text where `literal` is true, and otherwise by
+/// a pattern, which Polars splits at each match. `strict` is for a pattern: it decides whether a
+/// pattern that is no regex is refused when rows run or gives a null, so beside plain text it
+/// changes nothing.
 fn str_split(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
     let by = arguments.required_expression("by")?;
-    if !arguments.flag("literal", true)? {
-        return Err(refused(
-            "a split by a pattern waits for the kind of parameter that holds one; give `literal` as true",
-        ));
-    }
-    Ok(if arguments.flag("inclusive", false)? {
-        expr.str().split_inclusive(by)
+    let inclusive = arguments.flag("inclusive", false)?;
+    Ok(if arguments.flag("literal", true)? {
+        if inclusive {
+            expr.str().split_inclusive(by)
+        } else {
+            expr.str().split(by)
+        }
     } else {
-        expr.str().split(by)
+        let strict = arguments.flag("strict", true)?;
+        if inclusive {
+            expr.str().split_regex_inclusive(by, strict)
+        } else {
+            expr.str().split_regex(by, strict)
+        }
     })
 }
 

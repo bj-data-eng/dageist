@@ -130,33 +130,43 @@ fn a_method_of_text_after_whole_numbers_is_refused_at_its_link_as_polars_refuses
 }
 
 #[test]
-fn a_split_by_a_pattern_is_refused_before_polars_is_asked_and_one_by_text_is_not() {
-    let split = |literal: Option<bool>| {
-        let mut arguments = json!({ "by": text(" ") });
+fn a_split_by_a_pattern_runs_and_one_by_text_is_not_a_pattern() {
+    let split = |by: &str, literal: Option<bool>| {
+        let mut arguments = json!({ "by": text(by) });
         if let Some(literal) = literal {
             arguments["literal"] = json!({ "flag": literal });
         }
         field_then("owner", vec![call("Expr.str.split", arguments)])
     };
-    let by_text = report_of(&selecting(split(Some(true))));
-    assert!(matches!(
-        by_text.steps()[0].outcome(),
-        Outcome::Valid { .. }
-    ));
-    let by_default = report_of(&selecting(split(None)));
-    assert!(matches!(
-        by_default.steps()[0].outcome(),
-        Outcome::Valid { .. }
-    ));
-    let by_pattern = report_of(&selecting(split(Some(false))));
-    let Outcome::Refused(refusal) = by_pattern.steps()[0].outcome() else {
-        panic!("{:?}", by_pattern.steps()[0].outcome());
+    let first_cell = |by: &str, literal: Option<bool>| -> String {
+        let written = selecting(split(by, literal));
+        let report = report_of(&written);
+        assert!(
+            matches!(report.steps()[0].outcome(), Outcome::Valid { .. }),
+            "{:?}",
+            report.steps()[0].outcome()
+        );
+        assert_eq!(walk_refusal(&report), None);
+        let preview = Document::read(&written)
+            .expect("a document")
+            .preview(&inputs(), &claims(), &StepId::new("s").expect("an id"), 100)
+            .expect("the rows");
+        preview.rows()[0][0].clone().expect("a value")
     };
-    assert!(
-        matches!(refusal.cause(), RunCause::Polars(_) | RunCause::Build(_)),
-        "{refusal}"
-    );
-    assert!(refusal.to_string().contains("pattern"), "{refusal}");
+    // The first owner is `Company A`: a space or `\s` splits it at the space, a dot as text finds
+    // no dot in it, and as the pattern `y.` it splits at the `y` and the character after it.
+    assert_eq!(first_cell(" ", Some(true)), r#"["Company", "A"]"#);
+    assert_eq!(first_cell(" ", None), r#"["Company", "A"]"#);
+    assert_eq!(first_cell(r"\s", Some(false)), r#"["Company", "A"]"#);
+    assert_eq!(first_cell(".", Some(true)), r#"["Company A"]"#);
+    assert_eq!(first_cell("y.", Some(false)), r#"["Compan", "A"]"#);
+}
+
+/// The first refusal the tables or a rule gave the first step, if any.
+fn walk_refusal(
+    report: &dageist_engine::document::Report,
+) -> Option<&dageist_engine::document::WalkRefusal> {
+    report.steps()[0].walk().refusal()
 }
 
 #[test]
