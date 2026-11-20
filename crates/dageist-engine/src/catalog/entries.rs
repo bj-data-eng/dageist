@@ -181,11 +181,17 @@ const DECIMALS: Parameter = optional("decimals", Kind::Value(ValueType::Integer)
 /// as an unsigned 32-bit number. Unset, it fills them all.
 const LIMIT: Parameter = optional("limit", Kind::Value(ValueType::Integer), Shape::One, "None");
 
-/// A count of characters that a method of the `str` namespace takes: the number to keep, the length
-/// to pad to, or the place to start at. A whole number typed without a dtype is that dtype and
-/// adapts to nothing, as the rows `shift` counts are.
+/// A count of characters that a method of the `str` namespace takes: the number to keep, or the
+/// place to start at. A whole number typed without a dtype is that dtype and adapts to nothing, as
+/// the rows `shift` counts are.
 const fn characters_counted(name: &'static str) -> Parameter {
     required(name, EXPRESSION, Shape::One).with_role(Role::Count)
+}
+
+/// The length a method of the `str` namespace makes text, which it converts to an unsigned whole
+/// number.
+const fn a_length(name: &'static str) -> Parameter {
+    required(name, EXPRESSION, Shape::One).with_role(Role::Length)
 }
 
 /// `characters`: what `strip_chars` and its two sides take off the text, which is whitespace where
@@ -2108,7 +2114,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         id: EntryId("Expr.str.pad_end"),
         family: Family::Text,
         accepts: STRING,
-        parameters: &[characters_counted("length"), FILL_CHAR],
+        parameters: &[a_length("length"), FILL_CHAR],
         laziness: Laziness::Lazy,
         build: Build::Expression(str_pad_end),
     },
@@ -2116,7 +2122,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         id: EntryId("Expr.str.pad_start"),
         family: Family::Text,
         accepts: STRING,
-        parameters: &[characters_counted("length"), FILL_CHAR],
+        parameters: &[a_length("length"), FILL_CHAR],
         laziness: Laziness::Lazy,
         build: Build::Expression(str_pad_start),
     },
@@ -2134,7 +2140,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         accepts: STRING,
         parameters: &[
             characters_counted("offset"),
-            optional("length", EXPRESSION, Shape::One, "None").with_role(Role::Count),
+            optional("length", EXPRESSION, Shape::One, "None").with_role(Role::Length),
         ],
         laziness: Laziness::Lazy,
         build: Build::Expression(str_slice),
@@ -2236,7 +2242,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         id: EntryId("Expr.str.zfill"),
         family: Family::Text,
         accepts: STRING,
-        parameters: &[characters_counted("length")],
+        parameters: &[a_length("length")],
         laziness: Laziness::Lazy,
         build: Build::Expression(str_zfill),
     },

@@ -469,8 +469,12 @@ What Polars does with each is what the tables say, and some of it is not what a 
   a whole number typed without a dtype is that dtype. Polars casts it to a whole number, so a
   float or a `Boolean` is taken, text is not (the offset of a slice, which reads it as it does a
   date, is), and a value the whole number cannot hold is refused when the rows run, which a limit
-  covers. A negative count of `str.head` leaves out that many from the end, and a negative
-  offset of `str.slice` counts from the end.
+  covers. How long a text is made, the length of the two pads, of `str.zfill` and of a slice, is
+  a count of a role of its own, for Polars converts it to an unsigned whole number: a number typed
+  without a dtype that is below zero is refused when the schema is worked out, so the walk gives
+  the call no dtype, and the editor does not say what it gives. The head, the tail and the offset
+  of a slice are signed: a negative count of `str.head` leaves out that many from the end, and a
+  negative offset of `str.slice` counts from the end.
 - `fill_char` is one character, as Python's binding takes it, so the build refuses text of
   another length with that reason, and the document keeps it as a value, not an expression.
 - A split gives a list of text for each row, and Polars joins on a list, so a split may be a join's

@@ -424,8 +424,11 @@ pub dageist_engine::catalog::Role::Divisor
 pub dageist_engine::catalog::Role::Exponent
 pub dageist_engine::catalog::Role::Filler
 pub dageist_engine::catalog::Role::FloorDivisor
+pub dageist_engine::catalog::Role::Length
 pub dageist_engine::catalog::Role::Operand
 pub dageist_engine::catalog::Role::Plain
+impl dageist_engine::catalog::Role
+pub const fn dageist_engine::catalog::Role::is_a_count(self) -> bool
 pub enum dageist_engine::catalog::Setting
 pub dageist_engine::catalog::Setting::Comparison
 pub dageist_engine::catalog::Setting::Comparison::entry: &'static str

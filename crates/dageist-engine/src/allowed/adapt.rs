@@ -41,6 +41,11 @@ impl Loose {
         matches!(self.0, Number::Integer(_))
     }
 
+    /// Whether it is a whole number below zero.
+    pub(crate) const fn is_below_zero(self) -> bool {
+        matches!(self.0, Number::Integer(value) if value < 0)
+    }
+
     /// Whether the number fits `class`, as Polars adapts a number typed without a
     /// dtype to a column of it: a whole number to a whole number type it fits, and to
     /// a float, and a number with a fraction to a float.
@@ -152,7 +157,15 @@ pub(crate) fn adapts_numbers_only(entry: &Entry, name: &str) -> bool {
 /// Whether the parameter `name` of `entry` counts or indexes, which a whole
 /// number is the dtype of whatever it adapts to: `shift`'s rows.
 pub(crate) fn is_count(entry: &Entry, name: &str) -> bool {
-    role(entry, name) == Some(Role::Count)
+    role(entry, name).is_some_and(Role::is_a_count)
+}
+
+/// Whether the whole number typed without a dtype `number`, given as the parameter `name` of
+/// `entry`, is a count that Polars refuses: a length is converted to an unsigned whole number, so
+/// a number below zero is refused when the schema is worked out, which the tables, measured with
+/// the sample's columns, do not say.
+pub(crate) fn is_refused_as_a_count(entry: &Entry, name: &str, number: Loose) -> bool {
+    role(entry, name) == Some(Role::Length) && number.is_below_zero()
 }
 
 /// Whether Polars adapts a number typed without a dtype that is the parameter
@@ -240,7 +253,7 @@ pub(crate) fn receiver_beside(entry: &Entry, name: &str, number: Loose) -> Optio
         Role::Exponent | Role::Base | Role::Bound => Some(Receiver::Keeps),
         Role::Divisor if number.is_whole() => Some(Receiver::Adapts),
         Role::Divisor => Some(Receiver::Keeps),
-        Role::Plain | Role::Filler | Role::Count => None,
+        Role::Plain | Role::Filler | Role::Count | Role::Length => None,
     }
 }
 

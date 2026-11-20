@@ -7,7 +7,7 @@ use dageist_engine::document::{Document, Outcome, RunCause, Segment, StepId, Ste
 use serde_json::{Value, json};
 
 use crate::claims::{claims, inputs};
-use crate::support::{call, document, field, field_then, named, step, text};
+use crate::support::{call, document, field, field_then, named, step, text, whole};
 
 /// The one-step document that selects `expression` as the column `out`.
 fn selecting(expression: Value) -> String {
@@ -225,4 +225,42 @@ fn a_test_for_a_prefix_is_a_condition_a_filter_may_hold() {
         .expect("the rows");
     // Four of the seven claims are with Company A.
     assert_eq!(preview.rows().len(), 4);
+}
+
+#[test]
+fn a_negative_length_typed_as_a_whole_number_is_refused_by_polars_and_gives_the_walk_no_dtype() {
+    // Polars converts a length to an unsigned whole number when it works out the schema, so a
+    // negative literal is refused there, and the walk, which cannot say what it gives, claims no
+    // dtype after it. A negative head is allowed, and gives text.
+    let padded = field_then(
+        "owner",
+        vec![call("Expr.str.pad_start", json!({ "length": whole(-1) }))],
+    );
+    let report = report_of(&selecting(padded));
+    let step = &report.steps()[0];
+    assert!(
+        matches!(step.outcome(), Outcome::Refused(refusal) if matches!(refusal.cause(), RunCause::Polars(_))),
+        "{:?}",
+        step.outcome()
+    );
+    let expression = step
+        .walk()
+        .expressions()
+        .iter()
+        .find(|expression| {
+            expression.place().path()
+                == [
+                    Segment::Parameter("named_exprs".to_owned()),
+                    Segment::Value(0),
+                ]
+        })
+        .expect("the walk holds the chain");
+    let last = expression.places().last().cloned().flatten();
+    assert_eq!(last, None, "no dtype is claimed after the pad");
+    let headed = field_then(
+        "owner",
+        vec![call("Expr.str.head", json!({ "n": whole(-1) }))],
+    );
+    let report = report_of(&selecting(headed));
+    assert!(matches!(report.steps()[0].outcome(), Outcome::Valid { .. }));
 }

@@ -93,7 +93,7 @@ impl Value {
                 DefaultValue::Text(default),
             ) => value == default,
             (Self::Expression(expression), DefaultValue::Integer(default)) => {
-                role == Role::Count
+                role.is_a_count()
                     && matches!(alone_in(expression), Some(Self::Integer(value)) if value == default)
             }
             _ => false,

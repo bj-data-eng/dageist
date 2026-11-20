@@ -11,7 +11,8 @@
 use crate::catalog::{self, DefaultValue, Entry, Kind, ParameterDefault};
 
 use super::adapt::{
-    Loose, adapted_dtype, is_count, is_left_unresolved, is_required, operand_adapts,
+    Loose, adapted_dtype, is_count, is_left_unresolved, is_refused_as_a_count, is_required,
+    operand_adapts,
 };
 use super::context::Context;
 use super::dtype::Representative;
@@ -159,8 +160,9 @@ pub fn fit(candidate: &Candidate, slot: &Slot<'_>) -> Option<Fit> {
                 verdict: found,
             });
         };
-        let counts =
-            loose.is_some_and(Loose::is_whole) && is_count(argument.entry, argument.parameter);
+        let counts = loose.is_some_and(|number| {
+            number.is_whole() && !is_refused_as_a_count(argument.entry, argument.parameter, number)
+        }) && is_count(argument.entry, argument.parameter);
         verdict = Some(Verdict::Allowed(
             if loose.is_none() || adapted.is_some() || counts {
                 allowance

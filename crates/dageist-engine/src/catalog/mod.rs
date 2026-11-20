@@ -318,6 +318,11 @@ pub enum Role {
     /// A count or an index of rows, as `shift`'s `n` is. A whole number there is
     /// that dtype and adapts to nothing.
     Count,
+    /// How long a text is made, as `str.pad_start`'s length is: a count as [`Role::Count`] is, which
+    /// Polars converts to an unsigned whole number, so a whole number typed without a dtype that
+    /// is below zero is refused when the schema is worked out, where a count of rows or of
+    /// characters from an end may be negative.
+    Length,
     /// The power a value is raised to, as `pow`'s `exponent` is. A number typed
     /// without a dtype adapts to the value the method follows, but that value
     /// does not adapt to it: a number raised to a power is the dtype it has.
@@ -345,6 +350,15 @@ pub enum Role {
     /// with a fraction to a whole number beside whole numbers. The value the method follows does
     /// not adapt to it, and keeps the dtype it has.
     Bound,
+}
+
+impl Role {
+    /// Whether the parameter counts rows or characters, which a whole number typed without a dtype
+    /// is that dtype of and adapts to nothing.
+    #[must_use]
+    pub const fn is_a_count(self) -> bool {
+        matches!(self, Self::Count | Self::Length)
+    }
 }
 
 /// What a parameter that gives a number of values is given as many of as.

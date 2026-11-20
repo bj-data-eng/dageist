@@ -26,9 +26,9 @@ use crate::allowed::{
 };
 use crate::allowed::{
     Loose, Receiver, adapted_dtype, adapts_numbers_only, could_be_taken_by_a_number, is_count,
-    is_left_unresolved, is_required, operand_adapts, receiver_beside,
+    is_left_unresolved, is_refused_as_a_count, is_required, operand_adapts, receiver_beside,
 };
-use crate::catalog::{Applies, AsManyAs, Comparison, Entry, Kind, Role};
+use crate::catalog::{Applies, AsManyAs, Comparison, Entry, Kind};
 
 use super::error::{Place, Segment};
 use super::inputs::Inputs;
@@ -434,7 +434,7 @@ fn loose_number(call: &Call) -> Option<Loose> {
 fn takes_an_operand(entry: &Entry) -> bool {
     entry.applies() == Applies::Expression
         && entry.parameters().iter().any(|parameter| {
-            matches!(parameter.kind(), Kind::Expression(_)) && parameter.role() != Role::Count
+            matches!(parameter.kind(), Kind::Expression(_)) && !parameter.role().is_a_count()
         })
 }
 
@@ -1132,7 +1132,9 @@ impl Walker<'_> {
         let resolved: Vec<(&str, Option<Representative>, Option<Loose>)> = arguments
             .iter()
             .map(|(name, operand)| {
-                let counts = operand.loose.is_some_and(Loose::is_whole);
+                let counts = operand.loose.is_some_and(|number| {
+                    number.is_whole() && !is_refused_as_a_count(entry, name, number)
+                });
                 let hidden = entry.applies() == Applies::Expression
                     && operand.loose.is_some()
                     && !(counts && is_count(entry, name));

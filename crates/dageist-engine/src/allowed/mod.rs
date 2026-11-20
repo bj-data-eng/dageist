@@ -45,7 +45,7 @@ mod typed;
 
 pub(crate) use adapt::{
     Loose, Receiver, adapted_dtype, adapts_numbers_only, could_be_taken_by_a_number, is_count,
-    is_left_unresolved, is_required, operand_adapts, receiver_beside,
+    is_left_unresolved, is_refused_as_a_count, is_required, operand_adapts, receiver_beside,
 };
 pub use candidates::{
     ArgumentSlot, Candidate, DefaultArgument, Fit, OptionOffer, OptionWord, Slot, default_argument,

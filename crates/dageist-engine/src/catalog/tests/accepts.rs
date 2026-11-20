@@ -83,7 +83,7 @@ fn arguments_for(entry: &Entry, column: &str, operand: &str) -> Arguments {
                 // or taken from, a column of the table.
                 Kind::Expression(&[Dtypes::String]) => expression_arg(lit("1d")),
                 // The length or the count of characters of a method of text is a whole number.
-                Kind::Expression(_) if parameter.role() == Role::Count => expression_arg(col("i")),
+                Kind::Expression(_) if parameter.role().is_a_count() => expression_arg(col("i")),
                 Kind::Expression(_) if parameter.role() != Role::Plain => {
                     expression_arg(col(operand))
                 }
