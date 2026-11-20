@@ -50,6 +50,10 @@ const DURATION: &[Dtypes] = &[Dtypes::Duration];
 // What Polars takes a time zone of: a `Datetime`, which it gives one it has none, converts to another
 // and, where it has one, reads the offsets of. A `Datetime` with none is refused the offsets.
 const ZONED: &[Dtypes] = &[Dtypes::Datetime];
+// The time of day `combine` puts on a date or a moment.
+const TIME_OF_DAY: &[Dtypes] = &[Dtypes::Time];
+// What Polars writes as text with a format: a moment, a date, a time of day and a duration.
+const WRITABLE: &[Dtypes] = &[Dtypes::Temporal];
 const HAS_A_UNIT: &[Dtypes] = &[Dtypes::Datetime, Dtypes::Duration];
 // What Polars counts since the start of 1970: a moment, and a number or a `Boolean`, which it
 // reads as the count of microseconds a moment is. A time of day, a duration and text it refuses.
@@ -1291,6 +1295,46 @@ fn dt_replace_time_zone(expr: Expr, arguments: &Arguments) -> Result<Expr, Build
         .replace_time_zone(zone, lit(ambiguous), non_existent))
 }
 
+fn dt_combine(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().combine(
+        arguments.required_expression("time")?,
+        time_unit(arguments, "time_unit", TIME_UNIT, Some("us"))?,
+    ))
+}
+
+/// A part of a moment that is left as it is where it is not given: Python gives each a null.
+fn dt_replace(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let part = |name: &'static str| -> Result<Expr, BuildError> {
+        Ok(arguments.expression(name)?.unwrap_or_else(|| lit(NULL)))
+    };
+    let ambiguous = arguments.choice("ambiguous", AMBIGUOUS, "raise")?;
+    Ok(expr.dt().replace(
+        part("year")?,
+        part("month")?,
+        part("day")?,
+        part("hour")?,
+        part("minute")?,
+        part("second")?,
+        part("microsecond")?,
+        lit(ambiguous),
+    ))
+}
+
+fn dt_strftime(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let format = arguments.string("format")?.ok_or(BuildError::Missing {
+        parameter: "format",
+    })?;
+    Ok(expr.dt().strftime(&format))
+}
+
+/// A moment as text, in ISO form where Python's `to_string` is given no format.
+fn dt_to_string(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let format = arguments
+        .string("format")?
+        .unwrap_or_else(|| "iso".to_owned());
+    Ok(expr.dt().to_string(&format))
+}
+
 fn dt_cast_time_unit(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
     Ok(expr
         .dt()
@@ -1913,6 +1957,15 @@ pub(super) const ENTRIES: &[Entry] = &[
     ),
     temporal("Expr.dt.century", DATE_PART, &[], dt_century),
     temporal(
+        "Expr.dt.combine",
+        DATE_PART,
+        &[
+            required("time", Kind::Expression(TIME_OF_DAY), Shape::One),
+            optional("time_unit", Kind::Choice(TIME_UNIT), Shape::One, "'us'"),
+        ],
+        dt_combine,
+    ),
+    temporal(
         "Expr.dt.convert_time_zone",
         ZONED,
         &[required("time_zone", Kind::TimeZone, Shape::One)],
@@ -1971,6 +2024,21 @@ pub(super) const ENTRIES: &[Entry] = &[
     temporal("Expr.dt.ordinal_day", DATE_PART, &[], dt_ordinal_day),
     temporal("Expr.dt.quarter", DATE_PART, &[], dt_quarter),
     temporal(
+        "Expr.dt.replace",
+        DATE_PART,
+        &[
+            optional("year", EXPRESSION, Shape::One, "None").keyword_only(),
+            optional("month", EXPRESSION, Shape::One, "None").keyword_only(),
+            optional("day", EXPRESSION, Shape::One, "None").keyword_only(),
+            optional("hour", EXPRESSION, Shape::One, "None").keyword_only(),
+            optional("minute", EXPRESSION, Shape::One, "None").keyword_only(),
+            optional("second", EXPRESSION, Shape::One, "None").keyword_only(),
+            optional("microsecond", EXPRESSION, Shape::One, "None").keyword_only(),
+            optional("ambiguous", Kind::Choice(AMBIGUOUS), Shape::One, "'raise'").keyword_only(),
+        ],
+        dt_replace,
+    ),
+    temporal(
         "Expr.dt.replace_time_zone",
         ZONED,
         &[
@@ -2000,6 +2068,16 @@ pub(super) const ENTRIES: &[Entry] = &[
         &[flag("fractional", "False").keyword_only()],
         dt_second,
     ),
+    temporal(
+        "Expr.dt.strftime",
+        WRITABLE,
+        &[required(
+            "format",
+            Kind::Value(ValueType::String),
+            Shape::One,
+        )],
+        dt_strftime,
+    ),
     Entry {
         id: EntryId("Expr.dt.time"),
         family: Family::Temporal,
@@ -2018,6 +2096,17 @@ pub(super) const ENTRIES: &[Entry] = &[
             "'us'",
         )],
         dt_timestamp,
+    ),
+    temporal(
+        "Expr.dt.to_string",
+        WRITABLE,
+        &[optional(
+            "format",
+            Kind::Value(ValueType::String),
+            Shape::One,
+            "None",
+        )],
+        dt_to_string,
     ),
     Entry {
         id: EntryId("Expr.dt.total_days"),

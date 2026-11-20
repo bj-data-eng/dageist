@@ -445,6 +445,21 @@
       "slots": []
     },
     {
+      "entry": "Expr.dt.combine",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.dt.convert_time_zone",
       "verdict": {
         "kind": "refused",
@@ -745,6 +760,21 @@
       "slots": []
     },
     {
+      "entry": "Expr.dt.replace",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.dt.replace_time_zone",
       "verdict": {
         "kind": "refused",
@@ -790,6 +820,21 @@
       "slots": []
     },
     {
+      "entry": "Expr.dt.strftime",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.dt.time",
       "verdict": {
         "kind": "refused",
@@ -806,6 +851,21 @@
     },
     {
       "entry": "Expr.dt.timestamp",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.to_string",
       "verdict": {
         "kind": "refused",
         "refusal": {

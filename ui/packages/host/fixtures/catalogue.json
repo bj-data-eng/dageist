@@ -818,6 +818,76 @@
       "parameters": []
     },
     {
+      "id": "Expr.dt.combine",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.combine",
+      "hint": "a date or moment with a time of day",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "time",
+          "shown": "time",
+          "label": "time of day",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "time_unit",
+          "shown": "time_unit",
+          "label": "unit",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "ns",
+                "shown": "ns"
+              },
+              {
+                "word": "us",
+                "shown": "us"
+              },
+              {
+                "word": "ms",
+                "shown": "ms"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "us"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "us"
+          },
+          "start": {
+            "kind": "word",
+            "value": "ns"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "Expr.dt.convert_time_zone",
       "applies": "expression",
       "family": "temporal",
@@ -1109,6 +1179,200 @@
       "parameters": []
     },
     {
+      "id": "Expr.dt.replace",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.replace",
+      "hint": "some parts of a moment set",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "year",
+          "shown": "year",
+          "label": "year",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "month",
+          "shown": "month",
+          "label": "month",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "day",
+          "shown": "day",
+          "label": "day",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "hour",
+          "shown": "hour",
+          "label": "hour",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "minute",
+          "shown": "minute",
+          "label": "minute",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "second",
+          "shown": "second",
+          "label": "second",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "microsecond",
+          "shown": "microsecond",
+          "label": "microsecond",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "ambiguous",
+          "shown": "ambiguous",
+          "label": "a clock read twice is",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "earliest",
+                "shown": "earliest"
+              },
+              {
+                "word": "latest",
+                "shown": "latest"
+              },
+              {
+                "word": "raise",
+                "shown": "raise"
+              },
+              {
+                "word": "null",
+                "shown": "null"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "raise"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "raise"
+          },
+          "start": {
+            "kind": "word",
+            "value": "earliest"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "Expr.dt.replace_time_zone",
       "applies": "expression",
       "family": "temporal",
@@ -1286,6 +1550,38 @@
       ]
     },
     {
+      "id": "Expr.dt.strftime",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.strftime",
+      "hint": "written as text by a format",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "format",
+          "shown": "format",
+          "label": "format",
+          "kind": {
+            "kind": "value",
+            "type": "string"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "Expr.dt.time",
       "applies": "expression",
       "family": "temporal",
@@ -1339,6 +1635,38 @@
           "start": {
             "kind": "word",
             "value": "ns"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.dt.to_string",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.to_string",
+      "hint": "written as text, by a format or as ISO",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "format",
+          "shown": "format",
+          "label": "format",
+          "kind": {
+            "kind": "value",
+            "type": "string"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
           },
           "position": null,
           "offered": true

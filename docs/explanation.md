@@ -760,6 +760,35 @@ meant, which is not about the text.
   measured them with a zone that has neither gap nor repeat, so what they say of the words is that
   Polars takes them; a step that meets a clock Polars refuses is refused when the rows run.
 
+### The Parts Of A Moment
+
+The `dt` namespace is a family of its own, Temporal, under Polars' own names, which the tables say
+what each takes and gives.
+
+- **Taking a moment apart.** `year`, `iso_year`, `quarter`, `month`, `week`, `weekday`, `day`,
+  `ordinal_day`, `century`, `millennium`, `days_in_month`, `is_leap_year` and `month_end` take a date or
+  a moment, and `hour`, `minute`, `second`, `millisecond`, `microsecond` and `nanosecond` a moment or a
+  time of day. `weekday` is Monday 1, `week` the ISO week, and `second` has the fraction of the second
+  where `fractional` is set, as Python writes it, which is the nanoseconds over a billion added to the
+  second.
+- **Counting a length of time.** `total_days`, `total_hours`, `total_minutes`, `total_seconds`,
+  `total_milliseconds`, `total_microseconds` and `total_nanoseconds` take a duration and give whole
+  numbers, or with a fraction where `fractional` is set.
+- **Counting a moment.** `timestamp` gives the count since the start of 1970 in a unit and `epoch` also
+  in seconds and in days, which Python works out of the others, so the catalogue does. Polars counts a
+  number or a `Boolean` as the moment it stands for, so the tables allow `timestamp` of them; a time of
+  day, a duration and text it refuses. `cast_time_unit` holds a moment or a duration in another unit.
+- **Combining, cutting and moving.** `combine` puts a time of day on a date or a moment, `truncate`
+  and `round` cut and round to a period, `offset_by` moves, and `replace` sets the parts it is given
+  and keeps the rest. A part not given is left as it was, so the method starts with all of them left
+  out.
+- **Writing.** `strftime` and `to_string` write a moment as text by a format, or, for `to_string` given
+  none, by ISO, which separates the date and the time of day by a space and by `T` where the format is
+  `iso:strict`. A format is text typed in, and Polars says when it can write it: a year of a time of
+  day, an hour of a date, a field that does not exist and anything but `iso` and `polars` for a
+  duration are refused when the rows run, and the tables, which measured `iso`, do not say so, so a
+  limit holds it. `strftime` takes a format, which Python's `to_string` takes optionally.
+
 ### The Duration String
 
 The methods of the `dt` namespace that move, cut and round a moment by a length of time, `dt.offset_by`,
@@ -1473,6 +1502,7 @@ of 157 or 158 pivot cases. The test asserts none of those.
 | A replacement of more than the first match | Polars replaces more than the first match only of plain text and of one value, and refuses a pattern that has an ASCII punctuation mark, which it takes for a regular expression, or a value that is many, with a count above one. The tables measured the first match, which is `n`'s default. Polars refusing the rows or the empty table with the refusal that a replacement of a pattern or of many values with a count above one is not yet supported, which has no place, in a case with a `str.replace` given a count above one: the case run again with each count left out is not refused for it. |
 | A literal text beside many replacement values | A literal text is one value, which Polars' streaming engine broadcasts over the rows of a table only where each piece it runs them in is no longer than that one value, and never over a table with no rows, so a replacement of it given many values is refused where the column of text the tables measured it with is not. How long a piece is depends on how the rows are shared among the threads: the rows of the target's three-row tables are one piece of three at one thread, pieces of two and one at two, and pieces of one at three or more, so the rows are refused at the first two and pass at the others, and the empty table is refused at every count. Polars refusing the rows or the empty table with the refusal that the length of the value does not match that of the text, which has no place, in a case with a replacement in a chain that starts from a literal: the case run again with each such literal a column of text is not refused for it. |
 | A struct with no fields | A struct with no fields, which `str.extract_groups` gives of a pattern that has no group, cannot be grouped by: Polars refuses a test for a value that is unique or duplicated of it, with the refusal that at least one key is required. The tables measured a struct on two fields. Polars refusing the rows or the empty table with that refusal, which has no place, in a case with an `str.extract_groups` of a pattern with no group: the case run again with each such pattern given a group is not refused for it. |
+| A format the dtype cannot write | A format writes the fields of the calendar and of the clock that a dtype has, and Polars refuses one it has no field for: a year for a time of day, an hour for a date, a field that does not exist, and any but `iso` and `polars` for a duration. The tables measured the format `iso`, which every dtype takes. Polars refusing the rows or the empty table with the refusal that it cannot format the dtype with the format, that a duration has no such format or that the format is not a valid one, which has no place, in a case with a method that writes a moment as text, given a format: the case run again with each format made `iso` is not refused for it. |
 | A replacement of an aggregate in a window key | Polars' streaming engine does not meet a text of one value, a literal or an aggregate, with each of the many values of a replacement in the order key of a window, or in a key inside it, which it does in a select, where the tables measured the replacement. It refuses the lengths at every thread count. Polars refusing the rows or the empty table with the refusal that the length of the value does not match that of the text, which has no place, in a case with a window and a replacement: the case run again with the value of each replacement made a text literal is not refused for it, and nor is the case run again with each window made a fill. |
 | A replacement of a literal aggregate in a branch | Polars' streaming engine refuses a replacement of the aggregate of a literal text, which is one value, where it stands in a branch of a condition, and meets it where it stands in a select, in a sum, in a window or in memory. It reads the pattern of the replacement as many values, and what it says depends on how it splits the rows of the table: that the length of the pattern is dynamic where a piece of them is longer than one row, and that the pattern is null where it is not. The tables measured the replacement in select, on columns. Polars refusing the rows or the empty table with either refusal, which has no place, in a case with a branch of a condition that holds a chain that starts from a literal and replaces after an aggregate: the case run again with each such literal a column of text is not refused for it. |
 | A bitwise call in a join's key | Polars refuses some dtypes of `and_`, `or_` and `xor` when it works out the schema of a select, a filter or a sort key, and accepts them in a join's key, on either side: it checks the dtypes of a bitwise call there less than anywhere else (the pairs it accepts are listed below the table). The tables measured a bitwise call in select, and refuse it for the dtypes it is given; for an argument whose dtype they do not know, for one it might have. The tables refusing, with a reason that names the two dtypes of a bitwise call (`^ not allowed on date and i8`, `\| on Boolean and Int64 is not supported`), at an `and_`, `or_` or `xor` in one of a join's own keys, which Polars allows; the key is why only where Polars, asked to select the refused call on a column of each of the two dtypes the reason names, refuses it at that call for the tables' reason, which a call whose dtypes select accepts, a refusal about another call, a step that is no join and the key of a window do not meet. |

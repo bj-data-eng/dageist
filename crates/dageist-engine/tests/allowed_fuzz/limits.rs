@@ -399,11 +399,19 @@ pub enum Limit {
     /// after an aggregate: the case run again with each such literal a column of text is not
     /// refused for it.
     AReplacementOfALiteralAggregateInABranch,
+    /// A format writes the fields of the calendar and of the clock that a dtype has, and Polars refuses
+    /// one it has no field for, such as a year for a time of day, an hour for a date, a field that does
+    /// not exist, and any but the two ISO words for a duration. The tables measured the format `iso`,
+    /// which every dtype takes. Polars refusing the rows or the empty table with the refusal that it
+    /// cannot format the dtype with the format, that a duration has no such format or that the format
+    /// is not a valid one, which has no place, in a case that holds a method that writes a moment as
+    /// text, given a format: the case run again with each format made `iso` is not refused for it.
+    AFormatTheDtypeCannotWrite,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 33] = [
+    pub const ALL: [Self; 34] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -437,6 +445,7 @@ impl Limit {
         Self::AStructWithNoFields,
         Self::AReplacementOfAnAggregateInAWindowKey,
         Self::AReplacementOfALiteralAggregateInABranch,
+        Self::AFormatTheDtypeCannotWrite,
     ];
 
     /// The name a kept case is filed under.
@@ -485,6 +494,7 @@ impl Limit {
             Self::AReplacementOfALiteralAggregateInABranch => {
                 "a-replacement-of-a-literal-aggregate-in-a-branch"
             }
+            Self::AFormatTheDtypeCannotWrite => "a-format-the-dtype-cannot-write",
         }
     }
 
@@ -565,6 +575,9 @@ impl Limit {
             }
             Self::AReplacementOfALiteralAggregateInABranch => {
                 "Polars' streaming engine reads the pattern of a replacement of the aggregate of a literal text in a branch of a condition as many values, which it does not where it stands in a select, where the tables measured it"
+            }
+            Self::AFormatTheDtypeCannotWrite => {
+                "a format writes the fields a dtype has and Polars refuses one it has none for, where the tables measured the format iso, which every dtype takes"
             }
             Self::AReplacementOfAnAggregateInAWindowKey => {
                 "Polars' streaming engine does not meet a text of one value with each value of a replacement in the order key of a window, which it does in a select, where the tables measured it"
@@ -1958,6 +1971,47 @@ fn refused_for_a_pattern_read_as_many_with_columns(case: &Case) -> Option<bool> 
     })
 }
 
+/// Whether the reason is one that Polars refuses a format with: that it cannot format the dtype
+/// with it, that a duration has no such format, or that it is not a format of a method that
+/// writes text.
+fn is_a_format_refusal(reason: &str) -> bool {
+    reason.contains("cannot format ")
+        || reason.contains("not supported for Duration type")
+        || reason.contains("is not a valid `to_string` format")
+}
+
+/// Whether the call writes a moment as text, given a format that is typed in.
+fn is_a_writing_with_a_format(call: &Call) -> bool {
+    (is(call, "Expr.dt.strftime") || is(call, "Expr.dt.to_string"))
+        && matches!(call.argument("format"), Some(Value::String(_)))
+}
+
+/// The case with the format of each writing made `iso`.
+fn case_with_iso_formats(case: &Case) -> Option<Case> {
+    case_changed(case, &|call| {
+        if !is_a_writing_with_a_format(call) {
+            return None;
+        }
+        Call::new(
+            catalog::entry(call.entry().id().as_str())?,
+            vec![("format", Value::String("iso".to_owned()))],
+        )
+        .ok()
+    })
+}
+
+/// Whether Polars refuses the case for a format still when each is `iso`: the format is then no
+/// cause. `None` where no writing is given a format.
+fn refused_for_a_format_with_iso(case: &Case) -> Option<bool> {
+    changed(case_with_iso_formats(case), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| is_a_format_refusal(&refusal.reason))
+        })
+    })
+}
+
 /// What Polars says of a group by that has no key, as a test for a unique value of a struct with
 /// no fields is.
 const A_GROUP_BY_WITHOUT_A_KEY: &str = "at least one key is required in a group_by operation";
@@ -3229,6 +3283,17 @@ fn applies(
                 })
                 && refused_for_another_length_with_text_values(case) == Some(false)
                 && refused_for_another_length_without_windows(case) == Some(false)
+        }
+        (Limit::AFormatTheDtypeCannotWrite, Disagreement::PolarsRefuses(refusal)) => {
+            // The format is the cause where Polars stops refusing the dtype once each format is
+            // `iso`, which every dtype takes.
+            unplaced(refusal)
+                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                && is_a_format_refusal(&refusal.reason)
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &is_a_writing_with_a_format))
+                && refused_for_a_format_with_iso(case) == Some(false)
         }
         (Limit::AStructWithNoFields, Disagreement::PolarsRefuses(refusal)) => {
             // The missing group is the cause where Polars stops refusing the key once each pattern
@@ -7590,6 +7655,92 @@ mod tests {
                 Stage::Schema,
                 ANOTHER_LENGTH_OF_AN_AGGREGATE
             ),
+            vec![]
+        );
+    }
+
+    // ----- A format the dtype cannot write
+
+    const A_YEAR_OF_A_TIME: &str = "cannot format Time with format '%Y'";
+    const A_FORMAT_OF_A_DURATION: &str =
+        "format \"%Y\" not supported for Duration type (expected one of 'iso' or 'polars')";
+    const NOT_A_FORMAT: &str =
+        "'polars' is not a valid `to_string` format for date dtype expressions";
+
+    fn written_with(id: &str, start: Call, format: &str) -> Case {
+        let write = call(id, vec![("format", Value::String(format.to_owned()))]);
+        select(vec![chain_of(start, vec![write])])
+    }
+
+    /// The whole number 1 as a literal of `Time`, which is a time of day.
+    fn time_of_day() -> Call {
+        let dtype = Dtype::new(Representative::Time.dtype()).expect("a dtype");
+        call(
+            "polars.lit",
+            vec![("value", Value::Integer(1)), ("dtype", Value::Dtype(dtype))],
+        )
+    }
+
+    #[test]
+    fn a_format_the_dtype_has_no_field_for_is_excused_at_the_rows_and_the_empty_table() {
+        assert_eq!(
+            excused_by_kept("uncovered-a-format-the-dtype-cannot-write.case"),
+            vec![Limit::AFormatTheDtypeCannotWrite]
+        );
+        for id in ["Expr.dt.strftime", "Expr.dt.to_string"] {
+            for (said, format) in [
+                (A_YEAR_OF_A_TIME, "%Y"),
+                (A_FORMAT_OF_A_DURATION, "%Y"),
+                (NOT_A_FORMAT, "polars"),
+            ] {
+                for stage in [Stage::Rows, Stage::Empty] {
+                    assert_eq!(
+                        refused_for_a_bound(
+                            &written_with(id, time_of_day(), format),
+                            None,
+                            stage,
+                            said
+                        ),
+                        vec![Limit::AFormatTheDtypeCannotWrite],
+                        "{id} {format} {said}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_format_is_not_excused_where_iso_is_refused_too_nor_at_a_place_nor_for_another_reason() {
+        // `iso` is the control, and Polars writes a time of day by it: the case itself shows
+        // nothing, so the limit does not apply.
+        let case = written_with("Expr.dt.to_string", time_of_day(), "iso");
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, A_YEAR_OF_A_TIME),
+            vec![]
+        );
+        // A refusal at a place, in the schema, or for another reason is not this one.
+        let case = written_with("Expr.dt.to_string", time_of_day(), "%Y");
+        assert_eq!(
+            refused_for_a_bound(
+                &case,
+                Some(link_of("exprs", 0, 1)),
+                Stage::Rows,
+                A_YEAR_OF_A_TIME
+            ),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Schema, A_YEAR_OF_A_TIME),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, "invalid series dtype"),
+            vec![]
+        );
+        // A case with no writing given a format has no format to blame.
+        let other = select(vec![chain(column("a"), &["Expr.cum_sum"])]);
+        assert_eq!(
+            refused_for_a_bound(&other, None, Stage::Rows, A_YEAR_OF_A_TIME),
             vec![]
         );
     }

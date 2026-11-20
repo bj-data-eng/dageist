@@ -258,6 +258,23 @@ ms = "ms"
 name = "dt.century"
 hint = "the century"
 
+[entries."Expr.dt.combine"]
+name = "dt.combine"
+hint = "a date or moment with a time of day"
+
+[entries."Expr.dt.combine".parameters.time]
+name = "time"
+label = "time of day"
+
+[entries."Expr.dt.combine".parameters.time_unit]
+name = "time_unit"
+label = "unit"
+
+[entries."Expr.dt.combine".parameters.time_unit.choices]
+ns = "ns"
+us = "us"
+ms = "ms"
+
 [entries."Expr.dt.convert_time_zone"]
 name = "dt.convert_time_zone"
 hint = "the same instant, in another time zone"
@@ -357,6 +374,48 @@ hint = "the day of the year"
 name = "dt.quarter"
 hint = "the quarter of the year"
 
+[entries."Expr.dt.replace"]
+name = "dt.replace"
+hint = "some parts of a moment set"
+
+[entries."Expr.dt.replace".parameters.year]
+name = "year"
+label = "year"
+
+[entries."Expr.dt.replace".parameters.month]
+name = "month"
+label = "month"
+
+[entries."Expr.dt.replace".parameters.day]
+name = "day"
+label = "day"
+
+[entries."Expr.dt.replace".parameters.hour]
+name = "hour"
+label = "hour"
+
+[entries."Expr.dt.replace".parameters.minute]
+name = "minute"
+label = "minute"
+
+[entries."Expr.dt.replace".parameters.second]
+name = "second"
+label = "second"
+
+[entries."Expr.dt.replace".parameters.microsecond]
+name = "microsecond"
+label = "microsecond"
+
+[entries."Expr.dt.replace".parameters.ambiguous]
+name = "ambiguous"
+label = "a clock read twice is"
+
+[entries."Expr.dt.replace".parameters.ambiguous.choices]
+earliest = "earliest"
+latest = "latest"
+raise = "raise"
+null = "null"
+
 [entries."Expr.dt.replace_time_zone"]
 name = "dt.replace_time_zone"
 hint = "the same clock, in another time zone"
@@ -399,6 +458,14 @@ hint = "the second of the minute"
 name = "fractional"
 label = "with fractions"
 
+[entries."Expr.dt.strftime"]
+name = "dt.strftime"
+hint = "written as text by a format"
+
+[entries."Expr.dt.strftime".parameters.format]
+name = "format"
+label = "format"
+
 [entries."Expr.dt.time"]
 name = "dt.time"
 hint = "the time part"
@@ -415,6 +482,14 @@ label = "unit"
 ns = "ns"
 us = "us"
 ms = "ms"
+
+[entries."Expr.dt.to_string"]
+name = "dt.to_string"
+hint = "written as text, by a format or as ISO"
+
+[entries."Expr.dt.to_string".parameters.format]
+name = "format"
+label = "format"
 
 [entries."Expr.dt.total_days"]
 name = "dt.total_days"

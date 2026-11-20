@@ -1246,13 +1246,18 @@ impl Gen<'_> {
     fn texts(&mut self, entry: &'static Entry) -> Vec<(&'static str, Value)> {
         let mut texts = Vec::new();
         for parameter in entry.parameters() {
-            if parameter.kind() != Kind::Value(ValueType::String) || !self.draw.chance(50) {
+            if parameter.kind() != Kind::Value(ValueType::String)
+                || (!parameter.is_needed() && !self.draw.chance(50))
+            {
                 continue;
             }
             let name = parameter.name();
             let value = match name {
                 "delimiter" => self.draw.pick(&["", "-", ", ", "é", "ab"]),
                 "fill_char" => self.draw.pick(&["*", "0", " ", "é", "-"]),
+                // How a moment is written: ISO in its two forms, and the formats of the calendar
+                // and of the clock, some of which a date or a time of day has no part for.
+                "format" => self.draw.pick(&FORMATS),
                 other => panic!("the generator does not know what to give {other}"),
             };
             texts.push((name, Value::String(value.to_owned())));
@@ -1430,6 +1435,23 @@ const VALID_TIME_ZONES: [&str; 8] = [
 /// Time zones Polars does not read: a name that is none, one in the wrong case, one with a space
 /// and one that is the letter of an offset.
 const INVALID_TIME_ZONES: [&str; 4] = ["Not/AZone", "europe/berlin", "America/New_York ", "Z"];
+
+/// Formats a moment is written by: the two ISO forms, the date, the clock, the names of the day and
+/// of the month, the day of the year, text with no field in it, and two that Polars reads no field
+/// in: a percent sign with nothing after it and a field that does not exist.
+const FORMATS: [&str; 11] = [
+    "iso",
+    "iso:strict",
+    "%Y-%m-%d",
+    "%H:%M:%S",
+    "%A %d %B %Y",
+    "%j",
+    "%F %T%.f",
+    "text",
+    "%Y",
+    "%",
+    "%Q",
+];
 
 /// The class every value of a condition has, when they have the same one.
 fn unify(values: &[Option<Representative>]) -> Option<Representative> {

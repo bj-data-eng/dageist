@@ -316,10 +316,10 @@ fn dates_and_times() -> DataFrame {
     .with_columns([
         col("d").cast(DataType::Date),
         col("tm").cast(DataType::Time),
-        col("d")
-            .cast(DataType::Datetime(TimeUnit::Microseconds, None))
-            .alias("t"),
     ])
+    .with_columns([col("d")
+        .cast(DataType::Datetime(TimeUnit::Microseconds, None))
+        .alias("t")])
     .collect()
     .expect("a table")
 }
@@ -419,13 +419,18 @@ fn a_moment_is_written_by_a_format_and_by_iso_where_none_is_given() {
             "{id}"
         );
     }
-    // Python's `to_string` writes ISO where it is given no format.
+    // Python's `to_string` writes ISO where it is given no format, a moment with a space between
+    // its date and its time of day, and with a `T` where the format is `iso:strict`.
     assert_eq!(
         written("Expr.dt.to_string", "d", None),
         [Some("2023-02-10".to_owned()), None]
     );
     assert_eq!(
         written("Expr.dt.to_string", "t", None),
+        [Some("2024-02-29 13:45:30.123456".to_owned()), None]
+    );
+    assert_eq!(
+        written("Expr.dt.to_string", "t", Some("iso:strict")),
         [Some("2024-02-29T13:45:30.123456".to_owned()), None]
     );
 }

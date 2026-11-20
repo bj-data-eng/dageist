@@ -64,7 +64,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 10200 combinations: 7025 allowed; 1830 refused when Polars resolved the schema, 1345 when it ran the rows, 0 when it ran the empty table.
+# 10440 combinations: 7185 allowed; 1870 refused when Polars resolved the schema, 1385 when it ran the rows, 0 when it ran the empty table.
 #
 ChainedThen.otherwise | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 ChainedThen.otherwise | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
@@ -1806,6 +1806,66 @@ Expr.dt.century | sort > over.partition_by | continues | Date | - | - | allowed 
 Expr.dt.century | sort > over.partition_by | ends | Date | - | - | allowed Int32 many
 Expr.dt.century | sort | continues | Date | - | - | allowed Int32 many
 Expr.dt.century | sort | ends | Date | - | - | allowed Int32 many
+Expr.dt.combine | filter > condition.predicate | continues | Date | Int8 | condition-predicate-is-boolean | allowed Datetime(us) many
+Expr.dt.combine | filter > condition.predicate | ends | Date | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs]` for series with name `a`
+Expr.dt.combine | filter > condition.value | continues | Date | Int8 | filter-predicate-is-boolean | allowed Datetime(us) many
+Expr.dt.combine | filter > condition.value | ends | Date | Int8 | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Datetime('μs')`
+Expr.dt.combine | filter > over.order_by | continues | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | filter > over.order_by | ends | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | filter > over.partition_by | continues | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | filter > over.partition_by | ends | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | filter | continues | Date | Int8 | filter-predicate-is-boolean | allowed Datetime(us) many
+Expr.dt.combine | filter | ends | Date | Int8 | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Datetime('μs')`
+Expr.dt.combine | join_left > condition.predicate | continues | Date | Int8 | condition-predicate-is-boolean | allowed Datetime(us) many
+Expr.dt.combine | join_left > condition.predicate | ends | Date | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs]` for series with name `a`
+Expr.dt.combine | join_left > condition.value | continues | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | join_left > condition.value | ends | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | join_left > over.order_by | continues | Date | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.combine | join_left > over.order_by | ends | Date | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.combine | join_left > over.partition_by | continues | Date | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.combine | join_left > over.partition_by | ends | Date | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.combine | join_left | continues | Date | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed Datetime(us) many
+Expr.dt.combine | join_left | ends | Date | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed Datetime(us) many
+Expr.dt.combine | join_right > condition.predicate | continues | Date | Int8 | condition-predicate-is-boolean | allowed Datetime(us) many
+Expr.dt.combine | join_right > condition.predicate | ends | Date | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs]` for series with name `ra`
+Expr.dt.combine | join_right > condition.value | continues | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | join_right > condition.value | ends | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | join_right > over.order_by | continues | Date | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.combine | join_right > over.order_by | ends | Date | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.combine | join_right > over.partition_by | continues | Date | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.combine | join_right > over.partition_by | ends | Date | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.combine | join_right | continues | Date | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed Datetime(us) many
+Expr.dt.combine | join_right | ends | Date | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed Datetime(us) many
+Expr.dt.combine | pivot_aggregate > condition.predicate | continues | Date | Int8 | condition-predicate-is-boolean | allowed Datetime(us) many
+Expr.dt.combine | pivot_aggregate > condition.predicate | ends | Date | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs]` for series with name `a`
+Expr.dt.combine | pivot_aggregate > condition.value | continues | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | pivot_aggregate > condition.value | ends | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | pivot_aggregate > over.order_by | continues | Date | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.combine | pivot_aggregate > over.order_by | ends | Date | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.combine | pivot_aggregate > over.partition_by | continues | Date | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.combine | pivot_aggregate > over.partition_by | ends | Date | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.combine | pivot_aggregate | continues | Date | Int8 | pivot-aggregate-gives-one-value | allowed Datetime(us) many
+Expr.dt.combine | pivot_aggregate | ends | Date | Int8 | pivot-aggregate-gives-one-value | allowed Datetime(us) many
+Expr.dt.combine | select > condition.predicate | continues | Date | Int8 | condition-predicate-is-boolean | allowed Datetime(us) many
+Expr.dt.combine | select > condition.predicate | ends | Date | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs]` for series with name `a`
+Expr.dt.combine | select > condition.value | continues | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | select > condition.value | ends | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | select > over.order_by | continues | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | select > over.order_by | ends | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | select > over.partition_by | continues | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | select > over.partition_by | ends | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | select | continues | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | select | ends | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | sort > condition.predicate | continues | Date | Int8 | condition-predicate-is-boolean | allowed Datetime(us) many
+Expr.dt.combine | sort > condition.predicate | ends | Date | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs]` for series with name `a`
+Expr.dt.combine | sort > condition.value | continues | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | sort > condition.value | ends | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | sort > over.order_by | continues | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | sort > over.order_by | ends | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | sort > over.partition_by | continues | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | sort > over.partition_by | ends | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | sort | continues | Date | Int8 | - | allowed Datetime(us) many
+Expr.dt.combine | sort | ends | Date | Int8 | - | allowed Datetime(us) many
 Expr.dt.convert_time_zone | filter > condition.predicate | continues | Datetime(us) | - | condition-predicate-is-boolean | allowed Datetime(us, UTC) many
 Expr.dt.convert_time_zone | filter > condition.predicate | ends | Datetime(us) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs, UTC]` for series with name `a`
 Expr.dt.convert_time_zone | filter > condition.value | continues | Datetime(us) | - | filter-predicate-is-boolean | allowed Datetime(us, UTC) many
@@ -3006,6 +3066,66 @@ Expr.dt.quarter | sort > over.partition_by | continues | Date | - | - | allowed 
 Expr.dt.quarter | sort > over.partition_by | ends | Date | - | - | allowed Int8 many
 Expr.dt.quarter | sort | continues | Date | - | - | allowed Int8 many
 Expr.dt.quarter | sort | ends | Date | - | - | allowed Int8 many
+Expr.dt.replace | filter > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed Date many
+Expr.dt.replace | filter > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `a`
+Expr.dt.replace | filter > condition.value | continues | Date | - | filter-predicate-is-boolean | allowed Date many
+Expr.dt.replace | filter > condition.value | ends | Date | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Date`
+Expr.dt.replace | filter > over.order_by | continues | Date | - | - | allowed Date many
+Expr.dt.replace | filter > over.order_by | ends | Date | - | - | allowed Date many
+Expr.dt.replace | filter > over.partition_by | continues | Date | - | - | allowed Date many
+Expr.dt.replace | filter > over.partition_by | ends | Date | - | - | allowed Date many
+Expr.dt.replace | filter | continues | Date | - | filter-predicate-is-boolean | allowed Date many
+Expr.dt.replace | filter | ends | Date | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Date`
+Expr.dt.replace | join_left > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed Date many
+Expr.dt.replace | join_left > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `a`
+Expr.dt.replace | join_left > condition.value | continues | Date | - | - | allowed Date many
+Expr.dt.replace | join_left > condition.value | ends | Date | - | - | allowed Date many
+Expr.dt.replace | join_left > over.order_by | continues | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.replace | join_left > over.order_by | ends | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.replace | join_left > over.partition_by | continues | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.replace | join_left > over.partition_by | ends | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.replace | join_left | continues | Date | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Date many
+Expr.dt.replace | join_left | ends | Date | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Date many
+Expr.dt.replace | join_right > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed Date many
+Expr.dt.replace | join_right > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `ra`
+Expr.dt.replace | join_right > condition.value | continues | Date | - | - | allowed Date many
+Expr.dt.replace | join_right > condition.value | ends | Date | - | - | allowed Date many
+Expr.dt.replace | join_right > over.order_by | continues | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.replace | join_right > over.order_by | ends | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.replace | join_right > over.partition_by | continues | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.replace | join_right > over.partition_by | ends | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.replace | join_right | continues | Date | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Date many
+Expr.dt.replace | join_right | ends | Date | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Date many
+Expr.dt.replace | pivot_aggregate > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed Date many
+Expr.dt.replace | pivot_aggregate > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `a`
+Expr.dt.replace | pivot_aggregate > condition.value | continues | Date | - | - | allowed Date many
+Expr.dt.replace | pivot_aggregate > condition.value | ends | Date | - | - | allowed Date many
+Expr.dt.replace | pivot_aggregate > over.order_by | continues | Date | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.replace | pivot_aggregate > over.order_by | ends | Date | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.replace | pivot_aggregate > over.partition_by | continues | Date | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.replace | pivot_aggregate > over.partition_by | ends | Date | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.replace | pivot_aggregate | continues | Date | - | pivot-aggregate-gives-one-value | allowed Date many
+Expr.dt.replace | pivot_aggregate | ends | Date | - | pivot-aggregate-gives-one-value | allowed Date many
+Expr.dt.replace | select > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed Date many
+Expr.dt.replace | select > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `a`
+Expr.dt.replace | select > condition.value | continues | Date | - | - | allowed Date many
+Expr.dt.replace | select > condition.value | ends | Date | - | - | allowed Date many
+Expr.dt.replace | select > over.order_by | continues | Date | - | - | allowed Date many
+Expr.dt.replace | select > over.order_by | ends | Date | - | - | allowed Date many
+Expr.dt.replace | select > over.partition_by | continues | Date | - | - | allowed Date many
+Expr.dt.replace | select > over.partition_by | ends | Date | - | - | allowed Date many
+Expr.dt.replace | select | continues | Date | - | - | allowed Date many
+Expr.dt.replace | select | ends | Date | - | - | allowed Date many
+Expr.dt.replace | sort > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed Date many
+Expr.dt.replace | sort > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `a`
+Expr.dt.replace | sort > condition.value | continues | Date | - | - | allowed Date many
+Expr.dt.replace | sort > condition.value | ends | Date | - | - | allowed Date many
+Expr.dt.replace | sort > over.order_by | continues | Date | - | - | allowed Date many
+Expr.dt.replace | sort > over.order_by | ends | Date | - | - | allowed Date many
+Expr.dt.replace | sort > over.partition_by | continues | Date | - | - | allowed Date many
+Expr.dt.replace | sort > over.partition_by | ends | Date | - | - | allowed Date many
+Expr.dt.replace | sort | continues | Date | - | - | allowed Date many
+Expr.dt.replace | sort | ends | Date | - | - | allowed Date many
 Expr.dt.replace_time_zone | filter > condition.predicate | continues | Datetime(us) | - | condition-predicate-is-boolean | allowed Datetime(us, UTC) many
 Expr.dt.replace_time_zone | filter > condition.predicate | ends | Datetime(us) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs, UTC]` for series with name `a`
 Expr.dt.replace_time_zone | filter > condition.value | continues | Datetime(us) | - | filter-predicate-is-boolean | allowed Datetime(us, UTC) many
@@ -3186,6 +3306,66 @@ Expr.dt.second | sort > over.partition_by | continues | Time | - | - | allowed I
 Expr.dt.second | sort > over.partition_by | ends | Time | - | - | allowed Int8 many
 Expr.dt.second | sort | continues | Time | - | - | allowed Int8 many
 Expr.dt.second | sort | ends | Time | - | - | allowed Int8 many
+Expr.dt.strftime | filter > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed String many
+Expr.dt.strftime | filter > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.dt.strftime | filter > condition.value | continues | Date | - | filter-predicate-is-boolean | allowed String many
+Expr.dt.strftime | filter > condition.value | ends | Date | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.dt.strftime | filter > over.order_by | continues | Date | - | - | allowed String many
+Expr.dt.strftime | filter > over.order_by | ends | Date | - | - | allowed String many
+Expr.dt.strftime | filter > over.partition_by | continues | Date | - | - | allowed String many
+Expr.dt.strftime | filter > over.partition_by | ends | Date | - | - | allowed String many
+Expr.dt.strftime | filter | continues | Date | - | filter-predicate-is-boolean | allowed String many
+Expr.dt.strftime | filter | ends | Date | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.dt.strftime | join_left > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed String many
+Expr.dt.strftime | join_left > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.dt.strftime | join_left > condition.value | continues | Date | - | - | allowed String many
+Expr.dt.strftime | join_left > condition.value | ends | Date | - | - | allowed String many
+Expr.dt.strftime | join_left > over.order_by | continues | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.strftime | join_left > over.order_by | ends | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.strftime | join_left > over.partition_by | continues | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.strftime | join_left > over.partition_by | ends | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.strftime | join_left | continues | Date | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.dt.strftime | join_left | ends | Date | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.dt.strftime | join_right > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed String many
+Expr.dt.strftime | join_right > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `ra`
+Expr.dt.strftime | join_right > condition.value | continues | Date | - | - | allowed String many
+Expr.dt.strftime | join_right > condition.value | ends | Date | - | - | allowed String many
+Expr.dt.strftime | join_right > over.order_by | continues | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.strftime | join_right > over.order_by | ends | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.strftime | join_right > over.partition_by | continues | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.strftime | join_right > over.partition_by | ends | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.strftime | join_right | continues | Date | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.dt.strftime | join_right | ends | Date | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.dt.strftime | pivot_aggregate > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed String many
+Expr.dt.strftime | pivot_aggregate > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.dt.strftime | pivot_aggregate > condition.value | continues | Date | - | - | allowed String many
+Expr.dt.strftime | pivot_aggregate > condition.value | ends | Date | - | - | allowed String many
+Expr.dt.strftime | pivot_aggregate > over.order_by | continues | Date | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.strftime | pivot_aggregate > over.order_by | ends | Date | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.strftime | pivot_aggregate > over.partition_by | continues | Date | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.strftime | pivot_aggregate > over.partition_by | ends | Date | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.strftime | pivot_aggregate | continues | Date | - | pivot-aggregate-gives-one-value | allowed String many
+Expr.dt.strftime | pivot_aggregate | ends | Date | - | pivot-aggregate-gives-one-value | allowed String many
+Expr.dt.strftime | select > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed String many
+Expr.dt.strftime | select > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.dt.strftime | select > condition.value | continues | Date | - | - | allowed String many
+Expr.dt.strftime | select > condition.value | ends | Date | - | - | allowed String many
+Expr.dt.strftime | select > over.order_by | continues | Date | - | - | allowed String many
+Expr.dt.strftime | select > over.order_by | ends | Date | - | - | allowed String many
+Expr.dt.strftime | select > over.partition_by | continues | Date | - | - | allowed String many
+Expr.dt.strftime | select > over.partition_by | ends | Date | - | - | allowed String many
+Expr.dt.strftime | select | continues | Date | - | - | allowed String many
+Expr.dt.strftime | select | ends | Date | - | - | allowed String many
+Expr.dt.strftime | sort > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed String many
+Expr.dt.strftime | sort > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.dt.strftime | sort > condition.value | continues | Date | - | - | allowed String many
+Expr.dt.strftime | sort > condition.value | ends | Date | - | - | allowed String many
+Expr.dt.strftime | sort > over.order_by | continues | Date | - | - | allowed String many
+Expr.dt.strftime | sort > over.order_by | ends | Date | - | - | allowed String many
+Expr.dt.strftime | sort > over.partition_by | continues | Date | - | - | allowed String many
+Expr.dt.strftime | sort > over.partition_by | ends | Date | - | - | allowed String many
+Expr.dt.strftime | sort | continues | Date | - | - | allowed String many
+Expr.dt.strftime | sort | ends | Date | - | - | allowed String many
 Expr.dt.time | filter > condition.predicate | continues | Time | - | condition-predicate-is-boolean | allowed Time many
 Expr.dt.time | filter > condition.predicate | ends | Time | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `time` for series with name `a`
 Expr.dt.time | filter > condition.value | continues | Time | - | filter-predicate-is-boolean | allowed Time many
@@ -3306,6 +3486,66 @@ Expr.dt.timestamp | sort > over.partition_by | continues | Int64 | - | - | allow
 Expr.dt.timestamp | sort > over.partition_by | ends | Int64 | - | - | allowed Int64 many
 Expr.dt.timestamp | sort | continues | Int64 | - | - | allowed Int64 many
 Expr.dt.timestamp | sort | ends | Int64 | - | - | allowed Int64 many
+Expr.dt.to_string | filter > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed String many
+Expr.dt.to_string | filter > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.dt.to_string | filter > condition.value | continues | Date | - | filter-predicate-is-boolean | allowed String many
+Expr.dt.to_string | filter > condition.value | ends | Date | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.dt.to_string | filter > over.order_by | continues | Date | - | - | allowed String many
+Expr.dt.to_string | filter > over.order_by | ends | Date | - | - | allowed String many
+Expr.dt.to_string | filter > over.partition_by | continues | Date | - | - | allowed String many
+Expr.dt.to_string | filter > over.partition_by | ends | Date | - | - | allowed String many
+Expr.dt.to_string | filter | continues | Date | - | filter-predicate-is-boolean | allowed String many
+Expr.dt.to_string | filter | ends | Date | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.dt.to_string | join_left > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed String many
+Expr.dt.to_string | join_left > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.dt.to_string | join_left > condition.value | continues | Date | - | - | allowed String many
+Expr.dt.to_string | join_left > condition.value | ends | Date | - | - | allowed String many
+Expr.dt.to_string | join_left > over.order_by | continues | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.to_string | join_left > over.order_by | ends | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.to_string | join_left > over.partition_by | continues | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.to_string | join_left > over.partition_by | ends | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.to_string | join_left | continues | Date | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.dt.to_string | join_left | ends | Date | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.dt.to_string | join_right > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed String many
+Expr.dt.to_string | join_right > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `ra`
+Expr.dt.to_string | join_right > condition.value | continues | Date | - | - | allowed String many
+Expr.dt.to_string | join_right > condition.value | ends | Date | - | - | allowed String many
+Expr.dt.to_string | join_right > over.order_by | continues | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.to_string | join_right > over.order_by | ends | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.to_string | join_right > over.partition_by | continues | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.to_string | join_right > over.partition_by | ends | Date | - | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.to_string | join_right | continues | Date | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.dt.to_string | join_right | ends | Date | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.dt.to_string | pivot_aggregate > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed String many
+Expr.dt.to_string | pivot_aggregate > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.dt.to_string | pivot_aggregate > condition.value | continues | Date | - | - | allowed String many
+Expr.dt.to_string | pivot_aggregate > condition.value | ends | Date | - | - | allowed String many
+Expr.dt.to_string | pivot_aggregate > over.order_by | continues | Date | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.to_string | pivot_aggregate > over.order_by | ends | Date | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.to_string | pivot_aggregate > over.partition_by | continues | Date | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.to_string | pivot_aggregate > over.partition_by | ends | Date | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.to_string | pivot_aggregate | continues | Date | - | pivot-aggregate-gives-one-value | allowed String many
+Expr.dt.to_string | pivot_aggregate | ends | Date | - | pivot-aggregate-gives-one-value | allowed String many
+Expr.dt.to_string | select > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed String many
+Expr.dt.to_string | select > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.dt.to_string | select > condition.value | continues | Date | - | - | allowed String many
+Expr.dt.to_string | select > condition.value | ends | Date | - | - | allowed String many
+Expr.dt.to_string | select > over.order_by | continues | Date | - | - | allowed String many
+Expr.dt.to_string | select > over.order_by | ends | Date | - | - | allowed String many
+Expr.dt.to_string | select > over.partition_by | continues | Date | - | - | allowed String many
+Expr.dt.to_string | select > over.partition_by | ends | Date | - | - | allowed String many
+Expr.dt.to_string | select | continues | Date | - | - | allowed String many
+Expr.dt.to_string | select | ends | Date | - | - | allowed String many
+Expr.dt.to_string | sort > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed String many
+Expr.dt.to_string | sort > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.dt.to_string | sort > condition.value | continues | Date | - | - | allowed String many
+Expr.dt.to_string | sort > condition.value | ends | Date | - | - | allowed String many
+Expr.dt.to_string | sort > over.order_by | continues | Date | - | - | allowed String many
+Expr.dt.to_string | sort > over.order_by | ends | Date | - | - | allowed String many
+Expr.dt.to_string | sort > over.partition_by | continues | Date | - | - | allowed String many
+Expr.dt.to_string | sort > over.partition_by | ends | Date | - | - | allowed String many
+Expr.dt.to_string | sort | continues | Date | - | - | allowed String many
+Expr.dt.to_string | sort | ends | Date | - | - | allowed String many
 Expr.dt.total_days | filter > condition.predicate | continues | Duration(us) | - | condition-predicate-is-boolean | allowed Int64 many
 Expr.dt.total_days | filter > condition.predicate | ends | Duration(us) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `i64` for series with name `a`
 Expr.dt.total_days | filter > condition.value | continues | Duration(us) | - | filter-predicate-is-boolean | allowed Int64 many

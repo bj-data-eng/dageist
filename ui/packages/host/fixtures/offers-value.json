@@ -453,6 +453,20 @@
       "slots": []
     },
     {
+      "entry": "Expr.dt.combine",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.dt.convert_time_zone",
       "verdict": {
         "kind": "allowed",
@@ -735,6 +749,20 @@
       "slots": []
     },
     {
+      "entry": "Expr.dt.replace",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": "year",
+      "slots": []
+    },
+    {
       "entry": "Expr.dt.replace_time_zone",
       "verdict": {
         "kind": "allowed",
@@ -777,6 +805,20 @@
       "slots": []
     },
     {
+      "entry": "Expr.dt.strftime",
+      "verdict": {
+        "kind": "allowed",
+        "result": "String",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": ["format"]
+    },
+    {
       "entry": "Expr.dt.time",
       "verdict": {
         "kind": "allowed",
@@ -795,6 +837,20 @@
       "verdict": {
         "kind": "allowed",
         "result": "Int64",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.to_string",
+      "verdict": {
+        "kind": "allowed",
+        "result": "String",
         "shape": "many",
         "ending": {
           "kind": "allowed"
