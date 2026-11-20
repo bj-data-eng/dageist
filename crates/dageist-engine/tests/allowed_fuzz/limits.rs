@@ -189,6 +189,7 @@ pub enum Limit {
     /// or a difference of the sample's values can be. Polars refusing the rows with
     /// the reason that it divides a Decimal by zero, which has no place, in a case with a
     /// Decimal as a column, that holds a division, a floor division or a remainder.
+    /// The empty table holds one too: the sum of no rows is zero.
     ADivisionByZero,
     /// Polars panicking has no place, and is gated by its reason. A panic of
     /// Polars is an internal check that failed. The tables record
@@ -430,7 +431,7 @@ impl Limit {
                 "Polars meets an operand of the dtype Null of a bitwise call where select does not, and refuses it, though the tables allowed the call as a Boolean"
             }
             Self::ADivisionByZero => {
-                "Polars refuses to divide a Decimal by zero, which the sample's values never give the tables"
+                "Polars refuses to divide a Decimal by zero, which the sample's values never give the tables, though a sum of no rows is zero"
             }
             Self::AValueBeyondADecimal => {
                 "a UInt128 beyond the digits of a decimal cannot be cast to it, which the tables measured on values within it"
@@ -3001,9 +3002,9 @@ fn applies(
                 && refused_on_columns_as_a_select(case, refused)
         }
         (Limit::ADivisionByZero, Disagreement::PolarsRefuses(refusal)) => {
-            // The rows hold the divisor; a table with no rows holds none.
+            // The rows hold the divisor, and so does the empty table, whose sum is zero.
             unplaced(refusal)
-                && refusal.stage == Stage::Rows
+                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
                 && refusal.reason.contains("division by zero Decimal")
                 && [case.receiver, case.argument].contains(&Representative::Decimal)
                 && held.iter().any(|(_, held)| {
