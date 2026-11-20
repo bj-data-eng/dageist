@@ -154,6 +154,17 @@ pub(crate) fn adapts_numbers_only(entry: &Entry, name: &str) -> bool {
         .is_some_and(crate::catalog::Parameter::adapts_numbers_only)
 }
 
+/// Whether Polars meets a receiver of one value with each of the many values of the parameter
+/// `name` of `entry`, so that the call gives as many: a fact about the method, whatever the role
+/// of the parameter says of how a number typed without a dtype adapts.
+pub(crate) fn broadcasts(entry: &Entry, name: &str) -> bool {
+    entry
+        .parameters()
+        .iter()
+        .find(|parameter| parameter.name() == name)
+        .is_some_and(crate::catalog::Parameter::broadcasts)
+}
+
 /// Whether the parameter `name` of `entry` counts or indexes, which a whole
 /// number is the dtype of whatever it adapts to: `shift`'s rows.
 pub(crate) fn is_count(entry: &Entry, name: &str) -> bool {

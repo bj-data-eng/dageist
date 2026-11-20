@@ -421,6 +421,21 @@ differs. Run them when the generator's Cargo or rustdoc handling changes:
 env -u CARGO_TARGET_DIR CARGO_NET_OFFLINE=true cargo test --offline --locked --manifest-path api/generator/Cargo.toml --lib -- --ignored
 ```
 
+## Add Entries To The Catalogue
+
+A new entry is data in `crates/dageist-engine/src/catalog/entries.rs` and its words in
+`en.toml`, with each parameter as the signature in `api/polars/python.txt` has it. Refresh
+[the tables](#refresh-the-tables-of-allowed-combinations) and the
+[snapshots the host writes](#refresh-the-offers-snapshots), then run the engine's tests, which check
+the entry against Polars: its dtypes, its parameters and defaults, its words, and the facts the walk
+reads. A method with an expression parameter is checked by
+`allowed::tests::broadcast`: for each such parameter it gives Polars a receiver of one value and a
+column for the operand, and holds the catalogue's `broadcasts` to whether the result is many values,
+so a parameter that Polars does not meet a receiver of one value with each value of, as one that takes
+one value only, has to say so with `not_broadcasting`. A test that cannot measure a parameter is
+listed there with the reason. Last, run the fuzz target for more seeds than the engine's tests do,
+[as below](#check-the-tables-against-polars).
+
 ## Refresh The Tables Of Allowed Combinations
 
 The files `dtypes.txt`, `contexts.txt` and `options.txt` in

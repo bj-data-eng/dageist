@@ -413,6 +413,7 @@ pub struct Parameter {
     converts: &'static [&'static str],
     lenient_beside: Option<&'static str>,
     adapts_numbers_only: bool,
+    broadcasts: bool,
 }
 
 impl Parameter {
@@ -433,6 +434,7 @@ impl Parameter {
             converts: &[],
             lenient_beside: None,
             adapts_numbers_only: false,
+            broadcasts: true,
         }
     }
 
@@ -502,6 +504,17 @@ impl Parameter {
     /// a dtype, say nothing of what the method gives with it.
     const fn adapting_numbers_only(mut self) -> Self {
         self.adapts_numbers_only = true;
+        self
+    }
+
+    /// The same parameter, of which Polars does not meet a receiver of one value with each of
+    /// many values: it takes one value only, as `shift`'s rows and fill, which Polars refuses
+    /// many values of, or the values it takes are listed and met by a rule of their own, as the
+    /// values of a replacement are. Every other expression parameter of a method is met by a
+    /// receiver of one value with each of its values, so a method of one value given an operand
+    /// of many gives many.
+    const fn not_broadcasting(mut self) -> Self {
+        self.broadcasts = false;
         self
     }
 
@@ -601,6 +614,16 @@ impl Parameter {
     #[must_use]
     pub const fn lenient_beside(&self) -> Option<&'static str> {
         self.lenient_beside
+    }
+
+    /// Whether a receiver of one value is met with each of the many values the parameter is given,
+    /// so that the method gives as many: Polars broadcasts the receiver against the operand. It is
+    /// a fact about the method in Polars, apart from how a number typed without a dtype adapts,
+    /// which the role says. True for every expression parameter but those that take one value only
+    /// or list the values they take.
+    #[must_use]
+    pub const fn broadcasts(&self) -> bool {
+        self.broadcasts
     }
 
     /// Whether a number typed without a dtype that is given to the parameter takes the dtype of

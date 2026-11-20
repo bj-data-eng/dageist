@@ -1959,11 +1959,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         family: Family::Conversion,
         accepts: ANY,
         parameters: &[
-            required("old", EXPRESSION, Shape::One).with_role(Role::Bound),
+            required("old", EXPRESSION, Shape::One)
+                .with_role(Role::Bound)
+                .not_broadcasting(),
             optional("new", EXPRESSION, Shape::One, "NO_DEFAULT")
                 .with_role(Role::Bound)
                 .with_at_least_one()
-                .given_as_many_as(AsManyAs::Parameter("old")),
+                .given_as_many_as(AsManyAs::Parameter("old"))
+                .not_broadcasting(),
         ],
         laziness: Laziness::Lazy,
         build: Build::Expression(replace),
@@ -1973,14 +1976,18 @@ pub(super) const ENTRIES: &[Entry] = &[
         family: Family::Conversion,
         accepts: ANY,
         parameters: &[
-            required("old", EXPRESSION, Shape::One).with_role(Role::Bound),
+            required("old", EXPRESSION, Shape::One)
+                .with_role(Role::Bound)
+                .not_broadcasting(),
             optional("new", EXPRESSION, Shape::One, "NO_DEFAULT")
                 .with_at_least_one()
-                .given_as_many_as(AsManyAs::Parameter("old")),
+                .given_as_many_as(AsManyAs::Parameter("old"))
+                .not_broadcasting(),
             optional("default", EXPRESSION, Shape::One, "NO_DEFAULT")
                 .keyword_only()
                 .sharing_a_dtype_with("new")
-                .given_as_many_as(AsManyAs::TheReceiver),
+                .given_as_many_as(AsManyAs::TheReceiver)
+                .not_broadcasting(),
             optional("return_dtype", Kind::Dtype, Shape::One, "None")
                 .keyword_only()
                 .converting(&["new", "default"])
@@ -2022,10 +2029,13 @@ pub(super) const ENTRIES: &[Entry] = &[
         family: Family::Rows,
         accepts: ANY,
         parameters: &[
-            optional("n", Kind::Expression(INTEGER), Shape::One, "1").with_role(Role::Count),
+            optional("n", Kind::Expression(INTEGER), Shape::One, "1")
+                .with_role(Role::Count)
+                .not_broadcasting(),
             optional("fill_value", EXPRESSION, Shape::One, "None")
                 .keyword_only()
-                .with_role(Role::Filler),
+                .with_role(Role::Filler)
+                .not_broadcasting(),
         ],
         laziness: Laziness::Lazy,
         build: Build::Expression(shift),

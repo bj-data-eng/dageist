@@ -573,6 +573,7 @@ pub struct dageist_engine::catalog::Parameter
 impl dageist_engine::catalog::Parameter
 pub const fn dageist_engine::catalog::Parameter::adapts_numbers_only(&self) -> bool
 pub const fn dageist_engine::catalog::Parameter::as_many_as(&self) -> core::option::Option<dageist_engine::catalog::AsManyAs>
+pub const fn dageist_engine::catalog::Parameter::broadcasts(&self) -> bool
 pub const fn dageist_engine::catalog::Parameter::converts(&self) -> &'static [&'static str]
 pub const fn dageist_engine::catalog::Parameter::default(&self) -> dageist_engine::catalog::ParameterDefault
 pub const fn dageist_engine::catalog::Parameter::in_place_of(&self) -> core::option::Option<&'static str>

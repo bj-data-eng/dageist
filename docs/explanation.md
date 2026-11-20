@@ -485,6 +485,12 @@ What Polars does with each is what the tables say, and some of it is not what a 
   that has a value of its own by default, as the rows `shift` counts, is still to be picked or
   starts with the default. `over` is the one earlier method this holds for: it starts without
   `partition_by`, and Polars refuses a window that has neither it nor an order, with its reason.
+- Polars meets a receiver of one value with each value of an expression operand of many, so a
+  text method of one value (`lit("abc").str.head(col a)`) gives many values. The catalogue holds
+  that for each expression parameter, as a fact about the method that is apart from the role of the
+  parameter, which says how a number typed without a dtype adapts; the walk reads it. The
+  parameters that do not meet it are the ones that take one value only (`shift`'s rows and fill) and
+  the values a replacement lists, and an engine test measures every parameter against Polars.
 - `fill_char` is one character, as Python's binding takes it, so the build refuses text of
   another length with that reason, and the document keeps it as a value, not an expression.
 - A split gives a list of text for each row, and Polars joins on a list, so a split may be a join's

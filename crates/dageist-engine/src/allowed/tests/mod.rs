@@ -2,6 +2,7 @@
 //! authorities: Polars' documented behavior, run again by hand.
 
 mod artifacts;
+mod broadcast;
 mod build;
 mod candidates;
 mod every_variant;

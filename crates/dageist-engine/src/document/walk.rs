@@ -25,8 +25,9 @@ use crate::allowed::{
     Place as OfferPlace, Position as Slot, Refusal, Representative, Shape, Unknown, Verdict,
 };
 use crate::allowed::{
-    Loose, Receiver, adapted_dtype, adapts_numbers_only, could_be_taken_by_a_number, is_count,
-    is_left_unresolved, is_refused_as_a_count, is_required, operand_adapts, receiver_beside,
+    Loose, Receiver, adapted_dtype, adapts_numbers_only, broadcasts, could_be_taken_by_a_number,
+    is_count, is_left_unresolved, is_refused_as_a_count, is_required, operand_adapts,
+    receiver_beside,
 };
 use crate::catalog::{Applies, AsManyAs, Comparison, Entry, Kind};
 
@@ -1438,12 +1439,13 @@ fn broadcast(link: &Call, arguments: &[(String, Operand)], shape: Shape) -> Shap
             Shape::Many
         };
     }
-    // What a replacement lists is a table of values, which gives no more values than what it
-    // follows, as many values as that table holds.
-    let given_many = !matches!(entry.id().as_str(), "Expr.replace" | "Expr.replace_strict")
-        && arguments.iter().any(|(name, operand)| {
-            operand.shape == Shape::Many && operand_adapts(entry, name) && !is_count(entry, name)
-        });
+    // Polars meets a receiver of one value with each value of an operand of many, whatever the
+    // parameter is: a fact about the method, which the catalogue holds apart from how a number
+    // typed without a dtype adapts. What a replacement lists is a table of values, which gives no
+    // more values than what it follows, and a shift takes one value only: neither broadcasts.
+    let given_many = arguments
+        .iter()
+        .any(|(name, operand)| operand.shape == Shape::Many && broadcasts(entry, name));
     if shape == Shape::One && given_many {
         Shape::Many
     } else {
