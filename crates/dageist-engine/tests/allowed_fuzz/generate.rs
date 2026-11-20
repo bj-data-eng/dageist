@@ -395,8 +395,9 @@ impl Gen<'_> {
     // -----------------------------------------------------------------------
     // Options
 
-    /// The options an entry is given: none, or, as the option table reads
-    /// them, one when the entry has only one, and two or more otherwise.
+    /// The options an entry is given: those it must be given, and none or, as the option table
+    /// reads them, one when the entry has only one that it need not be given, and two or more
+    /// otherwise.
     fn options(&mut self, entry: &'static Entry) -> Vec<(&'static str, Value)> {
         let parameters: Vec<_> = entry
             .parameters()
@@ -410,11 +411,19 @@ impl Gen<'_> {
             // A fill takes a strategy in place of a value, which `method_call` decides.
             .filter(|parameter| parameter.in_place_of().is_none())
             .collect();
-        if !matches!(entry.applies(), Applies::Expression | Applies::Frame)
-            || parameters.is_empty()
-            || !self.draw.chance(45)
-        {
+        if !matches!(entry.applies(), Applies::Expression | Applies::Frame) {
             return Vec::new();
+        }
+        // An option that a call must be given, as `cast_time_unit` its unit, is always given.
+        let (needed, parameters): (Vec<&catalog::Parameter>, Vec<&catalog::Parameter>) = parameters
+            .into_iter()
+            .partition(|parameter| parameter.is_needed());
+        let mut given: Vec<(&'static str, Value)> = needed
+            .into_iter()
+            .map(|parameter| (parameter.name(), self.option_value(parameter)))
+            .collect();
+        if parameters.is_empty() || !self.draw.chance(45) {
+            return given;
         }
         let mut chosen: Vec<usize> = Vec::new();
         if parameters.len() == 1 {
@@ -432,24 +441,26 @@ impl Gen<'_> {
             }
         }
         chosen.sort_unstable();
-        chosen
-            .into_iter()
-            .map(|at| {
-                let parameter = parameters[at];
-                let value = match parameter.kind() {
-                    Kind::Choice(words) => Value::Choice((*self.draw.pick(words)).to_owned()),
-                    _ => {
-                        let unsettable = parameter.default() == ParameterDefault::Python("None");
-                        match self.draw.below(if unsettable { 3 } else { 2 }) {
-                            0 => Value::Flag(Some(true)),
-                            1 => Value::Flag(Some(false)),
-                            _ => Value::Flag(None),
-                        }
-                    }
-                };
-                (parameter.name(), value)
-            })
-            .collect()
+        for at in chosen {
+            let parameter = parameters[at];
+            given.push((parameter.name(), self.option_value(parameter)));
+        }
+        given
+    }
+
+    /// A word of a choice, or a setting of a flag, drawn for the option `parameter`.
+    fn option_value(&mut self, parameter: &catalog::Parameter) -> Value {
+        match parameter.kind() {
+            Kind::Choice(words) => Value::Choice((*self.draw.pick(words)).to_owned()),
+            _ => {
+                let unsettable = parameter.default() == ParameterDefault::Python("None");
+                match self.draw.below(if unsettable { 3 } else { 2 }) {
+                    0 => Value::Flag(Some(true)),
+                    1 => Value::Flag(Some(false)),
+                    _ => Value::Flag(None),
+                }
+            }
+        }
     }
 
     // -----------------------------------------------------------------------

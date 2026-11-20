@@ -237,13 +237,93 @@ label = "from the end"
 name = "degrees"
 hint = "an angle in radians, in degrees"
 
+[entries."Expr.dt.cast_time_unit"]
+name = "dt.cast_time_unit"
+hint = "count in another time unit"
+
+[entries."Expr.dt.cast_time_unit".parameters.time_unit]
+name = "time_unit"
+label = "unit"
+
+[entries."Expr.dt.cast_time_unit".parameters.time_unit.choices]
+ns = "ns"
+us = "us"
+ms = "ms"
+
+[entries."Expr.dt.century"]
+name = "dt.century"
+hint = "the century"
+
 [entries."Expr.dt.date"]
 name = "dt.date"
 hint = "the date part"
 
+[entries."Expr.dt.day"]
+name = "dt.day"
+hint = "the day of the month"
+
+[entries."Expr.dt.days_in_month"]
+name = "dt.days_in_month"
+hint = "how many days the month has"
+
+[entries."Expr.dt.epoch"]
+name = "dt.epoch"
+hint = "time since 1970 in a unit or in days"
+
+[entries."Expr.dt.epoch".parameters.time_unit]
+name = "time_unit"
+label = "unit"
+
+[entries."Expr.dt.epoch".parameters.time_unit.choices]
+ns = "ns"
+us = "us"
+ms = "ms"
+s = "s"
+d = "d"
+
+[entries."Expr.dt.hour"]
+name = "dt.hour"
+hint = "the hour"
+
+[entries."Expr.dt.is_leap_year"]
+name = "dt.is_leap_year"
+hint = "true in a leap year"
+
+[entries."Expr.dt.iso_year"]
+name = "dt.iso_year"
+hint = "the ISO year of the week"
+
+[entries."Expr.dt.microsecond"]
+name = "dt.microsecond"
+hint = "the microseconds of the second"
+
+[entries."Expr.dt.millennium"]
+name = "dt.millennium"
+hint = "the millennium"
+
+[entries."Expr.dt.millisecond"]
+name = "dt.millisecond"
+hint = "the milliseconds of the second"
+
+[entries."Expr.dt.minute"]
+name = "dt.minute"
+hint = "the minute"
+
+[entries."Expr.dt.month"]
+name = "dt.month"
+hint = "the month"
+
+[entries."Expr.dt.month_end"]
+name = "dt.month_end"
+hint = "last of the month"
+
 [entries."Expr.dt.month_start"]
 name = "dt.month_start"
 hint = "first of the month"
+
+[entries."Expr.dt.nanosecond"]
+name = "dt.nanosecond"
+hint = "the nanoseconds of the second"
 
 [entries."Expr.dt.offset_by"]
 name = "dt.offset_by"
@@ -253,9 +333,38 @@ hint = "move by a duration"
 name = "by"
 label = "by"
 
+[entries."Expr.dt.ordinal_day"]
+name = "dt.ordinal_day"
+hint = "the day of the year"
+
+[entries."Expr.dt.quarter"]
+name = "dt.quarter"
+hint = "the quarter of the year"
+
+[entries."Expr.dt.second"]
+name = "dt.second"
+hint = "the second of the minute"
+
+[entries."Expr.dt.second".parameters.fractional]
+name = "fractional"
+label = "with fractions"
+
 [entries."Expr.dt.time"]
 name = "dt.time"
 hint = "the time part"
+
+[entries."Expr.dt.timestamp"]
+name = "dt.timestamp"
+hint = "time since 1970 in a unit"
+
+[entries."Expr.dt.timestamp".parameters.time_unit]
+name = "time_unit"
+label = "unit"
+
+[entries."Expr.dt.timestamp".parameters.time_unit.choices]
+ns = "ns"
+us = "us"
+ms = "ms"
 
 [entries."Expr.dt.total_days"]
 name = "dt.total_days"
@@ -264,6 +373,66 @@ hint = "whole days in a duration"
 [entries."Expr.dt.total_days".parameters.fractional]
 name = "fractional"
 label = "with fractions"
+
+[entries."Expr.dt.total_hours"]
+name = "dt.total_hours"
+hint = "hours in a duration"
+
+[entries."Expr.dt.total_hours".parameters.fractional]
+name = "fractional"
+label = "with fractions"
+
+[entries."Expr.dt.total_microseconds"]
+name = "dt.total_microseconds"
+hint = "microseconds in a duration"
+
+[entries."Expr.dt.total_microseconds".parameters.fractional]
+name = "fractional"
+label = "with fractions"
+
+[entries."Expr.dt.total_milliseconds"]
+name = "dt.total_milliseconds"
+hint = "milliseconds in a duration"
+
+[entries."Expr.dt.total_milliseconds".parameters.fractional]
+name = "fractional"
+label = "with fractions"
+
+[entries."Expr.dt.total_minutes"]
+name = "dt.total_minutes"
+hint = "minutes in a duration"
+
+[entries."Expr.dt.total_minutes".parameters.fractional]
+name = "fractional"
+label = "with fractions"
+
+[entries."Expr.dt.total_nanoseconds"]
+name = "dt.total_nanoseconds"
+hint = "nanoseconds in a duration"
+
+[entries."Expr.dt.total_nanoseconds".parameters.fractional]
+name = "fractional"
+label = "with fractions"
+
+[entries."Expr.dt.total_seconds"]
+name = "dt.total_seconds"
+hint = "seconds in a duration"
+
+[entries."Expr.dt.total_seconds".parameters.fractional]
+name = "fractional"
+label = "with fractions"
+
+[entries."Expr.dt.week"]
+name = "dt.week"
+hint = "the ISO week of the year"
+
+[entries."Expr.dt.weekday"]
+name = "dt.weekday"
+hint = "the day of the week, Monday 1"
+
+[entries."Expr.dt.year"]
+name = "dt.year"
+hint = "the year"
 
 [entries."Expr.eq"]
 name = "eq"

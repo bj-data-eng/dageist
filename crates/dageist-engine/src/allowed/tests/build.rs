@@ -20,6 +20,20 @@ pub(super) fn patterns(entry: &Entry) -> Vec<(&'static str, Argument)> {
         .collect()
 }
 
+/// The arguments of `entry` that are choices that must be given, each the first word of the
+/// choice: any word makes the call run, and the option table says what each does.
+pub(super) fn required_choices(entry: &Entry) -> Vec<(&'static str, Argument)> {
+    entry
+        .parameters()
+        .iter()
+        .filter(|parameter| parameter.is_needed())
+        .filter_map(|parameter| match parameter.kind() {
+            Kind::Choice(words) => Some((parameter.name(), Argument::Choice(words[0].to_owned()))),
+            _ => None,
+        })
+        .collect()
+}
+
 /// The entry named `id`.
 pub(super) fn entry(id: &str) -> &'static Entry {
     catalog::entry(id).unwrap_or_else(|| panic!("the catalogue has no entry {id}"))

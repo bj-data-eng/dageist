@@ -155,7 +155,15 @@ fn what_follows_a_datetime_is_what_polars_allows_of_it_with_the_reason_for_the_r
                 .expect("an id")
                 .starts_with("LazyFrame."))
     );
-    assert_eq!(answer["entries"].as_array().expect("entries").len(), 129);
+    // Every entry that is no step is offered or refused, once.
+    let not_steps = dageist_engine::catalog::entries()
+        .iter()
+        .filter(|entry| entry.applies() != dageist_engine::catalog::Applies::Frame)
+        .count();
+    assert_eq!(
+        answer["entries"].as_array().expect("entries").len(),
+        not_steps
+    );
 }
 
 #[test]

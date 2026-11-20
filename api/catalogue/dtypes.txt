@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 38584 combinations: 14562 allowed; 6847 refused when Polars resolved the schema, 17175 when it ran the rows, 0 when it ran the empty table.
+# 39312 combinations: 14664 allowed; 6870 refused when Polars resolved the schema, 17778 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.abs | - | Array(Int64, 2) | - | refused rows: `abs` operation not supported for dtype `array[i64, 2]`
 Expr.abs | - | Boolean | - | refused rows: `abs` operation not supported for dtype `bool`
@@ -3258,6 +3258,58 @@ Expr.drop_nulls | - | UInt16 | - | allowed UInt16 many
 Expr.drop_nulls | - | UInt32 | - | allowed UInt32 many
 Expr.drop_nulls | - | UInt64 | - | allowed UInt64 many
 Expr.drop_nulls | - | UInt8 | - | allowed UInt8 many
+Expr.dt.cast_time_unit | - | Array(Int64, 2) | - | refused schema: expected duration or datetime, got array[i64, 2]
+Expr.dt.cast_time_unit | - | Boolean | - | refused schema: expected duration or datetime, got bool
+Expr.dt.cast_time_unit | - | Date | - | refused schema: expected duration or datetime, got date
+Expr.dt.cast_time_unit | - | Datetime(us) | - | allowed Datetime(ns) many
+Expr.dt.cast_time_unit | - | Datetime(us, UTC) | - | allowed Datetime(ns, UTC) many
+Expr.dt.cast_time_unit | - | Decimal(10, 2) | - | refused schema: expected duration or datetime, got decimal[10,2]
+Expr.dt.cast_time_unit | - | Duration(us) | - | allowed Duration(ns) many
+Expr.dt.cast_time_unit | - | Float16 | - | refused schema: expected duration or datetime, got f16
+Expr.dt.cast_time_unit | - | Float32 | - | refused schema: expected duration or datetime, got f32
+Expr.dt.cast_time_unit | - | Float64 | - | refused schema: expected duration or datetime, got f64
+Expr.dt.cast_time_unit | - | Int128 | - | refused schema: expected duration or datetime, got i128
+Expr.dt.cast_time_unit | - | Int16 | - | refused schema: expected duration or datetime, got i16
+Expr.dt.cast_time_unit | - | Int32 | - | refused schema: expected duration or datetime, got i32
+Expr.dt.cast_time_unit | - | Int64 | - | refused schema: expected duration or datetime, got i64
+Expr.dt.cast_time_unit | - | Int8 | - | refused schema: expected duration or datetime, got i8
+Expr.dt.cast_time_unit | - | List(Int64) | - | refused schema: expected duration or datetime, got list[i64]
+Expr.dt.cast_time_unit | - | List(String) | - | refused schema: expected duration or datetime, got list[str]
+Expr.dt.cast_time_unit | - | Null | - | refused schema: expected duration or datetime, got null
+Expr.dt.cast_time_unit | - | String | - | refused schema: expected duration or datetime, got str
+Expr.dt.cast_time_unit | - | Struct(x: Int64, y: String) | - | refused schema: expected duration or datetime, got struct[2]
+Expr.dt.cast_time_unit | - | Time | - | refused schema: expected duration or datetime, got time
+Expr.dt.cast_time_unit | - | UInt128 | - | refused schema: expected duration or datetime, got u128
+Expr.dt.cast_time_unit | - | UInt16 | - | refused schema: expected duration or datetime, got u16
+Expr.dt.cast_time_unit | - | UInt32 | - | refused schema: expected duration or datetime, got u32
+Expr.dt.cast_time_unit | - | UInt64 | - | refused schema: expected duration or datetime, got u64
+Expr.dt.cast_time_unit | - | UInt8 | - | refused schema: expected duration or datetime, got u8
+Expr.dt.century | - | Array(Int64, 2) | - | refused rows: `century` operation not supported for dtype `array[i64, 2]`
+Expr.dt.century | - | Boolean | - | refused rows: `century` operation not supported for dtype `bool`
+Expr.dt.century | - | Date | - | allowed Int32 many
+Expr.dt.century | - | Datetime(us) | - | allowed Int32 many
+Expr.dt.century | - | Datetime(us, UTC) | - | allowed Int32 many
+Expr.dt.century | - | Decimal(10, 2) | - | refused rows: `century` operation not supported for dtype `decimal[10,2]`
+Expr.dt.century | - | Duration(us) | - | refused rows: `century` operation not supported for dtype `duration[μs]`
+Expr.dt.century | - | Float16 | - | refused rows: `century` operation not supported for dtype `f16`
+Expr.dt.century | - | Float32 | - | refused rows: `century` operation not supported for dtype `f32`
+Expr.dt.century | - | Float64 | - | refused rows: `century` operation not supported for dtype `f64`
+Expr.dt.century | - | Int128 | - | refused rows: `century` operation not supported for dtype `i128`
+Expr.dt.century | - | Int16 | - | refused rows: `century` operation not supported for dtype `i16`
+Expr.dt.century | - | Int32 | - | refused rows: `century` operation not supported for dtype `i32`
+Expr.dt.century | - | Int64 | - | refused rows: `century` operation not supported for dtype `i64`
+Expr.dt.century | - | Int8 | - | refused rows: `century` operation not supported for dtype `i8`
+Expr.dt.century | - | List(Int64) | - | refused rows: `century` operation not supported for dtype `list[i64]`
+Expr.dt.century | - | List(String) | - | refused rows: `century` operation not supported for dtype `list[str]`
+Expr.dt.century | - | Null | - | refused rows: `century` operation not supported for dtype `null`
+Expr.dt.century | - | String | - | refused rows: `century` operation not supported for dtype `str`
+Expr.dt.century | - | Struct(x: Int64, y: String) | - | refused rows: `century` operation not supported for dtype `struct[2]`
+Expr.dt.century | - | Time | - | refused rows: `century` operation not supported for dtype `time`
+Expr.dt.century | - | UInt128 | - | refused rows: `century` operation not supported for dtype `u128`
+Expr.dt.century | - | UInt16 | - | refused rows: `century` operation not supported for dtype `u16`
+Expr.dt.century | - | UInt32 | - | refused rows: `century` operation not supported for dtype `u32`
+Expr.dt.century | - | UInt64 | - | refused rows: `century` operation not supported for dtype `u64`
+Expr.dt.century | - | UInt8 | - | refused rows: `century` operation not supported for dtype `u8`
 Expr.dt.date | - | Array(Int64, 2) | - | refused rows: expected Datetime or Date, got array[i64, 2]
 Expr.dt.date | - | Boolean | - | refused rows: expected Datetime or Date, got bool
 Expr.dt.date | - | Date | - | allowed Date many
@@ -3284,6 +3336,318 @@ Expr.dt.date | - | UInt16 | - | refused rows: expected Datetime or Date, got u16
 Expr.dt.date | - | UInt32 | - | refused rows: expected Datetime or Date, got u32
 Expr.dt.date | - | UInt64 | - | refused rows: expected Datetime or Date, got u64
 Expr.dt.date | - | UInt8 | - | refused rows: expected Datetime or Date, got u8
+Expr.dt.day | - | Array(Int64, 2) | - | refused rows: `day` operation not supported for dtype `array[i64, 2]`
+Expr.dt.day | - | Boolean | - | refused rows: `day` operation not supported for dtype `bool`
+Expr.dt.day | - | Date | - | allowed Int8 many
+Expr.dt.day | - | Datetime(us) | - | allowed Int8 many
+Expr.dt.day | - | Datetime(us, UTC) | - | allowed Int8 many
+Expr.dt.day | - | Decimal(10, 2) | - | refused rows: `day` operation not supported for dtype `decimal[10,2]`
+Expr.dt.day | - | Duration(us) | - | refused rows: `day` operation not supported for dtype `duration[μs]`
+Expr.dt.day | - | Float16 | - | refused rows: `day` operation not supported for dtype `f16`
+Expr.dt.day | - | Float32 | - | refused rows: `day` operation not supported for dtype `f32`
+Expr.dt.day | - | Float64 | - | refused rows: `day` operation not supported for dtype `f64`
+Expr.dt.day | - | Int128 | - | refused rows: `day` operation not supported for dtype `i128`
+Expr.dt.day | - | Int16 | - | refused rows: `day` operation not supported for dtype `i16`
+Expr.dt.day | - | Int32 | - | refused rows: `day` operation not supported for dtype `i32`
+Expr.dt.day | - | Int64 | - | refused rows: `day` operation not supported for dtype `i64`
+Expr.dt.day | - | Int8 | - | refused rows: `day` operation not supported for dtype `i8`
+Expr.dt.day | - | List(Int64) | - | refused rows: `day` operation not supported for dtype `list[i64]`
+Expr.dt.day | - | List(String) | - | refused rows: `day` operation not supported for dtype `list[str]`
+Expr.dt.day | - | Null | - | refused rows: `day` operation not supported for dtype `null`
+Expr.dt.day | - | String | - | refused rows: `day` operation not supported for dtype `str`
+Expr.dt.day | - | Struct(x: Int64, y: String) | - | refused rows: `day` operation not supported for dtype `struct[2]`
+Expr.dt.day | - | Time | - | refused rows: `day` operation not supported for dtype `time`
+Expr.dt.day | - | UInt128 | - | refused rows: `day` operation not supported for dtype `u128`
+Expr.dt.day | - | UInt16 | - | refused rows: `day` operation not supported for dtype `u16`
+Expr.dt.day | - | UInt32 | - | refused rows: `day` operation not supported for dtype `u32`
+Expr.dt.day | - | UInt64 | - | refused rows: `day` operation not supported for dtype `u64`
+Expr.dt.day | - | UInt8 | - | refused rows: `day` operation not supported for dtype `u8`
+Expr.dt.days_in_month | - | Array(Int64, 2) | - | refused rows: `days_in_month` operation not supported for dtype `array[i64, 2]`
+Expr.dt.days_in_month | - | Boolean | - | refused rows: `days_in_month` operation not supported for dtype `bool`
+Expr.dt.days_in_month | - | Date | - | allowed Int8 many
+Expr.dt.days_in_month | - | Datetime(us) | - | allowed Int8 many
+Expr.dt.days_in_month | - | Datetime(us, UTC) | - | allowed Int8 many
+Expr.dt.days_in_month | - | Decimal(10, 2) | - | refused rows: `days_in_month` operation not supported for dtype `decimal[10,2]`
+Expr.dt.days_in_month | - | Duration(us) | - | refused rows: `days_in_month` operation not supported for dtype `duration[μs]`
+Expr.dt.days_in_month | - | Float16 | - | refused rows: `days_in_month` operation not supported for dtype `f16`
+Expr.dt.days_in_month | - | Float32 | - | refused rows: `days_in_month` operation not supported for dtype `f32`
+Expr.dt.days_in_month | - | Float64 | - | refused rows: `days_in_month` operation not supported for dtype `f64`
+Expr.dt.days_in_month | - | Int128 | - | refused rows: `days_in_month` operation not supported for dtype `i128`
+Expr.dt.days_in_month | - | Int16 | - | refused rows: `days_in_month` operation not supported for dtype `i16`
+Expr.dt.days_in_month | - | Int32 | - | refused rows: `days_in_month` operation not supported for dtype `i32`
+Expr.dt.days_in_month | - | Int64 | - | refused rows: `days_in_month` operation not supported for dtype `i64`
+Expr.dt.days_in_month | - | Int8 | - | refused rows: `days_in_month` operation not supported for dtype `i8`
+Expr.dt.days_in_month | - | List(Int64) | - | refused rows: `days_in_month` operation not supported for dtype `list[i64]`
+Expr.dt.days_in_month | - | List(String) | - | refused rows: `days_in_month` operation not supported for dtype `list[str]`
+Expr.dt.days_in_month | - | Null | - | refused rows: `days_in_month` operation not supported for dtype `null`
+Expr.dt.days_in_month | - | String | - | refused rows: `days_in_month` operation not supported for dtype `str`
+Expr.dt.days_in_month | - | Struct(x: Int64, y: String) | - | refused rows: `days_in_month` operation not supported for dtype `struct[2]`
+Expr.dt.days_in_month | - | Time | - | refused rows: `days_in_month` operation not supported for dtype `time`
+Expr.dt.days_in_month | - | UInt128 | - | refused rows: `days_in_month` operation not supported for dtype `u128`
+Expr.dt.days_in_month | - | UInt16 | - | refused rows: `days_in_month` operation not supported for dtype `u16`
+Expr.dt.days_in_month | - | UInt32 | - | refused rows: `days_in_month` operation not supported for dtype `u32`
+Expr.dt.days_in_month | - | UInt64 | - | refused rows: `days_in_month` operation not supported for dtype `u64`
+Expr.dt.days_in_month | - | UInt8 | - | refused rows: `days_in_month` operation not supported for dtype `u8`
+Expr.dt.epoch | - | Array(Int64, 2) | - | refused rows: cannot cast Array type (inner: 'Int64', to: 'Datetime('μs')')
+Expr.dt.epoch | - | Boolean | - | allowed Int64 many
+Expr.dt.epoch | - | Date | - | allowed Int64 many
+Expr.dt.epoch | - | Datetime(us) | - | allowed Int64 many
+Expr.dt.epoch | - | Datetime(us, UTC) | - | allowed Int64 many
+Expr.dt.epoch | - | Decimal(10, 2) | - | refused rows: casting from Decimal(10, 2) to Datetime('μs') not supported
+Expr.dt.epoch | - | Duration(us) | - | refused rows: `timestamp` operation not supported for dtype `duration[μs]`
+Expr.dt.epoch | - | Float16 | - | allowed Int64 many
+Expr.dt.epoch | - | Float32 | - | allowed Int64 many
+Expr.dt.epoch | - | Float64 | - | allowed Int64 many
+Expr.dt.epoch | - | Int128 | - | allowed Int64 many
+Expr.dt.epoch | - | Int16 | - | allowed Int64 many
+Expr.dt.epoch | - | Int32 | - | allowed Int64 many
+Expr.dt.epoch | - | Int64 | - | allowed Int64 many
+Expr.dt.epoch | - | Int8 | - | allowed Int64 many
+Expr.dt.epoch | - | List(Int64) | - | refused rows: cannot cast List type (inner: 'Int64', to: 'Datetime('μs')')
+Expr.dt.epoch | - | List(String) | - | refused rows: cannot cast List type (inner: 'String', to: 'Datetime('μs')')
+Expr.dt.epoch | - | Null | - | allowed Int64 many
+Expr.dt.epoch | - | String | - | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+Expr.dt.epoch | - | Struct(x: Int64, y: String) | - | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+Expr.dt.epoch | - | Time | - | refused rows: `timestamp` operation not supported for dtype `time`
+Expr.dt.epoch | - | UInt128 | - | allowed Int64 many
+Expr.dt.epoch | - | UInt16 | - | allowed Int64 many
+Expr.dt.epoch | - | UInt32 | - | allowed Int64 many
+Expr.dt.epoch | - | UInt64 | - | allowed Int64 many
+Expr.dt.epoch | - | UInt8 | - | allowed Int64 many
+Expr.dt.hour | - | Array(Int64, 2) | - | refused rows: `hour` operation not supported for dtype `array[i64, 2]`
+Expr.dt.hour | - | Boolean | - | refused rows: `hour` operation not supported for dtype `bool`
+Expr.dt.hour | - | Date | - | refused rows: `hour` operation not supported for dtype `date`
+Expr.dt.hour | - | Datetime(us) | - | allowed Int8 many
+Expr.dt.hour | - | Datetime(us, UTC) | - | allowed Int8 many
+Expr.dt.hour | - | Decimal(10, 2) | - | refused rows: `hour` operation not supported for dtype `decimal[10,2]`
+Expr.dt.hour | - | Duration(us) | - | refused rows: `hour` operation not supported for dtype `duration[μs]`
+Expr.dt.hour | - | Float16 | - | refused rows: `hour` operation not supported for dtype `f16`
+Expr.dt.hour | - | Float32 | - | refused rows: `hour` operation not supported for dtype `f32`
+Expr.dt.hour | - | Float64 | - | refused rows: `hour` operation not supported for dtype `f64`
+Expr.dt.hour | - | Int128 | - | refused rows: `hour` operation not supported for dtype `i128`
+Expr.dt.hour | - | Int16 | - | refused rows: `hour` operation not supported for dtype `i16`
+Expr.dt.hour | - | Int32 | - | refused rows: `hour` operation not supported for dtype `i32`
+Expr.dt.hour | - | Int64 | - | refused rows: `hour` operation not supported for dtype `i64`
+Expr.dt.hour | - | Int8 | - | refused rows: `hour` operation not supported for dtype `i8`
+Expr.dt.hour | - | List(Int64) | - | refused rows: `hour` operation not supported for dtype `list[i64]`
+Expr.dt.hour | - | List(String) | - | refused rows: `hour` operation not supported for dtype `list[str]`
+Expr.dt.hour | - | Null | - | refused rows: `hour` operation not supported for dtype `null`
+Expr.dt.hour | - | String | - | refused rows: `hour` operation not supported for dtype `str`
+Expr.dt.hour | - | Struct(x: Int64, y: String) | - | refused rows: `hour` operation not supported for dtype `struct[2]`
+Expr.dt.hour | - | Time | - | allowed Int8 many
+Expr.dt.hour | - | UInt128 | - | refused rows: `hour` operation not supported for dtype `u128`
+Expr.dt.hour | - | UInt16 | - | refused rows: `hour` operation not supported for dtype `u16`
+Expr.dt.hour | - | UInt32 | - | refused rows: `hour` operation not supported for dtype `u32`
+Expr.dt.hour | - | UInt64 | - | refused rows: `hour` operation not supported for dtype `u64`
+Expr.dt.hour | - | UInt8 | - | refused rows: `hour` operation not supported for dtype `u8`
+Expr.dt.is_leap_year | - | Array(Int64, 2) | - | refused rows: `is_leap_year` operation not supported for dtype `array[i64, 2]`
+Expr.dt.is_leap_year | - | Boolean | - | refused rows: `is_leap_year` operation not supported for dtype `bool`
+Expr.dt.is_leap_year | - | Date | - | allowed Boolean many
+Expr.dt.is_leap_year | - | Datetime(us) | - | allowed Boolean many
+Expr.dt.is_leap_year | - | Datetime(us, UTC) | - | allowed Boolean many
+Expr.dt.is_leap_year | - | Decimal(10, 2) | - | refused rows: `is_leap_year` operation not supported for dtype `decimal[10,2]`
+Expr.dt.is_leap_year | - | Duration(us) | - | refused rows: `is_leap_year` operation not supported for dtype `duration[μs]`
+Expr.dt.is_leap_year | - | Float16 | - | refused rows: `is_leap_year` operation not supported for dtype `f16`
+Expr.dt.is_leap_year | - | Float32 | - | refused rows: `is_leap_year` operation not supported for dtype `f32`
+Expr.dt.is_leap_year | - | Float64 | - | refused rows: `is_leap_year` operation not supported for dtype `f64`
+Expr.dt.is_leap_year | - | Int128 | - | refused rows: `is_leap_year` operation not supported for dtype `i128`
+Expr.dt.is_leap_year | - | Int16 | - | refused rows: `is_leap_year` operation not supported for dtype `i16`
+Expr.dt.is_leap_year | - | Int32 | - | refused rows: `is_leap_year` operation not supported for dtype `i32`
+Expr.dt.is_leap_year | - | Int64 | - | refused rows: `is_leap_year` operation not supported for dtype `i64`
+Expr.dt.is_leap_year | - | Int8 | - | refused rows: `is_leap_year` operation not supported for dtype `i8`
+Expr.dt.is_leap_year | - | List(Int64) | - | refused rows: `is_leap_year` operation not supported for dtype `list[i64]`
+Expr.dt.is_leap_year | - | List(String) | - | refused rows: `is_leap_year` operation not supported for dtype `list[str]`
+Expr.dt.is_leap_year | - | Null | - | refused rows: `is_leap_year` operation not supported for dtype `null`
+Expr.dt.is_leap_year | - | String | - | refused rows: `is_leap_year` operation not supported for dtype `str`
+Expr.dt.is_leap_year | - | Struct(x: Int64, y: String) | - | refused rows: `is_leap_year` operation not supported for dtype `struct[2]`
+Expr.dt.is_leap_year | - | Time | - | refused rows: `is_leap_year` operation not supported for dtype `time`
+Expr.dt.is_leap_year | - | UInt128 | - | refused rows: `is_leap_year` operation not supported for dtype `u128`
+Expr.dt.is_leap_year | - | UInt16 | - | refused rows: `is_leap_year` operation not supported for dtype `u16`
+Expr.dt.is_leap_year | - | UInt32 | - | refused rows: `is_leap_year` operation not supported for dtype `u32`
+Expr.dt.is_leap_year | - | UInt64 | - | refused rows: `is_leap_year` operation not supported for dtype `u64`
+Expr.dt.is_leap_year | - | UInt8 | - | refused rows: `is_leap_year` operation not supported for dtype `u8`
+Expr.dt.iso_year | - | Array(Int64, 2) | - | refused rows: `iso_year` operation not supported for dtype `array[i64, 2]`
+Expr.dt.iso_year | - | Boolean | - | refused rows: `iso_year` operation not supported for dtype `bool`
+Expr.dt.iso_year | - | Date | - | allowed Int32 many
+Expr.dt.iso_year | - | Datetime(us) | - | allowed Int32 many
+Expr.dt.iso_year | - | Datetime(us, UTC) | - | allowed Int32 many
+Expr.dt.iso_year | - | Decimal(10, 2) | - | refused rows: `iso_year` operation not supported for dtype `decimal[10,2]`
+Expr.dt.iso_year | - | Duration(us) | - | refused rows: `iso_year` operation not supported for dtype `duration[μs]`
+Expr.dt.iso_year | - | Float16 | - | refused rows: `iso_year` operation not supported for dtype `f16`
+Expr.dt.iso_year | - | Float32 | - | refused rows: `iso_year` operation not supported for dtype `f32`
+Expr.dt.iso_year | - | Float64 | - | refused rows: `iso_year` operation not supported for dtype `f64`
+Expr.dt.iso_year | - | Int128 | - | refused rows: `iso_year` operation not supported for dtype `i128`
+Expr.dt.iso_year | - | Int16 | - | refused rows: `iso_year` operation not supported for dtype `i16`
+Expr.dt.iso_year | - | Int32 | - | refused rows: `iso_year` operation not supported for dtype `i32`
+Expr.dt.iso_year | - | Int64 | - | refused rows: `iso_year` operation not supported for dtype `i64`
+Expr.dt.iso_year | - | Int8 | - | refused rows: `iso_year` operation not supported for dtype `i8`
+Expr.dt.iso_year | - | List(Int64) | - | refused rows: `iso_year` operation not supported for dtype `list[i64]`
+Expr.dt.iso_year | - | List(String) | - | refused rows: `iso_year` operation not supported for dtype `list[str]`
+Expr.dt.iso_year | - | Null | - | refused rows: `iso_year` operation not supported for dtype `null`
+Expr.dt.iso_year | - | String | - | refused rows: `iso_year` operation not supported for dtype `str`
+Expr.dt.iso_year | - | Struct(x: Int64, y: String) | - | refused rows: `iso_year` operation not supported for dtype `struct[2]`
+Expr.dt.iso_year | - | Time | - | refused rows: `iso_year` operation not supported for dtype `time`
+Expr.dt.iso_year | - | UInt128 | - | refused rows: `iso_year` operation not supported for dtype `u128`
+Expr.dt.iso_year | - | UInt16 | - | refused rows: `iso_year` operation not supported for dtype `u16`
+Expr.dt.iso_year | - | UInt32 | - | refused rows: `iso_year` operation not supported for dtype `u32`
+Expr.dt.iso_year | - | UInt64 | - | refused rows: `iso_year` operation not supported for dtype `u64`
+Expr.dt.iso_year | - | UInt8 | - | refused rows: `iso_year` operation not supported for dtype `u8`
+Expr.dt.microsecond | - | Array(Int64, 2) | - | refused rows: `nanosecond` operation not supported for dtype `array[i64, 2]`
+Expr.dt.microsecond | - | Boolean | - | refused rows: `nanosecond` operation not supported for dtype `bool`
+Expr.dt.microsecond | - | Date | - | refused rows: `nanosecond` operation not supported for dtype `date`
+Expr.dt.microsecond | - | Datetime(us) | - | allowed Int32 many
+Expr.dt.microsecond | - | Datetime(us, UTC) | - | allowed Int32 many
+Expr.dt.microsecond | - | Decimal(10, 2) | - | refused rows: `nanosecond` operation not supported for dtype `decimal[10,2]`
+Expr.dt.microsecond | - | Duration(us) | - | refused rows: `nanosecond` operation not supported for dtype `duration[μs]`
+Expr.dt.microsecond | - | Float16 | - | refused rows: `nanosecond` operation not supported for dtype `f16`
+Expr.dt.microsecond | - | Float32 | - | refused rows: `nanosecond` operation not supported for dtype `f32`
+Expr.dt.microsecond | - | Float64 | - | refused rows: `nanosecond` operation not supported for dtype `f64`
+Expr.dt.microsecond | - | Int128 | - | refused rows: `nanosecond` operation not supported for dtype `i128`
+Expr.dt.microsecond | - | Int16 | - | refused rows: `nanosecond` operation not supported for dtype `i16`
+Expr.dt.microsecond | - | Int32 | - | refused rows: `nanosecond` operation not supported for dtype `i32`
+Expr.dt.microsecond | - | Int64 | - | refused rows: `nanosecond` operation not supported for dtype `i64`
+Expr.dt.microsecond | - | Int8 | - | refused rows: `nanosecond` operation not supported for dtype `i8`
+Expr.dt.microsecond | - | List(Int64) | - | refused rows: `nanosecond` operation not supported for dtype `list[i64]`
+Expr.dt.microsecond | - | List(String) | - | refused rows: `nanosecond` operation not supported for dtype `list[str]`
+Expr.dt.microsecond | - | Null | - | refused rows: `nanosecond` operation not supported for dtype `null`
+Expr.dt.microsecond | - | String | - | refused rows: `nanosecond` operation not supported for dtype `str`
+Expr.dt.microsecond | - | Struct(x: Int64, y: String) | - | refused rows: `nanosecond` operation not supported for dtype `struct[2]`
+Expr.dt.microsecond | - | Time | - | allowed Int32 many
+Expr.dt.microsecond | - | UInt128 | - | refused rows: `nanosecond` operation not supported for dtype `u128`
+Expr.dt.microsecond | - | UInt16 | - | refused rows: `nanosecond` operation not supported for dtype `u16`
+Expr.dt.microsecond | - | UInt32 | - | refused rows: `nanosecond` operation not supported for dtype `u32`
+Expr.dt.microsecond | - | UInt64 | - | refused rows: `nanosecond` operation not supported for dtype `u64`
+Expr.dt.microsecond | - | UInt8 | - | refused rows: `nanosecond` operation not supported for dtype `u8`
+Expr.dt.millennium | - | Array(Int64, 2) | - | refused rows: `century` operation not supported for dtype `array[i64, 2]`
+Expr.dt.millennium | - | Boolean | - | refused rows: `century` operation not supported for dtype `bool`
+Expr.dt.millennium | - | Date | - | allowed Int32 many
+Expr.dt.millennium | - | Datetime(us) | - | allowed Int32 many
+Expr.dt.millennium | - | Datetime(us, UTC) | - | allowed Int32 many
+Expr.dt.millennium | - | Decimal(10, 2) | - | refused rows: `century` operation not supported for dtype `decimal[10,2]`
+Expr.dt.millennium | - | Duration(us) | - | refused rows: `century` operation not supported for dtype `duration[μs]`
+Expr.dt.millennium | - | Float16 | - | refused rows: `century` operation not supported for dtype `f16`
+Expr.dt.millennium | - | Float32 | - | refused rows: `century` operation not supported for dtype `f32`
+Expr.dt.millennium | - | Float64 | - | refused rows: `century` operation not supported for dtype `f64`
+Expr.dt.millennium | - | Int128 | - | refused rows: `century` operation not supported for dtype `i128`
+Expr.dt.millennium | - | Int16 | - | refused rows: `century` operation not supported for dtype `i16`
+Expr.dt.millennium | - | Int32 | - | refused rows: `century` operation not supported for dtype `i32`
+Expr.dt.millennium | - | Int64 | - | refused rows: `century` operation not supported for dtype `i64`
+Expr.dt.millennium | - | Int8 | - | refused rows: `century` operation not supported for dtype `i8`
+Expr.dt.millennium | - | List(Int64) | - | refused rows: `century` operation not supported for dtype `list[i64]`
+Expr.dt.millennium | - | List(String) | - | refused rows: `century` operation not supported for dtype `list[str]`
+Expr.dt.millennium | - | Null | - | refused rows: `century` operation not supported for dtype `null`
+Expr.dt.millennium | - | String | - | refused rows: `century` operation not supported for dtype `str`
+Expr.dt.millennium | - | Struct(x: Int64, y: String) | - | refused rows: `century` operation not supported for dtype `struct[2]`
+Expr.dt.millennium | - | Time | - | refused rows: `century` operation not supported for dtype `time`
+Expr.dt.millennium | - | UInt128 | - | refused rows: `century` operation not supported for dtype `u128`
+Expr.dt.millennium | - | UInt16 | - | refused rows: `century` operation not supported for dtype `u16`
+Expr.dt.millennium | - | UInt32 | - | refused rows: `century` operation not supported for dtype `u32`
+Expr.dt.millennium | - | UInt64 | - | refused rows: `century` operation not supported for dtype `u64`
+Expr.dt.millennium | - | UInt8 | - | refused rows: `century` operation not supported for dtype `u8`
+Expr.dt.millisecond | - | Array(Int64, 2) | - | refused rows: `nanosecond` operation not supported for dtype `array[i64, 2]`
+Expr.dt.millisecond | - | Boolean | - | refused rows: `nanosecond` operation not supported for dtype `bool`
+Expr.dt.millisecond | - | Date | - | refused rows: `nanosecond` operation not supported for dtype `date`
+Expr.dt.millisecond | - | Datetime(us) | - | allowed Int32 many
+Expr.dt.millisecond | - | Datetime(us, UTC) | - | allowed Int32 many
+Expr.dt.millisecond | - | Decimal(10, 2) | - | refused rows: `nanosecond` operation not supported for dtype `decimal[10,2]`
+Expr.dt.millisecond | - | Duration(us) | - | refused rows: `nanosecond` operation not supported for dtype `duration[μs]`
+Expr.dt.millisecond | - | Float16 | - | refused rows: `nanosecond` operation not supported for dtype `f16`
+Expr.dt.millisecond | - | Float32 | - | refused rows: `nanosecond` operation not supported for dtype `f32`
+Expr.dt.millisecond | - | Float64 | - | refused rows: `nanosecond` operation not supported for dtype `f64`
+Expr.dt.millisecond | - | Int128 | - | refused rows: `nanosecond` operation not supported for dtype `i128`
+Expr.dt.millisecond | - | Int16 | - | refused rows: `nanosecond` operation not supported for dtype `i16`
+Expr.dt.millisecond | - | Int32 | - | refused rows: `nanosecond` operation not supported for dtype `i32`
+Expr.dt.millisecond | - | Int64 | - | refused rows: `nanosecond` operation not supported for dtype `i64`
+Expr.dt.millisecond | - | Int8 | - | refused rows: `nanosecond` operation not supported for dtype `i8`
+Expr.dt.millisecond | - | List(Int64) | - | refused rows: `nanosecond` operation not supported for dtype `list[i64]`
+Expr.dt.millisecond | - | List(String) | - | refused rows: `nanosecond` operation not supported for dtype `list[str]`
+Expr.dt.millisecond | - | Null | - | refused rows: `nanosecond` operation not supported for dtype `null`
+Expr.dt.millisecond | - | String | - | refused rows: `nanosecond` operation not supported for dtype `str`
+Expr.dt.millisecond | - | Struct(x: Int64, y: String) | - | refused rows: `nanosecond` operation not supported for dtype `struct[2]`
+Expr.dt.millisecond | - | Time | - | allowed Int32 many
+Expr.dt.millisecond | - | UInt128 | - | refused rows: `nanosecond` operation not supported for dtype `u128`
+Expr.dt.millisecond | - | UInt16 | - | refused rows: `nanosecond` operation not supported for dtype `u16`
+Expr.dt.millisecond | - | UInt32 | - | refused rows: `nanosecond` operation not supported for dtype `u32`
+Expr.dt.millisecond | - | UInt64 | - | refused rows: `nanosecond` operation not supported for dtype `u64`
+Expr.dt.millisecond | - | UInt8 | - | refused rows: `nanosecond` operation not supported for dtype `u8`
+Expr.dt.minute | - | Array(Int64, 2) | - | refused rows: `minute` operation not supported for dtype `array[i64, 2]`
+Expr.dt.minute | - | Boolean | - | refused rows: `minute` operation not supported for dtype `bool`
+Expr.dt.minute | - | Date | - | refused rows: `minute` operation not supported for dtype `date`
+Expr.dt.minute | - | Datetime(us) | - | allowed Int8 many
+Expr.dt.minute | - | Datetime(us, UTC) | - | allowed Int8 many
+Expr.dt.minute | - | Decimal(10, 2) | - | refused rows: `minute` operation not supported for dtype `decimal[10,2]`
+Expr.dt.minute | - | Duration(us) | - | refused rows: `minute` operation not supported for dtype `duration[μs]`
+Expr.dt.minute | - | Float16 | - | refused rows: `minute` operation not supported for dtype `f16`
+Expr.dt.minute | - | Float32 | - | refused rows: `minute` operation not supported for dtype `f32`
+Expr.dt.minute | - | Float64 | - | refused rows: `minute` operation not supported for dtype `f64`
+Expr.dt.minute | - | Int128 | - | refused rows: `minute` operation not supported for dtype `i128`
+Expr.dt.minute | - | Int16 | - | refused rows: `minute` operation not supported for dtype `i16`
+Expr.dt.minute | - | Int32 | - | refused rows: `minute` operation not supported for dtype `i32`
+Expr.dt.minute | - | Int64 | - | refused rows: `minute` operation not supported for dtype `i64`
+Expr.dt.minute | - | Int8 | - | refused rows: `minute` operation not supported for dtype `i8`
+Expr.dt.minute | - | List(Int64) | - | refused rows: `minute` operation not supported for dtype `list[i64]`
+Expr.dt.minute | - | List(String) | - | refused rows: `minute` operation not supported for dtype `list[str]`
+Expr.dt.minute | - | Null | - | refused rows: `minute` operation not supported for dtype `null`
+Expr.dt.minute | - | String | - | refused rows: `minute` operation not supported for dtype `str`
+Expr.dt.minute | - | Struct(x: Int64, y: String) | - | refused rows: `minute` operation not supported for dtype `struct[2]`
+Expr.dt.minute | - | Time | - | allowed Int8 many
+Expr.dt.minute | - | UInt128 | - | refused rows: `minute` operation not supported for dtype `u128`
+Expr.dt.minute | - | UInt16 | - | refused rows: `minute` operation not supported for dtype `u16`
+Expr.dt.minute | - | UInt32 | - | refused rows: `minute` operation not supported for dtype `u32`
+Expr.dt.minute | - | UInt64 | - | refused rows: `minute` operation not supported for dtype `u64`
+Expr.dt.minute | - | UInt8 | - | refused rows: `minute` operation not supported for dtype `u8`
+Expr.dt.month | - | Array(Int64, 2) | - | refused rows: `month` operation not supported for dtype `array[i64, 2]`
+Expr.dt.month | - | Boolean | - | refused rows: `month` operation not supported for dtype `bool`
+Expr.dt.month | - | Date | - | allowed Int8 many
+Expr.dt.month | - | Datetime(us) | - | allowed Int8 many
+Expr.dt.month | - | Datetime(us, UTC) | - | allowed Int8 many
+Expr.dt.month | - | Decimal(10, 2) | - | refused rows: `month` operation not supported for dtype `decimal[10,2]`
+Expr.dt.month | - | Duration(us) | - | refused rows: `month` operation not supported for dtype `duration[μs]`
+Expr.dt.month | - | Float16 | - | refused rows: `month` operation not supported for dtype `f16`
+Expr.dt.month | - | Float32 | - | refused rows: `month` operation not supported for dtype `f32`
+Expr.dt.month | - | Float64 | - | refused rows: `month` operation not supported for dtype `f64`
+Expr.dt.month | - | Int128 | - | refused rows: `month` operation not supported for dtype `i128`
+Expr.dt.month | - | Int16 | - | refused rows: `month` operation not supported for dtype `i16`
+Expr.dt.month | - | Int32 | - | refused rows: `month` operation not supported for dtype `i32`
+Expr.dt.month | - | Int64 | - | refused rows: `month` operation not supported for dtype `i64`
+Expr.dt.month | - | Int8 | - | refused rows: `month` operation not supported for dtype `i8`
+Expr.dt.month | - | List(Int64) | - | refused rows: `month` operation not supported for dtype `list[i64]`
+Expr.dt.month | - | List(String) | - | refused rows: `month` operation not supported for dtype `list[str]`
+Expr.dt.month | - | Null | - | refused rows: `month` operation not supported for dtype `null`
+Expr.dt.month | - | String | - | refused rows: `month` operation not supported for dtype `str`
+Expr.dt.month | - | Struct(x: Int64, y: String) | - | refused rows: `month` operation not supported for dtype `struct[2]`
+Expr.dt.month | - | Time | - | refused rows: `month` operation not supported for dtype `time`
+Expr.dt.month | - | UInt128 | - | refused rows: `month` operation not supported for dtype `u128`
+Expr.dt.month | - | UInt16 | - | refused rows: `month` operation not supported for dtype `u16`
+Expr.dt.month | - | UInt32 | - | refused rows: `month` operation not supported for dtype `u32`
+Expr.dt.month | - | UInt64 | - | refused rows: `month` operation not supported for dtype `u64`
+Expr.dt.month | - | UInt8 | - | refused rows: `month` operation not supported for dtype `u8`
+Expr.dt.month_end | - | Array(Int64, 2) | - | refused rows: `month_end` operation not supported for dtype `array[i64, 2]` (expected: date/datetime)
+Expr.dt.month_end | - | Boolean | - | refused rows: `month_end` operation not supported for dtype `bool` (expected: date/datetime)
+Expr.dt.month_end | - | Date | - | allowed Date many
+Expr.dt.month_end | - | Datetime(us) | - | allowed Datetime(us) many
+Expr.dt.month_end | - | Datetime(us, UTC) | - | allowed Datetime(us, UTC) many
+Expr.dt.month_end | - | Decimal(10, 2) | - | refused rows: `month_end` operation not supported for dtype `decimal[10,2]` (expected: date/datetime)
+Expr.dt.month_end | - | Duration(us) | - | refused rows: `month_end` operation not supported for dtype `duration[μs]` (expected: date/datetime)
+Expr.dt.month_end | - | Float16 | - | refused rows: `month_end` operation not supported for dtype `f16` (expected: date/datetime)
+Expr.dt.month_end | - | Float32 | - | refused rows: `month_end` operation not supported for dtype `f32` (expected: date/datetime)
+Expr.dt.month_end | - | Float64 | - | refused rows: `month_end` operation not supported for dtype `f64` (expected: date/datetime)
+Expr.dt.month_end | - | Int128 | - | refused rows: `month_end` operation not supported for dtype `i128` (expected: date/datetime)
+Expr.dt.month_end | - | Int16 | - | refused rows: `month_end` operation not supported for dtype `i16` (expected: date/datetime)
+Expr.dt.month_end | - | Int32 | - | refused rows: `month_end` operation not supported for dtype `i32` (expected: date/datetime)
+Expr.dt.month_end | - | Int64 | - | refused rows: `month_end` operation not supported for dtype `i64` (expected: date/datetime)
+Expr.dt.month_end | - | Int8 | - | refused rows: `month_end` operation not supported for dtype `i8` (expected: date/datetime)
+Expr.dt.month_end | - | List(Int64) | - | refused rows: `month_end` operation not supported for dtype `list[i64]` (expected: date/datetime)
+Expr.dt.month_end | - | List(String) | - | refused rows: `month_end` operation not supported for dtype `list[str]` (expected: date/datetime)
+Expr.dt.month_end | - | Null | - | refused rows: `month_end` operation not supported for dtype `null` (expected: date/datetime)
+Expr.dt.month_end | - | String | - | refused rows: `month_end` operation not supported for dtype `str` (expected: date/datetime)
+Expr.dt.month_end | - | Struct(x: Int64, y: String) | - | refused rows: `month_end` operation not supported for dtype `struct[2]` (expected: date/datetime)
+Expr.dt.month_end | - | Time | - | refused rows: `month_end` operation not supported for dtype `time` (expected: date/datetime)
+Expr.dt.month_end | - | UInt128 | - | refused rows: `month_end` operation not supported for dtype `u128` (expected: date/datetime)
+Expr.dt.month_end | - | UInt16 | - | refused rows: `month_end` operation not supported for dtype `u16` (expected: date/datetime)
+Expr.dt.month_end | - | UInt32 | - | refused rows: `month_end` operation not supported for dtype `u32` (expected: date/datetime)
+Expr.dt.month_end | - | UInt64 | - | refused rows: `month_end` operation not supported for dtype `u64` (expected: date/datetime)
+Expr.dt.month_end | - | UInt8 | - | refused rows: `month_end` operation not supported for dtype `u8` (expected: date/datetime)
 Expr.dt.month_start | - | Array(Int64, 2) | - | refused rows: `month_start` operation not supported for dtype `array[i64, 2]` (expected: date/datetime)
 Expr.dt.month_start | - | Boolean | - | refused rows: `month_start` operation not supported for dtype `bool` (expected: date/datetime)
 Expr.dt.month_start | - | Date | - | allowed Date many
@@ -3310,6 +3674,32 @@ Expr.dt.month_start | - | UInt16 | - | refused rows: `month_start` operation not
 Expr.dt.month_start | - | UInt32 | - | refused rows: `month_start` operation not supported for dtype `u32` (expected: date/datetime)
 Expr.dt.month_start | - | UInt64 | - | refused rows: `month_start` operation not supported for dtype `u64` (expected: date/datetime)
 Expr.dt.month_start | - | UInt8 | - | refused rows: `month_start` operation not supported for dtype `u8` (expected: date/datetime)
+Expr.dt.nanosecond | - | Array(Int64, 2) | - | refused rows: `nanosecond` operation not supported for dtype `array[i64, 2]`
+Expr.dt.nanosecond | - | Boolean | - | refused rows: `nanosecond` operation not supported for dtype `bool`
+Expr.dt.nanosecond | - | Date | - | refused rows: `nanosecond` operation not supported for dtype `date`
+Expr.dt.nanosecond | - | Datetime(us) | - | allowed Int32 many
+Expr.dt.nanosecond | - | Datetime(us, UTC) | - | allowed Int32 many
+Expr.dt.nanosecond | - | Decimal(10, 2) | - | refused rows: `nanosecond` operation not supported for dtype `decimal[10,2]`
+Expr.dt.nanosecond | - | Duration(us) | - | refused rows: `nanosecond` operation not supported for dtype `duration[μs]`
+Expr.dt.nanosecond | - | Float16 | - | refused rows: `nanosecond` operation not supported for dtype `f16`
+Expr.dt.nanosecond | - | Float32 | - | refused rows: `nanosecond` operation not supported for dtype `f32`
+Expr.dt.nanosecond | - | Float64 | - | refused rows: `nanosecond` operation not supported for dtype `f64`
+Expr.dt.nanosecond | - | Int128 | - | refused rows: `nanosecond` operation not supported for dtype `i128`
+Expr.dt.nanosecond | - | Int16 | - | refused rows: `nanosecond` operation not supported for dtype `i16`
+Expr.dt.nanosecond | - | Int32 | - | refused rows: `nanosecond` operation not supported for dtype `i32`
+Expr.dt.nanosecond | - | Int64 | - | refused rows: `nanosecond` operation not supported for dtype `i64`
+Expr.dt.nanosecond | - | Int8 | - | refused rows: `nanosecond` operation not supported for dtype `i8`
+Expr.dt.nanosecond | - | List(Int64) | - | refused rows: `nanosecond` operation not supported for dtype `list[i64]`
+Expr.dt.nanosecond | - | List(String) | - | refused rows: `nanosecond` operation not supported for dtype `list[str]`
+Expr.dt.nanosecond | - | Null | - | refused rows: `nanosecond` operation not supported for dtype `null`
+Expr.dt.nanosecond | - | String | - | refused rows: `nanosecond` operation not supported for dtype `str`
+Expr.dt.nanosecond | - | Struct(x: Int64, y: String) | - | refused rows: `nanosecond` operation not supported for dtype `struct[2]`
+Expr.dt.nanosecond | - | Time | - | allowed Int32 many
+Expr.dt.nanosecond | - | UInt128 | - | refused rows: `nanosecond` operation not supported for dtype `u128`
+Expr.dt.nanosecond | - | UInt16 | - | refused rows: `nanosecond` operation not supported for dtype `u16`
+Expr.dt.nanosecond | - | UInt32 | - | refused rows: `nanosecond` operation not supported for dtype `u32`
+Expr.dt.nanosecond | - | UInt64 | - | refused rows: `nanosecond` operation not supported for dtype `u64`
+Expr.dt.nanosecond | - | UInt8 | - | refused rows: `nanosecond` operation not supported for dtype `u8`
 Expr.dt.offset_by | by | Array(Int64, 2) | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
 Expr.dt.offset_by | by | Array(Int64, 2) | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
 Expr.dt.offset_by | by | Array(Int64, 2) | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
@@ -3986,6 +4376,84 @@ Expr.dt.offset_by | by | UInt8 | UInt16 | refused rows: invalid series dtype: ex
 Expr.dt.offset_by | by | UInt8 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
 Expr.dt.offset_by | by | UInt8 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
 Expr.dt.offset_by | by | UInt8 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.ordinal_day | - | Array(Int64, 2) | - | refused rows: `ordinal_day` operation not supported for dtype `array[i64, 2]`
+Expr.dt.ordinal_day | - | Boolean | - | refused rows: `ordinal_day` operation not supported for dtype `bool`
+Expr.dt.ordinal_day | - | Date | - | allowed Int16 many
+Expr.dt.ordinal_day | - | Datetime(us) | - | allowed Int16 many
+Expr.dt.ordinal_day | - | Datetime(us, UTC) | - | allowed Int16 many
+Expr.dt.ordinal_day | - | Decimal(10, 2) | - | refused rows: `ordinal_day` operation not supported for dtype `decimal[10,2]`
+Expr.dt.ordinal_day | - | Duration(us) | - | refused rows: `ordinal_day` operation not supported for dtype `duration[μs]`
+Expr.dt.ordinal_day | - | Float16 | - | refused rows: `ordinal_day` operation not supported for dtype `f16`
+Expr.dt.ordinal_day | - | Float32 | - | refused rows: `ordinal_day` operation not supported for dtype `f32`
+Expr.dt.ordinal_day | - | Float64 | - | refused rows: `ordinal_day` operation not supported for dtype `f64`
+Expr.dt.ordinal_day | - | Int128 | - | refused rows: `ordinal_day` operation not supported for dtype `i128`
+Expr.dt.ordinal_day | - | Int16 | - | refused rows: `ordinal_day` operation not supported for dtype `i16`
+Expr.dt.ordinal_day | - | Int32 | - | refused rows: `ordinal_day` operation not supported for dtype `i32`
+Expr.dt.ordinal_day | - | Int64 | - | refused rows: `ordinal_day` operation not supported for dtype `i64`
+Expr.dt.ordinal_day | - | Int8 | - | refused rows: `ordinal_day` operation not supported for dtype `i8`
+Expr.dt.ordinal_day | - | List(Int64) | - | refused rows: `ordinal_day` operation not supported for dtype `list[i64]`
+Expr.dt.ordinal_day | - | List(String) | - | refused rows: `ordinal_day` operation not supported for dtype `list[str]`
+Expr.dt.ordinal_day | - | Null | - | refused rows: `ordinal_day` operation not supported for dtype `null`
+Expr.dt.ordinal_day | - | String | - | refused rows: `ordinal_day` operation not supported for dtype `str`
+Expr.dt.ordinal_day | - | Struct(x: Int64, y: String) | - | refused rows: `ordinal_day` operation not supported for dtype `struct[2]`
+Expr.dt.ordinal_day | - | Time | - | refused rows: `ordinal_day` operation not supported for dtype `time`
+Expr.dt.ordinal_day | - | UInt128 | - | refused rows: `ordinal_day` operation not supported for dtype `u128`
+Expr.dt.ordinal_day | - | UInt16 | - | refused rows: `ordinal_day` operation not supported for dtype `u16`
+Expr.dt.ordinal_day | - | UInt32 | - | refused rows: `ordinal_day` operation not supported for dtype `u32`
+Expr.dt.ordinal_day | - | UInt64 | - | refused rows: `ordinal_day` operation not supported for dtype `u64`
+Expr.dt.ordinal_day | - | UInt8 | - | refused rows: `ordinal_day` operation not supported for dtype `u8`
+Expr.dt.quarter | - | Array(Int64, 2) | - | refused rows: `quarter` operation not supported for dtype `array[i64, 2]`
+Expr.dt.quarter | - | Boolean | - | refused rows: `quarter` operation not supported for dtype `bool`
+Expr.dt.quarter | - | Date | - | allowed Int8 many
+Expr.dt.quarter | - | Datetime(us) | - | allowed Int8 many
+Expr.dt.quarter | - | Datetime(us, UTC) | - | allowed Int8 many
+Expr.dt.quarter | - | Decimal(10, 2) | - | refused rows: `quarter` operation not supported for dtype `decimal[10,2]`
+Expr.dt.quarter | - | Duration(us) | - | refused rows: `quarter` operation not supported for dtype `duration[μs]`
+Expr.dt.quarter | - | Float16 | - | refused rows: `quarter` operation not supported for dtype `f16`
+Expr.dt.quarter | - | Float32 | - | refused rows: `quarter` operation not supported for dtype `f32`
+Expr.dt.quarter | - | Float64 | - | refused rows: `quarter` operation not supported for dtype `f64`
+Expr.dt.quarter | - | Int128 | - | refused rows: `quarter` operation not supported for dtype `i128`
+Expr.dt.quarter | - | Int16 | - | refused rows: `quarter` operation not supported for dtype `i16`
+Expr.dt.quarter | - | Int32 | - | refused rows: `quarter` operation not supported for dtype `i32`
+Expr.dt.quarter | - | Int64 | - | refused rows: `quarter` operation not supported for dtype `i64`
+Expr.dt.quarter | - | Int8 | - | refused rows: `quarter` operation not supported for dtype `i8`
+Expr.dt.quarter | - | List(Int64) | - | refused rows: `quarter` operation not supported for dtype `list[i64]`
+Expr.dt.quarter | - | List(String) | - | refused rows: `quarter` operation not supported for dtype `list[str]`
+Expr.dt.quarter | - | Null | - | refused rows: `quarter` operation not supported for dtype `null`
+Expr.dt.quarter | - | String | - | refused rows: `quarter` operation not supported for dtype `str`
+Expr.dt.quarter | - | Struct(x: Int64, y: String) | - | refused rows: `quarter` operation not supported for dtype `struct[2]`
+Expr.dt.quarter | - | Time | - | refused rows: `quarter` operation not supported for dtype `time`
+Expr.dt.quarter | - | UInt128 | - | refused rows: `quarter` operation not supported for dtype `u128`
+Expr.dt.quarter | - | UInt16 | - | refused rows: `quarter` operation not supported for dtype `u16`
+Expr.dt.quarter | - | UInt32 | - | refused rows: `quarter` operation not supported for dtype `u32`
+Expr.dt.quarter | - | UInt64 | - | refused rows: `quarter` operation not supported for dtype `u64`
+Expr.dt.quarter | - | UInt8 | - | refused rows: `quarter` operation not supported for dtype `u8`
+Expr.dt.second | - | Array(Int64, 2) | - | refused rows: `second` operation not supported for dtype `array[i64, 2]`
+Expr.dt.second | - | Boolean | - | refused rows: `second` operation not supported for dtype `bool`
+Expr.dt.second | - | Date | - | refused rows: `second` operation not supported for dtype `date`
+Expr.dt.second | - | Datetime(us) | - | allowed Int8 many
+Expr.dt.second | - | Datetime(us, UTC) | - | allowed Int8 many
+Expr.dt.second | - | Decimal(10, 2) | - | refused rows: `second` operation not supported for dtype `decimal[10,2]`
+Expr.dt.second | - | Duration(us) | - | refused rows: `second` operation not supported for dtype `duration[μs]`
+Expr.dt.second | - | Float16 | - | refused rows: `second` operation not supported for dtype `f16`
+Expr.dt.second | - | Float32 | - | refused rows: `second` operation not supported for dtype `f32`
+Expr.dt.second | - | Float64 | - | refused rows: `second` operation not supported for dtype `f64`
+Expr.dt.second | - | Int128 | - | refused rows: `second` operation not supported for dtype `i128`
+Expr.dt.second | - | Int16 | - | refused rows: `second` operation not supported for dtype `i16`
+Expr.dt.second | - | Int32 | - | refused rows: `second` operation not supported for dtype `i32`
+Expr.dt.second | - | Int64 | - | refused rows: `second` operation not supported for dtype `i64`
+Expr.dt.second | - | Int8 | - | refused rows: `second` operation not supported for dtype `i8`
+Expr.dt.second | - | List(Int64) | - | refused rows: `second` operation not supported for dtype `list[i64]`
+Expr.dt.second | - | List(String) | - | refused rows: `second` operation not supported for dtype `list[str]`
+Expr.dt.second | - | Null | - | refused rows: `second` operation not supported for dtype `null`
+Expr.dt.second | - | String | - | refused rows: `second` operation not supported for dtype `str`
+Expr.dt.second | - | Struct(x: Int64, y: String) | - | refused rows: `second` operation not supported for dtype `struct[2]`
+Expr.dt.second | - | Time | - | allowed Int8 many
+Expr.dt.second | - | UInt128 | - | refused rows: `second` operation not supported for dtype `u128`
+Expr.dt.second | - | UInt16 | - | refused rows: `second` operation not supported for dtype `u16`
+Expr.dt.second | - | UInt32 | - | refused rows: `second` operation not supported for dtype `u32`
+Expr.dt.second | - | UInt64 | - | refused rows: `second` operation not supported for dtype `u64`
+Expr.dt.second | - | UInt8 | - | refused rows: `second` operation not supported for dtype `u8`
 Expr.dt.time | - | Array(Int64, 2) | - | refused rows: expected Datetime or Time, got array[i64, 2]
 Expr.dt.time | - | Boolean | - | refused rows: expected Datetime or Time, got bool
 Expr.dt.time | - | Date | - | refused rows: expected Datetime or Time, got date
@@ -4012,6 +4480,32 @@ Expr.dt.time | - | UInt16 | - | refused rows: expected Datetime or Time, got u16
 Expr.dt.time | - | UInt32 | - | refused rows: expected Datetime or Time, got u32
 Expr.dt.time | - | UInt64 | - | refused rows: expected Datetime or Time, got u64
 Expr.dt.time | - | UInt8 | - | refused rows: expected Datetime or Time, got u8
+Expr.dt.timestamp | - | Array(Int64, 2) | - | refused rows: cannot cast Array type (inner: 'Int64', to: 'Datetime('μs')')
+Expr.dt.timestamp | - | Boolean | - | allowed Int64 many
+Expr.dt.timestamp | - | Date | - | allowed Int64 many
+Expr.dt.timestamp | - | Datetime(us) | - | allowed Int64 many
+Expr.dt.timestamp | - | Datetime(us, UTC) | - | allowed Int64 many
+Expr.dt.timestamp | - | Decimal(10, 2) | - | refused rows: casting from Decimal(10, 2) to Datetime('μs') not supported
+Expr.dt.timestamp | - | Duration(us) | - | refused rows: `timestamp` operation not supported for dtype `duration[μs]`
+Expr.dt.timestamp | - | Float16 | - | allowed Int64 many
+Expr.dt.timestamp | - | Float32 | - | allowed Int64 many
+Expr.dt.timestamp | - | Float64 | - | allowed Int64 many
+Expr.dt.timestamp | - | Int128 | - | allowed Int64 many
+Expr.dt.timestamp | - | Int16 | - | allowed Int64 many
+Expr.dt.timestamp | - | Int32 | - | allowed Int64 many
+Expr.dt.timestamp | - | Int64 | - | allowed Int64 many
+Expr.dt.timestamp | - | Int8 | - | allowed Int64 many
+Expr.dt.timestamp | - | List(Int64) | - | refused rows: cannot cast List type (inner: 'Int64', to: 'Datetime('μs')')
+Expr.dt.timestamp | - | List(String) | - | refused rows: cannot cast List type (inner: 'String', to: 'Datetime('μs')')
+Expr.dt.timestamp | - | Null | - | allowed Int64 many
+Expr.dt.timestamp | - | String | - | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+Expr.dt.timestamp | - | Struct(x: Int64, y: String) | - | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+Expr.dt.timestamp | - | Time | - | refused rows: `timestamp` operation not supported for dtype `time`
+Expr.dt.timestamp | - | UInt128 | - | allowed Int64 many
+Expr.dt.timestamp | - | UInt16 | - | allowed Int64 many
+Expr.dt.timestamp | - | UInt32 | - | allowed Int64 many
+Expr.dt.timestamp | - | UInt64 | - | allowed Int64 many
+Expr.dt.timestamp | - | UInt8 | - | allowed Int64 many
 Expr.dt.total_days | - | Array(Int64, 2) | - | refused rows: invalid series dtype: expected `Duration`, got `array[i64, 2]` for series with name `a`
 Expr.dt.total_days | - | Boolean | - | refused rows: invalid series dtype: expected `Duration`, got `bool` for series with name `a`
 Expr.dt.total_days | - | Date | - | refused rows: invalid series dtype: expected `Duration`, got `date` for series with name `a`
@@ -4038,6 +4532,240 @@ Expr.dt.total_days | - | UInt16 | - | refused rows: invalid series dtype: expect
 Expr.dt.total_days | - | UInt32 | - | refused rows: invalid series dtype: expected `Duration`, got `u32` for series with name `a`
 Expr.dt.total_days | - | UInt64 | - | refused rows: invalid series dtype: expected `Duration`, got `u64` for series with name `a`
 Expr.dt.total_days | - | UInt8 | - | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
+Expr.dt.total_hours | - | Array(Int64, 2) | - | refused rows: invalid series dtype: expected `Duration`, got `array[i64, 2]` for series with name `a`
+Expr.dt.total_hours | - | Boolean | - | refused rows: invalid series dtype: expected `Duration`, got `bool` for series with name `a`
+Expr.dt.total_hours | - | Date | - | refused rows: invalid series dtype: expected `Duration`, got `date` for series with name `a`
+Expr.dt.total_hours | - | Datetime(us) | - | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`
+Expr.dt.total_hours | - | Datetime(us, UTC) | - | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.total_hours | - | Decimal(10, 2) | - | refused rows: invalid series dtype: expected `Duration`, got `decimal[10,2]` for series with name `a`
+Expr.dt.total_hours | - | Duration(us) | - | allowed Int64 many
+Expr.dt.total_hours | - | Float16 | - | refused rows: invalid series dtype: expected `Duration`, got `f16` for series with name `a`
+Expr.dt.total_hours | - | Float32 | - | refused rows: invalid series dtype: expected `Duration`, got `f32` for series with name `a`
+Expr.dt.total_hours | - | Float64 | - | refused rows: invalid series dtype: expected `Duration`, got `f64` for series with name `a`
+Expr.dt.total_hours | - | Int128 | - | refused rows: invalid series dtype: expected `Duration`, got `i128` for series with name `a`
+Expr.dt.total_hours | - | Int16 | - | refused rows: invalid series dtype: expected `Duration`, got `i16` for series with name `a`
+Expr.dt.total_hours | - | Int32 | - | refused rows: invalid series dtype: expected `Duration`, got `i32` for series with name `a`
+Expr.dt.total_hours | - | Int64 | - | refused rows: invalid series dtype: expected `Duration`, got `i64` for series with name `a`
+Expr.dt.total_hours | - | Int8 | - | refused rows: invalid series dtype: expected `Duration`, got `i8` for series with name `a`
+Expr.dt.total_hours | - | List(Int64) | - | refused rows: invalid series dtype: expected `Duration`, got `list[i64]` for series with name `a`
+Expr.dt.total_hours | - | List(String) | - | refused rows: invalid series dtype: expected `Duration`, got `list[str]` for series with name `a`
+Expr.dt.total_hours | - | Null | - | refused rows: invalid series dtype: expected `Duration`, got `null` for series with name `a`
+Expr.dt.total_hours | - | String | - | refused rows: invalid series dtype: expected `Duration`, got `str` for series with name `a`
+Expr.dt.total_hours | - | Struct(x: Int64, y: String) | - | refused rows: invalid series dtype: expected `Duration`, got `struct[2]` for series with name `a`
+Expr.dt.total_hours | - | Time | - | refused rows: invalid series dtype: expected `Duration`, got `time` for series with name `a`
+Expr.dt.total_hours | - | UInt128 | - | refused rows: invalid series dtype: expected `Duration`, got `u128` for series with name `a`
+Expr.dt.total_hours | - | UInt16 | - | refused rows: invalid series dtype: expected `Duration`, got `u16` for series with name `a`
+Expr.dt.total_hours | - | UInt32 | - | refused rows: invalid series dtype: expected `Duration`, got `u32` for series with name `a`
+Expr.dt.total_hours | - | UInt64 | - | refused rows: invalid series dtype: expected `Duration`, got `u64` for series with name `a`
+Expr.dt.total_hours | - | UInt8 | - | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
+Expr.dt.total_microseconds | - | Array(Int64, 2) | - | refused rows: invalid series dtype: expected `Duration`, got `array[i64, 2]` for series with name `a`
+Expr.dt.total_microseconds | - | Boolean | - | refused rows: invalid series dtype: expected `Duration`, got `bool` for series with name `a`
+Expr.dt.total_microseconds | - | Date | - | refused rows: invalid series dtype: expected `Duration`, got `date` for series with name `a`
+Expr.dt.total_microseconds | - | Datetime(us) | - | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`
+Expr.dt.total_microseconds | - | Datetime(us, UTC) | - | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.total_microseconds | - | Decimal(10, 2) | - | refused rows: invalid series dtype: expected `Duration`, got `decimal[10,2]` for series with name `a`
+Expr.dt.total_microseconds | - | Duration(us) | - | allowed Int64 many
+Expr.dt.total_microseconds | - | Float16 | - | refused rows: invalid series dtype: expected `Duration`, got `f16` for series with name `a`
+Expr.dt.total_microseconds | - | Float32 | - | refused rows: invalid series dtype: expected `Duration`, got `f32` for series with name `a`
+Expr.dt.total_microseconds | - | Float64 | - | refused rows: invalid series dtype: expected `Duration`, got `f64` for series with name `a`
+Expr.dt.total_microseconds | - | Int128 | - | refused rows: invalid series dtype: expected `Duration`, got `i128` for series with name `a`
+Expr.dt.total_microseconds | - | Int16 | - | refused rows: invalid series dtype: expected `Duration`, got `i16` for series with name `a`
+Expr.dt.total_microseconds | - | Int32 | - | refused rows: invalid series dtype: expected `Duration`, got `i32` for series with name `a`
+Expr.dt.total_microseconds | - | Int64 | - | refused rows: invalid series dtype: expected `Duration`, got `i64` for series with name `a`
+Expr.dt.total_microseconds | - | Int8 | - | refused rows: invalid series dtype: expected `Duration`, got `i8` for series with name `a`
+Expr.dt.total_microseconds | - | List(Int64) | - | refused rows: invalid series dtype: expected `Duration`, got `list[i64]` for series with name `a`
+Expr.dt.total_microseconds | - | List(String) | - | refused rows: invalid series dtype: expected `Duration`, got `list[str]` for series with name `a`
+Expr.dt.total_microseconds | - | Null | - | refused rows: invalid series dtype: expected `Duration`, got `null` for series with name `a`
+Expr.dt.total_microseconds | - | String | - | refused rows: invalid series dtype: expected `Duration`, got `str` for series with name `a`
+Expr.dt.total_microseconds | - | Struct(x: Int64, y: String) | - | refused rows: invalid series dtype: expected `Duration`, got `struct[2]` for series with name `a`
+Expr.dt.total_microseconds | - | Time | - | refused rows: invalid series dtype: expected `Duration`, got `time` for series with name `a`
+Expr.dt.total_microseconds | - | UInt128 | - | refused rows: invalid series dtype: expected `Duration`, got `u128` for series with name `a`
+Expr.dt.total_microseconds | - | UInt16 | - | refused rows: invalid series dtype: expected `Duration`, got `u16` for series with name `a`
+Expr.dt.total_microseconds | - | UInt32 | - | refused rows: invalid series dtype: expected `Duration`, got `u32` for series with name `a`
+Expr.dt.total_microseconds | - | UInt64 | - | refused rows: invalid series dtype: expected `Duration`, got `u64` for series with name `a`
+Expr.dt.total_microseconds | - | UInt8 | - | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
+Expr.dt.total_milliseconds | - | Array(Int64, 2) | - | refused rows: invalid series dtype: expected `Duration`, got `array[i64, 2]` for series with name `a`
+Expr.dt.total_milliseconds | - | Boolean | - | refused rows: invalid series dtype: expected `Duration`, got `bool` for series with name `a`
+Expr.dt.total_milliseconds | - | Date | - | refused rows: invalid series dtype: expected `Duration`, got `date` for series with name `a`
+Expr.dt.total_milliseconds | - | Datetime(us) | - | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`
+Expr.dt.total_milliseconds | - | Datetime(us, UTC) | - | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.total_milliseconds | - | Decimal(10, 2) | - | refused rows: invalid series dtype: expected `Duration`, got `decimal[10,2]` for series with name `a`
+Expr.dt.total_milliseconds | - | Duration(us) | - | allowed Int64 many
+Expr.dt.total_milliseconds | - | Float16 | - | refused rows: invalid series dtype: expected `Duration`, got `f16` for series with name `a`
+Expr.dt.total_milliseconds | - | Float32 | - | refused rows: invalid series dtype: expected `Duration`, got `f32` for series with name `a`
+Expr.dt.total_milliseconds | - | Float64 | - | refused rows: invalid series dtype: expected `Duration`, got `f64` for series with name `a`
+Expr.dt.total_milliseconds | - | Int128 | - | refused rows: invalid series dtype: expected `Duration`, got `i128` for series with name `a`
+Expr.dt.total_milliseconds | - | Int16 | - | refused rows: invalid series dtype: expected `Duration`, got `i16` for series with name `a`
+Expr.dt.total_milliseconds | - | Int32 | - | refused rows: invalid series dtype: expected `Duration`, got `i32` for series with name `a`
+Expr.dt.total_milliseconds | - | Int64 | - | refused rows: invalid series dtype: expected `Duration`, got `i64` for series with name `a`
+Expr.dt.total_milliseconds | - | Int8 | - | refused rows: invalid series dtype: expected `Duration`, got `i8` for series with name `a`
+Expr.dt.total_milliseconds | - | List(Int64) | - | refused rows: invalid series dtype: expected `Duration`, got `list[i64]` for series with name `a`
+Expr.dt.total_milliseconds | - | List(String) | - | refused rows: invalid series dtype: expected `Duration`, got `list[str]` for series with name `a`
+Expr.dt.total_milliseconds | - | Null | - | refused rows: invalid series dtype: expected `Duration`, got `null` for series with name `a`
+Expr.dt.total_milliseconds | - | String | - | refused rows: invalid series dtype: expected `Duration`, got `str` for series with name `a`
+Expr.dt.total_milliseconds | - | Struct(x: Int64, y: String) | - | refused rows: invalid series dtype: expected `Duration`, got `struct[2]` for series with name `a`
+Expr.dt.total_milliseconds | - | Time | - | refused rows: invalid series dtype: expected `Duration`, got `time` for series with name `a`
+Expr.dt.total_milliseconds | - | UInt128 | - | refused rows: invalid series dtype: expected `Duration`, got `u128` for series with name `a`
+Expr.dt.total_milliseconds | - | UInt16 | - | refused rows: invalid series dtype: expected `Duration`, got `u16` for series with name `a`
+Expr.dt.total_milliseconds | - | UInt32 | - | refused rows: invalid series dtype: expected `Duration`, got `u32` for series with name `a`
+Expr.dt.total_milliseconds | - | UInt64 | - | refused rows: invalid series dtype: expected `Duration`, got `u64` for series with name `a`
+Expr.dt.total_milliseconds | - | UInt8 | - | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
+Expr.dt.total_minutes | - | Array(Int64, 2) | - | refused rows: invalid series dtype: expected `Duration`, got `array[i64, 2]` for series with name `a`
+Expr.dt.total_minutes | - | Boolean | - | refused rows: invalid series dtype: expected `Duration`, got `bool` for series with name `a`
+Expr.dt.total_minutes | - | Date | - | refused rows: invalid series dtype: expected `Duration`, got `date` for series with name `a`
+Expr.dt.total_minutes | - | Datetime(us) | - | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`
+Expr.dt.total_minutes | - | Datetime(us, UTC) | - | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.total_minutes | - | Decimal(10, 2) | - | refused rows: invalid series dtype: expected `Duration`, got `decimal[10,2]` for series with name `a`
+Expr.dt.total_minutes | - | Duration(us) | - | allowed Int64 many
+Expr.dt.total_minutes | - | Float16 | - | refused rows: invalid series dtype: expected `Duration`, got `f16` for series with name `a`
+Expr.dt.total_minutes | - | Float32 | - | refused rows: invalid series dtype: expected `Duration`, got `f32` for series with name `a`
+Expr.dt.total_minutes | - | Float64 | - | refused rows: invalid series dtype: expected `Duration`, got `f64` for series with name `a`
+Expr.dt.total_minutes | - | Int128 | - | refused rows: invalid series dtype: expected `Duration`, got `i128` for series with name `a`
+Expr.dt.total_minutes | - | Int16 | - | refused rows: invalid series dtype: expected `Duration`, got `i16` for series with name `a`
+Expr.dt.total_minutes | - | Int32 | - | refused rows: invalid series dtype: expected `Duration`, got `i32` for series with name `a`
+Expr.dt.total_minutes | - | Int64 | - | refused rows: invalid series dtype: expected `Duration`, got `i64` for series with name `a`
+Expr.dt.total_minutes | - | Int8 | - | refused rows: invalid series dtype: expected `Duration`, got `i8` for series with name `a`
+Expr.dt.total_minutes | - | List(Int64) | - | refused rows: invalid series dtype: expected `Duration`, got `list[i64]` for series with name `a`
+Expr.dt.total_minutes | - | List(String) | - | refused rows: invalid series dtype: expected `Duration`, got `list[str]` for series with name `a`
+Expr.dt.total_minutes | - | Null | - | refused rows: invalid series dtype: expected `Duration`, got `null` for series with name `a`
+Expr.dt.total_minutes | - | String | - | refused rows: invalid series dtype: expected `Duration`, got `str` for series with name `a`
+Expr.dt.total_minutes | - | Struct(x: Int64, y: String) | - | refused rows: invalid series dtype: expected `Duration`, got `struct[2]` for series with name `a`
+Expr.dt.total_minutes | - | Time | - | refused rows: invalid series dtype: expected `Duration`, got `time` for series with name `a`
+Expr.dt.total_minutes | - | UInt128 | - | refused rows: invalid series dtype: expected `Duration`, got `u128` for series with name `a`
+Expr.dt.total_minutes | - | UInt16 | - | refused rows: invalid series dtype: expected `Duration`, got `u16` for series with name `a`
+Expr.dt.total_minutes | - | UInt32 | - | refused rows: invalid series dtype: expected `Duration`, got `u32` for series with name `a`
+Expr.dt.total_minutes | - | UInt64 | - | refused rows: invalid series dtype: expected `Duration`, got `u64` for series with name `a`
+Expr.dt.total_minutes | - | UInt8 | - | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
+Expr.dt.total_nanoseconds | - | Array(Int64, 2) | - | refused rows: invalid series dtype: expected `Duration`, got `array[i64, 2]` for series with name `a`
+Expr.dt.total_nanoseconds | - | Boolean | - | refused rows: invalid series dtype: expected `Duration`, got `bool` for series with name `a`
+Expr.dt.total_nanoseconds | - | Date | - | refused rows: invalid series dtype: expected `Duration`, got `date` for series with name `a`
+Expr.dt.total_nanoseconds | - | Datetime(us) | - | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`
+Expr.dt.total_nanoseconds | - | Datetime(us, UTC) | - | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.total_nanoseconds | - | Decimal(10, 2) | - | refused rows: invalid series dtype: expected `Duration`, got `decimal[10,2]` for series with name `a`
+Expr.dt.total_nanoseconds | - | Duration(us) | - | allowed Int64 many
+Expr.dt.total_nanoseconds | - | Float16 | - | refused rows: invalid series dtype: expected `Duration`, got `f16` for series with name `a`
+Expr.dt.total_nanoseconds | - | Float32 | - | refused rows: invalid series dtype: expected `Duration`, got `f32` for series with name `a`
+Expr.dt.total_nanoseconds | - | Float64 | - | refused rows: invalid series dtype: expected `Duration`, got `f64` for series with name `a`
+Expr.dt.total_nanoseconds | - | Int128 | - | refused rows: invalid series dtype: expected `Duration`, got `i128` for series with name `a`
+Expr.dt.total_nanoseconds | - | Int16 | - | refused rows: invalid series dtype: expected `Duration`, got `i16` for series with name `a`
+Expr.dt.total_nanoseconds | - | Int32 | - | refused rows: invalid series dtype: expected `Duration`, got `i32` for series with name `a`
+Expr.dt.total_nanoseconds | - | Int64 | - | refused rows: invalid series dtype: expected `Duration`, got `i64` for series with name `a`
+Expr.dt.total_nanoseconds | - | Int8 | - | refused rows: invalid series dtype: expected `Duration`, got `i8` for series with name `a`
+Expr.dt.total_nanoseconds | - | List(Int64) | - | refused rows: invalid series dtype: expected `Duration`, got `list[i64]` for series with name `a`
+Expr.dt.total_nanoseconds | - | List(String) | - | refused rows: invalid series dtype: expected `Duration`, got `list[str]` for series with name `a`
+Expr.dt.total_nanoseconds | - | Null | - | refused rows: invalid series dtype: expected `Duration`, got `null` for series with name `a`
+Expr.dt.total_nanoseconds | - | String | - | refused rows: invalid series dtype: expected `Duration`, got `str` for series with name `a`
+Expr.dt.total_nanoseconds | - | Struct(x: Int64, y: String) | - | refused rows: invalid series dtype: expected `Duration`, got `struct[2]` for series with name `a`
+Expr.dt.total_nanoseconds | - | Time | - | refused rows: invalid series dtype: expected `Duration`, got `time` for series with name `a`
+Expr.dt.total_nanoseconds | - | UInt128 | - | refused rows: invalid series dtype: expected `Duration`, got `u128` for series with name `a`
+Expr.dt.total_nanoseconds | - | UInt16 | - | refused rows: invalid series dtype: expected `Duration`, got `u16` for series with name `a`
+Expr.dt.total_nanoseconds | - | UInt32 | - | refused rows: invalid series dtype: expected `Duration`, got `u32` for series with name `a`
+Expr.dt.total_nanoseconds | - | UInt64 | - | refused rows: invalid series dtype: expected `Duration`, got `u64` for series with name `a`
+Expr.dt.total_nanoseconds | - | UInt8 | - | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
+Expr.dt.total_seconds | - | Array(Int64, 2) | - | refused rows: invalid series dtype: expected `Duration`, got `array[i64, 2]` for series with name `a`
+Expr.dt.total_seconds | - | Boolean | - | refused rows: invalid series dtype: expected `Duration`, got `bool` for series with name `a`
+Expr.dt.total_seconds | - | Date | - | refused rows: invalid series dtype: expected `Duration`, got `date` for series with name `a`
+Expr.dt.total_seconds | - | Datetime(us) | - | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`
+Expr.dt.total_seconds | - | Datetime(us, UTC) | - | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.total_seconds | - | Decimal(10, 2) | - | refused rows: invalid series dtype: expected `Duration`, got `decimal[10,2]` for series with name `a`
+Expr.dt.total_seconds | - | Duration(us) | - | allowed Int64 many
+Expr.dt.total_seconds | - | Float16 | - | refused rows: invalid series dtype: expected `Duration`, got `f16` for series with name `a`
+Expr.dt.total_seconds | - | Float32 | - | refused rows: invalid series dtype: expected `Duration`, got `f32` for series with name `a`
+Expr.dt.total_seconds | - | Float64 | - | refused rows: invalid series dtype: expected `Duration`, got `f64` for series with name `a`
+Expr.dt.total_seconds | - | Int128 | - | refused rows: invalid series dtype: expected `Duration`, got `i128` for series with name `a`
+Expr.dt.total_seconds | - | Int16 | - | refused rows: invalid series dtype: expected `Duration`, got `i16` for series with name `a`
+Expr.dt.total_seconds | - | Int32 | - | refused rows: invalid series dtype: expected `Duration`, got `i32` for series with name `a`
+Expr.dt.total_seconds | - | Int64 | - | refused rows: invalid series dtype: expected `Duration`, got `i64` for series with name `a`
+Expr.dt.total_seconds | - | Int8 | - | refused rows: invalid series dtype: expected `Duration`, got `i8` for series with name `a`
+Expr.dt.total_seconds | - | List(Int64) | - | refused rows: invalid series dtype: expected `Duration`, got `list[i64]` for series with name `a`
+Expr.dt.total_seconds | - | List(String) | - | refused rows: invalid series dtype: expected `Duration`, got `list[str]` for series with name `a`
+Expr.dt.total_seconds | - | Null | - | refused rows: invalid series dtype: expected `Duration`, got `null` for series with name `a`
+Expr.dt.total_seconds | - | String | - | refused rows: invalid series dtype: expected `Duration`, got `str` for series with name `a`
+Expr.dt.total_seconds | - | Struct(x: Int64, y: String) | - | refused rows: invalid series dtype: expected `Duration`, got `struct[2]` for series with name `a`
+Expr.dt.total_seconds | - | Time | - | refused rows: invalid series dtype: expected `Duration`, got `time` for series with name `a`
+Expr.dt.total_seconds | - | UInt128 | - | refused rows: invalid series dtype: expected `Duration`, got `u128` for series with name `a`
+Expr.dt.total_seconds | - | UInt16 | - | refused rows: invalid series dtype: expected `Duration`, got `u16` for series with name `a`
+Expr.dt.total_seconds | - | UInt32 | - | refused rows: invalid series dtype: expected `Duration`, got `u32` for series with name `a`
+Expr.dt.total_seconds | - | UInt64 | - | refused rows: invalid series dtype: expected `Duration`, got `u64` for series with name `a`
+Expr.dt.total_seconds | - | UInt8 | - | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
+Expr.dt.week | - | Array(Int64, 2) | - | refused rows: `week` operation not supported for dtype `array[i64, 2]`
+Expr.dt.week | - | Boolean | - | refused rows: `week` operation not supported for dtype `bool`
+Expr.dt.week | - | Date | - | allowed Int8 many
+Expr.dt.week | - | Datetime(us) | - | allowed Int8 many
+Expr.dt.week | - | Datetime(us, UTC) | - | allowed Int8 many
+Expr.dt.week | - | Decimal(10, 2) | - | refused rows: `week` operation not supported for dtype `decimal[10,2]`
+Expr.dt.week | - | Duration(us) | - | refused rows: `week` operation not supported for dtype `duration[μs]`
+Expr.dt.week | - | Float16 | - | refused rows: `week` operation not supported for dtype `f16`
+Expr.dt.week | - | Float32 | - | refused rows: `week` operation not supported for dtype `f32`
+Expr.dt.week | - | Float64 | - | refused rows: `week` operation not supported for dtype `f64`
+Expr.dt.week | - | Int128 | - | refused rows: `week` operation not supported for dtype `i128`
+Expr.dt.week | - | Int16 | - | refused rows: `week` operation not supported for dtype `i16`
+Expr.dt.week | - | Int32 | - | refused rows: `week` operation not supported for dtype `i32`
+Expr.dt.week | - | Int64 | - | refused rows: `week` operation not supported for dtype `i64`
+Expr.dt.week | - | Int8 | - | refused rows: `week` operation not supported for dtype `i8`
+Expr.dt.week | - | List(Int64) | - | refused rows: `week` operation not supported for dtype `list[i64]`
+Expr.dt.week | - | List(String) | - | refused rows: `week` operation not supported for dtype `list[str]`
+Expr.dt.week | - | Null | - | refused rows: `week` operation not supported for dtype `null`
+Expr.dt.week | - | String | - | refused rows: `week` operation not supported for dtype `str`
+Expr.dt.week | - | Struct(x: Int64, y: String) | - | refused rows: `week` operation not supported for dtype `struct[2]`
+Expr.dt.week | - | Time | - | refused rows: `week` operation not supported for dtype `time`
+Expr.dt.week | - | UInt128 | - | refused rows: `week` operation not supported for dtype `u128`
+Expr.dt.week | - | UInt16 | - | refused rows: `week` operation not supported for dtype `u16`
+Expr.dt.week | - | UInt32 | - | refused rows: `week` operation not supported for dtype `u32`
+Expr.dt.week | - | UInt64 | - | refused rows: `week` operation not supported for dtype `u64`
+Expr.dt.week | - | UInt8 | - | refused rows: `week` operation not supported for dtype `u8`
+Expr.dt.weekday | - | Array(Int64, 2) | - | refused rows: `weekday` operation not supported for dtype `array[i64, 2]`
+Expr.dt.weekday | - | Boolean | - | refused rows: `weekday` operation not supported for dtype `bool`
+Expr.dt.weekday | - | Date | - | allowed Int8 many
+Expr.dt.weekday | - | Datetime(us) | - | allowed Int8 many
+Expr.dt.weekday | - | Datetime(us, UTC) | - | allowed Int8 many
+Expr.dt.weekday | - | Decimal(10, 2) | - | refused rows: `weekday` operation not supported for dtype `decimal[10,2]`
+Expr.dt.weekday | - | Duration(us) | - | refused rows: `weekday` operation not supported for dtype `duration[μs]`
+Expr.dt.weekday | - | Float16 | - | refused rows: `weekday` operation not supported for dtype `f16`
+Expr.dt.weekday | - | Float32 | - | refused rows: `weekday` operation not supported for dtype `f32`
+Expr.dt.weekday | - | Float64 | - | refused rows: `weekday` operation not supported for dtype `f64`
+Expr.dt.weekday | - | Int128 | - | refused rows: `weekday` operation not supported for dtype `i128`
+Expr.dt.weekday | - | Int16 | - | refused rows: `weekday` operation not supported for dtype `i16`
+Expr.dt.weekday | - | Int32 | - | refused rows: `weekday` operation not supported for dtype `i32`
+Expr.dt.weekday | - | Int64 | - | refused rows: `weekday` operation not supported for dtype `i64`
+Expr.dt.weekday | - | Int8 | - | refused rows: `weekday` operation not supported for dtype `i8`
+Expr.dt.weekday | - | List(Int64) | - | refused rows: `weekday` operation not supported for dtype `list[i64]`
+Expr.dt.weekday | - | List(String) | - | refused rows: `weekday` operation not supported for dtype `list[str]`
+Expr.dt.weekday | - | Null | - | refused rows: `weekday` operation not supported for dtype `null`
+Expr.dt.weekday | - | String | - | refused rows: `weekday` operation not supported for dtype `str`
+Expr.dt.weekday | - | Struct(x: Int64, y: String) | - | refused rows: `weekday` operation not supported for dtype `struct[2]`
+Expr.dt.weekday | - | Time | - | refused rows: `weekday` operation not supported for dtype `time`
+Expr.dt.weekday | - | UInt128 | - | refused rows: `weekday` operation not supported for dtype `u128`
+Expr.dt.weekday | - | UInt16 | - | refused rows: `weekday` operation not supported for dtype `u16`
+Expr.dt.weekday | - | UInt32 | - | refused rows: `weekday` operation not supported for dtype `u32`
+Expr.dt.weekday | - | UInt64 | - | refused rows: `weekday` operation not supported for dtype `u64`
+Expr.dt.weekday | - | UInt8 | - | refused rows: `weekday` operation not supported for dtype `u8`
+Expr.dt.year | - | Array(Int64, 2) | - | refused rows: `year` operation not supported for dtype `array[i64, 2]`
+Expr.dt.year | - | Boolean | - | refused rows: `year` operation not supported for dtype `bool`
+Expr.dt.year | - | Date | - | allowed Int32 many
+Expr.dt.year | - | Datetime(us) | - | allowed Int32 many
+Expr.dt.year | - | Datetime(us, UTC) | - | allowed Int32 many
+Expr.dt.year | - | Decimal(10, 2) | - | refused rows: `year` operation not supported for dtype `decimal[10,2]`
+Expr.dt.year | - | Duration(us) | - | refused rows: `year` operation not supported for dtype `duration[μs]`
+Expr.dt.year | - | Float16 | - | refused rows: `year` operation not supported for dtype `f16`
+Expr.dt.year | - | Float32 | - | refused rows: `year` operation not supported for dtype `f32`
+Expr.dt.year | - | Float64 | - | refused rows: `year` operation not supported for dtype `f64`
+Expr.dt.year | - | Int128 | - | refused rows: `year` operation not supported for dtype `i128`
+Expr.dt.year | - | Int16 | - | refused rows: `year` operation not supported for dtype `i16`
+Expr.dt.year | - | Int32 | - | refused rows: `year` operation not supported for dtype `i32`
+Expr.dt.year | - | Int64 | - | refused rows: `year` operation not supported for dtype `i64`
+Expr.dt.year | - | Int8 | - | refused rows: `year` operation not supported for dtype `i8`
+Expr.dt.year | - | List(Int64) | - | refused rows: `year` operation not supported for dtype `list[i64]`
+Expr.dt.year | - | List(String) | - | refused rows: `year` operation not supported for dtype `list[str]`
+Expr.dt.year | - | Null | - | refused rows: `year` operation not supported for dtype `null`
+Expr.dt.year | - | String | - | refused rows: `year` operation not supported for dtype `str`
+Expr.dt.year | - | Struct(x: Int64, y: String) | - | refused rows: `year` operation not supported for dtype `struct[2]`
+Expr.dt.year | - | Time | - | refused rows: `year` operation not supported for dtype `time`
+Expr.dt.year | - | UInt128 | - | refused rows: `year` operation not supported for dtype `u128`
+Expr.dt.year | - | UInt16 | - | refused rows: `year` operation not supported for dtype `u16`
+Expr.dt.year | - | UInt32 | - | refused rows: `year` operation not supported for dtype `u32`
+Expr.dt.year | - | UInt64 | - | refused rows: `year` operation not supported for dtype `u64`
+Expr.dt.year | - | UInt8 | - | refused rows: `year` operation not supported for dtype `u8`
 Expr.eq | other | Array(Int64, 2) | Array(Int64, 2) | allowed Boolean many
 Expr.eq | other | Array(Int64, 2) | Boolean | refused rows: could not evaluate comparison between series 'a' of dtype: Array(Int64, 2) and series 'b' of dtype: Boolean
 Expr.eq | other | Array(Int64, 2) | Date | refused rows: could not evaluate comparison between series 'a' of dtype: Array(Int64, 2) and series 'b' of dtype: Date

@@ -15,7 +15,7 @@ use polars::frame::PivotColumnNaming;
 use polars::prelude::{
     AnyValue, ClosedInterval, DataType, Expr, FillNullStrategy, JoinBuildSide, JoinCoalesce,
     JoinType, JoinValidation, LazyFrame, MaintainOrderJoin, NULL, NamedFrom, Operator, PolarsError,
-    RoundMode, Scalar, Series, SortMultipleOptions, SortOptions, WindowMapping, all,
+    RoundMode, Scalar, Series, SortMultipleOptions, SortOptions, TimeUnit, WindowMapping, all,
     all_horizontal, binary_expr, col, cols, element, lit, when,
 };
 
@@ -45,6 +45,17 @@ const SUBTRACTABLE: &[Dtypes] = &[Dtypes::Numeric, Dtypes::Temporal];
 const DATE_PART: &[Dtypes] = &[Dtypes::Datetime, Dtypes::Date];
 const TIME_PART: &[Dtypes] = &[Dtypes::Datetime, Dtypes::Time];
 const DURATION: &[Dtypes] = &[Dtypes::Duration];
+// What Polars takes a time unit of: a `Datetime` and a `Duration` are held in one, and changed to
+// another by `cast_time_unit`.
+const HAS_A_UNIT: &[Dtypes] = &[Dtypes::Datetime, Dtypes::Duration];
+// What Polars counts since the start of 1970: a moment, and a number or a `Boolean`, which it
+// reads as the count of microseconds a moment is. A time of day, a duration and text it refuses.
+const COUNTED_SINCE_1970: &[Dtypes] = &[
+    Dtypes::Numeric,
+    Dtypes::Boolean,
+    Dtypes::Datetime,
+    Dtypes::Date,
+];
 
 // What Polars accepts on the receiver of arithmetic and logic, from the functions that run
 // them: a coarse group is claimed when Polars accepts it with some dtype of operand, and the
@@ -119,6 +130,11 @@ const BUILD_SIDE: &[&str] = &[
     "force_left",
     "force_right",
 ];
+// The words Python's `TimeUnit` takes: the unit a `Datetime` or a `Duration` counts in.
+const TIME_UNIT: &[&str] = &["ns", "us", "ms"];
+// The words Python's `epoch` takes for `time_unit`: the three units of a `TimeUnit`, and seconds
+// and days, which `epoch` works out of them.
+const EPOCH_UNIT: &[&str] = &["ns", "us", "ms", "s", "d"];
 const COLUMN_NAMING: &[&str] = &["auto", "combine"];
 const MAPPING_STRATEGY: &[&str] = &["group_to_rows", "join", "explode"];
 // The words Python's binding takes for `mode`. Polars' enum also has `to_zero`, which the
@@ -129,6 +145,24 @@ const CLOSED: &[&str] = &["both", "left", "right", "none"];
 // The words Python's `fill_null` takes for `strategy`, which `parse_fill_null_strategy` in the
 // binding reads. `forward` and `backward` are the strategies `limit` bounds.
 const FILL_STRATEGY: &[&str] = &["forward", "backward", "min", "max", "mean", "zero", "one"];
+
+/// A method of the `dt` namespace: it takes the dates, times and lengths of time it `accepts` and
+/// is swapped for the others of its family.
+const fn temporal(
+    id: &'static str,
+    accepts: &'static [Dtypes],
+    parameters: &'static [Parameter],
+    build: fn(Expr, &Arguments) -> Result<Expr, BuildError>,
+) -> Entry {
+    Entry {
+        id: EntryId(id),
+        family: Family::Temporal,
+        accepts,
+        parameters,
+        laziness: Laziness::Lazy,
+        build: Build::Expression(build),
+    }
+}
 
 const fn required(name: &'static str, kind: Kind, shape: Shape) -> Parameter {
     Parameter::new(name, kind, shape, ParameterDefault::Required)
@@ -1075,6 +1109,168 @@ fn dt_total_days(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> 
     Ok(expr.dt().total_days(arguments.flag("fractional", false)?))
 }
 
+fn dt_century(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().century())
+}
+
+fn dt_day(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().day())
+}
+
+fn dt_days_in_month(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().days_in_month())
+}
+
+fn dt_iso_year(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().iso_year())
+}
+
+fn dt_millennium(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().millennium())
+}
+
+fn dt_month(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().month())
+}
+
+fn dt_month_end(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().month_end())
+}
+
+fn dt_ordinal_day(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().ordinal_day())
+}
+
+fn dt_quarter(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().quarter())
+}
+
+fn dt_week(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().week())
+}
+
+fn dt_weekday(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().weekday())
+}
+
+fn dt_year(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().year())
+}
+
+fn dt_is_leap_year(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().is_leap_year())
+}
+
+fn dt_hour(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().hour())
+}
+
+fn dt_minute(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().minute())
+}
+
+fn dt_millisecond(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().millisecond())
+}
+
+fn dt_microsecond(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().microsecond())
+}
+
+fn dt_nanosecond(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().nanosecond())
+}
+
+/// The second of the minute, with the fraction of it as Python writes it: the whole second and
+/// the nanoseconds of it over a billion.
+fn dt_second(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(if arguments.flag("fractional", false)? {
+        expr.clone().dt().second() + expr.dt().nanosecond() / lit(1_000_000_000.0)
+    } else {
+        expr.dt().second()
+    })
+}
+
+fn dt_total_hours(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().total_hours(arguments.flag("fractional", false)?))
+}
+
+fn dt_total_minutes(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr
+        .dt()
+        .total_minutes(arguments.flag("fractional", false)?))
+}
+
+fn dt_total_seconds(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr
+        .dt()
+        .total_seconds(arguments.flag("fractional", false)?))
+}
+
+fn dt_total_milliseconds(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr
+        .dt()
+        .total_milliseconds(arguments.flag("fractional", false)?))
+}
+
+fn dt_total_microseconds(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr
+        .dt()
+        .total_microseconds(arguments.flag("fractional", false)?))
+}
+
+fn dt_total_nanoseconds(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr
+        .dt()
+        .total_nanoseconds(arguments.flag("fractional", false)?))
+}
+
+/// The time unit given for `parameter`, which is one of `words`.
+fn time_unit(
+    arguments: &Arguments,
+    parameter: &'static str,
+    words: &[&'static str],
+    default: Option<&'static str>,
+) -> Result<TimeUnit, BuildError> {
+    let word = match (arguments.get(parameter), default) {
+        (None, None) => return Err(BuildError::Missing { parameter }),
+        (_, default) => arguments.choice(parameter, words, default.unwrap_or(words[0]))?,
+    };
+    Ok(match word {
+        "ns" => TimeUnit::Nanoseconds,
+        "ms" => TimeUnit::Milliseconds,
+        _ => TimeUnit::Microseconds,
+    })
+}
+
+fn dt_cast_time_unit(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr
+        .dt()
+        .cast_time_unit(time_unit(arguments, "time_unit", TIME_UNIT, None)?))
+}
+
+fn dt_timestamp(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr
+        .dt()
+        .timestamp(time_unit(arguments, "time_unit", TIME_UNIT, Some("us"))?))
+}
+
+/// The time since the start of 1970 in the unit asked for, as Python works it out: a time stamp
+/// in the three units of a time unit, a whole number of seconds from one in milliseconds, and a
+/// whole number of days from the date.
+fn dt_epoch(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(match arguments.choice("time_unit", EPOCH_UNIT, "us")? {
+        "s" => expr
+            .dt()
+            .timestamp(TimeUnit::Milliseconds)
+            .floor_div(lit(1000_i64)),
+        "d" => expr.cast(DataType::Date).cast(DataType::Int32),
+        _ => expr
+            .dt()
+            .timestamp(time_unit(arguments, "time_unit", TIME_UNIT, Some("us"))?),
+    })
+}
+
 fn over(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
     // As in Python, `*more_exprs` extends `partition_by` and means nothing without it.
     let partition_by = match arguments.get("partition_by") {
@@ -1660,6 +1856,13 @@ pub(super) const ENTRIES: &[Entry] = &[
         laziness: Laziness::Lazy,
         build: Build::Expression(drop_nulls),
     },
+    temporal(
+        "Expr.dt.cast_time_unit",
+        HAS_A_UNIT,
+        &[required("time_unit", Kind::Choice(TIME_UNIT), Shape::One)],
+        dt_cast_time_unit,
+    ),
+    temporal("Expr.dt.century", DATE_PART, &[], dt_century),
     Entry {
         id: EntryId("Expr.dt.date"),
         family: Family::Temporal,
@@ -1668,6 +1871,28 @@ pub(super) const ENTRIES: &[Entry] = &[
         laziness: Laziness::Lazy,
         build: Build::Expression(dt_date),
     },
+    temporal("Expr.dt.day", DATE_PART, &[], dt_day),
+    temporal("Expr.dt.days_in_month", DATE_PART, &[], dt_days_in_month),
+    temporal(
+        "Expr.dt.epoch",
+        COUNTED_SINCE_1970,
+        &[optional(
+            "time_unit",
+            Kind::Choice(EPOCH_UNIT),
+            Shape::One,
+            "'us'",
+        )],
+        dt_epoch,
+    ),
+    temporal("Expr.dt.hour", TIME_PART, &[], dt_hour),
+    temporal("Expr.dt.is_leap_year", DATE_PART, &[], dt_is_leap_year),
+    temporal("Expr.dt.iso_year", DATE_PART, &[], dt_iso_year),
+    temporal("Expr.dt.microsecond", TIME_PART, &[], dt_microsecond),
+    temporal("Expr.dt.millennium", DATE_PART, &[], dt_millennium),
+    temporal("Expr.dt.millisecond", TIME_PART, &[], dt_millisecond),
+    temporal("Expr.dt.minute", TIME_PART, &[], dt_minute),
+    temporal("Expr.dt.month", DATE_PART, &[], dt_month),
+    temporal("Expr.dt.month_end", DATE_PART, &[], dt_month_end),
     Entry {
         id: EntryId("Expr.dt.month_start"),
         family: Family::Temporal,
@@ -1676,6 +1901,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         laziness: Laziness::Lazy,
         build: Build::Expression(dt_month_start),
     },
+    temporal("Expr.dt.nanosecond", TIME_PART, &[], dt_nanosecond),
     Entry {
         id: EntryId("Expr.dt.offset_by"),
         family: Family::Temporal,
@@ -1685,6 +1911,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         laziness: Laziness::Lazy,
         build: Build::Expression(dt_offset_by),
     },
+    temporal("Expr.dt.ordinal_day", DATE_PART, &[], dt_ordinal_day),
+    temporal("Expr.dt.quarter", DATE_PART, &[], dt_quarter),
+    temporal(
+        "Expr.dt.second",
+        TIME_PART,
+        &[flag("fractional", "False").keyword_only()],
+        dt_second,
+    ),
     Entry {
         id: EntryId("Expr.dt.time"),
         family: Family::Temporal,
@@ -1693,6 +1927,17 @@ pub(super) const ENTRIES: &[Entry] = &[
         laziness: Laziness::Lazy,
         build: Build::Expression(dt_time),
     },
+    temporal(
+        "Expr.dt.timestamp",
+        COUNTED_SINCE_1970,
+        &[optional(
+            "time_unit",
+            Kind::Choice(TIME_UNIT),
+            Shape::One,
+            "'us'",
+        )],
+        dt_timestamp,
+    ),
     Entry {
         id: EntryId("Expr.dt.total_days"),
         family: Family::Temporal,
@@ -1701,6 +1946,45 @@ pub(super) const ENTRIES: &[Entry] = &[
         laziness: Laziness::Lazy,
         build: Build::Expression(dt_total_days),
     },
+    temporal(
+        "Expr.dt.total_hours",
+        DURATION,
+        &[flag("fractional", "False").keyword_only()],
+        dt_total_hours,
+    ),
+    temporal(
+        "Expr.dt.total_microseconds",
+        DURATION,
+        &[flag("fractional", "False").keyword_only()],
+        dt_total_microseconds,
+    ),
+    temporal(
+        "Expr.dt.total_milliseconds",
+        DURATION,
+        &[flag("fractional", "False").keyword_only()],
+        dt_total_milliseconds,
+    ),
+    temporal(
+        "Expr.dt.total_minutes",
+        DURATION,
+        &[flag("fractional", "False").keyword_only()],
+        dt_total_minutes,
+    ),
+    temporal(
+        "Expr.dt.total_nanoseconds",
+        DURATION,
+        &[flag("fractional", "False").keyword_only()],
+        dt_total_nanoseconds,
+    ),
+    temporal(
+        "Expr.dt.total_seconds",
+        DURATION,
+        &[flag("fractional", "False").keyword_only()],
+        dt_total_seconds,
+    ),
+    temporal("Expr.dt.week", DATE_PART, &[], dt_week),
+    temporal("Expr.dt.weekday", DATE_PART, &[], dt_weekday),
+    temporal("Expr.dt.year", DATE_PART, &[], dt_year),
     Entry {
         id: EntryId("Expr.eq"),
         family: Family::Compare,

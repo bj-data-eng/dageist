@@ -752,6 +752,62 @@
       "parameters": []
     },
     {
+      "id": "Expr.dt.cast_time_unit",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.cast_time_unit",
+      "hint": "count in another time unit",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "time_unit",
+          "shown": "time_unit",
+          "label": "unit",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "ns",
+                "shown": "ns"
+              },
+              {
+                "word": "us",
+                "shown": "us"
+              },
+              {
+                "word": "ms",
+                "shown": "ms"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "word",
+            "value": "ns"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.dt.century",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.century",
+      "hint": "the century",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
       "id": "Expr.dt.date",
       "applies": "expression",
       "family": "temporal",
@@ -762,11 +818,189 @@
       "parameters": []
     },
     {
+      "id": "Expr.dt.day",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.day",
+      "hint": "the day of the month",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.dt.days_in_month",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.days_in_month",
+      "hint": "how many days the month has",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.dt.epoch",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.epoch",
+      "hint": "time since 1970 in a unit or in days",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "time_unit",
+          "shown": "time_unit",
+          "label": "unit",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "ns",
+                "shown": "ns"
+              },
+              {
+                "word": "us",
+                "shown": "us"
+              },
+              {
+                "word": "ms",
+                "shown": "ms"
+              },
+              {
+                "word": "s",
+                "shown": "s"
+              },
+              {
+                "word": "d",
+                "shown": "d"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "us"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "us"
+          },
+          "start": {
+            "kind": "word",
+            "value": "ns"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.dt.hour",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.hour",
+      "hint": "the hour",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.dt.is_leap_year",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.is_leap_year",
+      "hint": "true in a leap year",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.dt.iso_year",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.iso_year",
+      "hint": "the ISO year of the week",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.dt.microsecond",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.microsecond",
+      "hint": "the microseconds of the second",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.dt.millennium",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.millennium",
+      "hint": "the millennium",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.dt.millisecond",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.millisecond",
+      "hint": "the milliseconds of the second",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.dt.minute",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.minute",
+      "hint": "the minute",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.dt.month",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.month",
+      "hint": "the month",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.dt.month_end",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.month_end",
+      "hint": "last of the month",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
       "id": "Expr.dt.month_start",
       "applies": "expression",
       "family": "temporal",
       "name": "dt.month_start",
       "hint": "first of the month",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.dt.nanosecond",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.nanosecond",
+      "hint": "the nanoseconds of the second",
       "head": null,
       "lazy": true,
       "parameters": []
@@ -803,6 +1037,62 @@
       ]
     },
     {
+      "id": "Expr.dt.ordinal_day",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.ordinal_day",
+      "hint": "the day of the year",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.dt.quarter",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.quarter",
+      "hint": "the quarter of the year",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.dt.second",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.second",
+      "hint": "the second of the minute",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "fractional",
+          "shown": "fractional",
+          "label": "with fractions",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "Expr.dt.time",
       "applies": "expression",
       "family": "temporal",
@@ -811,6 +1101,56 @@
       "head": null,
       "lazy": true,
       "parameters": []
+    },
+    {
+      "id": "Expr.dt.timestamp",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.timestamp",
+      "hint": "time since 1970 in a unit",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "time_unit",
+          "shown": "time_unit",
+          "label": "unit",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "ns",
+                "shown": "ns"
+              },
+              {
+                "word": "us",
+                "shown": "us"
+              },
+              {
+                "word": "ms",
+                "shown": "ms"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "us"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "us"
+          },
+          "start": {
+            "kind": "word",
+            "value": "ns"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
     },
     {
       "id": "Expr.dt.total_days",
@@ -847,6 +1187,252 @@
           "offered": true
         }
       ]
+    },
+    {
+      "id": "Expr.dt.total_hours",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.total_hours",
+      "hint": "hours in a duration",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "fractional",
+          "shown": "fractional",
+          "label": "with fractions",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.dt.total_microseconds",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.total_microseconds",
+      "hint": "microseconds in a duration",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "fractional",
+          "shown": "fractional",
+          "label": "with fractions",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.dt.total_milliseconds",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.total_milliseconds",
+      "hint": "milliseconds in a duration",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "fractional",
+          "shown": "fractional",
+          "label": "with fractions",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.dt.total_minutes",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.total_minutes",
+      "hint": "minutes in a duration",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "fractional",
+          "shown": "fractional",
+          "label": "with fractions",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.dt.total_nanoseconds",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.total_nanoseconds",
+      "hint": "nanoseconds in a duration",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "fractional",
+          "shown": "fractional",
+          "label": "with fractions",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.dt.total_seconds",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.total_seconds",
+      "hint": "seconds in a duration",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "fractional",
+          "shown": "fractional",
+          "label": "with fractions",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.dt.week",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.week",
+      "hint": "the ISO week of the year",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.dt.weekday",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.weekday",
+      "hint": "the day of the week, Monday 1",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.dt.year",
+      "applies": "expression",
+      "family": "temporal",
+      "name": "dt.year",
+      "hint": "the year",
+      "head": null,
+      "lazy": true,
+      "parameters": []
     },
     {
       "id": "Expr.eq",
