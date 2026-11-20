@@ -3,6 +3,7 @@
 
 mod claims;
 mod counts;
+mod dates;
 mod defaults;
 mod dtypes;
 mod floats;

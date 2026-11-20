@@ -3,11 +3,11 @@
 //! the calendar: a moment is split into its parts, a length of time into its totals, and a time
 //! stamp is counted in a unit.
 
-use polars::prelude::{DataFrame, DataType, IntoLazy, TimeUnit, col, df};
+use polars::prelude::{DataFrame, DataType, IntoLazy, TimeUnit, col, df, lit};
 
 use crate::catalog::{Arguments, entry};
 
-use super::build::{choice, flag, method, none, run};
+use super::build::{choice, expression_arg, flag, method, none, run};
 
 /// 2024-02-29 13:45:30.123456 (a Thursday, in a leap year) and 2023-02-10, which are
 /// 1,709,214,330,123,456 microseconds and 19,398 days after the start of 1970, each beside a null.
@@ -263,4 +263,43 @@ fn a_moment_is_cast_to_another_time_unit_and_keeps_its_value() {
             .collect();
         assert_eq!(counted, [Some(expected), None], "{unit}");
     }
+}
+
+#[test]
+fn a_moment_is_cut_to_the_start_of_its_period_and_rounded_to_the_nearest_one() {
+    // 2024-02-29 13:45:30.123456 and the date 2023-02-10, cut and rounded by a duration string.
+    let cut = |id: &str, column: &str, every: &str| {
+        let given = Arguments::new().with("every", expression_arg(lit(every)));
+        let expr = method(id, col(column), &given).expect("the method builds");
+        let out = run(moments().lazy().select([expr.alias("out")]));
+        let column = out.column("out").expect("a column");
+        let dtype = column.dtype().clone();
+        let values: Vec<_> = column
+            .cast(&DataType::Int64)
+            .expect("whole numbers")
+            .i64()
+            .expect("whole numbers")
+            .iter()
+            .collect();
+        (dtype, values)
+    };
+    let datetime = DataType::Datetime(TimeUnit::Microseconds, None);
+    // The start of the hour is 13:00 and of the month 2024-02-01: 1,709,211,600 and
+    // 1,706,745,600 seconds after the start of 1970.
+    let (dtype, values) = cut("Expr.dt.truncate", "t", "1h");
+    assert_eq!(dtype, datetime);
+    assert_eq!(values, [Some(1_709_211_600_000_000), None]);
+    let (_, values) = cut("Expr.dt.truncate", "t", "1mo");
+    assert_eq!(values, [Some(1_706_745_600_000_000), None]);
+    // 13:45:30 is nearer 14:00 than 13:00, and the afternoon is nearer the next midnight.
+    let (_, values) = cut("Expr.dt.round", "t", "1h");
+    assert_eq!(values, [Some(1_709_215_200_000_000), None]);
+    let (_, values) = cut("Expr.dt.round", "t", "1d");
+    assert_eq!(values, [Some(1_709_251_200_000_000), None]);
+    // 2023-02-01 is the 19,389th day of the epoch, 9 days before the 10th and nearer than March.
+    let (dtype, values) = cut("Expr.dt.truncate", "d", "1mo");
+    assert_eq!(dtype, DataType::Date);
+    assert_eq!(values, [Some(19_389), None]);
+    let (_, values) = cut("Expr.dt.round", "d", "1mo");
+    assert_eq!(values, [Some(19_389), None]);
 }
