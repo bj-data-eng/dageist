@@ -14,7 +14,7 @@ use dageist_fuzz::{CaseTarget, OutcomeKind};
 
 use super::case::Case;
 use super::limits::Limit;
-use super::target::{AllowedTarget, STRICTER_WHERE_UNEVALUATED};
+use super::target::{AllowedTarget, REFUSED_FOR_ANOTHER_REASON, STRICTER_WHERE_UNEVALUATED};
 
 /// `a.cum_sum().len()` of a `Date`, the only item of a `select`: Polars never reads what the length counts.
 const LEN_IN_A_SELECT_OF_ONE_VALUES: &str = r#"{"a":"Date","b":"Int64","revision":1}
@@ -83,6 +83,30 @@ const LITERAL_IN_A_SORT_KEY_OF_ONE_VALUE: &str = r#"{"a":"Date","b":"Date","revi
 const LITERAL_IN_A_SORT_KEY_OF_A_CONDITION: &str = r#"{"a":"Date","b":"Date","revision":1}
 {"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.sort","arguments":{"by":{"many":[{"expression":{"start":{"entry":"polars.when","arguments":{"predicates":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["h"]}}},"then":[{"entry":"Expr.le","arguments":{"other":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"flag":null},"dtype":{"dtype":"UInt8"}}},"then":[]}}}}]}}]}}},"then":[{"entry":"When.then","arguments":{"statement":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["k"]}}},"then":[]}}}}]}}]}}}}]}"#;
 
+/// A non-Boolean predicate in a sort key that is one value (`has_nulls`), which Polars drops: it never meets the predicate, which on its own it refuses for the comparison of text with a number.
+const A_SORT_KEY_OF_ONE_VALUE_WITH_A_NON_BOOLEAN_PREDICATE: &str = r#"{"a":"Date","b":"List(Int64)","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.sort","arguments":{"by":{"many":[{"expression":{"start":{"entry":"polars.when","arguments":{"predicates":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["g"]}}},"then":[{"entry":"Expr.ne","arguments":{"other":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"float":1.5}}},"then":[]}}}},{"entry":"Expr.truediv","arguments":{"other":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["b"]}}},"then":[]}}}}]}}]}}},"then":[{"entry":"When.then","arguments":{"statement":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["b"]}}},"then":[]}}}},{"entry":"Expr.has_nulls","arguments":{}}]}}]}}}}]}"#;
+
+/// The same condition as the key, not one value: Polars evaluates its predicate, and refuses it.
+const A_SORT_KEY_WITH_A_NON_BOOLEAN_PREDICATE: &str = r#"{"a":"Date","b":"List(Int64)","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.sort","arguments":{"by":{"many":[{"expression":{"start":{"entry":"polars.when","arguments":{"predicates":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["g"]}}},"then":[{"entry":"Expr.ne","arguments":{"other":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"float":1.5}}},"then":[]}}}},{"entry":"Expr.truediv","arguments":{"other":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["b"]}}},"then":[]}}}}]}}]}}},"then":[{"entry":"When.then","arguments":{"statement":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["b"]}}},"then":[]}}}}]}}]}}}}]}"#;
+
+/// The same predicate under `or_(true)`, which Polars folds to `true`: it never meets the predicate.
+const A_FOLD_BY_OR_TRUE_OVER_A_NON_BOOLEAN_PREDICATE: &str = r#"{"a":"Date","b":"List(Int64)","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.select","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.when","arguments":{"predicates":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["g"]}}},"then":[{"entry":"Expr.ne","arguments":{"other":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"float":1.5}}},"then":[]}}}},{"entry":"Expr.truediv","arguments":{"other":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["b"]}}},"then":[]}}}}]}}]}}},"then":[{"entry":"When.then","arguments":{"statement":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["b"]}}},"then":[]}}}},{"entry":"Expr.has_nulls","arguments":{}},{"entry":"Expr.or_","arguments":{"others":{"many":[{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"flag":true}}},"then":[]}}]}}}]}}]}}}}]}"#;
+
+/// The same without the fold: Polars evaluates the predicate, and refuses it.
+const NO_FOLD_OVER_A_NON_BOOLEAN_PREDICATE: &str = r#"{"a":"Date","b":"List(Int64)","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.select","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.when","arguments":{"predicates":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["g"]}}},"then":[{"entry":"Expr.ne","arguments":{"other":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"float":1.5}}},"then":[]}}}},{"entry":"Expr.truediv","arguments":{"other":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["b"]}}},"then":[]}}}}]}}]}}},"then":[{"entry":"When.then","arguments":{"statement":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["b"]}}},"then":[]}}}},{"entry":"Expr.has_nulls","arguments":{}}]}}]}}}}]}"#;
+
+/// A pivot's aggregate that holds a non-Boolean predicate (`element().abs()`, an `Int16`) under `or_(true)`, which Polars folds to `true`: it never meets the predicate.
+const A_PIVOT_AGGREGATE_FOLDED_BY_OR_TRUE: &str = r#"{"a":"Int16","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.pivot","arguments":{"on":{"columns":["h"]},"on_columns":{"table":"on_h"},"values":{"columns":["a"]},"aggregate_function":{"expression":{"start":{"entry":"polars.when","arguments":{"predicates":{"many":[{"expression":{"start":{"entry":"polars.element","arguments":{}},"then":[{"entry":"Expr.abs","arguments":{}}]}}]}}},"then":[{"entry":"When.then","arguments":{"statement":{"expression":{"start":{"entry":"polars.element","arguments":{}},"then":[]}}}},{"entry":"Expr.has_nulls","arguments":{}},{"entry":"Expr.or_","arguments":{"others":{"many":[{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"flag":true}}},"then":[]}}]}}}]}}}}}]}"#;
+
+/// The same aggregate without the fold: Polars evaluates the predicate for each group, and refuses it as a predicate that is not a `Boolean`.
+const A_PIVOT_AGGREGATE_NOT_FOLDED: &str = r#"{"a":"Int16","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.pivot","arguments":{"on":{"columns":["h"]},"on_columns":{"table":"on_h"},"values":{"columns":["a"]},"aggregate_function":{"expression":{"start":{"entry":"polars.when","arguments":{"predicates":{"many":[{"expression":{"start":{"entry":"polars.element","arguments":{}},"then":[{"entry":"Expr.abs","arguments":{}}]}}]}}},"then":[{"entry":"When.then","arguments":{"statement":{"expression":{"start":{"entry":"polars.element","arguments":{}},"then":[]}}}},{"entry":"Expr.has_nulls","arguments":{}}]}}}}}]}"#;
+
 /// What the target made of `text`: the kind of outcome, and what it said.
 fn outcome_of(text: &'static str) -> (OutcomeKind, String) {
     let case = Case::decode(text.as_bytes()).expect("a case");
@@ -118,6 +142,14 @@ fn assert_excused_by_the_literal(text: &'static str) {
 fn assert_refused_by_polars(text: &'static str) {
     let (kind, said) = outcome_of(text);
     assert_eq!(kind, OutcomeKind::Evaluated, "{text}: {said}");
+}
+
+/// The tables refuse a part by a rule and Polars refuses it too, in words that are not the rule's:
+/// it evaluates the part, and meets a refusal inside it first.
+fn assert_refused_by_polars_for_another_reason(text: &'static str) {
+    let (kind, said) = outcome_of(text);
+    assert_eq!(kind, OutcomeKind::ExpectedRejection, "{text}: {said}");
+    assert!(said.starts_with(REFUSED_FOR_ANOTHER_REASON), "{said}");
 }
 
 #[test]
@@ -159,4 +191,22 @@ fn a_literal_is_skipped_where_no_row_takes_its_branch_and_is_the_cause_where_one
 fn a_literal_is_skipped_in_a_sort_key_of_one_value_and_is_the_cause_in_one_that_is_not() {
     assert_skipped(LITERAL_IN_A_SORT_KEY_OF_ONE_VALUE);
     assert_excused_by_the_literal(LITERAL_IN_A_SORT_KEY_OF_A_CONDITION);
+}
+
+#[test]
+fn a_non_boolean_predicate_is_skipped_in_a_sort_key_of_one_value_and_met_in_one_that_is_not() {
+    assert_skipped(A_SORT_KEY_OF_ONE_VALUE_WITH_A_NON_BOOLEAN_PREDICATE);
+    assert_refused_by_polars_for_another_reason(A_SORT_KEY_WITH_A_NON_BOOLEAN_PREDICATE);
+}
+
+#[test]
+fn a_non_boolean_predicate_is_skipped_under_a_fold_to_true_and_met_without_it() {
+    assert_skipped(A_FOLD_BY_OR_TRUE_OVER_A_NON_BOOLEAN_PREDICATE);
+    assert_refused_by_polars_for_another_reason(NO_FOLD_OVER_A_NON_BOOLEAN_PREDICATE);
+}
+
+#[test]
+fn a_non_boolean_predicate_is_skipped_in_a_pivot_aggregate_folded_to_true_and_met_without_it() {
+    assert_skipped(A_PIVOT_AGGREGATE_FOLDED_BY_OR_TRUE);
+    assert_refused_by_polars(A_PIVOT_AGGREGATE_NOT_FOLDED);
 }
