@@ -154,6 +154,33 @@ fn a_replacement_given_one_new_value_beside_many_old_values_or_equally_many_is_n
 }
 
 #[test]
+fn a_method_that_follows_a_condition_of_identical_values_beside_many_predicates_is_not_one_value() {
+    // `when(f).then(1).otherwise(1).mod(1)`: the values are one expression, so Polars may drop
+    // the predicate and the condition is one value or three, and a method that gives a value for
+    // each of what it follows, as the remainder does, gives the same number. It is no aggregate
+    // that gives one value of any, so what is not counted is still not counted after it: Polars
+    // allows the strict replacement with a default of three that it would refuse beside one value.
+    let one = || {
+        json!({ "expression": { "start": call("polars.lit", json!({
+            "value": { "integer": 1 }, "dtype": dtype("Int32") })), "then": [] } })
+    };
+    let condition = json!({ "expression": {
+        "start": call("polars.when", json!({ "predicates": many(vec![field("f")]) })),
+        "then": [
+            call("When.then", json!({ "statement": one() })),
+            call("Then.otherwise", json!({ "statement": one() })),
+            call("Expr.mod", json!({ "other": whole(1) })),
+            call("Expr.replace_strict", json!({
+                "old": field("a"), "new": field("f"), "default": field("f") })),
+        ],
+    } });
+    let report = report_of("LazyFrame.select", select(vec![condition]));
+    assert_eq!(walk(&report).refusal(), None);
+    assert!(polars_says(&report).is_none(), "{:?}", outcome(&report));
+    assert!(matches!(outcome(&report), Outcome::Valid { .. }));
+}
+
+#[test]
 fn a_strict_replacement_given_a_default_of_many_values_beside_one_value_is_refused_as_polars_does()
 {
     let strict = |default: Value| {
