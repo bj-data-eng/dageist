@@ -362,11 +362,19 @@ pub enum Limit {
     /// place, in a case with a `str.replace` that is given a count above one: the case run again
     /// with each count left out is not refused for it.
     AReplacementOfMoreThanTheFirstMatch,
+    /// A literal text is one value that Polars broadcasts over the rows of a table and does not over
+    /// a table with no rows, so a replacement of it given many values is refused for the empty table
+    /// where the column of text the tables measured it with is not: the rows of the table and the
+    /// column's agree. Polars refusing the empty table with the refusal that the value's length
+    /// does not match the text's, which has no place, in a case with a replacement in a chain that
+    /// starts from a literal: the case run again with each such literal a column of text is not
+    /// refused for it.
+    ALiteralTextBesideManyReplacementValues,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 29] = [
+    pub const ALL: [Self; 30] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -396,6 +404,7 @@ impl Limit {
         Self::AStrictReplacementGivenNoDefault,
         Self::AReplacementOfEveryMatchGivenANullValue,
         Self::AReplacementOfMoreThanTheFirstMatch,
+        Self::ALiteralTextBesideManyReplacementValues,
     ];
 
     /// The name a kept case is filed under.
@@ -433,6 +442,9 @@ impl Limit {
             }
             Self::AReplacementOfMoreThanTheFirstMatch => {
                 "a-replacement-of-more-than-the-first-match"
+            }
+            Self::ALiteralTextBesideManyReplacementValues => {
+                "a-literal-text-beside-many-replacement-values"
             }
         }
     }
@@ -511,6 +523,9 @@ impl Limit {
             }
             Self::AReplacementOfEveryMatchGivenANullValue => {
                 "a replacement of every match refuses a value that is null where Polars reads it as one value, a literal or a piece of one row, where the tables measured the value as a column of three rows in one piece"
+            }
+            Self::ALiteralTextBesideManyReplacementValues => {
+                "a literal text is one value that Polars does not broadcast over a table with no rows, where the tables measured the text as a column of the table's rows"
             }
             Self::AReplacementOfMoreThanTheFirstMatch => {
                 "Polars replaces more than the first match only of plain text and of one value, and refuses a pattern or many values, where the tables measured the replacement of the first match"
@@ -1810,6 +1825,105 @@ fn replaces_every_match(call: &Call) -> bool {
 /// What Polars says of a replacement of every match whose value is null where it reads it as one.
 const A_NULL_VALUE_OF_A_REPLACEMENT: &str = "value cannot be 'null' in 'replace' expression";
 
+/// What Polars says of a replacement whose value has other numbers of values than the text it
+/// follows.
+const A_VALUE_OF_ANOTHER_LENGTH: &str = "does not match string column length";
+
+/// Whether `expression` replaces what a pattern matches in a chain that starts from a literal,
+/// in it or in an expression it holds.
+fn holds_a_replacement_of_a_literal(expression: &Expression) -> bool {
+    let replaces = |link: &Call| is(link, "Expr.str.replace") || is(link, "Expr.str.replace_all");
+    let starts_from_a_text =
+        matches!(expression.start(), Start::Call(start) if is(start, "polars.lit"));
+    (starts_from_a_text && expression.links().iter().any(replaces))
+        || std::iter::once(expression.start())
+            .filter_map(|start| match start {
+                Start::Call(call) => Some(call),
+                Start::Input(_) | Start::Hole => None,
+            })
+            .chain(expression.links())
+            .any(|call| {
+                operands(call)
+                    .into_iter()
+                    .any(|(_, inside)| holds_a_replacement_of_a_literal(inside))
+            })
+}
+
+/// `call` with the start of each chain that is a literal and holds a replacement made the column
+/// `g`, which holds text in every row.
+fn call_with_text_columns(call: &Call) -> Option<Call> {
+    fn value(held: &Value) -> Option<Value> {
+        Some(match held {
+            Value::Expression(expression) => Value::Expression(expression_of_columns(expression)?),
+            Value::Many(items) => Value::Many(items.iter().map(value).collect::<Option<Vec<_>>>()?),
+            Value::Pairs(pairs) => Value::Pairs(
+                pairs
+                    .iter()
+                    .map(|(key, entry)| Some((value(key)?, value(entry)?)))
+                    .collect::<Option<Vec<_>>>()?,
+            ),
+            other => other.clone(),
+        })
+    }
+    fn expression_of_columns(expression: &Expression) -> Option<Expression> {
+        let start = if holds_a_replacement_of_a_literal_alone(expression) {
+            Start::Call(
+                Call::new(
+                    catalog::entry("polars.col")?,
+                    vec![("name", Value::Columns(vec!["g".to_owned()]))],
+                )
+                .ok()?,
+            )
+        } else {
+            match expression.start() {
+                Start::Call(start) => Start::Call(call_with_text_columns(start)?),
+                other => other.clone(),
+            }
+        };
+        let links = expression
+            .links()
+            .iter()
+            .map(call_with_text_columns)
+            .collect::<Option<Vec<_>>>()?;
+        Expression::new(start, links).ok()
+    }
+    let given = call
+        .arguments()
+        .iter()
+        .map(|given| Some((given.parameter(), value(given.value())?)))
+        .collect::<Option<Vec<_>>>()?;
+    Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
+}
+
+/// Whether the chain itself, and not an expression it holds, starts from a literal and replaces.
+fn holds_a_replacement_of_a_literal_alone(expression: &Expression) -> bool {
+    matches!(expression.start(), Start::Call(start) if is(start, "polars.lit"))
+        && expression
+            .links()
+            .iter()
+            .any(|link| is(link, "Expr.str.replace") || is(link, "Expr.str.replace_all"))
+}
+
+/// Whether Polars refuses the case for a value of another length still when the literal of each
+/// replacement is a column of text: the literal is then no cause. `None` where no chain that
+/// starts from a literal holds a replacement.
+fn refused_for_a_value_of_another_length_with_columns(case: &Case) -> Option<bool> {
+    let step = &case.document.steps()[0];
+    let rebuilt = Step::new(step.id().clone(), call_with_text_columns(step.call())?).ok()?;
+    let control = Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        document: Document::new(vec![rebuilt]).ok()?,
+    };
+    changed(Some(control), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| refusal.reason.contains(A_VALUE_OF_ANOTHER_LENGTH))
+        })
+    })
+}
+
 /// What Polars says of a replacement of a pattern, or of many values, that is given a count above
 /// one.
 const A_COUNT_OF_A_REPLACEMENT: &str = "with 'n > 1' not yet supported";
@@ -2880,6 +2994,17 @@ fn applies(
                         .iter()
                         .any(|(_, held)| holds_a_fill_by_a_strategy_in_a_condition(held))
                         && refused_for_a_strategy_without_strategies(case) == Some(false))
+        }
+        (Limit::ALiteralTextBesideManyReplacementValues, Disagreement::PolarsRefuses(refusal)) => {
+            // The literal is the cause where Polars stops refusing the empty table once the
+            // text of each replacement is a column.
+            unplaced(refusal)
+                && refusal.stage == Stage::Empty
+                && refusal.reason.contains(A_VALUE_OF_ANOTHER_LENGTH)
+                && held
+                    .iter()
+                    .any(|(_, held)| holds_a_replacement_of_a_literal(held))
+                && refused_for_a_value_of_another_length_with_columns(case) == Some(false)
         }
         (Limit::AReplacementOfMoreThanTheFirstMatch, Disagreement::PolarsRefuses(refusal)) => {
             // The count is the cause where Polars stops refusing it once each replacement is
@@ -7015,6 +7140,92 @@ mod tests {
                 "{count}"
             );
         }
+    }
+
+    // ----- A literal text beside many replacement values
+
+    const ANOTHER_LENGTH: &str =
+        "replacement value length (0) does not match string column length (1)";
+
+    fn replacing_in(text_start: Call, value: Call) -> Case {
+        let replace = call(
+            "Expr.str.replace",
+            vec![
+                ("pattern", Value::Pattern("a|d".to_owned())),
+                ("value", Value::Expression(chain(value, &[]))),
+            ],
+        );
+        select(vec![chain_of(text_start, vec![replace])])
+    }
+
+    #[test]
+    fn a_value_of_another_length_is_excused_at_the_empty_table_for_a_replacement_of_a_literal() {
+        let text = call(
+            "polars.lit",
+            vec![("value", Value::String("1d".to_owned()))],
+        );
+        assert_eq!(
+            excused_by_kept("uncovered-a-literal-text-beside-many-replacement-values.case"),
+            vec![Limit::ALiteralTextBesideManyReplacementValues]
+        );
+        assert_eq!(
+            refused_for_a_bound(
+                &replacing_in(text, column("g")),
+                None,
+                Stage::Empty,
+                ANOTHER_LENGTH
+            ),
+            vec![Limit::ALiteralTextBesideManyReplacementValues]
+        );
+    }
+
+    #[test]
+    fn a_value_of_another_length_is_not_excused_for_a_column_nor_at_the_rows_nor_at_a_place() {
+        let text = || {
+            call(
+                "polars.lit",
+                vec![("value", Value::String("1d".to_owned()))],
+            )
+        };
+        // The text is a column: the control is the case itself, which shows nothing.
+        assert_eq!(
+            refused_for_a_bound(
+                &replacing_in(column("g"), column("h")),
+                None,
+                Stage::Empty,
+                ANOTHER_LENGTH
+            ),
+            vec![]
+        );
+        // Only the empty table holds the literal against nothing.
+        assert_eq!(
+            refused_for_a_bound(
+                &replacing_in(text(), column("g")),
+                None,
+                Stage::Rows,
+                ANOTHER_LENGTH
+            ),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(
+                &replacing_in(text(), column("g")),
+                Some(link_of("exprs", 0, 0)),
+                Stage::Empty,
+                ANOTHER_LENGTH
+            ),
+            vec![]
+        );
+        // Another refusal of the empty table is not this one.
+        assert_eq!(
+            refused_for_a_bound(
+                &replacing_in(text(), column("g")),
+                None,
+                Stage::Empty,
+                "invalid series dtype"
+            ),
+            vec![]
+        );
     }
 
     // ----- A replacement of more than the first match
