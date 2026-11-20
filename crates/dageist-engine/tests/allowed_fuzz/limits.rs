@@ -385,11 +385,22 @@ pub enum Limit {
     /// window and a replacement: the case run again with the value of each replacement made a text
     /// literal is not refused for it, and nor is it run again with each window made a fill.
     AReplacementOfAnAggregateInAWindowKey,
+    /// Polars' streaming engine refuses a replacement of the aggregate of a literal text, which is one
+    /// value, where the replacement stands in a branch of a condition, and meets it where it stands
+    /// in a select, in a sum, in a window or in memory. It reads the pattern of the replacement
+    /// as many values, and what it says depends on how it splits the rows: that the pattern's
+    /// length is dynamic where the pieces are longer than one row, and that the pattern is null
+    /// where they are not. The tables measured the replacement in select, on columns. Polars
+    /// refusing the rows or the empty table with either refusal, which has no place, in a case
+    /// with a branch of a condition that holds a chain that starts from a literal and replaces
+    /// after an aggregate: the case run again with each such literal a column of text is not
+    /// refused for it.
+    AReplacementOfALiteralAggregateInABranch,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 32] = [
+    pub const ALL: [Self; 33] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -422,6 +433,7 @@ impl Limit {
         Self::ALiteralTextBesideManyReplacementValues,
         Self::AStructWithNoFields,
         Self::AReplacementOfAnAggregateInAWindowKey,
+        Self::AReplacementOfALiteralAggregateInABranch,
     ];
 
     /// The name a kept case is filed under.
@@ -466,6 +478,9 @@ impl Limit {
             Self::AStructWithNoFields => "a-struct-with-no-fields",
             Self::AReplacementOfAnAggregateInAWindowKey => {
                 "a-replacement-of-an-aggregate-in-a-window-key"
+            }
+            Self::AReplacementOfALiteralAggregateInABranch => {
+                "a-replacement-of-a-literal-aggregate-in-a-branch"
             }
         }
     }
@@ -544,6 +559,9 @@ impl Limit {
             }
             Self::AReplacementOfEveryMatchGivenANullValue => {
                 "a replacement of every match refuses a value that is null where Polars reads it as one value, a literal or a piece of one row, where the tables measured the value as a column of three rows in one piece"
+            }
+            Self::AReplacementOfALiteralAggregateInABranch => {
+                "Polars' streaming engine reads the pattern of a replacement of the aggregate of a literal text in a branch of a condition as many values, which it does not where it stands in a select, where the tables measured it"
             }
             Self::AReplacementOfAnAggregateInAWindowKey => {
                 "Polars' streaming engine does not meet a text of one value with each value of a replacement in the order key of a window, which it does in a select, where the tables measured it"
@@ -1852,6 +1870,91 @@ fn replaces_every_match(call: &Call) -> bool {
 /// What Polars says of a replacement of every match whose value is null where it reads it as one.
 const A_NULL_VALUE_OF_A_REPLACEMENT: &str = "value cannot be 'null' in 'replace' expression";
 
+/// What Polars says where it reads the pattern of a replacement as many values: that its length is
+/// dynamic, or that it is null, by how it splits the rows.
+const A_PATTERN_READ_AS_MANY: [&str; 2] = [
+    "dynamic pattern length in 'str.replace' expressions is not supported yet",
+    "pattern cannot be 'null' in 'replace' expression",
+];
+
+/// Whether the chain starts from a literal and replaces after an aggregate.
+fn is_a_literal_aggregate_replaced(expression: &Expression) -> bool {
+    if !matches!(expression.start(), Start::Call(start) if is(start, "polars.lit")) {
+        return false;
+    }
+    let mut aggregated = false;
+    for link in expression.links() {
+        if is_one_value(link) {
+            aggregated = true;
+        } else if aggregated && is_a_text_replacement(link) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Whether an expression holds, at any depth, a value of a condition that is such a chain or holds
+/// one.
+fn holds_a_literal_aggregate_replaced_in_a_branch(expression: &Expression) -> bool {
+    let calls = std::iter::once(expression.start())
+        .filter_map(|start| match start {
+            Start::Call(call) => Some(call),
+            Start::Input(_) | Start::Hole => None,
+        })
+        .chain(expression.links());
+    calls.into_iter().any(|call| {
+        operands(call).into_iter().any(|(_, inside)| {
+            (is_a_branch_value(call) && holds_a_chain(inside, &is_a_literal_aggregate_replaced))
+                || holds_a_literal_aggregate_replaced_in_a_branch(inside)
+        })
+    })
+}
+
+/// Whether the call is a value of a condition: what a `then` or an `otherwise` gives.
+fn is_a_branch_value(call: &Call) -> bool {
+    matches!(
+        call.entry().id().as_str(),
+        "When.then" | "Then.otherwise" | "ChainedWhen.then" | "ChainedThen.otherwise"
+    )
+}
+
+/// Whether the expression, or one it holds at any depth, is a chain `found` accepts.
+fn holds_a_chain(expression: &Expression, found: &dyn Fn(&Expression) -> bool) -> bool {
+    found(expression)
+        || std::iter::once(expression.start())
+            .filter_map(|start| match start {
+                Start::Call(call) => Some(call),
+                Start::Input(_) | Start::Hole => None,
+            })
+            .chain(expression.links())
+            .any(|call| {
+                operands(call)
+                    .into_iter()
+                    .any(|(_, inside)| holds_a_chain(inside, found))
+            })
+}
+
+/// Whether Polars refuses the case for a pattern read as many values still when each literal that
+/// such a chain starts from is a column of text: the literal is then no cause.
+fn refused_for_a_pattern_read_as_many_with_columns(case: &Case) -> Option<bool> {
+    let step = &case.document.steps()[0];
+    let rebuilt = Step::new(step.id().clone(), call_with_text_columns(step.call())?).ok()?;
+    let control = Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        document: Document::new(vec![rebuilt]).ok()?,
+    };
+    changed(Some(control), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control).refusal.is_some_and(|refusal| {
+                A_PATTERN_READ_AS_MANY
+                    .iter()
+                    .any(|said| refusal.reason.contains(said))
+            })
+        })
+    })
+}
+
 /// What Polars says of a group by that has no key, as a test for a unique value of a struct with
 /// no fields is.
 const A_GROUP_BY_WITHOUT_A_KEY: &str = "at least one key is required in a group_by operation";
@@ -3097,6 +3200,19 @@ fn applies(
                         .iter()
                         .any(|(_, held)| holds_a_fill_by_a_strategy_in_a_condition(held))
                         && refused_for_a_strategy_without_strategies(case) == Some(false))
+        }
+        (Limit::AReplacementOfALiteralAggregateInABranch, Disagreement::PolarsRefuses(refusal)) => {
+            // The literal is the cause where Polars stops refusing the pattern once the text of
+            // each such replacement is a column.
+            unplaced(refusal)
+                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                && A_PATTERN_READ_AS_MANY
+                    .iter()
+                    .any(|said| refusal.reason.contains(said))
+                && held
+                    .iter()
+                    .any(|(_, held)| holds_a_literal_aggregate_replaced_in_a_branch(held))
+                && refused_for_a_pattern_read_as_many_with_columns(case) == Some(false)
         }
         (Limit::AReplacementOfAnAggregateInAWindowKey, Disagreement::PolarsRefuses(refusal)) => {
             // The window and the many values are the cause where Polars stops refusing the lengths
@@ -7267,6 +7383,111 @@ mod tests {
                 "{count}"
             );
         }
+    }
+
+    // ----- A replacement of a literal aggregate in a branch
+
+    const DYNAMIC: &str =
+        "dynamic pattern length in 'str.replace' expressions is not supported yet";
+    const NULL_PATTERN: &str = "pattern cannot be 'null' in 'replace' expression";
+
+    /// `when(true).then(lit("a").join().replace_all(pattern, "_")).otherwise(h)`, or the replacement
+    /// as a plain chain, `start` being the chain's own start.
+    fn branch_replacing(start: Call, in_a_branch: bool) -> Case {
+        let replace = call(
+            "Expr.str.replace_all",
+            vec![
+                ("pattern", Value::Pattern("(a)".to_owned())),
+                (
+                    "value",
+                    Value::Expression(chain(
+                        call("polars.lit", vec![("value", Value::String("_".to_owned()))]),
+                        &[],
+                    )),
+                ),
+            ],
+        );
+        let replaced = chain_of(start, vec![call("Expr.str.join", Vec::new()), replace]);
+        if !in_a_branch {
+            return select(vec![replaced]);
+        }
+        let then = call(
+            "When.then",
+            vec![("statement", Value::Expression(replaced))],
+        );
+        let otherwise = call(
+            "Then.otherwise",
+            vec![("statement", Value::Expression(chain(column("h"), &[])))],
+        );
+        let when = call(
+            "polars.when",
+            vec![(
+                "predicates",
+                many(vec![chain_of(
+                    call("polars.lit", vec![("value", Value::Flag(Some(true)))]),
+                    Vec::new(),
+                )]),
+            )],
+        );
+        select(vec![chain_of(when, vec![then, otherwise])])
+    }
+
+    #[test]
+    fn a_pattern_read_as_many_is_excused_for_a_literal_aggregate_replaced_in_a_branch() {
+        assert_eq!(
+            excused_by_kept("uncovered-a-replacement-of-a-literal-aggregate-in-a-branch.case"),
+            vec![Limit::AReplacementOfALiteralAggregateInABranch]
+        );
+        let text = call("polars.lit", vec![("value", Value::String("a".to_owned()))]);
+        // Either refusal, which one depends on how Polars splits the rows, and either stage.
+        for said in [DYNAMIC, NULL_PATTERN] {
+            for stage in [Stage::Rows, Stage::Empty] {
+                assert_eq!(
+                    refused_for_a_bound(&branch_replacing(text.clone(), true), None, stage, said),
+                    vec![Limit::AReplacementOfALiteralAggregateInABranch],
+                    "{said}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_pattern_read_as_many_is_not_excused_outside_a_branch_nor_for_a_column_nor_at_a_place() {
+        let text = call("polars.lit", vec![("value", Value::String("a".to_owned()))]);
+        // The replacement stands in a select, where Polars meets it: no branch holds it.
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_replacing(text.clone(), false),
+                None,
+                Stage::Rows,
+                DYNAMIC
+            ),
+            vec![]
+        );
+        // A column of text starts the chain: the control is the case itself.
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_replacing(column("g"), true),
+                None,
+                Stage::Rows,
+                DYNAMIC
+            ),
+            vec![]
+        );
+        // Another reason, a place and the schema are not this one.
+        let case = branch_replacing(text, true);
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, "invalid series dtype"),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(&case, Some(link_of("exprs", 0, 0)), Stage::Rows, DYNAMIC),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Schema, DYNAMIC),
+            vec![]
+        );
     }
 
     // ----- A replacement of an aggregate in a window key
