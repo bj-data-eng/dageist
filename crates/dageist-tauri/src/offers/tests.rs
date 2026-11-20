@@ -224,6 +224,37 @@ fn a_method_whose_first_parameter_defaults_to_none_is_offered_starting_without_i
 }
 
 #[test]
+fn a_method_that_is_added_starts_with_a_slot_for_each_parameter_it_must_be_given_besides_its_argument()
+ {
+    let answer = invoke(
+        "offers_at",
+        json!({
+            "positions": [{ "kind": "outer", "name": "select" }],
+            "after": { "kind": "value", "dtype": "String", "shape": "many" }
+        }),
+    )
+    .expect("offers");
+    // Python requires these and gives them no default, so a step always gives them: a pattern, and
+    // what replaces its matches, which is not the first parameter; and the dtype a cast gives.
+    for (id, slots) in [
+        ("Expr.str.contains", json!(["pattern"])),
+        ("Expr.str.replace", json!(["pattern", "value"])),
+        ("Expr.str.replace_all", json!(["pattern", "value"])),
+        ("Expr.str.extract", json!(["pattern"])),
+        ("Expr.cast", json!(["dtype"])),
+        // The first parameter that is an expression is the argument, drawn where the method is.
+        ("Expr.str.head", json!([])),
+        ("Expr.str.starts_with", json!([])),
+        // What has a default, or that Python leaves to None, is an option to add.
+        ("Expr.str.strip_chars", json!([])),
+        ("Expr.str.to_uppercase", json!([])),
+        ("Expr.str.pad_start", json!([])),
+    ] {
+        assert_eq!(offered(&answer, id)["slots"], slots, "{id}");
+    }
+}
+
+#[test]
 fn what_may_start_an_expression_depends_on_where_it_stands() {
     let at = |outer_name: &str| {
         invoke(
