@@ -473,6 +473,11 @@ What Polars does with each is what the tables say, and some of it is not what a 
   offset of `str.slice` counts from the end.
 - `fill_char` is one character, as Python's binding takes it, so the build refuses text of
   another length with that reason, and the document keeps it as a value, not an expression.
+- A split gives a list of text for each row, and Polars joins on a list, so a split may be a join's
+  key, with a list of text on the other side. The tables measure a call in a join's key with a
+  continuation that casts the key to the dtype of the other table's key, which a list, an array or
+  a struct cannot be, so such a call is measured as the end of the chain, with the other key the
+  dtype the key has.
 - `str.split` is offered with `literal` true only. A split by a pattern waits for the kind of
   parameter that holds a pattern, which the next batch of text methods adds with `contains` and
   `replace`, and until then the build refuses `literal` set to false with the reason that it

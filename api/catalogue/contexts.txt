@@ -61,7 +61,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 7620 combinations: 5285 allowed; 1404 refused when Polars resolved the schema, 931 when it ran the rows, 0 when it ran the empty table.
+# 7620 combinations: 5289 allowed; 1404 refused when Polars resolved the schema, 927 when it ran the rows, 0 when it ran the empty table.
 #
 ChainedThen.otherwise | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 ChainedThen.otherwise | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
@@ -6135,23 +6135,23 @@ Expr.str.split | filter | continues | String | String | filter-predicate-is-bool
 Expr.str.split | filter | ends | String | String | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `List(String)`
 Expr.str.split | join_left > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed List(String) many
 Expr.str.split | join_left > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `list[str]` for series with name `a`
-Expr.str.split | join_left > condition.value | continues | String | String | - | refused rows: cannot cast List type (inner: 'String', to: 'Int64')
+Expr.str.split | join_left > condition.value | continues | String | String | - | allowed List(String) many
 Expr.str.split | join_left > condition.value | ends | String | String | - | allowed List(String) many
 Expr.str.split | join_left > over.order_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
 Expr.str.split | join_left > over.order_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
 Expr.str.split | join_left > over.partition_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
 Expr.str.split | join_left > over.partition_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
-Expr.str.split | join_left | continues | String | String | join-key-names-are-not-repeated,key-is-elementwise | refused rows: cannot cast List type (inner: 'String', to: 'Int64')
+Expr.str.split | join_left | continues | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed List(String) many
 Expr.str.split | join_left | ends | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed List(String) many
 Expr.str.split | join_right > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed List(String) many
 Expr.str.split | join_right > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `list[str]` for series with name `ra`
-Expr.str.split | join_right > condition.value | continues | String | String | - | refused rows: cannot cast List type (inner: 'String', to: 'Int64')
+Expr.str.split | join_right > condition.value | continues | String | String | - | allowed List(String) many
 Expr.str.split | join_right > condition.value | ends | String | String | - | allowed List(String) many
 Expr.str.split | join_right > over.order_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
 Expr.str.split | join_right > over.order_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
 Expr.str.split | join_right > over.partition_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
 Expr.str.split | join_right > over.partition_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
-Expr.str.split | join_right | continues | String | String | join-key-names-are-not-repeated,key-is-elementwise | refused rows: cannot cast List type (inner: 'String', to: 'Int64')
+Expr.str.split | join_right | continues | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed List(String) many
 Expr.str.split | join_right | ends | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed List(String) many
 Expr.str.split | pivot_aggregate > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed List(String) many
 Expr.str.split | pivot_aggregate > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `list[str]` for series with name `a`
