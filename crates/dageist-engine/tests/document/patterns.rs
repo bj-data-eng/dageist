@@ -236,3 +236,52 @@ fn a_replacement_of_an_aggregate_by_many_values_is_met_by_each_as_polars_meets_i
         no_rows.steps()[0].rows()
     );
 }
+
+#[test]
+fn a_separator_typed_as_a_pattern_is_refused_at_it_where_literal_is_false_and_not_otherwise() {
+    let split = |by: Value, literal: Option<bool>| {
+        let mut arguments = json!({ "by": by });
+        if let Some(literal) = literal {
+            arguments["literal"] = json!({ "flag": literal });
+        }
+        selecting(owner_then("Expr.str.split", arguments))
+    };
+    // `(` is no regular expression: as a pattern the step is refused at the separator, with
+    // Polars' words, and the walk says it before.
+    let report = report_of(&split(text("("), Some(false)));
+    let step = &report.steps()[0];
+    let Outcome::Refused(refusal) = step.outcome() else {
+        panic!("{:?}", step.outcome());
+    };
+    assert_eq!(
+        refusal.place().path(),
+        [
+            Segment::Parameter("named_exprs".to_owned()),
+            Segment::Value(0),
+            Segment::Link(0),
+            Segment::Parameter("by".to_owned()),
+        ]
+    );
+    assert!(
+        refusal.cause().to_string().contains("unclosed group"),
+        "{refusal}"
+    );
+    let walked = step.walk().refusal().expect("the walk refuses it");
+    assert_eq!(
+        walked.refusal().source(),
+        RefusalSource::Rule(Rule::PatternIsValid)
+    );
+    // As plain text, by the default or by the flag, it is a separator like another.
+    for literal in [None, Some(true)] {
+        let report = report_of(&split(text("("), literal));
+        assert!(
+            matches!(report.steps()[0].outcome(), Outcome::Valid { .. }),
+            "{literal:?}: {:?}",
+            report.steps()[0].outcome()
+        );
+    }
+    // A separator that is a column is no typed text: Polars checks each row when it runs them.
+    let report = report_of(&split(crate::support::field("owner"), Some(false)));
+    assert!(matches!(report.steps()[0].outcome(), Outcome::Valid { .. }));
+    assert_eq!(report.steps()[0].walk().refusal(), None);
+}
