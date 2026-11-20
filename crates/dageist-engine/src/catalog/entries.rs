@@ -20,9 +20,9 @@ use polars::prelude::{
 };
 
 use super::{
-    Argument, Arguments, AsManyAs, Build, BuildError, Conditional, Dtypes, Entry, EntryId, Family,
-    Kind, Laziness, Parameter, ParameterDefault, PatternMeans, Role, Shape, ValueType, Variadic,
-    Writes,
+    Argument, Arguments, AsManyAs, Build, BuildError, Conditional, Dtypes, DurationUse, Entry,
+    EntryId, Family, Kind, Laziness, Parameter, ParameterDefault, PatternMeans, Role, Shape,
+    ValueType, Variadic, Writes,
 };
 
 const ANY: &[Dtypes] = &[Dtypes::Any];
@@ -1101,6 +1101,14 @@ fn dt_offset_by(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
     Ok(expr.dt().offset_by(arguments.required_expression("by")?))
 }
 
+fn dt_truncate(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().truncate(arguments.required_expression("every")?))
+}
+
+fn dt_round(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().round(arguments.required_expression("every")?))
+}
+
 fn dt_month_start(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
     Ok(expr.dt().month_start())
 }
@@ -1907,12 +1915,21 @@ pub(super) const ENTRIES: &[Entry] = &[
         family: Family::Temporal,
         accepts: DATE_PART,
         // `str | Expr`: a duration string is the expression that holds it.
-        parameters: &[required("by", Kind::Expression(STRING), Shape::One)],
+        parameters: &[required("by", Kind::Expression(STRING), Shape::One)
+            .holding_a_duration_string(DurationUse::Offset)],
         laziness: Laziness::Lazy,
         build: Build::Expression(dt_offset_by),
     },
     temporal("Expr.dt.ordinal_day", DATE_PART, &[], dt_ordinal_day),
     temporal("Expr.dt.quarter", DATE_PART, &[], dt_quarter),
+    temporal(
+        "Expr.dt.round",
+        DATE_PART,
+        // `str | timedelta | Expr`: a duration string is the expression that holds it.
+        &[required("every", Kind::Expression(STRING), Shape::One)
+            .holding_a_duration_string(DurationUse::Round)],
+        dt_round,
+    ),
     temporal(
         "Expr.dt.second",
         TIME_PART,
@@ -1981,6 +1998,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         DURATION,
         &[flag("fractional", "False").keyword_only()],
         dt_total_seconds,
+    ),
+    temporal(
+        "Expr.dt.truncate",
+        DATE_PART,
+        // `str | timedelta | Expr`: a duration string is the expression that holds it.
+        &[required("every", Kind::Expression(STRING), Shape::One)
+            .holding_a_duration_string(DurationUse::Cut)],
+        dt_truncate,
     ),
     temporal("Expr.dt.week", DATE_PART, &[], dt_week),
     temporal("Expr.dt.weekday", DATE_PART, &[], dt_weekday),

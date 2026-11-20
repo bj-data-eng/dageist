@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use polars::prelude::{DataType, Expr, LazyFrame, PolarsError};
 
-use super::{Entry, Kind, Parameter, PatternError, Shape, ValueType, check_pattern};
+use super::{DurationError, Entry, Kind, Parameter, PatternError, Shape, ValueType, check_pattern};
 
 /// What the text of a pattern stands for: a regular expression, or, where a flag such as `literal`
 /// says so, plain text that matches itself.
@@ -127,6 +127,13 @@ pub enum BuildError {
         /// What Polars said of it.
         error: PatternError,
     },
+    /// A duration string that Polars does not read, or cannot hold.
+    NotADuration {
+        /// The parameter's name.
+        parameter: &'static str,
+        /// What Polars said of it.
+        error: DurationError,
+    },
     /// Polars refused the arguments.
     Polars(PolarsError),
 }
@@ -165,6 +172,9 @@ impl std::fmt::Display for BuildError {
                     "{parameter} is not a valid regular expression: {error}"
                 )
             }
+            Self::NotADuration { parameter, error } => {
+                write!(formatter, "{parameter} is not a duration: {error}")
+            }
             Self::Polars(error) => write!(formatter, "{error}"),
         }
     }
@@ -174,6 +184,7 @@ impl std::error::Error for BuildError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::NotAPattern { error, .. } => Some(error),
+            Self::NotADuration { error, .. } => Some(error),
             Self::Polars(error) => Some(error),
             _ => None,
         }

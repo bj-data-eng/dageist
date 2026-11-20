@@ -504,7 +504,7 @@ describe('a report that is not what the host sends', () => {
   it('is refused where a rule, a context or a dtype resolution is not one the engine has', () => {
     const source = ['steps', 1, 'walk', 'refusal', 'refusal', 'source'];
     expect(refusal(replaced(refused, source, { by: 'rule', rule: 'no-such-rule' })).problem).toBe(
-      'must be one of "pivot-aggregate-gives-one-value", "condition-predicate-is-boolean", "element-only-in-pivot-aggregate", "filter-predicate-is-boolean", "join-key-names-are-not-repeated", "key-is-elementwise", "pattern-is-valid", "replacement-values-match-in-number", not "no-such-rule"',
+      'must be one of "pivot-aggregate-gives-one-value", "condition-predicate-is-boolean", "duration-is-valid", "element-only-in-pivot-aggregate", "filter-predicate-is-boolean", "join-key-names-are-not-repeated", "key-is-elementwise", "pattern-is-valid", "replacement-values-match-in-number", not "no-such-rule"',
     );
     expect(
       refusal(

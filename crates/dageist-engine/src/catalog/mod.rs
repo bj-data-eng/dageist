@@ -16,6 +16,7 @@ mod arguments;
 mod comparison;
 mod condition;
 mod defaults;
+mod duration;
 mod entries;
 mod left_out;
 mod pattern;
@@ -28,6 +29,7 @@ pub use arguments::{Argument, Arguments, BuildError, PatternMeans};
 pub use comparison::Comparison;
 pub use condition::Conditional;
 pub use defaults::{DefaultValue, ParameterDefault};
+pub use duration::{DurationError, DurationUse, any_moment, check_duration};
 pub use left_out::{LeftOut, Reason, left_out};
 pub use pattern::{PatternError, check_pattern, groups_dtype};
 pub use starting::{Setting, StepFrame, StepStart, start_step};
@@ -431,6 +433,7 @@ pub struct Parameter {
     plain_text_flag: Option<&'static str>,
     names_the_fields_of_the_result: bool,
     offered: bool,
+    duration_string: Option<DurationUse>,
 }
 
 impl Parameter {
@@ -455,6 +458,7 @@ impl Parameter {
             plain_text_flag: None,
             names_the_fields_of_the_result: false,
             offered: true,
+            duration_string: None,
         }
     }
 
@@ -556,6 +560,19 @@ impl Parameter {
     /// typed in, which is refused when it is none whatever `strict` says.
     const fn not_offered(mut self) -> Self {
         self.offered = false;
+        self
+    }
+
+    /// The same parameter, an expression that holds a duration string where it is text typed in,
+    /// as `truncate`'s `every` and `offset_by`'s `by` do: Polars reads it as one when it runs
+    /// the rows, and the editor refuses the text it does not read at the parameter, with Polars'
+    /// words, where it is built.
+    const fn holding_a_duration_string(mut self, using: DurationUse) -> Self {
+        assert!(
+            matches!(self.kind, Kind::Expression(_)),
+            "only an expression may hold a duration string typed in"
+        );
+        self.duration_string = Some(using);
         self
     }
 
@@ -701,6 +718,13 @@ impl Parameter {
     #[must_use]
     pub const fn names_the_fields_of_the_result(&self) -> bool {
         self.names_the_fields_of_the_result
+    }
+
+    /// The method that reads the expression the parameter holds as a duration string where it is
+    /// text typed in, which Polars is asked to run it on: `truncate`'s `every`, `round`'s and `offset_by`'s `by`.
+    #[must_use]
+    pub const fn duration_string(&self) -> Option<DurationUse> {
+        self.duration_string
     }
 
     /// Whether a number typed without a dtype that is given to the parameter takes the dtype of

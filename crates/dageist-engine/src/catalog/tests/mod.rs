@@ -8,6 +8,7 @@ mod comparison;
 mod condition;
 mod dates;
 mod defaults;
+mod durations;
 mod every_variant;
 mod inventory;
 mod language;

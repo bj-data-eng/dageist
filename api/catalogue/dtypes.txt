@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 39312 combinations: 14664 allowed; 6870 refused when Polars resolved the schema, 17778 when it ran the rows, 0 when it ran the empty table.
+# 40664 combinations: 14670 allowed; 6870 refused when Polars resolved the schema, 19124 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.abs | - | Array(Int64, 2) | - | refused rows: `abs` operation not supported for dtype `array[i64, 2]`
 Expr.abs | - | Boolean | - | refused rows: `abs` operation not supported for dtype `bool`
@@ -4428,6 +4428,682 @@ Expr.dt.quarter | - | UInt16 | - | refused rows: `quarter` operation not support
 Expr.dt.quarter | - | UInt32 | - | refused rows: `quarter` operation not supported for dtype `u32`
 Expr.dt.quarter | - | UInt64 | - | refused rows: `quarter` operation not supported for dtype `u64`
 Expr.dt.quarter | - | UInt8 | - | refused rows: `quarter` operation not supported for dtype `u8`
+Expr.dt.round | every | Array(Int64, 2) | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | String | refused rows: `round` operation not supported for dtype `array[i64, 2]` (expected: date/datetime)
+Expr.dt.round | every | Array(Int64, 2) | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | Array(Int64, 2) | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | Boolean | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | Boolean | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | Boolean | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | Boolean | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | Boolean | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | Boolean | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | Boolean | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | Boolean | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | Boolean | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | Boolean | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | Boolean | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | Boolean | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | Boolean | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | Boolean | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | Boolean | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | Boolean | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | Boolean | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | Boolean | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | Boolean | String | refused rows: `round` operation not supported for dtype `bool` (expected: date/datetime)
+Expr.dt.round | every | Boolean | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | Boolean | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | Boolean | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | Boolean | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | Boolean | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | Boolean | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | Boolean | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | Date | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | Date | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | Date | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | Date | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | Date | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | Date | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | Date | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | Date | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | Date | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | Date | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | Date | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | Date | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | Date | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | Date | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | Date | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | Date | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | Date | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | Date | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | Date | String | allowed Date many
+Expr.dt.round | every | Date | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | Date | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | Date | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | Date | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | Date | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | Date | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | Date | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | Datetime(us) | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | Datetime(us) | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | Datetime(us) | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | Datetime(us) | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | Datetime(us) | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | Datetime(us) | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | Datetime(us) | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | Datetime(us) | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | Datetime(us) | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | Datetime(us) | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | Datetime(us) | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | Datetime(us) | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | Datetime(us) | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | Datetime(us) | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | Datetime(us) | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | Datetime(us) | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | Datetime(us) | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | Datetime(us) | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | Datetime(us) | String | allowed Datetime(us) many
+Expr.dt.round | every | Datetime(us) | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | Datetime(us) | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | Datetime(us) | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | Datetime(us) | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | Datetime(us) | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | Datetime(us) | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | Datetime(us) | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | String | allowed Datetime(us, UTC) many
+Expr.dt.round | every | Datetime(us, UTC) | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | Datetime(us, UTC) | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | String | refused rows: `round` operation not supported for dtype `decimal[10,2]` (expected: date/datetime)
+Expr.dt.round | every | Decimal(10, 2) | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | Decimal(10, 2) | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | Duration(us) | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | Duration(us) | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | Duration(us) | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | Duration(us) | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | Duration(us) | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | Duration(us) | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | Duration(us) | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | Duration(us) | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | Duration(us) | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | Duration(us) | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | Duration(us) | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | Duration(us) | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | Duration(us) | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | Duration(us) | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | Duration(us) | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | Duration(us) | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | Duration(us) | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | Duration(us) | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | Duration(us) | String | refused rows: `round` operation not supported for dtype `duration[μs]` (expected: date/datetime)
+Expr.dt.round | every | Duration(us) | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | Duration(us) | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | Duration(us) | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | Duration(us) | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | Duration(us) | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | Duration(us) | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | Duration(us) | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | Float16 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | Float16 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | Float16 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | Float16 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | Float16 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | Float16 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | Float16 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | Float16 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | Float16 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | Float16 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | Float16 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | Float16 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | Float16 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | Float16 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | Float16 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | Float16 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | Float16 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | Float16 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | Float16 | String | refused rows: `round` operation not supported for dtype `f16` (expected: date/datetime)
+Expr.dt.round | every | Float16 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | Float16 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | Float16 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | Float16 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | Float16 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | Float16 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | Float16 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | Float32 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | Float32 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | Float32 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | Float32 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | Float32 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | Float32 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | Float32 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | Float32 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | Float32 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | Float32 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | Float32 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | Float32 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | Float32 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | Float32 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | Float32 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | Float32 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | Float32 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | Float32 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | Float32 | String | refused rows: `round` operation not supported for dtype `f32` (expected: date/datetime)
+Expr.dt.round | every | Float32 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | Float32 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | Float32 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | Float32 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | Float32 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | Float32 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | Float32 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | Float64 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | Float64 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | Float64 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | Float64 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | Float64 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | Float64 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | Float64 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | Float64 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | Float64 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | Float64 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | Float64 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | Float64 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | Float64 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | Float64 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | Float64 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | Float64 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | Float64 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | Float64 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | Float64 | String | refused rows: `round` operation not supported for dtype `f64` (expected: date/datetime)
+Expr.dt.round | every | Float64 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | Float64 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | Float64 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | Float64 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | Float64 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | Float64 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | Float64 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | Int128 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | Int128 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | Int128 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | Int128 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | Int128 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | Int128 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | Int128 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | Int128 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | Int128 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | Int128 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | Int128 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | Int128 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | Int128 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | Int128 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | Int128 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | Int128 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | Int128 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | Int128 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | Int128 | String | refused rows: `round` operation not supported for dtype `i128` (expected: date/datetime)
+Expr.dt.round | every | Int128 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | Int128 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | Int128 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | Int128 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | Int128 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | Int128 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | Int128 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | Int16 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | Int16 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | Int16 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | Int16 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | Int16 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | Int16 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | Int16 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | Int16 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | Int16 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | Int16 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | Int16 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | Int16 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | Int16 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | Int16 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | Int16 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | Int16 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | Int16 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | Int16 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | Int16 | String | refused rows: `round` operation not supported for dtype `i16` (expected: date/datetime)
+Expr.dt.round | every | Int16 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | Int16 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | Int16 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | Int16 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | Int16 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | Int16 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | Int16 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | Int32 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | Int32 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | Int32 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | Int32 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | Int32 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | Int32 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | Int32 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | Int32 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | Int32 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | Int32 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | Int32 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | Int32 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | Int32 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | Int32 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | Int32 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | Int32 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | Int32 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | Int32 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | Int32 | String | refused rows: `round` operation not supported for dtype `i32` (expected: date/datetime)
+Expr.dt.round | every | Int32 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | Int32 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | Int32 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | Int32 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | Int32 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | Int32 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | Int32 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | Int64 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | Int64 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | Int64 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | Int64 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | Int64 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | Int64 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | Int64 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | Int64 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | Int64 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | Int64 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | Int64 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | Int64 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | Int64 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | Int64 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | Int64 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | Int64 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | Int64 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | Int64 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | Int64 | String | refused rows: `round` operation not supported for dtype `i64` (expected: date/datetime)
+Expr.dt.round | every | Int64 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | Int64 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | Int64 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | Int64 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | Int64 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | Int64 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | Int64 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | Int8 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | Int8 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | Int8 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | Int8 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | Int8 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | Int8 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | Int8 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | Int8 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | Int8 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | Int8 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | Int8 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | Int8 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | Int8 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | Int8 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | Int8 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | Int8 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | Int8 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | Int8 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | Int8 | String | refused rows: `round` operation not supported for dtype `i8` (expected: date/datetime)
+Expr.dt.round | every | Int8 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | Int8 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | Int8 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | Int8 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | Int8 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | Int8 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | Int8 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | List(Int64) | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | List(Int64) | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | List(Int64) | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | List(Int64) | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | List(Int64) | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | List(Int64) | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | List(Int64) | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | List(Int64) | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | List(Int64) | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | List(Int64) | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | List(Int64) | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | List(Int64) | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | List(Int64) | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | List(Int64) | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | List(Int64) | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | List(Int64) | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | List(Int64) | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | List(Int64) | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | List(Int64) | String | refused rows: `round` operation not supported for dtype `list[i64]` (expected: date/datetime)
+Expr.dt.round | every | List(Int64) | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | List(Int64) | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | List(Int64) | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | List(Int64) | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | List(Int64) | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | List(Int64) | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | List(Int64) | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | List(String) | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | List(String) | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | List(String) | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | List(String) | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | List(String) | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | List(String) | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | List(String) | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | List(String) | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | List(String) | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | List(String) | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | List(String) | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | List(String) | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | List(String) | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | List(String) | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | List(String) | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | List(String) | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | List(String) | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | List(String) | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | List(String) | String | refused rows: `round` operation not supported for dtype `list[str]` (expected: date/datetime)
+Expr.dt.round | every | List(String) | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | List(String) | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | List(String) | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | List(String) | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | List(String) | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | List(String) | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | List(String) | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | Null | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | Null | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | Null | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | Null | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | Null | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | Null | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | Null | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | Null | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | Null | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | Null | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | Null | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | Null | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | Null | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | Null | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | Null | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | Null | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | Null | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | Null | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | Null | String | refused rows: `round` operation not supported for dtype `null` (expected: date/datetime)
+Expr.dt.round | every | Null | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | Null | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | Null | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | Null | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | Null | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | Null | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | Null | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | String | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | String | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | String | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | String | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | String | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | String | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | String | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | String | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | String | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | String | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | String | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | String | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | String | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | String | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | String | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | String | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | String | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | String | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | String | String | refused rows: `round` operation not supported for dtype `str` (expected: date/datetime)
+Expr.dt.round | every | String | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | String | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | String | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | String | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | String | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | String | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | String | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | String | refused rows: `round` operation not supported for dtype `struct[2]` (expected: date/datetime)
+Expr.dt.round | every | Struct(x: Int64, y: String) | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | Struct(x: Int64, y: String) | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | Time | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | Time | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | Time | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | Time | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | Time | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | Time | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | Time | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | Time | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | Time | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | Time | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | Time | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | Time | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | Time | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | Time | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | Time | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | Time | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | Time | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | Time | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | Time | String | refused rows: `round` operation not supported for dtype `time` (expected: date/datetime)
+Expr.dt.round | every | Time | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | Time | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | Time | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | Time | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | Time | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | Time | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | Time | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | UInt128 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | UInt128 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | UInt128 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | UInt128 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | UInt128 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | UInt128 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | UInt128 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | UInt128 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | UInt128 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | UInt128 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | UInt128 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | UInt128 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | UInt128 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | UInt128 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | UInt128 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | UInt128 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | UInt128 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | UInt128 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | UInt128 | String | refused rows: `round` operation not supported for dtype `u128` (expected: date/datetime)
+Expr.dt.round | every | UInt128 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | UInt128 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | UInt128 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | UInt128 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | UInt128 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | UInt128 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | UInt128 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | UInt16 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | UInt16 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | UInt16 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | UInt16 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | UInt16 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | UInt16 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | UInt16 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | UInt16 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | UInt16 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | UInt16 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | UInt16 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | UInt16 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | UInt16 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | UInt16 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | UInt16 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | UInt16 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | UInt16 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | UInt16 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | UInt16 | String | refused rows: `round` operation not supported for dtype `u16` (expected: date/datetime)
+Expr.dt.round | every | UInt16 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | UInt16 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | UInt16 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | UInt16 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | UInt16 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | UInt16 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | UInt16 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | UInt32 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | UInt32 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | UInt32 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | UInt32 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | UInt32 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | UInt32 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | UInt32 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | UInt32 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | UInt32 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | UInt32 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | UInt32 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | UInt32 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | UInt32 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | UInt32 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | UInt32 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | UInt32 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | UInt32 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | UInt32 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | UInt32 | String | refused rows: `round` operation not supported for dtype `u32` (expected: date/datetime)
+Expr.dt.round | every | UInt32 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | UInt32 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | UInt32 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | UInt32 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | UInt32 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | UInt32 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | UInt32 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | UInt64 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | UInt64 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | UInt64 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | UInt64 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | UInt64 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | UInt64 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | UInt64 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | UInt64 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | UInt64 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | UInt64 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | UInt64 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | UInt64 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | UInt64 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | UInt64 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | UInt64 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | UInt64 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | UInt64 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | UInt64 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | UInt64 | String | refused rows: `round` operation not supported for dtype `u64` (expected: date/datetime)
+Expr.dt.round | every | UInt64 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | UInt64 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | UInt64 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | UInt64 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | UInt64 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | UInt64 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | UInt64 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.round | every | UInt8 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.round | every | UInt8 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.round | every | UInt8 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.round | every | UInt8 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.round | every | UInt8 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.round | every | UInt8 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.round | every | UInt8 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.round | every | UInt8 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.round | every | UInt8 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.round | every | UInt8 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.round | every | UInt8 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.round | every | UInt8 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.round | every | UInt8 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.round | every | UInt8 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.round | every | UInt8 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.round | every | UInt8 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.round | every | UInt8 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.round | every | UInt8 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.round | every | UInt8 | String | refused rows: `round` operation not supported for dtype `u8` (expected: date/datetime)
+Expr.dt.round | every | UInt8 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.round | every | UInt8 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.round | every | UInt8 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.round | every | UInt8 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.round | every | UInt8 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.round | every | UInt8 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.round | every | UInt8 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
 Expr.dt.second | - | Array(Int64, 2) | - | refused rows: `second` operation not supported for dtype `array[i64, 2]`
 Expr.dt.second | - | Boolean | - | refused rows: `second` operation not supported for dtype `bool`
 Expr.dt.second | - | Date | - | refused rows: `second` operation not supported for dtype `date`
@@ -4688,6 +5364,682 @@ Expr.dt.total_seconds | - | UInt16 | - | refused rows: invalid series dtype: exp
 Expr.dt.total_seconds | - | UInt32 | - | refused rows: invalid series dtype: expected `Duration`, got `u32` for series with name `a`
 Expr.dt.total_seconds | - | UInt64 | - | refused rows: invalid series dtype: expected `Duration`, got `u64` for series with name `a`
 Expr.dt.total_seconds | - | UInt8 | - | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
+Expr.dt.truncate | every | Array(Int64, 2) | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | String | refused rows: `truncate` operation not supported for dtype `array[i64, 2]` (expected: date/datetime)
+Expr.dt.truncate | every | Array(Int64, 2) | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | Array(Int64, 2) | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | Boolean | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | Boolean | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | Boolean | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | Boolean | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | Boolean | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | Boolean | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | Boolean | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | Boolean | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | Boolean | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | Boolean | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | Boolean | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | Boolean | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | Boolean | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | Boolean | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | Boolean | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | Boolean | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | Boolean | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | Boolean | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | Boolean | String | refused rows: `truncate` operation not supported for dtype `bool` (expected: date/datetime)
+Expr.dt.truncate | every | Boolean | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | Boolean | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | Boolean | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | Boolean | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | Boolean | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | Boolean | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | Boolean | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | Date | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | Date | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | Date | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | Date | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | Date | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | Date | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | Date | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | Date | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | Date | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | Date | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | Date | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | Date | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | Date | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | Date | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | Date | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | Date | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | Date | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | Date | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | Date | String | allowed Date many
+Expr.dt.truncate | every | Date | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | Date | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | Date | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | Date | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | Date | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | Date | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | Date | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | String | allowed Datetime(us) many
+Expr.dt.truncate | every | Datetime(us) | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | Datetime(us) | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | String | allowed Datetime(us, UTC) many
+Expr.dt.truncate | every | Datetime(us, UTC) | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | Datetime(us, UTC) | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | String | refused rows: `truncate` operation not supported for dtype `decimal[10,2]` (expected: date/datetime)
+Expr.dt.truncate | every | Decimal(10, 2) | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | Decimal(10, 2) | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | String | refused rows: `truncate` operation not supported for dtype `duration[μs]` (expected: date/datetime)
+Expr.dt.truncate | every | Duration(us) | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | Duration(us) | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | Float16 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | Float16 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | Float16 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | Float16 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | Float16 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | Float16 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | Float16 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | Float16 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | Float16 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | Float16 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | Float16 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | Float16 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | Float16 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | Float16 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | Float16 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | Float16 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | Float16 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | Float16 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | Float16 | String | refused rows: `truncate` operation not supported for dtype `f16` (expected: date/datetime)
+Expr.dt.truncate | every | Float16 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | Float16 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | Float16 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | Float16 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | Float16 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | Float16 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | Float16 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | Float32 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | Float32 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | Float32 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | Float32 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | Float32 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | Float32 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | Float32 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | Float32 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | Float32 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | Float32 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | Float32 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | Float32 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | Float32 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | Float32 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | Float32 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | Float32 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | Float32 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | Float32 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | Float32 | String | refused rows: `truncate` operation not supported for dtype `f32` (expected: date/datetime)
+Expr.dt.truncate | every | Float32 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | Float32 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | Float32 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | Float32 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | Float32 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | Float32 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | Float32 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | Float64 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | Float64 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | Float64 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | Float64 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | Float64 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | Float64 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | Float64 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | Float64 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | Float64 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | Float64 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | Float64 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | Float64 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | Float64 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | Float64 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | Float64 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | Float64 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | Float64 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | Float64 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | Float64 | String | refused rows: `truncate` operation not supported for dtype `f64` (expected: date/datetime)
+Expr.dt.truncate | every | Float64 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | Float64 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | Float64 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | Float64 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | Float64 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | Float64 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | Float64 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | Int128 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | Int128 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | Int128 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | Int128 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | Int128 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | Int128 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | Int128 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | Int128 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | Int128 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | Int128 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | Int128 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | Int128 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | Int128 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | Int128 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | Int128 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | Int128 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | Int128 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | Int128 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | Int128 | String | refused rows: `truncate` operation not supported for dtype `i128` (expected: date/datetime)
+Expr.dt.truncate | every | Int128 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | Int128 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | Int128 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | Int128 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | Int128 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | Int128 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | Int128 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | Int16 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | Int16 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | Int16 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | Int16 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | Int16 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | Int16 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | Int16 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | Int16 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | Int16 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | Int16 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | Int16 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | Int16 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | Int16 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | Int16 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | Int16 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | Int16 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | Int16 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | Int16 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | Int16 | String | refused rows: `truncate` operation not supported for dtype `i16` (expected: date/datetime)
+Expr.dt.truncate | every | Int16 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | Int16 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | Int16 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | Int16 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | Int16 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | Int16 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | Int16 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | Int32 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | Int32 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | Int32 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | Int32 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | Int32 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | Int32 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | Int32 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | Int32 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | Int32 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | Int32 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | Int32 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | Int32 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | Int32 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | Int32 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | Int32 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | Int32 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | Int32 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | Int32 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | Int32 | String | refused rows: `truncate` operation not supported for dtype `i32` (expected: date/datetime)
+Expr.dt.truncate | every | Int32 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | Int32 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | Int32 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | Int32 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | Int32 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | Int32 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | Int32 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | Int64 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | Int64 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | Int64 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | Int64 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | Int64 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | Int64 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | Int64 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | Int64 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | Int64 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | Int64 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | Int64 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | Int64 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | Int64 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | Int64 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | Int64 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | Int64 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | Int64 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | Int64 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | Int64 | String | refused rows: `truncate` operation not supported for dtype `i64` (expected: date/datetime)
+Expr.dt.truncate | every | Int64 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | Int64 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | Int64 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | Int64 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | Int64 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | Int64 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | Int64 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | Int8 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | Int8 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | Int8 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | Int8 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | Int8 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | Int8 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | Int8 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | Int8 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | Int8 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | Int8 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | Int8 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | Int8 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | Int8 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | Int8 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | Int8 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | Int8 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | Int8 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | Int8 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | Int8 | String | refused rows: `truncate` operation not supported for dtype `i8` (expected: date/datetime)
+Expr.dt.truncate | every | Int8 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | Int8 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | Int8 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | Int8 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | Int8 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | Int8 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | Int8 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | String | refused rows: `truncate` operation not supported for dtype `list[i64]` (expected: date/datetime)
+Expr.dt.truncate | every | List(Int64) | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | List(Int64) | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | List(String) | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | List(String) | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | List(String) | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | List(String) | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | List(String) | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | List(String) | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | List(String) | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | List(String) | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | List(String) | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | List(String) | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | List(String) | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | List(String) | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | List(String) | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | List(String) | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | List(String) | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | List(String) | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | List(String) | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | List(String) | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | List(String) | String | refused rows: `truncate` operation not supported for dtype `list[str]` (expected: date/datetime)
+Expr.dt.truncate | every | List(String) | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | List(String) | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | List(String) | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | List(String) | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | List(String) | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | List(String) | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | List(String) | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | Null | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | Null | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | Null | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | Null | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | Null | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | Null | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | Null | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | Null | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | Null | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | Null | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | Null | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | Null | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | Null | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | Null | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | Null | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | Null | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | Null | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | Null | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | Null | String | refused rows: `truncate` operation not supported for dtype `null` (expected: date/datetime)
+Expr.dt.truncate | every | Null | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | Null | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | Null | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | Null | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | Null | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | Null | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | Null | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | String | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | String | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | String | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | String | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | String | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | String | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | String | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | String | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | String | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | String | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | String | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | String | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | String | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | String | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | String | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | String | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | String | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | String | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | String | String | refused rows: `truncate` operation not supported for dtype `str` (expected: date/datetime)
+Expr.dt.truncate | every | String | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | String | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | String | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | String | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | String | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | String | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | String | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | String | refused rows: `truncate` operation not supported for dtype `struct[2]` (expected: date/datetime)
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | Struct(x: Int64, y: String) | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | Time | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | Time | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | Time | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | Time | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | Time | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | Time | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | Time | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | Time | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | Time | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | Time | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | Time | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | Time | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | Time | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | Time | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | Time | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | Time | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | Time | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | Time | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | Time | String | refused rows: `truncate` operation not supported for dtype `time` (expected: date/datetime)
+Expr.dt.truncate | every | Time | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | Time | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | Time | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | Time | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | Time | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | Time | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | Time | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | UInt128 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | UInt128 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | UInt128 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | UInt128 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | UInt128 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | UInt128 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | UInt128 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | UInt128 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | UInt128 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | UInt128 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | UInt128 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | UInt128 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | UInt128 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | UInt128 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | UInt128 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | UInt128 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | UInt128 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | UInt128 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | UInt128 | String | refused rows: `truncate` operation not supported for dtype `u128` (expected: date/datetime)
+Expr.dt.truncate | every | UInt128 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | UInt128 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | UInt128 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | UInt128 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | UInt128 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | UInt128 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | UInt128 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | UInt16 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | UInt16 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | UInt16 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | UInt16 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | UInt16 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | UInt16 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | UInt16 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | UInt16 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | UInt16 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | UInt16 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | UInt16 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | UInt16 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | UInt16 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | UInt16 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | UInt16 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | UInt16 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | UInt16 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | UInt16 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | UInt16 | String | refused rows: `truncate` operation not supported for dtype `u16` (expected: date/datetime)
+Expr.dt.truncate | every | UInt16 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | UInt16 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | UInt16 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | UInt16 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | UInt16 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | UInt16 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | UInt16 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | UInt32 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | UInt32 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | UInt32 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | UInt32 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | UInt32 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | UInt32 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | UInt32 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | UInt32 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | UInt32 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | UInt32 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | UInt32 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | UInt32 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | UInt32 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | UInt32 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | UInt32 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | UInt32 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | UInt32 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | UInt32 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | UInt32 | String | refused rows: `truncate` operation not supported for dtype `u32` (expected: date/datetime)
+Expr.dt.truncate | every | UInt32 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | UInt32 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | UInt32 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | UInt32 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | UInt32 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | UInt32 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | UInt32 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | UInt64 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | UInt64 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | UInt64 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | UInt64 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | UInt64 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | UInt64 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | UInt64 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | UInt64 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | UInt64 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | UInt64 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | UInt64 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | UInt64 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | UInt64 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | UInt64 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | UInt64 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | UInt64 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | UInt64 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | UInt64 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | UInt64 | String | refused rows: `truncate` operation not supported for dtype `u64` (expected: date/datetime)
+Expr.dt.truncate | every | UInt64 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | UInt64 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | UInt64 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | UInt64 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | UInt64 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | UInt64 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | UInt64 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
+Expr.dt.truncate | every | UInt8 | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `b`
+Expr.dt.truncate | every | UInt8 | Boolean | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `b`
+Expr.dt.truncate | every | UInt8 | Date | refused rows: invalid series dtype: expected `String`, got `date` for series with name `b`
+Expr.dt.truncate | every | UInt8 | Datetime(us) | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `b`
+Expr.dt.truncate | every | UInt8 | Datetime(us, UTC) | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `b`
+Expr.dt.truncate | every | UInt8 | Decimal(10, 2) | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `b`
+Expr.dt.truncate | every | UInt8 | Duration(us) | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `b`
+Expr.dt.truncate | every | UInt8 | Float16 | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `b`
+Expr.dt.truncate | every | UInt8 | Float32 | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `b`
+Expr.dt.truncate | every | UInt8 | Float64 | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `b`
+Expr.dt.truncate | every | UInt8 | Int128 | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `b`
+Expr.dt.truncate | every | UInt8 | Int16 | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `b`
+Expr.dt.truncate | every | UInt8 | Int32 | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `b`
+Expr.dt.truncate | every | UInt8 | Int64 | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `b`
+Expr.dt.truncate | every | UInt8 | Int8 | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `b`
+Expr.dt.truncate | every | UInt8 | List(Int64) | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `b`
+Expr.dt.truncate | every | UInt8 | List(String) | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `b`
+Expr.dt.truncate | every | UInt8 | Null | refused rows: invalid series dtype: expected `String`, got `null` for series with name `b`
+Expr.dt.truncate | every | UInt8 | String | refused rows: `truncate` operation not supported for dtype `u8` (expected: date/datetime)
+Expr.dt.truncate | every | UInt8 | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `b`
+Expr.dt.truncate | every | UInt8 | Time | refused rows: invalid series dtype: expected `String`, got `time` for series with name `b`
+Expr.dt.truncate | every | UInt8 | UInt128 | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `b`
+Expr.dt.truncate | every | UInt8 | UInt16 | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `b`
+Expr.dt.truncate | every | UInt8 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `b`
+Expr.dt.truncate | every | UInt8 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `b`
+Expr.dt.truncate | every | UInt8 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `b`
 Expr.dt.week | - | Array(Int64, 2) | - | refused rows: `week` operation not supported for dtype `array[i64, 2]`
 Expr.dt.week | - | Boolean | - | refused rows: `week` operation not supported for dtype `bool`
 Expr.dt.week | - | Date | - | allowed Int8 many

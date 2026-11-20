@@ -111,6 +111,7 @@ impl core::fmt::Display for dageist_engine::allowed::Representative
 pub fn dageist_engine::allowed::Representative::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub enum dageist_engine::allowed::Rule
 pub dageist_engine::allowed::Rule::ConditionPredicateIsBoolean
+pub dageist_engine::allowed::Rule::DurationIsValid
 pub dageist_engine::allowed::Rule::ElementOnlyInPivotAggregate
 pub dageist_engine::allowed::Rule::FilterPredicateIsBoolean
 pub dageist_engine::allowed::Rule::JoinKeyNamesAreNotRepeated
@@ -119,7 +120,7 @@ pub dageist_engine::allowed::Rule::PatternIsValid
 pub dageist_engine::allowed::Rule::PivotAggregateGivesOneValue
 pub dageist_engine::allowed::Rule::ReplacementValuesMatchInNumber
 impl dageist_engine::allowed::Rule
-pub const dageist_engine::allowed::Rule::ALL: [Self; 8]
+pub const dageist_engine::allowed::Rule::ALL: [Self; 9]
 pub fn dageist_engine::allowed::Rule::from_name(name: &str) -> core::option::Option<Self>
 pub const fn dageist_engine::allowed::Rule::name(self) -> &'static str
 pub const fn dageist_engine::allowed::Rule::statement(self) -> &'static str
@@ -179,6 +180,7 @@ impl<'a> dageist_engine::allowed::Chosen<'a>
 pub const fn dageist_engine::allowed::Chosen<'a>::giving(self, dtype: dageist_engine::allowed::Representative) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::giving_many(self) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_arguments(self, arguments: &'a [(&'a str, dageist_engine::allowed::Representative)]) -> Self
+pub const fn dageist_engine::allowed::Chosen<'a>::with_durations(self, durations: &'a [(&'a str, &'a str, dageist_engine::catalog::DurationUse)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_options(self, options: &'a [(&'a str, &'a str)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_patterns(self, patterns: &'a [(&'a str, &'a str)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_unclassed(self, unclassed: &'a [&'a str]) -> Self
@@ -304,6 +306,9 @@ pub fn dageist_engine::catalog::Build::fmt(&self, formatter: &mut core::fmt::For
 pub enum dageist_engine::catalog::BuildError
 pub dageist_engine::catalog::BuildError::Missing
 pub dageist_engine::catalog::BuildError::Missing::parameter: &'static str
+pub dageist_engine::catalog::BuildError::NotADuration
+pub dageist_engine::catalog::BuildError::NotADuration::error: dageist_engine::catalog::DurationError
+pub dageist_engine::catalog::BuildError::NotADuration::parameter: &'static str
 pub dageist_engine::catalog::BuildError::NotAPattern
 pub dageist_engine::catalog::BuildError::NotAPattern::error: dageist_engine::catalog::PatternError
 pub dageist_engine::catalog::BuildError::NotAPattern::parameter: &'static str
@@ -377,6 +382,10 @@ pub dageist_engine::catalog::Dtypes::Time
 impl dageist_engine::catalog::Dtypes
 pub const dageist_engine::catalog::Dtypes::ALL: [Self; 10]
 pub const fn dageist_engine::catalog::Dtypes::key(self) -> &'static str
+pub enum dageist_engine::catalog::DurationUse
+pub dageist_engine::catalog::DurationUse::Cut
+pub dageist_engine::catalog::DurationUse::Offset
+pub dageist_engine::catalog::DurationUse::Round
 pub enum dageist_engine::catalog::Family
 pub dageist_engine::catalog::Family::Aggregate
 pub dageist_engine::catalog::Family::Arithmetic
@@ -565,6 +574,12 @@ pub fn dageist_engine::catalog::Arguments::pattern(&self, parameter: &'static st
 pub fn dageist_engine::catalog::Arguments::required_expression(&self, parameter: &'static str) -> core::result::Result<polars_plan::dsl::expr::Expr, dageist_engine::catalog::BuildError>
 pub fn dageist_engine::catalog::Arguments::string(&self, parameter: &'static str) -> core::result::Result<core::option::Option<alloc::string::String>, dageist_engine::catalog::BuildError>
 pub fn dageist_engine::catalog::Arguments::table(&self, parameter: &'static str) -> core::result::Result<polars_lazy::frame::LazyFrame, dageist_engine::catalog::BuildError>
+pub struct dageist_engine::catalog::DurationError
+impl dageist_engine::catalog::DurationError
+pub fn dageist_engine::catalog::DurationError::reason(&self) -> &str
+impl core::error::Error for dageist_engine::catalog::DurationError
+impl core::fmt::Display for dageist_engine::catalog::DurationError
+pub fn dageist_engine::catalog::DurationError::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub struct dageist_engine::catalog::Entry
 impl dageist_engine::catalog::Entry
 pub const fn dageist_engine::catalog::Entry::accepts(&self) -> &'static [dageist_engine::catalog::Dtypes]
@@ -590,6 +605,7 @@ pub const fn dageist_engine::catalog::Parameter::as_many_as(&self) -> core::opti
 pub const fn dageist_engine::catalog::Parameter::broadcasts(&self) -> bool
 pub const fn dageist_engine::catalog::Parameter::converts(&self) -> &'static [&'static str]
 pub const fn dageist_engine::catalog::Parameter::default(&self) -> dageist_engine::catalog::ParameterDefault
+pub const fn dageist_engine::catalog::Parameter::duration_string(&self) -> core::option::Option<dageist_engine::catalog::DurationUse>
 pub const fn dageist_engine::catalog::Parameter::in_place_of(&self) -> core::option::Option<&'static str>
 pub const fn dageist_engine::catalog::Parameter::is_keyword_only(&self) -> bool
 pub const fn dageist_engine::catalog::Parameter::is_needed(&self) -> bool
@@ -636,6 +652,8 @@ pub fn dageist_engine::catalog::Words::parameter_name(&self, id: dageist_engine:
 pub fn dageist_engine::catalog::Words::parse(source: &str) -> core::result::Result<Self, dageist_engine::catalog::WordsError>
 pub fn dageist_engine::catalog::Words::say(&self, phrase: dageist_engine::catalog::SummaryPhrase<'_>) -> alloc::string::String
 pub fn dageist_engine::catalog::Words::sign(&self, comparison: dageist_engine::catalog::Comparison) -> core::option::Option<&str>
+pub const fn dageist_engine::catalog::any_moment() -> polars_core::datatypes::dtype::DataType
+pub fn dageist_engine::catalog::check_duration(text: &str, using: dageist_engine::catalog::DurationUse, on: &polars_core::datatypes::dtype::DataType) -> core::result::Result<(), dageist_engine::catalog::DurationError>
 pub fn dageist_engine::catalog::check_pattern(text: &str) -> core::result::Result<(), dageist_engine::catalog::PatternError>
 pub fn dageist_engine::catalog::english() -> &'static dageist_engine::catalog::Words
 pub fn dageist_engine::catalog::entries() -> &'static [dageist_engine::catalog::Entry]

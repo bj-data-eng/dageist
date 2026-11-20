@@ -33,6 +33,8 @@ pub enum Rule {
     /// an earlier one, beside a key on the other side that repeats the name it
     /// was paired with, makes the same pair again.
     JoinKeyNamesAreNotRepeated,
+    /// A duration typed in, where a method reads a text as one, is a duration string Polars reads.
+    DurationIsValid,
     /// A join's own key is elementwise: it holds no aggregate beside a column,
     /// no column compared with a null, and no replacement of values that are not literals.
     KeyIsElementwise,
@@ -46,8 +48,9 @@ pub enum Rule {
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 9] = [
         Self::ConditionPredicateIsBoolean,
+        Self::DurationIsValid,
         Self::ElementOnlyInPivotAggregate,
         Self::FilterPredicateIsBoolean,
         Self::JoinKeyNamesAreNotRepeated,
@@ -63,6 +66,7 @@ impl Rule {
         match self {
             Self::PivotAggregateGivesOneValue => "pivot-aggregate-gives-one-value",
             Self::ConditionPredicateIsBoolean => "condition-predicate-is-boolean",
+            Self::DurationIsValid => "duration-is-valid",
             Self::ElementOnlyInPivotAggregate => "element-only-in-pivot-aggregate",
             Self::FilterPredicateIsBoolean => "filter-predicate-is-boolean",
             Self::JoinKeyNamesAreNotRepeated => "join-key-names-are-not-repeated",
@@ -96,6 +100,7 @@ impl Rule {
             Self::KeyIsElementwise => {
                 "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a column be compared with a null, nor a replacement take a value that reads a column"
             }
+            Self::DurationIsValid => "a duration typed in must be a duration string Polars reads",
             Self::PatternIsValid => "a pattern must be a valid regular expression",
             Self::ReplacementValuesMatchInNumber => {
                 "a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one"
@@ -114,7 +119,9 @@ impl Rule {
             Self::PivotAggregateGivesOneValue => context == Context::step(Outer::PivotAggregate),
             Self::JoinKeyNamesAreNotRepeated | Self::KeyIsElementwise => context.is_join_key(),
             // A matter of the values a call is given, whatever context it stands in.
-            Self::PatternIsValid | Self::ReplacementValuesMatchInNumber => false,
+            Self::DurationIsValid | Self::PatternIsValid | Self::ReplacementValuesMatchInNumber => {
+                false
+            }
             Self::ConditionPredicateIsBoolean | Self::FilterPredicateIsBoolean => {
                 self.needs_boolean_end(context)
             }
@@ -209,6 +216,7 @@ impl Rule {
             | Self::ElementOnlyInPivotAggregate
             | Self::JoinKeyNamesAreNotRepeated
             | Self::KeyIsElementwise
+            | Self::DurationIsValid
             | Self::PatternIsValid
             | Self::ReplacementValuesMatchInNumber => false,
         }

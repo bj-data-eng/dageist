@@ -730,6 +730,32 @@ as a refusal when the steps run, not in its list; only the list that adds an
 option asks. The values of `is_in` are connected lists the engine has no entry
 to judge yet, so that list offers them unjudged.
 
+### The Duration String
+
+The methods of the `dt` namespace that move, cut and round a moment by a length of time, `dt.offset_by`,
+`dt.truncate` and `dt.round`, take it as an expression that holds a duration string such as `1mo`,
+`2d12h` or `-3h`, which may be a column of them, so it is not a parameter of a kind of its own. The
+catalogue names the parameter as one that holds a duration string, and the method that reads it: the
+move, the cut or the round.
+
+Where the expression is text typed in and nothing more, the engine asks Polars whether it reads it,
+and does not parse one itself. `check_duration` runs the method on one moment with the text and
+gives Polars' reason where it refuses, in Polars' words, up to the first blank line: a text with no
+amount or no unit, a unit that does not exist, a second sign, or, of the cut and the round, a length
+below zero. Polars refuses some of them only for the dtype of what it is given to, so the moment is
+of the dtype that the value before the method has where the walk knows it: a `Date` cannot be cut
+by a length of days and hours together, nor by a length of nothing, where a `Datetime` can. The build
+cannot know the dtype, and asks on a `Datetime`. An amount whose units add up to more than an `i64` of
+nanoseconds is refused before Polars is asked, in every build, as [a typed duration is](#how-a-typed-text-is-read).
+
+- A duration typed in that Polars refuses is refused where the step is built, at the parameter that
+  holds it, and where the walk asks, by the named rule `duration-is-valid`, whatever follows it.
+- A duration that is a column is Polars' to read, row by row, when the rows run, and the tables
+  measured the text of the sample's rows, which is `1d` and `2d`. The target gives a duration that is
+  a column only that column, for the text of the others is no duration, which is the person's to
+  give and not a mistake of the tables.
+- The parameter of the move is `by`; that of the cut and the round is `every`.
+
 ### How A Typed Text Is Read
 
 The view sends the text it was given with what it is typed into, which is the
@@ -754,7 +780,8 @@ or, for a text the slot does not take, why not. Nothing typed reads as nothing.
 - **A duration** is read as Polars reads a duration string, such as `1mo` or
   `2d12h`, by the parser that `dt.offset_by` uses. Given to an expression, as
   `dt.offset_by`'s `by`, `"1d"` is a `String` literal like any other, which the
-  tables allow there and Polars reads when it runs rows; only a parameter that
+  tables allow there and Polars reads when it runs rows, and which the step holds to a
+  duration Polars reads, [as below](#the-duration-string); only a parameter that
   takes a duration itself reads the text as one, and the reading has no dtype.
   An amount whose units add up to more than an `i64` of nanoseconds (a day is 24
   hours and a week 7 days) or of months is refused, in every build: Polars adds

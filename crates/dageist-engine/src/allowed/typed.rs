@@ -36,12 +36,11 @@
 //! Nothing typed reads as nothing.
 
 use std::fmt;
-use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use polars::chunked_array::temporal::string::StringMethods;
-use polars::prelude::{DataType, Duration, IntoSeries, NamedFrom, Series};
+use polars::prelude::{DataType, IntoSeries, NamedFrom, Series};
 
-use crate::catalog::ValueType;
+use crate::catalog::{DurationUse, ValueType, any_moment, check_duration};
 use crate::document::{NotWritten, WrittenNumber, read_number};
 
 use super::dtype::Representative;
@@ -241,147 +240,9 @@ fn date(text: &str) -> Result<Read, Unread> {
     })
 }
 
-/// The lengths of time Polars converts the parts of a duration with, in nanoseconds.
-mod span {
-    pub(super) const MICROSECOND: i64 = 1_000;
-    pub(super) const MILLISECOND: i64 = 1_000 * MICROSECOND;
-    pub(super) const SECOND: i64 = 1_000 * MILLISECOND;
-    pub(super) const MINUTE: i64 = 60 * SECOND;
-    pub(super) const HOUR: i64 = 60 * MINUTE;
-    pub(super) const DAY: i64 = 24 * HOUR;
-    pub(super) const WEEK: i64 = 7 * DAY;
-    /// A month as Polars counts it in the length of a duration: 28 days.
-    pub(super) const MONTH: i64 = 28 * DAY;
-    /// The longest a month, a week and a day may be where Polars bounds a duration: 31 days and
-    /// an hour, a week of six days and a day, and a day of 25 hours and a nanosecond.
-    pub(super) const MONTH_AT_MOST: i64 = (31 * 24 + 1) * HOUR;
-    pub(super) const DAY_AT_MOST: i64 = 25 * HOUR + 1;
-    pub(super) const WEEK_AT_MOST: i64 = 6 * DAY + DAY_AT_MOST;
-}
-
-/// What each unit of a duration string counts, which is one of the parts Polars holds a
-/// duration as: months, weeks, days and nanoseconds.
-enum Count {
-    Nanoseconds(i64),
-    Days,
-    Weeks,
-    Months(i64),
-}
-
-/// How a unit of a duration string counts. `None` for a word that is no unit, which Polars refuses
-/// with its own reason.
-fn count_of(unit: &[u8]) -> Option<Count> {
-    Some(match unit {
-        b"ns" | b"i" => Count::Nanoseconds(1),
-        b"us" => Count::Nanoseconds(span::MICROSECOND),
-        b"ms" => Count::Nanoseconds(span::MILLISECOND),
-        b"s" => Count::Nanoseconds(span::SECOND),
-        b"m" => Count::Nanoseconds(span::MINUTE),
-        b"h" => Count::Nanoseconds(span::HOUR),
-        b"d" => Count::Days,
-        b"w" => Count::Weeks,
-        b"mo" => Count::Months(1),
-        b"q" => Count::Months(3),
-        b"y" => Count::Months(12),
-        _ => return None,
-    })
-}
-
-/// The parts of a duration, each an `i64` that holds what the string adds up to.
-#[derive(Default)]
-struct Parts {
-    months: i64,
-    weeks: i64,
-    days: i64,
-    nanoseconds: i64,
-}
-
-impl Parts {
-    /// Adds `amount` of `count`, or `None` where a part overflows.
-    fn add(&mut self, amount: i64, count: &Count) -> Option<()> {
-        match count {
-            Count::Nanoseconds(per) => {
-                self.nanoseconds = self.nanoseconds.checked_add(amount.checked_mul(*per)?)?;
-            }
-            Count::Days => self.days = self.days.checked_add(amount)?,
-            Count::Weeks => self.weeks = self.weeks.checked_add(amount)?,
-            Count::Months(per) => {
-                self.months = self.months.checked_add(amount.checked_mul(*per)?)?;
-            }
-        }
-        Some(())
-    }
-
-    /// The nanoseconds the parts come to where a month, a week and a day are as long as given,
-    /// or `None` where they do not fit an `i64`.
-    fn nanoseconds_with(&self, month: i64, week: i64, day: i64) -> Option<i64> {
-        self.months
-            .checked_mul(month)?
-            .checked_add(self.weeks.checked_mul(week)?)?
-            .checked_add(self.days.checked_mul(day)?)?
-            .checked_add(self.nanoseconds)
-    }
-
-    /// Whether the duration is one Polars holds: its length, where it adds the parts up with a
-    /// month of 28 days, and the longest it may be, where a month is 31 days and an hour, a week
-    /// 6 days and a day, and a day 25 hours and a nanosecond, each fit an `i64` of nanoseconds.
-    fn fit(&self) -> bool {
-        self.nanoseconds_with(span::MONTH, span::WEEK, span::DAY)
-            .is_some()
-            && self
-                .nanoseconds_with(span::MONTH_AT_MOST, span::WEEK_AT_MOST, span::DAY_AT_MOST)
-                .is_some()
-    }
-}
-
-/// Whether the duration string `text` is one Polars holds. Polars adds the amounts up with
-/// arithmetic that is not checked, so that a build with overflow checks panics and one without
-/// wraps around, and it does not convert months, weeks and days into nanoseconds until the
-/// duration is used, in its length (`duration_ns`) and in the longest it may be
-/// (`nte_duration_ns`), as a window, a half-life, a literal and a join's tolerance do. This is
-/// checked here, the same in every build, and only to find an amount that is too large: what is
-/// no duration for another reason is Polars' to refuse.
-fn fits_polars(text: &str) -> bool {
-    let bytes = text.as_bytes();
-    let mut at = usize::from(matches!(bytes.first(), Some(b'-' | b'+')));
-    let mut parts = Parts::default();
-    while at < bytes.len() && bytes[at].is_ascii_digit() {
-        let mut amount = 0_i64;
-        while let Some(digit) = bytes.get(at).filter(|byte| byte.is_ascii_digit()) {
-            let Some(next) = amount
-                .checked_mul(10)
-                .and_then(|tens| tens.checked_add(i64::from(digit - b'0')))
-            else {
-                return false;
-            };
-            amount = next;
-            at += 1;
-        }
-        let unit_start = at;
-        while bytes.get(at).is_some_and(u8::is_ascii_alphabetic) {
-            at += 1;
-        }
-        let Some(count) = count_of(&bytes[unit_start..at]) else {
-            return true;
-        };
-        if parts.add(amount, &count).is_none() {
-            return false;
-        }
-    }
-    parts.fit()
-}
-
 /// The duration Polars reads `text` as.
 fn duration(text: &str) -> Result<Read, Unread> {
-    const TOO_LARGE: &str = "the duration is too large for Polars to hold";
-    if !fits_polars(text) {
-        return Err(Unread::NotADuration(TOO_LARGE.to_owned()));
-    }
-    // What `fits_polars` lets through does not overflow Polars' parser; the catch is for a text
-    // that its checks do not foresee.
-    match catch_unwind(AssertUnwindSafe(|| Duration::try_parse(text))) {
-        Ok(Ok(_)) => Ok(Read::untyped(Literal::String(text.to_owned()))),
-        Ok(Err(error)) => Err(Unread::NotADuration(error.to_string())),
-        Err(_) => Err(Unread::NotADuration(TOO_LARGE.to_owned())),
-    }
+    check_duration(text, DurationUse::Offset, &any_moment())
+        .map(|()| Read::untyped(Literal::String(text.to_owned())))
+        .map_err(|error| Unread::NotADuration(error.reason().to_owned()))
 }

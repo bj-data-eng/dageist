@@ -49,7 +49,8 @@ const fn next_nested(nested: Nested) -> Option<Nested> {
 
 const fn next_rule(rule: Rule) -> Option<Rule> {
     match rule {
-        Rule::ConditionPredicateIsBoolean => Some(Rule::ElementOnlyInPivotAggregate),
+        Rule::ConditionPredicateIsBoolean => Some(Rule::DurationIsValid),
+        Rule::DurationIsValid => Some(Rule::ElementOnlyInPivotAggregate),
         Rule::ElementOnlyInPivotAggregate => Some(Rule::FilterPredicateIsBoolean),
         Rule::FilterPredicateIsBoolean => Some(Rule::JoinKeyNamesAreNotRepeated),
         Rule::JoinKeyNamesAreNotRepeated => Some(Rule::KeyIsElementwise),

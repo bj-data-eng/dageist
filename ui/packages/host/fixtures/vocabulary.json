@@ -3,6 +3,7 @@
   "nested": ["over.partition_by", "over.order_by", "condition.predicate", "condition.value"],
   "rules": [
     "condition-predicate-is-boolean",
+    "duration-is-valid",
     "element-only-in-pivot-aggregate",
     "filter-predicate-is-boolean",
     "join-key-names-are-not-repeated",

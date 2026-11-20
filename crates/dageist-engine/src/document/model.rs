@@ -10,7 +10,9 @@
 
 use std::fmt;
 
-use crate::catalog::{Argument, Build, DefaultValue, Entry, Kind, Parameter, Shape, ValueType};
+use crate::catalog::{
+    Argument, Build, DefaultValue, DurationUse, Entry, Kind, Parameter, Shape, ValueType,
+};
 
 use super::dtype::Dtype;
 use super::error::{Cause, Place, Position, Refusal, Segment};
@@ -249,6 +251,25 @@ impl Call {
             .collect()
     }
 
+    /// The durations the call was given that are duration strings, each by its parameter's name
+    /// and as typed: the parameters that hold a duration string where an expression is text typed
+    /// in and nothing more. A duration that is a column is Polars' to read when it runs the rows.
+    pub(crate) fn durations(&self) -> Vec<(&'static str, &str, DurationUse)> {
+        self.entry
+            .parameters()
+            .iter()
+            .filter_map(|parameter| {
+                let using = parameter.duration_string()?;
+                match self.argument(parameter.name())? {
+                    Value::Expression(expression) => {
+                        Some((parameter.name(), typed_text(expression)?.as_str(), using))
+                    }
+                    _ => None,
+                }
+            })
+            .collect()
+    }
+
     /// The argument given for `parameter`, if there is one.
     #[must_use]
     pub fn argument(&self, parameter: &str) -> Option<&Value> {
@@ -271,7 +292,8 @@ fn arguments_refused(
         BuildError::Repeated { parameter }
         | BuildError::Missing { parameter }
         | BuildError::OutOfRange { parameter, .. }
-        | BuildError::NotAPattern { parameter, .. } => (Some((*parameter).to_owned()), Vec::new()),
+        | BuildError::NotAPattern { parameter, .. }
+        | BuildError::NotADuration { parameter, .. } => (Some((*parameter).to_owned()), Vec::new()),
         BuildError::WrongKind { parameter, .. } | BuildError::UnknownChoice { parameter, .. } => {
             let found = entry
                 .parameters()

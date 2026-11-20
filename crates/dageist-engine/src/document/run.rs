@@ -15,7 +15,8 @@ use polars::prelude::{
 
 use crate::allowed::{self, Context, Position, Refusal};
 use crate::catalog::{
-    Argument, Arguments, Build, BuildError, Conditional, Kind, Laziness, check_pattern, english,
+    Argument, Arguments, Build, BuildError, Conditional, Kind, Laziness, any_moment,
+    check_duration, check_pattern, english,
 };
 
 use super::changes::ColumnChange;
@@ -629,6 +630,7 @@ impl Builder<'_> {
                 | BuildError::UnknownChoice { parameter, .. }
                 | BuildError::OutOfRange { parameter, .. }
                 | BuildError::NotAPattern { parameter, .. }
+                | BuildError::NotADuration { parameter, .. }
                 | BuildError::Repeated { parameter } => Some((*parameter).to_owned()),
                 BuildError::UnknownParameter { parameter } => Some(parameter.clone()),
                 BuildError::OutOfOrder { .. } | BuildError::Polars(_) => None,
@@ -744,6 +746,13 @@ impl Builder<'_> {
             });
             if typed_expression && let Err(error) = check_pattern(text) {
                 return self.built(Err(BuildError::NotAPattern { parameter, error }));
+            }
+        }
+        // A duration typed in is a duration string where the call takes it so, and is refused at
+        // its place when Polars reads it as none: Polars would refuse it only when the rows run.
+        for (parameter, text, using) in call.durations() {
+            if let Err(error) = check_duration(text, using, &any_moment()) {
+                return self.built(Err(BuildError::NotADuration { parameter, error }));
             }
         }
         self.built(call.entry().arguments(given))

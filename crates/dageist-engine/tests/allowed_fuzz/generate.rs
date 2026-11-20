@@ -1057,6 +1057,44 @@ impl Gen<'_> {
                         class: Some(Representative::String),
                     }]
                 }
+                // A duration is often text typed in, which Polars reads as a duration string: one it
+                // reads for the period of a cut or the amount of a move, or one it does not. Where
+                // it is a column it is the one that stands for an argument, whose text is the
+                // durations the tables were measured with: the text of the other columns is no
+                // duration, which Polars refuses when the rows run, and is no mistake of the
+                // tables but of what a duration is given.
+                _ if parameter.duration_string().is_some() => {
+                    let argument = match self.host {
+                        Host::JoinRight => Some("rb"),
+                        Host::Pivot | Host::JoinOn => None,
+                        _ => Some("b"),
+                    };
+                    match argument {
+                        Some(name) if !self.draw.chance(55) => {
+                            vec![Built {
+                                expression: Expression::new(Start::Call(column(name)), Vec::new())
+                                    .expect("a start"),
+                                class: self.class_of(name),
+                            }]
+                        }
+                        _ => {
+                            let text = if self.draw.chance(25) {
+                                self.draw.pick(&INVALID_DURATIONS)
+                            } else {
+                                self.draw.pick(&VALID_DURATIONS)
+                            };
+                            let literal = call(
+                                "polars.lit",
+                                vec![("value", Value::String(text.to_owned()))],
+                            );
+                            vec![Built {
+                                expression: Expression::new(Start::Call(literal), Vec::new())
+                                    .expect("a start"),
+                                class: Some(Representative::String),
+                            }]
+                        }
+                    }
+                }
                 // What a replacement puts in place of a match is often text, with the references to
                 // a group of the match that a pattern gives it meaning for.
                 ("Expr.str.replace" | "Expr.str.replace_all", "value") if self.draw.chance(50) => {
@@ -1331,6 +1369,27 @@ const INVALID_PATTERNS: [&str; 10] = [
     "\\",
     "*a",
     "a)",
+];
+
+/// Durations Polars reads: a single unit of each kind, two units, a sign and a zero. A method
+/// that cuts or rounds meets some of them with a reason of its own, which a limit holds.
+const VALID_DURATIONS: [&str; 12] = [
+    "1d", "1h", "30m", "1mo", "1w", "1y", "1q", "500ms", "1s", "2d12h", "+1d", "-1d",
+];
+
+/// Durations Polars does not read, each for a reason of its own: no amount, no unit, an amount
+/// with a fraction, a unit that does not exist and one in the wrong case, a second sign, a space,
+/// and an amount too large to hold.
+const INVALID_DURATIONS: [&str; 9] = [
+    "d",
+    "1",
+    "1.5d",
+    "1x",
+    "1D",
+    "1d-1h",
+    "1 d",
+    "1d ",
+    "99999999999y",
 ];
 
 /// The class every value of a condition has, when they have the same one.

@@ -3,7 +3,9 @@
 
 use std::fmt;
 
-use crate::catalog::{self, Applies, Entry, Kind, PatternError};
+use polars::prelude::DataType;
+
+use crate::catalog::{self, Applies, DurationUse, Entry, Kind};
 
 use super::adapt::could_be_taken_by_a_number;
 use super::context::Context;
@@ -81,6 +83,7 @@ pub struct Chosen<'a> {
     options: &'a [(&'a str, &'a str)],
     unclassed: &'a [&'a str],
     patterns: &'a [(&'a str, &'a str)],
+    durations: &'a [(&'a str, &'a str, DurationUse)],
     gives: Option<Representative>,
     many: bool,
 }
@@ -120,6 +123,18 @@ impl<'a> Chosen<'a> {
     #[must_use]
     pub const fn with_patterns(mut self, patterns: &'a [(&'a str, &'a str)]) -> Self {
         self.patterns = patterns;
+        self
+    }
+
+    /// The durations given to parameters that hold a duration string, each by the parameter's name
+    /// and the text as typed. A text Polars does not read as a duration is refused in Polars' words,
+    /// whatever follows it.
+    #[must_use]
+    pub const fn with_durations(
+        mut self,
+        durations: &'a [(&'a str, &'a str, DurationUse)],
+    ) -> Self {
+        self.durations = durations;
         self
     }
 
@@ -212,7 +227,7 @@ impl Refusal {
     }
 
     /// A refusal by `rule` that adds what Polars says of the case, in its words.
-    fn rule_because(rule: Rule, said: &PatternError) -> Self {
+    fn rule_because(rule: Rule, said: &impl fmt::Display) -> Self {
         Self {
             source: RefusalSource::Rule(rule),
             reason: format!("{}: {said}", rule.statement()),
@@ -772,6 +787,23 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     for (_, text) in chosen.patterns {
         if let Err(said) = catalog::check_pattern(text) {
             return Err(Refusal::rule_because(Rule::PatternIsValid, &said));
+        }
+    }
+    // A duration Polars does not read is refused in Polars' words, whatever follows it.
+    let moment = match place.after {
+        After::Value {
+            dtype: Representative::Date,
+            ..
+        } => DataType::Date,
+        After::Value {
+            dtype: Representative::DatetimeZoned,
+            ..
+        } => Representative::DatetimeZoned.dtype(),
+        _ => catalog::any_moment(),
+    };
+    for (_, text, using) in chosen.durations {
+        if let Err(said) = catalog::check_duration(text, *using, &moment) {
+            return Err(Refusal::rule_because(Rule::DurationIsValid, &said));
         }
     }
     // What the options set are refused for, on the dtype of the value the method follows.

@@ -1,0 +1,2 @@
+{"a":"Date","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.select","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[{"entry":"Expr.dt.truncate","arguments":{"every":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"string":"2d12h"}}},"then":[]}}}}]}}]}}}}]}

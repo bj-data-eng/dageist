@@ -161,7 +161,13 @@ fn a_cut_moment_is_a_moment_and_the_walk_says_so() {
         json!({ "every": text("1mo") }),
     ));
     let report = report_of(&written);
-    let walked = &report.steps()[0].walk().expressions()[0];
+    // The expression of the step is the column and the cut, and the duration is one of its own.
+    let walked = report.steps()[0]
+        .walk()
+        .expressions()
+        .iter()
+        .find(|walked| walked.calls().len() == 2)
+        .expect("the step's expression");
     let standing = walked.calls().last().expect("the call stands");
     let result = standing
         .verdict()

@@ -341,6 +341,14 @@ hint = "the day of the year"
 name = "dt.quarter"
 hint = "the quarter of the year"
 
+[entries."Expr.dt.round"]
+name = "dt.round"
+hint = "to the nearest period"
+
+[entries."Expr.dt.round".parameters.every]
+name = "every"
+label = "every"
+
 [entries."Expr.dt.second"]
 name = "dt.second"
 hint = "the second of the minute"
@@ -421,6 +429,14 @@ hint = "seconds in a duration"
 [entries."Expr.dt.total_seconds".parameters.fractional]
 name = "fractional"
 label = "with fractions"
+
+[entries."Expr.dt.truncate"]
+name = "dt.truncate"
+hint = "cut to the start of the period"
+
+[entries."Expr.dt.truncate".parameters.every]
+name = "every"
+label = "every"
 
 [entries."Expr.dt.week"]
 name = "dt.week"

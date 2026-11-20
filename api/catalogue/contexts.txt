@@ -46,6 +46,7 @@
 # The rules column names the rules that govern the line, which dageist holds and Polars
 # does not. The outcome is Polars' alone, whatever the rules say. The rules are:
 #   condition-predicate-is-boolean: a condition's predicate must be Boolean.
+#   duration-is-valid: a duration typed in must be a duration string Polars reads.
 #   element-only-in-pivot-aggregate: `polars.element` stands only in a pivot's aggregate.
 #   filter-predicate-is-boolean: a filter's predicate must be Boolean.
 #   join-key-names-are-not-repeated: a join may not pair the same two output column names twice: where two keys on one side are named alike, the keys they are paired with must be named differently.
@@ -62,7 +63,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 9840 combinations: 6785 allowed; 1770 refused when Polars resolved the schema, 1285 when it ran the rows, 0 when it ran the empty table.
+# 9960 combinations: 6865 allowed; 1790 refused when Polars resolved the schema, 1305 when it ran the rows, 0 when it ran the empty table.
 #
 ChainedThen.otherwise | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 ChainedThen.otherwise | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
@@ -2824,6 +2825,66 @@ Expr.dt.quarter | sort > over.partition_by | continues | Date | - | - | allowed 
 Expr.dt.quarter | sort > over.partition_by | ends | Date | - | - | allowed Int8 many
 Expr.dt.quarter | sort | continues | Date | - | - | allowed Int8 many
 Expr.dt.quarter | sort | ends | Date | - | - | allowed Int8 many
+Expr.dt.round | filter > condition.predicate | continues | Date | String | condition-predicate-is-boolean | allowed Date many
+Expr.dt.round | filter > condition.predicate | ends | Date | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `a`
+Expr.dt.round | filter > condition.value | continues | Date | String | filter-predicate-is-boolean | allowed Date many
+Expr.dt.round | filter > condition.value | ends | Date | String | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Date`
+Expr.dt.round | filter > over.order_by | continues | Date | String | - | allowed Date many
+Expr.dt.round | filter > over.order_by | ends | Date | String | - | allowed Date many
+Expr.dt.round | filter > over.partition_by | continues | Date | String | - | allowed Date many
+Expr.dt.round | filter > over.partition_by | ends | Date | String | - | allowed Date many
+Expr.dt.round | filter | continues | Date | String | filter-predicate-is-boolean | allowed Date many
+Expr.dt.round | filter | ends | Date | String | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Date`
+Expr.dt.round | join_left > condition.predicate | continues | Date | String | condition-predicate-is-boolean | allowed Date many
+Expr.dt.round | join_left > condition.predicate | ends | Date | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `a`
+Expr.dt.round | join_left > condition.value | continues | Date | String | - | allowed Date many
+Expr.dt.round | join_left > condition.value | ends | Date | String | - | allowed Date many
+Expr.dt.round | join_left > over.order_by | continues | Date | String | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.round | join_left > over.order_by | ends | Date | String | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.round | join_left > over.partition_by | continues | Date | String | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.round | join_left > over.partition_by | ends | Date | String | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.round | join_left | continues | Date | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Date many
+Expr.dt.round | join_left | ends | Date | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Date many
+Expr.dt.round | join_right > condition.predicate | continues | Date | String | condition-predicate-is-boolean | allowed Date many
+Expr.dt.round | join_right > condition.predicate | ends | Date | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `ra`
+Expr.dt.round | join_right > condition.value | continues | Date | String | - | allowed Date many
+Expr.dt.round | join_right > condition.value | ends | Date | String | - | allowed Date many
+Expr.dt.round | join_right > over.order_by | continues | Date | String | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.round | join_right > over.order_by | ends | Date | String | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.round | join_right > over.partition_by | continues | Date | String | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.round | join_right > over.partition_by | ends | Date | String | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.round | join_right | continues | Date | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Date many
+Expr.dt.round | join_right | ends | Date | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Date many
+Expr.dt.round | pivot_aggregate > condition.predicate | continues | Date | String | condition-predicate-is-boolean | allowed Date many
+Expr.dt.round | pivot_aggregate > condition.predicate | ends | Date | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `a`
+Expr.dt.round | pivot_aggregate > condition.value | continues | Date | String | - | allowed Date many
+Expr.dt.round | pivot_aggregate > condition.value | ends | Date | String | - | allowed Date many
+Expr.dt.round | pivot_aggregate > over.order_by | continues | Date | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.round | pivot_aggregate > over.order_by | ends | Date | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.round | pivot_aggregate > over.partition_by | continues | Date | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.round | pivot_aggregate > over.partition_by | ends | Date | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.round | pivot_aggregate | continues | Date | String | pivot-aggregate-gives-one-value | allowed Date many
+Expr.dt.round | pivot_aggregate | ends | Date | String | pivot-aggregate-gives-one-value | allowed Date many
+Expr.dt.round | select > condition.predicate | continues | Date | String | condition-predicate-is-boolean | allowed Date many
+Expr.dt.round | select > condition.predicate | ends | Date | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `a`
+Expr.dt.round | select > condition.value | continues | Date | String | - | allowed Date many
+Expr.dt.round | select > condition.value | ends | Date | String | - | allowed Date many
+Expr.dt.round | select > over.order_by | continues | Date | String | - | allowed Date many
+Expr.dt.round | select > over.order_by | ends | Date | String | - | allowed Date many
+Expr.dt.round | select > over.partition_by | continues | Date | String | - | allowed Date many
+Expr.dt.round | select > over.partition_by | ends | Date | String | - | allowed Date many
+Expr.dt.round | select | continues | Date | String | - | allowed Date many
+Expr.dt.round | select | ends | Date | String | - | allowed Date many
+Expr.dt.round | sort > condition.predicate | continues | Date | String | condition-predicate-is-boolean | allowed Date many
+Expr.dt.round | sort > condition.predicate | ends | Date | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `a`
+Expr.dt.round | sort > condition.value | continues | Date | String | - | allowed Date many
+Expr.dt.round | sort > condition.value | ends | Date | String | - | allowed Date many
+Expr.dt.round | sort > over.order_by | continues | Date | String | - | allowed Date many
+Expr.dt.round | sort > over.order_by | ends | Date | String | - | allowed Date many
+Expr.dt.round | sort > over.partition_by | continues | Date | String | - | allowed Date many
+Expr.dt.round | sort > over.partition_by | ends | Date | String | - | allowed Date many
+Expr.dt.round | sort | continues | Date | String | - | allowed Date many
+Expr.dt.round | sort | ends | Date | String | - | allowed Date many
 Expr.dt.second | filter > condition.predicate | continues | Time | - | condition-predicate-is-boolean | allowed Int8 many
 Expr.dt.second | filter > condition.predicate | ends | Time | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `i8` for series with name `a`
 Expr.dt.second | filter > condition.value | continues | Time | - | filter-predicate-is-boolean | allowed Int8 many
@@ -3424,6 +3485,66 @@ Expr.dt.total_seconds | sort > over.partition_by | continues | Duration(us) | - 
 Expr.dt.total_seconds | sort > over.partition_by | ends | Duration(us) | - | - | allowed Int64 many
 Expr.dt.total_seconds | sort | continues | Duration(us) | - | - | allowed Int64 many
 Expr.dt.total_seconds | sort | ends | Duration(us) | - | - | allowed Int64 many
+Expr.dt.truncate | filter > condition.predicate | continues | Date | String | condition-predicate-is-boolean | allowed Date many
+Expr.dt.truncate | filter > condition.predicate | ends | Date | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `a`
+Expr.dt.truncate | filter > condition.value | continues | Date | String | filter-predicate-is-boolean | allowed Date many
+Expr.dt.truncate | filter > condition.value | ends | Date | String | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Date`
+Expr.dt.truncate | filter > over.order_by | continues | Date | String | - | allowed Date many
+Expr.dt.truncate | filter > over.order_by | ends | Date | String | - | allowed Date many
+Expr.dt.truncate | filter > over.partition_by | continues | Date | String | - | allowed Date many
+Expr.dt.truncate | filter > over.partition_by | ends | Date | String | - | allowed Date many
+Expr.dt.truncate | filter | continues | Date | String | filter-predicate-is-boolean | allowed Date many
+Expr.dt.truncate | filter | ends | Date | String | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Date`
+Expr.dt.truncate | join_left > condition.predicate | continues | Date | String | condition-predicate-is-boolean | allowed Date many
+Expr.dt.truncate | join_left > condition.predicate | ends | Date | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `a`
+Expr.dt.truncate | join_left > condition.value | continues | Date | String | - | allowed Date many
+Expr.dt.truncate | join_left > condition.value | ends | Date | String | - | allowed Date many
+Expr.dt.truncate | join_left > over.order_by | continues | Date | String | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.truncate | join_left > over.order_by | ends | Date | String | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.truncate | join_left > over.partition_by | continues | Date | String | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.truncate | join_left > over.partition_by | ends | Date | String | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.truncate | join_left | continues | Date | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Date many
+Expr.dt.truncate | join_left | ends | Date | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Date many
+Expr.dt.truncate | join_right > condition.predicate | continues | Date | String | condition-predicate-is-boolean | allowed Date many
+Expr.dt.truncate | join_right > condition.predicate | ends | Date | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `ra`
+Expr.dt.truncate | join_right > condition.value | continues | Date | String | - | allowed Date many
+Expr.dt.truncate | join_right > condition.value | ends | Date | String | - | allowed Date many
+Expr.dt.truncate | join_right > over.order_by | continues | Date | String | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.truncate | join_right > over.order_by | ends | Date | String | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.truncate | join_right > over.partition_by | continues | Date | String | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.truncate | join_right > over.partition_by | ends | Date | String | - | refused schema: all join key expressions must be elementwise.
+Expr.dt.truncate | join_right | continues | Date | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Date many
+Expr.dt.truncate | join_right | ends | Date | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Date many
+Expr.dt.truncate | pivot_aggregate > condition.predicate | continues | Date | String | condition-predicate-is-boolean | allowed Date many
+Expr.dt.truncate | pivot_aggregate > condition.predicate | ends | Date | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `a`
+Expr.dt.truncate | pivot_aggregate > condition.value | continues | Date | String | - | allowed Date many
+Expr.dt.truncate | pivot_aggregate > condition.value | ends | Date | String | - | allowed Date many
+Expr.dt.truncate | pivot_aggregate > over.order_by | continues | Date | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.truncate | pivot_aggregate > over.order_by | ends | Date | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.truncate | pivot_aggregate > over.partition_by | continues | Date | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.truncate | pivot_aggregate > over.partition_by | ends | Date | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.dt.truncate | pivot_aggregate | continues | Date | String | pivot-aggregate-gives-one-value | allowed Date many
+Expr.dt.truncate | pivot_aggregate | ends | Date | String | pivot-aggregate-gives-one-value | allowed Date many
+Expr.dt.truncate | select > condition.predicate | continues | Date | String | condition-predicate-is-boolean | allowed Date many
+Expr.dt.truncate | select > condition.predicate | ends | Date | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `a`
+Expr.dt.truncate | select > condition.value | continues | Date | String | - | allowed Date many
+Expr.dt.truncate | select > condition.value | ends | Date | String | - | allowed Date many
+Expr.dt.truncate | select > over.order_by | continues | Date | String | - | allowed Date many
+Expr.dt.truncate | select > over.order_by | ends | Date | String | - | allowed Date many
+Expr.dt.truncate | select > over.partition_by | continues | Date | String | - | allowed Date many
+Expr.dt.truncate | select > over.partition_by | ends | Date | String | - | allowed Date many
+Expr.dt.truncate | select | continues | Date | String | - | allowed Date many
+Expr.dt.truncate | select | ends | Date | String | - | allowed Date many
+Expr.dt.truncate | sort > condition.predicate | continues | Date | String | condition-predicate-is-boolean | allowed Date many
+Expr.dt.truncate | sort > condition.predicate | ends | Date | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `date` for series with name `a`
+Expr.dt.truncate | sort > condition.value | continues | Date | String | - | allowed Date many
+Expr.dt.truncate | sort > condition.value | ends | Date | String | - | allowed Date many
+Expr.dt.truncate | sort > over.order_by | continues | Date | String | - | allowed Date many
+Expr.dt.truncate | sort > over.order_by | ends | Date | String | - | allowed Date many
+Expr.dt.truncate | sort > over.partition_by | continues | Date | String | - | allowed Date many
+Expr.dt.truncate | sort > over.partition_by | ends | Date | String | - | allowed Date many
+Expr.dt.truncate | sort | continues | Date | String | - | allowed Date many
+Expr.dt.truncate | sort | ends | Date | String | - | allowed Date many
 Expr.dt.week | filter > condition.predicate | continues | Date | - | condition-predicate-is-boolean | allowed Int8 many
 Expr.dt.week | filter > condition.predicate | ends | Date | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `i8` for series with name `a`
 Expr.dt.week | filter > condition.value | continues | Date | - | filter-predicate-is-boolean | allowed Int8 many

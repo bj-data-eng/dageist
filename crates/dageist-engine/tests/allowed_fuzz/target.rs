@@ -318,6 +318,9 @@ const KEYS_DO_NOT_MATCH: &str = "datatypes of join keys don't match";
 /// How a refusal of the tables is worded when it is of where an expression may end.
 const CANNOT_END: &str = "it cannot end here: ";
 
+/// The rule that a duration typed in be one Polars reads.
+const DURATION_RULE: &str = "duration-is-valid";
+
 /// What Polars says of what a named rule is about, where it refuses the same: any
 /// of these words. The rule that a pivot's aggregate give one value is not Polars':
 /// it lets a running value stand, so it has no words, and Polars refusing a case it
@@ -355,6 +358,15 @@ fn refused_for_the_same_reason(refused: &Refused, refusal: &Refusal) -> bool {
     }
     match &refused.source {
         Source::Polars => same_reason(&refused.source, tables, &refusal.reason),
+        // The engine words a duration it refuses with Polars' own reason after its own statement.
+        Source::Rule(rule) if *rule == DURATION_RULE => {
+            let said = refusal
+                .reason
+                .split("\n\n")
+                .next()
+                .unwrap_or(&refusal.reason);
+            tables.ends_with(said)
+        }
         Source::Rule(rule) => match polars_words(rule) {
             [] => same_reason(&refused.source, tables, &refusal.reason),
             words => words.iter().any(|said| refusal.reason.contains(said)),

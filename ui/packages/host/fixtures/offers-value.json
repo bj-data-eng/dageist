@@ -689,6 +689,20 @@
       "slots": []
     },
     {
+      "entry": "Expr.dt.round",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.dt.second",
       "verdict": {
         "kind": "allowed",
@@ -836,6 +850,20 @@
             "stage": "rows"
           },
           "reason": "invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.truncate",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
         }
       },
       "argument": null,

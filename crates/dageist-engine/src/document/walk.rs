@@ -1179,6 +1179,7 @@ impl Walker<'_> {
             .map(|(name, word)| (name.as_str(), word.as_str()))
             .collect();
         let patterns = link.patterns();
+        let durations = link.durations();
         let place = OfferPlace::new(context, after);
         // Two arguments that meet in the supertype of their dtypes are judged each apart, so
         // where their dtypes differ, whether Polars finds a supertype is not known, and what
@@ -1247,7 +1248,8 @@ impl Walker<'_> {
                     .with_arguments(&judged)
                     .with_unclassed(&unjudged)
                     .with_options(&words)
-                    .with_patterns(&patterns),
+                    .with_patterns(&patterns)
+                    .with_durations(&durations),
             );
             let standing = Standing {
                 follows: Some(after),
@@ -1315,7 +1317,8 @@ impl Walker<'_> {
             .with_arguments(&given)
             .with_unclassed(&unclassed)
             .with_options(&words)
-            .with_patterns(&patterns);
+            .with_patterns(&patterns)
+            .with_durations(&durations);
         let chosen = match gives {
             Some(dtype) => chosen.giving(dtype),
             None => chosen,

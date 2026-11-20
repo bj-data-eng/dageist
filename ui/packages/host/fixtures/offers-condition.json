@@ -701,6 +701,21 @@
       "slots": []
     },
     {
+      "entry": "Expr.dt.round",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.dt.second",
       "verdict": {
         "kind": "refused",
@@ -837,6 +852,21 @@
     },
     {
       "entry": "Expr.dt.total_seconds",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.truncate",
       "verdict": {
         "kind": "refused",
         "refusal": {

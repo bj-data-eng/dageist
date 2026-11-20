@@ -445,6 +445,7 @@ export type StageView = (typeof STAGES)[number];
 export const RULE_NAMES = [
   'pivot-aggregate-gives-one-value',
   'condition-predicate-is-boolean',
+  'duration-is-valid',
   'element-only-in-pivot-aggregate',
   'filter-predicate-is-boolean',
   'join-key-names-are-not-repeated',
