@@ -553,6 +553,31 @@ mod tests {
     }
 
     #[test]
+    fn a_parameter_that_does_nothing_for_the_editor_is_not_offered_and_the_others_are() {
+        let view = view();
+        // A typed pattern is always refused when it is none, so `strict` changes nothing for
+        // `contains` and `find`, which the editor does not list. For a split it decides what a
+        // separator that is a column of patterns does, so it stays.
+        for id in ["Expr.str.contains", "Expr.str.find"] {
+            assert_eq!(
+                parameter(&view, id, "strict")["offered"],
+                json!(false),
+                "{id}"
+            );
+            assert_eq!(
+                parameter(&view, id, "literal")["offered"],
+                json!(true),
+                "{id}"
+            );
+        }
+        assert_eq!(
+            parameter(&view, "Expr.str.split", "strict")["offered"],
+            json!(true)
+        );
+        assert_eq!(parameter(&view, "Expr.shift", "n")["offered"], json!(true));
+    }
+
+    #[test]
     fn shift_serializes_as_its_python_signature_and_the_catalogue_rules_give() {
         // `Expr.shift(n=1, *, fill_value=None)`: `n` is a whole number or an
         // expression, `fill_value` any expression, both one value and lazy-safe.
