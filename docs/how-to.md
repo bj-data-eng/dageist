@@ -549,8 +549,8 @@ Polars by hand, and decide which it is:
   refused where no column of its dtype can be asked or no column is to be had, as in a
   pivot's aggregate, the condition alone with what follows it removed, where Polars refusing
   it in the predicate, and allowing it with the predicate made `true`, shows that a sort key
-  of one value or a fold to `true` is why Polars never evaluated it. A call that the tables judge by each of its values beside a companion,
-  `replace`, `replace_strict`, `is_between` and `is_close`, counts when Polars refuses
+  of one value or a fold to `true` is why Polars never evaluated it. A call that the tables
+  judge by each of its values beside a companion, `replace`, `replace_strict`, `is_between` and `is_close`, counts when Polars refuses
   the part at the call, or in what the call is given, whatever words it uses, for the
   value the tables refused first is not always the one Polars meets; the limit for a
   literal asks the same of the case run again with columns, and for a comparison that
