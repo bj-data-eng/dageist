@@ -6973,6 +6973,41 @@ mod tests {
         );
     }
 
+    #[test]
+    fn a_null_value_is_excused_for_a_replacement_with_a_count_below_zero_which_is_every_match() {
+        // Polars replaces every match where the count is below zero, as `str.replace_all` does, and
+        // reads the value of it as one value just the same.
+        let every = |count: i64| {
+            let replace = call(
+                "Expr.str.replace",
+                vec![
+                    ("pattern", Value::Pattern("a".to_owned())),
+                    ("value", Value::Expression(chain(null(), &[]))),
+                    ("n", Value::Integer(count)),
+                ],
+            );
+            select(vec![chain_of(column("g"), vec![replace])])
+        };
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-replacement-of-every-match-given-a-null-value--a-replacement-with-a-count-below-zero.case"
+            ),
+            vec![Limit::AReplacementOfEveryMatchGivenANullValue]
+        );
+        assert_eq!(
+            refused_for_a_bound(&every(-1), None, Stage::Rows, NULL_VALUE),
+            vec![Limit::AReplacementOfEveryMatchGivenANullValue]
+        );
+        // The first match, or a few, or none, is no replacement of every match.
+        for count in [0, 1, 2] {
+            assert_eq!(
+                refused_for_a_bound(&every(count), None, Stage::Rows, NULL_VALUE),
+                vec![],
+                "{count}"
+            );
+        }
+    }
+
     // ----- A replacement of more than the first match
 
     const MORE_THAN_THE_FIRST: &str = "regex replacement with 'n > 1' not yet supported";
