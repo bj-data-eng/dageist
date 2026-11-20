@@ -242,6 +242,28 @@ pub fn left_out_at_start(entry: &'static Entry) -> Option<&'static str> {
     parameter.starts_left_out().then(|| parameter.name())
 }
 
+/// The parameters of the method `entry` that it starts with as slots to fill: those Python requires
+/// and gives no default, so that a step always gives them, besides the first parameter when that is
+/// an expression, which is the argument and is drawn where the method is. A pattern, what replaces
+/// a match, and the dtype a cast gives are such. A parameter that has a default, or that Python
+/// leaves to `None`, is an option to add, and is not among them. Empty for what is no method.
+#[must_use]
+pub fn slots_at_start(entry: &'static Entry) -> Vec<&'static str> {
+    if entry.applies() != catalog::Applies::Expression {
+        return Vec::new();
+    }
+    entry
+        .parameters()
+        .iter()
+        .enumerate()
+        .filter(|(at, parameter)| {
+            parameter.default() == ParameterDefault::Required
+                && !(*at == 0 && matches!(parameter.kind(), Kind::Expression(_)))
+        })
+        .map(|(_, parameter)| parameter.name())
+        .collect()
+}
+
 /// The argument the method `entry` starts with where it stands at `place`:
 /// Polars' default for its first parameter, when that takes an expression and
 /// the default is a number or text that the tables allow as its argument there.
@@ -375,6 +397,7 @@ pub fn option_offers(entry: &Entry, chosen: &[(&str, &str)]) -> Vec<OptionOffer>
     entry
         .parameters()
         .iter()
+        .filter(|parameter| parameter.offered())
         .filter_map(|parameter| {
             let words: Vec<String> = match parameter.kind() {
                 Kind::Flag => vec!["true".to_owned(), "false".to_owned()],

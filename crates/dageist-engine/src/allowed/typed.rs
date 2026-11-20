@@ -26,6 +26,10 @@
 //!   A duration whose months, weeks, days and nanoseconds do not fit an `i64` of
 //!   nanoseconds, in the length Polars gives it and in the longest it may be, is
 //!   refused in every build, for Polars converts them unchecked.
+//! - **A pattern** as it is typed, with no dtype: it is not a value of any dtype, but the
+//!   regular expression a method looks for. Whether it is one, which depends on the flag that may
+//!   make it plain text, is for the step to say where it is built, with the reason, at the
+//!   pattern's place.
 //! - **Text** as it is, with the dtype `String`, or none where the text is a
 //!   path, which is not a value of any dtype.
 //!
@@ -58,6 +62,8 @@ pub enum Typed {
     Value(ValueType),
     /// A parameter that takes a Polars duration string.
     Duration,
+    /// A parameter that takes a regular expression.
+    Pattern,
     /// A parameter that takes a file, folder or cloud location.
     Path,
 }
@@ -165,7 +171,7 @@ pub fn read_typed(text: &str, typed: Typed) -> Vec<Result<Read, Unread>> {
         }
         Typed::Value(ValueType::Date) => vec![date(text)],
         Typed::Duration => vec![duration(text)],
-        Typed::Path => vec![Ok(Read::untyped(Literal::String(text.to_owned())))],
+        Typed::Pattern | Typed::Path => vec![Ok(Read::untyped(Literal::String(text.to_owned())))],
     }
 }
 

@@ -107,3 +107,30 @@ fn a_float_that_needs_all_seventeen_digits_reads_back_exactly() {
         document
     );
 }
+
+#[test]
+fn a_pattern_is_written_and_read_as_a_kind_of_its_own_and_one_that_is_no_regular_expression_is_read()
+ {
+    let step = |pattern: &str| {
+        format!(
+            concat!(
+                r#"{{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.select","arguments":{{"exprs":{{"many":["#,
+                r#"{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["owner"]}}}}}},"then":["#,
+                r#"{{"entry":"Expr.str.contains","arguments":{{"pattern":{pattern}}}}}]}}}}]}}}}}}}}]}}"#,
+            ),
+            pattern = pattern
+        )
+    };
+    // A pattern is text, written as it is typed, and a half-typed one is a document still: the
+    // step is refused where it is built, with the reason, not where it is read.
+    for typed in [r#""\\d+""#, r#""(Comp""#] {
+        let text = step(&format!(r#"{{"pattern":{typed}}}"#));
+        let document = Document::read(&text).expect("a document");
+        assert_eq!(document.write(), text);
+    }
+    // A pattern is no string: an argument of the one kind is refused where the other is taken.
+    let as_a_string = step(r#"{"string":"a"}"#);
+    assert!(Document::read(&as_a_string).is_err());
+    let not_text = step(r#"{"pattern":1}"#);
+    assert!(Document::read(&not_text).is_err());
+}

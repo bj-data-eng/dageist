@@ -14,7 +14,9 @@ use polars::prelude::{
 };
 
 use crate::allowed::{self, Context, Position, Refusal};
-use crate::catalog::{Argument, Arguments, Build, BuildError, Conditional, Laziness, english};
+use crate::catalog::{
+    Argument, Arguments, Build, BuildError, Conditional, Kind, Laziness, check_pattern, english,
+};
 
 use super::changes::ColumnChange;
 use super::counts::{Counted, StepRows};
@@ -626,6 +628,7 @@ impl Builder<'_> {
                 | BuildError::WrongKind { parameter, .. }
                 | BuildError::UnknownChoice { parameter, .. }
                 | BuildError::OutOfRange { parameter, .. }
+                | BuildError::NotAPattern { parameter, .. }
                 | BuildError::Repeated { parameter } => Some((*parameter).to_owned()),
                 BuildError::UnknownParameter { parameter } => Some(parameter.clone()),
                 BuildError::OutOfOrder { .. } | BuildError::Polars(_) => None,
@@ -733,6 +736,16 @@ impl Builder<'_> {
             }
             self.path.pop();
         }
+        // A separator typed in is a pattern where the call takes it so, and is refused at its
+        // place as one: Polars would refuse it only when the rows run.
+        for (parameter, text) in call.patterns() {
+            let typed_expression = call.entry().parameters().iter().any(|known| {
+                known.name() == parameter && matches!(known.kind(), Kind::Expression(_))
+            });
+            if typed_expression && let Err(error) = check_pattern(text) {
+                return self.built(Err(BuildError::NotAPattern { parameter, error }));
+            }
+        }
         self.built(call.entry().arguments(given))
     }
 
@@ -747,6 +760,7 @@ impl Builder<'_> {
             Value::Choice(word) => Argument::Choice(word.clone()),
             Value::Dtype(dtype) => Argument::Dtype(dtype.as_polars().clone()),
             Value::Duration(text) => Argument::Duration(text.clone()),
+            Value::Pattern(text) => Argument::Pattern(text.clone()),
             Value::Path(text) => Argument::Path(text.clone()),
             Value::Table(name) => match self.inputs.table(name) {
                 Some(table) => Argument::Table(table),

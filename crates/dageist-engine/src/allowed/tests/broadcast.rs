@@ -12,7 +12,7 @@ use crate::allowed::table::Shape;
 use crate::allowed::{After, Chosen, Context, Outer, Place, offer};
 use crate::catalog::{self, Applies, Argument, Entry, Kind, Shape as ParameterShape};
 
-use super::build::{column, expression, expressions, method, null_of, one_of, step};
+use super::build::{column, expression, expressions, method, null_of, one_of, patterns, step};
 use super::probe::measure;
 use super::sample::Frames;
 
@@ -31,7 +31,7 @@ fn arguments(
     operand: Representative,
     column_named: &str,
 ) -> Vec<(&'static str, Argument)> {
-    let mut given: Vec<(&'static str, Argument)> = Vec::new();
+    let mut given: Vec<(&'static str, Argument)> = patterns(entry);
     for parameter in entry.parameters() {
         if !matches!(parameter.kind(), Kind::Expression(_)) {
             continue;
@@ -67,18 +67,33 @@ fn gives(
     operand: Representative,
 ) -> Option<Shape> {
     let (receiver, one_valued) = receivers;
+    let aggregated = AGGREGATE_RECEIVER.contains(&(entry.id().as_str(), name));
     let frames = Frames::new(receiver, operand, &DataType::Int64);
     let plan = |frames: &Frames, empty: bool| {
         // A receiver of one value is a literal and the operand a column; a receiver of many is a
         // column and the operand a literal.
         let call = method(
             entry,
-            if one_valued {
+            if one_valued && aggregated {
+                column("a").first()
+            } else if one_valued {
                 literal_of(&receiver.dtype())
             } else {
                 column("a")
             },
-            arguments(entry, name, operand, if one_valued { "b" } else { "" }),
+            arguments(
+                entry,
+                name,
+                operand,
+                match (one_valued, aggregated) {
+                    // A column of text with no null: Polars refuses a replacement of every match
+                    // given a null that it meets in a piece of one row, at more threads than the
+                    // tables were measured at, so the one that holds a null measures nothing.
+                    (true, true) => "g",
+                    (true, false) => "b",
+                    (false, _) => "",
+                },
+            ),
         )?;
         step(
             "LazyFrame.select",
@@ -101,6 +116,15 @@ fn found(entry: &'static Entry, name: &str) -> Option<(Representative, Represent
         })
     })
 }
+
+/// The parameters measured with an aggregate of the column `a` as the receiver of one value, and
+/// not a literal: Polars meets a text of one value that is an aggregate with each value of what
+/// replaces it, and refuses a literal text beside them for a table with no rows, which the tables
+/// count as refused, so a literal receiver measures nothing of them.
+const AGGREGATE_RECEIVER: [(&str, &str); 2] = [
+    ("Expr.str.replace", "value"),
+    ("Expr.str.replace_all", "value"),
+];
 
 /// The parameters that Polars allows no operand of many for, with why: nothing is measured of them.
 /// `over`'s keys are met by the window, which has a rule of its own.

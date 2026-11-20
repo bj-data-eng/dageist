@@ -68,6 +68,12 @@ enum KindView {
     },
     Dtype,
     Duration,
+    /// A regular expression. Where the entry has a flag that makes the text plain text, as
+    /// `literal` does, the flag's parameter name.
+    Pattern {
+        #[serde(rename = "plainTextFlag")]
+        plain_text_flag: Option<&'static str>,
+    },
     Table,
     Path,
     Pairs {
@@ -254,6 +260,9 @@ struct ParameterView {
     /// Where the expression the parameter holds stands, when a named position
     /// holds it. The tables of allowed combinations are asked at that place.
     position: Option<PositionView>,
+    /// Whether the editor offers the parameter: it lists it among a method's options. One that is
+    /// not is in Python's signature and changes nothing here.
+    offered: bool,
 }
 
 /// What an entry is applied to.
@@ -413,6 +422,9 @@ fn kind_of(
         },
         Kind::Dtype => KindView::Dtype,
         Kind::Duration => KindView::Duration,
+        Kind::Pattern => KindView::Pattern {
+            plain_text_flag: parameter.plain_text_flag(),
+        },
         Kind::Table => KindView::Table,
         Kind::Path => KindView::Path,
         Kind::Pairs(key, value) => KindView::Pairs {
@@ -443,6 +455,7 @@ fn parameter_view(
         default_setting: parameter.default_setting().as_ref().map(setting_view),
         start: setting_view(&parameter.start_setting()),
         position: Position::of_parameter(id.as_str(), parameter.name()).map(position_view),
+        offered: parameter.offered(),
     })
 }
 
@@ -544,6 +557,31 @@ mod tests {
     }
 
     #[test]
+    fn a_parameter_that_does_nothing_for_the_editor_is_not_offered_and_the_others_are() {
+        let view = view();
+        // A typed pattern is always refused when it is none, so `strict` changes nothing for
+        // `contains` and `find`, which the editor does not list. For a split it decides what a
+        // separator that is a column of patterns does, so it stays.
+        for id in ["Expr.str.contains", "Expr.str.find"] {
+            assert_eq!(
+                parameter(&view, id, "strict")["offered"],
+                json!(false),
+                "{id}"
+            );
+            assert_eq!(
+                parameter(&view, id, "literal")["offered"],
+                json!(true),
+                "{id}"
+            );
+        }
+        assert_eq!(
+            parameter(&view, "Expr.str.split", "strict")["offered"],
+            json!(true)
+        );
+        assert_eq!(parameter(&view, "Expr.shift", "n")["offered"], json!(true));
+    }
+
+    #[test]
     fn shift_serializes_as_its_python_signature_and_the_catalogue_rules_give() {
         // `Expr.shift(n=1, *, fill_value=None)`: `n` is a whole number or an
         // expression, `fill_value` any expression, both one value and lazy-safe.
@@ -568,7 +606,8 @@ mod tests {
                         "default": { "kind": "integer", "value": 1 },
                         "defaultSetting": { "kind": "integer", "value": 1, "shown": "1" },
                         "start": { "kind": "unset" },
-                        "position": null
+                        "position": null,
+                        "offered": true
                     },
                     {
                         "name": "fill_value",
@@ -579,7 +618,8 @@ mod tests {
                         "default": { "kind": "none" },
                         "defaultSetting": null,
                         "start": { "kind": "unset" },
-                        "position": null
+                        "position": null,
+                        "offered": true
                     }
                 ]
             })
@@ -603,7 +643,8 @@ mod tests {
                 "default": { "kind": "text", "value": "inner" },
                 "defaultSetting": { "kind": "word", "value": "inner" },
                 "start": { "kind": "word", "value": "left" },
-                "position": null
+                "position": null,
+                "offered": true
             })
         );
     }
@@ -623,7 +664,8 @@ mod tests {
                 "default": { "kind": "flag", "value": false },
                 "defaultSetting": { "kind": "flag", "value": false },
                 "start": { "kind": "flag", "value": true },
-                "position": null
+                "position": null,
+                "offered": true
             })
         );
     }
@@ -921,6 +963,7 @@ mod tests {
                 "temporal",
                 "text",
                 "pieces",
+                "search",
                 "window",
                 "compare",
                 "checks",

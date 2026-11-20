@@ -44,6 +44,7 @@ import type { ArgumentRule, Method, MethodName } from './model/expr';
 import {
   argumentRule,
   methodOptionParameters,
+  slotOptions,
   startingArgument,
   swappedArgument,
 } from './model/expr';
@@ -322,7 +323,12 @@ function MethodLink({
       name,
       argument: swappedArgument(catalogue, method.argument, name, picked.argument, picked.leftOut),
       // What is set carries over to a method that takes the same parameter.
-      options: next === null ? NO_OPTIONS : carriedOptions(method.options, entry, next),
+      options: slotOptions(
+        catalogue,
+        name,
+        picked.slots,
+        next === null ? NO_OPTIONS : carriedOptions(method.options, entry, next),
+      ),
     });
   };
   const parameters = methodOptionParameters(catalogue, method.name);
@@ -473,7 +479,7 @@ export function ChainBlocks({
       id: nextId('method'),
       name,
       argument: startingArgument(catalogue, name, picked.argument, picked.leftOut),
-      options: NO_OPTIONS,
+      options: slotOptions(catalogue, name, picked.slots, NO_OPTIONS),
     };
     const methods = [...chain.methods];
     methods.splice(at, 0, method);

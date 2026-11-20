@@ -521,6 +521,11 @@ function settingArgument(
 ): Json {
   switch (setting.kind) {
     case 'unset':
+      // An expression still to be picked is a hole, as an argument's is, so what is before it is
+      // still walked; any other kind has nothing to stand for it, and the step is held back.
+      if (kind.kind === 'expression') {
+        return expressionArgument(context, { kind: 'unset' }, path, wrong);
+      }
       throw unset(`Give ${parameter.shown} a value (${parameter.label}).`, wrong);
     case 'flag':
       return { flag: setting.value };
@@ -528,6 +533,7 @@ function settingArgument(
       return numberArgument(kind, setting.value, setting.float === true, wrong);
     case 'text':
       if (kind.kind === 'duration') return { duration: setting.value };
+      if (kind.kind === 'pattern') return { pattern: setting.value };
       if (kind.kind === 'path') return { path: setting.value };
       return { string: setting.value };
     case 'word':

@@ -71,6 +71,11 @@ export type KindView =
   | { readonly kind: 'choice'; readonly words: readonly ChoiceView[] }
   | { readonly kind: 'dtype' }
   | { readonly kind: 'duration' }
+  /**
+   * A regular expression, as Polars reads one. `plainTextFlag` names the flag of the same entry
+   * that makes the text plain text where it is true, such as `literal`, or is `null`.
+   */
+  | { readonly kind: 'pattern'; readonly plainTextFlag: string | null }
   | { readonly kind: 'table' }
   | { readonly kind: 'path' }
   | { readonly kind: 'pairs'; readonly key: KindView; readonly value: KindView };
@@ -193,6 +198,11 @@ export interface ParameterView {
    * holds it; the engine's tables are asked at that place.
    */
   readonly position: PositionView | null;
+  /**
+   * Whether the editor offers the parameter among a method's options. One that is not is in
+   * Python's signature and changes nothing here.
+   */
+  readonly offered: boolean;
 }
 
 /** What an entry is applied to, mirroring `Applies` in the engine's catalogue; `condition` is one link of `when`, `then` and `otherwise`. */
@@ -439,6 +449,7 @@ export const RULE_NAMES = [
   'filter-predicate-is-boolean',
   'join-key-names-are-not-repeated',
   'key-is-elementwise',
+  'pattern-is-valid',
   'replacement-values-match-in-number',
 ] as const;
 
@@ -676,13 +687,14 @@ export interface FitsRequest {
 
 /**
  * What a text is typed into, as the catalogue writes the kind of a parameter that takes a typed
- * value: an expression, a literal of a type, a duration or a path. The engine reads the text as
+ * value: an expression, a literal of a type, a duration, a pattern or a path. The engine reads the text as
  * that slot takes it.
  */
 export type TypedKind =
   | { readonly kind: 'expression' }
   | { readonly kind: 'value'; readonly type: ValueTypeView }
   | { readonly kind: 'duration' }
+  | { readonly kind: 'pattern' }
   | { readonly kind: 'path' };
 
 /**
@@ -723,6 +735,12 @@ export interface EntryOfferView {
    * Polars gives it when it is not given, or `null`. The method is complete as it starts.
    */
   readonly leftOut: string | null;
+  /**
+   * The parameters a method that may stand starts with as slots to fill, besides its argument:
+   * those a step must give and Polars gives no default, such as a pattern. They are options the
+   * method starts with already set to what is still to be given.
+   */
+  readonly slots: readonly string[];
 }
 
 /** Every call that stands in an expression, offered or refused at a place. Mirrors `OffersView` in crates/dageist-tauri/src/offers.rs. */

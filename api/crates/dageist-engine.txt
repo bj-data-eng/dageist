@@ -115,10 +115,11 @@ pub dageist_engine::allowed::Rule::ElementOnlyInPivotAggregate
 pub dageist_engine::allowed::Rule::FilterPredicateIsBoolean
 pub dageist_engine::allowed::Rule::JoinKeyNamesAreNotRepeated
 pub dageist_engine::allowed::Rule::KeyIsElementwise
+pub dageist_engine::allowed::Rule::PatternIsValid
 pub dageist_engine::allowed::Rule::PivotAggregateGivesOneValue
 pub dageist_engine::allowed::Rule::ReplacementValuesMatchInNumber
 impl dageist_engine::allowed::Rule
-pub const dageist_engine::allowed::Rule::ALL: [Self; 7]
+pub const dageist_engine::allowed::Rule::ALL: [Self; 8]
 pub fn dageist_engine::allowed::Rule::from_name(name: &str) -> core::option::Option<Self>
 pub const fn dageist_engine::allowed::Rule::name(self) -> &'static str
 pub const fn dageist_engine::allowed::Rule::statement(self) -> &'static str
@@ -140,6 +141,7 @@ pub enum dageist_engine::allowed::Typed
 pub dageist_engine::allowed::Typed::Duration
 pub dageist_engine::allowed::Typed::Expression
 pub dageist_engine::allowed::Typed::Path
+pub dageist_engine::allowed::Typed::Pattern
 pub dageist_engine::allowed::Typed::Value(dageist_engine::catalog::ValueType)
 pub enum dageist_engine::allowed::Unknown
 pub dageist_engine::allowed::Unknown::TheResultsDtype
@@ -178,6 +180,7 @@ pub const fn dageist_engine::allowed::Chosen<'a>::giving(self, dtype: dageist_en
 pub const fn dageist_engine::allowed::Chosen<'a>::giving_many(self) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_arguments(self, arguments: &'a [(&'a str, dageist_engine::allowed::Representative)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_options(self, options: &'a [(&'a str, &'a str)]) -> Self
+pub const fn dageist_engine::allowed::Chosen<'a>::with_patterns(self, patterns: &'a [(&'a str, &'a str)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_unclassed(self, unclassed: &'a [&'a str]) -> Self
 pub struct dageist_engine::allowed::Context
 impl dageist_engine::allowed::Context
@@ -262,6 +265,7 @@ pub fn dageist_engine::allowed::rule_forbids(entry: &dageist_engine::catalog::En
 pub fn dageist_engine::allowed::rule_forbids_a_key_known_not_elementwise(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_repeated_pair_of_key_names(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_replacement_values_of_other_numbers() -> core::result::Result<(), dageist_engine::allowed::Refusal>
+pub fn dageist_engine::allowed::slots_at_start(entry: &'static dageist_engine::catalog::Entry) -> alloc::vec::Vec<&'static str>
 pub mod dageist_engine::catalog
 pub enum dageist_engine::catalog::Applies
 pub dageist_engine::catalog::Applies::Condition
@@ -282,6 +286,7 @@ pub dageist_engine::catalog::Argument::Integer(i64)
 pub dageist_engine::catalog::Argument::Many(alloc::vec::Vec<dageist_engine::catalog::Argument>)
 pub dageist_engine::catalog::Argument::Pairs(alloc::vec::Vec<(dageist_engine::catalog::Argument, dageist_engine::catalog::Argument)>)
 pub dageist_engine::catalog::Argument::Path(alloc::string::String)
+pub dageist_engine::catalog::Argument::Pattern(alloc::string::String)
 pub dageist_engine::catalog::Argument::String(alloc::string::String)
 pub dageist_engine::catalog::Argument::Table(polars_lazy::frame::LazyFrame)
 pub enum dageist_engine::catalog::AsManyAs
@@ -299,6 +304,9 @@ pub fn dageist_engine::catalog::Build::fmt(&self, formatter: &mut core::fmt::For
 pub enum dageist_engine::catalog::BuildError
 pub dageist_engine::catalog::BuildError::Missing
 pub dageist_engine::catalog::BuildError::Missing::parameter: &'static str
+pub dageist_engine::catalog::BuildError::NotAPattern
+pub dageist_engine::catalog::BuildError::NotAPattern::error: dageist_engine::catalog::PatternError
+pub dageist_engine::catalog::BuildError::NotAPattern::parameter: &'static str
 pub dageist_engine::catalog::BuildError::OutOfOrder
 pub dageist_engine::catalog::BuildError::OutOfOrder::expected: &'static str
 pub dageist_engine::catalog::BuildError::OutOfOrder::found: &'static str
@@ -383,6 +391,7 @@ pub dageist_engine::catalog::Family::Nulls
 pub dageist_engine::catalog::Family::Pieces
 pub dageist_engine::catalog::Family::Rounding
 pub dageist_engine::catalog::Family::Rows
+pub dageist_engine::catalog::Family::Search
 pub dageist_engine::catalog::Family::Start
 pub dageist_engine::catalog::Family::Steps
 pub dageist_engine::catalog::Family::Temporal
@@ -390,7 +399,7 @@ pub dageist_engine::catalog::Family::Text
 pub dageist_engine::catalog::Family::Trigonometry
 pub dageist_engine::catalog::Family::Window
 impl dageist_engine::catalog::Family
-pub const dageist_engine::catalog::Family::ALL: [Self; 19]
+pub const dageist_engine::catalog::Family::ALL: [Self; 20]
 pub const fn dageist_engine::catalog::Family::key(self) -> &'static str
 pub enum dageist_engine::catalog::Kind
 pub dageist_engine::catalog::Kind::Choice(&'static [&'static str])
@@ -401,6 +410,7 @@ pub dageist_engine::catalog::Kind::Expression(&'static [dageist_engine::catalog:
 pub dageist_engine::catalog::Kind::Flag
 pub dageist_engine::catalog::Kind::Pairs(&'static dageist_engine::catalog::Kind, &'static dageist_engine::catalog::Kind)
 pub dageist_engine::catalog::Kind::Path
+pub dageist_engine::catalog::Kind::Pattern
 pub dageist_engine::catalog::Kind::Table
 pub dageist_engine::catalog::Kind::Value(dageist_engine::catalog::ValueType)
 pub enum dageist_engine::catalog::Laziness
@@ -411,6 +421,9 @@ pub dageist_engine::catalog::ParameterDefault::Python(&'static str)
 pub dageist_engine::catalog::ParameterDefault::Required
 impl dageist_engine::catalog::ParameterDefault
 pub fn dageist_engine::catalog::ParameterDefault::value(self) -> dageist_engine::catalog::DefaultValue
+pub enum dageist_engine::catalog::PatternMeans
+pub dageist_engine::catalog::PatternMeans::PlainText
+pub dageist_engine::catalog::PatternMeans::RegularExpression
 pub enum dageist_engine::catalog::Reason
 pub dageist_engine::catalog::Reason::Deprecated
 pub dageist_engine::catalog::Reason::NeverOffered
@@ -548,6 +561,7 @@ pub fn dageist_engine::catalog::Arguments::flag(&self, parameter: &'static str, 
 pub fn dageist_engine::catalog::Arguments::get(&self, parameter: &str) -> core::option::Option<&dageist_engine::catalog::Argument>
 pub fn dageist_engine::catalog::Arguments::new() -> Self
 pub fn dageist_engine::catalog::Arguments::pairs(&self, parameter: &'static str) -> core::result::Result<alloc::vec::Vec<(dageist_engine::catalog::Argument, dageist_engine::catalog::Argument)>, dageist_engine::catalog::BuildError>
+pub fn dageist_engine::catalog::Arguments::pattern(&self, parameter: &'static str, means: dageist_engine::catalog::PatternMeans) -> core::result::Result<alloc::string::String, dageist_engine::catalog::BuildError>
 pub fn dageist_engine::catalog::Arguments::required_expression(&self, parameter: &'static str) -> core::result::Result<polars_plan::dsl::expr::Expr, dageist_engine::catalog::BuildError>
 pub fn dageist_engine::catalog::Arguments::string(&self, parameter: &'static str) -> core::result::Result<core::option::Option<alloc::string::String>, dageist_engine::catalog::BuildError>
 pub fn dageist_engine::catalog::Arguments::table(&self, parameter: &'static str) -> core::result::Result<polars_lazy::frame::LazyFrame, dageist_engine::catalog::BuildError>
@@ -582,6 +596,9 @@ pub const fn dageist_engine::catalog::Parameter::is_needed(&self) -> bool
 pub const fn dageist_engine::catalog::Parameter::kind(&self) -> dageist_engine::catalog::Kind
 pub const fn dageist_engine::catalog::Parameter::lenient_beside(&self) -> core::option::Option<&'static str>
 pub const fn dageist_engine::catalog::Parameter::name(&self) -> &'static str
+pub const fn dageist_engine::catalog::Parameter::names_the_fields_of_the_result(&self) -> bool
+pub const fn dageist_engine::catalog::Parameter::offered(&self) -> bool
+pub const fn dageist_engine::catalog::Parameter::plain_text_flag(&self) -> core::option::Option<&'static str>
 pub const fn dageist_engine::catalog::Parameter::role(&self) -> dageist_engine::catalog::Role
 pub const fn dageist_engine::catalog::Parameter::shape(&self) -> dageist_engine::catalog::Shape
 pub const fn dageist_engine::catalog::Parameter::shares_a_dtype_with(&self) -> core::option::Option<&'static str>
@@ -591,6 +608,12 @@ impl dageist_engine::catalog::Parameter
 pub fn dageist_engine::catalog::Parameter::default_setting(&self) -> core::option::Option<dageist_engine::catalog::Setting>
 pub fn dageist_engine::catalog::Parameter::start_setting(&self) -> dageist_engine::catalog::Setting
 pub fn dageist_engine::catalog::Parameter::starts_left_out(&self) -> bool
+pub struct dageist_engine::catalog::PatternError
+impl dageist_engine::catalog::PatternError
+pub fn dageist_engine::catalog::PatternError::reason(&self) -> &str
+impl core::error::Error for dageist_engine::catalog::PatternError
+impl core::fmt::Display for dageist_engine::catalog::PatternError
+pub fn dageist_engine::catalog::PatternError::fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 pub struct dageist_engine::catalog::StepFrame<'a>
 pub dageist_engine::catalog::StepFrame::columns: &'a [alloc::string::String]
 pub dageist_engine::catalog::StepFrame::tables: &'a [alloc::string::String]
@@ -613,9 +636,11 @@ pub fn dageist_engine::catalog::Words::parameter_name(&self, id: dageist_engine:
 pub fn dageist_engine::catalog::Words::parse(source: &str) -> core::result::Result<Self, dageist_engine::catalog::WordsError>
 pub fn dageist_engine::catalog::Words::say(&self, phrase: dageist_engine::catalog::SummaryPhrase<'_>) -> alloc::string::String
 pub fn dageist_engine::catalog::Words::sign(&self, comparison: dageist_engine::catalog::Comparison) -> core::option::Option<&str>
+pub fn dageist_engine::catalog::check_pattern(text: &str) -> core::result::Result<(), dageist_engine::catalog::PatternError>
 pub fn dageist_engine::catalog::english() -> &'static dageist_engine::catalog::Words
 pub fn dageist_engine::catalog::entries() -> &'static [dageist_engine::catalog::Entry]
 pub fn dageist_engine::catalog::entry(id: &str) -> core::option::Option<&'static dageist_engine::catalog::Entry>
+pub fn dageist_engine::catalog::groups_dtype(text: &str) -> core::result::Result<polars_core::datatypes::dtype::DataType, dageist_engine::catalog::PatternError>
 pub fn dageist_engine::catalog::left_out() -> &'static [dageist_engine::catalog::LeftOut]
 pub fn dageist_engine::catalog::start_step(entry: &dageist_engine::catalog::Entry, frame: &dageist_engine::catalog::StepFrame<'_>) -> core::option::Option<dageist_engine::catalog::StepStart>
 pub mod dageist_engine::claim_timing
@@ -793,6 +818,7 @@ pub dageist_engine::document::Value::Integer(i64)
 pub dageist_engine::document::Value::Many(alloc::vec::Vec<dageist_engine::document::Value>)
 pub dageist_engine::document::Value::Pairs(alloc::vec::Vec<(dageist_engine::document::Value, dageist_engine::document::Value)>)
 pub dageist_engine::document::Value::Path(alloc::string::String)
+pub dageist_engine::document::Value::Pattern(alloc::string::String)
 pub dageist_engine::document::Value::String(alloc::string::String)
 pub dageist_engine::document::Value::Table(alloc::string::String)
 pub struct dageist_engine::document::Call

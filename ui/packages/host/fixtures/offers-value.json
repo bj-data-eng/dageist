@@ -23,7 +23,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "ChainedThen.when",
@@ -37,7 +38,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "ChainedWhen.then",
@@ -51,7 +53,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.abs",
@@ -66,7 +69,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.add",
@@ -79,7 +83,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.and_",
@@ -94,7 +99,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.arccos",
@@ -109,7 +115,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.arccosh",
@@ -124,7 +131,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.arcsin",
@@ -139,7 +147,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.arcsinh",
@@ -154,7 +163,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.arctan",
@@ -169,7 +179,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.arctanh",
@@ -184,7 +195,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.backward_fill",
@@ -197,7 +209,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.cast",
@@ -210,7 +223,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": ["dtype"]
     },
     {
       "entry": "Expr.cbrt",
@@ -225,7 +239,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.ceil",
@@ -240,7 +255,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.clip",
@@ -253,7 +269,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.cos",
@@ -268,7 +285,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.cosh",
@@ -283,7 +301,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.cot",
@@ -298,7 +317,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.cum_count",
@@ -311,7 +331,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.cum_max",
@@ -324,7 +345,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.cum_sum",
@@ -339,7 +361,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.degrees",
@@ -354,7 +377,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.drop_nans",
@@ -367,7 +391,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.drop_nulls",
@@ -380,7 +405,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.dt.date",
@@ -393,7 +419,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.dt.month_start",
@@ -406,7 +433,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.dt.offset_by",
@@ -419,7 +447,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.dt.time",
@@ -432,7 +461,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.dt.total_days",
@@ -447,7 +477,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.eq",
@@ -460,7 +491,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.eq_missing",
@@ -473,7 +505,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.erf",
@@ -488,7 +521,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.erfc",
@@ -503,7 +537,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.exp",
@@ -518,7 +553,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.fill_nan",
@@ -533,7 +569,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.fill_null",
@@ -546,7 +583,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.first",
@@ -559,7 +597,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.floor",
@@ -574,7 +613,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.floordiv",
@@ -589,7 +629,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.forward_fill",
@@ -602,7 +643,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.ge",
@@ -615,7 +657,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.gt",
@@ -628,7 +671,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.has_nulls",
@@ -641,7 +685,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.is_between",
@@ -654,7 +699,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": ["upper_bound"]
     },
     {
       "entry": "Expr.is_close",
@@ -667,7 +713,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.is_duplicated",
@@ -680,7 +727,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.is_finite",
@@ -695,7 +743,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.is_first_distinct",
@@ -708,7 +757,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.is_infinite",
@@ -723,7 +773,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.is_last_distinct",
@@ -736,7 +787,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.is_nan",
@@ -751,7 +803,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.is_not_nan",
@@ -766,7 +819,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.is_not_null",
@@ -779,7 +833,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.is_null",
@@ -792,7 +847,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.is_unique",
@@ -805,7 +861,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.last",
@@ -818,7 +875,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.le",
@@ -831,7 +889,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.len",
@@ -844,7 +903,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.log",
@@ -859,7 +919,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.log1p",
@@ -874,7 +935,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.lt",
@@ -887,7 +949,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.max",
@@ -900,7 +963,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.min",
@@ -913,7 +977,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.mod",
@@ -928,7 +993,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.mul",
@@ -943,7 +1009,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.ne",
@@ -956,7 +1023,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.ne_missing",
@@ -969,7 +1037,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.neg",
@@ -984,7 +1053,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.not_",
@@ -999,7 +1069,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.null_count",
@@ -1012,7 +1083,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.or_",
@@ -1027,7 +1099,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.over",
@@ -1040,7 +1113,8 @@
         }
       },
       "argument": null,
-      "leftOut": "partition_by"
+      "leftOut": "partition_by",
+      "slots": []
     },
     {
       "entry": "Expr.pow",
@@ -1055,7 +1129,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.radians",
@@ -1070,7 +1145,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.replace",
@@ -1083,7 +1159,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.replace_strict",
@@ -1096,7 +1173,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.round",
@@ -1111,7 +1189,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.round_sig_figs",
@@ -1126,7 +1205,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.shift",
@@ -1146,7 +1226,8 @@
           "shown": "1"
         }
       },
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.sign",
@@ -1161,7 +1242,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.sin",
@@ -1176,7 +1258,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.sinh",
@@ -1191,7 +1274,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.sqrt",
@@ -1206,7 +1290,40 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.str.contains",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "expected String type, got: datetime[μs]"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.str.count_matches",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.str.ends_with",
@@ -1221,7 +1338,88 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.str.escape_regex",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.str.extract",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "expected String type, got: datetime[μs]"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.str.extract_all",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.str.extract_groups",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.str.find",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "expected String type, got: datetime[μs]"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.str.head",
@@ -1236,7 +1434,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.str.join",
@@ -1249,7 +1448,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.str.len_bytes",
@@ -1264,7 +1464,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.str.len_chars",
@@ -1279,7 +1480,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.str.pad_end",
@@ -1294,7 +1496,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.str.pad_start",
@@ -1309,7 +1512,40 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.str.replace",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "expected String type, got: datetime[μs]"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.str.replace_all",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "expected String type, got: datetime[μs]"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.str.reverse",
@@ -1324,7 +1560,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.str.slice",
@@ -1339,7 +1576,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.str.split",
@@ -1354,7 +1592,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.str.starts_with",
@@ -1369,7 +1608,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.str.strip_chars",
@@ -1384,7 +1624,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.str.strip_chars_end",
@@ -1399,7 +1640,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.str.strip_chars_start",
@@ -1414,7 +1656,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.str.strip_prefix",
@@ -1429,7 +1672,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.str.strip_suffix",
@@ -1444,7 +1688,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.str.tail",
@@ -1459,7 +1704,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.str.to_lowercase",
@@ -1474,7 +1720,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.str.to_titlecase",
@@ -1489,7 +1736,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.str.to_uppercase",
@@ -1504,7 +1752,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.str.zfill",
@@ -1519,7 +1768,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.sub",
@@ -1532,7 +1782,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.sum",
@@ -1547,7 +1798,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.tan",
@@ -1562,7 +1814,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.tanh",
@@ -1577,7 +1830,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.truediv",
@@ -1592,7 +1846,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.truncate",
@@ -1607,7 +1862,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Expr.xor",
@@ -1622,7 +1878,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Then.otherwise",
@@ -1636,7 +1893,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "Then.when",
@@ -1650,7 +1908,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "When.then",
@@ -1664,7 +1923,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "polars.col",
@@ -1678,7 +1938,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "polars.element",
@@ -1692,7 +1953,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "polars.lit",
@@ -1706,7 +1968,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     },
     {
       "entry": "polars.when",
@@ -1720,7 +1983,8 @@
         }
       },
       "argument": null,
-      "leftOut": null
+      "leftOut": null,
+      "slots": []
     }
   ]
 }

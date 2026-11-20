@@ -345,11 +345,65 @@ pub enum Limit {
     /// `replace_strict` given no default: the case run again with each given a null default is
     /// not refused for it.
     AStrictReplacementGivenNoDefault,
+    /// A replacement of every match refuses a value that is null where Polars reads the value
+    /// as one value, which it does of a literal, and of a piece of one row where its streaming
+    /// engine runs the rows in pieces, whose length depends on how the rows are shared among the
+    /// threads. The tables measured the value as a column of three rows in one piece, which Polars
+    /// meets row by row and leaves a null row of unchanged. Polars refusing the rows or the empty table with the refusal that
+    /// the value cannot be null, which has no place, in a case with a `str.replace_all`, or a
+    /// `str.replace` given a count below zero, which replaces every match: the case run again with
+    /// the value of each made a text literal is not refused for it.
+    AReplacementOfEveryMatchGivenANullValue,
+    /// Polars replaces more than the first match only of plain text and of one value: a pattern
+    /// that is a regular expression, or a value that is many, is refused for a count above one.
+    /// The tables measured the replacement of the first match, which is the count Python gives it
+    /// by default. Polars refusing the rows or the empty table with the refusal that a replacement
+    /// of a pattern or of many values with a count above one is not yet supported, which has no
+    /// place, in a case with a `str.replace` that is given a count above one: the case run again
+    /// with each count left out is not refused for it.
+    AReplacementOfMoreThanTheFirstMatch,
+    /// A literal text is one value, which Polars' streaming engine broadcasts over the rows of a table
+    /// only where each piece it runs them in is no longer than that one value, and never over a table
+    /// with no rows, so a replacement of it given many values is refused where the column of text the
+    /// tables measured it with is not: its rows and the table's agree. How long a piece is depends on
+    /// how the rows are shared among the threads, so the three rows of the target's tables are refused
+    /// at one thread and at two, where a piece is longer than one, and pass at three and more. Polars
+    /// refusing the rows, or the
+    /// empty table, with the refusal that the value's length does not match the text's, which has no
+    /// place, in a case with a replacement in a chain that starts from a literal: the case run again
+    /// with each such literal a column of text is not refused for it.
+    ALiteralTextBesideManyReplacementValues,
+    /// A struct with no fields, which `str.extract_groups` gives of a pattern that has no group,
+    /// cannot be grouped by: Polars refuses a test for a value that is unique or duplicated of it
+    /// with the refusal that at least one key is required. The tables measured the struct on two
+    /// fields. Polars refusing the rows or the empty table with that refusal, which has no place, in
+    /// a case with an `str.extract_groups` of a pattern with no group: the case run again with each
+    /// such pattern given a group is not refused for it.
+    AStructWithNoFields,
+    /// Polars' streaming engine refuses, for the order key of a window and for a key inside it, a
+    /// replacement of a text of one value, a literal or an aggregate, given many values, which it
+    /// meets with each of them in a select, and does so at every thread count. The tables measured
+    /// the replacement in select. Polars refusing the rows or the empty table with the refusal that
+    /// the length of the value does not match that of the text, which has no place, in a case with a
+    /// window and a replacement: the case run again with the value of each replacement made a text
+    /// literal is not refused for it, and nor is it run again with each window made a fill.
+    AReplacementOfAnAggregateInAWindowKey,
+    /// Polars' streaming engine refuses a replacement of the aggregate of a literal text, which is one
+    /// value, where the replacement stands in a branch of a condition, and meets it where it stands
+    /// in a select, in a sum, in a window or in memory. It reads the pattern of the replacement
+    /// as many values, and what it says depends on how it splits the rows: that the pattern's
+    /// length is dynamic where the pieces are longer than one row, and that the pattern is null
+    /// where they are not. The tables measured the replacement in select, on columns. Polars
+    /// refusing the rows or the empty table with either refusal, which has no place, in a case
+    /// with a branch of a condition that holds a chain that starts from a literal and replaces
+    /// after an aggregate: the case run again with each such literal a column of text is not
+    /// refused for it.
+    AReplacementOfALiteralAggregateInABranch,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 27] = [
+    pub const ALL: [Self; 33] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -377,6 +431,12 @@ impl Limit {
         Self::ADropOfNansInAWindow,
         Self::ANullStructToFill,
         Self::AStrictReplacementGivenNoDefault,
+        Self::AReplacementOfEveryMatchGivenANullValue,
+        Self::AReplacementOfMoreThanTheFirstMatch,
+        Self::ALiteralTextBesideManyReplacementValues,
+        Self::AStructWithNoFields,
+        Self::AReplacementOfAnAggregateInAWindowKey,
+        Self::AReplacementOfALiteralAggregateInABranch,
     ];
 
     /// The name a kept case is filed under.
@@ -409,6 +469,22 @@ impl Limit {
             Self::ADropOfNansInAWindow => "a-drop-of-nans-in-a-window",
             Self::ANullStructToFill => "a-null-struct-to-fill",
             Self::AStrictReplacementGivenNoDefault => "a-strict-replacement-given-no-default",
+            Self::AReplacementOfEveryMatchGivenANullValue => {
+                "a-replacement-of-every-match-given-a-null-value"
+            }
+            Self::AReplacementOfMoreThanTheFirstMatch => {
+                "a-replacement-of-more-than-the-first-match"
+            }
+            Self::ALiteralTextBesideManyReplacementValues => {
+                "a-literal-text-beside-many-replacement-values"
+            }
+            Self::AStructWithNoFields => "a-struct-with-no-fields",
+            Self::AReplacementOfAnAggregateInAWindowKey => {
+                "a-replacement-of-an-aggregate-in-a-window-key"
+            }
+            Self::AReplacementOfALiteralAggregateInABranch => {
+                "a-replacement-of-a-literal-aggregate-in-a-branch"
+            }
         }
     }
 
@@ -483,6 +559,24 @@ impl Limit {
             }
             Self::AStrictReplacementGivenNoDefault => {
                 "a strict replacement given no default refuses a value it does not list and values of a dtype a default lets pass, where the tables measured it given a default and listing every value"
+            }
+            Self::AReplacementOfEveryMatchGivenANullValue => {
+                "a replacement of every match refuses a value that is null where Polars reads it as one value, a literal or a piece of one row, where the tables measured the value as a column of three rows in one piece"
+            }
+            Self::AReplacementOfALiteralAggregateInABranch => {
+                "Polars' streaming engine reads the pattern of a replacement of the aggregate of a literal text in a branch of a condition as many values, which it does not where it stands in a select, where the tables measured it"
+            }
+            Self::AReplacementOfAnAggregateInAWindowKey => {
+                "Polars' streaming engine does not meet a text of one value with each value of a replacement in the order key of a window, which it does in a select, where the tables measured it"
+            }
+            Self::AStructWithNoFields => {
+                "a struct with no fields cannot be grouped by, where the tables measured the struct on two fields"
+            }
+            Self::ALiteralTextBesideManyReplacementValues => {
+                "a literal text is one value that Polars does not broadcast over a table with no rows, nor over the rows at every thread count, where the tables measured the text as a column of the table's rows"
+            }
+            Self::AReplacementOfMoreThanTheFirstMatch => {
+                "Polars replaces more than the first match only of plain text and of one value, and refuses a pattern or many values, where the tables measured the replacement of the first match"
             }
             Self::ANullStructToFill => {
                 "a shift, and the first, the last, the minimum and the maximum of nothing, give a null, which a fill by a strategy refuses a struct for, where the sample's struct holds none"
@@ -1768,6 +1862,354 @@ fn refused_for_an_incomplete_mapping_with_defaults(case: &Case, reason: &str) ->
     })
 }
 
+/// Whether the call replaces every match: `str.replace_all`, and `str.replace` given a count below
+/// zero, which Polars takes to be all of them.
+fn replaces_every_match(call: &Call) -> bool {
+    is(call, "Expr.str.replace_all")
+        || (is(call, "Expr.str.replace")
+            && matches!(call.argument("n"), Some(Value::Integer(count)) if *count < 0))
+}
+
+/// What Polars says of a replacement of every match whose value is null where it reads it as one.
+const A_NULL_VALUE_OF_A_REPLACEMENT: &str = "value cannot be 'null' in 'replace' expression";
+
+/// What Polars says where it reads the pattern of a replacement as many values: that its length is
+/// dynamic, or that it is null, by how it splits the rows.
+const A_PATTERN_READ_AS_MANY: [&str; 2] = [
+    "dynamic pattern length in 'str.replace' expressions is not supported yet",
+    "pattern cannot be 'null' in 'replace' expression",
+];
+
+/// Whether the chain starts from a literal and replaces after an aggregate.
+fn is_a_literal_aggregate_replaced(expression: &Expression) -> bool {
+    if !matches!(expression.start(), Start::Call(start) if is(start, "polars.lit")) {
+        return false;
+    }
+    let mut aggregated = false;
+    for link in expression.links() {
+        if is_one_value(link) {
+            aggregated = true;
+        } else if aggregated && is_a_text_replacement(link) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Whether an expression holds, at any depth, a value of a condition that is such a chain or holds
+/// one.
+fn holds_a_literal_aggregate_replaced_in_a_branch(expression: &Expression) -> bool {
+    let calls = std::iter::once(expression.start())
+        .filter_map(|start| match start {
+            Start::Call(call) => Some(call),
+            Start::Input(_) | Start::Hole => None,
+        })
+        .chain(expression.links());
+    calls.into_iter().any(|call| {
+        operands(call).into_iter().any(|(_, inside)| {
+            (is_a_branch_value(call) && holds_a_chain(inside, &is_a_literal_aggregate_replaced))
+                || holds_a_literal_aggregate_replaced_in_a_branch(inside)
+        })
+    })
+}
+
+/// Whether the call is a value of a condition: what a `then` or an `otherwise` gives.
+fn is_a_branch_value(call: &Call) -> bool {
+    matches!(
+        call.entry().id().as_str(),
+        "When.then" | "Then.otherwise" | "ChainedWhen.then" | "ChainedThen.otherwise"
+    )
+}
+
+/// Whether the expression, or one it holds at any depth, is a chain `found` accepts.
+fn holds_a_chain(expression: &Expression, found: &dyn Fn(&Expression) -> bool) -> bool {
+    found(expression)
+        || std::iter::once(expression.start())
+            .filter_map(|start| match start {
+                Start::Call(call) => Some(call),
+                Start::Input(_) | Start::Hole => None,
+            })
+            .chain(expression.links())
+            .any(|call| {
+                operands(call)
+                    .into_iter()
+                    .any(|(_, inside)| holds_a_chain(inside, found))
+            })
+}
+
+/// Whether Polars refuses the case for a pattern read as many values still when each literal that
+/// such a chain starts from is a column of text: the literal is then no cause.
+fn refused_for_a_pattern_read_as_many_with_columns(case: &Case) -> Option<bool> {
+    let step = &case.document.steps()[0];
+    let rebuilt = Step::new(step.id().clone(), call_with_text_columns(step.call())?).ok()?;
+    let control = Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        document: Document::new(vec![rebuilt]).ok()?,
+    };
+    changed(Some(control), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control).refusal.is_some_and(|refusal| {
+                A_PATTERN_READ_AS_MANY
+                    .iter()
+                    .any(|said| refusal.reason.contains(said))
+            })
+        })
+    })
+}
+
+/// What Polars says of a group by that has no key, as a test for a unique value of a struct with
+/// no fields is.
+const A_GROUP_BY_WITHOUT_A_KEY: &str = "at least one key is required in a group_by operation";
+
+/// Whether the call extracts the groups of a pattern that has none, which is a struct with no fields.
+fn is_an_extraction_of_no_groups(call: &Call) -> bool {
+    is(call, "Expr.str.extract_groups")
+        && matches!(
+            call.argument("pattern"),
+            Some(Value::Pattern(text))
+                if catalog::groups_dtype(text)
+                    .is_ok_and(|dtype| dageist_engine::allowed::dtype_name(&dtype) == "Struct()")
+        )
+}
+
+/// The case with the pattern of each extraction of no groups given a group.
+fn case_with_groups(case: &Case) -> Option<Case> {
+    case_changed(case, &|call| {
+        if !is_an_extraction_of_no_groups(call) {
+            return None;
+        }
+        Call::new(
+            catalog::entry("Expr.str.extract_groups")?,
+            vec![("pattern", Value::Pattern("(x)".to_owned()))],
+        )
+        .ok()
+    })
+}
+
+/// Whether Polars refuses the case for a group by with no key still when each pattern has a group:
+/// the lack of one is then no cause. `None` where no pattern lacks one.
+fn refused_for_no_key_with_groups(case: &Case) -> Option<bool> {
+    changed(case_with_groups(case), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| refusal.reason.contains(A_GROUP_BY_WITHOUT_A_KEY))
+        })
+    })
+}
+
+/// What Polars says of a replacement whose value has other numbers of values than the text it
+/// follows.
+const A_VALUE_OF_ANOTHER_LENGTH: &str = "does not match string column length";
+
+/// Whether `expression` replaces what a pattern matches in a chain that starts from a literal,
+/// in it or in an expression it holds.
+fn holds_a_replacement_of_a_literal(expression: &Expression) -> bool {
+    let replaces = |link: &Call| is(link, "Expr.str.replace") || is(link, "Expr.str.replace_all");
+    let starts_from_a_text =
+        matches!(expression.start(), Start::Call(start) if is(start, "polars.lit"));
+    (starts_from_a_text && expression.links().iter().any(replaces))
+        || std::iter::once(expression.start())
+            .filter_map(|start| match start {
+                Start::Call(call) => Some(call),
+                Start::Input(_) | Start::Hole => None,
+            })
+            .chain(expression.links())
+            .any(|call| {
+                operands(call)
+                    .into_iter()
+                    .any(|(_, inside)| holds_a_replacement_of_a_literal(inside))
+            })
+}
+
+/// `call` with the start of each chain that is a literal and holds a replacement made the column
+/// `g`, which holds text in every row.
+fn call_with_text_columns(call: &Call) -> Option<Call> {
+    fn value(held: &Value) -> Option<Value> {
+        Some(match held {
+            Value::Expression(expression) => Value::Expression(expression_of_columns(expression)?),
+            Value::Many(items) => Value::Many(items.iter().map(value).collect::<Option<Vec<_>>>()?),
+            Value::Pairs(pairs) => Value::Pairs(
+                pairs
+                    .iter()
+                    .map(|(key, entry)| Some((value(key)?, value(entry)?)))
+                    .collect::<Option<Vec<_>>>()?,
+            ),
+            other => other.clone(),
+        })
+    }
+    fn expression_of_columns(expression: &Expression) -> Option<Expression> {
+        let start = if holds_a_replacement_of_a_literal_alone(expression) {
+            Start::Call(
+                Call::new(
+                    catalog::entry("polars.col")?,
+                    vec![("name", Value::Columns(vec!["g".to_owned()]))],
+                )
+                .ok()?,
+            )
+        } else {
+            match expression.start() {
+                Start::Call(start) => Start::Call(call_with_text_columns(start)?),
+                other => other.clone(),
+            }
+        };
+        let links = expression
+            .links()
+            .iter()
+            .map(call_with_text_columns)
+            .collect::<Option<Vec<_>>>()?;
+        Expression::new(start, links).ok()
+    }
+    let given = call
+        .arguments()
+        .iter()
+        .map(|given| Some((given.parameter(), value(given.value())?)))
+        .collect::<Option<Vec<_>>>()?;
+    Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
+}
+
+/// Whether the chain itself, and not an expression it holds, starts from a literal and replaces.
+fn holds_a_replacement_of_a_literal_alone(expression: &Expression) -> bool {
+    matches!(expression.start(), Start::Call(start) if is(start, "polars.lit"))
+        && expression
+            .links()
+            .iter()
+            .any(|link| is(link, "Expr.str.replace") || is(link, "Expr.str.replace_all"))
+}
+
+/// Whether Polars refuses the case for a value of another length still when the literal of each
+/// replacement is a column of text: the literal is then no cause. `None` where no chain that
+/// starts from a literal holds a replacement.
+fn refused_for_a_value_of_another_length_with_columns(case: &Case) -> Option<bool> {
+    let step = &case.document.steps()[0];
+    let rebuilt = Step::new(step.id().clone(), call_with_text_columns(step.call())?).ok()?;
+    let control = Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        document: Document::new(vec![rebuilt]).ok()?,
+    };
+    changed(Some(control), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| refusal.reason.contains(A_VALUE_OF_ANOTHER_LENGTH))
+        })
+    })
+}
+
+/// What Polars says of a replacement of a pattern, or of many values, that is given a count above
+/// one.
+const A_COUNT_OF_A_REPLACEMENT: &str = "with 'n > 1' not yet supported";
+
+/// The case with each replacement given no count, which is the first match.
+fn case_without_counts(case: &Case) -> Option<Case> {
+    case_changed(case, &|call| {
+        if !is(call, "Expr.str.replace") || call.argument("n").is_none() {
+            return None;
+        }
+        let given: Vec<(&str, Value)> = call
+            .arguments()
+            .iter()
+            .filter(|given| given.parameter() != "n")
+            .map(|given| (given.parameter(), given.value().clone()))
+            .collect();
+        Call::new(catalog::entry("Expr.str.replace")?, given).ok()
+    })
+}
+
+/// Whether Polars refuses the case for a count above one still when each replacement is given
+/// none: the count is then no cause. `None` where no replacement has one to leave out.
+fn refused_for_a_count_without_counts(case: &Case) -> Option<bool> {
+    changed(case_without_counts(case), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| refusal.reason.contains(A_COUNT_OF_A_REPLACEMENT))
+        })
+    })
+}
+
+/// A text literal, which is no null.
+fn a_text_literal() -> Option<Expression> {
+    let literal = Call::new(
+        catalog::entry("polars.lit")?,
+        vec![("value", Value::String("x".to_owned()))],
+    )
+    .ok()?;
+    Expression::new(Start::Call(literal), Vec::new()).ok()
+}
+
+/// The case with the value of each replacement of every match made a text literal.
+fn case_with_text_values(case: &Case) -> Option<Case> {
+    case_with_text_values_of(case, &replaces_every_match)
+}
+
+/// Whether the call replaces what a pattern matches, the first match or each.
+fn is_a_text_replacement(call: &Call) -> bool {
+    is(call, "Expr.str.replace") || is(call, "Expr.str.replace_all")
+}
+
+/// Whether Polars refuses the case for the length of a value still when the value of each
+/// replacement is a text literal: the many values are then no cause. `None` where no replacement
+/// has one to change.
+fn refused_for_another_length_with_text_values(case: &Case) -> Option<bool> {
+    changed(case_with_text_values_of(case, &is_a_text_replacement), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| refusal.reason.contains(A_VALUE_OF_ANOTHER_LENGTH))
+        })
+    })
+}
+
+/// Whether Polars refuses the case for the length of a value still when no call is a window: the
+/// window is then no cause. `None` where no call is one.
+fn refused_for_another_length_without_windows(case: &Case) -> Option<bool> {
+    changed(case_without_windows(case), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| refusal.reason.contains(A_VALUE_OF_ANOTHER_LENGTH))
+        })
+    })
+}
+
+/// The case with the value of each call `which` accepts made a text literal.
+fn case_with_text_values_of(case: &Case, which: &dyn Fn(&Call) -> bool) -> Option<Case> {
+    case_changed(case, &|call| {
+        if !which(call) {
+            return None;
+        }
+        let given: Vec<(&str, Value)> = call
+            .arguments()
+            .iter()
+            .map(|given| {
+                let value = if given.parameter() == "value" {
+                    Value::Expression(a_text_literal()?)
+                } else {
+                    given.value().clone()
+                };
+                Some((given.parameter(), value))
+            })
+            .collect::<Option<_>>()?;
+        Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
+    })
+}
+
+/// Whether Polars refuses the case for a null value still when the value of each replacement of
+/// every match is text: the value is then no cause. `None` where no replacement of every match
+/// has one to change.
+fn refused_for_a_null_value_with_text_values(case: &Case) -> Option<bool> {
+    changed(case_with_text_values(case), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| refusal.reason.contains(A_NULL_VALUE_OF_A_REPLACEMENT))
+        })
+    })
+}
+
 /// Whether the call drops the nulls or the NaNs of what it follows.
 fn is_a_drop(call: &Call) -> bool {
     is(call, "Expr.drop_nulls") || is(call, "Expr.drop_nans")
@@ -2761,6 +3203,79 @@ fn applies(
                         .iter()
                         .any(|(_, held)| holds_a_fill_by_a_strategy_in_a_condition(held))
                         && refused_for_a_strategy_without_strategies(case) == Some(false))
+        }
+        (Limit::AReplacementOfALiteralAggregateInABranch, Disagreement::PolarsRefuses(refusal)) => {
+            // The literal is the cause where Polars stops refusing the pattern once the text of
+            // each such replacement is a column.
+            unplaced(refusal)
+                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                && A_PATTERN_READ_AS_MANY
+                    .iter()
+                    .any(|said| refusal.reason.contains(said))
+                && held
+                    .iter()
+                    .any(|(_, held)| holds_a_literal_aggregate_replaced_in_a_branch(held))
+                && refused_for_a_pattern_read_as_many_with_columns(case) == Some(false)
+        }
+        (Limit::AReplacementOfAnAggregateInAWindowKey, Disagreement::PolarsRefuses(refusal)) => {
+            // The window and the many values are the cause where Polars stops refusing the lengths
+            // once each value is text, and once no call is a window.
+            unplaced(refusal)
+                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                && refusal.reason.contains(A_VALUE_OF_ANOTHER_LENGTH)
+                && held.iter().any(|(_, held)| {
+                    any_call(held, &|call| is(call, "Expr.over"))
+                        && any_call(held, &is_a_text_replacement)
+                })
+                && refused_for_another_length_with_text_values(case) == Some(false)
+                && refused_for_another_length_without_windows(case) == Some(false)
+        }
+        (Limit::AStructWithNoFields, Disagreement::PolarsRefuses(refusal)) => {
+            // The missing group is the cause where Polars stops refusing the key once each pattern
+            // that has none is given one.
+            unplaced(refusal)
+                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                && refusal.reason.contains(A_GROUP_BY_WITHOUT_A_KEY)
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &is_an_extraction_of_no_groups))
+                && refused_for_no_key_with_groups(case) == Some(false)
+        }
+        (Limit::ALiteralTextBesideManyReplacementValues, Disagreement::PolarsRefuses(refusal)) => {
+            // The literal is the cause where Polars stops refusing the empty table once the
+            // text of each replacement is a column.
+            unplaced(refusal)
+                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                && refusal.reason.contains(A_VALUE_OF_ANOTHER_LENGTH)
+                && held
+                    .iter()
+                    .any(|(_, held)| holds_a_replacement_of_a_literal(held))
+                && refused_for_a_value_of_another_length_with_columns(case) == Some(false)
+        }
+        (Limit::AReplacementOfMoreThanTheFirstMatch, Disagreement::PolarsRefuses(refusal)) => {
+            // The count is the cause where Polars stops refusing it once each replacement is
+            // given none, which is the first match.
+            unplaced(refusal)
+                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                && refusal.reason.contains(A_COUNT_OF_A_REPLACEMENT)
+                && held.iter().any(|(_, held)| {
+                    any_call(held, &|call| {
+                        is(call, "Expr.str.replace")
+                            && matches!(call.argument("n"), Some(Value::Integer(count)) if *count > 1)
+                    })
+                })
+                && refused_for_a_count_without_counts(case) == Some(false)
+        }
+        (Limit::AReplacementOfEveryMatchGivenANullValue, Disagreement::PolarsRefuses(refusal)) => {
+            // The value is the cause where Polars stops refusing it as null once the value of
+            // each replacement of every match is text.
+            unplaced(refusal)
+                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                && refusal.reason.contains(A_NULL_VALUE_OF_A_REPLACEMENT)
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &replaces_every_match))
+                && refused_for_a_null_value_with_text_values(case) == Some(false)
         }
         (Limit::AStrictReplacementGivenNoDefault, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
@@ -6751,6 +7266,570 @@ mod tests {
         // A default maps every value, so the refusal is not for the want of one.
         assert_eq!(
             refused_for_a_bound(&strict(true), None, Stage::Rows, reason),
+            vec![]
+        );
+    }
+
+    // ----- A replacement of every match given a null value
+
+    const NULL_VALUE: &str = "value cannot be 'null' in 'replace' expression";
+
+    fn replacing_every_match_by(value: Call) -> Case {
+        let replace = call(
+            "Expr.str.replace_all",
+            vec![
+                ("pattern", Value::Pattern("a".to_owned())),
+                ("value", Value::Expression(chain(value, &[]))),
+            ],
+        );
+        select(vec![chain_of(column("g"), vec![replace])])
+    }
+
+    #[test]
+    fn a_null_value_is_excused_for_a_replacement_of_every_match_given_a_null_literal_or_a_column() {
+        // A literal is one value, and a null of it is refused as Polars refuses it. A column
+        // is refused where Polars runs its rows in pieces of one, which the control cannot show:
+        // the control is that the value made text is not refused, which holds for both.
+        for value in [null(), column("b")] {
+            for stage in [Stage::Rows, Stage::Empty] {
+                assert_eq!(
+                    refused_for_a_bound(
+                        &replacing_every_match_by(value.clone()),
+                        None,
+                        stage,
+                        NULL_VALUE
+                    ),
+                    vec![Limit::AReplacementOfEveryMatchGivenANullValue]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_null_value_is_not_excused_for_a_value_that_is_text_nor_for_another_replacement() {
+        // The value is text already: the control is the case itself, which shows nothing, so
+        // the limit does not apply.
+        let text = call("polars.lit", vec![("value", Value::String("x".to_owned()))]);
+        assert_eq!(
+            refused_for_a_bound(
+                &replacing_every_match_by(text),
+                None,
+                Stage::Rows,
+                NULL_VALUE
+            ),
+            vec![]
+        );
+        // A replacement of the first match, and a strict one, are not one of every match.
+        let first = call(
+            "Expr.str.replace",
+            vec![
+                ("pattern", Value::Pattern("a".to_owned())),
+                ("value", Value::Expression(chain(null(), &[]))),
+            ],
+        );
+        let case = select(vec![chain_of(column("g"), vec![first])]);
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, NULL_VALUE),
+            vec![]
+        );
+        // Another refusal of the rows, or one that is at a place, is not the value's.
+        assert_eq!(
+            refused_for_a_bound(
+                &replacing_every_match_by(null()),
+                None,
+                Stage::Rows,
+                "invalid series dtype: expected `String`"
+            ),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(
+                &replacing_every_match_by(null()),
+                Some(Place::of_step(0, None).then(Segment::Parameter("exprs".to_owned()))),
+                Stage::Rows,
+                NULL_VALUE
+            ),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_null_value_is_excused_for_a_replacement_with_a_count_below_zero_which_is_every_match() {
+        // Polars replaces every match where the count is below zero, as `str.replace_all` does, and
+        // reads the value of it as one value just the same.
+        let every = |count: i64| {
+            let replace = call(
+                "Expr.str.replace",
+                vec![
+                    ("pattern", Value::Pattern("a".to_owned())),
+                    ("value", Value::Expression(chain(null(), &[]))),
+                    ("n", Value::Integer(count)),
+                ],
+            );
+            select(vec![chain_of(column("g"), vec![replace])])
+        };
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-replacement-of-every-match-given-a-null-value--a-replacement-with-a-count-below-zero.case"
+            ),
+            vec![Limit::AReplacementOfEveryMatchGivenANullValue]
+        );
+        assert_eq!(
+            refused_for_a_bound(&every(-1), None, Stage::Rows, NULL_VALUE),
+            vec![Limit::AReplacementOfEveryMatchGivenANullValue]
+        );
+        // The first match, or a few, or none, is no replacement of every match.
+        for count in [0, 1, 2] {
+            assert_eq!(
+                refused_for_a_bound(&every(count), None, Stage::Rows, NULL_VALUE),
+                vec![],
+                "{count}"
+            );
+        }
+    }
+
+    // ----- A replacement of a literal aggregate in a branch
+
+    const DYNAMIC: &str =
+        "dynamic pattern length in 'str.replace' expressions is not supported yet";
+    const NULL_PATTERN: &str = "pattern cannot be 'null' in 'replace' expression";
+
+    /// `when(true).then(lit("a").join().replace_all(pattern, "_")).otherwise(h)`, or the replacement
+    /// as a plain chain, `start` being the chain's own start.
+    fn branch_replacing(start: Call, in_a_branch: bool) -> Case {
+        let replace = call(
+            "Expr.str.replace_all",
+            vec![
+                ("pattern", Value::Pattern("(a)".to_owned())),
+                (
+                    "value",
+                    Value::Expression(chain(
+                        call("polars.lit", vec![("value", Value::String("_".to_owned()))]),
+                        &[],
+                    )),
+                ),
+            ],
+        );
+        let replaced = chain_of(start, vec![call("Expr.str.join", Vec::new()), replace]);
+        if !in_a_branch {
+            return select(vec![replaced]);
+        }
+        let then = call(
+            "When.then",
+            vec![("statement", Value::Expression(replaced))],
+        );
+        let otherwise = call(
+            "Then.otherwise",
+            vec![("statement", Value::Expression(chain(column("h"), &[])))],
+        );
+        let when = call(
+            "polars.when",
+            vec![(
+                "predicates",
+                many(vec![chain_of(
+                    call("polars.lit", vec![("value", Value::Flag(Some(true)))]),
+                    Vec::new(),
+                )]),
+            )],
+        );
+        select(vec![chain_of(when, vec![then, otherwise])])
+    }
+
+    #[test]
+    fn a_pattern_read_as_many_is_excused_for_a_literal_aggregate_replaced_in_a_branch() {
+        assert_eq!(
+            excused_by_kept("uncovered-a-replacement-of-a-literal-aggregate-in-a-branch.case"),
+            vec![Limit::AReplacementOfALiteralAggregateInABranch]
+        );
+        let text = call("polars.lit", vec![("value", Value::String("a".to_owned()))]);
+        // Either refusal, which one depends on how Polars splits the rows, and either stage.
+        for said in [DYNAMIC, NULL_PATTERN] {
+            for stage in [Stage::Rows, Stage::Empty] {
+                assert_eq!(
+                    refused_for_a_bound(&branch_replacing(text.clone(), true), None, stage, said),
+                    vec![Limit::AReplacementOfALiteralAggregateInABranch],
+                    "{said}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_pattern_read_as_many_is_not_excused_outside_a_branch_nor_for_a_column_nor_at_a_place() {
+        let text = call("polars.lit", vec![("value", Value::String("a".to_owned()))]);
+        // The replacement stands in a select, where Polars meets it: no branch holds it.
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_replacing(text.clone(), false),
+                None,
+                Stage::Rows,
+                DYNAMIC
+            ),
+            vec![]
+        );
+        // A column of text starts the chain: the control is the case itself.
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_replacing(column("g"), true),
+                None,
+                Stage::Rows,
+                DYNAMIC
+            ),
+            vec![]
+        );
+        // Another reason, a place and the schema are not this one.
+        let case = branch_replacing(text, true);
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, "invalid series dtype"),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(&case, Some(link_of("exprs", 0, 0)), Stage::Rows, DYNAMIC),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Schema, DYNAMIC),
+            vec![]
+        );
+    }
+
+    // ----- A replacement of an aggregate in a window key
+
+    const ANOTHER_LENGTH_OF_AN_AGGREGATE: &str =
+        "replacement value length (3) does not match string column length (1)";
+
+    /// `b.over(order_by=[ h.max().replace_all(pattern, value) ])`, with the window as `key`.
+    fn windowed_replacement(key: &str, value: Call, partition: bool) -> Case {
+        let replace = call(
+            "Expr.str.replace_all",
+            vec![
+                ("pattern", Value::Pattern("d".to_owned())),
+                ("value", Value::Expression(chain(value, &[]))),
+            ],
+        );
+        let keyed = chain_of(column("h"), vec![call("Expr.max", Vec::new()), replace]);
+        let window = call(
+            "Expr.over",
+            vec![(
+                if partition {
+                    "partition_by"
+                } else {
+                    "order_by"
+                },
+                many(vec![keyed]),
+            )],
+        );
+        select(vec![chain_of(column(key), vec![window])])
+    }
+
+    #[test]
+    fn a_value_of_another_length_is_excused_for_an_aggregate_replaced_in_a_window_key() {
+        assert_eq!(
+            excused_by_kept("uncovered-a-replacement-of-an-aggregate-in-a-window-key.case"),
+            vec![Limit::AReplacementOfAnAggregateInAWindowKey]
+        );
+        assert_eq!(
+            refused_for_a_bound(
+                &windowed_replacement("b", column("g"), false),
+                None,
+                Stage::Rows,
+                ANOTHER_LENGTH_OF_AN_AGGREGATE
+            ),
+            vec![Limit::AReplacementOfAnAggregateInAWindowKey]
+        );
+    }
+
+    #[test]
+    fn a_value_of_another_length_is_not_excused_for_a_text_value_nor_without_a_window() {
+        // The value is text: the control is the case itself, which shows nothing.
+        let text = call("polars.lit", vec![("value", Value::String("x".to_owned()))]);
+        assert_eq!(
+            refused_for_a_bound(
+                &windowed_replacement("b", text, false),
+                None,
+                Stage::Rows,
+                ANOTHER_LENGTH_OF_AN_AGGREGATE
+            ),
+            vec![]
+        );
+        // No window: the replacement alone is the cause, and Polars meets it as it does in a select.
+        let replace = call(
+            "Expr.str.replace_all",
+            vec![
+                ("pattern", Value::Pattern("d".to_owned())),
+                ("value", Value::Expression(chain(column("g"), &[]))),
+            ],
+        );
+        let alone = select(vec![chain_of(
+            column("h"),
+            vec![call("Expr.max", Vec::new()), replace],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&alone, None, Stage::Rows, ANOTHER_LENGTH_OF_AN_AGGREGATE),
+            vec![]
+        );
+        // Another refusal, a place and the schema are not this one.
+        let windowed = windowed_replacement("b", column("g"), false);
+        assert_eq!(
+            refused_for_a_bound(&windowed, None, Stage::Rows, "invalid series dtype"),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(
+                &windowed,
+                Some(link_of("exprs", 0, 0)),
+                Stage::Rows,
+                ANOTHER_LENGTH_OF_AN_AGGREGATE
+            ),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(
+                &windowed,
+                None,
+                Stage::Schema,
+                ANOTHER_LENGTH_OF_AN_AGGREGATE
+            ),
+            vec![]
+        );
+    }
+
+    // ----- A struct with no fields
+
+    const NO_KEY: &str = "at least one key is required in a group_by operation";
+
+    fn tested_after_extracting(pattern: &str, test: &str) -> Case {
+        let extract = call(
+            "Expr.str.extract_groups",
+            vec![("pattern", Value::Pattern(pattern.to_owned()))],
+        );
+        select(vec![chain_of(
+            column("g"),
+            vec![extract, call(test, Vec::new())],
+        )])
+    }
+
+    #[test]
+    fn a_test_for_unique_values_is_excused_for_a_struct_with_no_fields() {
+        for name in [
+            "uncovered-a-struct-with-no-fields.case",
+            "uncovered-a-struct-with-no-fields--a-test-for-a-duplicate.case",
+        ] {
+            assert_eq!(
+                excused_by_kept(name),
+                vec![Limit::AStructWithNoFields],
+                "{name}"
+            );
+        }
+        for test in ["Expr.is_unique", "Expr.is_duplicated"] {
+            for stage in [Stage::Rows, Stage::Empty] {
+                assert_eq!(
+                    refused_for_a_bound(&tested_after_extracting("x", test), None, stage, NO_KEY),
+                    vec![Limit::AStructWithNoFields],
+                    "{test}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_group_by_without_a_key_is_not_excused_for_a_struct_with_a_field_nor_at_a_place() {
+        // The pattern has a group, so the control is the case itself, which shows nothing.
+        for pattern in ["(x)", "(?<n>x)"] {
+            assert_eq!(
+                refused_for_a_bound(
+                    &tested_after_extracting(pattern, "Expr.is_unique"),
+                    None,
+                    Stage::Rows,
+                    NO_KEY
+                ),
+                vec![],
+                "{pattern}"
+            );
+        }
+        // A refusal at a place, or the schema, or another reason is not this one.
+        let case = tested_after_extracting("x", "Expr.is_unique");
+        assert_eq!(
+            refused_for_a_bound(&case, Some(link_of("exprs", 0, 1)), Stage::Rows, NO_KEY),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Schema, NO_KEY),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, "invalid series dtype"),
+            vec![]
+        );
+    }
+
+    // ----- A literal text beside many replacement values
+
+    const ANOTHER_LENGTH: &str =
+        "replacement value length (0) does not match string column length (1)";
+
+    fn replacing_in(text_start: Call, value: Call) -> Case {
+        let replace = call(
+            "Expr.str.replace",
+            vec![
+                ("pattern", Value::Pattern("a|d".to_owned())),
+                ("value", Value::Expression(chain(value, &[]))),
+            ],
+        );
+        select(vec![chain_of(text_start, vec![replace])])
+    }
+
+    #[test]
+    fn a_value_of_another_length_is_excused_at_the_empty_table_for_a_replacement_of_a_literal() {
+        let text = call(
+            "polars.lit",
+            vec![("value", Value::String("1d".to_owned()))],
+        );
+        assert_eq!(
+            excused_by_kept("uncovered-a-literal-text-beside-many-replacement-values.case"),
+            vec![Limit::ALiteralTextBesideManyReplacementValues]
+        );
+        assert_eq!(
+            refused_for_a_bound(
+                &replacing_in(text, column("g")),
+                None,
+                Stage::Empty,
+                ANOTHER_LENGTH
+            ),
+            vec![Limit::ALiteralTextBesideManyReplacementValues]
+        );
+    }
+
+    #[test]
+    fn a_value_of_another_length_is_excused_at_the_rows_where_polars_runs_them_in_one_piece() {
+        // At one thread and at two Polars does not broadcast a literal over the rows either, and
+        // refuses the replacement for the lengths of the rows: three, or the two of a piece.
+        let text = call(
+            "polars.lit",
+            vec![("value", Value::String("1d".to_owned()))],
+        );
+        for reason in [
+            "replacement value length (3) does not match string column length (1)",
+            "replacement value length (2) does not match string column length (1)",
+        ] {
+            assert_eq!(
+                refused_for_a_bound(
+                    &replacing_in(text.clone(), column("g")),
+                    None,
+                    Stage::Rows,
+                    reason
+                ),
+                vec![Limit::ALiteralTextBesideManyReplacementValues],
+                "{reason}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_value_of_another_length_is_not_excused_for_a_column_nor_at_the_schema_nor_at_a_place() {
+        let text = || {
+            call(
+                "polars.lit",
+                vec![("value", Value::String("1d".to_owned()))],
+            )
+        };
+        // The text is a column: the control is the case itself, which shows nothing.
+        assert_eq!(
+            refused_for_a_bound(
+                &replacing_in(column("g"), column("h")),
+                None,
+                Stage::Empty,
+                ANOTHER_LENGTH
+            ),
+            vec![]
+        );
+        // Only the rows and the empty table hold the literal against a value: a schema holds none.
+        assert_eq!(
+            refused_for_a_bound(
+                &replacing_in(text(), column("g")),
+                None,
+                Stage::Schema,
+                ANOTHER_LENGTH
+            ),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(
+                &replacing_in(text(), column("g")),
+                Some(link_of("exprs", 0, 0)),
+                Stage::Empty,
+                ANOTHER_LENGTH
+            ),
+            vec![]
+        );
+        // Another refusal of the empty table is not this one.
+        assert_eq!(
+            refused_for_a_bound(
+                &replacing_in(text(), column("g")),
+                None,
+                Stage::Empty,
+                "invalid series dtype"
+            ),
+            vec![]
+        );
+    }
+
+    // ----- A replacement of more than the first match
+
+    const MORE_THAN_THE_FIRST: &str = "regex replacement with 'n > 1' not yet supported";
+    const MORE_THAN_THE_FIRST_OF_MANY: &str =
+        "multivalue replacement with 'n > 1' not yet supported";
+
+    fn replacing_matches(pattern: &str, count: Option<i64>, value: Expression) -> Case {
+        let mut given = vec![
+            ("pattern", Value::Pattern(pattern.to_owned())),
+            ("value", Value::Expression(value)),
+        ];
+        given.extend(count.map(|count| ("n", Value::Integer(count))));
+        select(vec![chain_of(
+            column("g"),
+            vec![call("Expr.str.replace", given)],
+        )])
+    }
+
+    #[test]
+    fn a_count_above_one_is_excused_for_a_replacement_of_a_pattern_or_of_many_values() {
+        for (reason, case) in [
+            (
+                MORE_THAN_THE_FIRST,
+                replacing_matches("x*", Some(2), chain(column("h"), &[])),
+            ),
+            (
+                MORE_THAN_THE_FIRST_OF_MANY,
+                replacing_matches("x", Some(3), chain(column("h"), &[])),
+            ),
+        ] {
+            for stage in [Stage::Rows, Stage::Empty] {
+                assert_eq!(
+                    refused_for_a_bound(&case, None, stage, reason),
+                    vec![Limit::AReplacementOfMoreThanTheFirstMatch],
+                    "{reason}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_count_above_one_is_not_excused_without_one_given_nor_by_another_refusal() {
+        // No count is given, or one that replaces the first match or none: the control is the
+        // case itself, or Polars refuses it still, so the count is no cause.
+        for count in [None, Some(1), Some(0), Some(-1)] {
+            let case = replacing_matches("x*", count, chain(column("h"), &[]));
+            assert_eq!(
+                refused_for_a_bound(&case, None, Stage::Rows, MORE_THAN_THE_FIRST),
+                vec![],
+                "{count:?}"
+            );
+        }
+        // A replacement of every match has no count, and another reason is no count's.
+        let case = replacing_matches("x*", Some(2), chain(column("h"), &[]));
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, "invalid series dtype"),
             vec![]
         );
     }

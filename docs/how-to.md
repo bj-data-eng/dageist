@@ -433,7 +433,11 @@ reads. A method with an expression parameter is checked by
 column for the operand, and holds the catalogue's `broadcasts` to whether the result is many values,
 so a parameter that Polars does not meet a receiver of one value with each value of, as one that takes
 one value only, has to say so with `not_broadcasting`. A test that cannot measure a parameter is
-listed there with the reason. Last, run the fuzz target for more seeds than the engine's tests do,
+listed there with the reason. A parameter of the [pattern kind](explanation.md#the-pattern-kind) is
+given the harness's pattern, one with a named group that every method of text accepts, wherever the
+generator of the tables builds the call; a pattern that names the fields of what the method gives, as
+`str.extract_groups` does, has its result named by the pattern at the walk and not by the table.
+Last, run the fuzz target for more seeds than the engine's tests do,
 [as below](#check-the-tables-against-polars).
 
 ## Refresh The Tables Of Allowed Combinations

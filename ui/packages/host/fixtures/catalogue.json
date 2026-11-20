@@ -38,11 +38,15 @@
     },
     {
       "key": "text",
-      "title": "str · case, trim, pad"
+      "title": "str · case, trim, pad, replace"
     },
     {
       "key": "pieces",
       "title": "str · slice, split, join, length"
+    },
+    {
+      "key": "search",
+      "title": "str · find, count, extract"
     },
     {
       "key": "window",
@@ -153,7 +157,8 @@
           "position": {
             "kind": "nested",
             "name": "condition.value"
-          }
+          },
+          "offered": true
         }
       ]
     },
@@ -191,7 +196,8 @@
           "position": {
             "kind": "nested",
             "name": "condition.predicate"
-          }
+          },
+          "offered": true
         },
         {
           "name": "constraints",
@@ -217,7 +223,8 @@
             "kind": "pairs",
             "entries": []
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -250,7 +257,8 @@
           "position": {
             "kind": "nested",
             "name": "condition.value"
-          }
+          },
+          "offered": true
         }
       ]
     },
@@ -290,7 +298,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -325,7 +334,8 @@
               }
             ]
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -416,7 +426,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -446,7 +457,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "strict",
@@ -470,7 +482,8 @@
             "kind": "flag",
             "value": false
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "wrap_numerical",
@@ -494,7 +507,8 @@
             "kind": "flag",
             "value": true
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -544,7 +558,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "upper_bound",
@@ -563,7 +578,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -628,7 +644,8 @@
             "kind": "flag",
             "value": true
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -663,7 +680,8 @@
             "kind": "flag",
             "value": true
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -698,7 +716,8 @@
             "kind": "flag",
             "value": true
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -778,7 +797,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -823,7 +843,8 @@
             "kind": "flag",
             "value": true
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -853,7 +874,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -883,7 +905,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -943,7 +966,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -973,7 +997,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "strategy",
@@ -1023,7 +1048,8 @@
             "kind": "word",
             "value": "forward"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "limit",
@@ -1043,7 +1069,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -1078,7 +1105,8 @@
             "kind": "flag",
             "value": true
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -1118,7 +1146,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -1149,7 +1178,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -1179,7 +1209,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -1209,7 +1240,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -1249,7 +1281,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "upper_bound",
@@ -1268,7 +1301,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "closed",
@@ -1310,7 +1344,8 @@
             "kind": "word",
             "value": "left"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -1340,7 +1375,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "abs_tol",
@@ -1365,7 +1401,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "rel_tol",
@@ -1390,7 +1427,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "nans_equal",
@@ -1414,7 +1452,8 @@
             "kind": "flag",
             "value": true
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -1549,7 +1588,8 @@
             "kind": "flag",
             "value": true
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -1579,7 +1619,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -1624,7 +1665,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -1664,7 +1706,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -1714,7 +1757,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -1744,7 +1788,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -1774,7 +1819,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -1804,7 +1850,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -1869,7 +1916,8 @@
               }
             ]
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -1907,7 +1955,8 @@
           "position": {
             "kind": "nested",
             "name": "over.partition_by"
-          }
+          },
+          "offered": true
         },
         {
           "name": "more_exprs",
@@ -1934,7 +1983,8 @@
           "position": {
             "kind": "nested",
             "name": "over.partition_by"
-          }
+          },
+          "offered": true
         },
         {
           "name": "order_by",
@@ -1961,7 +2011,8 @@
           "position": {
             "kind": "nested",
             "name": "over.order_by"
-          }
+          },
+          "offered": true
         },
         {
           "name": "descending",
@@ -1985,7 +2036,8 @@
             "kind": "flag",
             "value": true
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "nulls_last",
@@ -2009,7 +2061,8 @@
             "kind": "flag",
             "value": true
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "mapping_strategy",
@@ -2047,7 +2100,8 @@
             "kind": "word",
             "value": "join"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -2077,7 +2131,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -2117,7 +2172,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "new",
@@ -2136,7 +2192,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -2166,7 +2223,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "new",
@@ -2185,7 +2243,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "default",
@@ -2204,7 +2263,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "return_dtype",
@@ -2223,7 +2283,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -2259,7 +2320,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "mode",
@@ -2293,7 +2355,8 @@
             "kind": "word",
             "value": "half_away_from_zero"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -2324,7 +2387,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -2359,7 +2423,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "fill_value",
@@ -2378,7 +2443,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -2423,6 +2489,145 @@
       "parameters": []
     },
     {
+      "id": "Expr.str.contains",
+      "applies": "expression",
+      "family": "compare",
+      "name": "str.contains",
+      "hint": "true where the text has a match for a pattern",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "pattern",
+          "shown": "pattern",
+          "label": "matches",
+          "kind": {
+            "kind": "pattern",
+            "plainTextFlag": "literal"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "literal",
+          "shown": "literal",
+          "label": "as plain text",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "strict",
+          "shown": "strict",
+          "label": "refuse a bad pattern",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": true
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": true
+          },
+          "start": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": false
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.count_matches",
+      "applies": "expression",
+      "family": "search",
+      "name": "str.count_matches",
+      "hint": "how many times a pattern matches in the text",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "pattern",
+          "shown": "pattern",
+          "label": "pattern",
+          "kind": {
+            "kind": "pattern",
+            "plainTextFlag": "literal"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "literal",
+          "shown": "literal",
+          "label": "as plain text",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "Expr.str.ends_with",
       "applies": "expression",
       "family": "compare",
@@ -2448,7 +2653,222 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.escape_regex",
+      "applies": "expression",
+      "family": "text",
+      "name": "str.escape_regex",
+      "hint": "put a backslash before each character that has a meaning in a pattern",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.str.extract",
+      "applies": "expression",
+      "family": "search",
+      "name": "str.extract",
+      "hint": "the text one group of the first match holds, nothing where there is none",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "pattern",
+          "shown": "pattern",
+          "label": "pattern",
+          "kind": {
+            "kind": "pattern",
+            "plainTextFlag": null
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "group_index",
+          "shown": "group_index",
+          "label": "group number",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 1
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 1,
+            "shown": "1"
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.extract_all",
+      "applies": "expression",
+      "family": "search",
+      "name": "str.extract_all",
+      "hint": "a list of every match of a pattern",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "pattern",
+          "shown": "pattern",
+          "label": "pattern",
+          "kind": {
+            "kind": "pattern",
+            "plainTextFlag": null
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.extract_groups",
+      "applies": "expression",
+      "family": "search",
+      "name": "str.extract_groups",
+      "hint": "a struct of the text each group of a pattern matched, its fields named as the groups are",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "pattern",
+          "shown": "pattern",
+          "label": "pattern",
+          "kind": {
+            "kind": "pattern",
+            "plainTextFlag": null
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.find",
+      "applies": "expression",
+      "family": "search",
+      "name": "str.find",
+      "hint": "where a pattern first matches, in bytes from the start, nothing where it does not",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "pattern",
+          "shown": "pattern",
+          "label": "pattern",
+          "kind": {
+            "kind": "pattern",
+            "plainTextFlag": "literal"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "literal",
+          "shown": "literal",
+          "label": "as plain text",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "strict",
+          "shown": "strict",
+          "label": "refuse a bad pattern",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": true
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": true
+          },
+          "start": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": false
         }
       ]
     },
@@ -2478,7 +2898,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -2514,7 +2935,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "ignore_nulls",
@@ -2538,7 +2960,8 @@
             "kind": "flag",
             "value": false
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -2588,7 +3011,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "fill_char",
@@ -2613,7 +3037,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -2643,7 +3068,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "fill_char",
@@ -2668,7 +3094,188 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.replace",
+      "applies": "expression",
+      "family": "text",
+      "name": "str.replace",
+      "hint": "replace the first match of a pattern, or the first n, by a text where $1 and ${name} stand for what a group matched",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "pattern",
+          "shown": "pattern",
+          "label": "pattern",
+          "kind": {
+            "kind": "pattern",
+            "plainTextFlag": "literal"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "value",
+          "shown": "value",
+          "label": "with",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "literal",
+          "shown": "literal",
+          "label": "as plain text",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "n",
+          "shown": "n",
+          "label": "how many",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 1
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 1,
+            "shown": "1"
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.replace_all",
+      "applies": "expression",
+      "family": "text",
+      "name": "str.replace_all",
+      "hint": "replace every match of a pattern by a text where $1 and ${name} stand for what a group matched",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "pattern",
+          "shown": "pattern",
+          "label": "pattern",
+          "kind": {
+            "kind": "pattern",
+            "plainTextFlag": "literal"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "value",
+          "shown": "value",
+          "label": "with",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "literal",
+          "shown": "literal",
+          "label": "as plain text",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -2708,7 +3315,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "length",
@@ -2727,7 +3335,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -2757,7 +3366,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "inclusive",
@@ -2781,7 +3391,8 @@
             "kind": "flag",
             "value": true
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "literal",
@@ -2805,7 +3416,8 @@
             "kind": "flag",
             "value": false
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "strict",
@@ -2829,7 +3441,8 @@
             "kind": "flag",
             "value": false
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -2859,7 +3472,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -2889,7 +3503,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -2919,7 +3534,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -2949,7 +3565,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -2979,7 +3596,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -3009,7 +3627,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -3039,7 +3658,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -3099,7 +3719,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -3129,7 +3750,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -3189,7 +3811,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -3225,7 +3848,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -3255,7 +3879,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -3293,7 +3918,8 @@
           "position": {
             "kind": "outer",
             "name": "filter"
-          }
+          },
+          "offered": true
         },
         {
           "name": "constraints",
@@ -3319,7 +3945,8 @@
             "kind": "pairs",
             "entries": []
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -3349,7 +3976,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "on",
@@ -3376,7 +4004,8 @@
           "position": {
             "kind": "outer",
             "name": "join_left"
-          }
+          },
+          "offered": true
         },
         {
           "name": "how",
@@ -3430,7 +4059,8 @@
             "kind": "word",
             "value": "left"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "left_on",
@@ -3457,7 +4087,8 @@
           "position": {
             "kind": "outer",
             "name": "join_left"
-          }
+          },
+          "offered": true
         },
         {
           "name": "right_on",
@@ -3484,7 +4115,8 @@
           "position": {
             "kind": "outer",
             "name": "join_right"
-          }
+          },
+          "offered": true
         },
         {
           "name": "suffix",
@@ -3509,7 +4141,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "validate",
@@ -3551,7 +4184,8 @@
             "kind": "word",
             "value": "m:1"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "nulls_equal",
@@ -3575,7 +4209,8 @@
             "kind": "flag",
             "value": true
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "coalesce",
@@ -3595,7 +4230,8 @@
             "kind": "flag",
             "value": true
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "maintain_order",
@@ -3637,7 +4273,8 @@
             "kind": "word",
             "value": "none"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "build_side",
@@ -3683,7 +4320,8 @@
             "kind": "word",
             "value": "prefer_left"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "allow_parallel",
@@ -3707,7 +4345,8 @@
             "kind": "flag",
             "value": false
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "force_parallel",
@@ -3731,7 +4370,8 @@
             "kind": "flag",
             "value": true
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -3761,7 +4401,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "on_columns",
@@ -3780,7 +4421,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "index",
@@ -3799,7 +4441,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "values",
@@ -3818,7 +4461,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "aggregate_function",
@@ -3840,7 +4484,8 @@
           "position": {
             "kind": "outer",
             "name": "pivot_aggregate"
-          }
+          },
+          "offered": true
         },
         {
           "name": "maintain_order",
@@ -3864,7 +4509,8 @@
             "kind": "flag",
             "value": true
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "separator",
@@ -3889,7 +4535,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "column_naming",
@@ -3923,7 +4570,8 @@
             "kind": "word",
             "value": "combine"
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -3961,7 +4609,8 @@
             "kind": "pairs",
             "entries": []
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "strict",
@@ -3985,7 +4634,8 @@
             "kind": "flag",
             "value": false
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -4023,7 +4673,8 @@
           "position": {
             "kind": "outer",
             "name": "select"
-          }
+          },
+          "offered": true
         },
         {
           "name": "named_exprs",
@@ -4052,7 +4703,8 @@
           "position": {
             "kind": "outer",
             "name": "select"
-          }
+          },
+          "offered": true
         }
       ]
     },
@@ -4090,7 +4742,8 @@
           "position": {
             "kind": "outer",
             "name": "sort"
-          }
+          },
+          "offered": true
         },
         {
           "name": "more_by",
@@ -4117,7 +4770,8 @@
           "position": {
             "kind": "outer",
             "name": "sort"
-          }
+          },
+          "offered": true
         },
         {
           "name": "descending",
@@ -4142,7 +4796,8 @@
             "kind": "flag",
             "value": true
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "nulls_last",
@@ -4167,7 +4822,8 @@
             "kind": "flag",
             "value": true
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "maintain_order",
@@ -4191,7 +4847,8 @@
             "kind": "flag",
             "value": true
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "multithreaded",
@@ -4215,7 +4872,8 @@
             "kind": "flag",
             "value": false
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -4253,7 +4911,8 @@
           "position": {
             "kind": "outer",
             "name": "select"
-          }
+          },
+          "offered": true
         },
         {
           "name": "named_exprs",
@@ -4282,7 +4941,8 @@
           "position": {
             "kind": "outer",
             "name": "select"
-          }
+          },
+          "offered": true
         }
       ]
     },
@@ -4315,7 +4975,8 @@
           "position": {
             "kind": "nested",
             "name": "condition.value"
-          }
+          },
+          "offered": true
         }
       ]
     },
@@ -4353,7 +5014,8 @@
           "position": {
             "kind": "nested",
             "name": "condition.predicate"
-          }
+          },
+          "offered": true
         },
         {
           "name": "constraints",
@@ -4379,7 +5041,8 @@
             "kind": "pairs",
             "entries": []
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -4412,7 +5075,8 @@
           "position": {
             "kind": "nested",
             "name": "condition.value"
-          }
+          },
+          "offered": true
         }
       ]
     },
@@ -4442,7 +5106,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "more_names",
@@ -4466,7 +5131,8 @@
               }
             ]
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -4507,7 +5173,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "dtype",
@@ -4526,7 +5193,8 @@
           "start": {
             "kind": "unset"
           },
-          "position": null
+          "position": null,
+          "offered": true
         },
         {
           "name": "allow_object",
@@ -4550,7 +5218,8 @@
             "kind": "flag",
             "value": true
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     },
@@ -4588,7 +5257,8 @@
           "position": {
             "kind": "nested",
             "name": "condition.predicate"
-          }
+          },
+          "offered": true
         },
         {
           "name": "constraints",
@@ -4614,7 +5284,8 @@
             "kind": "pairs",
             "entries": []
           },
-          "position": null
+          "position": null,
+          "offered": true
         }
       ]
     }

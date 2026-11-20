@@ -235,6 +235,8 @@ pub(crate) enum TypedRequest {
     },
     /// A Polars duration string.
     Duration,
+    /// A regular expression.
+    Pattern,
     /// A file, folder or cloud location.
     Path,
 }
@@ -245,6 +247,7 @@ impl From<TypedRequest> for Typed {
             TypedRequest::Expression => Self::Expression,
             TypedRequest::Value { value_type } => Self::Value(value_type.into()),
             TypedRequest::Duration => Self::Duration,
+            TypedRequest::Pattern => Self::Pattern,
             TypedRequest::Path => Self::Path,
         }
     }
@@ -298,6 +301,9 @@ struct EntryOfferView {
     /// The first parameter a method that may stand starts without giving, which holds what
     /// Polars gives it when it is not given: the method is complete as it starts.
     left_out: Option<&'static str>,
+    /// The parameters a method that may stand starts with as slots to fill, besides its argument:
+    /// those a step must give and Polars gives no default.
+    slots: Vec<&'static str>,
 }
 
 /// Every call that stands in an expression, offered or refused at a place.
@@ -438,11 +444,17 @@ pub fn offers_view(
                 .is_allowed()
                 .then(|| allowed::left_out_at_start(entry))
                 .flatten();
+            let slots = if offer.verdict().is_allowed() {
+                allowed::slots_at_start(entry)
+            } else {
+                Vec::new()
+            };
             EntryOfferView {
                 entry: entry.id().as_str(),
                 verdict: verdict_view(offer.verdict()),
                 argument,
                 left_out,
+                slots,
             }
         })
         .collect();

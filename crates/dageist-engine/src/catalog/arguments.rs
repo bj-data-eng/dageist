@@ -4,7 +4,17 @@ use std::collections::BTreeMap;
 
 use polars::prelude::{DataType, Expr, LazyFrame, PolarsError};
 
-use super::{Entry, Kind, Parameter, Shape, ValueType};
+use super::{Entry, Kind, Parameter, PatternError, Shape, ValueType, check_pattern};
+
+/// What the text of a pattern stands for: a regular expression, or, where a flag such as `literal`
+/// says so, plain text that matches itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PatternMeans {
+    /// A regular expression, which must be one Polars can compile.
+    RegularExpression,
+    /// Plain text, which is never refused.
+    PlainText,
+}
 
 /// One filled-in argument, ready for Polars. Its variant follows the
 /// parameter's kind; a parameter of shape many or per item holds `Many`.
@@ -28,6 +38,8 @@ pub enum Argument {
     Dtype(DataType),
     /// A Polars duration string.
     Duration(String),
+    /// A regular expression, as typed: whether it is one is asked when the entry is built.
+    Pattern(String),
     /// A frame from the graph.
     Table(LazyFrame),
     /// A file, folder or cloud location.
@@ -50,6 +62,7 @@ impl Argument {
             Self::Choice(_) => "a choice",
             Self::Dtype(_) => "a dtype",
             Self::Duration(_) => "a duration",
+            Self::Pattern(_) => "a pattern",
             Self::Table(_) => "a table",
             Self::Path(_) => "a path",
             Self::Pairs(_) => "pairs",
@@ -107,6 +120,13 @@ pub enum BuildError {
         /// The state it was given.
         found: &'static str,
     },
+    /// A pattern that Polars cannot compile as a regular expression.
+    NotAPattern {
+        /// The parameter's name.
+        parameter: &'static str,
+        /// What Polars said of it.
+        error: PatternError,
+    },
     /// Polars refused the arguments.
     Polars(PolarsError),
 }
@@ -139,6 +159,12 @@ impl std::fmt::Display for BuildError {
                     "this needs a {expected} before it, not a {found}"
                 )
             }
+            Self::NotAPattern { parameter, error } => {
+                write!(
+                    formatter,
+                    "{parameter} is not a valid regular expression: {error}"
+                )
+            }
             Self::Polars(error) => write!(formatter, "{error}"),
         }
     }
@@ -147,6 +173,7 @@ impl std::fmt::Display for BuildError {
 impl std::error::Error for BuildError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            Self::NotAPattern { error, .. } => Some(error),
             Self::Polars(error) => Some(error),
             _ => None,
         }
@@ -308,6 +335,32 @@ impl Arguments {
         }
     }
 
+    /// The pattern given for the required `parameter`, as it was typed. Where it `means` plain text
+    /// the text is no regular expression and is given as it is; otherwise Polars is asked whether
+    /// it is one, which is the reason it is refused with where it is not.
+    ///
+    /// # Errors
+    ///
+    /// When none was given, another kind of argument was, or the text is a pattern that Polars
+    /// cannot compile.
+    pub fn pattern(
+        &self,
+        parameter: &'static str,
+        means: PatternMeans,
+    ) -> Result<String, BuildError> {
+        match self.get(parameter) {
+            None => Err(BuildError::Missing { parameter }),
+            Some(Argument::Pattern(text)) => {
+                if means == PatternMeans::RegularExpression {
+                    check_pattern(text)
+                        .map_err(|error| BuildError::NotAPattern { parameter, error })?;
+                }
+                Ok(text.clone())
+            }
+            Some(other) => Err(Self::wrong(parameter, "a pattern", other)),
+        }
+    }
+
     /// The word given for `parameter`, checked against `words`, or `default`.
     ///
     /// # Errors
@@ -378,6 +431,7 @@ const fn expects(kind: Kind) -> &'static str {
         Kind::Choice(_) => "a choice",
         Kind::Dtype => "a dtype",
         Kind::Duration => "a duration",
+        Kind::Pattern => "a pattern",
         Kind::Table => "a table",
         Kind::Path => "a path",
         Kind::Pairs(..) => "pairs",
@@ -399,6 +453,7 @@ fn check_kind(parameter: &'static str, kind: Kind, argument: &Argument) -> Resul
         | (Kind::Flag, Argument::Flag(_))
         | (Kind::Dtype, Argument::Dtype(_))
         | (Kind::Duration, Argument::Duration(_))
+        | (Kind::Pattern, Argument::Pattern(_))
         | (Kind::Table, Argument::Table(_))
         | (Kind::Path, Argument::Path(_)) => Ok(()),
         (Kind::Choice(words), Argument::Choice(word)) => {

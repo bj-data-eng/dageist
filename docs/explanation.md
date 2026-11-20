@@ -264,7 +264,7 @@ dtypes are not stored, because Polars works them out from a schema without
 reading data; which combinations Polars allows is kept in
 [tables](#which-combinations-polars-allows) beside it.
 
-Every parameter is one of ten kinds, and the view has one way of drawing
+Every parameter is one of eleven kinds, and the view has one way of drawing
 each, so a new operation needs data rather than a new look:
 
 | Kind | Holds |
@@ -276,6 +276,7 @@ each, so a new operation needs data rather than a new look:
 | choice | One word of a closed set. |
 | dtype | A Polars dtype. |
 | duration | A Polars duration such as `1mo`. |
+| pattern | A regular expression, in the syntax of Rust's `regex` crate that Polars uses, typed in; see [the pattern kind](#the-pattern-kind). |
 | table | A frame from the graph. |
 | path | A file, folder or cloud location. |
 | pairs | Key and value entries, each side of its own kind. |
@@ -436,19 +437,21 @@ What Polars does with each is what the tables say, and some of it is not what a 
   refuses `new` of many values beside an `old` of one, and a `default` of many beside a value of
   one, which the walk knows from the shapes and holds to a rule.
 
-The methods of text are two families beside these, and two more stand in Comparison. Each is
+The methods of text are three families beside these, and three tests stand in Comparison. Each is
 Polars' own name with `str.` in front of it, as `dt.` is for dates and times, and the editor shows
 it so: `str.to_lowercase`, `str.strip_chars`, `str.zfill`, and the rest. Text holds the methods
 that give text: the case (`str.to_lowercase`, `str.to_uppercase`, `str.to_titlecase`), the trims
 (`str.strip_chars`, `str.strip_chars_start`, `str.strip_chars_end`, `str.strip_prefix`,
-`str.strip_suffix`), the padding (`str.pad_start`, `str.pad_end`, `str.zfill`) and `str.reverse`.
-Pieces holds the methods that take text apart or measure it: `str.slice`, `str.head` and
-`str.tail`, the lengths `str.len_chars` and `str.len_bytes`, `str.split` and `str.join`. The two
+`str.strip_suffix`), the padding (`str.pad_start`, `str.pad_end`, `str.zfill`), `str.reverse`, and,
+with the methods that take a pattern [below](#the-pattern-kind), `str.replace`, `str.replace_all` and
+`str.escape_regex`. Pieces holds the methods that take text apart or measure it: `str.slice`, `str.head` and
+`str.tail`, the lengths `str.len_chars` and `str.len_bytes`, `str.split` and `str.join`. The
 tests, `str.starts_with` and `str.ends_with`, give true or false, so they stand in Comparison with
-`is_between` and `is_close`, where a person who wants a filter looks first. One family of
-nineteen methods would be the longest list the popover shows, which is how a method is found by
-its name; two of twelve and seven keep each short, with what changes text apart from what
-measures or splits it, and a method is swapped for another of its family that takes the same
+`is_between` and `is_close`, where a person who wants a filter looks first, as does `str.contains`.
+One family of the methods that give text, take it apart or measure it would be the longest list the
+popover shows, which is how a method is found by its name; Text of fifteen, Pieces of seven and Search
+of five keep each short, with what changes text apart from what measures or splits it and from what
+finds a pattern in it, and a method is swapped for another of its family that takes the same
 arguments, as the three cases take none and the three trims take `characters`. The hints are
 where the plain words go: "length in characters", "add zeros at the start up to a length".
 
@@ -498,17 +501,108 @@ What Polars does with each is what the tables say, and some of it is not what a 
   continuation that casts the key to the dtype of the other table's key, which a list, an array or
   a struct cannot be, so such a call is measured as the end of the chain, with the other key the
   dtype the key has.
-- `str.split` is offered with `literal` true only. A split by a pattern waits for the kind of
-  parameter that holds a pattern, which the next batch of text methods adds with `contains` and
-  `replace`, and until then the build refuses `literal` set to false with the reason that it
-  waits, which the option table records at the schema, so the editor refuses the word with that
-  reason. `strict` is for a pattern, so beside a literal split it changes nothing, as in Python.
-  When the kind exists, `literal` false builds `split_regex` and `split_regex_inclusive`, and the
-  refusal and the table lines it left go with it. The table has no line for an option of a method
-  that has several alone, only for each pair of them, so an option set alone is judged by the
-  lines that pair its word with the others at their defaults, and refused when Polars refuses the
-  pair; a step's lines are not read so, for they are measured with the arguments the harness
-  gives the step.
+- `str.split` splits at plain text where `literal` is true, as Python's default has it, and at each
+  match of a pattern where it is false, which Polars builds as its regex split, with the match kept
+  by `inclusive`. `strict` is for a pattern: where the separator is no regex, a strict split is
+  refused when rows run and one that is not strict gives a null, so beside plain text `strict`
+  changes nothing, as in Python. The separator is an expression, which may be a column of patterns, so
+  it is not a parameter of the pattern kind. Where it is text typed in and `literal` is false it is held to
+  a pattern as one is: refused at the separator, with Polars' words, by the build and by the rule
+  `pattern-is-valid`, whatever `strict` says. A separator that is a column is Polars' to check, row by row,
+  when the rows run and not when the step is built, and `strict` decides there whether a row that is no
+  regex is refused or gives a null. The table has no line for an option of a method that has several alone, only
+  for each pair of them, so an option set alone is judged by the lines that pair its word with the
+  others at their defaults, and refused when Polars refuses the pair; a step's lines are not read
+  so, for they are measured with the arguments the harness gives the step.
+
+### The Pattern Kind
+
+The methods of text that look for or replace what matches a regular expression take their pattern as a
+parameter of a kind of its own, so that the editor knows which parameters hold one, as the designer
+of patterns will ([issue 96](https://github.com/bj-data-eng/dageist/issues/96)). Polars takes a pattern as an
+expression, which may be a column of them, and the catalogue holds one that is typed in: a column of
+patterns is not offered. The pattern is Polars' own regex: Rust's `regex` crate, compiled with the settings
+Polars compiles it with, which the engine does not repeat.
+
+How the engine knows a pattern is valid is to ask Polars. `str.extract_groups` is the one method
+that compiles its pattern when it is built, and not when rows run, for the groups of the pattern name
+the fields of the struct it gives. `check_pattern` builds that call on the text and gives Polars'
+reason where it refuses, in Polars' words, which place the error in the pattern: an unclosed group,
+an unclosed class, a repetition whose end comes before its start, a group named twice, a flag or a
+property that does not exist, an escape with nothing after it, or a regex that compiles to more than
+Polars' size limit. The same compile is what a method of text that takes a pattern runs when it meets the
+rows, so what it refuses is, nearly always, what each would refuse, and the dtypes and the rows are not
+asked. Not always: `contains` takes a fast path for a pattern that is a chain of literals, which it never
+compiles, so a very large chain written with a flag such as `(?s)` that Polars accepts there is refused here
+for the size limit of the compile it does not make. A dependency on `regex` or `regex-syntax` was not needed.
+
+- A pattern is refused where it is built, at the parameter that holds it, with Polars' reason, and
+  where the walk asks, by the named rule `pattern-is-valid`, which says it in its own words followed by
+  Polars': a step that holds a half-typed pattern is a document, and is reported as refused at the
+  pattern, whatever follows it. A pattern is refused whatever `strict` says: that flag is for a
+  column of patterns, where a row's may be none, and a typed one is held to what Polars accepts. The `strict` of `str.contains` and `str.find` is
+  therefore kept in the catalogue for Python's signature and not offered, which a parameter's `offered` says, and
+  the editor does not list it; that of `str.split` is offered, for a separator that is a column.
+- The flag `literal`, where Polars has one (`str.contains`, `str.count_matches`, `str.find`,
+  `str.replace` and `str.replace_all`), makes the pattern plain text. The catalogue names it as the
+  pattern parameter's plain-text flag, the build reads the pattern as a regular expression only
+  where the flag is not true, and the walk tells `offer` a pattern only where it is one. A pattern
+  that no flag makes plain text, as that of `str.extract`, is always a regular expression.
+- The kind is read from a typed text as the text typed, with no dtype. Whether it is a regular
+  expression depends on the flag, which the step knows and the slot does not, so the step says
+  it, with its reason, where it is built.
+- `str.split` takes its separator as an expression, which may be a column of patterns, so the
+  separator is not of the pattern kind. Text typed in as the separator is held to a pattern where
+  `literal` is false, as one is; a column of them is Polars' to check when the rows run.
+
+What the methods are, and the families that hold them. Each is Polars' own name with `str.` in front of it.
+`str.contains`, a test that gives true or false, stands in Comparison with `str.starts_with`, where a person
+who wants a filter looks first. `str.find`, `str.count_matches`, `str.extract`, `str.extract_all` and
+`str.extract_groups` are a family of their own, Search, since each takes the pattern and gives what it
+found, a place, a count, a piece, the pieces or the groups, and a method is swapped for another of its
+family that takes the same arguments, so the pattern stays when what is wanted of it changes. `str.replace`,
+`str.replace_all` and `str.escape_regex` give text, so they are in Text, which has fifteen methods, as many as
+Trigonometry and Comparison, and fewer than the longest list one family of all the methods of text would be.
+
+What Polars does with each is what the tables say, and some of it is not what a name suggests:
+
+- `str.find` gives the place in bytes from the start, as Polars does, so a character of two bytes before the
+  match makes it two further than the characters say, and nothing where there is no match. `str.count_matches` gives a
+  `UInt32`, and every method of text refuses what is no text, a `Null` among them, at the stage the tables show.
+- `str.extract` takes a group number, `group_index`, whose default is 1, 0 the whole match and a group
+  the pattern lacks a null. Python's binding takes it as an unsigned whole number, so a negative one is refused by the build.
+- `str.replace` replaces the first `n` matches and `str.replace_all` every one. Where the pattern is a regular
+  expression, `$1` and `${name}` in what replaces stand for the text of a group of the match and `$$` for a
+  dollar sign, which the hints of both say; given as plain text, by `literal`, the text means what it says.
+  `n` is a whole number; below zero Polars replaces them all. Polars refuses a count above one of a pattern
+  that has an ASCII punctuation mark, which it takes for a regular expression (one with none is taken as plain
+  text, as `literal` makes it), or of a value that is many values, and the tables measured the first match, so a
+  limit holds it.
+- What replaces is an expression, and Polars meets a text of one value that is an aggregate with each of the
+  many values of it in a select, as it does the operand of any other method of text, but not in the order key of
+  a window or a key inside it, where its streaming engine refuses the lengths at every thread count, which a limit
+  holds. A literal text beside many is refused by Polars for a table with no rows, and for the rows where a piece of them
+  has more rows than the literal's one (see the limit below), which the tables count as refused where they
+  measure a column beside a literal, so the broadcast test measures the value with an aggregate of the column as the receiver.
+  `str.replace_all` refuses a value that is null where Polars reads the value as
+  one value, a literal, and in a piece of one row where the streaming engine splits the rows into pieces, which
+  depends on how many threads share them and how many rows there are; a limit holds it.
+- `str.extract_groups` gives a struct whose fields are named by the groups of the pattern, the name a group has or its number where it has none, each of
+  text. What it gives depends on the pattern and not on the dtype it follows alone, so
+  the dtype table, measured with one pattern, does not say it: `offer` gives no dtype until it is told the
+  pattern, and then the dtype Polars works out from the schema of the call with that pattern, such as
+  `Struct(year: String, 2: String)`, so the report, the walk and the offers name the fields. A pattern with no
+  groups gives a struct with no fields, which Polars cannot group by: it refuses a test for a value that is
+  unique or duplicated of one, though the tables measured the struct on two fields, so a limit holds it, and
+  the first and the last of one panic on the streaming engine, which the limit for a panic holds. The fields are
+  read with `struct.field`, which is not catalogued yet: the walk knows what the call gives, and a chain that
+  goes on from it is judged as one that follows a struct of two fields.
+- `str.escape_regex` puts a backslash before each character that has a meaning in a pattern. Python's
+  `polars.escape_regex` gives a Python string, and not an expression, so it is no start the catalogue has, and
+  is left out as never offered: `literal` and the method give a step what it needs.
+- Left for later: `str.contains_any`, `str.replace_many`, `str.extract_many` and `str.find_many`, which take a
+  list of literal patterns that Polars matches all at once, wait for a kind that holds a list of texts, typed or
+  connected; `str.split_exact` and `str.splitn` give a struct that waits for `struct.field`.
 
 The catalogue holds the seven steps, the expression methods the storyboard
 uses, the aggregates `sum`, `min`, `max` and `len`, the six comparisons and the six
@@ -524,7 +618,14 @@ it, and draws every parameter by its kind. A method's first expression
 parameter is written inline. Any other parameter of a method or step is an
 option: the list its name opens offers the rest by name. The editor writes
 every option that is set into the document; the engine decides which are at
-their default. A step's own parameters are drawn by kind too: sort's keys and
+their default. A parameter that a step must give and Polars gives no default, beyond that first one, is not
+left to be found in that list: the engine names it as a slot the method starts with (`slots` in the
+offers, from `slots_at_start`), and the editor starts the method with an option for each, set to what is
+still to be given. They are the pattern of the methods that take one, what `str.replace` puts in place of
+a match, the dtype a `cast` gives and `is_between`'s upper bound. A slot that takes an expression is a hole
+until it is picked, so the engine walks the step up to it; one that takes a literal has nothing to stand for
+it in the document, so the step waits, with the reason, until it is given. A parameter that has a default, or that
+Python leaves to `None`, stays an option to add. A step's own parameters are drawn by kind too: sort's keys and
 their per-item `descending`, select's expressions, join's table, keys and
 `how`, a rename's pairs, and a pivot's aggregate, which is a chain from
 `pl.element()`. A new
@@ -633,7 +734,7 @@ to judge yet, so that list offers them unjudged.
 
 The view sends the text it was given with what it is typed into, which is the
 kind of the parameter as the catalogue writes it (an expression, a literal of a
-type, a duration or a path) and, for an expression, the slot it stands in. It
+type, a duration, a pattern or a path) and, for an expression, the slot it stands in. It
 holds no pattern of a number, a date or a duration and no word for a dtype. The
 engine's `read_typed` answers with each way the slot reads the text, in the
 order the slot offers them: the literal the document would hold, the dtype
@@ -669,6 +770,9 @@ or, for a text the slot does not take, why not. Nothing typed reads as nothing.
   literal the document holds, so a date reading has the dtype `Date` and its
   `fit` is that of the `String` that carries it; this changes when the document
   holds a date.
+- **A pattern** is read as typed, with no dtype, whatever it holds: whether it is a regular expression
+  depends on a flag the slot does not know, and a pattern half typed is the person's to finish. The step says,
+  with Polars' reason and at the pattern, where one is none.
 - **Text** is read as typed, with the dtype `String`, or with none for a path.
 
 Where a slot is both the start of an expression and the argument of a method, as
@@ -950,6 +1054,7 @@ and referenced from the lines of the context table they govern:
 | `element-only-in-pivot-aggregate` | `polars.element` stands only in a pivot's aggregate. Polars refuses it elsewhere, but as a panic when the table is sorted. |
 | `join-key-names-are-not-repeated` | A join pairs no two output column names twice. Polars names a key by the column its chain starts from, whatever methods follow it, `literal` for a literal and by its first value for a condition, and refuses a join in which the key of one side and the key it is paired with repeat the names of an earlier pair: `left_on=[k, k.sum()]` with `right_on=[rk, rk.sum()]` is refused, and with `right_on=[rk, ra]` is not, for the pairs differ. A name repeated on one side only is allowed. `on` pairs each key with itself. An alias is refused in a join's key by Polars, and the catalogue holds none. The rule is asked by the walk, which finds the names of the whole join and places the refusal at the later left key that makes the pair again. Polars pairs the keys after expanding each side, so a key that may expand to several columns (a `col` of several names or a pattern), a key that starts from an input or is not picked yet (a hole), and an item that is no expression shift every pair after them. The rule judges only the pairs before the first such key on either side, and none after it. |
 | `key-is-elementwise` | A join's own key holds no aggregate beside a column and no column compared with a null literal, `is_between` being two comparisons of its value with each bound, so a bound that is a null literal with no dtype is one and a null it follows, or a bound of a dtype, is not. Polars refuses such a key as not elementwise: it folds a comparison with a null literal into a null, at any depth, in an operand, before a method or in a condition's predicate, and a key whose column has gone is not elementwise. A key holds no replacement whose old or new values read a column, which Polars calls elementwise only where they are literals, except where a fold drops it as it drops an aggregate: `a.replace_strict(old=b, new=1).sum() < null` in a condition's predicate is taken, for Polars never evaluates the replacement, and the same replacement given a number to compare with is refused. A subtraction with a null does not drop an aggregate it follows or is given: `k != f.len() - null` is refused. Nor does a fold drop a side that is more than one value or literals alone: `(k - a.sum()) > (b.first() == null)` is refused, for Polars evaluates the side that holds a column beside the aggregate. It allows a key that is wholly an aggregate, a null alone, a comparison of literals, a null beside a column that is not compared, an aggregate compared with a null, a column compared with a null inside the one value that a comparison of a null is given (`null != (f != null).min()` is a null whatever it is given, and `null != f` leaves a null where a column was), a column compared with a null that a later comparison with a null drops with the one value it follows (`(null > h).last() >= null` drops `null > h`, which `(null > h) >= null` does not), and in the key of a window in a select, a filter or a sort an aggregate beside a column. `and_` and `or_` given no operand are the expression they follow, so a null followed by one is still the null a comparison is given, and a comparison that follows it is the first Polars meets. A comparison of missing values, `eq_missing` or `ne_missing`, with a whole number that some dtype cannot hold, below zero or above 127, is one Polars decides at once where the dtype of what it compares cannot hold the number, as an unsigned count cannot hold one below zero, so what it follows is a literal and an aggregate in it is not met: `len() ne_missing -1` less a column is taken, and a number from zero to 127, or any other comparison, is not decided, so the key is refused; which dtype it is the document does not decide, so a limit covers it. A column of the dtype Null holds a null in every row, so comparing it with a null or a column leaves no value of it to replace, though it is a column to an aggregate beside it. The rule holds what the evidence settles. What Polars does with a comparison with what an earlier one folded depends on dtypes that the document does not decide, so a limit covers it, and so does an interval with a null bound of a dtype or a whole number below zero as a bound. The context table measured an entry as the whole key, and what a key holds is a matter of the whole expression, so the caller that walks it asks `rule_forbids_a_key_known_not_elementwise`. |
+| `pattern-is-valid` | A pattern is a regular expression Polars can compile, unless a flag such as `literal` makes it plain text. The rule is not a combination of dtypes the tables measure but a value, so it asks Polars: the walk gives `offer` the patterns a call is given, and `offer` refuses one that `check_pattern` refuses, in the rule's words followed by Polars', before the tables are read and whatever the receiver is. Polars refuses the same pattern with the words `regex error` where a method that takes it runs, which the target holds the rule to. |
 | `replacement-values-match-in-number` | A replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one. One value given an operand of many values, or put over a window that does not explode, is as many values, for the window gives each row of its group what it gives the group, while a window that explodes gives one row for each group; what a replacement lists is a table it looks values up in, so it gives as many values as what it follows. A condition whose predicates and values are each one value gives one value, whether or not Polars drops its predicates, so what follows it is counted; where only its values are one, the number depends on what Polars drops, and is not counted. Polars refuses `new` of many values beside an `old` of one, and a `default` of many beside a value of one, when the rows run. The walk finds how many values an expression gives from its shape, and does not judge one that is not walked to its end or whose count Polars's plan decides, as a condition with one expression for all its values. |
 
 `dageist_engine::allowed::offers` answers which entries may stand at a place,
@@ -1307,6 +1412,12 @@ of 157 or 158 pivot cases. The test asserts none of those.
 | A drop of NaNs in a window | `drop_nans` is a filter by the test for NaN, which Polars leaves out of a plan for a dtype that is no float, where it has nothing to drop, and keeps where an aggregate of what it drops is evaluated for each group of a window, and refuses there for the dtype it cannot test. The tables measure the call where it is left out. Polars refusing the rows with the refusal that the test for NaN is not supported for a dtype, which has no place, in a case with a `drop_nans` that a window follows in its chain: the case run again with each drop made a fill of nulls forward, and again with each window made one, is not refused for it. |
 | A null struct to fill | A fill by a strategy refuses a `Struct` only where it meets a null to fill, and the sample's `Struct` holds none. A shift leaves nulls, and the first, the last, the minimum and the maximum of a table with no rows, or of a group of a pivot that holds nulls alone, are one null, where those of the sample's rows are a value. Polars refusing the rows or the empty table with the refusal that a strategy of a fill is not supported for a struct, which has no place, in a case with a fill by a strategy that follows one of the five: the case run again with each of the five made a fill of nulls forward, which leaves the nulls of the column and no more, is not refused for it. Inside a condition Polars refuses the strategy for a struct where it fills nothing, which it runs in a plain select: the case with a condition and a fill by a strategy, run again with each fill a fill forward, is not refused for it. |
 | A strict replacement given no default | A strict replacement that is given no default is held to more than one that is: it refuses a value that it does not list, which depends on the rows, and values of a dtype that cannot become the dtype of the column it follows, which a default lets pass. The tables measured it with a default and with what it replaces the column it follows. Polars refusing the rows with the refusal of an incomplete mapping, of nothing listed to replace, or of values of a type that cannot replace the column's, which has no place, or, of the empty table, in the words of what follows it, for Polars gives back what the replacement follows where it lists nothing, in a case with a `replace_strict` given no default: the case run again with each given a null default is not refused for it. |
+| A replacement of every match given a null value | `str.replace_all` refuses a value that is null where Polars reads the value as one value, which it does of a literal and of a piece of one row. Polars' streaming engine runs the rows in pieces, whose length depends on how the rows are shared among the threads, so a column that holds a null is refused where a piece is one row and not where it is longer, though Polars' in-memory engine and the tables allow it. A literal null is refused at every count. Polars refusing the rows or the empty table with the refusal that the value cannot be null, which has no place, in a case with a `str.replace_all`, or a `str.replace` given a count below zero, which replaces every match: the case run again with the value of each made a text literal is not refused for it. |
+| A replacement of more than the first match | Polars replaces more than the first match only of plain text and of one value, and refuses a pattern that has an ASCII punctuation mark, which it takes for a regular expression, or a value that is many, with a count above one. The tables measured the first match, which is `n`'s default. Polars refusing the rows or the empty table with the refusal that a replacement of a pattern or of many values with a count above one is not yet supported, which has no place, in a case with a `str.replace` given a count above one: the case run again with each count left out is not refused for it. |
+| A literal text beside many replacement values | A literal text is one value, which Polars' streaming engine broadcasts over the rows of a table only where each piece it runs them in is no longer than that one value, and never over a table with no rows, so a replacement of it given many values is refused where the column of text the tables measured it with is not. How long a piece is depends on how the rows are shared among the threads: the rows of the target's three-row tables are one piece of three at one thread, pieces of two and one at two, and pieces of one at three or more, so the rows are refused at the first two and pass at the others, and the empty table is refused at every count. Polars refusing the rows or the empty table with the refusal that the length of the value does not match that of the text, which has no place, in a case with a replacement in a chain that starts from a literal: the case run again with each such literal a column of text is not refused for it. |
+| A struct with no fields | A struct with no fields, which `str.extract_groups` gives of a pattern that has no group, cannot be grouped by: Polars refuses a test for a value that is unique or duplicated of it, with the refusal that at least one key is required. The tables measured a struct on two fields. Polars refusing the rows or the empty table with that refusal, which has no place, in a case with an `str.extract_groups` of a pattern with no group: the case run again with each such pattern given a group is not refused for it. |
+| A replacement of an aggregate in a window key | Polars' streaming engine does not meet a text of one value, a literal or an aggregate, with each of the many values of a replacement in the order key of a window, or in a key inside it, which it does in a select, where the tables measured the replacement. It refuses the lengths at every thread count. Polars refusing the rows or the empty table with the refusal that the length of the value does not match that of the text, which has no place, in a case with a window and a replacement: the case run again with the value of each replacement made a text literal is not refused for it, and nor is the case run again with each window made a fill. |
+| A replacement of a literal aggregate in a branch | Polars' streaming engine refuses a replacement of the aggregate of a literal text, which is one value, where it stands in a branch of a condition, and meets it where it stands in a select, in a sum, in a window or in memory. It reads the pattern of the replacement as many values, and what it says depends on how it splits the rows of the table: that the length of the pattern is dynamic where a piece of them is longer than one row, and that the pattern is null where it is not. The tables measured the replacement in select, on columns. Polars refusing the rows or the empty table with either refusal, which has no place, in a case with a branch of a condition that holds a chain that starts from a literal and replaces after an aggregate: the case run again with each such literal a column of text is not refused for it. |
 | A bitwise call in a join's key | Polars refuses some dtypes of `and_`, `or_` and `xor` when it works out the schema of a select, a filter or a sort key, and accepts them in a join's key, on either side: it checks the dtypes of a bitwise call there less than anywhere else (the pairs it accepts are listed below the table). The tables measured a bitwise call in select, and refuse it for the dtypes it is given; for an argument whose dtype they do not know, for one it might have. The tables refusing, with a reason that names the two dtypes of a bitwise call (`^ not allowed on date and i8`, `\| on Boolean and Int64 is not supported`), at an `and_`, `or_` or `xor` in one of a join's own keys, which Polars allows; the key is why only where Polars, asked to select the refused call on a column of each of the two dtypes the reason names, refuses it at that call for the tables' reason, which a call whose dtypes select accepts, a refusal about another call, a step that is no join and the key of a window do not meet. |
 
 
@@ -1330,7 +1441,13 @@ without `validate`, a tolerance of `is_close` from zero, a fill of a value or of
 never both, a limit only for a fill that goes `forward` or `backward`, what a replacement
 replaces a column of values that are all different or a literal, and a strict replacement mostly
 given a default, for a value it does not list is refused when the rows run, and sometimes given
-none, which a limit holds.
+none, which a limit holds. A pattern is drawn from a small fixed set of fourteen that Polars compiles,
+with groups, named groups in both spellings, classes, anchors, alternation and flags, and ten that it
+cannot, an unclosed group or class, a repetition that ends before it begins, a group whose name is
+none or is named twice, a flag or a property that does not exist, an escape with nothing after it, a repetition of nothing and
+an unopened group, so that the refusal of a pattern is checked as the pattern is, with the rule that
+asks Polars, a replacement's value is often text with a reference to a group, and a split's separator is often text drawn from the same two sets, and the groups of a pattern are often tested for unique values. `n` and a group
+number are drawn from a few values, and a limit holds the count that Polars refuses.
 
 ## What The Step Editor Storyboard Has Settled
 

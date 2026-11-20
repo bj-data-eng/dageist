@@ -75,6 +75,8 @@ export interface PreparedOffer {
   readonly argument: DefaultArgumentView | null;
   /** The first parameter the method starts without giving, which holds Polars' default, or `null`. */
   readonly leftOut: string | null;
+  /** The parameters the method starts with as slots to fill, besides its argument. */
+  readonly slots: readonly string[];
 }
 
 /** The calls of one family. */
@@ -120,6 +122,7 @@ export function prepareOffers(
       ends: verdict.kind === 'allowed' ? endsOf(verdict.ending) : { kind: 'notKnown' },
       argument: verdict.kind === 'allowed' ? offered.argument : null,
       leftOut: verdict.kind === 'allowed' ? offered.leftOut : null,
+      slots: verdict.kind === 'allowed' ? offered.slots : [],
     });
   }
   const present = families.filter((family) => family.offers.length > 0);

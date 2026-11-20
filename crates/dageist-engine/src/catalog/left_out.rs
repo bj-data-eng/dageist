@@ -89,6 +89,20 @@ pub fn left_out() -> &'static [LeftOut] {
 //     from that value, as `lit(2)` and then `Expr.sub`, so each reflected form is the entry of
 //     its own operation with the chain on the other side;
 //   - `__pos__` returns the expression it is given, as `LazyFrame.clone` returns its frame.
+// - `polars.escape_regex` gives a Python string, the text with the characters of a pattern
+//   escaped, and not an expression, so no start of the catalogue is its form. What a step needs
+//   of it is there already: every method that takes a pattern takes `literal`, which makes the
+//   text plain text, and `Expr.str.escape_regex` escapes the text of a column or a literal.
+//
+// Items marked `NotYetCatalogued` that wait for something, and what:
+//
+// - `Expr.str.contains_any`, `replace_many`, `extract_many` and `find_many` take a list of literal
+//   patterns, which Polars matches all at once with Aho-Corasick. A pattern here is one regular
+//   expression typed in; a list of texts, typed or connected from another node, is a kind of its
+//   own, and the many-pattern methods wait for it.
+// - `Expr.str.split_exact` and `splitn` give a struct, whose fields a step reads with
+//   `Expr.struct.field`, which is not catalogued yet. `Expr.str.extract_groups` gives one too, and
+//   is catalogued, for its fields are named by the pattern and Polars says them.
 const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.__abs__", Reason::NeverOffered),
     LeftOut::new("Expr.__add__", Reason::NeverOffered),
@@ -419,23 +433,14 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.sort", Reason::NotYetCatalogued),
     LeftOut::new("Expr.sort_by", Reason::NotYetCatalogued),
     LeftOut::new("Expr.std", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.str.contains", Reason::NotYetCatalogued),
     LeftOut::new("Expr.str.contains_any", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.str.count_matches", Reason::NotYetCatalogued),
     LeftOut::new("Expr.str.decode", Reason::NotYetCatalogued),
     LeftOut::new("Expr.str.encode", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.str.escape_regex", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.str.extract", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.str.extract_all", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.str.extract_groups", Reason::NotYetCatalogued),
     LeftOut::new("Expr.str.extract_many", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.str.find", Reason::NotYetCatalogued),
     LeftOut::new("Expr.str.find_many", Reason::NotYetCatalogued),
     LeftOut::new("Expr.str.json_decode", Reason::NotYetCatalogued),
     LeftOut::new("Expr.str.json_path_match", Reason::NotYetCatalogued),
     LeftOut::new("Expr.str.normalize", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.str.replace", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.str.replace_all", Reason::NotYetCatalogued),
     LeftOut::new("Expr.str.replace_many", Reason::NotYetCatalogued),
     LeftOut::new("Expr.str.split_exact", Reason::NotYetCatalogued),
     LeftOut::new("Expr.str.splitn", Reason::NotYetCatalogued),
@@ -600,7 +605,7 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("polars.datetime_ranges", Reason::NotYetCatalogued),
     LeftOut::new("polars.dtype_of", Reason::NotYetCatalogued),
     LeftOut::new("polars.duration", Reason::NotYetCatalogued),
-    LeftOut::new("polars.escape_regex", Reason::NotYetCatalogued),
+    LeftOut::new("polars.escape_regex", Reason::NeverOffered),
     LeftOut::new("polars.exclude", Reason::NotYetCatalogued),
     LeftOut::new("polars.explain_all", Reason::NeverOffered),
     LeftOut::new("polars.field", Reason::NotYetCatalogued),

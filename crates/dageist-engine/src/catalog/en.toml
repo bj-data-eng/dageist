@@ -33,10 +33,13 @@ title = "Rounding · places, whole numbers"
 title = "dt · dates and times"
 
 [families.text]
-title = "str · case, trim, pad"
+title = "str · case, trim, pad, replace"
 
 [families.pieces]
 title = "str · slice, split, join, length"
+
+[families.search]
+title = "str · find, count, extract"
 
 [families.window]
 title = "Window"
@@ -499,6 +502,34 @@ hint = "hyperbolic sine"
 name = "sqrt"
 hint = "square root"
 
+[entries."Expr.str.contains"]
+name = "str.contains"
+hint = "true where the text has a match for a pattern"
+
+[entries."Expr.str.contains".parameters.pattern]
+name = "pattern"
+label = "matches"
+
+[entries."Expr.str.contains".parameters.literal]
+name = "literal"
+label = "as plain text"
+
+[entries."Expr.str.contains".parameters.strict]
+name = "strict"
+label = "refuse a bad pattern"
+
+[entries."Expr.str.count_matches"]
+name = "str.count_matches"
+hint = "how many times a pattern matches in the text"
+
+[entries."Expr.str.count_matches".parameters.pattern]
+name = "pattern"
+label = "pattern"
+
+[entries."Expr.str.count_matches".parameters.literal]
+name = "literal"
+label = "as plain text"
+
 [entries."Expr.str.ends_with"]
 name = "str.ends_with"
 hint = "true where the text ends with a suffix"
@@ -506,6 +537,54 @@ hint = "true where the text ends with a suffix"
 [entries."Expr.str.ends_with".parameters.suffix]
 name = "suffix"
 label = "ends with"
+
+[entries."Expr.str.escape_regex"]
+name = "str.escape_regex"
+hint = "put a backslash before each character that has a meaning in a pattern"
+
+[entries."Expr.str.extract"]
+name = "str.extract"
+hint = "the text one group of the first match holds, nothing where there is none"
+
+[entries."Expr.str.extract".parameters.pattern]
+name = "pattern"
+label = "pattern"
+
+[entries."Expr.str.extract".parameters.group_index]
+name = "group_index"
+label = "group number"
+
+[entries."Expr.str.extract_all"]
+name = "str.extract_all"
+hint = "a list of every match of a pattern"
+
+[entries."Expr.str.extract_all".parameters.pattern]
+name = "pattern"
+label = "pattern"
+
+[entries."Expr.str.extract_groups"]
+name = "str.extract_groups"
+hint = "a struct of the text each group of a pattern matched, its fields named as the groups are"
+
+[entries."Expr.str.extract_groups".parameters.pattern]
+name = "pattern"
+label = "pattern"
+
+[entries."Expr.str.find"]
+name = "str.find"
+hint = "where a pattern first matches, in bytes from the start, nothing where it does not"
+
+[entries."Expr.str.find".parameters.pattern]
+name = "pattern"
+label = "pattern"
+
+[entries."Expr.str.find".parameters.literal]
+name = "literal"
+label = "as plain text"
+
+[entries."Expr.str.find".parameters.strict]
+name = "strict"
+label = "refuse a bad pattern"
 
 [entries."Expr.str.head"]
 name = "str.head"
@@ -558,6 +637,42 @@ label = "up to"
 [entries."Expr.str.pad_start".parameters.fill_char]
 name = "fill_char"
 label = "with"
+
+[entries."Expr.str.replace"]
+name = "str.replace"
+hint = "replace the first match of a pattern, or the first n, by a text where $1 and ${name} stand for what a group matched"
+
+[entries."Expr.str.replace".parameters.pattern]
+name = "pattern"
+label = "pattern"
+
+[entries."Expr.str.replace".parameters.value]
+name = "value"
+label = "with"
+
+[entries."Expr.str.replace".parameters.literal]
+name = "literal"
+label = "as plain text"
+
+[entries."Expr.str.replace".parameters.n]
+name = "n"
+label = "how many"
+
+[entries."Expr.str.replace_all"]
+name = "str.replace_all"
+hint = "replace every match of a pattern by a text where $1 and ${name} stand for what a group matched"
+
+[entries."Expr.str.replace_all".parameters.pattern]
+name = "pattern"
+label = "pattern"
+
+[entries."Expr.str.replace_all".parameters.value]
+name = "value"
+label = "with"
+
+[entries."Expr.str.replace_all".parameters.literal]
+name = "literal"
+label = "as plain text"
 
 [entries."Expr.str.reverse"]
 name = "str.reverse"

@@ -117,6 +117,7 @@ fn nothing_typed_reads_as_nothing() {
         Typed::Value(ValueType::Date),
         Typed::Value(ValueType::Any),
         Typed::Duration,
+        Typed::Pattern,
         Typed::Path,
     ] {
         assert!(read_typed("", typed).is_empty(), "{typed:?}");
@@ -185,6 +186,20 @@ fn a_path_is_text_that_has_no_dtype() {
             None
         ))]
     );
+}
+
+#[test]
+fn a_pattern_is_read_as_typed_and_has_no_dtype_even_where_it_is_no_regular_expression_yet() {
+    // The slot reads what is typed as the pattern it is. Whether it is a regular expression
+    // is for the step to say where it is built: a flag may make it plain text, and a pattern
+    // typed halfway is the person's to finish.
+    for typed in [r"\d+", "(?<year>\\d{4})", "(Comp", " ", "12"] {
+        assert_eq!(
+            readings(typed, Typed::Pattern),
+            [Ok((Literal::String(typed.to_owned()), None))],
+            "{typed}"
+        );
+    }
 }
 
 #[test]

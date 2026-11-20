@@ -2,7 +2,23 @@
 
 use polars::prelude::{DataType, Expr, LazyFrame};
 
-use crate::catalog::{self, Argument, Arguments, Build, BuildError, Conditional, Entry};
+use crate::catalog::{self, Argument, Arguments, Build, BuildError, Conditional, Entry, Kind};
+
+/// The pattern the harness gives a method that must be given one: a regular expression with a
+/// named group, which every method that takes a pattern accepts and which gives a struct of one
+/// field of text where it names the fields of what it gives.
+pub(super) const PATTERN: &str = "(?<g>a)";
+
+/// The arguments of `entry` that are patterns, each the pattern of the harness, for the
+/// parameters that must be given one.
+pub(super) fn patterns(entry: &Entry) -> Vec<(&'static str, Argument)> {
+    entry
+        .parameters()
+        .iter()
+        .filter(|parameter| parameter.kind() == Kind::Pattern && parameter.is_needed())
+        .map(|parameter| (parameter.name(), Argument::Pattern(PATTERN.to_owned())))
+        .collect()
+}
 
 /// The entry named `id`.
 pub(super) fn entry(id: &str) -> &'static Entry {

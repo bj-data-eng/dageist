@@ -12,6 +12,7 @@ mod inventory;
 mod language;
 mod maths;
 mod nulls;
+mod patterns;
 mod roles;
 mod starting;
 mod text;

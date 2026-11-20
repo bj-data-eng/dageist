@@ -62,6 +62,7 @@ describe('the catalogue the host sends', () => {
       'temporal',
       'text',
       'pieces',
+      'search',
       'window',
       'compare',
       'checks',
@@ -95,6 +96,7 @@ describe('the catalogue the host sends', () => {
           defaultSetting: { kind: 'integer', value: 1, shown: '1' },
           start: { kind: 'unset' },
           position: null,
+          offered: true,
         },
         {
           name: 'fill_value',
@@ -106,9 +108,48 @@ describe('the catalogue the host sends', () => {
           defaultSetting: null,
           start: { kind: 'unset' },
           position: null,
+          offered: true,
         },
       ],
     });
+  });
+
+  it('is read with the pattern of a method as a kind of its own and the flag that makes it text', () => {
+    const entries = decodeCatalogue(catalogue).entries;
+    const kindOf = (id: string, name: string) =>
+      entries
+        .find((entry) => entry.id === id)
+        ?.parameters.find((parameter) => parameter.name === name)?.kind;
+    // `contains`, `replace_all` and the others that take `literal` say it; the others take a
+    // regular expression always.
+    expect(kindOf('Expr.str.contains', 'pattern')).toEqual({
+      kind: 'pattern',
+      plainTextFlag: 'literal',
+    });
+    expect(kindOf('Expr.str.replace_all', 'pattern')).toEqual({
+      kind: 'pattern',
+      plainTextFlag: 'literal',
+    });
+    expect(kindOf('Expr.str.extract_groups', 'pattern')).toEqual({
+      kind: 'pattern',
+      plainTextFlag: null,
+    });
+    // The flag is a parameter of the same entry, which the editor draws as it draws any flag.
+    expect(kindOf('Expr.str.contains', 'literal')).toEqual({ kind: 'flag' });
+  });
+
+  it('is read with which parameters the editor offers, and those it does not offer left out of its options', () => {
+    const entries = decodeCatalogue(catalogue).entries;
+    const offered = (id: string, name: string) =>
+      entries
+        .find((entry) => entry.id === id)
+        ?.parameters.find((parameter) => parameter.name === name)?.offered;
+    // A typed pattern that is none is refused whatever `strict` says, so the editor does not list it
+    // for `contains` and `find`, and a split's separator may be a column, which it decides for.
+    expect(offered('Expr.str.contains', 'strict')).toBe(false);
+    expect(offered('Expr.str.find', 'strict')).toBe(false);
+    expect(offered('Expr.str.contains', 'literal')).toBe(true);
+    expect(offered('Expr.str.split', 'strict')).toBe(true);
   });
 
   it('is read with the position of an expression parameter that a named position holds', () => {
@@ -189,7 +230,7 @@ describe('the catalogue the host sends', () => {
     );
     expect(refused.path).toBe(`$.entries[${String(shift)}].parameters[0].kind.kind`);
     expect(refused.problem).toBe(
-      'must be one of "expression", "column", "value", "flag", "choice", "dtype", "duration", "table", "path", "pairs", not "map"',
+      'must be one of "expression", "column", "value", "flag", "choice", "dtype", "duration", "pattern", "table", "path", "pairs", not "map"',
     );
   });
 

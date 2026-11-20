@@ -4,8 +4,8 @@ import { decodeCatalogue } from '@dageist/host';
 
 import catalogueFixture from '../../../host/fixtures/catalogue.json';
 import { indexCatalogue } from './catalogue';
-import { startingArgument, swappedArgument } from './expr';
-import { expressionSetting } from './settings';
+import { slotOptions, startingArgument, swappedArgument } from './expr';
+import { NO_OPTIONS, expressionSetting, optionParameters } from './settings';
 import { stepItems } from './steps';
 import type { Step } from './steps';
 
@@ -96,5 +96,45 @@ describe('the keys of a sort that each have a setting of their own', () => {
     // The key still to be picked is not one yet; the one after it is the third in the list.
     expect(stepItems(sort, 'by')).toEqual(['dcn', 'key 3']);
     expect(stepItems(sort, 'other')).toEqual([]);
+  });
+});
+
+describe('the options a method that is added starts with', () => {
+  it('are the slots the engine names, each still to be given, and none where it names none', () => {
+    // `str.replace(pattern, value)`: the engine names both, and the editor sets each to what is
+    // still to be given.
+    expect(slotOptions(catalogue, 'str.replace', ['pattern', 'value'], NO_OPTIONS)).toEqual({
+      pattern: { kind: 'unset' },
+      value: { kind: 'unset' },
+    });
+    expect(slotOptions(catalogue, 'cast', ['dtype'], NO_OPTIONS)).toEqual({
+      dtype: { kind: 'unset' },
+    });
+    expect(slotOptions(catalogue, 'str.contains', [], NO_OPTIONS)).toBe(NO_OPTIONS);
+    // A name the method has no parameter of is not a slot of it.
+    expect(slotOptions(catalogue, 'str.contains', ['other'], NO_OPTIONS)).toBe(NO_OPTIONS);
+  });
+
+  it('keep what is already set when a method is swapped, and start what the new method lacks', () => {
+    const given = { pattern: { kind: 'text', value: 'a', shown: 'a' } } as const;
+    expect(slotOptions(catalogue, 'str.replace_all', ['pattern', 'value'], given)).toEqual({
+      pattern: { kind: 'text', value: 'a', shown: 'a' },
+      value: { kind: 'unset' },
+    });
+  });
+});
+
+/** The names of the parameters of `entryId` that can be given as options. */
+const optionNames = (entryId: string): readonly string[] => {
+  const entry = catalogue.entries.get(entryId);
+  if (entry === undefined) throw new Error(`no entry ${entryId}`);
+  return optionParameters(entry, []).map((parameter) => parameter.name);
+};
+
+describe('the options a method can be given', () => {
+  it('leave out a parameter the engine does not offer, and list the others', () => {
+    expect(optionNames('Expr.str.contains')).toEqual(['pattern', 'literal']);
+    expect(optionNames('Expr.str.find')).toEqual(['pattern', 'literal']);
+    expect(optionNames('Expr.str.split')).toContain('strict');
   });
 });

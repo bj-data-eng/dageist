@@ -92,6 +92,8 @@ fn arguments_for(entry: &Entry, column: &str, operand: &str) -> Arguments {
                 Kind::Value(ValueType::Integer) => Argument::Integer(2),
                 // `cast`'s `dtype`: the dtype the column has, which converts to itself.
                 Kind::Dtype => Argument::Dtype(dtype_of(column)),
+                // A pattern that every method of text that takes one accepts: a group of `a`.
+                Kind::Pattern => Argument::Pattern("(a)".to_owned()),
                 other => panic!("{} takes {other:?}", entry.id().as_str()),
             };
             let value = if parameter.variadic() == Some(Variadic::Args) {

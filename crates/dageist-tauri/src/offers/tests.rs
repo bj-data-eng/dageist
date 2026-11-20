@@ -155,7 +155,7 @@ fn what_follows_a_datetime_is_what_polars_allows_of_it_with_the_reason_for_the_r
                 .expect("an id")
                 .starts_with("LazyFrame."))
     );
-    assert_eq!(answer["entries"].as_array().expect("entries").len(), 120);
+    assert_eq!(answer["entries"].as_array().expect("entries").len(), 129);
 }
 
 #[test]
@@ -221,6 +221,37 @@ fn a_method_whose_first_parameter_defaults_to_none_is_offered_starting_without_i
         offered(&shifted, "Expr.str.strip_chars")["leftOut"],
         Value::Null
     );
+}
+
+#[test]
+fn a_method_that_is_added_starts_with_a_slot_for_each_parameter_it_must_be_given_besides_its_argument()
+ {
+    let answer = invoke(
+        "offers_at",
+        json!({
+            "positions": [{ "kind": "outer", "name": "select" }],
+            "after": { "kind": "value", "dtype": "String", "shape": "many" }
+        }),
+    )
+    .expect("offers");
+    // Python requires these and gives them no default, so a step always gives them: a pattern, and
+    // what replaces its matches, which is not the first parameter; and the dtype a cast gives.
+    for (id, slots) in [
+        ("Expr.str.contains", json!(["pattern"])),
+        ("Expr.str.replace", json!(["pattern", "value"])),
+        ("Expr.str.replace_all", json!(["pattern", "value"])),
+        ("Expr.str.extract", json!(["pattern"])),
+        ("Expr.cast", json!(["dtype"])),
+        // The first parameter that is an expression is the argument, drawn where the method is.
+        ("Expr.str.head", json!([])),
+        ("Expr.str.starts_with", json!([])),
+        // What has a default, or that Python leaves to None, is an option to add.
+        ("Expr.str.strip_chars", json!([])),
+        ("Expr.str.to_uppercase", json!([])),
+        ("Expr.str.pad_start", json!([])),
+    ] {
+        assert_eq!(offered(&answer, id)["slots"], slots, "{id}");
+    }
 }
 
 #[test]
@@ -639,6 +670,12 @@ fn a_typed_text_reads_as_the_slot_it_is_typed_into_takes_it() {
     assert_eq!(
         read(json!({ "kind": "path" }), "data/claims.parquet")["readings"],
         json!([{ "kind": "read", "literal": { "kind": "text", "value": "data/claims.parquet", "shown": "data/claims.parquet" }, "dtype": null, "fit": null }])
+    );
+    // A pattern is carried as typed with no dtype, a half-typed one included: the step says, with
+    // Polars' reason, where it is no regular expression.
+    assert_eq!(
+        read(json!({ "kind": "pattern" }), "(Comp")["readings"],
+        json!([{ "kind": "read", "literal": { "kind": "text", "value": "(Comp", "shown": "(Comp" }, "dtype": null, "fit": null }])
     );
     // A date is read as Polars reads one and carried as the day, a duration as Polars reads a
     // duration string and carried as typed.

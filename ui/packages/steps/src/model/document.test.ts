@@ -28,6 +28,17 @@ function written(steps: readonly Step[]): unknown {
 const col = (name: string): Value => ({ kind: 'column', column: name });
 const UNSET_VALUE: Value = { kind: 'unset' };
 
+/** A step that adds a column that replaces in the owners, as `options` set `str.replace`. */
+const replacing = (options: Options) =>
+  adding('x', {
+    kind: 'chain',
+    id: 'c1',
+    chain: {
+      source: { kind: 'column', column: 'owner' },
+      methods: [{ id: 'm1', name: 'str.replace', argument: null, options }],
+    },
+  });
+
 /** A step that adds a column holding `value`. */
 function adding(id: string, value: Value): Step {
   return { id, verb: 'with_columns', alias: id, value, options: NO_OPTIONS };
@@ -252,6 +263,35 @@ describe('what the document cannot hold', () => {
     ).toMatchObject({
       kind: 'held',
       problem: { cause: 'unsupported' },
+    });
+  });
+
+  it('writes a hole for a slot that takes an expression and holds back a step whose other slot is still to be given', () => {
+    // `str.replace` starts with a slot for its pattern and one for what replaces a match, which is
+    // an expression: the pattern has nothing to stand for it, and the step waits for it.
+    const started: Options = { pattern: { kind: 'unset' }, value: { kind: 'unset' } };
+    expect(translate(catalogue, [replacing(started)]).steps[0]).toMatchObject({
+      kind: 'held',
+      problem: { cause: 'unset', message: 'Give pattern a value (pattern).' },
+    });
+    // With the pattern given, what replaces is a hole, which the engine reports as incomplete.
+    const pattern: Options = {
+      pattern: { kind: 'text', value: '[aeiou]', shown: '[aeiou]' },
+      value: { kind: 'unset' },
+    };
+    const [sent] = translate(catalogue, [replacing(pattern)]).steps;
+    expect(sent).toMatchObject({
+      kind: 'sent',
+      holes: new Map([
+        [
+          'parameter:named_exprs/value:0/link:0/parameter:value/start',
+          {
+            cause: 'unset',
+            message: 'Pick a value.',
+            wrong: [wrongId({ kind: 'method', methodId: 'm1' })],
+          },
+        ],
+      ]),
     });
   });
 

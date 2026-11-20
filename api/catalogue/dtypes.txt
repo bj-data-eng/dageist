@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 37050 combinations: 14513 allowed; 5472 refused when Polars resolved the schema, 17065 when it ran the rows, 0 when it ran the empty table.
+# 38584 combinations: 14562 allowed; 6847 refused when Polars resolved the schema, 17175 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.abs | - | Array(Int64, 2) | - | refused rows: `abs` operation not supported for dtype `array[i64, 2]`
 Expr.abs | - | Boolean | - | refused rows: `abs` operation not supported for dtype `bool`
@@ -24552,6 +24552,58 @@ Expr.sqrt | - | UInt16 | - | allowed Float64 many
 Expr.sqrt | - | UInt32 | - | allowed Float64 many
 Expr.sqrt | - | UInt64 | - | allowed Float64 many
 Expr.sqrt | - | UInt8 | - | allowed Float64 many
+Expr.str.contains | - | Array(Int64, 2) | - | refused schema: expected String type, got: array[i64, 2]
+Expr.str.contains | - | Boolean | - | refused schema: expected String type, got: bool
+Expr.str.contains | - | Date | - | refused schema: expected String type, got: date
+Expr.str.contains | - | Datetime(us) | - | refused schema: expected String type, got: datetime[μs]
+Expr.str.contains | - | Datetime(us, UTC) | - | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.contains | - | Decimal(10, 2) | - | refused schema: expected String type, got: decimal[10,2]
+Expr.str.contains | - | Duration(us) | - | refused schema: expected String type, got: duration[μs]
+Expr.str.contains | - | Float16 | - | refused schema: expected String type, got: f16
+Expr.str.contains | - | Float32 | - | refused schema: expected String type, got: f32
+Expr.str.contains | - | Float64 | - | refused schema: expected String type, got: f64
+Expr.str.contains | - | Int128 | - | refused schema: expected String type, got: i128
+Expr.str.contains | - | Int16 | - | refused schema: expected String type, got: i16
+Expr.str.contains | - | Int32 | - | refused schema: expected String type, got: i32
+Expr.str.contains | - | Int64 | - | refused schema: expected String type, got: i64
+Expr.str.contains | - | Int8 | - | refused schema: expected String type, got: i8
+Expr.str.contains | - | List(Int64) | - | refused schema: expected String type, got: list[i64]
+Expr.str.contains | - | List(String) | - | refused schema: expected String type, got: list[str]
+Expr.str.contains | - | Null | - | refused schema: expected String type, got: null
+Expr.str.contains | - | String | - | allowed Boolean many
+Expr.str.contains | - | Struct(x: Int64, y: String) | - | refused schema: expected String type, got: struct[2]
+Expr.str.contains | - | Time | - | refused schema: expected String type, got: time
+Expr.str.contains | - | UInt128 | - | refused schema: expected String type, got: u128
+Expr.str.contains | - | UInt16 | - | refused schema: expected String type, got: u16
+Expr.str.contains | - | UInt32 | - | refused schema: expected String type, got: u32
+Expr.str.contains | - | UInt64 | - | refused schema: expected String type, got: u64
+Expr.str.contains | - | UInt8 | - | refused schema: expected String type, got: u8
+Expr.str.count_matches | - | Array(Int64, 2) | - | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`
+Expr.str.count_matches | - | Boolean | - | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `a`
+Expr.str.count_matches | - | Date | - | refused rows: invalid series dtype: expected `String`, got `date` for series with name `a`
+Expr.str.count_matches | - | Datetime(us) | - | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`
+Expr.str.count_matches | - | Datetime(us, UTC) | - | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `a`
+Expr.str.count_matches | - | Decimal(10, 2) | - | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `a`
+Expr.str.count_matches | - | Duration(us) | - | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `a`
+Expr.str.count_matches | - | Float16 | - | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `a`
+Expr.str.count_matches | - | Float32 | - | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `a`
+Expr.str.count_matches | - | Float64 | - | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `a`
+Expr.str.count_matches | - | Int128 | - | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `a`
+Expr.str.count_matches | - | Int16 | - | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `a`
+Expr.str.count_matches | - | Int32 | - | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `a`
+Expr.str.count_matches | - | Int64 | - | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `a`
+Expr.str.count_matches | - | Int8 | - | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `a`
+Expr.str.count_matches | - | List(Int64) | - | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `a`
+Expr.str.count_matches | - | List(String) | - | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `a`
+Expr.str.count_matches | - | Null | - | refused rows: invalid series dtype: expected `String`, got `null` for series with name `a`
+Expr.str.count_matches | - | String | - | allowed UInt32 many
+Expr.str.count_matches | - | Struct(x: Int64, y: String) | - | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `a`
+Expr.str.count_matches | - | Time | - | refused rows: invalid series dtype: expected `String`, got `time` for series with name `a`
+Expr.str.count_matches | - | UInt128 | - | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `a`
+Expr.str.count_matches | - | UInt16 | - | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `a`
+Expr.str.count_matches | - | UInt32 | - | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `a`
+Expr.str.count_matches | - | UInt64 | - | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `a`
+Expr.str.count_matches | - | UInt8 | - | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
 Expr.str.ends_with | suffix | Array(Int64, 2) | Array(Int64, 2) | refused schema: expected String type, got: array[i64, 2]
 Expr.str.ends_with | suffix | Array(Int64, 2) | Boolean | refused schema: expected String type, got: array[i64, 2]
 Expr.str.ends_with | suffix | Array(Int64, 2) | Date | refused schema: expected String type, got: array[i64, 2]
@@ -25228,6 +25280,136 @@ Expr.str.ends_with | suffix | UInt8 | UInt16 | refused schema: expected String t
 Expr.str.ends_with | suffix | UInt8 | UInt32 | refused schema: expected String type, got: u8
 Expr.str.ends_with | suffix | UInt8 | UInt64 | refused schema: expected String type, got: u8
 Expr.str.ends_with | suffix | UInt8 | UInt8 | refused schema: expected String type, got: u8
+Expr.str.escape_regex | - | Array(Int64, 2) | - | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`
+Expr.str.escape_regex | - | Boolean | - | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `a`
+Expr.str.escape_regex | - | Date | - | refused rows: invalid series dtype: expected `String`, got `date` for series with name `a`
+Expr.str.escape_regex | - | Datetime(us) | - | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`
+Expr.str.escape_regex | - | Datetime(us, UTC) | - | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `a`
+Expr.str.escape_regex | - | Decimal(10, 2) | - | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `a`
+Expr.str.escape_regex | - | Duration(us) | - | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `a`
+Expr.str.escape_regex | - | Float16 | - | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `a`
+Expr.str.escape_regex | - | Float32 | - | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `a`
+Expr.str.escape_regex | - | Float64 | - | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `a`
+Expr.str.escape_regex | - | Int128 | - | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `a`
+Expr.str.escape_regex | - | Int16 | - | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `a`
+Expr.str.escape_regex | - | Int32 | - | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `a`
+Expr.str.escape_regex | - | Int64 | - | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `a`
+Expr.str.escape_regex | - | Int8 | - | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `a`
+Expr.str.escape_regex | - | List(Int64) | - | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `a`
+Expr.str.escape_regex | - | List(String) | - | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `a`
+Expr.str.escape_regex | - | Null | - | refused rows: invalid series dtype: expected `String`, got `null` for series with name `a`
+Expr.str.escape_regex | - | String | - | allowed String many
+Expr.str.escape_regex | - | Struct(x: Int64, y: String) | - | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `a`
+Expr.str.escape_regex | - | Time | - | refused rows: invalid series dtype: expected `String`, got `time` for series with name `a`
+Expr.str.escape_regex | - | UInt128 | - | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `a`
+Expr.str.escape_regex | - | UInt16 | - | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `a`
+Expr.str.escape_regex | - | UInt32 | - | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `a`
+Expr.str.escape_regex | - | UInt64 | - | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `a`
+Expr.str.escape_regex | - | UInt8 | - | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
+Expr.str.extract | - | Array(Int64, 2) | - | refused schema: expected String type, got: array[i64, 2]
+Expr.str.extract | - | Boolean | - | refused schema: expected String type, got: bool
+Expr.str.extract | - | Date | - | refused schema: expected String type, got: date
+Expr.str.extract | - | Datetime(us) | - | refused schema: expected String type, got: datetime[μs]
+Expr.str.extract | - | Datetime(us, UTC) | - | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.extract | - | Decimal(10, 2) | - | refused schema: expected String type, got: decimal[10,2]
+Expr.str.extract | - | Duration(us) | - | refused schema: expected String type, got: duration[μs]
+Expr.str.extract | - | Float16 | - | refused schema: expected String type, got: f16
+Expr.str.extract | - | Float32 | - | refused schema: expected String type, got: f32
+Expr.str.extract | - | Float64 | - | refused schema: expected String type, got: f64
+Expr.str.extract | - | Int128 | - | refused schema: expected String type, got: i128
+Expr.str.extract | - | Int16 | - | refused schema: expected String type, got: i16
+Expr.str.extract | - | Int32 | - | refused schema: expected String type, got: i32
+Expr.str.extract | - | Int64 | - | refused schema: expected String type, got: i64
+Expr.str.extract | - | Int8 | - | refused schema: expected String type, got: i8
+Expr.str.extract | - | List(Int64) | - | refused schema: expected String type, got: list[i64]
+Expr.str.extract | - | List(String) | - | refused schema: expected String type, got: list[str]
+Expr.str.extract | - | Null | - | refused schema: expected String type, got: null
+Expr.str.extract | - | String | - | allowed String many
+Expr.str.extract | - | Struct(x: Int64, y: String) | - | refused schema: expected String type, got: struct[2]
+Expr.str.extract | - | Time | - | refused schema: expected String type, got: time
+Expr.str.extract | - | UInt128 | - | refused schema: expected String type, got: u128
+Expr.str.extract | - | UInt16 | - | refused schema: expected String type, got: u16
+Expr.str.extract | - | UInt32 | - | refused schema: expected String type, got: u32
+Expr.str.extract | - | UInt64 | - | refused schema: expected String type, got: u64
+Expr.str.extract | - | UInt8 | - | refused schema: expected String type, got: u8
+Expr.str.extract_all | - | Array(Int64, 2) | - | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`
+Expr.str.extract_all | - | Boolean | - | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `a`
+Expr.str.extract_all | - | Date | - | refused rows: invalid series dtype: expected `String`, got `date` for series with name `a`
+Expr.str.extract_all | - | Datetime(us) | - | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`
+Expr.str.extract_all | - | Datetime(us, UTC) | - | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `a`
+Expr.str.extract_all | - | Decimal(10, 2) | - | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `a`
+Expr.str.extract_all | - | Duration(us) | - | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `a`
+Expr.str.extract_all | - | Float16 | - | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `a`
+Expr.str.extract_all | - | Float32 | - | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `a`
+Expr.str.extract_all | - | Float64 | - | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `a`
+Expr.str.extract_all | - | Int128 | - | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `a`
+Expr.str.extract_all | - | Int16 | - | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `a`
+Expr.str.extract_all | - | Int32 | - | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `a`
+Expr.str.extract_all | - | Int64 | - | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `a`
+Expr.str.extract_all | - | Int8 | - | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `a`
+Expr.str.extract_all | - | List(Int64) | - | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `a`
+Expr.str.extract_all | - | List(String) | - | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `a`
+Expr.str.extract_all | - | Null | - | refused rows: invalid series dtype: expected `String`, got `null` for series with name `a`
+Expr.str.extract_all | - | String | - | allowed List(String) many
+Expr.str.extract_all | - | Struct(x: Int64, y: String) | - | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `a`
+Expr.str.extract_all | - | Time | - | refused rows: invalid series dtype: expected `String`, got `time` for series with name `a`
+Expr.str.extract_all | - | UInt128 | - | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `a`
+Expr.str.extract_all | - | UInt16 | - | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `a`
+Expr.str.extract_all | - | UInt32 | - | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `a`
+Expr.str.extract_all | - | UInt64 | - | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `a`
+Expr.str.extract_all | - | UInt8 | - | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
+Expr.str.extract_groups | - | Array(Int64, 2) | - | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`
+Expr.str.extract_groups | - | Boolean | - | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `a`
+Expr.str.extract_groups | - | Date | - | refused rows: invalid series dtype: expected `String`, got `date` for series with name `a`
+Expr.str.extract_groups | - | Datetime(us) | - | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`
+Expr.str.extract_groups | - | Datetime(us, UTC) | - | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `a`
+Expr.str.extract_groups | - | Decimal(10, 2) | - | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `a`
+Expr.str.extract_groups | - | Duration(us) | - | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `a`
+Expr.str.extract_groups | - | Float16 | - | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `a`
+Expr.str.extract_groups | - | Float32 | - | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `a`
+Expr.str.extract_groups | - | Float64 | - | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `a`
+Expr.str.extract_groups | - | Int128 | - | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `a`
+Expr.str.extract_groups | - | Int16 | - | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `a`
+Expr.str.extract_groups | - | Int32 | - | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `a`
+Expr.str.extract_groups | - | Int64 | - | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `a`
+Expr.str.extract_groups | - | Int8 | - | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `a`
+Expr.str.extract_groups | - | List(Int64) | - | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `a`
+Expr.str.extract_groups | - | List(String) | - | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `a`
+Expr.str.extract_groups | - | Null | - | refused rows: invalid series dtype: expected `String`, got `null` for series with name `a`
+Expr.str.extract_groups | - | String | - | allowed Struct(g: String) many
+Expr.str.extract_groups | - | Struct(x: Int64, y: String) | - | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `a`
+Expr.str.extract_groups | - | Time | - | refused rows: invalid series dtype: expected `String`, got `time` for series with name `a`
+Expr.str.extract_groups | - | UInt128 | - | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `a`
+Expr.str.extract_groups | - | UInt16 | - | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `a`
+Expr.str.extract_groups | - | UInt32 | - | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `a`
+Expr.str.extract_groups | - | UInt64 | - | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `a`
+Expr.str.extract_groups | - | UInt8 | - | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
+Expr.str.find | - | Array(Int64, 2) | - | refused schema: expected String type, got: array[i64, 2]
+Expr.str.find | - | Boolean | - | refused schema: expected String type, got: bool
+Expr.str.find | - | Date | - | refused schema: expected String type, got: date
+Expr.str.find | - | Datetime(us) | - | refused schema: expected String type, got: datetime[μs]
+Expr.str.find | - | Datetime(us, UTC) | - | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.find | - | Decimal(10, 2) | - | refused schema: expected String type, got: decimal[10,2]
+Expr.str.find | - | Duration(us) | - | refused schema: expected String type, got: duration[μs]
+Expr.str.find | - | Float16 | - | refused schema: expected String type, got: f16
+Expr.str.find | - | Float32 | - | refused schema: expected String type, got: f32
+Expr.str.find | - | Float64 | - | refused schema: expected String type, got: f64
+Expr.str.find | - | Int128 | - | refused schema: expected String type, got: i128
+Expr.str.find | - | Int16 | - | refused schema: expected String type, got: i16
+Expr.str.find | - | Int32 | - | refused schema: expected String type, got: i32
+Expr.str.find | - | Int64 | - | refused schema: expected String type, got: i64
+Expr.str.find | - | Int8 | - | refused schema: expected String type, got: i8
+Expr.str.find | - | List(Int64) | - | refused schema: expected String type, got: list[i64]
+Expr.str.find | - | List(String) | - | refused schema: expected String type, got: list[str]
+Expr.str.find | - | Null | - | refused schema: expected String type, got: null
+Expr.str.find | - | String | - | allowed UInt32 many
+Expr.str.find | - | Struct(x: Int64, y: String) | - | refused schema: expected String type, got: struct[2]
+Expr.str.find | - | Time | - | refused schema: expected String type, got: time
+Expr.str.find | - | UInt128 | - | refused schema: expected String type, got: u128
+Expr.str.find | - | UInt16 | - | refused schema: expected String type, got: u16
+Expr.str.find | - | UInt32 | - | refused schema: expected String type, got: u32
+Expr.str.find | - | UInt64 | - | refused schema: expected String type, got: u64
+Expr.str.find | - | UInt8 | - | refused schema: expected String type, got: u8
 Expr.str.head | n | Array(Int64, 2) | Array(Int64, 2) | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`
 Expr.str.head | n | Array(Int64, 2) | Boolean | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`
 Expr.str.head | n | Array(Int64, 2) | Date | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`
@@ -27334,6 +27516,1358 @@ Expr.str.pad_start | length | UInt8 | UInt16 | refused rows: invalid series dtyp
 Expr.str.pad_start | length | UInt8 | UInt32 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
 Expr.str.pad_start | length | UInt8 | UInt64 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
 Expr.str.pad_start | length | UInt8 | UInt8 | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
+Expr.str.replace | value | Array(Int64, 2) | Array(Int64, 2) | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | Boolean | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | Date | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | Datetime(us) | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | Datetime(us, UTC) | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | Decimal(10, 2) | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | Duration(us) | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | Float16 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | Float32 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | Float64 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | Int128 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | Int16 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | Int32 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | Int64 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | Int8 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | List(Int64) | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | List(String) | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | Null | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | String | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | Struct(x: Int64, y: String) | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | Time | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | UInt128 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | UInt16 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | UInt32 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | UInt64 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Array(Int64, 2) | UInt8 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | value | Boolean | Array(Int64, 2) | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | Boolean | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | Date | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | Datetime(us) | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | Datetime(us, UTC) | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | Decimal(10, 2) | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | Duration(us) | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | Float16 | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | Float32 | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | Float64 | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | Int128 | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | Int16 | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | Int32 | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | Int64 | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | Int8 | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | List(Int64) | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | List(String) | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | Null | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | String | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | Struct(x: Int64, y: String) | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | Time | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | UInt128 | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | UInt16 | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | UInt32 | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | UInt64 | refused schema: expected String type, got: bool
+Expr.str.replace | value | Boolean | UInt8 | refused schema: expected String type, got: bool
+Expr.str.replace | value | Date | Array(Int64, 2) | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | Boolean | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | Date | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | Datetime(us) | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | Datetime(us, UTC) | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | Decimal(10, 2) | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | Duration(us) | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | Float16 | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | Float32 | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | Float64 | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | Int128 | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | Int16 | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | Int32 | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | Int64 | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | Int8 | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | List(Int64) | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | List(String) | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | Null | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | String | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | Struct(x: Int64, y: String) | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | Time | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | UInt128 | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | UInt16 | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | UInt32 | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | UInt64 | refused schema: expected String type, got: date
+Expr.str.replace | value | Date | UInt8 | refused schema: expected String type, got: date
+Expr.str.replace | value | Datetime(us) | Array(Int64, 2) | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | Boolean | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | Date | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | Datetime(us) | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | Datetime(us, UTC) | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | Decimal(10, 2) | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | Duration(us) | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | Float16 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | Float32 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | Float64 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | Int128 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | Int16 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | Int32 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | Int64 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | Int8 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | List(Int64) | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | List(String) | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | Null | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | String | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | Struct(x: Int64, y: String) | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | Time | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | UInt128 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | UInt16 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | UInt32 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | UInt64 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us) | UInt8 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | value | Datetime(us, UTC) | Array(Int64, 2) | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | Boolean | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | Date | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | Datetime(us) | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | Datetime(us, UTC) | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | Decimal(10, 2) | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | Duration(us) | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | Float16 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | Float32 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | Float64 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | Int128 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | Int16 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | Int32 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | Int64 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | Int8 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | List(Int64) | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | List(String) | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | Null | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | String | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | Struct(x: Int64, y: String) | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | Time | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | UInt128 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | UInt16 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | UInt32 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | UInt64 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Datetime(us, UTC) | UInt8 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | value | Decimal(10, 2) | Array(Int64, 2) | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | Boolean | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | Date | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | Datetime(us) | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | Datetime(us, UTC) | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | Decimal(10, 2) | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | Duration(us) | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | Float16 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | Float32 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | Float64 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | Int128 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | Int16 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | Int32 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | Int64 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | Int8 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | List(Int64) | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | List(String) | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | Null | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | String | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | Struct(x: Int64, y: String) | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | Time | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | UInt128 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | UInt16 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | UInt32 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | UInt64 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Decimal(10, 2) | UInt8 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | value | Duration(us) | Array(Int64, 2) | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | Boolean | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | Date | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | Datetime(us) | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | Datetime(us, UTC) | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | Decimal(10, 2) | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | Duration(us) | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | Float16 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | Float32 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | Float64 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | Int128 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | Int16 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | Int32 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | Int64 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | Int8 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | List(Int64) | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | List(String) | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | Null | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | String | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | Struct(x: Int64, y: String) | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | Time | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | UInt128 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | UInt16 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | UInt32 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | UInt64 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Duration(us) | UInt8 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | value | Float16 | Array(Int64, 2) | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | Boolean | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | Date | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | Datetime(us) | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | Datetime(us, UTC) | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | Decimal(10, 2) | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | Duration(us) | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | Float16 | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | Float32 | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | Float64 | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | Int128 | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | Int16 | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | Int32 | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | Int64 | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | Int8 | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | List(Int64) | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | List(String) | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | Null | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | String | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | Struct(x: Int64, y: String) | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | Time | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | UInt128 | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | UInt16 | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | UInt32 | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | UInt64 | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float16 | UInt8 | refused schema: expected String type, got: f16
+Expr.str.replace | value | Float32 | Array(Int64, 2) | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | Boolean | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | Date | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | Datetime(us) | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | Datetime(us, UTC) | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | Decimal(10, 2) | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | Duration(us) | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | Float16 | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | Float32 | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | Float64 | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | Int128 | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | Int16 | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | Int32 | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | Int64 | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | Int8 | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | List(Int64) | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | List(String) | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | Null | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | String | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | Struct(x: Int64, y: String) | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | Time | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | UInt128 | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | UInt16 | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | UInt32 | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | UInt64 | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float32 | UInt8 | refused schema: expected String type, got: f32
+Expr.str.replace | value | Float64 | Array(Int64, 2) | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | Boolean | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | Date | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | Datetime(us) | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | Datetime(us, UTC) | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | Decimal(10, 2) | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | Duration(us) | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | Float16 | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | Float32 | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | Float64 | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | Int128 | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | Int16 | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | Int32 | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | Int64 | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | Int8 | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | List(Int64) | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | List(String) | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | Null | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | String | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | Struct(x: Int64, y: String) | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | Time | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | UInt128 | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | UInt16 | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | UInt32 | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | UInt64 | refused schema: expected String type, got: f64
+Expr.str.replace | value | Float64 | UInt8 | refused schema: expected String type, got: f64
+Expr.str.replace | value | Int128 | Array(Int64, 2) | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | Boolean | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | Date | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | Datetime(us) | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | Datetime(us, UTC) | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | Decimal(10, 2) | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | Duration(us) | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | Float16 | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | Float32 | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | Float64 | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | Int128 | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | Int16 | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | Int32 | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | Int64 | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | Int8 | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | List(Int64) | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | List(String) | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | Null | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | String | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | Struct(x: Int64, y: String) | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | Time | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | UInt128 | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | UInt16 | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | UInt32 | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | UInt64 | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int128 | UInt8 | refused schema: expected String type, got: i128
+Expr.str.replace | value | Int16 | Array(Int64, 2) | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | Boolean | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | Date | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | Datetime(us) | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | Datetime(us, UTC) | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | Decimal(10, 2) | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | Duration(us) | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | Float16 | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | Float32 | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | Float64 | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | Int128 | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | Int16 | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | Int32 | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | Int64 | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | Int8 | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | List(Int64) | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | List(String) | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | Null | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | String | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | Struct(x: Int64, y: String) | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | Time | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | UInt128 | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | UInt16 | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | UInt32 | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | UInt64 | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int16 | UInt8 | refused schema: expected String type, got: i16
+Expr.str.replace | value | Int32 | Array(Int64, 2) | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | Boolean | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | Date | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | Datetime(us) | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | Datetime(us, UTC) | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | Decimal(10, 2) | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | Duration(us) | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | Float16 | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | Float32 | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | Float64 | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | Int128 | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | Int16 | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | Int32 | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | Int64 | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | Int8 | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | List(Int64) | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | List(String) | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | Null | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | String | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | Struct(x: Int64, y: String) | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | Time | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | UInt128 | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | UInt16 | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | UInt32 | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | UInt64 | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int32 | UInt8 | refused schema: expected String type, got: i32
+Expr.str.replace | value | Int64 | Array(Int64, 2) | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | Boolean | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | Date | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | Datetime(us) | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | Datetime(us, UTC) | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | Decimal(10, 2) | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | Duration(us) | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | Float16 | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | Float32 | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | Float64 | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | Int128 | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | Int16 | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | Int32 | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | Int64 | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | Int8 | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | List(Int64) | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | List(String) | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | Null | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | String | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | Struct(x: Int64, y: String) | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | Time | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | UInt128 | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | UInt16 | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | UInt32 | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | UInt64 | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int64 | UInt8 | refused schema: expected String type, got: i64
+Expr.str.replace | value | Int8 | Array(Int64, 2) | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | Boolean | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | Date | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | Datetime(us) | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | Datetime(us, UTC) | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | Decimal(10, 2) | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | Duration(us) | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | Float16 | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | Float32 | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | Float64 | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | Int128 | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | Int16 | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | Int32 | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | Int64 | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | Int8 | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | List(Int64) | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | List(String) | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | Null | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | String | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | Struct(x: Int64, y: String) | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | Time | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | UInt128 | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | UInt16 | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | UInt32 | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | UInt64 | refused schema: expected String type, got: i8
+Expr.str.replace | value | Int8 | UInt8 | refused schema: expected String type, got: i8
+Expr.str.replace | value | List(Int64) | Array(Int64, 2) | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | Boolean | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | Date | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | Datetime(us) | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | Datetime(us, UTC) | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | Decimal(10, 2) | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | Duration(us) | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | Float16 | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | Float32 | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | Float64 | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | Int128 | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | Int16 | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | Int32 | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | Int64 | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | Int8 | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | List(Int64) | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | List(String) | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | Null | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | String | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | Struct(x: Int64, y: String) | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | Time | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | UInt128 | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | UInt16 | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | UInt32 | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | UInt64 | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(Int64) | UInt8 | refused schema: expected String type, got: list[i64]
+Expr.str.replace | value | List(String) | Array(Int64, 2) | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | Boolean | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | Date | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | Datetime(us) | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | Datetime(us, UTC) | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | Decimal(10, 2) | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | Duration(us) | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | Float16 | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | Float32 | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | Float64 | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | Int128 | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | Int16 | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | Int32 | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | Int64 | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | Int8 | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | List(Int64) | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | List(String) | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | Null | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | String | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | Struct(x: Int64, y: String) | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | Time | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | UInt128 | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | UInt16 | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | UInt32 | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | UInt64 | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | List(String) | UInt8 | refused schema: expected String type, got: list[str]
+Expr.str.replace | value | Null | Array(Int64, 2) | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | Boolean | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | Date | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | Datetime(us) | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | Datetime(us, UTC) | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | Decimal(10, 2) | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | Duration(us) | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | Float16 | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | Float32 | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | Float64 | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | Int128 | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | Int16 | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | Int32 | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | Int64 | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | Int8 | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | List(Int64) | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | List(String) | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | Null | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | String | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | Struct(x: Int64, y: String) | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | Time | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | UInt128 | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | UInt16 | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | UInt32 | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | UInt64 | refused schema: expected String type, got: null
+Expr.str.replace | value | Null | UInt8 | refused schema: expected String type, got: null
+Expr.str.replace | value | String | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'String')
+Expr.str.replace | value | String | Boolean | allowed String many
+Expr.str.replace | value | String | Date | allowed String many
+Expr.str.replace | value | String | Datetime(us) | allowed String many
+Expr.str.replace | value | String | Datetime(us, UTC) | allowed String many
+Expr.str.replace | value | String | Decimal(10, 2) | allowed String many
+Expr.str.replace | value | String | Duration(us) | refused rows: casting from Duration('μs') to String not supported
+Expr.str.replace | value | String | Float16 | allowed String many
+Expr.str.replace | value | String | Float32 | allowed String many
+Expr.str.replace | value | String | Float64 | allowed String many
+Expr.str.replace | value | String | Int128 | allowed String many
+Expr.str.replace | value | String | Int16 | allowed String many
+Expr.str.replace | value | String | Int32 | allowed String many
+Expr.str.replace | value | String | Int64 | allowed String many
+Expr.str.replace | value | String | Int8 | allowed String many
+Expr.str.replace | value | String | List(Int64) | refused rows: cannot cast List type (inner: 'Int64', to: 'String')
+Expr.str.replace | value | String | List(String) | refused rows: cannot cast List type (inner: 'String', to: 'String')
+Expr.str.replace | value | String | Null | allowed String many
+Expr.str.replace | value | String | String | allowed String many
+Expr.str.replace | value | String | Struct(x: Int64, y: String) | refused rows: conversion from `struct[2]` to `str` failed in column 'b' for 1 out of 3 values: [{null,null}]
+Expr.str.replace | value | String | Time | allowed String many
+Expr.str.replace | value | String | UInt128 | allowed String many
+Expr.str.replace | value | String | UInt16 | allowed String many
+Expr.str.replace | value | String | UInt32 | allowed String many
+Expr.str.replace | value | String | UInt64 | allowed String many
+Expr.str.replace | value | String | UInt8 | allowed String many
+Expr.str.replace | value | Struct(x: Int64, y: String) | Array(Int64, 2) | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | Boolean | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | Date | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | Datetime(us) | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | Datetime(us, UTC) | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | Decimal(10, 2) | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | Duration(us) | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | Float16 | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | Float32 | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | Float64 | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | Int128 | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | Int16 | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | Int32 | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | Int64 | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | Int8 | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | List(Int64) | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | List(String) | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | Null | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | String | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | Struct(x: Int64, y: String) | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | Time | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | UInt128 | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | UInt16 | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | UInt32 | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | UInt64 | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Struct(x: Int64, y: String) | UInt8 | refused schema: expected String type, got: struct[2]
+Expr.str.replace | value | Time | Array(Int64, 2) | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | Boolean | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | Date | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | Datetime(us) | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | Datetime(us, UTC) | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | Decimal(10, 2) | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | Duration(us) | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | Float16 | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | Float32 | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | Float64 | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | Int128 | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | Int16 | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | Int32 | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | Int64 | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | Int8 | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | List(Int64) | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | List(String) | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | Null | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | String | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | Struct(x: Int64, y: String) | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | Time | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | UInt128 | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | UInt16 | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | UInt32 | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | UInt64 | refused schema: expected String type, got: time
+Expr.str.replace | value | Time | UInt8 | refused schema: expected String type, got: time
+Expr.str.replace | value | UInt128 | Array(Int64, 2) | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | Boolean | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | Date | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | Datetime(us) | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | Datetime(us, UTC) | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | Decimal(10, 2) | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | Duration(us) | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | Float16 | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | Float32 | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | Float64 | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | Int128 | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | Int16 | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | Int32 | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | Int64 | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | Int8 | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | List(Int64) | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | List(String) | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | Null | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | String | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | Struct(x: Int64, y: String) | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | Time | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | UInt128 | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | UInt16 | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | UInt32 | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | UInt64 | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt128 | UInt8 | refused schema: expected String type, got: u128
+Expr.str.replace | value | UInt16 | Array(Int64, 2) | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | Boolean | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | Date | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | Datetime(us) | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | Datetime(us, UTC) | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | Decimal(10, 2) | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | Duration(us) | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | Float16 | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | Float32 | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | Float64 | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | Int128 | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | Int16 | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | Int32 | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | Int64 | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | Int8 | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | List(Int64) | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | List(String) | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | Null | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | String | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | Struct(x: Int64, y: String) | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | Time | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | UInt128 | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | UInt16 | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | UInt32 | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | UInt64 | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt16 | UInt8 | refused schema: expected String type, got: u16
+Expr.str.replace | value | UInt32 | Array(Int64, 2) | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | Boolean | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | Date | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | Datetime(us) | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | Datetime(us, UTC) | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | Decimal(10, 2) | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | Duration(us) | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | Float16 | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | Float32 | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | Float64 | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | Int128 | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | Int16 | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | Int32 | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | Int64 | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | Int8 | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | List(Int64) | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | List(String) | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | Null | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | String | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | Struct(x: Int64, y: String) | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | Time | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | UInt128 | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | UInt16 | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | UInt32 | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | UInt64 | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt32 | UInt8 | refused schema: expected String type, got: u32
+Expr.str.replace | value | UInt64 | Array(Int64, 2) | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | Boolean | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | Date | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | Datetime(us) | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | Datetime(us, UTC) | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | Decimal(10, 2) | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | Duration(us) | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | Float16 | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | Float32 | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | Float64 | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | Int128 | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | Int16 | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | Int32 | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | Int64 | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | Int8 | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | List(Int64) | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | List(String) | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | Null | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | String | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | Struct(x: Int64, y: String) | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | Time | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | UInt128 | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | UInt16 | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | UInt32 | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | UInt64 | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt64 | UInt8 | refused schema: expected String type, got: u64
+Expr.str.replace | value | UInt8 | Array(Int64, 2) | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | Boolean | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | Date | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | Datetime(us) | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | Datetime(us, UTC) | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | Decimal(10, 2) | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | Duration(us) | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | Float16 | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | Float32 | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | Float64 | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | Int128 | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | Int16 | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | Int32 | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | Int64 | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | Int8 | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | List(Int64) | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | List(String) | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | Null | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | String | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | Struct(x: Int64, y: String) | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | Time | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | UInt128 | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | UInt16 | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | UInt32 | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | UInt64 | refused schema: expected String type, got: u8
+Expr.str.replace | value | UInt8 | UInt8 | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | Array(Int64, 2) | Array(Int64, 2) | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | Boolean | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | Date | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | Datetime(us) | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | Datetime(us, UTC) | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | Decimal(10, 2) | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | Duration(us) | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | Float16 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | Float32 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | Float64 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | Int128 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | Int16 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | Int32 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | Int64 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | Int8 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | List(Int64) | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | List(String) | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | Null | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | String | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | Struct(x: Int64, y: String) | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | Time | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | UInt128 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | UInt16 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | UInt32 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | UInt64 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Array(Int64, 2) | UInt8 | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | value | Boolean | Array(Int64, 2) | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | Boolean | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | Date | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | Datetime(us) | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | Datetime(us, UTC) | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | Decimal(10, 2) | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | Duration(us) | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | Float16 | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | Float32 | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | Float64 | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | Int128 | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | Int16 | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | Int32 | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | Int64 | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | Int8 | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | List(Int64) | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | List(String) | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | Null | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | String | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | Struct(x: Int64, y: String) | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | Time | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | UInt128 | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | UInt16 | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | UInt32 | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | UInt64 | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Boolean | UInt8 | refused schema: expected String type, got: bool
+Expr.str.replace_all | value | Date | Array(Int64, 2) | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | Boolean | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | Date | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | Datetime(us) | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | Datetime(us, UTC) | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | Decimal(10, 2) | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | Duration(us) | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | Float16 | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | Float32 | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | Float64 | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | Int128 | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | Int16 | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | Int32 | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | Int64 | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | Int8 | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | List(Int64) | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | List(String) | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | Null | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | String | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | Struct(x: Int64, y: String) | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | Time | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | UInt128 | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | UInt16 | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | UInt32 | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | UInt64 | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Date | UInt8 | refused schema: expected String type, got: date
+Expr.str.replace_all | value | Datetime(us) | Array(Int64, 2) | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | Boolean | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | Date | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | Datetime(us) | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | Datetime(us, UTC) | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | Decimal(10, 2) | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | Duration(us) | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | Float16 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | Float32 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | Float64 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | Int128 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | Int16 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | Int32 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | Int64 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | Int8 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | List(Int64) | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | List(String) | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | Null | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | String | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | Struct(x: Int64, y: String) | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | Time | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | UInt128 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | UInt16 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | UInt32 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | UInt64 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us) | UInt8 | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | value | Datetime(us, UTC) | Array(Int64, 2) | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | Boolean | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | Date | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | Datetime(us) | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | Datetime(us, UTC) | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | Decimal(10, 2) | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | Duration(us) | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | Float16 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | Float32 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | Float64 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | Int128 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | Int16 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | Int32 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | Int64 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | Int8 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | List(Int64) | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | List(String) | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | Null | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | String | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | Struct(x: Int64, y: String) | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | Time | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | UInt128 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | UInt16 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | UInt32 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | UInt64 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Datetime(us, UTC) | UInt8 | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | value | Decimal(10, 2) | Array(Int64, 2) | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | Boolean | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | Date | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | Datetime(us) | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | Datetime(us, UTC) | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | Decimal(10, 2) | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | Duration(us) | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | Float16 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | Float32 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | Float64 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | Int128 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | Int16 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | Int32 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | Int64 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | Int8 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | List(Int64) | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | List(String) | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | Null | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | String | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | Struct(x: Int64, y: String) | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | Time | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | UInt128 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | UInt16 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | UInt32 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | UInt64 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Decimal(10, 2) | UInt8 | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | value | Duration(us) | Array(Int64, 2) | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | Boolean | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | Date | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | Datetime(us) | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | Datetime(us, UTC) | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | Decimal(10, 2) | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | Duration(us) | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | Float16 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | Float32 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | Float64 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | Int128 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | Int16 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | Int32 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | Int64 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | Int8 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | List(Int64) | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | List(String) | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | Null | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | String | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | Struct(x: Int64, y: String) | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | Time | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | UInt128 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | UInt16 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | UInt32 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | UInt64 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Duration(us) | UInt8 | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | value | Float16 | Array(Int64, 2) | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | Boolean | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | Date | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | Datetime(us) | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | Datetime(us, UTC) | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | Decimal(10, 2) | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | Duration(us) | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | Float16 | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | Float32 | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | Float64 | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | Int128 | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | Int16 | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | Int32 | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | Int64 | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | Int8 | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | List(Int64) | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | List(String) | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | Null | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | String | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | Struct(x: Int64, y: String) | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | Time | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | UInt128 | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | UInt16 | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | UInt32 | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | UInt64 | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float16 | UInt8 | refused schema: expected String type, got: f16
+Expr.str.replace_all | value | Float32 | Array(Int64, 2) | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | Boolean | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | Date | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | Datetime(us) | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | Datetime(us, UTC) | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | Decimal(10, 2) | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | Duration(us) | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | Float16 | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | Float32 | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | Float64 | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | Int128 | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | Int16 | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | Int32 | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | Int64 | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | Int8 | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | List(Int64) | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | List(String) | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | Null | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | String | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | Struct(x: Int64, y: String) | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | Time | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | UInt128 | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | UInt16 | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | UInt32 | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | UInt64 | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float32 | UInt8 | refused schema: expected String type, got: f32
+Expr.str.replace_all | value | Float64 | Array(Int64, 2) | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | Boolean | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | Date | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | Datetime(us) | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | Datetime(us, UTC) | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | Decimal(10, 2) | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | Duration(us) | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | Float16 | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | Float32 | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | Float64 | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | Int128 | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | Int16 | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | Int32 | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | Int64 | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | Int8 | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | List(Int64) | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | List(String) | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | Null | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | String | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | Struct(x: Int64, y: String) | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | Time | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | UInt128 | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | UInt16 | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | UInt32 | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | UInt64 | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Float64 | UInt8 | refused schema: expected String type, got: f64
+Expr.str.replace_all | value | Int128 | Array(Int64, 2) | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | Boolean | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | Date | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | Datetime(us) | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | Datetime(us, UTC) | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | Decimal(10, 2) | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | Duration(us) | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | Float16 | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | Float32 | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | Float64 | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | Int128 | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | Int16 | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | Int32 | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | Int64 | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | Int8 | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | List(Int64) | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | List(String) | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | Null | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | String | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | Struct(x: Int64, y: String) | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | Time | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | UInt128 | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | UInt16 | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | UInt32 | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | UInt64 | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int128 | UInt8 | refused schema: expected String type, got: i128
+Expr.str.replace_all | value | Int16 | Array(Int64, 2) | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | Boolean | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | Date | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | Datetime(us) | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | Datetime(us, UTC) | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | Decimal(10, 2) | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | Duration(us) | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | Float16 | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | Float32 | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | Float64 | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | Int128 | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | Int16 | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | Int32 | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | Int64 | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | Int8 | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | List(Int64) | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | List(String) | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | Null | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | String | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | Struct(x: Int64, y: String) | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | Time | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | UInt128 | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | UInt16 | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | UInt32 | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | UInt64 | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int16 | UInt8 | refused schema: expected String type, got: i16
+Expr.str.replace_all | value | Int32 | Array(Int64, 2) | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | Boolean | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | Date | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | Datetime(us) | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | Datetime(us, UTC) | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | Decimal(10, 2) | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | Duration(us) | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | Float16 | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | Float32 | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | Float64 | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | Int128 | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | Int16 | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | Int32 | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | Int64 | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | Int8 | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | List(Int64) | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | List(String) | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | Null | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | String | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | Struct(x: Int64, y: String) | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | Time | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | UInt128 | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | UInt16 | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | UInt32 | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | UInt64 | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int32 | UInt8 | refused schema: expected String type, got: i32
+Expr.str.replace_all | value | Int64 | Array(Int64, 2) | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | Boolean | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | Date | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | Datetime(us) | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | Datetime(us, UTC) | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | Decimal(10, 2) | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | Duration(us) | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | Float16 | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | Float32 | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | Float64 | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | Int128 | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | Int16 | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | Int32 | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | Int64 | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | Int8 | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | List(Int64) | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | List(String) | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | Null | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | String | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | Struct(x: Int64, y: String) | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | Time | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | UInt128 | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | UInt16 | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | UInt32 | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | UInt64 | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int64 | UInt8 | refused schema: expected String type, got: i64
+Expr.str.replace_all | value | Int8 | Array(Int64, 2) | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | Boolean | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | Date | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | Datetime(us) | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | Datetime(us, UTC) | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | Decimal(10, 2) | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | Duration(us) | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | Float16 | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | Float32 | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | Float64 | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | Int128 | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | Int16 | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | Int32 | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | Int64 | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | Int8 | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | List(Int64) | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | List(String) | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | Null | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | String | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | Struct(x: Int64, y: String) | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | Time | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | UInt128 | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | UInt16 | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | UInt32 | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | UInt64 | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | Int8 | UInt8 | refused schema: expected String type, got: i8
+Expr.str.replace_all | value | List(Int64) | Array(Int64, 2) | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | Boolean | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | Date | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | Datetime(us) | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | Datetime(us, UTC) | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | Decimal(10, 2) | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | Duration(us) | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | Float16 | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | Float32 | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | Float64 | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | Int128 | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | Int16 | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | Int32 | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | Int64 | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | Int8 | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | List(Int64) | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | List(String) | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | Null | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | String | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | Struct(x: Int64, y: String) | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | Time | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | UInt128 | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | UInt16 | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | UInt32 | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | UInt64 | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(Int64) | UInt8 | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | value | List(String) | Array(Int64, 2) | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | Boolean | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | Date | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | Datetime(us) | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | Datetime(us, UTC) | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | Decimal(10, 2) | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | Duration(us) | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | Float16 | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | Float32 | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | Float64 | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | Int128 | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | Int16 | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | Int32 | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | Int64 | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | Int8 | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | List(Int64) | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | List(String) | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | Null | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | String | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | Struct(x: Int64, y: String) | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | Time | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | UInt128 | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | UInt16 | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | UInt32 | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | UInt64 | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | List(String) | UInt8 | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | value | Null | Array(Int64, 2) | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | Boolean | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | Date | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | Datetime(us) | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | Datetime(us, UTC) | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | Decimal(10, 2) | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | Duration(us) | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | Float16 | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | Float32 | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | Float64 | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | Int128 | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | Int16 | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | Int32 | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | Int64 | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | Int8 | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | List(Int64) | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | List(String) | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | Null | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | String | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | Struct(x: Int64, y: String) | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | Time | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | UInt128 | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | UInt16 | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | UInt32 | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | UInt64 | refused schema: expected String type, got: null
+Expr.str.replace_all | value | Null | UInt8 | refused schema: expected String type, got: null
+Expr.str.replace_all | value | String | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'String')
+Expr.str.replace_all | value | String | Boolean | allowed String many
+Expr.str.replace_all | value | String | Date | allowed String many
+Expr.str.replace_all | value | String | Datetime(us) | allowed String many
+Expr.str.replace_all | value | String | Datetime(us, UTC) | allowed String many
+Expr.str.replace_all | value | String | Decimal(10, 2) | allowed String many
+Expr.str.replace_all | value | String | Duration(us) | refused rows: casting from Duration('μs') to String not supported
+Expr.str.replace_all | value | String | Float16 | allowed String many
+Expr.str.replace_all | value | String | Float32 | allowed String many
+Expr.str.replace_all | value | String | Float64 | allowed String many
+Expr.str.replace_all | value | String | Int128 | allowed String many
+Expr.str.replace_all | value | String | Int16 | allowed String many
+Expr.str.replace_all | value | String | Int32 | allowed String many
+Expr.str.replace_all | value | String | Int64 | allowed String many
+Expr.str.replace_all | value | String | Int8 | allowed String many
+Expr.str.replace_all | value | String | List(Int64) | refused rows: cannot cast List type (inner: 'Int64', to: 'String')
+Expr.str.replace_all | value | String | List(String) | refused rows: cannot cast List type (inner: 'String', to: 'String')
+Expr.str.replace_all | value | String | Null | allowed String many
+Expr.str.replace_all | value | String | String | allowed String many
+Expr.str.replace_all | value | String | Struct(x: Int64, y: String) | refused rows: conversion from `struct[2]` to `str` failed in column 'b' for 1 out of 3 values: [{null,null}]
+Expr.str.replace_all | value | String | Time | allowed String many
+Expr.str.replace_all | value | String | UInt128 | allowed String many
+Expr.str.replace_all | value | String | UInt16 | allowed String many
+Expr.str.replace_all | value | String | UInt32 | allowed String many
+Expr.str.replace_all | value | String | UInt64 | allowed String many
+Expr.str.replace_all | value | String | UInt8 | allowed String many
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | Array(Int64, 2) | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | Boolean | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | Date | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | Datetime(us) | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | Datetime(us, UTC) | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | Decimal(10, 2) | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | Duration(us) | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | Float16 | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | Float32 | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | Float64 | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | Int128 | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | Int16 | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | Int32 | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | Int64 | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | Int8 | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | List(Int64) | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | List(String) | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | Null | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | String | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | Struct(x: Int64, y: String) | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | Time | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | UInt128 | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | UInt16 | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | UInt32 | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | UInt64 | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Struct(x: Int64, y: String) | UInt8 | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | value | Time | Array(Int64, 2) | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | Boolean | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | Date | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | Datetime(us) | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | Datetime(us, UTC) | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | Decimal(10, 2) | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | Duration(us) | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | Float16 | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | Float32 | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | Float64 | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | Int128 | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | Int16 | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | Int32 | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | Int64 | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | Int8 | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | List(Int64) | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | List(String) | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | Null | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | String | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | Struct(x: Int64, y: String) | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | Time | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | UInt128 | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | UInt16 | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | UInt32 | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | UInt64 | refused schema: expected String type, got: time
+Expr.str.replace_all | value | Time | UInt8 | refused schema: expected String type, got: time
+Expr.str.replace_all | value | UInt128 | Array(Int64, 2) | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | Boolean | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | Date | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | Datetime(us) | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | Datetime(us, UTC) | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | Decimal(10, 2) | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | Duration(us) | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | Float16 | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | Float32 | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | Float64 | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | Int128 | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | Int16 | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | Int32 | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | Int64 | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | Int8 | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | List(Int64) | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | List(String) | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | Null | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | String | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | Struct(x: Int64, y: String) | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | Time | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | UInt128 | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | UInt16 | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | UInt32 | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | UInt64 | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt128 | UInt8 | refused schema: expected String type, got: u128
+Expr.str.replace_all | value | UInt16 | Array(Int64, 2) | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | Boolean | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | Date | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | Datetime(us) | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | Datetime(us, UTC) | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | Decimal(10, 2) | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | Duration(us) | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | Float16 | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | Float32 | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | Float64 | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | Int128 | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | Int16 | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | Int32 | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | Int64 | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | Int8 | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | List(Int64) | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | List(String) | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | Null | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | String | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | Struct(x: Int64, y: String) | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | Time | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | UInt128 | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | UInt16 | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | UInt32 | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | UInt64 | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt16 | UInt8 | refused schema: expected String type, got: u16
+Expr.str.replace_all | value | UInt32 | Array(Int64, 2) | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | Boolean | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | Date | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | Datetime(us) | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | Datetime(us, UTC) | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | Decimal(10, 2) | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | Duration(us) | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | Float16 | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | Float32 | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | Float64 | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | Int128 | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | Int16 | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | Int32 | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | Int64 | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | Int8 | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | List(Int64) | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | List(String) | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | Null | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | String | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | Struct(x: Int64, y: String) | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | Time | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | UInt128 | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | UInt16 | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | UInt32 | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | UInt64 | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt32 | UInt8 | refused schema: expected String type, got: u32
+Expr.str.replace_all | value | UInt64 | Array(Int64, 2) | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | Boolean | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | Date | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | Datetime(us) | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | Datetime(us, UTC) | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | Decimal(10, 2) | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | Duration(us) | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | Float16 | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | Float32 | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | Float64 | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | Int128 | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | Int16 | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | Int32 | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | Int64 | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | Int8 | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | List(Int64) | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | List(String) | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | Null | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | String | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | Struct(x: Int64, y: String) | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | Time | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | UInt128 | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | UInt16 | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | UInt32 | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | UInt64 | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt64 | UInt8 | refused schema: expected String type, got: u64
+Expr.str.replace_all | value | UInt8 | Array(Int64, 2) | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | Boolean | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | Date | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | Datetime(us) | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | Datetime(us, UTC) | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | Decimal(10, 2) | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | Duration(us) | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | Float16 | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | Float32 | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | Float64 | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | Int128 | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | Int16 | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | Int32 | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | Int64 | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | Int8 | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | List(Int64) | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | List(String) | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | Null | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | String | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | Struct(x: Int64, y: String) | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | Time | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | UInt128 | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | UInt16 | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | UInt32 | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | UInt64 | refused schema: expected String type, got: u8
+Expr.str.replace_all | value | UInt8 | UInt8 | refused schema: expected String type, got: u8
 Expr.str.reverse | - | Array(Int64, 2) | - | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`
 Expr.str.reverse | - | Boolean | - | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `a`
 Expr.str.reverse | - | Date | - | refused rows: invalid series dtype: expected `String`, got `date` for series with name `a`

@@ -109,12 +109,14 @@ export function setParameters(entry: EntryView, options: Options): SetParameter[
   });
 }
 
-/** Returns the parameters of `entry` that a method or step can be given as options: all but `covered`. */
+/** Returns the parameters of `entry` that a method or step can be given as options: all but `covered` and those the engine does not offer. */
 export function optionParameters(
   entry: EntryView,
   covered: readonly string[],
 ): readonly ParameterView[] {
-  return entry.parameters.filter((parameter) => !covered.includes(parameter.name));
+  return entry.parameters.filter(
+    (parameter) => parameter.offered && !covered.includes(parameter.name),
+  );
 }
 
 /** Returns `options` with the parameter called `name` set to `setting`. */
