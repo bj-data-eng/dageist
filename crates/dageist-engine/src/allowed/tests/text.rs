@@ -5,7 +5,10 @@ use polars::prelude::{DataType, JoinType, col, lit};
 
 use crate::allowed::dtype::Representative;
 use crate::allowed::offers::RefusalSource;
-use crate::allowed::{After, Chosen, Context, Outer, Place, Shape, Stage, Verdict, offer, options};
+use crate::allowed::{
+    After, ArgumentSlot, Candidate, Chosen, Context, Literal, Outer, Place, Shape, Slot, Stage,
+    Verdict, fit, offer, options,
+};
 use crate::catalog;
 
 use super::oracle::{Seen, selected};
@@ -376,5 +379,77 @@ fn a_split_may_stand_in_a_join_key_as_polars_joins_on_a_list_of_text() {
     assert!(!joins_on(
         split().cast(DataType::Int64),
         col("ra").cast(DataType::Int64)
+    ));
+}
+
+/// What a literal given as the argument `parameter` of `id` after text gives, as the offers say.
+fn given_a_literal(id: &str, parameter: &'static str, literal: Literal) -> Option<String> {
+    let place = Place::new(
+        Context::step(Outer::Select),
+        After::Value {
+            dtype: Representative::String,
+            shape: Shape::Many,
+        },
+    );
+    let slot =
+        Slot::new(None, Some(ArgumentSlot::new(entry(id), parameter, place))).expect("a slot");
+    let found = fit(&Candidate::Literal(literal), &slot).expect("a class");
+    let allowance = found.verdict().allowance().expect("the tables allow it");
+    allowance.result().map(|result| result.name().to_owned())
+}
+
+#[test]
+fn a_whole_number_typed_as_a_count_is_that_dtype_and_text_is_what_the_call_gives() {
+    for (id, parameter) in [
+        ("Expr.str.head", "n"),
+        ("Expr.str.tail", "n"),
+        ("Expr.str.slice", "offset"),
+        ("Expr.str.pad_start", "length"),
+        ("Expr.str.zfill", "length"),
+    ] {
+        assert_eq!(
+            given_a_literal(id, parameter, Literal::Integer(3)).as_deref(),
+            Some("String"),
+            "{id}"
+        );
+    }
+}
+
+#[test]
+fn a_negative_whole_number_typed_as_a_length_is_refused_by_polars_and_gives_no_dtype() {
+    // Polars converts a length to an unsigned whole number, and refuses one below zero when it
+    // works out the schema, where a count from the end, an offset and the head or the tail may be
+    // negative. The tables measured a column of the sample's rows, so they cannot say it.
+    for (id, parameter, length) in [
+        ("Expr.str.pad_start", "length", true),
+        ("Expr.str.pad_end", "length", true),
+        ("Expr.str.zfill", "length", true),
+        ("Expr.str.slice", "length", true),
+        ("Expr.str.head", "n", false),
+        ("Expr.str.tail", "n", false),
+        ("Expr.str.slice", "offset", false),
+    ] {
+        let given = given_a_literal(id, parameter, Literal::Integer(-1));
+        assert_eq!(
+            given.as_deref(),
+            if length { None } else { Some("String") },
+            "{id} {parameter}"
+        );
+    }
+    assert_eq!(
+        selected(
+            Representative::String,
+            Representative::Int64,
+            col("a").str().pad_start(lit(-1), ' ')
+        ),
+        Seen::Refused(Stage::Schema)
+    );
+    assert!(matches!(
+        selected(
+            Representative::String,
+            Representative::Int64,
+            col("a").str().head(lit(-1))
+        ),
+        Seen::Ran(_)
     ));
 }
