@@ -2482,7 +2482,7 @@
         {
           "name": "strict",
           "shown": "strict",
-          "label": "refuse a bad pattern",
+          "label": "no effect: a bad pattern is always refused",
           "kind": {
             "kind": "flag"
           },
@@ -2774,7 +2774,7 @@
         {
           "name": "strict",
           "shown": "strict",
-          "label": "refuse a bad pattern",
+          "label": "no effect: a bad pattern is always refused",
           "kind": {
             "kind": "flag"
           },
@@ -3328,7 +3328,7 @@
         {
           "name": "strict",
           "shown": "strict",
-          "label": "refuse a bad pattern",
+          "label": "refuse a bad pattern in a column",
           "kind": {
             "kind": "flag"
           },
