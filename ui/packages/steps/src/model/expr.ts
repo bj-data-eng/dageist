@@ -51,6 +51,16 @@ export function argumentRule(catalogue: Catalogue, name: MethodName): ArgumentRu
 }
 
 /**
+ * Whether a method may start with nothing for the parameter, which then holds what Polars leaves
+ * it when it is not given: a parameter that a step need not give and whose default is Python's
+ * `None`, as the characters `strip_chars` takes off are. One that is needed, or that has a value
+ * of its own by default, is still to be picked.
+ */
+export function mayBeLeftOut(parameter: ParameterView): boolean {
+  return !parameter.needed && parameter.default.kind === 'none';
+}
+
+/**
  * Returns the parameters of the method `name` that can be added to it: all
  * but the argument that is drawn where the method is.
  */

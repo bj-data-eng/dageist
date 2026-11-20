@@ -43,6 +43,7 @@ import { wrongId } from './model/document';
 import type { ArgumentRule, Method, MethodName } from './model/expr';
 import {
   argumentRule,
+  mayBeLeftOut,
   methodOptionParameters,
   startingArgument,
   swappedArgument,
@@ -234,7 +235,7 @@ function ArgumentSlot({
         label={shown.label}
         tone={shown.tone}
         look={shown.look}
-        wrong={wrong || argument.kind === 'unset'}
+        wrong={wrong || (argument.kind === 'unset' && !mayBeLeftOut(rule.parameter))}
         openNow={fresh.id === method.id}
         describedAs={`${rule.shown}: ${rule.parameter.label}`}
         placeholder="Type a value, or search the fields"

@@ -179,6 +179,11 @@ export interface ParameterView {
   readonly label: string;
   readonly kind: KindView;
   readonly shape: ShapeView;
+  /**
+   * Whether a step must give the parameter. One that is not needed may be left out, which leaves
+   * what it holds to its default.
+   */
+  readonly needed: boolean;
   /** Polars' default, read by the engine. */
   readonly default: DefaultView;
   /**
