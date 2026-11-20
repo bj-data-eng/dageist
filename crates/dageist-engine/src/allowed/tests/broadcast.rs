@@ -67,20 +67,33 @@ fn gives(
     operand: Representative,
 ) -> Option<Shape> {
     let (receiver, one_valued) = receivers;
+    let aggregated = AGGREGATE_RECEIVER.contains(&(entry.id().as_str(), name));
     let frames = Frames::new(receiver, operand, &DataType::Int64);
     let plan = |frames: &Frames, empty: bool| {
         // A receiver of one value is a literal and the operand a column; a receiver of many is a
         // column and the operand a literal.
         let call = method(
             entry,
-            if one_valued && AGGREGATE_RECEIVER.contains(&(entry.id().as_str(), name)) {
+            if one_valued && aggregated {
                 column("a").first()
             } else if one_valued {
                 literal_of(&receiver.dtype())
             } else {
                 column("a")
             },
-            arguments(entry, name, operand, if one_valued { "b" } else { "" }),
+            arguments(
+                entry,
+                name,
+                operand,
+                match (one_valued, aggregated) {
+                    // A column of text with no null: Polars refuses a replacement of every match
+                    // given a null that it meets in a piece of one row, at more threads than the
+                    // tables were measured at, so the one that holds a null measures nothing.
+                    (true, true) => "g",
+                    (true, false) => "b",
+                    (false, _) => "",
+                },
+            ),
         )?;
         step(
             "LazyFrame.select",

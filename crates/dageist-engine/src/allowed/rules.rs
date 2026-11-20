@@ -39,9 +39,8 @@ pub enum Rule {
     /// A pattern is a regular expression Polars can compile, unless the text is plain text by a
     /// flag such as `literal`.
     PatternIsValid,
-    /// A replacement is given as many new values as old ones, or one, a strict one a
-    /// default of as many values as what it follows, or one, and the replacement of text a value
-    /// of as many as the text it follows, or one.
+    /// A replacement is given as many new values as old ones, or one, and a strict one a
+    /// default of as many values as what it follows, or one.
     ReplacementValuesMatchInNumber,
 }
 
@@ -99,7 +98,7 @@ impl Rule {
             }
             Self::PatternIsValid => "a pattern must be a valid regular expression",
             Self::ReplacementValuesMatchInNumber => {
-                "a replacement takes as many new values as old ones, or one, a strict one a default of as many values as what it follows, or one, and the replacement of text a value of as many as the text it follows, or one"
+                "a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one"
             }
         }
     }

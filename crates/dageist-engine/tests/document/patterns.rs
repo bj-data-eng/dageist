@@ -171,11 +171,11 @@ fn the_groups_of_a_pattern_are_the_fields_the_step_reports_and_the_walk_says_no_
 }
 
 #[test]
-fn a_replacement_of_many_values_for_one_text_is_refused_by_the_rule_and_by_polars_for_no_rows() {
-    // A text of one value, given a replacement that is a column of many. Polars broadcasts the
-    // text over the rows of the table, and refuses it for a table with no rows, where the
-    // column has none and the text has one: the tables count the combination refused, as the
-    // rule says.
+fn a_replacement_of_a_literal_text_by_many_values_runs_and_polars_refuses_it_for_no_rows() {
+    // A text of one value that is a literal, given a replacement that is a column of many. Polars
+    // broadcasts the text over the rows of the table, and refuses it for a table with no rows,
+    // where the column has none and the literal one: the tables, which count a combination refused
+    // when the empty table refuses it, measured a column beside it and not a literal.
     let written = selecting(json!({ "expression": {
         "start": crate::support::text_call("a_b"),
         "then": [call(
@@ -184,14 +184,8 @@ fn a_replacement_of_many_values_for_one_text_is_refused_by_the_rule_and_by_polar
         )],
     } }));
     let report = report_of(&written);
-    let walked = report.steps()[0]
-        .walk()
-        .refusal()
-        .expect("the walk refuses it");
-    assert_eq!(
-        walked.refusal().source(),
-        RefusalSource::Rule(Rule::ReplacementValuesMatchInNumber)
-    );
+    assert_eq!(report.steps()[0].walk().refusal(), None);
+    assert!(matches!(report.steps()[0].rows(), StepRows::Counted(_)));
     let no_rows = Document::read(&written)
         .expect("a document")
         .run_on(&inputs(), &claims().clear())

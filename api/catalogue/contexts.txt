@@ -52,7 +52,7 @@
 #   key-is-elementwise: a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a column be compared with a null, nor a replacement take a value that reads a column.
 #   pattern-is-valid: a pattern must be a valid regular expression.
 #   pivot-aggregate-gives-one-value: a pivot's aggregate must give one value for each group.
-#   replacement-values-match-in-number: a replacement takes as many new values as old ones, or one, a strict one a default of as many values as what it follows, or one, and the replacement of text a value of as many as the text it follows, or one.
+#   replacement-values-match-in-number: a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one.
 #
 # An outcome is `allowed <dtype of the result> <one|many>` (`-` for a step), or
 # `refused <stage>: <Polars' reason>`. A combination is allowed only when Polars resolved

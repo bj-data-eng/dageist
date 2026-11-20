@@ -226,11 +226,8 @@ const STRICT: Parameter = flag("strict", "True").keyword_only();
 
 /// What a replacement puts in place of what the pattern matches. Where the pattern is a regular
 /// expression, `$1` and `${name}` stand for the text of a group of the match, and `$$` for a
-/// dollar sign. Polars takes one value or as many as the text it follows has, and refuses many
-/// beside one value, which it does not meet with each of them.
-const REPLACEMENT: Parameter = required("value", EXPRESSION, Shape::One)
-    .given_as_many_as(AsManyAs::TheReceiver)
-    .not_broadcasting();
+/// dollar sign. Polars meets a text of one value with each of the many values of it.
+const REPLACEMENT: Parameter = required("value", EXPRESSION, Shape::One);
 
 /// A tolerance `is_close` takes: a number from zero, which Python passes on as a float.
 const fn tolerance(name: &'static str, default: &'static str) -> Parameter {
