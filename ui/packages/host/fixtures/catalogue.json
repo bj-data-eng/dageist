@@ -37,6 +37,14 @@
       "title": "dt · dates and times"
     },
     {
+      "key": "text",
+      "title": "str · case, trim, pad"
+    },
+    {
+      "key": "pieces",
+      "title": "str · slice, split, join, length"
+    },
+    {
       "key": "window",
       "title": "Window"
     },
@@ -2413,6 +2421,687 @@
       "head": null,
       "lazy": true,
       "parameters": []
+    },
+    {
+      "id": "Expr.str.ends_with",
+      "applies": "expression",
+      "family": "compare",
+      "name": "str.ends_with",
+      "hint": "true where the text ends with a suffix",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "suffix",
+          "shown": "suffix",
+          "label": "ends with",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.head",
+      "applies": "expression",
+      "family": "pieces",
+      "name": "str.head",
+      "hint": "the first characters",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "n",
+          "shown": "n",
+          "label": "how many",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.join",
+      "applies": "expression",
+      "family": "pieces",
+      "name": "str.join",
+      "hint": "all the text of the column as one, with a delimiter between",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "delimiter",
+          "shown": "delimiter",
+          "label": "between them",
+          "kind": {
+            "kind": "value",
+            "type": "string"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": ""
+          },
+          "defaultSetting": {
+            "kind": "text",
+            "value": "",
+            "shown": ""
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "ignore_nulls",
+          "shown": "ignore_nulls",
+          "label": "skip missing text",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": true
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": true
+          },
+          "start": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.len_bytes",
+      "applies": "expression",
+      "family": "pieces",
+      "name": "str.len_bytes",
+      "hint": "length in bytes",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.str.len_chars",
+      "applies": "expression",
+      "family": "pieces",
+      "name": "str.len_chars",
+      "hint": "length in characters",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.str.pad_end",
+      "applies": "expression",
+      "family": "text",
+      "name": "str.pad_end",
+      "hint": "add characters at the end up to a length",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "length",
+          "shown": "length",
+          "label": "up to",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "fill_char",
+          "shown": "fill_char",
+          "label": "with",
+          "kind": {
+            "kind": "value",
+            "type": "string"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": " "
+          },
+          "defaultSetting": {
+            "kind": "text",
+            "value": " ",
+            "shown": " "
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.pad_start",
+      "applies": "expression",
+      "family": "text",
+      "name": "str.pad_start",
+      "hint": "add characters at the start up to a length",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "length",
+          "shown": "length",
+          "label": "up to",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "fill_char",
+          "shown": "fill_char",
+          "label": "with",
+          "kind": {
+            "kind": "value",
+            "type": "string"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": " "
+          },
+          "defaultSetting": {
+            "kind": "text",
+            "value": " ",
+            "shown": " "
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.reverse",
+      "applies": "expression",
+      "family": "text",
+      "name": "str.reverse",
+      "hint": "the text backwards",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.str.slice",
+      "applies": "expression",
+      "family": "pieces",
+      "name": "str.slice",
+      "hint": "part of the text from a position",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "offset",
+          "shown": "offset",
+          "label": "from",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "length",
+          "shown": "length",
+          "label": "characters",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.split",
+      "applies": "expression",
+      "family": "pieces",
+      "name": "str.split",
+      "hint": "a list of the pieces between a separator",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "by",
+          "shown": "by",
+          "label": "at",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "inclusive",
+          "shown": "inclusive",
+          "label": "keep the separator",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null
+        },
+        {
+          "name": "literal",
+          "shown": "literal",
+          "label": "as plain text",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": true
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": true
+          },
+          "start": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null
+        },
+        {
+          "name": "strict",
+          "shown": "strict",
+          "label": "refuse a bad pattern",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": true
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": true
+          },
+          "start": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.starts_with",
+      "applies": "expression",
+      "family": "compare",
+      "name": "str.starts_with",
+      "hint": "true where the text starts with a prefix",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "prefix",
+          "shown": "prefix",
+          "label": "starts with",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.strip_chars",
+      "applies": "expression",
+      "family": "text",
+      "name": "str.strip_chars",
+      "hint": "remove characters from both ends, spaces if none are given",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "characters",
+          "shown": "characters",
+          "label": "characters",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.strip_chars_end",
+      "applies": "expression",
+      "family": "text",
+      "name": "str.strip_chars_end",
+      "hint": "remove characters from the end, spaces if none are given",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "characters",
+          "shown": "characters",
+          "label": "characters",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.strip_chars_start",
+      "applies": "expression",
+      "family": "text",
+      "name": "str.strip_chars_start",
+      "hint": "remove characters from the start, spaces if none are given",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "characters",
+          "shown": "characters",
+          "label": "characters",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.strip_prefix",
+      "applies": "expression",
+      "family": "text",
+      "name": "str.strip_prefix",
+      "hint": "remove a prefix where the text starts with it",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "prefix",
+          "shown": "prefix",
+          "label": "prefix",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.strip_suffix",
+      "applies": "expression",
+      "family": "text",
+      "name": "str.strip_suffix",
+      "hint": "remove a suffix where the text ends with it",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "suffix",
+          "shown": "suffix",
+          "label": "suffix",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.tail",
+      "applies": "expression",
+      "family": "pieces",
+      "name": "str.tail",
+      "hint": "the last characters",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "n",
+          "shown": "n",
+          "label": "how many",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.to_lowercase",
+      "applies": "expression",
+      "family": "text",
+      "name": "str.to_lowercase",
+      "hint": "all lowercase",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.str.to_titlecase",
+      "applies": "expression",
+      "family": "text",
+      "name": "str.to_titlecase",
+      "hint": "the first letter of each word capitalised",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.str.to_uppercase",
+      "applies": "expression",
+      "family": "text",
+      "name": "str.to_uppercase",
+      "hint": "all uppercase",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.str.zfill",
+      "applies": "expression",
+      "family": "text",
+      "name": "str.zfill",
+      "hint": "add zeros at the start up to a length",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "length",
+          "shown": "length",
+          "label": "up to",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
     },
     {
       "id": "Expr.sub",

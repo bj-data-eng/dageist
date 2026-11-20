@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 3324 combinations: 2629 allowed; 32 refused when Polars resolved the schema, 663 when it ran the rows, 0 when it ran the empty table.
+# 3688 combinations: 2681 allowed; 136 refused when Polars resolved the schema, 871 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.cast | Array(Int64, 2) | dtype=Boolean | refused rows: cannot cast Array type (inner: 'Int64', to: 'Boolean')
 Expr.cast | Array(Int64, 2) | dtype=Boolean, strict=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Boolean')
@@ -2946,6 +2946,370 @@ Expr.round | UInt64 | mode=half_away_from_zero | allowed UInt64 many
 Expr.round | UInt64 | mode=half_to_even | allowed UInt64 many
 Expr.round | UInt8 | mode=half_away_from_zero | allowed UInt8 many
 Expr.round | UInt8 | mode=half_to_even | allowed UInt8 many
+Expr.str.join | Array(Int64, 2) | ignore_nulls=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'String')
+Expr.str.join | Array(Int64, 2) | ignore_nulls=true | refused rows: cannot cast Array type (inner: 'Int64', to: 'String')
+Expr.str.join | Boolean | ignore_nulls=false | allowed String one
+Expr.str.join | Boolean | ignore_nulls=true | allowed String one
+Expr.str.join | Date | ignore_nulls=false | allowed String one
+Expr.str.join | Date | ignore_nulls=true | allowed String one
+Expr.str.join | Datetime(us) | ignore_nulls=false | allowed String one
+Expr.str.join | Datetime(us) | ignore_nulls=true | allowed String one
+Expr.str.join | Datetime(us, UTC) | ignore_nulls=false | allowed String one
+Expr.str.join | Datetime(us, UTC) | ignore_nulls=true | allowed String one
+Expr.str.join | Decimal(10, 2) | ignore_nulls=false | allowed String one
+Expr.str.join | Decimal(10, 2) | ignore_nulls=true | allowed String one
+Expr.str.join | Duration(us) | ignore_nulls=false | refused rows: casting from Duration('μs') to String not supported
+Expr.str.join | Duration(us) | ignore_nulls=true | refused rows: casting from Duration('μs') to String not supported
+Expr.str.join | Float16 | ignore_nulls=false | allowed String one
+Expr.str.join | Float16 | ignore_nulls=true | allowed String one
+Expr.str.join | Float32 | ignore_nulls=false | allowed String one
+Expr.str.join | Float32 | ignore_nulls=true | allowed String one
+Expr.str.join | Float64 | ignore_nulls=false | allowed String one
+Expr.str.join | Float64 | ignore_nulls=true | allowed String one
+Expr.str.join | Int128 | ignore_nulls=false | allowed String one
+Expr.str.join | Int128 | ignore_nulls=true | allowed String one
+Expr.str.join | Int16 | ignore_nulls=false | allowed String one
+Expr.str.join | Int16 | ignore_nulls=true | allowed String one
+Expr.str.join | Int32 | ignore_nulls=false | allowed String one
+Expr.str.join | Int32 | ignore_nulls=true | allowed String one
+Expr.str.join | Int64 | ignore_nulls=false | allowed String one
+Expr.str.join | Int64 | ignore_nulls=true | allowed String one
+Expr.str.join | Int8 | ignore_nulls=false | allowed String one
+Expr.str.join | Int8 | ignore_nulls=true | allowed String one
+Expr.str.join | List(Int64) | ignore_nulls=false | refused rows: cannot cast List type (inner: 'Int64', to: 'String')
+Expr.str.join | List(Int64) | ignore_nulls=true | refused rows: cannot cast List type (inner: 'Int64', to: 'String')
+Expr.str.join | List(String) | ignore_nulls=false | refused rows: cannot cast List type (inner: 'String', to: 'String')
+Expr.str.join | List(String) | ignore_nulls=true | refused rows: cannot cast List type (inner: 'String', to: 'String')
+Expr.str.join | Null | ignore_nulls=false | allowed String one
+Expr.str.join | Null | ignore_nulls=true | allowed String one
+Expr.str.join | String | ignore_nulls=false | allowed String one
+Expr.str.join | String | ignore_nulls=true | allowed String one
+Expr.str.join | Struct(x: Int64, y: String) | ignore_nulls=false | allowed String one
+Expr.str.join | Struct(x: Int64, y: String) | ignore_nulls=true | allowed String one
+Expr.str.join | Time | ignore_nulls=false | allowed String one
+Expr.str.join | Time | ignore_nulls=true | allowed String one
+Expr.str.join | UInt128 | ignore_nulls=false | allowed String one
+Expr.str.join | UInt128 | ignore_nulls=true | allowed String one
+Expr.str.join | UInt16 | ignore_nulls=false | allowed String one
+Expr.str.join | UInt16 | ignore_nulls=true | allowed String one
+Expr.str.join | UInt32 | ignore_nulls=false | allowed String one
+Expr.str.join | UInt32 | ignore_nulls=true | allowed String one
+Expr.str.join | UInt64 | ignore_nulls=false | allowed String one
+Expr.str.join | UInt64 | ignore_nulls=true | allowed String one
+Expr.str.join | UInt8 | ignore_nulls=false | allowed String one
+Expr.str.join | UInt8 | ignore_nulls=true | allowed String one
+Expr.str.split | Array(Int64, 2) | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Array(Int64, 2) | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`
+Expr.str.split | Array(Int64, 2) | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`
+Expr.str.split | Array(Int64, 2) | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`
+Expr.str.split | Array(Int64, 2) | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Array(Int64, 2) | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`
+Expr.str.split | Array(Int64, 2) | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`
+Expr.str.split | Array(Int64, 2) | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`
+Expr.str.split | Array(Int64, 2) | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Array(Int64, 2) | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Array(Int64, 2) | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`
+Expr.str.split | Array(Int64, 2) | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`
+Expr.str.split | Boolean | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Boolean | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `a`
+Expr.str.split | Boolean | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `a`
+Expr.str.split | Boolean | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `a`
+Expr.str.split | Boolean | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Boolean | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `a`
+Expr.str.split | Boolean | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `a`
+Expr.str.split | Boolean | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `a`
+Expr.str.split | Boolean | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Boolean | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Boolean | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `a`
+Expr.str.split | Boolean | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `a`
+Expr.str.split | Date | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Date | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `date` for series with name `a`
+Expr.str.split | Date | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `date` for series with name `a`
+Expr.str.split | Date | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `date` for series with name `a`
+Expr.str.split | Date | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Date | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `date` for series with name `a`
+Expr.str.split | Date | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `date` for series with name `a`
+Expr.str.split | Date | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `date` for series with name `a`
+Expr.str.split | Date | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Date | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Date | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `date` for series with name `a`
+Expr.str.split | Date | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `date` for series with name `a`
+Expr.str.split | Datetime(us) | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Datetime(us) | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`
+Expr.str.split | Datetime(us) | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`
+Expr.str.split | Datetime(us) | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`
+Expr.str.split | Datetime(us) | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Datetime(us) | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`
+Expr.str.split | Datetime(us) | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`
+Expr.str.split | Datetime(us) | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`
+Expr.str.split | Datetime(us) | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Datetime(us) | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Datetime(us) | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`
+Expr.str.split | Datetime(us) | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`
+Expr.str.split | Datetime(us, UTC) | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Datetime(us, UTC) | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `a`
+Expr.str.split | Datetime(us, UTC) | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `a`
+Expr.str.split | Datetime(us, UTC) | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `a`
+Expr.str.split | Datetime(us, UTC) | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Datetime(us, UTC) | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `a`
+Expr.str.split | Datetime(us, UTC) | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `a`
+Expr.str.split | Datetime(us, UTC) | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `a`
+Expr.str.split | Datetime(us, UTC) | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Datetime(us, UTC) | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Datetime(us, UTC) | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `a`
+Expr.str.split | Datetime(us, UTC) | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `a`
+Expr.str.split | Decimal(10, 2) | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Decimal(10, 2) | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `a`
+Expr.str.split | Decimal(10, 2) | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `a`
+Expr.str.split | Decimal(10, 2) | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `a`
+Expr.str.split | Decimal(10, 2) | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Decimal(10, 2) | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `a`
+Expr.str.split | Decimal(10, 2) | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `a`
+Expr.str.split | Decimal(10, 2) | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `a`
+Expr.str.split | Decimal(10, 2) | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Decimal(10, 2) | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Decimal(10, 2) | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `a`
+Expr.str.split | Decimal(10, 2) | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `a`
+Expr.str.split | Duration(us) | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Duration(us) | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `a`
+Expr.str.split | Duration(us) | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `a`
+Expr.str.split | Duration(us) | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `a`
+Expr.str.split | Duration(us) | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Duration(us) | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `a`
+Expr.str.split | Duration(us) | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `a`
+Expr.str.split | Duration(us) | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `a`
+Expr.str.split | Duration(us) | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Duration(us) | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Duration(us) | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `a`
+Expr.str.split | Duration(us) | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `a`
+Expr.str.split | Float16 | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Float16 | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `a`
+Expr.str.split | Float16 | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `a`
+Expr.str.split | Float16 | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `a`
+Expr.str.split | Float16 | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Float16 | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `a`
+Expr.str.split | Float16 | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `a`
+Expr.str.split | Float16 | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `a`
+Expr.str.split | Float16 | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Float16 | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Float16 | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `a`
+Expr.str.split | Float16 | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `a`
+Expr.str.split | Float32 | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Float32 | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `a`
+Expr.str.split | Float32 | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `a`
+Expr.str.split | Float32 | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `a`
+Expr.str.split | Float32 | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Float32 | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `a`
+Expr.str.split | Float32 | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `a`
+Expr.str.split | Float32 | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `a`
+Expr.str.split | Float32 | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Float32 | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Float32 | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `a`
+Expr.str.split | Float32 | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `a`
+Expr.str.split | Float64 | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Float64 | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `a`
+Expr.str.split | Float64 | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `a`
+Expr.str.split | Float64 | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `a`
+Expr.str.split | Float64 | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Float64 | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `a`
+Expr.str.split | Float64 | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `a`
+Expr.str.split | Float64 | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `a`
+Expr.str.split | Float64 | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Float64 | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Float64 | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `a`
+Expr.str.split | Float64 | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `a`
+Expr.str.split | Int128 | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Int128 | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `a`
+Expr.str.split | Int128 | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `a`
+Expr.str.split | Int128 | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `a`
+Expr.str.split | Int128 | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Int128 | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `a`
+Expr.str.split | Int128 | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `a`
+Expr.str.split | Int128 | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `a`
+Expr.str.split | Int128 | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Int128 | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Int128 | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `a`
+Expr.str.split | Int128 | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `a`
+Expr.str.split | Int16 | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Int16 | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `a`
+Expr.str.split | Int16 | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `a`
+Expr.str.split | Int16 | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `a`
+Expr.str.split | Int16 | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Int16 | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `a`
+Expr.str.split | Int16 | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `a`
+Expr.str.split | Int16 | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `a`
+Expr.str.split | Int16 | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Int16 | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Int16 | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `a`
+Expr.str.split | Int16 | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `a`
+Expr.str.split | Int32 | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Int32 | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `a`
+Expr.str.split | Int32 | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `a`
+Expr.str.split | Int32 | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `a`
+Expr.str.split | Int32 | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Int32 | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `a`
+Expr.str.split | Int32 | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `a`
+Expr.str.split | Int32 | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `a`
+Expr.str.split | Int32 | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Int32 | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Int32 | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `a`
+Expr.str.split | Int32 | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `a`
+Expr.str.split | Int64 | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Int64 | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `a`
+Expr.str.split | Int64 | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `a`
+Expr.str.split | Int64 | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `a`
+Expr.str.split | Int64 | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Int64 | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `a`
+Expr.str.split | Int64 | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `a`
+Expr.str.split | Int64 | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `a`
+Expr.str.split | Int64 | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Int64 | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Int64 | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `a`
+Expr.str.split | Int64 | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `a`
+Expr.str.split | Int8 | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Int8 | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `a`
+Expr.str.split | Int8 | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `a`
+Expr.str.split | Int8 | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `a`
+Expr.str.split | Int8 | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Int8 | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `a`
+Expr.str.split | Int8 | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `a`
+Expr.str.split | Int8 | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `a`
+Expr.str.split | Int8 | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Int8 | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Int8 | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `a`
+Expr.str.split | Int8 | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `a`
+Expr.str.split | List(Int64) | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | List(Int64) | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `a`
+Expr.str.split | List(Int64) | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `a`
+Expr.str.split | List(Int64) | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `a`
+Expr.str.split | List(Int64) | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | List(Int64) | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `a`
+Expr.str.split | List(Int64) | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `a`
+Expr.str.split | List(Int64) | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `a`
+Expr.str.split | List(Int64) | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | List(Int64) | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | List(Int64) | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `a`
+Expr.str.split | List(Int64) | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `a`
+Expr.str.split | List(String) | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | List(String) | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `a`
+Expr.str.split | List(String) | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `a`
+Expr.str.split | List(String) | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `a`
+Expr.str.split | List(String) | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | List(String) | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `a`
+Expr.str.split | List(String) | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `a`
+Expr.str.split | List(String) | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `a`
+Expr.str.split | List(String) | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | List(String) | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | List(String) | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `a`
+Expr.str.split | List(String) | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `a`
+Expr.str.split | Null | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Null | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `null` for series with name `a`
+Expr.str.split | Null | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `null` for series with name `a`
+Expr.str.split | Null | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `null` for series with name `a`
+Expr.str.split | Null | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Null | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `null` for series with name `a`
+Expr.str.split | Null | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `null` for series with name `a`
+Expr.str.split | Null | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `null` for series with name `a`
+Expr.str.split | Null | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Null | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Null | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `null` for series with name `a`
+Expr.str.split | Null | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `null` for series with name `a`
+Expr.str.split | String | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | String | inclusive=false, literal=true | allowed List(String) many
+Expr.str.split | String | inclusive=false, strict=false | allowed List(String) many
+Expr.str.split | String | inclusive=false, strict=true | allowed List(String) many
+Expr.str.split | String | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | String | inclusive=true, literal=true | allowed List(String) many
+Expr.str.split | String | inclusive=true, strict=false | allowed List(String) many
+Expr.str.split | String | inclusive=true, strict=true | allowed List(String) many
+Expr.str.split | String | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | String | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | String | literal=true, strict=false | allowed List(String) many
+Expr.str.split | String | literal=true, strict=true | allowed List(String) many
+Expr.str.split | Struct(x: Int64, y: String) | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Struct(x: Int64, y: String) | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `a`
+Expr.str.split | Struct(x: Int64, y: String) | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `a`
+Expr.str.split | Struct(x: Int64, y: String) | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `a`
+Expr.str.split | Struct(x: Int64, y: String) | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Struct(x: Int64, y: String) | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `a`
+Expr.str.split | Struct(x: Int64, y: String) | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `a`
+Expr.str.split | Struct(x: Int64, y: String) | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `a`
+Expr.str.split | Struct(x: Int64, y: String) | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Struct(x: Int64, y: String) | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Struct(x: Int64, y: String) | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `a`
+Expr.str.split | Struct(x: Int64, y: String) | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `a`
+Expr.str.split | Time | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Time | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `time` for series with name `a`
+Expr.str.split | Time | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `time` for series with name `a`
+Expr.str.split | Time | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `time` for series with name `a`
+Expr.str.split | Time | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Time | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `time` for series with name `a`
+Expr.str.split | Time | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `time` for series with name `a`
+Expr.str.split | Time | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `time` for series with name `a`
+Expr.str.split | Time | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Time | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | Time | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `time` for series with name `a`
+Expr.str.split | Time | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `time` for series with name `a`
+Expr.str.split | UInt128 | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | UInt128 | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `a`
+Expr.str.split | UInt128 | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `a`
+Expr.str.split | UInt128 | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `a`
+Expr.str.split | UInt128 | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | UInt128 | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `a`
+Expr.str.split | UInt128 | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `a`
+Expr.str.split | UInt128 | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `a`
+Expr.str.split | UInt128 | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | UInt128 | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | UInt128 | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `a`
+Expr.str.split | UInt128 | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `a`
+Expr.str.split | UInt16 | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | UInt16 | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `a`
+Expr.str.split | UInt16 | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `a`
+Expr.str.split | UInt16 | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `a`
+Expr.str.split | UInt16 | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | UInt16 | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `a`
+Expr.str.split | UInt16 | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `a`
+Expr.str.split | UInt16 | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `a`
+Expr.str.split | UInt16 | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | UInt16 | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | UInt16 | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `a`
+Expr.str.split | UInt16 | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `a`
+Expr.str.split | UInt32 | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | UInt32 | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `a`
+Expr.str.split | UInt32 | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `a`
+Expr.str.split | UInt32 | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `a`
+Expr.str.split | UInt32 | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | UInt32 | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `a`
+Expr.str.split | UInt32 | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `a`
+Expr.str.split | UInt32 | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `a`
+Expr.str.split | UInt32 | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | UInt32 | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | UInt32 | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `a`
+Expr.str.split | UInt32 | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `a`
+Expr.str.split | UInt64 | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | UInt64 | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `a`
+Expr.str.split | UInt64 | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `a`
+Expr.str.split | UInt64 | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `a`
+Expr.str.split | UInt64 | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | UInt64 | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `a`
+Expr.str.split | UInt64 | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `a`
+Expr.str.split | UInt64 | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `a`
+Expr.str.split | UInt64 | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | UInt64 | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | UInt64 | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `a`
+Expr.str.split | UInt64 | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `a`
+Expr.str.split | UInt8 | inclusive=false, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | UInt8 | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
+Expr.str.split | UInt8 | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
+Expr.str.split | UInt8 | inclusive=false, strict=true | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
+Expr.str.split | UInt8 | inclusive=true, literal=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | UInt8 | inclusive=true, literal=true | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
+Expr.str.split | UInt8 | inclusive=true, strict=false | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
+Expr.str.split | UInt8 | inclusive=true, strict=true | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
+Expr.str.split | UInt8 | literal=false, strict=false | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | UInt8 | literal=false, strict=true | refused schema: a split by a pattern waits for the kind of parameter that holds one; give `literal` as true
+Expr.str.split | UInt8 | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
+Expr.str.split | UInt8 | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
 LazyFrame.join | - | allow_parallel=false, force_parallel=false | allowed -
 LazyFrame.join | - | allow_parallel=false, force_parallel=true | allowed -
 LazyFrame.join | - | allow_parallel=true, force_parallel=false | allowed -

@@ -1510,7 +1510,7 @@ fn operands(call: &Call) -> Vec<&Expression> {
     found
 }
 
-const ONE_VALUE: [&str; 8] = [
+const ONE_VALUE: [&str; 9] = [
     "Expr.sum",
     "Expr.min",
     "Expr.max",
@@ -1519,6 +1519,7 @@ const ONE_VALUE: [&str; 8] = [
     "Expr.last",
     "Expr.has_nulls",
     "Expr.null_count",
+    "Expr.str.join",
 ];
 
 fn is_one_value(call: &Call) -> bool {

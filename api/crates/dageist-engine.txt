@@ -379,15 +379,17 @@ pub dageist_engine::catalog::Family::Cumulative
 pub dageist_engine::catalog::Family::Logic
 pub dageist_engine::catalog::Family::Maths
 pub dageist_engine::catalog::Family::Nulls
+pub dageist_engine::catalog::Family::Pieces
 pub dageist_engine::catalog::Family::Rounding
 pub dageist_engine::catalog::Family::Rows
 pub dageist_engine::catalog::Family::Start
 pub dageist_engine::catalog::Family::Steps
 pub dageist_engine::catalog::Family::Temporal
+pub dageist_engine::catalog::Family::Text
 pub dageist_engine::catalog::Family::Trigonometry
 pub dageist_engine::catalog::Family::Window
 impl dageist_engine::catalog::Family
-pub const dageist_engine::catalog::Family::ALL: [Self; 17]
+pub const dageist_engine::catalog::Family::ALL: [Self; 19]
 pub const fn dageist_engine::catalog::Family::key(self) -> &'static str
 pub enum dageist_engine::catalog::Kind
 pub dageist_engine::catalog::Kind::Choice(&'static [&'static str])

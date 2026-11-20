@@ -89,6 +89,21 @@ const CLOSE: &[Dtypes] = &[Dtypes::Numeric, Dtypes::Temporal, Dtypes::Boolean];
 const NUMERIC_OR_BOOLEAN: &[Dtypes] = &[Dtypes::Numeric, Dtypes::Boolean];
 const CLIPPABLE: &[Dtypes] = &[Dtypes::Numeric, Dtypes::Temporal];
 
+// What Polars accepts on the receiver of the methods of the `str` namespace, from the functions
+// that run them: text, and no other dtype, a `Null` included, except for `join`, which casts what
+// it joins to text and refuses a dtype it cannot cast, as a list, an array or a duration. The
+// tables of allowed combinations show which, and what each argument may be, for Polars casts
+// some of them: a count of characters may be a float or a `Boolean`, and a prefix to test for may
+// be a number.
+const JOINABLE: &[Dtypes] = &[
+    Dtypes::Numeric,
+    Dtypes::String,
+    Dtypes::Boolean,
+    Dtypes::Datetime,
+    Dtypes::Date,
+    Dtypes::Time,
+];
+
 const EXPRESSION: Kind = Kind::Expression(ANY);
 /// A new column's name and the expression that gives it: `**named_exprs`.
 const NAMED_EXPRESSIONS: Kind = Kind::Pairs(&Kind::Column, &EXPRESSION);
@@ -165,6 +180,26 @@ const DECIMALS: Parameter = optional("decimals", Kind::Value(ValueType::Integer)
 /// `limit`: how many consecutive nulls a forward or backward fill fills, which Python passes on
 /// as an unsigned 32-bit number. Unset, it fills them all.
 const LIMIT: Parameter = optional("limit", Kind::Value(ValueType::Integer), Shape::One, "None");
+
+/// A count of characters that a method of the `str` namespace takes: the number to keep, the length
+/// to pad to, or the place to start at. A whole number typed without a dtype is that dtype and
+/// adapts to nothing, as the rows `shift` counts are.
+const fn characters_counted(name: &'static str) -> Parameter {
+    required(name, EXPRESSION, Shape::One).with_role(Role::Count)
+}
+
+/// `characters`: what `strip_chars` and its two sides take off the text, which is whitespace where
+/// it is not given.
+const CHARACTERS: Parameter = optional("characters", EXPRESSION, Shape::One, "None");
+
+/// `fill_char`: the one character that `pad_start` and `pad_end` add, which Python's binding takes
+/// as a single character.
+const FILL_CHAR: Parameter = optional(
+    "fill_char",
+    Kind::Value(ValueType::String),
+    Shape::One,
+    "' '",
+);
 
 /// A tolerance `is_close` takes: a number from zero, which Python passes on as a float.
 const fn tolerance(name: &'static str, default: &'static str) -> Parameter {
@@ -288,6 +323,29 @@ fn signed(arguments: &Arguments, parameter: &'static str) -> Result<i32, BuildEr
             })
         }
         Some(other) => Err(Arguments::wrong(parameter, "a whole number", other)),
+    }
+}
+
+/// The one character given for `parameter`, as Python's binding takes it, or `default` when it
+/// was not given: a text of another length is refused.
+fn one_character(
+    arguments: &Arguments,
+    parameter: &'static str,
+    default: char,
+) -> Result<char, BuildError> {
+    match arguments.get(parameter) {
+        None => Ok(default),
+        Some(Argument::String(text)) => {
+            let mut characters = text.chars();
+            match (characters.next(), characters.next()) {
+                (Some(character), None) => Ok(character),
+                _ => Err(BuildError::OutOfRange {
+                    parameter,
+                    expected: "one character",
+                }),
+            }
+        }
+        Some(other) => Err(Arguments::wrong(parameter, "text", other)),
     }
 }
 
@@ -560,6 +618,27 @@ unary!(
     null_count,
 );
 
+/// The methods of the `str` namespace that take nothing, each the method of the same name that
+/// Polars' `StringNameSpace` has.
+macro_rules! unary_str {
+    ($($name:ident => $method:ident),+ $(,)?) => {
+        $(
+            fn $name(expr: Expr, _arguments: &Arguments) -> Result<Expr, BuildError> {
+                Ok(expr.str().$method())
+            }
+        )+
+    };
+}
+
+unary_str!(
+    str_to_lowercase => to_lowercase,
+    str_to_uppercase => to_uppercase,
+    str_to_titlecase => to_titlecase,
+    str_len_chars => len_chars,
+    str_len_bytes => len_bytes,
+    str_reverse => reverse,
+);
+
 /// The base defaults to `math.e`, which Python makes a number of no dtype, as it does a base
 /// given. Polars leaves the logarithm of a whole number to such a base an unresolved float, which
 /// a join's key or a sort key does not resolve, so the default is a `Float64`, which gives the
@@ -723,6 +802,111 @@ fn eq_missing(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
 
 fn ne_missing(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
     Ok(expr.neq_missing(arguments.required_expression("other")?))
+}
+
+/// The characters a trim takes off, which Python makes the null literal where none are given, and
+/// then Polars trims whitespace.
+fn characters(arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(arguments
+        .expression("characters")?
+        .unwrap_or_else(|| lit(NULL)))
+}
+
+fn str_strip_chars(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.str().strip_chars(characters(arguments)?))
+}
+
+fn str_strip_chars_start(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.str().strip_chars_start(characters(arguments)?))
+}
+
+fn str_strip_chars_end(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.str().strip_chars_end(characters(arguments)?))
+}
+
+fn str_strip_prefix(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr
+        .str()
+        .strip_prefix(arguments.required_expression("prefix")?))
+}
+
+fn str_strip_suffix(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr
+        .str()
+        .strip_suffix(arguments.required_expression("suffix")?))
+}
+
+fn str_starts_with(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr
+        .str()
+        .starts_with(arguments.required_expression("prefix")?))
+}
+
+fn str_ends_with(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr
+        .str()
+        .ends_with(arguments.required_expression("suffix")?))
+}
+
+/// As Python's `slice` takes its arguments: a length that is not given is the null literal, which
+/// is the rest of the text.
+fn str_slice(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.str().slice(
+        arguments.required_expression("offset")?,
+        arguments.expression("length")?.unwrap_or_else(|| lit(NULL)),
+    ))
+}
+
+fn str_head(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.str().head(arguments.required_expression("n")?))
+}
+
+fn str_tail(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.str().tail(arguments.required_expression("n")?))
+}
+
+fn str_pad_start(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.str().pad_start(
+        arguments.required_expression("length")?,
+        one_character(arguments, "fill_char", ' ')?,
+    ))
+}
+
+fn str_pad_end(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.str().pad_end(
+        arguments.required_expression("length")?,
+        one_character(arguments, "fill_char", ' ')?,
+    ))
+}
+
+fn str_zfill(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.str().zfill(arguments.required_expression("length")?))
+}
+
+/// As Python's `split` takes its arguments, but for a split by a pattern, which waits for the kind
+/// of parameter that holds a pattern: `literal` is true, and so `strict`, which only a pattern
+/// uses, changes nothing.
+fn str_split(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let by = arguments.required_expression("by")?;
+    if !arguments.flag("literal", true)? {
+        return Err(refused(
+            "a split by a pattern waits for the kind of parameter that holds one; give `literal` as true",
+        ));
+    }
+    Ok(if arguments.flag("inclusive", false)? {
+        expr.str().split_inclusive(by)
+    } else {
+        expr.str().split(by)
+    })
+}
+
+/// One text, as Python's `join` gives it: every value of the column joined by the delimiter, a
+/// null being skipped unless it is asked to make the whole a null.
+fn str_join(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let delimiter = arguments.string("delimiter")?.unwrap_or_default();
+    Ok(expr
+        .str()
+        .join(&delimiter, arguments.flag("ignore_nulls", true)?))
 }
 
 fn dt_date(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
@@ -1871,6 +2055,190 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[],
         laziness: Laziness::Lazy,
         build: Build::Expression(sqrt),
+    },
+    Entry {
+        id: EntryId("Expr.str.ends_with"),
+        family: Family::Compare,
+        accepts: STRING,
+        parameters: &[required("suffix", EXPRESSION, Shape::One)],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_ends_with),
+    },
+    Entry {
+        id: EntryId("Expr.str.head"),
+        family: Family::Pieces,
+        accepts: STRING,
+        parameters: &[characters_counted("n")],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_head),
+    },
+    Entry {
+        id: EntryId("Expr.str.join"),
+        family: Family::Pieces,
+        accepts: JOINABLE,
+        parameters: &[
+            optional(
+                "delimiter",
+                Kind::Value(ValueType::String),
+                Shape::One,
+                "''",
+            ),
+            flag("ignore_nulls", "True").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_join),
+    },
+    Entry {
+        id: EntryId("Expr.str.len_bytes"),
+        family: Family::Pieces,
+        accepts: STRING,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_len_bytes),
+    },
+    Entry {
+        id: EntryId("Expr.str.len_chars"),
+        family: Family::Pieces,
+        accepts: STRING,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_len_chars),
+    },
+    Entry {
+        id: EntryId("Expr.str.pad_end"),
+        family: Family::Text,
+        accepts: STRING,
+        parameters: &[characters_counted("length"), FILL_CHAR],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_pad_end),
+    },
+    Entry {
+        id: EntryId("Expr.str.pad_start"),
+        family: Family::Text,
+        accepts: STRING,
+        parameters: &[characters_counted("length"), FILL_CHAR],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_pad_start),
+    },
+    Entry {
+        id: EntryId("Expr.str.reverse"),
+        family: Family::Text,
+        accepts: STRING,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_reverse),
+    },
+    Entry {
+        id: EntryId("Expr.str.slice"),
+        family: Family::Pieces,
+        accepts: STRING,
+        parameters: &[
+            characters_counted("offset"),
+            optional("length", EXPRESSION, Shape::One, "None").with_role(Role::Count),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_slice),
+    },
+    Entry {
+        id: EntryId("Expr.str.split"),
+        family: Family::Pieces,
+        accepts: STRING,
+        parameters: &[
+            required("by", EXPRESSION, Shape::One),
+            flag("inclusive", "False").keyword_only(),
+            flag("literal", "True").keyword_only(),
+            flag("strict", "True").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_split),
+    },
+    Entry {
+        id: EntryId("Expr.str.starts_with"),
+        family: Family::Compare,
+        accepts: STRING,
+        parameters: &[required("prefix", EXPRESSION, Shape::One)],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_starts_with),
+    },
+    Entry {
+        id: EntryId("Expr.str.strip_chars"),
+        family: Family::Text,
+        accepts: STRING,
+        parameters: &[CHARACTERS],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_strip_chars),
+    },
+    Entry {
+        id: EntryId("Expr.str.strip_chars_end"),
+        family: Family::Text,
+        accepts: STRING,
+        parameters: &[CHARACTERS],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_strip_chars_end),
+    },
+    Entry {
+        id: EntryId("Expr.str.strip_chars_start"),
+        family: Family::Text,
+        accepts: STRING,
+        parameters: &[CHARACTERS],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_strip_chars_start),
+    },
+    Entry {
+        id: EntryId("Expr.str.strip_prefix"),
+        family: Family::Text,
+        accepts: STRING,
+        parameters: &[required("prefix", EXPRESSION, Shape::One)],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_strip_prefix),
+    },
+    Entry {
+        id: EntryId("Expr.str.strip_suffix"),
+        family: Family::Text,
+        accepts: STRING,
+        parameters: &[required("suffix", EXPRESSION, Shape::One)],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_strip_suffix),
+    },
+    Entry {
+        id: EntryId("Expr.str.tail"),
+        family: Family::Pieces,
+        accepts: STRING,
+        parameters: &[characters_counted("n")],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_tail),
+    },
+    Entry {
+        id: EntryId("Expr.str.to_lowercase"),
+        family: Family::Text,
+        accepts: STRING,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_to_lowercase),
+    },
+    Entry {
+        id: EntryId("Expr.str.to_titlecase"),
+        family: Family::Text,
+        accepts: STRING,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_to_titlecase),
+    },
+    Entry {
+        id: EntryId("Expr.str.to_uppercase"),
+        family: Family::Text,
+        accepts: STRING,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_to_uppercase),
+    },
+    Entry {
+        id: EntryId("Expr.str.zfill"),
+        family: Family::Text,
+        accepts: STRING,
+        parameters: &[characters_counted("length")],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_zfill),
     },
     Entry {
         id: EntryId("Expr.sub"),

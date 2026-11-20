@@ -61,7 +61,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 6360 combinations: 4432 allowed; 1198 refused when Polars resolved the schema, 730 when it ran the rows, 0 when it ran the empty table.
+# 7620 combinations: 5285 allowed; 1404 refused when Polars resolved the schema, 931 when it ran the rows, 0 when it ran the empty table.
 #
 ChainedThen.otherwise | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 ChainedThen.otherwise | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
@@ -5583,6 +5583,1266 @@ Expr.sqrt | sort > over.partition_by | continues | Int64 | - | - | allowed Float
 Expr.sqrt | sort > over.partition_by | ends | Int64 | - | - | allowed Float64 many
 Expr.sqrt | sort | continues | Int64 | - | - | allowed Float64 many
 Expr.sqrt | sort | ends | Int64 | - | - | allowed Float64 many
+Expr.str.ends_with | filter > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.ends_with | filter > condition.predicate | ends | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.ends_with | filter > condition.value | continues | String | String | filter-predicate-is-boolean | allowed Boolean many
+Expr.str.ends_with | filter > condition.value | ends | String | String | filter-predicate-is-boolean | allowed Boolean many
+Expr.str.ends_with | filter > over.order_by | continues | String | String | - | allowed Boolean many
+Expr.str.ends_with | filter > over.order_by | ends | String | String | - | allowed Boolean many
+Expr.str.ends_with | filter > over.partition_by | continues | String | String | - | allowed Boolean many
+Expr.str.ends_with | filter > over.partition_by | ends | String | String | - | allowed Boolean many
+Expr.str.ends_with | filter | continues | String | String | filter-predicate-is-boolean | allowed Boolean many
+Expr.str.ends_with | filter | ends | String | String | filter-predicate-is-boolean | allowed Boolean many
+Expr.str.ends_with | join_left > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.ends_with | join_left > condition.predicate | ends | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.ends_with | join_left > condition.value | continues | String | String | - | allowed Boolean many
+Expr.str.ends_with | join_left > condition.value | ends | String | String | - | allowed Boolean many
+Expr.str.ends_with | join_left > over.order_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.ends_with | join_left > over.order_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.ends_with | join_left > over.partition_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.ends_with | join_left > over.partition_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.ends_with | join_left | continues | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Boolean many
+Expr.str.ends_with | join_left | ends | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Boolean many
+Expr.str.ends_with | join_right > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.ends_with | join_right > condition.predicate | ends | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.ends_with | join_right > condition.value | continues | String | String | - | allowed Boolean many
+Expr.str.ends_with | join_right > condition.value | ends | String | String | - | allowed Boolean many
+Expr.str.ends_with | join_right > over.order_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.ends_with | join_right > over.order_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.ends_with | join_right > over.partition_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.ends_with | join_right > over.partition_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.ends_with | join_right | continues | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Boolean many
+Expr.str.ends_with | join_right | ends | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Boolean many
+Expr.str.ends_with | pivot_aggregate > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.ends_with | pivot_aggregate > condition.predicate | ends | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.ends_with | pivot_aggregate > condition.value | continues | String | String | - | allowed Boolean many
+Expr.str.ends_with | pivot_aggregate > condition.value | ends | String | String | - | allowed Boolean many
+Expr.str.ends_with | pivot_aggregate > over.order_by | continues | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.ends_with | pivot_aggregate > over.order_by | ends | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.ends_with | pivot_aggregate > over.partition_by | continues | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.ends_with | pivot_aggregate > over.partition_by | ends | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.ends_with | pivot_aggregate | continues | String | String | pivot-aggregate-gives-one-value | allowed Boolean many
+Expr.str.ends_with | pivot_aggregate | ends | String | String | pivot-aggregate-gives-one-value | allowed Boolean many
+Expr.str.ends_with | select > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.ends_with | select > condition.predicate | ends | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.ends_with | select > condition.value | continues | String | String | - | allowed Boolean many
+Expr.str.ends_with | select > condition.value | ends | String | String | - | allowed Boolean many
+Expr.str.ends_with | select > over.order_by | continues | String | String | - | allowed Boolean many
+Expr.str.ends_with | select > over.order_by | ends | String | String | - | allowed Boolean many
+Expr.str.ends_with | select > over.partition_by | continues | String | String | - | allowed Boolean many
+Expr.str.ends_with | select > over.partition_by | ends | String | String | - | allowed Boolean many
+Expr.str.ends_with | select | continues | String | String | - | allowed Boolean many
+Expr.str.ends_with | select | ends | String | String | - | allowed Boolean many
+Expr.str.ends_with | sort > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.ends_with | sort > condition.predicate | ends | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.ends_with | sort > condition.value | continues | String | String | - | allowed Boolean many
+Expr.str.ends_with | sort > condition.value | ends | String | String | - | allowed Boolean many
+Expr.str.ends_with | sort > over.order_by | continues | String | String | - | allowed Boolean many
+Expr.str.ends_with | sort > over.order_by | ends | String | String | - | allowed Boolean many
+Expr.str.ends_with | sort > over.partition_by | continues | String | String | - | allowed Boolean many
+Expr.str.ends_with | sort > over.partition_by | ends | String | String | - | allowed Boolean many
+Expr.str.ends_with | sort | continues | String | String | - | allowed Boolean many
+Expr.str.ends_with | sort | ends | String | String | - | allowed Boolean many
+Expr.str.head | filter > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.head | filter > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.head | filter > condition.value | continues | String | Int8 | filter-predicate-is-boolean | allowed String many
+Expr.str.head | filter > condition.value | ends | String | Int8 | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.head | filter > over.order_by | continues | String | Int8 | - | allowed String many
+Expr.str.head | filter > over.order_by | ends | String | Int8 | - | allowed String many
+Expr.str.head | filter > over.partition_by | continues | String | Int8 | - | allowed String many
+Expr.str.head | filter > over.partition_by | ends | String | Int8 | - | allowed String many
+Expr.str.head | filter | continues | String | Int8 | filter-predicate-is-boolean | allowed String many
+Expr.str.head | filter | ends | String | Int8 | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.head | join_left > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.head | join_left > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.head | join_left > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.head | join_left > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.head | join_left > over.order_by | continues | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.head | join_left > over.order_by | ends | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.head | join_left > over.partition_by | continues | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.head | join_left > over.partition_by | ends | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.head | join_left | continues | String | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.head | join_left | ends | String | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.head | join_right > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.head | join_right > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `ra`
+Expr.str.head | join_right > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.head | join_right > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.head | join_right > over.order_by | continues | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.head | join_right > over.order_by | ends | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.head | join_right > over.partition_by | continues | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.head | join_right > over.partition_by | ends | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.head | join_right | continues | String | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.head | join_right | ends | String | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.head | pivot_aggregate > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.head | pivot_aggregate > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.head | pivot_aggregate > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.head | pivot_aggregate > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.head | pivot_aggregate > over.order_by | continues | String | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.head | pivot_aggregate > over.order_by | ends | String | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.head | pivot_aggregate > over.partition_by | continues | String | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.head | pivot_aggregate > over.partition_by | ends | String | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.head | pivot_aggregate | continues | String | Int8 | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.head | pivot_aggregate | ends | String | Int8 | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.head | select > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.head | select > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.head | select > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.head | select > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.head | select > over.order_by | continues | String | Int8 | - | allowed String many
+Expr.str.head | select > over.order_by | ends | String | Int8 | - | allowed String many
+Expr.str.head | select > over.partition_by | continues | String | Int8 | - | allowed String many
+Expr.str.head | select > over.partition_by | ends | String | Int8 | - | allowed String many
+Expr.str.head | select | continues | String | Int8 | - | allowed String many
+Expr.str.head | select | ends | String | Int8 | - | allowed String many
+Expr.str.head | sort > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.head | sort > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.head | sort > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.head | sort > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.head | sort > over.order_by | continues | String | Int8 | - | allowed String many
+Expr.str.head | sort > over.order_by | ends | String | Int8 | - | allowed String many
+Expr.str.head | sort > over.partition_by | continues | String | Int8 | - | allowed String many
+Expr.str.head | sort > over.partition_by | ends | String | Int8 | - | allowed String many
+Expr.str.head | sort | continues | String | Int8 | - | allowed String many
+Expr.str.head | sort | ends | String | Int8 | - | allowed String many
+Expr.str.join | filter > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed String one
+Expr.str.join | filter > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `_POLARS_TMP_PHYS_`
+Expr.str.join | filter > condition.value | continues | Int64 | - | filter-predicate-is-boolean | allowed String one
+Expr.str.join | filter > condition.value | ends | Int64 | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.join | filter > over.order_by | continues | Int64 | - | - | allowed String one
+Expr.str.join | filter > over.order_by | ends | Int64 | - | - | allowed String one
+Expr.str.join | filter > over.partition_by | continues | Int64 | - | - | allowed String one
+Expr.str.join | filter > over.partition_by | ends | Int64 | - | - | allowed String one
+Expr.str.join | filter | continues | Int64 | - | filter-predicate-is-boolean | allowed String one
+Expr.str.join | filter | ends | Int64 | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.join | join_left > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed String one
+Expr.str.join | join_left > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `_POLARS_TMP_PHYS_`
+Expr.str.join | join_left > condition.value | continues | Int64 | - | - | allowed String one
+Expr.str.join | join_left > condition.value | ends | Int64 | - | - | allowed String one
+Expr.str.join | join_left > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.join | join_left > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.join | join_left > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.join | join_left > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.join | join_left | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String one
+Expr.str.join | join_left | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String one
+Expr.str.join | join_right > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed String one
+Expr.str.join | join_right > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `_POLARS_TMP_PHYS_`
+Expr.str.join | join_right > condition.value | continues | Int64 | - | - | allowed String one
+Expr.str.join | join_right > condition.value | ends | Int64 | - | - | allowed String one
+Expr.str.join | join_right > over.order_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.join | join_right > over.order_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.join | join_right > over.partition_by | continues | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.join | join_right > over.partition_by | ends | Int64 | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.join | join_right | continues | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String one
+Expr.str.join | join_right | ends | Int64 | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String one
+Expr.str.join | pivot_aggregate > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed String one
+Expr.str.join | pivot_aggregate > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.join | pivot_aggregate > condition.value | continues | Int64 | - | - | allowed String one
+Expr.str.join | pivot_aggregate > condition.value | ends | Int64 | - | - | allowed String one
+Expr.str.join | pivot_aggregate > over.order_by | continues | Int64 | - | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+Expr.str.join | pivot_aggregate > over.order_by | ends | Int64 | - | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
+Expr.str.join | pivot_aggregate > over.partition_by | continues | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.join | pivot_aggregate > over.partition_by | ends | Int64 | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.join | pivot_aggregate | continues | Int64 | - | pivot-aggregate-gives-one-value | allowed String one
+Expr.str.join | pivot_aggregate | ends | Int64 | - | pivot-aggregate-gives-one-value | allowed String one
+Expr.str.join | select > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed String one
+Expr.str.join | select > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `_POLARS_TMP_PHYS_`
+Expr.str.join | select > condition.value | continues | Int64 | - | - | allowed String one
+Expr.str.join | select > condition.value | ends | Int64 | - | - | allowed String one
+Expr.str.join | select > over.order_by | continues | Int64 | - | - | allowed String one
+Expr.str.join | select > over.order_by | ends | Int64 | - | - | allowed String one
+Expr.str.join | select > over.partition_by | continues | Int64 | - | - | allowed String one
+Expr.str.join | select > over.partition_by | ends | Int64 | - | - | allowed String one
+Expr.str.join | select | continues | Int64 | - | - | allowed String one
+Expr.str.join | select | ends | Int64 | - | - | allowed String one
+Expr.str.join | sort > condition.predicate | continues | Int64 | - | condition-predicate-is-boolean | allowed String one
+Expr.str.join | sort > condition.predicate | ends | Int64 | - | condition-predicate-is-boolean | allowed String one
+Expr.str.join | sort > condition.value | continues | Int64 | - | - | allowed String one
+Expr.str.join | sort > condition.value | ends | Int64 | - | - | allowed String one
+Expr.str.join | sort > over.order_by | continues | Int64 | - | - | allowed String one
+Expr.str.join | sort > over.order_by | ends | Int64 | - | - | allowed String one
+Expr.str.join | sort > over.partition_by | continues | Int64 | - | - | allowed String one
+Expr.str.join | sort > over.partition_by | ends | Int64 | - | - | allowed String one
+Expr.str.join | sort | continues | Int64 | - | - | allowed String one
+Expr.str.join | sort | ends | Int64 | - | - | allowed String one
+Expr.str.len_bytes | filter > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed UInt32 many
+Expr.str.len_bytes | filter > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `u32` for series with name `a`
+Expr.str.len_bytes | filter > condition.value | continues | String | - | filter-predicate-is-boolean | allowed UInt32 many
+Expr.str.len_bytes | filter > condition.value | ends | String | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `UInt32`
+Expr.str.len_bytes | filter > over.order_by | continues | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | filter > over.order_by | ends | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | filter > over.partition_by | continues | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | filter > over.partition_by | ends | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | filter | continues | String | - | filter-predicate-is-boolean | allowed UInt32 many
+Expr.str.len_bytes | filter | ends | String | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `UInt32`
+Expr.str.len_bytes | join_left > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed UInt32 many
+Expr.str.len_bytes | join_left > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `u32` for series with name `a`
+Expr.str.len_bytes | join_left > condition.value | continues | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | join_left > condition.value | ends | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | join_left > over.order_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.len_bytes | join_left > over.order_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.len_bytes | join_left > over.partition_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.len_bytes | join_left > over.partition_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.len_bytes | join_left | continues | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed UInt32 many
+Expr.str.len_bytes | join_left | ends | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed UInt32 many
+Expr.str.len_bytes | join_right > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed UInt32 many
+Expr.str.len_bytes | join_right > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `u32` for series with name `ra`
+Expr.str.len_bytes | join_right > condition.value | continues | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | join_right > condition.value | ends | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | join_right > over.order_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.len_bytes | join_right > over.order_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.len_bytes | join_right > over.partition_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.len_bytes | join_right > over.partition_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.len_bytes | join_right | continues | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed UInt32 many
+Expr.str.len_bytes | join_right | ends | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed UInt32 many
+Expr.str.len_bytes | pivot_aggregate > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed UInt32 many
+Expr.str.len_bytes | pivot_aggregate > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `u32` for series with name `a`
+Expr.str.len_bytes | pivot_aggregate > condition.value | continues | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | pivot_aggregate > condition.value | ends | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | pivot_aggregate > over.order_by | continues | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.len_bytes | pivot_aggregate > over.order_by | ends | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.len_bytes | pivot_aggregate > over.partition_by | continues | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.len_bytes | pivot_aggregate > over.partition_by | ends | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.len_bytes | pivot_aggregate | continues | String | - | pivot-aggregate-gives-one-value | allowed UInt32 many
+Expr.str.len_bytes | pivot_aggregate | ends | String | - | pivot-aggregate-gives-one-value | allowed UInt32 many
+Expr.str.len_bytes | select > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed UInt32 many
+Expr.str.len_bytes | select > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `u32` for series with name `a`
+Expr.str.len_bytes | select > condition.value | continues | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | select > condition.value | ends | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | select > over.order_by | continues | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | select > over.order_by | ends | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | select > over.partition_by | continues | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | select > over.partition_by | ends | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | select | continues | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | select | ends | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | sort > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed UInt32 many
+Expr.str.len_bytes | sort > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `u32` for series with name `a`
+Expr.str.len_bytes | sort > condition.value | continues | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | sort > condition.value | ends | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | sort > over.order_by | continues | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | sort > over.order_by | ends | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | sort > over.partition_by | continues | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | sort > over.partition_by | ends | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | sort | continues | String | - | - | allowed UInt32 many
+Expr.str.len_bytes | sort | ends | String | - | - | allowed UInt32 many
+Expr.str.len_chars | filter > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed UInt32 many
+Expr.str.len_chars | filter > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `u32` for series with name `a`
+Expr.str.len_chars | filter > condition.value | continues | String | - | filter-predicate-is-boolean | allowed UInt32 many
+Expr.str.len_chars | filter > condition.value | ends | String | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `UInt32`
+Expr.str.len_chars | filter > over.order_by | continues | String | - | - | allowed UInt32 many
+Expr.str.len_chars | filter > over.order_by | ends | String | - | - | allowed UInt32 many
+Expr.str.len_chars | filter > over.partition_by | continues | String | - | - | allowed UInt32 many
+Expr.str.len_chars | filter > over.partition_by | ends | String | - | - | allowed UInt32 many
+Expr.str.len_chars | filter | continues | String | - | filter-predicate-is-boolean | allowed UInt32 many
+Expr.str.len_chars | filter | ends | String | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `UInt32`
+Expr.str.len_chars | join_left > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed UInt32 many
+Expr.str.len_chars | join_left > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `u32` for series with name `a`
+Expr.str.len_chars | join_left > condition.value | continues | String | - | - | allowed UInt32 many
+Expr.str.len_chars | join_left > condition.value | ends | String | - | - | allowed UInt32 many
+Expr.str.len_chars | join_left > over.order_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.len_chars | join_left > over.order_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.len_chars | join_left > over.partition_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.len_chars | join_left > over.partition_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.len_chars | join_left | continues | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed UInt32 many
+Expr.str.len_chars | join_left | ends | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed UInt32 many
+Expr.str.len_chars | join_right > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed UInt32 many
+Expr.str.len_chars | join_right > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `u32` for series with name `ra`
+Expr.str.len_chars | join_right > condition.value | continues | String | - | - | allowed UInt32 many
+Expr.str.len_chars | join_right > condition.value | ends | String | - | - | allowed UInt32 many
+Expr.str.len_chars | join_right > over.order_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.len_chars | join_right > over.order_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.len_chars | join_right > over.partition_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.len_chars | join_right > over.partition_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.len_chars | join_right | continues | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed UInt32 many
+Expr.str.len_chars | join_right | ends | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed UInt32 many
+Expr.str.len_chars | pivot_aggregate > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed UInt32 many
+Expr.str.len_chars | pivot_aggregate > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `u32` for series with name `a`
+Expr.str.len_chars | pivot_aggregate > condition.value | continues | String | - | - | allowed UInt32 many
+Expr.str.len_chars | pivot_aggregate > condition.value | ends | String | - | - | allowed UInt32 many
+Expr.str.len_chars | pivot_aggregate > over.order_by | continues | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.len_chars | pivot_aggregate > over.order_by | ends | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.len_chars | pivot_aggregate > over.partition_by | continues | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.len_chars | pivot_aggregate > over.partition_by | ends | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.len_chars | pivot_aggregate | continues | String | - | pivot-aggregate-gives-one-value | allowed UInt32 many
+Expr.str.len_chars | pivot_aggregate | ends | String | - | pivot-aggregate-gives-one-value | allowed UInt32 many
+Expr.str.len_chars | select > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed UInt32 many
+Expr.str.len_chars | select > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `u32` for series with name `a`
+Expr.str.len_chars | select > condition.value | continues | String | - | - | allowed UInt32 many
+Expr.str.len_chars | select > condition.value | ends | String | - | - | allowed UInt32 many
+Expr.str.len_chars | select > over.order_by | continues | String | - | - | allowed UInt32 many
+Expr.str.len_chars | select > over.order_by | ends | String | - | - | allowed UInt32 many
+Expr.str.len_chars | select > over.partition_by | continues | String | - | - | allowed UInt32 many
+Expr.str.len_chars | select > over.partition_by | ends | String | - | - | allowed UInt32 many
+Expr.str.len_chars | select | continues | String | - | - | allowed UInt32 many
+Expr.str.len_chars | select | ends | String | - | - | allowed UInt32 many
+Expr.str.len_chars | sort > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed UInt32 many
+Expr.str.len_chars | sort > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `u32` for series with name `a`
+Expr.str.len_chars | sort > condition.value | continues | String | - | - | allowed UInt32 many
+Expr.str.len_chars | sort > condition.value | ends | String | - | - | allowed UInt32 many
+Expr.str.len_chars | sort > over.order_by | continues | String | - | - | allowed UInt32 many
+Expr.str.len_chars | sort > over.order_by | ends | String | - | - | allowed UInt32 many
+Expr.str.len_chars | sort > over.partition_by | continues | String | - | - | allowed UInt32 many
+Expr.str.len_chars | sort > over.partition_by | ends | String | - | - | allowed UInt32 many
+Expr.str.len_chars | sort | continues | String | - | - | allowed UInt32 many
+Expr.str.len_chars | sort | ends | String | - | - | allowed UInt32 many
+Expr.str.pad_end | filter > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.pad_end | filter > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.pad_end | filter > condition.value | continues | String | Int8 | filter-predicate-is-boolean | allowed String many
+Expr.str.pad_end | filter > condition.value | ends | String | Int8 | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.pad_end | filter > over.order_by | continues | String | Int8 | - | allowed String many
+Expr.str.pad_end | filter > over.order_by | ends | String | Int8 | - | allowed String many
+Expr.str.pad_end | filter > over.partition_by | continues | String | Int8 | - | allowed String many
+Expr.str.pad_end | filter > over.partition_by | ends | String | Int8 | - | allowed String many
+Expr.str.pad_end | filter | continues | String | Int8 | filter-predicate-is-boolean | allowed String many
+Expr.str.pad_end | filter | ends | String | Int8 | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.pad_end | join_left > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.pad_end | join_left > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.pad_end | join_left > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.pad_end | join_left > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.pad_end | join_left > over.order_by | continues | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.pad_end | join_left > over.order_by | ends | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.pad_end | join_left > over.partition_by | continues | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.pad_end | join_left > over.partition_by | ends | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.pad_end | join_left | continues | String | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.pad_end | join_left | ends | String | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.pad_end | join_right > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.pad_end | join_right > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `ra`
+Expr.str.pad_end | join_right > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.pad_end | join_right > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.pad_end | join_right > over.order_by | continues | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.pad_end | join_right > over.order_by | ends | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.pad_end | join_right > over.partition_by | continues | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.pad_end | join_right > over.partition_by | ends | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.pad_end | join_right | continues | String | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.pad_end | join_right | ends | String | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.pad_end | pivot_aggregate > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.pad_end | pivot_aggregate > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.pad_end | pivot_aggregate > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.pad_end | pivot_aggregate > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.pad_end | pivot_aggregate > over.order_by | continues | String | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.pad_end | pivot_aggregate > over.order_by | ends | String | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.pad_end | pivot_aggregate > over.partition_by | continues | String | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.pad_end | pivot_aggregate > over.partition_by | ends | String | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.pad_end | pivot_aggregate | continues | String | Int8 | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.pad_end | pivot_aggregate | ends | String | Int8 | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.pad_end | select > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.pad_end | select > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.pad_end | select > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.pad_end | select > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.pad_end | select > over.order_by | continues | String | Int8 | - | allowed String many
+Expr.str.pad_end | select > over.order_by | ends | String | Int8 | - | allowed String many
+Expr.str.pad_end | select > over.partition_by | continues | String | Int8 | - | allowed String many
+Expr.str.pad_end | select > over.partition_by | ends | String | Int8 | - | allowed String many
+Expr.str.pad_end | select | continues | String | Int8 | - | allowed String many
+Expr.str.pad_end | select | ends | String | Int8 | - | allowed String many
+Expr.str.pad_end | sort > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.pad_end | sort > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.pad_end | sort > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.pad_end | sort > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.pad_end | sort > over.order_by | continues | String | Int8 | - | allowed String many
+Expr.str.pad_end | sort > over.order_by | ends | String | Int8 | - | allowed String many
+Expr.str.pad_end | sort > over.partition_by | continues | String | Int8 | - | allowed String many
+Expr.str.pad_end | sort > over.partition_by | ends | String | Int8 | - | allowed String many
+Expr.str.pad_end | sort | continues | String | Int8 | - | allowed String many
+Expr.str.pad_end | sort | ends | String | Int8 | - | allowed String many
+Expr.str.pad_start | filter > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.pad_start | filter > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.pad_start | filter > condition.value | continues | String | Int8 | filter-predicate-is-boolean | allowed String many
+Expr.str.pad_start | filter > condition.value | ends | String | Int8 | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.pad_start | filter > over.order_by | continues | String | Int8 | - | allowed String many
+Expr.str.pad_start | filter > over.order_by | ends | String | Int8 | - | allowed String many
+Expr.str.pad_start | filter > over.partition_by | continues | String | Int8 | - | allowed String many
+Expr.str.pad_start | filter > over.partition_by | ends | String | Int8 | - | allowed String many
+Expr.str.pad_start | filter | continues | String | Int8 | filter-predicate-is-boolean | allowed String many
+Expr.str.pad_start | filter | ends | String | Int8 | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.pad_start | join_left > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.pad_start | join_left > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.pad_start | join_left > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.pad_start | join_left > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.pad_start | join_left > over.order_by | continues | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.pad_start | join_left > over.order_by | ends | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.pad_start | join_left > over.partition_by | continues | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.pad_start | join_left > over.partition_by | ends | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.pad_start | join_left | continues | String | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.pad_start | join_left | ends | String | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.pad_start | join_right > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.pad_start | join_right > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `ra`
+Expr.str.pad_start | join_right > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.pad_start | join_right > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.pad_start | join_right > over.order_by | continues | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.pad_start | join_right > over.order_by | ends | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.pad_start | join_right > over.partition_by | continues | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.pad_start | join_right > over.partition_by | ends | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.pad_start | join_right | continues | String | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.pad_start | join_right | ends | String | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.pad_start | pivot_aggregate > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.pad_start | pivot_aggregate > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.pad_start | pivot_aggregate > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.pad_start | pivot_aggregate > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.pad_start | pivot_aggregate > over.order_by | continues | String | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.pad_start | pivot_aggregate > over.order_by | ends | String | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.pad_start | pivot_aggregate > over.partition_by | continues | String | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.pad_start | pivot_aggregate > over.partition_by | ends | String | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.pad_start | pivot_aggregate | continues | String | Int8 | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.pad_start | pivot_aggregate | ends | String | Int8 | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.pad_start | select > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.pad_start | select > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.pad_start | select > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.pad_start | select > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.pad_start | select > over.order_by | continues | String | Int8 | - | allowed String many
+Expr.str.pad_start | select > over.order_by | ends | String | Int8 | - | allowed String many
+Expr.str.pad_start | select > over.partition_by | continues | String | Int8 | - | allowed String many
+Expr.str.pad_start | select > over.partition_by | ends | String | Int8 | - | allowed String many
+Expr.str.pad_start | select | continues | String | Int8 | - | allowed String many
+Expr.str.pad_start | select | ends | String | Int8 | - | allowed String many
+Expr.str.pad_start | sort > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.pad_start | sort > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.pad_start | sort > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.pad_start | sort > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.pad_start | sort > over.order_by | continues | String | Int8 | - | allowed String many
+Expr.str.pad_start | sort > over.order_by | ends | String | Int8 | - | allowed String many
+Expr.str.pad_start | sort > over.partition_by | continues | String | Int8 | - | allowed String many
+Expr.str.pad_start | sort > over.partition_by | ends | String | Int8 | - | allowed String many
+Expr.str.pad_start | sort | continues | String | Int8 | - | allowed String many
+Expr.str.pad_start | sort | ends | String | Int8 | - | allowed String many
+Expr.str.reverse | filter > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.reverse | filter > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.reverse | filter > condition.value | continues | String | - | filter-predicate-is-boolean | allowed String many
+Expr.str.reverse | filter > condition.value | ends | String | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.reverse | filter > over.order_by | continues | String | - | - | allowed String many
+Expr.str.reverse | filter > over.order_by | ends | String | - | - | allowed String many
+Expr.str.reverse | filter > over.partition_by | continues | String | - | - | allowed String many
+Expr.str.reverse | filter > over.partition_by | ends | String | - | - | allowed String many
+Expr.str.reverse | filter | continues | String | - | filter-predicate-is-boolean | allowed String many
+Expr.str.reverse | filter | ends | String | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.reverse | join_left > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.reverse | join_left > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.reverse | join_left > condition.value | continues | String | - | - | allowed String many
+Expr.str.reverse | join_left > condition.value | ends | String | - | - | allowed String many
+Expr.str.reverse | join_left > over.order_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.reverse | join_left > over.order_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.reverse | join_left > over.partition_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.reverse | join_left > over.partition_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.reverse | join_left | continues | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.reverse | join_left | ends | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.reverse | join_right > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.reverse | join_right > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `ra`
+Expr.str.reverse | join_right > condition.value | continues | String | - | - | allowed String many
+Expr.str.reverse | join_right > condition.value | ends | String | - | - | allowed String many
+Expr.str.reverse | join_right > over.order_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.reverse | join_right > over.order_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.reverse | join_right > over.partition_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.reverse | join_right > over.partition_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.reverse | join_right | continues | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.reverse | join_right | ends | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.reverse | pivot_aggregate > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.reverse | pivot_aggregate > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.reverse | pivot_aggregate > condition.value | continues | String | - | - | allowed String many
+Expr.str.reverse | pivot_aggregate > condition.value | ends | String | - | - | allowed String many
+Expr.str.reverse | pivot_aggregate > over.order_by | continues | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.reverse | pivot_aggregate > over.order_by | ends | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.reverse | pivot_aggregate > over.partition_by | continues | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.reverse | pivot_aggregate > over.partition_by | ends | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.reverse | pivot_aggregate | continues | String | - | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.reverse | pivot_aggregate | ends | String | - | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.reverse | select > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.reverse | select > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.reverse | select > condition.value | continues | String | - | - | allowed String many
+Expr.str.reverse | select > condition.value | ends | String | - | - | allowed String many
+Expr.str.reverse | select > over.order_by | continues | String | - | - | allowed String many
+Expr.str.reverse | select > over.order_by | ends | String | - | - | allowed String many
+Expr.str.reverse | select > over.partition_by | continues | String | - | - | allowed String many
+Expr.str.reverse | select > over.partition_by | ends | String | - | - | allowed String many
+Expr.str.reverse | select | continues | String | - | - | allowed String many
+Expr.str.reverse | select | ends | String | - | - | allowed String many
+Expr.str.reverse | sort > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.reverse | sort > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.reverse | sort > condition.value | continues | String | - | - | allowed String many
+Expr.str.reverse | sort > condition.value | ends | String | - | - | allowed String many
+Expr.str.reverse | sort > over.order_by | continues | String | - | - | allowed String many
+Expr.str.reverse | sort > over.order_by | ends | String | - | - | allowed String many
+Expr.str.reverse | sort > over.partition_by | continues | String | - | - | allowed String many
+Expr.str.reverse | sort > over.partition_by | ends | String | - | - | allowed String many
+Expr.str.reverse | sort | continues | String | - | - | allowed String many
+Expr.str.reverse | sort | ends | String | - | - | allowed String many
+Expr.str.slice | filter > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed String many
+Expr.str.slice | filter > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.slice | filter > condition.value | continues | String | String | filter-predicate-is-boolean | allowed String many
+Expr.str.slice | filter > condition.value | ends | String | String | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.slice | filter > over.order_by | continues | String | String | - | allowed String many
+Expr.str.slice | filter > over.order_by | ends | String | String | - | allowed String many
+Expr.str.slice | filter > over.partition_by | continues | String | String | - | allowed String many
+Expr.str.slice | filter > over.partition_by | ends | String | String | - | allowed String many
+Expr.str.slice | filter | continues | String | String | filter-predicate-is-boolean | allowed String many
+Expr.str.slice | filter | ends | String | String | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.slice | join_left > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed String many
+Expr.str.slice | join_left > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.slice | join_left > condition.value | continues | String | String | - | allowed String many
+Expr.str.slice | join_left > condition.value | ends | String | String | - | allowed String many
+Expr.str.slice | join_left > over.order_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.slice | join_left > over.order_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.slice | join_left > over.partition_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.slice | join_left > over.partition_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.slice | join_left | continues | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.slice | join_left | ends | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.slice | join_right > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed String many
+Expr.str.slice | join_right > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `ra`
+Expr.str.slice | join_right > condition.value | continues | String | String | - | allowed String many
+Expr.str.slice | join_right > condition.value | ends | String | String | - | allowed String many
+Expr.str.slice | join_right > over.order_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.slice | join_right > over.order_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.slice | join_right > over.partition_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.slice | join_right > over.partition_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.slice | join_right | continues | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.slice | join_right | ends | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.slice | pivot_aggregate > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed String many
+Expr.str.slice | pivot_aggregate > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.slice | pivot_aggregate > condition.value | continues | String | String | - | allowed String many
+Expr.str.slice | pivot_aggregate > condition.value | ends | String | String | - | allowed String many
+Expr.str.slice | pivot_aggregate > over.order_by | continues | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.slice | pivot_aggregate > over.order_by | ends | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.slice | pivot_aggregate > over.partition_by | continues | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.slice | pivot_aggregate > over.partition_by | ends | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.slice | pivot_aggregate | continues | String | String | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.slice | pivot_aggregate | ends | String | String | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.slice | select > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed String many
+Expr.str.slice | select > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.slice | select > condition.value | continues | String | String | - | allowed String many
+Expr.str.slice | select > condition.value | ends | String | String | - | allowed String many
+Expr.str.slice | select > over.order_by | continues | String | String | - | allowed String many
+Expr.str.slice | select > over.order_by | ends | String | String | - | allowed String many
+Expr.str.slice | select > over.partition_by | continues | String | String | - | allowed String many
+Expr.str.slice | select > over.partition_by | ends | String | String | - | allowed String many
+Expr.str.slice | select | continues | String | String | - | allowed String many
+Expr.str.slice | select | ends | String | String | - | allowed String many
+Expr.str.slice | sort > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed String many
+Expr.str.slice | sort > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.slice | sort > condition.value | continues | String | String | - | allowed String many
+Expr.str.slice | sort > condition.value | ends | String | String | - | allowed String many
+Expr.str.slice | sort > over.order_by | continues | String | String | - | allowed String many
+Expr.str.slice | sort > over.order_by | ends | String | String | - | allowed String many
+Expr.str.slice | sort > over.partition_by | continues | String | String | - | allowed String many
+Expr.str.slice | sort > over.partition_by | ends | String | String | - | allowed String many
+Expr.str.slice | sort | continues | String | String | - | allowed String many
+Expr.str.slice | sort | ends | String | String | - | allowed String many
+Expr.str.split | filter > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed List(String) many
+Expr.str.split | filter > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `list[str]` for series with name `a`
+Expr.str.split | filter > condition.value | continues | String | String | filter-predicate-is-boolean | allowed List(String) many
+Expr.str.split | filter > condition.value | ends | String | String | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `List(String)`
+Expr.str.split | filter > over.order_by | continues | String | String | - | allowed List(String) many
+Expr.str.split | filter > over.order_by | ends | String | String | - | allowed List(String) many
+Expr.str.split | filter > over.partition_by | continues | String | String | - | allowed List(String) many
+Expr.str.split | filter > over.partition_by | ends | String | String | - | allowed List(String) many
+Expr.str.split | filter | continues | String | String | filter-predicate-is-boolean | allowed List(String) many
+Expr.str.split | filter | ends | String | String | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `List(String)`
+Expr.str.split | join_left > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed List(String) many
+Expr.str.split | join_left > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `list[str]` for series with name `a`
+Expr.str.split | join_left > condition.value | continues | String | String | - | refused rows: cannot cast List type (inner: 'String', to: 'Int64')
+Expr.str.split | join_left > condition.value | ends | String | String | - | allowed List(String) many
+Expr.str.split | join_left > over.order_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.split | join_left > over.order_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.split | join_left > over.partition_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.split | join_left > over.partition_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.split | join_left | continues | String | String | join-key-names-are-not-repeated,key-is-elementwise | refused rows: cannot cast List type (inner: 'String', to: 'Int64')
+Expr.str.split | join_left | ends | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed List(String) many
+Expr.str.split | join_right > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed List(String) many
+Expr.str.split | join_right > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `list[str]` for series with name `ra`
+Expr.str.split | join_right > condition.value | continues | String | String | - | refused rows: cannot cast List type (inner: 'String', to: 'Int64')
+Expr.str.split | join_right > condition.value | ends | String | String | - | allowed List(String) many
+Expr.str.split | join_right > over.order_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.split | join_right > over.order_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.split | join_right > over.partition_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.split | join_right > over.partition_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.split | join_right | continues | String | String | join-key-names-are-not-repeated,key-is-elementwise | refused rows: cannot cast List type (inner: 'String', to: 'Int64')
+Expr.str.split | join_right | ends | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed List(String) many
+Expr.str.split | pivot_aggregate > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed List(String) many
+Expr.str.split | pivot_aggregate > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `list[str]` for series with name `a`
+Expr.str.split | pivot_aggregate > condition.value | continues | String | String | - | allowed List(String) many
+Expr.str.split | pivot_aggregate > condition.value | ends | String | String | - | allowed List(String) many
+Expr.str.split | pivot_aggregate > over.order_by | continues | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.split | pivot_aggregate > over.order_by | ends | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.split | pivot_aggregate > over.partition_by | continues | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.split | pivot_aggregate > over.partition_by | ends | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.split | pivot_aggregate | continues | String | String | pivot-aggregate-gives-one-value | allowed List(String) many
+Expr.str.split | pivot_aggregate | ends | String | String | pivot-aggregate-gives-one-value | allowed List(String) many
+Expr.str.split | select > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed List(String) many
+Expr.str.split | select > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `list[str]` for series with name `a`
+Expr.str.split | select > condition.value | continues | String | String | - | allowed List(String) many
+Expr.str.split | select > condition.value | ends | String | String | - | allowed List(String) many
+Expr.str.split | select > over.order_by | continues | String | String | - | allowed List(String) many
+Expr.str.split | select > over.order_by | ends | String | String | - | allowed List(String) many
+Expr.str.split | select > over.partition_by | continues | String | String | - | allowed List(String) many
+Expr.str.split | select > over.partition_by | ends | String | String | - | allowed List(String) many
+Expr.str.split | select | continues | String | String | - | allowed List(String) many
+Expr.str.split | select | ends | String | String | - | allowed List(String) many
+Expr.str.split | sort > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed List(String) many
+Expr.str.split | sort > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `list[str]` for series with name `a`
+Expr.str.split | sort > condition.value | continues | String | String | - | allowed List(String) many
+Expr.str.split | sort > condition.value | ends | String | String | - | allowed List(String) many
+Expr.str.split | sort > over.order_by | continues | String | String | - | allowed List(String) many
+Expr.str.split | sort > over.order_by | ends | String | String | - | allowed List(String) many
+Expr.str.split | sort > over.partition_by | continues | String | String | - | allowed List(String) many
+Expr.str.split | sort > over.partition_by | ends | String | String | - | allowed List(String) many
+Expr.str.split | sort | continues | String | String | - | allowed List(String) many
+Expr.str.split | sort | ends | String | String | - | allowed List(String) many
+Expr.str.starts_with | filter > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.starts_with | filter > condition.predicate | ends | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.starts_with | filter > condition.value | continues | String | String | filter-predicate-is-boolean | allowed Boolean many
+Expr.str.starts_with | filter > condition.value | ends | String | String | filter-predicate-is-boolean | allowed Boolean many
+Expr.str.starts_with | filter > over.order_by | continues | String | String | - | allowed Boolean many
+Expr.str.starts_with | filter > over.order_by | ends | String | String | - | allowed Boolean many
+Expr.str.starts_with | filter > over.partition_by | continues | String | String | - | allowed Boolean many
+Expr.str.starts_with | filter > over.partition_by | ends | String | String | - | allowed Boolean many
+Expr.str.starts_with | filter | continues | String | String | filter-predicate-is-boolean | allowed Boolean many
+Expr.str.starts_with | filter | ends | String | String | filter-predicate-is-boolean | allowed Boolean many
+Expr.str.starts_with | join_left > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.starts_with | join_left > condition.predicate | ends | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.starts_with | join_left > condition.value | continues | String | String | - | allowed Boolean many
+Expr.str.starts_with | join_left > condition.value | ends | String | String | - | allowed Boolean many
+Expr.str.starts_with | join_left > over.order_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.starts_with | join_left > over.order_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.starts_with | join_left > over.partition_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.starts_with | join_left > over.partition_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.starts_with | join_left | continues | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Boolean many
+Expr.str.starts_with | join_left | ends | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Boolean many
+Expr.str.starts_with | join_right > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.starts_with | join_right > condition.predicate | ends | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.starts_with | join_right > condition.value | continues | String | String | - | allowed Boolean many
+Expr.str.starts_with | join_right > condition.value | ends | String | String | - | allowed Boolean many
+Expr.str.starts_with | join_right > over.order_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.starts_with | join_right > over.order_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.starts_with | join_right > over.partition_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.starts_with | join_right > over.partition_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.starts_with | join_right | continues | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Boolean many
+Expr.str.starts_with | join_right | ends | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed Boolean many
+Expr.str.starts_with | pivot_aggregate > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.starts_with | pivot_aggregate > condition.predicate | ends | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.starts_with | pivot_aggregate > condition.value | continues | String | String | - | allowed Boolean many
+Expr.str.starts_with | pivot_aggregate > condition.value | ends | String | String | - | allowed Boolean many
+Expr.str.starts_with | pivot_aggregate > over.order_by | continues | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.starts_with | pivot_aggregate > over.order_by | ends | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.starts_with | pivot_aggregate > over.partition_by | continues | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.starts_with | pivot_aggregate > over.partition_by | ends | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.starts_with | pivot_aggregate | continues | String | String | pivot-aggregate-gives-one-value | allowed Boolean many
+Expr.str.starts_with | pivot_aggregate | ends | String | String | pivot-aggregate-gives-one-value | allowed Boolean many
+Expr.str.starts_with | select > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.starts_with | select > condition.predicate | ends | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.starts_with | select > condition.value | continues | String | String | - | allowed Boolean many
+Expr.str.starts_with | select > condition.value | ends | String | String | - | allowed Boolean many
+Expr.str.starts_with | select > over.order_by | continues | String | String | - | allowed Boolean many
+Expr.str.starts_with | select > over.order_by | ends | String | String | - | allowed Boolean many
+Expr.str.starts_with | select > over.partition_by | continues | String | String | - | allowed Boolean many
+Expr.str.starts_with | select > over.partition_by | ends | String | String | - | allowed Boolean many
+Expr.str.starts_with | select | continues | String | String | - | allowed Boolean many
+Expr.str.starts_with | select | ends | String | String | - | allowed Boolean many
+Expr.str.starts_with | sort > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.starts_with | sort > condition.predicate | ends | String | String | condition-predicate-is-boolean | allowed Boolean many
+Expr.str.starts_with | sort > condition.value | continues | String | String | - | allowed Boolean many
+Expr.str.starts_with | sort > condition.value | ends | String | String | - | allowed Boolean many
+Expr.str.starts_with | sort > over.order_by | continues | String | String | - | allowed Boolean many
+Expr.str.starts_with | sort > over.order_by | ends | String | String | - | allowed Boolean many
+Expr.str.starts_with | sort > over.partition_by | continues | String | String | - | allowed Boolean many
+Expr.str.starts_with | sort > over.partition_by | ends | String | String | - | allowed Boolean many
+Expr.str.starts_with | sort | continues | String | String | - | allowed Boolean many
+Expr.str.starts_with | sort | ends | String | String | - | allowed Boolean many
+Expr.str.strip_chars | filter > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_chars | filter > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_chars | filter > condition.value | continues | String | - | filter-predicate-is-boolean | allowed String many
+Expr.str.strip_chars | filter > condition.value | ends | String | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.strip_chars | filter > over.order_by | continues | String | - | - | allowed String many
+Expr.str.strip_chars | filter > over.order_by | ends | String | - | - | allowed String many
+Expr.str.strip_chars | filter > over.partition_by | continues | String | - | - | allowed String many
+Expr.str.strip_chars | filter > over.partition_by | ends | String | - | - | allowed String many
+Expr.str.strip_chars | filter | continues | String | - | filter-predicate-is-boolean | allowed String many
+Expr.str.strip_chars | filter | ends | String | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.strip_chars | join_left > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_chars | join_left > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_chars | join_left > condition.value | continues | String | - | - | allowed String many
+Expr.str.strip_chars | join_left > condition.value | ends | String | - | - | allowed String many
+Expr.str.strip_chars | join_left > over.order_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars | join_left > over.order_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars | join_left > over.partition_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars | join_left > over.partition_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars | join_left | continues | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.strip_chars | join_left | ends | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.strip_chars | join_right > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_chars | join_right > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `ra`
+Expr.str.strip_chars | join_right > condition.value | continues | String | - | - | allowed String many
+Expr.str.strip_chars | join_right > condition.value | ends | String | - | - | allowed String many
+Expr.str.strip_chars | join_right > over.order_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars | join_right > over.order_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars | join_right > over.partition_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars | join_right > over.partition_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars | join_right | continues | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.strip_chars | join_right | ends | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.strip_chars | pivot_aggregate > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_chars | pivot_aggregate > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_chars | pivot_aggregate > condition.value | continues | String | - | - | allowed String many
+Expr.str.strip_chars | pivot_aggregate > condition.value | ends | String | - | - | allowed String many
+Expr.str.strip_chars | pivot_aggregate > over.order_by | continues | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.strip_chars | pivot_aggregate > over.order_by | ends | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.strip_chars | pivot_aggregate > over.partition_by | continues | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.strip_chars | pivot_aggregate > over.partition_by | ends | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.strip_chars | pivot_aggregate | continues | String | - | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.strip_chars | pivot_aggregate | ends | String | - | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.strip_chars | select > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_chars | select > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_chars | select > condition.value | continues | String | - | - | allowed String many
+Expr.str.strip_chars | select > condition.value | ends | String | - | - | allowed String many
+Expr.str.strip_chars | select > over.order_by | continues | String | - | - | allowed String many
+Expr.str.strip_chars | select > over.order_by | ends | String | - | - | allowed String many
+Expr.str.strip_chars | select > over.partition_by | continues | String | - | - | allowed String many
+Expr.str.strip_chars | select > over.partition_by | ends | String | - | - | allowed String many
+Expr.str.strip_chars | select | continues | String | - | - | allowed String many
+Expr.str.strip_chars | select | ends | String | - | - | allowed String many
+Expr.str.strip_chars | sort > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_chars | sort > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_chars | sort > condition.value | continues | String | - | - | allowed String many
+Expr.str.strip_chars | sort > condition.value | ends | String | - | - | allowed String many
+Expr.str.strip_chars | sort > over.order_by | continues | String | - | - | allowed String many
+Expr.str.strip_chars | sort > over.order_by | ends | String | - | - | allowed String many
+Expr.str.strip_chars | sort > over.partition_by | continues | String | - | - | allowed String many
+Expr.str.strip_chars | sort > over.partition_by | ends | String | - | - | allowed String many
+Expr.str.strip_chars | sort | continues | String | - | - | allowed String many
+Expr.str.strip_chars | sort | ends | String | - | - | allowed String many
+Expr.str.strip_chars_end | filter > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_chars_end | filter > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_chars_end | filter > condition.value | continues | String | - | filter-predicate-is-boolean | allowed String many
+Expr.str.strip_chars_end | filter > condition.value | ends | String | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.strip_chars_end | filter > over.order_by | continues | String | - | - | allowed String many
+Expr.str.strip_chars_end | filter > over.order_by | ends | String | - | - | allowed String many
+Expr.str.strip_chars_end | filter > over.partition_by | continues | String | - | - | allowed String many
+Expr.str.strip_chars_end | filter > over.partition_by | ends | String | - | - | allowed String many
+Expr.str.strip_chars_end | filter | continues | String | - | filter-predicate-is-boolean | allowed String many
+Expr.str.strip_chars_end | filter | ends | String | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.strip_chars_end | join_left > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_chars_end | join_left > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_chars_end | join_left > condition.value | continues | String | - | - | allowed String many
+Expr.str.strip_chars_end | join_left > condition.value | ends | String | - | - | allowed String many
+Expr.str.strip_chars_end | join_left > over.order_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars_end | join_left > over.order_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars_end | join_left > over.partition_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars_end | join_left > over.partition_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars_end | join_left | continues | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.strip_chars_end | join_left | ends | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.strip_chars_end | join_right > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_chars_end | join_right > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `ra`
+Expr.str.strip_chars_end | join_right > condition.value | continues | String | - | - | allowed String many
+Expr.str.strip_chars_end | join_right > condition.value | ends | String | - | - | allowed String many
+Expr.str.strip_chars_end | join_right > over.order_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars_end | join_right > over.order_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars_end | join_right > over.partition_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars_end | join_right > over.partition_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars_end | join_right | continues | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.strip_chars_end | join_right | ends | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.strip_chars_end | pivot_aggregate > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_chars_end | pivot_aggregate > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_chars_end | pivot_aggregate > condition.value | continues | String | - | - | allowed String many
+Expr.str.strip_chars_end | pivot_aggregate > condition.value | ends | String | - | - | allowed String many
+Expr.str.strip_chars_end | pivot_aggregate > over.order_by | continues | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.strip_chars_end | pivot_aggregate > over.order_by | ends | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.strip_chars_end | pivot_aggregate > over.partition_by | continues | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.strip_chars_end | pivot_aggregate > over.partition_by | ends | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.strip_chars_end | pivot_aggregate | continues | String | - | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.strip_chars_end | pivot_aggregate | ends | String | - | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.strip_chars_end | select > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_chars_end | select > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_chars_end | select > condition.value | continues | String | - | - | allowed String many
+Expr.str.strip_chars_end | select > condition.value | ends | String | - | - | allowed String many
+Expr.str.strip_chars_end | select > over.order_by | continues | String | - | - | allowed String many
+Expr.str.strip_chars_end | select > over.order_by | ends | String | - | - | allowed String many
+Expr.str.strip_chars_end | select > over.partition_by | continues | String | - | - | allowed String many
+Expr.str.strip_chars_end | select > over.partition_by | ends | String | - | - | allowed String many
+Expr.str.strip_chars_end | select | continues | String | - | - | allowed String many
+Expr.str.strip_chars_end | select | ends | String | - | - | allowed String many
+Expr.str.strip_chars_end | sort > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_chars_end | sort > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_chars_end | sort > condition.value | continues | String | - | - | allowed String many
+Expr.str.strip_chars_end | sort > condition.value | ends | String | - | - | allowed String many
+Expr.str.strip_chars_end | sort > over.order_by | continues | String | - | - | allowed String many
+Expr.str.strip_chars_end | sort > over.order_by | ends | String | - | - | allowed String many
+Expr.str.strip_chars_end | sort > over.partition_by | continues | String | - | - | allowed String many
+Expr.str.strip_chars_end | sort > over.partition_by | ends | String | - | - | allowed String many
+Expr.str.strip_chars_end | sort | continues | String | - | - | allowed String many
+Expr.str.strip_chars_end | sort | ends | String | - | - | allowed String many
+Expr.str.strip_chars_start | filter > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_chars_start | filter > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_chars_start | filter > condition.value | continues | String | - | filter-predicate-is-boolean | allowed String many
+Expr.str.strip_chars_start | filter > condition.value | ends | String | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.strip_chars_start | filter > over.order_by | continues | String | - | - | allowed String many
+Expr.str.strip_chars_start | filter > over.order_by | ends | String | - | - | allowed String many
+Expr.str.strip_chars_start | filter > over.partition_by | continues | String | - | - | allowed String many
+Expr.str.strip_chars_start | filter > over.partition_by | ends | String | - | - | allowed String many
+Expr.str.strip_chars_start | filter | continues | String | - | filter-predicate-is-boolean | allowed String many
+Expr.str.strip_chars_start | filter | ends | String | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.strip_chars_start | join_left > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_chars_start | join_left > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_chars_start | join_left > condition.value | continues | String | - | - | allowed String many
+Expr.str.strip_chars_start | join_left > condition.value | ends | String | - | - | allowed String many
+Expr.str.strip_chars_start | join_left > over.order_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars_start | join_left > over.order_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars_start | join_left > over.partition_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars_start | join_left > over.partition_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars_start | join_left | continues | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.strip_chars_start | join_left | ends | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.strip_chars_start | join_right > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_chars_start | join_right > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `ra`
+Expr.str.strip_chars_start | join_right > condition.value | continues | String | - | - | allowed String many
+Expr.str.strip_chars_start | join_right > condition.value | ends | String | - | - | allowed String many
+Expr.str.strip_chars_start | join_right > over.order_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars_start | join_right > over.order_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars_start | join_right > over.partition_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars_start | join_right > over.partition_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_chars_start | join_right | continues | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.strip_chars_start | join_right | ends | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.strip_chars_start | pivot_aggregate > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_chars_start | pivot_aggregate > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_chars_start | pivot_aggregate > condition.value | continues | String | - | - | allowed String many
+Expr.str.strip_chars_start | pivot_aggregate > condition.value | ends | String | - | - | allowed String many
+Expr.str.strip_chars_start | pivot_aggregate > over.order_by | continues | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.strip_chars_start | pivot_aggregate > over.order_by | ends | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.strip_chars_start | pivot_aggregate > over.partition_by | continues | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.strip_chars_start | pivot_aggregate > over.partition_by | ends | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.strip_chars_start | pivot_aggregate | continues | String | - | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.strip_chars_start | pivot_aggregate | ends | String | - | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.strip_chars_start | select > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_chars_start | select > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_chars_start | select > condition.value | continues | String | - | - | allowed String many
+Expr.str.strip_chars_start | select > condition.value | ends | String | - | - | allowed String many
+Expr.str.strip_chars_start | select > over.order_by | continues | String | - | - | allowed String many
+Expr.str.strip_chars_start | select > over.order_by | ends | String | - | - | allowed String many
+Expr.str.strip_chars_start | select > over.partition_by | continues | String | - | - | allowed String many
+Expr.str.strip_chars_start | select > over.partition_by | ends | String | - | - | allowed String many
+Expr.str.strip_chars_start | select | continues | String | - | - | allowed String many
+Expr.str.strip_chars_start | select | ends | String | - | - | allowed String many
+Expr.str.strip_chars_start | sort > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_chars_start | sort > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_chars_start | sort > condition.value | continues | String | - | - | allowed String many
+Expr.str.strip_chars_start | sort > condition.value | ends | String | - | - | allowed String many
+Expr.str.strip_chars_start | sort > over.order_by | continues | String | - | - | allowed String many
+Expr.str.strip_chars_start | sort > over.order_by | ends | String | - | - | allowed String many
+Expr.str.strip_chars_start | sort > over.partition_by | continues | String | - | - | allowed String many
+Expr.str.strip_chars_start | sort > over.partition_by | ends | String | - | - | allowed String many
+Expr.str.strip_chars_start | sort | continues | String | - | - | allowed String many
+Expr.str.strip_chars_start | sort | ends | String | - | - | allowed String many
+Expr.str.strip_prefix | filter > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_prefix | filter > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_prefix | filter > condition.value | continues | String | String | filter-predicate-is-boolean | allowed String many
+Expr.str.strip_prefix | filter > condition.value | ends | String | String | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.strip_prefix | filter > over.order_by | continues | String | String | - | allowed String many
+Expr.str.strip_prefix | filter > over.order_by | ends | String | String | - | allowed String many
+Expr.str.strip_prefix | filter > over.partition_by | continues | String | String | - | allowed String many
+Expr.str.strip_prefix | filter > over.partition_by | ends | String | String | - | allowed String many
+Expr.str.strip_prefix | filter | continues | String | String | filter-predicate-is-boolean | allowed String many
+Expr.str.strip_prefix | filter | ends | String | String | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.strip_prefix | join_left > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_prefix | join_left > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_prefix | join_left > condition.value | continues | String | String | - | allowed String many
+Expr.str.strip_prefix | join_left > condition.value | ends | String | String | - | allowed String many
+Expr.str.strip_prefix | join_left > over.order_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_prefix | join_left > over.order_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_prefix | join_left > over.partition_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_prefix | join_left > over.partition_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_prefix | join_left | continues | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.strip_prefix | join_left | ends | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.strip_prefix | join_right > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_prefix | join_right > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `ra`
+Expr.str.strip_prefix | join_right > condition.value | continues | String | String | - | allowed String many
+Expr.str.strip_prefix | join_right > condition.value | ends | String | String | - | allowed String many
+Expr.str.strip_prefix | join_right > over.order_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_prefix | join_right > over.order_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_prefix | join_right > over.partition_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_prefix | join_right > over.partition_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_prefix | join_right | continues | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.strip_prefix | join_right | ends | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.strip_prefix | pivot_aggregate > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_prefix | pivot_aggregate > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_prefix | pivot_aggregate > condition.value | continues | String | String | - | allowed String many
+Expr.str.strip_prefix | pivot_aggregate > condition.value | ends | String | String | - | allowed String many
+Expr.str.strip_prefix | pivot_aggregate > over.order_by | continues | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.strip_prefix | pivot_aggregate > over.order_by | ends | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.strip_prefix | pivot_aggregate > over.partition_by | continues | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.strip_prefix | pivot_aggregate > over.partition_by | ends | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.strip_prefix | pivot_aggregate | continues | String | String | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.strip_prefix | pivot_aggregate | ends | String | String | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.strip_prefix | select > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_prefix | select > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_prefix | select > condition.value | continues | String | String | - | allowed String many
+Expr.str.strip_prefix | select > condition.value | ends | String | String | - | allowed String many
+Expr.str.strip_prefix | select > over.order_by | continues | String | String | - | allowed String many
+Expr.str.strip_prefix | select > over.order_by | ends | String | String | - | allowed String many
+Expr.str.strip_prefix | select > over.partition_by | continues | String | String | - | allowed String many
+Expr.str.strip_prefix | select > over.partition_by | ends | String | String | - | allowed String many
+Expr.str.strip_prefix | select | continues | String | String | - | allowed String many
+Expr.str.strip_prefix | select | ends | String | String | - | allowed String many
+Expr.str.strip_prefix | sort > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_prefix | sort > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_prefix | sort > condition.value | continues | String | String | - | allowed String many
+Expr.str.strip_prefix | sort > condition.value | ends | String | String | - | allowed String many
+Expr.str.strip_prefix | sort > over.order_by | continues | String | String | - | allowed String many
+Expr.str.strip_prefix | sort > over.order_by | ends | String | String | - | allowed String many
+Expr.str.strip_prefix | sort > over.partition_by | continues | String | String | - | allowed String many
+Expr.str.strip_prefix | sort > over.partition_by | ends | String | String | - | allowed String many
+Expr.str.strip_prefix | sort | continues | String | String | - | allowed String many
+Expr.str.strip_prefix | sort | ends | String | String | - | allowed String many
+Expr.str.strip_suffix | filter > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_suffix | filter > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_suffix | filter > condition.value | continues | String | String | filter-predicate-is-boolean | allowed String many
+Expr.str.strip_suffix | filter > condition.value | ends | String | String | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.strip_suffix | filter > over.order_by | continues | String | String | - | allowed String many
+Expr.str.strip_suffix | filter > over.order_by | ends | String | String | - | allowed String many
+Expr.str.strip_suffix | filter > over.partition_by | continues | String | String | - | allowed String many
+Expr.str.strip_suffix | filter > over.partition_by | ends | String | String | - | allowed String many
+Expr.str.strip_suffix | filter | continues | String | String | filter-predicate-is-boolean | allowed String many
+Expr.str.strip_suffix | filter | ends | String | String | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.strip_suffix | join_left > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_suffix | join_left > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_suffix | join_left > condition.value | continues | String | String | - | allowed String many
+Expr.str.strip_suffix | join_left > condition.value | ends | String | String | - | allowed String many
+Expr.str.strip_suffix | join_left > over.order_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_suffix | join_left > over.order_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_suffix | join_left > over.partition_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_suffix | join_left > over.partition_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_suffix | join_left | continues | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.strip_suffix | join_left | ends | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.strip_suffix | join_right > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_suffix | join_right > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `ra`
+Expr.str.strip_suffix | join_right > condition.value | continues | String | String | - | allowed String many
+Expr.str.strip_suffix | join_right > condition.value | ends | String | String | - | allowed String many
+Expr.str.strip_suffix | join_right > over.order_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_suffix | join_right > over.order_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_suffix | join_right > over.partition_by | continues | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_suffix | join_right > over.partition_by | ends | String | String | - | refused schema: all join key expressions must be elementwise.
+Expr.str.strip_suffix | join_right | continues | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.strip_suffix | join_right | ends | String | String | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.strip_suffix | pivot_aggregate > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_suffix | pivot_aggregate > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_suffix | pivot_aggregate > condition.value | continues | String | String | - | allowed String many
+Expr.str.strip_suffix | pivot_aggregate > condition.value | ends | String | String | - | allowed String many
+Expr.str.strip_suffix | pivot_aggregate > over.order_by | continues | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.strip_suffix | pivot_aggregate > over.order_by | ends | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.strip_suffix | pivot_aggregate > over.partition_by | continues | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.strip_suffix | pivot_aggregate > over.partition_by | ends | String | String | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.strip_suffix | pivot_aggregate | continues | String | String | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.strip_suffix | pivot_aggregate | ends | String | String | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.strip_suffix | select > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_suffix | select > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_suffix | select > condition.value | continues | String | String | - | allowed String many
+Expr.str.strip_suffix | select > condition.value | ends | String | String | - | allowed String many
+Expr.str.strip_suffix | select > over.order_by | continues | String | String | - | allowed String many
+Expr.str.strip_suffix | select > over.order_by | ends | String | String | - | allowed String many
+Expr.str.strip_suffix | select > over.partition_by | continues | String | String | - | allowed String many
+Expr.str.strip_suffix | select > over.partition_by | ends | String | String | - | allowed String many
+Expr.str.strip_suffix | select | continues | String | String | - | allowed String many
+Expr.str.strip_suffix | select | ends | String | String | - | allowed String many
+Expr.str.strip_suffix | sort > condition.predicate | continues | String | String | condition-predicate-is-boolean | allowed String many
+Expr.str.strip_suffix | sort > condition.predicate | ends | String | String | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.strip_suffix | sort > condition.value | continues | String | String | - | allowed String many
+Expr.str.strip_suffix | sort > condition.value | ends | String | String | - | allowed String many
+Expr.str.strip_suffix | sort > over.order_by | continues | String | String | - | allowed String many
+Expr.str.strip_suffix | sort > over.order_by | ends | String | String | - | allowed String many
+Expr.str.strip_suffix | sort > over.partition_by | continues | String | String | - | allowed String many
+Expr.str.strip_suffix | sort > over.partition_by | ends | String | String | - | allowed String many
+Expr.str.strip_suffix | sort | continues | String | String | - | allowed String many
+Expr.str.strip_suffix | sort | ends | String | String | - | allowed String many
+Expr.str.tail | filter > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.tail | filter > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.tail | filter > condition.value | continues | String | Int8 | filter-predicate-is-boolean | allowed String many
+Expr.str.tail | filter > condition.value | ends | String | Int8 | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.tail | filter > over.order_by | continues | String | Int8 | - | allowed String many
+Expr.str.tail | filter > over.order_by | ends | String | Int8 | - | allowed String many
+Expr.str.tail | filter > over.partition_by | continues | String | Int8 | - | allowed String many
+Expr.str.tail | filter > over.partition_by | ends | String | Int8 | - | allowed String many
+Expr.str.tail | filter | continues | String | Int8 | filter-predicate-is-boolean | allowed String many
+Expr.str.tail | filter | ends | String | Int8 | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.tail | join_left > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.tail | join_left > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.tail | join_left > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.tail | join_left > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.tail | join_left > over.order_by | continues | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.tail | join_left > over.order_by | ends | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.tail | join_left > over.partition_by | continues | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.tail | join_left > over.partition_by | ends | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.tail | join_left | continues | String | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.tail | join_left | ends | String | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.tail | join_right > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.tail | join_right > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `ra`
+Expr.str.tail | join_right > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.tail | join_right > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.tail | join_right > over.order_by | continues | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.tail | join_right > over.order_by | ends | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.tail | join_right > over.partition_by | continues | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.tail | join_right > over.partition_by | ends | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.tail | join_right | continues | String | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.tail | join_right | ends | String | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.tail | pivot_aggregate > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.tail | pivot_aggregate > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.tail | pivot_aggregate > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.tail | pivot_aggregate > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.tail | pivot_aggregate > over.order_by | continues | String | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.tail | pivot_aggregate > over.order_by | ends | String | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.tail | pivot_aggregate > over.partition_by | continues | String | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.tail | pivot_aggregate > over.partition_by | ends | String | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.tail | pivot_aggregate | continues | String | Int8 | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.tail | pivot_aggregate | ends | String | Int8 | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.tail | select > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.tail | select > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.tail | select > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.tail | select > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.tail | select > over.order_by | continues | String | Int8 | - | allowed String many
+Expr.str.tail | select > over.order_by | ends | String | Int8 | - | allowed String many
+Expr.str.tail | select > over.partition_by | continues | String | Int8 | - | allowed String many
+Expr.str.tail | select > over.partition_by | ends | String | Int8 | - | allowed String many
+Expr.str.tail | select | continues | String | Int8 | - | allowed String many
+Expr.str.tail | select | ends | String | Int8 | - | allowed String many
+Expr.str.tail | sort > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.tail | sort > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.tail | sort > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.tail | sort > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.tail | sort > over.order_by | continues | String | Int8 | - | allowed String many
+Expr.str.tail | sort > over.order_by | ends | String | Int8 | - | allowed String many
+Expr.str.tail | sort > over.partition_by | continues | String | Int8 | - | allowed String many
+Expr.str.tail | sort > over.partition_by | ends | String | Int8 | - | allowed String many
+Expr.str.tail | sort | continues | String | Int8 | - | allowed String many
+Expr.str.tail | sort | ends | String | Int8 | - | allowed String many
+Expr.str.to_lowercase | filter > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.to_lowercase | filter > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.to_lowercase | filter > condition.value | continues | String | - | filter-predicate-is-boolean | allowed String many
+Expr.str.to_lowercase | filter > condition.value | ends | String | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.to_lowercase | filter > over.order_by | continues | String | - | - | allowed String many
+Expr.str.to_lowercase | filter > over.order_by | ends | String | - | - | allowed String many
+Expr.str.to_lowercase | filter > over.partition_by | continues | String | - | - | allowed String many
+Expr.str.to_lowercase | filter > over.partition_by | ends | String | - | - | allowed String many
+Expr.str.to_lowercase | filter | continues | String | - | filter-predicate-is-boolean | allowed String many
+Expr.str.to_lowercase | filter | ends | String | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.to_lowercase | join_left > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.to_lowercase | join_left > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.to_lowercase | join_left > condition.value | continues | String | - | - | allowed String many
+Expr.str.to_lowercase | join_left > condition.value | ends | String | - | - | allowed String many
+Expr.str.to_lowercase | join_left > over.order_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_lowercase | join_left > over.order_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_lowercase | join_left > over.partition_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_lowercase | join_left > over.partition_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_lowercase | join_left | continues | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.to_lowercase | join_left | ends | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.to_lowercase | join_right > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.to_lowercase | join_right > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `ra`
+Expr.str.to_lowercase | join_right > condition.value | continues | String | - | - | allowed String many
+Expr.str.to_lowercase | join_right > condition.value | ends | String | - | - | allowed String many
+Expr.str.to_lowercase | join_right > over.order_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_lowercase | join_right > over.order_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_lowercase | join_right > over.partition_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_lowercase | join_right > over.partition_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_lowercase | join_right | continues | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.to_lowercase | join_right | ends | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.to_lowercase | pivot_aggregate > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.to_lowercase | pivot_aggregate > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.to_lowercase | pivot_aggregate > condition.value | continues | String | - | - | allowed String many
+Expr.str.to_lowercase | pivot_aggregate > condition.value | ends | String | - | - | allowed String many
+Expr.str.to_lowercase | pivot_aggregate > over.order_by | continues | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.to_lowercase | pivot_aggregate > over.order_by | ends | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.to_lowercase | pivot_aggregate > over.partition_by | continues | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.to_lowercase | pivot_aggregate > over.partition_by | ends | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.to_lowercase | pivot_aggregate | continues | String | - | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.to_lowercase | pivot_aggregate | ends | String | - | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.to_lowercase | select > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.to_lowercase | select > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.to_lowercase | select > condition.value | continues | String | - | - | allowed String many
+Expr.str.to_lowercase | select > condition.value | ends | String | - | - | allowed String many
+Expr.str.to_lowercase | select > over.order_by | continues | String | - | - | allowed String many
+Expr.str.to_lowercase | select > over.order_by | ends | String | - | - | allowed String many
+Expr.str.to_lowercase | select > over.partition_by | continues | String | - | - | allowed String many
+Expr.str.to_lowercase | select > over.partition_by | ends | String | - | - | allowed String many
+Expr.str.to_lowercase | select | continues | String | - | - | allowed String many
+Expr.str.to_lowercase | select | ends | String | - | - | allowed String many
+Expr.str.to_lowercase | sort > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.to_lowercase | sort > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.to_lowercase | sort > condition.value | continues | String | - | - | allowed String many
+Expr.str.to_lowercase | sort > condition.value | ends | String | - | - | allowed String many
+Expr.str.to_lowercase | sort > over.order_by | continues | String | - | - | allowed String many
+Expr.str.to_lowercase | sort > over.order_by | ends | String | - | - | allowed String many
+Expr.str.to_lowercase | sort > over.partition_by | continues | String | - | - | allowed String many
+Expr.str.to_lowercase | sort > over.partition_by | ends | String | - | - | allowed String many
+Expr.str.to_lowercase | sort | continues | String | - | - | allowed String many
+Expr.str.to_lowercase | sort | ends | String | - | - | allowed String many
+Expr.str.to_titlecase | filter > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.to_titlecase | filter > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.to_titlecase | filter > condition.value | continues | String | - | filter-predicate-is-boolean | allowed String many
+Expr.str.to_titlecase | filter > condition.value | ends | String | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.to_titlecase | filter > over.order_by | continues | String | - | - | allowed String many
+Expr.str.to_titlecase | filter > over.order_by | ends | String | - | - | allowed String many
+Expr.str.to_titlecase | filter > over.partition_by | continues | String | - | - | allowed String many
+Expr.str.to_titlecase | filter > over.partition_by | ends | String | - | - | allowed String many
+Expr.str.to_titlecase | filter | continues | String | - | filter-predicate-is-boolean | allowed String many
+Expr.str.to_titlecase | filter | ends | String | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.to_titlecase | join_left > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.to_titlecase | join_left > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.to_titlecase | join_left > condition.value | continues | String | - | - | allowed String many
+Expr.str.to_titlecase | join_left > condition.value | ends | String | - | - | allowed String many
+Expr.str.to_titlecase | join_left > over.order_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_titlecase | join_left > over.order_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_titlecase | join_left > over.partition_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_titlecase | join_left > over.partition_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_titlecase | join_left | continues | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.to_titlecase | join_left | ends | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.to_titlecase | join_right > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.to_titlecase | join_right > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `ra`
+Expr.str.to_titlecase | join_right > condition.value | continues | String | - | - | allowed String many
+Expr.str.to_titlecase | join_right > condition.value | ends | String | - | - | allowed String many
+Expr.str.to_titlecase | join_right > over.order_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_titlecase | join_right > over.order_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_titlecase | join_right > over.partition_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_titlecase | join_right > over.partition_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_titlecase | join_right | continues | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.to_titlecase | join_right | ends | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.to_titlecase | pivot_aggregate > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.to_titlecase | pivot_aggregate > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.to_titlecase | pivot_aggregate > condition.value | continues | String | - | - | allowed String many
+Expr.str.to_titlecase | pivot_aggregate > condition.value | ends | String | - | - | allowed String many
+Expr.str.to_titlecase | pivot_aggregate > over.order_by | continues | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.to_titlecase | pivot_aggregate > over.order_by | ends | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.to_titlecase | pivot_aggregate > over.partition_by | continues | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.to_titlecase | pivot_aggregate > over.partition_by | ends | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.to_titlecase | pivot_aggregate | continues | String | - | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.to_titlecase | pivot_aggregate | ends | String | - | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.to_titlecase | select > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.to_titlecase | select > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.to_titlecase | select > condition.value | continues | String | - | - | allowed String many
+Expr.str.to_titlecase | select > condition.value | ends | String | - | - | allowed String many
+Expr.str.to_titlecase | select > over.order_by | continues | String | - | - | allowed String many
+Expr.str.to_titlecase | select > over.order_by | ends | String | - | - | allowed String many
+Expr.str.to_titlecase | select > over.partition_by | continues | String | - | - | allowed String many
+Expr.str.to_titlecase | select > over.partition_by | ends | String | - | - | allowed String many
+Expr.str.to_titlecase | select | continues | String | - | - | allowed String many
+Expr.str.to_titlecase | select | ends | String | - | - | allowed String many
+Expr.str.to_titlecase | sort > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.to_titlecase | sort > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.to_titlecase | sort > condition.value | continues | String | - | - | allowed String many
+Expr.str.to_titlecase | sort > condition.value | ends | String | - | - | allowed String many
+Expr.str.to_titlecase | sort > over.order_by | continues | String | - | - | allowed String many
+Expr.str.to_titlecase | sort > over.order_by | ends | String | - | - | allowed String many
+Expr.str.to_titlecase | sort > over.partition_by | continues | String | - | - | allowed String many
+Expr.str.to_titlecase | sort > over.partition_by | ends | String | - | - | allowed String many
+Expr.str.to_titlecase | sort | continues | String | - | - | allowed String many
+Expr.str.to_titlecase | sort | ends | String | - | - | allowed String many
+Expr.str.to_uppercase | filter > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.to_uppercase | filter > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.to_uppercase | filter > condition.value | continues | String | - | filter-predicate-is-boolean | allowed String many
+Expr.str.to_uppercase | filter > condition.value | ends | String | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.to_uppercase | filter > over.order_by | continues | String | - | - | allowed String many
+Expr.str.to_uppercase | filter > over.order_by | ends | String | - | - | allowed String many
+Expr.str.to_uppercase | filter > over.partition_by | continues | String | - | - | allowed String many
+Expr.str.to_uppercase | filter > over.partition_by | ends | String | - | - | allowed String many
+Expr.str.to_uppercase | filter | continues | String | - | filter-predicate-is-boolean | allowed String many
+Expr.str.to_uppercase | filter | ends | String | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.to_uppercase | join_left > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.to_uppercase | join_left > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.to_uppercase | join_left > condition.value | continues | String | - | - | allowed String many
+Expr.str.to_uppercase | join_left > condition.value | ends | String | - | - | allowed String many
+Expr.str.to_uppercase | join_left > over.order_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_uppercase | join_left > over.order_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_uppercase | join_left > over.partition_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_uppercase | join_left > over.partition_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_uppercase | join_left | continues | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.to_uppercase | join_left | ends | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.to_uppercase | join_right > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.to_uppercase | join_right > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `ra`
+Expr.str.to_uppercase | join_right > condition.value | continues | String | - | - | allowed String many
+Expr.str.to_uppercase | join_right > condition.value | ends | String | - | - | allowed String many
+Expr.str.to_uppercase | join_right > over.order_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_uppercase | join_right > over.order_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_uppercase | join_right > over.partition_by | continues | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_uppercase | join_right > over.partition_by | ends | String | - | - | refused schema: all join key expressions must be elementwise.
+Expr.str.to_uppercase | join_right | continues | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.to_uppercase | join_right | ends | String | - | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.to_uppercase | pivot_aggregate > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.to_uppercase | pivot_aggregate > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.to_uppercase | pivot_aggregate > condition.value | continues | String | - | - | allowed String many
+Expr.str.to_uppercase | pivot_aggregate > condition.value | ends | String | - | - | allowed String many
+Expr.str.to_uppercase | pivot_aggregate > over.order_by | continues | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.to_uppercase | pivot_aggregate > over.order_by | ends | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.to_uppercase | pivot_aggregate > over.partition_by | continues | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.to_uppercase | pivot_aggregate > over.partition_by | ends | String | - | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.to_uppercase | pivot_aggregate | continues | String | - | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.to_uppercase | pivot_aggregate | ends | String | - | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.to_uppercase | select > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.to_uppercase | select > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.to_uppercase | select > condition.value | continues | String | - | - | allowed String many
+Expr.str.to_uppercase | select > condition.value | ends | String | - | - | allowed String many
+Expr.str.to_uppercase | select > over.order_by | continues | String | - | - | allowed String many
+Expr.str.to_uppercase | select > over.order_by | ends | String | - | - | allowed String many
+Expr.str.to_uppercase | select > over.partition_by | continues | String | - | - | allowed String many
+Expr.str.to_uppercase | select > over.partition_by | ends | String | - | - | allowed String many
+Expr.str.to_uppercase | select | continues | String | - | - | allowed String many
+Expr.str.to_uppercase | select | ends | String | - | - | allowed String many
+Expr.str.to_uppercase | sort > condition.predicate | continues | String | - | condition-predicate-is-boolean | allowed String many
+Expr.str.to_uppercase | sort > condition.predicate | ends | String | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.to_uppercase | sort > condition.value | continues | String | - | - | allowed String many
+Expr.str.to_uppercase | sort > condition.value | ends | String | - | - | allowed String many
+Expr.str.to_uppercase | sort > over.order_by | continues | String | - | - | allowed String many
+Expr.str.to_uppercase | sort > over.order_by | ends | String | - | - | allowed String many
+Expr.str.to_uppercase | sort > over.partition_by | continues | String | - | - | allowed String many
+Expr.str.to_uppercase | sort > over.partition_by | ends | String | - | - | allowed String many
+Expr.str.to_uppercase | sort | continues | String | - | - | allowed String many
+Expr.str.to_uppercase | sort | ends | String | - | - | allowed String many
+Expr.str.zfill | filter > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.zfill | filter > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.zfill | filter > condition.value | continues | String | Int8 | filter-predicate-is-boolean | allowed String many
+Expr.str.zfill | filter > condition.value | ends | String | Int8 | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.zfill | filter > over.order_by | continues | String | Int8 | - | allowed String many
+Expr.str.zfill | filter > over.order_by | ends | String | Int8 | - | allowed String many
+Expr.str.zfill | filter > over.partition_by | continues | String | Int8 | - | allowed String many
+Expr.str.zfill | filter > over.partition_by | ends | String | Int8 | - | allowed String many
+Expr.str.zfill | filter | continues | String | Int8 | filter-predicate-is-boolean | allowed String many
+Expr.str.zfill | filter | ends | String | Int8 | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `String`
+Expr.str.zfill | join_left > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.zfill | join_left > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.zfill | join_left > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.zfill | join_left > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.zfill | join_left > over.order_by | continues | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.zfill | join_left > over.order_by | ends | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.zfill | join_left > over.partition_by | continues | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.zfill | join_left > over.partition_by | ends | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.zfill | join_left | continues | String | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.zfill | join_left | ends | String | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.zfill | join_right > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.zfill | join_right > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `ra`
+Expr.str.zfill | join_right > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.zfill | join_right > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.zfill | join_right > over.order_by | continues | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.zfill | join_right > over.order_by | ends | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.zfill | join_right > over.partition_by | continues | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.zfill | join_right > over.partition_by | ends | String | Int8 | - | refused schema: all join key expressions must be elementwise.
+Expr.str.zfill | join_right | continues | String | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.zfill | join_right | ends | String | Int8 | join-key-names-are-not-repeated,key-is-elementwise | allowed String many
+Expr.str.zfill | pivot_aggregate > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.zfill | pivot_aggregate > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.zfill | pivot_aggregate > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.zfill | pivot_aggregate > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.zfill | pivot_aggregate > over.order_by | continues | String | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.zfill | pivot_aggregate > over.order_by | ends | String | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.zfill | pivot_aggregate > over.partition_by | continues | String | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.zfill | pivot_aggregate > over.partition_by | ends | String | Int8 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
+Expr.str.zfill | pivot_aggregate | continues | String | Int8 | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.zfill | pivot_aggregate | ends | String | Int8 | pivot-aggregate-gives-one-value | allowed String many
+Expr.str.zfill | select > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.zfill | select > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.zfill | select > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.zfill | select > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.zfill | select > over.order_by | continues | String | Int8 | - | allowed String many
+Expr.str.zfill | select > over.order_by | ends | String | Int8 | - | allowed String many
+Expr.str.zfill | select > over.partition_by | continues | String | Int8 | - | allowed String many
+Expr.str.zfill | select > over.partition_by | ends | String | Int8 | - | allowed String many
+Expr.str.zfill | select | continues | String | Int8 | - | allowed String many
+Expr.str.zfill | select | ends | String | Int8 | - | allowed String many
+Expr.str.zfill | sort > condition.predicate | continues | String | Int8 | condition-predicate-is-boolean | allowed String many
+Expr.str.zfill | sort > condition.predicate | ends | String | Int8 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `str` for series with name `a`
+Expr.str.zfill | sort > condition.value | continues | String | Int8 | - | allowed String many
+Expr.str.zfill | sort > condition.value | ends | String | Int8 | - | allowed String many
+Expr.str.zfill | sort > over.order_by | continues | String | Int8 | - | allowed String many
+Expr.str.zfill | sort > over.order_by | ends | String | Int8 | - | allowed String many
+Expr.str.zfill | sort > over.partition_by | continues | String | Int8 | - | allowed String many
+Expr.str.zfill | sort > over.partition_by | ends | String | Int8 | - | allowed String many
+Expr.str.zfill | sort | continues | String | Int8 | - | allowed String many
+Expr.str.zfill | sort | ends | String | Int8 | - | allowed String many
 Expr.sub | filter > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Int64 many
 Expr.sub | filter > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `i64` for series with name `a`
 Expr.sub | filter > condition.value | continues | Int64 | Int64 | filter-predicate-is-boolean | allowed Int64 many

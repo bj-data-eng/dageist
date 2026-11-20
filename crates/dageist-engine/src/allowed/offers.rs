@@ -1090,6 +1090,52 @@ fn check_conversions(entry: &Entry, chosen: &Chosen<'_>) -> Result<(), Refusal> 
     Ok(())
 }
 
+/// Whether the option `name` of `entry` may be set to `word`, where the other options are at their
+/// defaults, as the lines of the option table that pair it with an option at its default say.
+/// `Ok` where no line does.
+fn alone_in_a_pair(
+    entry: &Entry,
+    receiver: Option<Representative>,
+    name: &str,
+    word: &str,
+) -> Result<(), Refusal> {
+    let tables = Tables::committed();
+    let id = entry.id().as_str();
+    let at_default = |(other, set): &(&str, String)| {
+        entry
+            .parameters()
+            .iter()
+            .find(|parameter| parameter.name() == *other)
+            .is_some_and(|parameter| default_word(parameter).as_deref() == Some(set.as_str()))
+    };
+    let mut refusal = None;
+    for ((line_id, line_receiver, line), outcome) in &tables.options {
+        if *line_id != id
+            || *line_receiver != receiver
+            || line.len() != 2
+            || !line
+                .iter()
+                .any(|(set, value)| *set == name && value == word)
+        {
+            continue;
+        }
+        let others: Vec<&(&str, String)> = line
+            .iter()
+            .filter(|(set, value)| !(*set == name && value == word))
+            .collect();
+        if !others.iter().all(|other| at_default(other)) {
+            continue;
+        }
+        match outcome {
+            Outcome::Refused(reason) => {
+                refusal.get_or_insert_with(|| Refusal::polars(reason));
+            }
+            Outcome::Allowed(_) => return Ok(()),
+        }
+    }
+    refusal.map_or(Ok(()), Err)
+}
+
 /// Whether the options `chosen` of `entry` may be set together where a method follows a value
 /// of the dtype `receiver`, or for a step, which follows none.
 fn check_options(
@@ -1120,10 +1166,20 @@ fn check_options(
         named.sort_by_key(|(name, _)| position(name));
         named
     };
-    let check = |key: Vec<(&'static str, String)>| match tables.options.get(&(id, receiver, key)) {
-        Some(Outcome::Refused(reason)) => Err(Refusal::polars(reason)),
-        Some(Outcome::Allowed(_)) | None => Ok(()),
-    };
+    let check =
+        |key: Vec<(&'static str, String)>| match tables.options.get(&(id, receiver, key.clone())) {
+            Some(Outcome::Refused(reason)) => Err(Refusal::polars(reason)),
+            Some(Outcome::Allowed(_)) => Ok(()),
+            // A method with several options has no line for one of them alone. It is set to its
+            // word beside every other option at its default, so the lines that say that are
+            // asked: Polars refusing the pair is refusing the option. A step is measured with the
+            // arguments the harness gives it, which a pair of its options is refused for as well,
+            // as a cross join is given keys, so its lines say nothing of one option alone.
+            None => match key.as_slice() {
+                [(name, word)] if is_method(entry) => alone_in_a_pair(entry, receiver, name, word),
+                _ => Ok(()),
+            },
+        };
     match named.as_slice() {
         [] => Ok(()),
         [one] => check(vec![one.clone()]),

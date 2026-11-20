@@ -14,4 +14,5 @@ mod maths;
 mod nulls;
 mod roles;
 mod starting;
+mod text;
 mod writes;

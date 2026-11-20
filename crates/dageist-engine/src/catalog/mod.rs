@@ -97,10 +97,16 @@ pub enum Family {
     Aggregate,
     /// Dates and times: the `dt` namespace.
     Temporal,
+    /// Changing the text itself: its case, the characters trimmed from its ends, padding and
+    /// reversing, which are the methods of the `str` namespace that give text.
+    Text,
+    /// Taking text apart, and measuring it: `str.slice`, `str.head`, `str.split`, `str.join` and
+    /// the lengths, which give a piece of the text, a list of pieces, one text or a count.
+    Pieces,
     /// Working within groups: `over`.
     Window,
     /// Comparisons and tests that give a Boolean: `eq`, `gt`, `eq_missing`, `is_between`,
-    /// `is_close`, `is_null`, and the like.
+    /// `is_close`, `is_null`, `str.starts_with`, and the like.
     Compare,
     /// Tests of what a value is, or of whether it is repeated: `is_nan`, `is_infinite`,
     /// `is_unique`, `is_first_distinct`, and the like, which give a Boolean.
@@ -120,7 +126,7 @@ pub enum Family {
 
 impl Family {
     /// Every family, in the order they are offered.
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 19] = [
         Self::Steps,
         Self::Rows,
         Self::Cumulative,
@@ -130,6 +136,8 @@ impl Family {
         Self::Rounding,
         Self::Aggregate,
         Self::Temporal,
+        Self::Text,
+        Self::Pieces,
         Self::Window,
         Self::Compare,
         Self::Checks,
@@ -153,6 +161,8 @@ impl Family {
             Self::Rounding => "rounding",
             Self::Aggregate => "aggregate",
             Self::Temporal => "temporal",
+            Self::Text => "text",
+            Self::Pieces => "pieces",
             Self::Window => "window",
             Self::Compare => "compare",
             Self::Checks => "checks",

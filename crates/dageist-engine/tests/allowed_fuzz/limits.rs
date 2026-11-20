@@ -275,9 +275,11 @@ pub enum Limit {
     /// two dtypes, refuses it at the call for the tables' reason.
     ABitwiseCallInAJoinKey,
     /// A strict `cast`, a test of closeness and a fill by a value or of NaN, which convert what
-    /// they meet to the dtype that holds both as one does, and a `replace_strict` asked for a
-    /// dtype and given no default, which converts what replaces to it as one (given a default it
-    /// converts as a cast that gives a null does), refuse the rows when a value of the column
+    /// they meet to the dtype that holds both as one does, a method of text that is given a count
+    /// of characters (`str.head`, `str.tail`, `str.slice`, `str.pad_start`, `str.pad_end` and
+    /// `str.zfill`), which converts it to a whole number as one does, and a `replace_strict` asked
+    /// for a dtype and given no default, which converts what replaces to it as one (given a default
+    /// it converts as a cast that gives a null does), refuse the rows when a value of the column
     /// they follow or give is one the dtype cannot hold: a number out of its range, or below zero beside an unsigned dtype, the
     /// infinity or the not-a-number of a float beside a whole number, or text that does not read
     /// as the number. The tables measured a cast on the sample's rows, whose values every dtype
@@ -285,9 +287,10 @@ pub enum Limit {
     /// and so may a table with no rows, where the sum of nothing is a value for a root or a
     /// logarithm to give an infinity. Polars refusing the rows, the empty table's too, with a
     /// failed conversion that has no place, in a case with a strict `cast`, a test of closeness,
-    /// a fill by a value or of NaN, or a strict replacement given a dtype and no default: the
-    /// case run again with each cast made not strict, each test a comparison, each fill a fill
-    /// forward and each replacement not asked for a dtype is not refused for a failed conversion.
+    /// a fill by a value or of NaN, a count of characters, or a strict replacement given a dtype
+    /// and no default: the case run again with each cast made not strict, each test a comparison,
+    /// each fill a fill forward, each count the whole number 1 and each replacement not asked for
+    /// a dtype is not refused for a failed conversion.
     ACastOfAValueTheDtypeCannotHold,
     /// `drop_nulls` and `drop_nans` leave the values that are not null or not NaN, so a column
     /// that holds one has fewer values than the table has rows, which Polars refuses to meet the
@@ -468,7 +471,7 @@ impl Limit {
                 "Polars casts the values of a bound of clip to the dtype it clips, which the tables measured as the sample's rows, and a bound with others passes"
             }
             Self::ACastOfAValueTheDtypeCannotHold => {
-                "a strict cast, which a test of closeness and a fill by a value make of what they meet, refuses a value its dtype cannot hold, which the tables measured only with the sample's rows, whose values every number dtype holds"
+                "a strict cast, which a test of closeness, a fill by a value and a count of characters make of what they meet, refuses a value its dtype cannot hold, which the tables measured only with the sample's rows, whose values every number dtype holds"
             }
             Self::ADropChangesTheLengths => {
                 "a drop of nulls or of NaNs leaves fewer values where the rows hold one, which the tables measured on a column that holds none"
@@ -498,9 +501,10 @@ fn is(call: &Call, id: &str) -> bool {
     call.entry().id().as_str() == id
 }
 
-const ONE_VALUE: [&str; 8] = [
+const ONE_VALUE: [&str; 9] = [
     "Expr.has_nulls",
     "Expr.null_count",
+    "Expr.str.join",
     "Expr.sum",
     "Expr.min",
     "Expr.max",
@@ -1596,7 +1600,8 @@ pub fn case_changed(case: &Case, change: &dyn Fn(&Call) -> Option<Call>) -> Opti
 /// the one dtype that holds both as a strict cast does, and a strict replacement asked for a dtype
 /// and given no default.
 fn is_a_strict_cast(call: &Call) -> bool {
-    is(call, "Expr.is_close")
+    is_a_count_of_characters(call)
+        || is(call, "Expr.is_close")
         || (is(call, "Expr.fill_null") && call.argument("value").is_some())
         || is(call, "Expr.fill_nan")
         // Given no default it converts what replaces to the dtype strictly, and given one it
@@ -1612,13 +1617,77 @@ fn is_a_strict_cast(call: &Call) -> bool {
             && !matches!(call.argument("strict"), Some(Value::Flag(Some(false)))))
 }
 
+/// The methods of text that take a count of characters, and the parameters that hold it: Polars
+/// converts a count to a whole number strictly, to a signed one for where to start and how many
+/// to keep from the start or the end, and to an unsigned one for how long, so that a negative
+/// length, the infinity or the not-a-number of a float, or a value out of the range is refused
+/// when the rows run.
+const COUNTS_OF_CHARACTERS: [(&str, &[&str]); 6] = [
+    ("Expr.str.head", &["n"]),
+    ("Expr.str.pad_end", &["length"]),
+    ("Expr.str.pad_start", &["length"]),
+    ("Expr.str.slice", &["offset", "length"]),
+    ("Expr.str.tail", &["n"]),
+    ("Expr.str.zfill", &["length"]),
+];
+
+/// The parameters of the call that hold a count of characters, which are given, if it is a method
+/// of text that takes one.
+fn counts_of(call: &Call) -> Vec<&'static str> {
+    COUNTS_OF_CHARACTERS
+        .iter()
+        .filter(|(id, _)| is(call, id))
+        .flat_map(|(_, names)| names.iter().copied())
+        .filter(|name| call.argument(name).is_some())
+        .collect()
+}
+
+/// Whether the call is a method of text that is given a count of characters.
+fn is_a_count_of_characters(call: &Call) -> bool {
+    !counts_of(call).is_empty()
+}
+
+/// The call with the count of every parameter that holds one made the whole number 1, which
+/// converts without a failure.
+fn without_counts(call: &Call) -> Option<Call> {
+    let counts = counts_of(call);
+    let one = Expression::new(
+        Start::Call(
+            Call::new(
+                catalog::entry("polars.lit")?,
+                vec![("value", Value::Integer(1))],
+            )
+            .ok()?,
+        ),
+        Vec::new(),
+    )
+    .ok()?;
+    let given: Vec<(&str, Value)> = call
+        .arguments()
+        .iter()
+        .map(|given| {
+            let value = if counts.contains(&given.parameter()) {
+                Value::Expression(one.clone())
+            } else {
+                given.value().clone()
+            };
+            (given.parameter(), value)
+        })
+        .collect();
+    Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
+}
+
 /// The case with no strict cast: each gives a null where a value does not convert, a test of
 /// closeness is the comparison of what it compares and a fill by a value a fill forward, which
-/// convert nothing, and a replacement is not asked for a dtype, which converts nothing.
+/// convert nothing, a count of characters is the whole number 1, which converts without a failure,
+/// and a replacement is not asked for a dtype, which converts nothing.
 fn case_without_strict_casts(case: &Case) -> Option<Case> {
     case_changed(case, &|call| {
         if !is_a_strict_cast(call) {
             return None;
+        }
+        if is_a_count_of_characters(call) {
+            return without_counts(call);
         }
         if is(call, "Expr.is_close") {
             let other = call.argument("other")?.clone();
@@ -6305,6 +6374,74 @@ mod tests {
         )]);
         assert_eq!(
             refused_for_a_bound(&comparison, None, Stage::Rows, CLOSE_NOT_HELD),
+            vec![]
+        );
+    }
+
+    const COUNT_NOT_HELD: &str =
+        "conversion from `f64` to `u64` failed in column 'k' for 1 out of 1 values: [-2.262654]";
+
+    /// A count of characters that holds a negative number of a float: the cosine of `k`, cotangent
+    /// of which is `-2.26` in the first row.
+    fn a_negative_count() -> Expression {
+        chain(column("k"), &["Expr.cos", "Expr.cot"])
+    }
+
+    #[test]
+    fn a_failed_conversion_is_excused_where_a_count_of_characters_is_why() {
+        // Polars converts each count to a whole number strictly, and stops refusing once each is
+        // the whole number 1.
+        for (id, parameter) in [
+            ("Expr.str.head", "n"),
+            ("Expr.str.tail", "n"),
+            ("Expr.str.slice", "offset"),
+            ("Expr.str.pad_start", "length"),
+            ("Expr.str.pad_end", "length"),
+            ("Expr.str.zfill", "length"),
+        ] {
+            let counted = call(id, vec![(parameter, Value::Expression(a_negative_count()))]);
+            let case = select(vec![chain_of(column("g"), vec![counted])]);
+            assert_eq!(
+                refused_for_a_bound(&case, None, Stage::Rows, COUNT_NOT_HELD),
+                vec![Limit::ACastOfAValueTheDtypeCannotHold],
+                "{id}"
+            );
+        }
+        // The length of a slice is converted too, beside an offset that is not the cause.
+        let slice = call(
+            "Expr.str.slice",
+            vec![
+                ("offset", Value::Expression(whole(1))),
+                ("length", Value::Expression(a_negative_count())),
+            ],
+        );
+        let case = select(vec![chain_of(column("g"), vec![slice])]);
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, COUNT_NOT_HELD),
+            vec![Limit::ACastOfAValueTheDtypeCannotHold]
+        );
+    }
+
+    #[test]
+    fn a_failed_conversion_is_not_excused_by_a_method_of_text_that_counts_nothing() {
+        // Text that is not asked to count converts nothing, so the failed conversion is not its
+        // count's, and the control is the case itself.
+        let case = select(vec![chain_of(
+            column("g"),
+            vec![call("Expr.str.to_uppercase", Vec::new())],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, COUNT_NOT_HELD),
+            vec![]
+        );
+        // A method of text that is given a column to strip is no count either.
+        let stripped = call(
+            "Expr.str.strip_chars",
+            vec![("characters", Value::Expression(a_negative_count()))],
+        );
+        let case = select(vec![chain_of(column("g"), vec![stripped])]);
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, COUNT_NOT_HELD),
             vec![]
         );
     }

@@ -192,6 +192,8 @@ fn companions(
         // The default and what replaces meet in one dtype, so each is tested with the other of
         // the dtype the argument has.
         ("Expr.replace_strict", Some("default")) => vec![("old", own())],
+        // A slice that is tested for its length starts at a place: the second character.
+        ("Expr.str.slice", Some("length")) => vec![("offset", expression(integer(1)))],
         ("Expr.is_between", Some("lower_bound")) => vec![("upper_bound", own())],
         ("Expr.is_between", Some("upper_bound")) => vec![("lower_bound", own())],
         _ => Vec::new(),

@@ -60,6 +60,8 @@ describe('the catalogue the host sends', () => {
       'rounding',
       'aggregate',
       'temporal',
+      'text',
+      'pieces',
       'window',
       'compare',
       'checks',

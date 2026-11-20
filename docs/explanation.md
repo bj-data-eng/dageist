@@ -436,11 +436,60 @@ What Polars does with each is what the tables say, and some of it is not what a 
   refuses `new` of many values beside an `old` of one, and a `default` of many beside a value of
   one, which the walk knows from the shapes and holds to a rule.
 
+The methods of text are two families beside these, and two more stand in Comparison. Each is
+Polars' own name with `str.` in front of it, as `dt.` is for dates and times, and the editor shows
+it so: `str.to_lowercase`, `str.strip_chars`, `str.zfill`, and the rest. Text holds the methods
+that give text: the case (`str.to_lowercase`, `str.to_uppercase`, `str.to_titlecase`), the trims
+(`str.strip_chars`, `str.strip_chars_start`, `str.strip_chars_end`, `str.strip_prefix`,
+`str.strip_suffix`), the padding (`str.pad_start`, `str.pad_end`, `str.zfill`) and `str.reverse`.
+Pieces holds the methods that take text apart or measure it: `str.slice`, `str.head` and
+`str.tail`, the lengths `str.len_chars` and `str.len_bytes`, `str.split` and `str.join`. The two
+tests, `str.starts_with` and `str.ends_with`, give true or false, so they stand in Comparison with
+`is_between` and `is_close`, where a person who wants a filter looks first. One family of
+nineteen methods would be the longest list the popover shows, which is how a method is found by
+its name; two of twelve and seven keep each short, with what changes text apart from what
+measures or splits it, and a method is swapped for another of its family that takes the same
+arguments, as the three cases take none and the three trims take `characters`. The hints are
+where the plain words go: "length in characters", "add zeros at the start up to a length".
+
+What Polars does with each is what the tables say, and some of it is not what a name suggests:
+
+- A method of text takes text and refuses every other dtype, a `Null` included, when it runs
+  rows, where it resolves the schema. `str.join` is the exception: it casts what it joins to text
+  and refuses only what it cannot cast, a duration, a list or an array, which the tables show.
+  `str.join` gives one value, so it is an aggregate for what the walk holds a join's key to, as
+  `sum` is, and `delimiter` and `ignore_nulls` are its options: a null is skipped unless it is
+  asked to make the whole a null.
+- The lengths give a `UInt32`, in characters or in bytes, and a test gives a `Boolean`. A trim
+  and `str.split` take text; `characters` not given is null, which trims whitespace. A test for
+  a start or an end, which takes a prefix or a suffix, casts what it is given to text and refuses
+  only what it cannot cast.
+- A count of characters, which `str.head`, `str.tail`, `str.slice`, `str.pad_start`,
+  `str.pad_end` and `str.zfill` take as an expression, has the role of the rows `shift` counts:
+  a whole number typed without a dtype is that dtype. Polars casts it to a whole number, so a
+  float or a `Boolean` is taken, text is not (the offset of a slice, which reads it as it does a
+  date, is), and a value the whole number cannot hold is refused when the rows run, which a limit
+  covers. A negative count of `str.head` leaves out that many from the end, and a negative
+  offset of `str.slice` counts from the end.
+- `fill_char` is one character, as Python's binding takes it, so the build refuses text of
+  another length with that reason, and the document keeps it as a value, not an expression.
+- `str.split` is offered with `literal` true only. A split by a pattern waits for the kind of
+  parameter that holds a pattern, which the next batch of text methods adds with `contains` and
+  `replace`, and until then the build refuses `literal` set to false with the reason that it
+  waits, which the option table records at the schema, so the editor refuses the word with that
+  reason. `strict` is for a pattern, so beside a literal split it changes nothing, as in Python.
+  When the kind exists, `literal` false builds `split_regex` and `split_regex_inclusive`, and the
+  refusal and the table lines it left go with it. The table has no line for an option of a method
+  that has several alone, only for each pair of them, so an option set alone is judged by the
+  lines that pair its word with the others at their defaults, and refused when Polars refuses the
+  pair; a step's lines are not read so, for they are measured with the arguments the harness
+  gives the step.
+
 The catalogue holds the seven steps, the expression methods the storyboard
 uses, the aggregates `sum`, `min`, `max` and `len`, the six comparisons and the six
 others that compare, the arithmetic of `add`, `sub`, `mul`, `truediv`, `floordiv`, `mod`,
 `pow`, `neg`, `abs`, `sign` and `clip`, the maths, trigonometry and rounding above, the nulls,
-checks and conversions above, the logic of `and_`, `or_`, `xor` and `not_`, `col`, `lit`,
+checks and conversions above, the methods of text above, the logic of `and_`, `or_`, `xor` and `not_`, `col`, `lit`,
 `element`, and the links of `when`, `then` and `otherwise`.
 
 The host serves the catalogue with its English words to the view through the
@@ -1222,7 +1271,7 @@ of 157 or 158 pivot cases. The test asserts none of those.
 | A bound with values of its own | Polars casts the values of a bound of `clip` to the dtype it clips, and a bound whose values that dtype holds is cast whatever its dtype is: text that reads as the number, or a list or another dtype that holds nothing but nulls. The tables measured a bound as a column of the sample's rows, whose text is a duration no number reads and whose lists no dtype holds, so they refuse the cast of a dtype that the values of another bound pass. The tables refusing, when they run rows, with a failed conversion or a failed cast of a dtype, at a `clip` that has a bound that is not a bare column, which Polars allows, and where the tables, asked again with the computed bounds of every clip undone, no longer refuse a clip: the computed bound is then why. A bound that is a bare column holds the sample's rows, as the tables measured it, so a refusal that is its own is not this, whatever the other bound is, and neither is a clip with no bound or a refusal at another call. |
 | A window over a literal | A window whose partition holds no column, a literal or a running sum of one, gives Polars' streaming engine no rows, so what follows it in a chain that starts from a literal is never evaluated, and the rows do not show a plan that they contradict. The tables hold the schema of a method and what its rows give as one thing, and refuse a root of a date, whose schema names the date and whose rows are a float, which is the target's own comparison and shows only where rows are given. The tables refusing, when they run rows, with the reason that the schema says one dtype and the rows give another, at a call after such a window in a chain that starts from a literal, which Polars allows; the window is why only where Polars, asked again with each literal partition a column of the table, refuses the case for that reason, which a column start, a window over a column and no window do. None in a pivot's aggregate, which has no column to stand in. The same holds for a window of a value that reads no column whose keys, in its partition or its order, are literals that read no column or one value each, as an aggregate is, such as `lit(None).over(order_by=a.last())`: it gives no rows, so what a replacement is given as its new values has none beside old values of the table's rows, which Polars refuses as the new values being neither as many as the old nor one, with no place, in a case with such a window and the words of that refusal: the case run again with the partition of each such window a column of the table is not refused for them. |
 | A drop leaves no rows | `drop_nulls` can leave no value, as it does of a null literal or of a column of the dtype Null, so the rows are none and do not show a plan that they contradict. The tables hold the schema of a method and what its rows give as one thing, and refuse a method whose schema says the dtype Null and whose rows give another, as the cube root of a null does, which is the target's own comparison and shows only where rows are given. The tables refusing, when they run rows, with the reason that the schema says one dtype and the rows give another, at a call after a `drop_nulls` in its chain, which Polars allows; the drop is why only where Polars, asked again with each drop a fill of nulls forward, refuses the case for that reason. |
-| A cast of a value the dtype cannot hold | A strict `cast`, a strict `replace_strict` asked for a dtype and given no default (given one it converts as a cast that gives a null does), and the test of closeness and the fill by a value or of NaN, which convert what they meet to the one dtype that holds both as a strict cast does, refuse a value the dtype cannot hold: a number out of its range, below zero beside an unsigned dtype, the infinity or the not-a-number of a float beside a whole number, text that does not read as the number, or a `UInt128` above the largest `Int128` beside one. The tables measured them on the sample's rows, whose values every number dtype holds, and a table with no rows has the value that an aggregate of nothing is. Polars refusing the rows or the empty table with a failed conversion that has no place, in a case with a strict cast, a test of closeness, a fill by a value or of NaN, or a strict replacement given a dtype and no default: the case run again with each cast not strict, each test of closeness a comparison of the same two, each fill a fill forward and each replacement not asked for a dtype is not refused for a failed conversion. |
+| A cast of a value the dtype cannot hold | A strict `cast`, a strict `replace_strict` asked for a dtype and given no default (given one it converts as a cast that gives a null does), the test of closeness and the fill by a value or of NaN, which convert what they meet to the one dtype that holds both as a strict cast does, and the count of characters that `str.head`, `str.tail`, `str.slice`, `str.pad_start`, `str.pad_end` and `str.zfill` are given, which they convert to a whole number as one does, signed for where to start and how many to keep and unsigned for how long, refuse a value the dtype cannot hold: a number out of its range, below zero beside an unsigned dtype, the infinity or the not-a-number of a float beside a whole number, text that does not read as the number, or a `UInt128` above the largest `Int128` beside one. The tables measured them on the sample's rows, whose values every number dtype holds, and a table with no rows has the value that an aggregate of nothing is. Polars refusing the rows or the empty table with a failed conversion that has no place, in a case with a strict cast, a test of closeness, a fill by a value or of NaN, a count of characters, or a strict replacement given a dtype and no default: the case run again with each cast not strict, each test of closeness a comparison of the same two, each fill a fill forward, each count the whole number 1 and each replacement not asked for a dtype is not refused for a failed conversion. |
 | A drop changes the lengths | `drop_nulls` and `drop_nans` leave the values that are not null or not NaN, so a column that holds one has fewer values than the table has rows, which Polars refuses to meet the table's rows or another expression's values. The tables measure the two in a context on a column that holds no null, where they drop nothing. Polars refusing the rows with a reason about lengths, or about the shape of the exponent of a power that does not match its base, or about what a replacement replaces by being fewer than what it replaces, that has no place, in a case with either: the case run again with each made a fill of nulls forward, which keeps every value, is not refused for lengths. |
 | A replacement of columns in a window | A window evaluates what it follows once for each group, and what a replacement lists as the values of a column is then a list for each group, which Polars refuses as a replacement pattern per row where what it replaces is one value for each group, as an aggregate is, and as an output of the length of the column where what it replaces is one value, as a literal is. The tables measure a replacement in a context with the receiver's own rows. Polars refusing the rows with a reason that names a pattern per row or an output of another length than its input, in a case that has a window and a replacement that lists the values of a column: the case run again with what each replacement lists made null literals is not refused for it. |
 | A drop of NaNs in a window | `drop_nans` is a filter by the test for NaN, which Polars leaves out of a plan for a dtype that is no float, where it has nothing to drop, and keeps where an aggregate of what it drops is evaluated for each group of a window, and refuses there for the dtype it cannot test. The tables measure the call where it is left out. Polars refusing the rows with the refusal that the test for NaN is not supported for a dtype, which has no place, in a case with a `drop_nans` that a window follows in its chain: the case run again with each drop made a fill of nulls forward, and again with each window made one, is not refused for it. |

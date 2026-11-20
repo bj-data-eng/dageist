@@ -1051,6 +1051,7 @@ impl Gen<'_> {
         }
         given.extend(self.dtype_arguments(entry));
         given.extend(self.numbers(entry, &given));
+        given.extend(self.texts(entry));
         if id == "Expr.over" {
             let ordered = given.iter().any(|(name, _)| *name == "order_by");
             let optioned = given
@@ -1127,6 +1128,27 @@ impl Gen<'_> {
             numbers.push((name, value));
         }
         numbers
+    }
+
+    /// The texts a method is given for the parameters that take one: what `join` puts between the
+    /// values it joins, and the one character that `pad_start` and `pad_end` add. A fill character
+    /// is one character, as Python's binding takes it, and the others, which differ in how many
+    /// bytes they take, show the lengths in characters and in bytes apart.
+    fn texts(&mut self, entry: &'static Entry) -> Vec<(&'static str, Value)> {
+        let mut texts = Vec::new();
+        for parameter in entry.parameters() {
+            if parameter.kind() != Kind::Value(ValueType::String) || !self.draw.chance(50) {
+                continue;
+            }
+            let name = parameter.name();
+            let value = match name {
+                "delimiter" => self.draw.pick(&["", "-", ", ", "é", "ab"]),
+                "fill_char" => self.draw.pick(&["*", "0", " ", "é", "-"]),
+                other => panic!("the generator does not know what to give {other}"),
+            };
+            texts.push((name, Value::String(value.to_owned())));
+        }
+        texts
     }
 
     /// The dtypes a method is given for the parameters that take one: the dtype a cast gives,
