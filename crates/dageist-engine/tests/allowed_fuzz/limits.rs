@@ -1651,21 +1651,21 @@ fn is_a_count_of_characters(call: &Call) -> bool {
     !counts_of(call).is_empty()
 }
 
+/// The whole number 1 as a literal, which every count converts without a failure.
+fn the_number_one() -> Option<Expression> {
+    let literal = Call::new(
+        catalog::entry("polars.lit")?,
+        vec![("value", Value::Integer(1))],
+    )
+    .ok()?;
+    Expression::new(Start::Call(literal), Vec::new()).ok()
+}
+
 /// The call with the count of every parameter that holds one made the whole number 1, which
 /// converts without a failure.
 fn without_counts(call: &Call) -> Option<Call> {
     let counts = counts_of(call);
-    let one = Expression::new(
-        Start::Call(
-            Call::new(
-                catalog::entry("polars.lit")?,
-                vec![("value", Value::Integer(1))],
-            )
-            .ok()?,
-        ),
-        Vec::new(),
-    )
-    .ok()?;
+    let one = the_number_one()?;
     let given: Vec<(&str, Value)> = call
         .arguments()
         .iter()
@@ -2241,17 +2241,7 @@ fn case_without_computed_bounds(case: &Case) -> Option<Case> {
             return None;
         }
         let clipped = is(call, "Expr.clip");
-        let one = Expression::new(
-            Start::Call(
-                Call::new(
-                    catalog::entry("polars.lit")?,
-                    vec![("value", Value::Integer(1))],
-                )
-                .ok()?,
-            ),
-            Vec::new(),
-        )
-        .ok()?;
+        let one = the_number_one()?;
         let given: Vec<(&str, Value)> = call
             .arguments()
             .iter()
