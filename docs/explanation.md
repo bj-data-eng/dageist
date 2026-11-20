@@ -1043,6 +1043,21 @@ what surrounds it, after the limits, in these ways:
   dtype that Polars gave the end of the predicate, as the predicate of the same kind. Polars
   refuses a column of that dtype as a predicate for the reason the rule gives wherever it
   evaluates it;
+- for a refusal by the rule that a condition's predicate be a `Boolean`, where no column of the
+  dtype can be asked, as the dtype is not one Polars gives (it refuses the predicate on its own
+  for another call it holds first) or the predicate is in a pivot's aggregate, which reads no
+  column: Polars does not evaluate a predicate when a call after the condition makes it one value
+  that Polars drops, as a sort key of one value, or folds, as `or_(true)` does what it follows.
+  The condition that holds the predicate, standing alone in the place of the expression that
+  holds it (the aggregate of the same pivot, a `select` otherwise), with what follows it removed
+  and the last value of its `otherwise` made a fill forward of what it was so that Polars does not
+  drop its predicates either. It counts when Polars refuses it in the predicate, or in the rows
+  that evaluate it, and allows the same condition with the predicate made `true` every time it
+  runs, which shows that it is the predicate Polars refuses once nothing hides it. The refusal may
+  be in the rule's words or in other words, for what the predicate holds is met before its dtype
+  is judged, and the outcome says which; both are a refusal of the predicate where it is
+  evaluated, which the editor keeps refusing where Polars does not evaluate it, as it holds every
+  part to its types;
 - for a refusal of Polars' own words at a call inside a predicate of a condition that has an
   `otherwise`, which Polars allows: it takes a condition whose values are one expression for
   that expression and drops its predicates, so it never evaluates the part, and the part

@@ -62,6 +62,15 @@
 //! ([`Showing::WhereTheValuesDiffer`]). A probe of the part alone is no better, for an argument
 //! of it may be refused first.
 //!
+//! A predicate that the rule that it be a `Boolean` refused where no column of its dtype can be
+//! asked (Polars refuses it on its own for another call it holds, or it is in a pivot's aggregate)
+//! and Polars never evaluates, because a call after its condition makes it one value that Polars
+//! drops or folds, is asked in [`settle_by_evaluating_the_condition`]: the condition alone, in the
+//! place of the expression that holds it, with what follows it removed and its last value made to
+//! differ. Polars refusing that in the predicate, and allowing it with the predicate made `true`,
+//! shows that it is the predicate Polars refuses once nothing hides it
+//! ([`Showing::WhereTheConditionIsEvaluated`]).
+//!
 //! The last has no reason to match. [`settle_in_the_position`] is for a refusal
 //! that is the target's own comparison of a call's plan with its rows, which is no
 //! refusal of Polars and so is neither the tables' reason nor one a probe is refused
@@ -107,6 +116,12 @@ pub enum Showing {
     /// the values made to differ is refused by Polars for the tables' reason, so the predicate is
     /// evaluated there, and it is the dropping that Polars allows the case for.
     WhereTheValuesDiffer,
+    /// The rule that a condition's predicate be a `Boolean` refused a predicate that Polars allows
+    /// because it never evaluates it: a call that follows the condition makes it one value that
+    /// Polars drops or folds. The condition standing alone, with what follows it removed and its
+    /// values made to differ, is refused by Polars, and the same condition with the predicate
+    /// made `true` is allowed, so it is the predicate that Polars refuses once it evaluates it.
+    WhereTheConditionIsEvaluated,
 }
 
 /// What a probe found: the document it ran, why Polars refused it, and what that
@@ -137,6 +152,16 @@ impl Settled {
             Showing::WhereTheValuesDiffer => format!(
                 "Polars drops the predicate, for the values of the condition are one expression, and refuses the case {} where they differ, for the tables' reason: {}",
                 self.probe, self.reason
+            ),
+            Showing::WhereTheConditionIsEvaluated => format!(
+                "Polars never evaluates the predicate where what follows its condition makes it one value, and refuses the condition alone {}, {}, which is allowed with the predicate made true: {}",
+                self.probe,
+                if is_refused_as_a_predicate_that_is_no_boolean(&self.reason) {
+                    "for the rule's reason"
+                } else {
+                    "for another reason than the rule's, in the predicate"
+                },
+                self.reason
             ),
         }
     }
@@ -1362,6 +1387,166 @@ pub fn settle_by_values_that_differ(case: &Case, refused: &Refused) -> Option<Se
         })
 }
 
+/// The entries that end a condition, or give a value: `then` and `otherwise` of each state.
+const CONDITION_VALUES: [&str; 4] = [
+    "When.then",
+    "ChainedWhen.then",
+    "Then.otherwise",
+    "ChainedThen.otherwise",
+];
+
+/// Whether Polars' words are those of the rule that a predicate be a `Boolean`.
+fn is_refused_as_a_predicate_that_is_no_boolean(reason: &str) -> bool {
+    same_reason(&Source::Rule("condition-predicate-is-boolean"), "", reason)
+}
+
+/// `expression` cut after its last link that gives a condition a value, which is the condition
+/// without what follows it, with the last value of an `otherwise` made a fill forward of what it
+/// was, so that the values of the condition are not one expression, which Polars would take for
+/// that expression and drop the predicates of. `None` where no link gives a value.
+fn condition_alone(expression: &Expression) -> Option<Expression> {
+    let last = expression
+        .links()
+        .iter()
+        .rposition(|link| CONDITION_VALUES.contains(&link.entry().id().as_str()))?;
+    let mut links = expression.links()[..=last].to_vec();
+    let end = links.get(last)?;
+    if matches!(
+        end.entry().id().as_str(),
+        "Then.otherwise" | "ChainedThen.otherwise"
+    ) && let Some(Value::Expression(statement)) = end.argument("statement")
+    {
+        let fill = Call::new(catalog::entry("Expr.forward_fill")?, Vec::new()).ok()?;
+        let filled = Expression::new(
+            statement.start().clone(),
+            statement
+                .links()
+                .iter()
+                .cloned()
+                .chain(std::iter::once(fill))
+                .collect(),
+        )
+        .ok()?;
+        links[last] = call(
+            end.entry().id().as_str(),
+            vec![("statement", Value::Expression(filled))],
+        )?;
+    }
+    Expression::new(expression.start().clone(), links).ok()
+}
+
+/// `expression` with the expression that `path` leads to, from its start or one of its links and
+/// through the arguments of that call, replaced by `with`.
+fn replaced_through(
+    expression: &Expression,
+    path: &[Segment],
+    with: &Expression,
+) -> Option<Expression> {
+    match path {
+        [Segment::Link(_), Segment::Parameter(_), ..] => replaced_inside(expression, path, with),
+        [Segment::Start, Segment::Parameter(name), rest @ ..] => {
+            let Start::Call(start) = expression.start() else {
+                return None;
+            };
+            let mut given: Vec<(&str, Value)> = Vec::new();
+            for argument in start.arguments() {
+                let value = if argument.parameter() == name {
+                    replaced_in_value(argument.value(), rest, with)?
+                } else {
+                    argument.value().clone()
+                };
+                given.push((argument.parameter(), value));
+            }
+            Expression::new(
+                Start::Call(call(start.entry().id().as_str(), given)?),
+                expression.links().to_vec(),
+            )
+            .ok()
+        }
+        _ => None,
+    }
+}
+
+/// The conditions the tables hold to the rule that their predicate be a `Boolean`, which Polars
+/// does not hold where it never evaluates the predicate.
+const CONDITION_RULE: &str = "condition-predicate-is-boolean";
+
+/// Asks Polars about a predicate that the rule that it be a `Boolean` refused and Polars allows
+/// because it never evaluates it, as a sort key of one value is dropped and `or_(true)` folds what
+/// it follows. A probe of the predicate on a column of its dtype cannot ask it where the dtype is
+/// not known, as for a predicate that Polars refuses on its own for another reason, and a pivot's
+/// aggregate has no column to stand in. The condition that holds the predicate is asked alone, in
+/// the place of the expression that holds it, with what follows it removed and its last value made
+/// to differ from the others, which removes what Polars folds or drops it for. Polars refusing it
+/// shows that Polars evaluates the predicate and refuses it once nothing hides it. That it is the
+/// predicate is shown by a control: the same condition with the predicate made `true` is allowed.
+///
+/// The refusal may be in the rule's words, or in other words for what the predicate holds, which
+/// Polars meets before it judges the dtype. Both are a refusal of the predicate once it is
+/// evaluated, and the outcome says which it was. `None` for another rule, where the refusal is not
+/// of a predicate of a condition, where there is no condition to ask alone, and where Polars
+/// allows the condition alone, refuses it elsewhere than in the predicate, or refuses the control
+/// too.
+pub fn settle_by_evaluating_the_condition(case: &Case, refused: &Refused) -> Option<Settled> {
+    if refused.source != Source::Rule(CONDITION_RULE) {
+        return None;
+    }
+    let found = find(case, &refused.place)?;
+    if !found.rest.is_empty() {
+        return None;
+    }
+    let [.., (holder, holder_at), (_, predicate_at)] = found.levels.as_slice() else {
+        return None;
+    };
+    let inner = refused.place.path().get(*holder_at..*predicate_at)?;
+    let alone = condition_alone(holder)?;
+    let held = place_of_the_part(&found, false);
+    // Where the predicate stands in the probe: in the condition that stands alone.
+    let predicate_place = inner.iter().cloned().fold(held, Place::then);
+    let truth = Expression::new(
+        Start::Call(call(
+            "polars.lit",
+            vec![("value", Value::Flag(Some(true)))],
+        )?),
+        Vec::new(),
+    )
+    .ok()?;
+    let with_truth = replaced_through(&alone, inner, &truth)?;
+    let run = |part: Expression| {
+        Some(Case {
+            receiver: case.receiver,
+            argument: case.argument,
+            document: document_of(case, &found, part, false)?,
+        })
+    };
+    let probed = run(alone)?;
+    let control = run(with_truth)?;
+    let tables = tables_of(&found, None);
+    let refusal = (0..RUNS).find_map(|_| {
+        observe_probe(&probed, tables)
+            .refusal
+            .filter(|refusal| lies_in(refusal, &predicate_place))
+    })?;
+    // The control is allowed every time it runs.
+    if (0..RUNS).any(|_| observe_probe(&control, tables).refusal.is_some()) {
+        return None;
+    }
+    Some(Settled {
+        probe: probed.document.write(),
+        reason: refusal.reason,
+        showing: Showing::WhereTheConditionIsEvaluated,
+    })
+}
+
+/// Whether Polars' refusal is in the predicate at `place`: it names no place, as when the rows
+/// are refused, or a place within the predicate.
+fn lies_in(refusal: &Refusal, place: &Place) -> bool {
+    refusal
+        .place
+        .as_ref()
+        .is_none_or(|at| at.path().is_empty() || at.path().starts_with(place.path()))
+}
+
 /// Asks Polars about the part the tables refused apart from what surrounds it
 /// in the case, where the part as written is not asked: the refused call on a
 /// value of the dtype that reaches it, or a join's key by itself as the key, or
@@ -1379,6 +1564,7 @@ pub fn settle_apart(
         .or_else(|| settle_given_no_known_dtype(case, refused))
         .or_else(|| settle_a_predicate_on_a_value(case, refused, predicted, observed))
         .or_else(|| settle_by_values_that_differ(case, refused))
+        .or_else(|| settle_by_evaluating_the_condition(case, refused))
 }
 
 /// Whether `rule` is one that a predicate be a `Boolean`, which a probe of the predicate apart
@@ -1639,7 +1825,7 @@ mod tests {
         let rule = refusal(&case);
         // What Polars gave the predicate is not known, so the column is of no dtype it has.
         assert_eq!(
-            settle_apart(&case, &rule, &predict(&case), &Observed::default()),
+            settle_a_predicate_on_a_value(&case, &rule, &predict(&case), &Observed::default()),
             None
         );
         // A refusal of Polars' own, the same place, is no rule's.
@@ -2528,5 +2714,215 @@ mod tests {
         let without = format!("{}{}", &text[..start], &text[end..]);
         let case = Case::decode(without.as_bytes()).expect("a case without an otherwise");
         assert_eq!(settle_by_values_that_differ(&case, &refused), None);
+    }
+
+    fn col_json(name: &str) -> String {
+        format!(
+            r#"{{"expression":{{"start":{{"entry":"polars.col","arguments":{{"name":{{"columns":["{name}"]}}}}}},"then":[]}}}}"#
+        )
+    }
+
+    /// `sort(by=[when(predicate).then(value) links])` on a `String` and a `List(Int64)`, the
+    /// condition being the start of the key. `links` follow it, each written as a call without
+    /// arguments, and `otherwise` ends the condition when there is one.
+    fn sorted_by_a_condition(
+        predicate: &str,
+        value: &str,
+        otherwise: Option<&str>,
+        links: &[&str],
+    ) -> Case {
+        let mut calls = vec![format!(
+            r#"{{"entry":"When.then","arguments":{{"statement":{value}}}}}"#
+        )];
+        if let Some(otherwise) = otherwise {
+            calls.push(format!(
+                r#"{{"entry":"Then.otherwise","arguments":{{"statement":{otherwise}}}}}"#
+            ));
+        }
+        calls.extend(
+            links
+                .iter()
+                .map(|id| format!(r#"{{"entry":"{id}","arguments":{{}}}}"#)),
+        );
+        let text = format!(
+            r#"{{"a":"String","b":"List(Int64)","revision":1}}
+{{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.sort","arguments":{{"by":{{"many":[{{"expression":{{"start":{{"entry":"polars.when","arguments":{{"predicates":{{"many":[{predicate}]}}}}}},"then":[{}]}}}}]}}}}}}}}]}}"#,
+            calls.join(",")
+        );
+        Case::decode(text.as_bytes()).expect("a case")
+    }
+
+    /// The tables' refusal of the predicate of the condition that `sorted_by_a_condition` makes.
+    fn refused_as_a_predicate_that_is_no_boolean() -> Refused {
+        let place = Place::of_step(0, StepId::new(STEP).ok())
+            .then(Segment::Parameter("by".to_owned()))
+            .then(Segment::Item(0))
+            .then(Segment::Start)
+            .then(Segment::Parameter("predicates".to_owned()))
+            .then(Segment::Item(0));
+        Refused {
+            source: Source::Rule(CONDITION_RULE),
+            at: place.to_string(),
+            place,
+            stage: None,
+            reason: "it cannot end here: a condition's predicate must be Boolean".to_owned(),
+            argument_unknown: false,
+        }
+    }
+
+    /// A predicate that is no `Boolean` on its own: the text `a` compared with a number, which
+    /// Polars refuses when it evaluates the comparison.
+    fn a_comparison_of_text_with_a_number() -> String {
+        r#"{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[{"entry":"Expr.ne","arguments":{"other":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"float":1.5}}},"then":[]}}}}]}}"#
+            .to_owned()
+    }
+
+    #[test]
+    fn a_non_boolean_predicate_is_refused_where_its_condition_stands_alone_and_not_under_a_fold() {
+        // The sort key is one value, which Polars drops. The predicate, a comparison of text with
+        // a number, is refused where it is evaluated, and the dtype of the predicate is not one
+        // Polars gives, so no column of it can be asked.
+        for name in [
+            "stricter-a-non-boolean-predicate-in-a-sort-key-of-one-value.case",
+            "stricter-a-non-boolean-predicate-in-a-sort-key-of-a-max.case",
+            "stricter-a-non-boolean-predicate-under-a-fold-by-or-true.case",
+        ] {
+            let case = kept(name);
+            let found = settle_by_evaluating_the_condition(&case, &refusal(&case))
+                .unwrap_or_else(|| panic!("{name} is refused where the condition stands alone"));
+            assert_eq!(
+                found.showing,
+                Showing::WhereTheConditionIsEvaluated,
+                "{name}"
+            );
+            assert!(found.probe.contains("LazyFrame.select"), "{}", found.probe);
+            for folded in ["Expr.has_nulls", "Expr.max", "Expr.or_"] {
+                assert!(!found.probe.contains(folded), "{name}: {}", found.probe);
+            }
+        }
+    }
+
+    #[test]
+    fn a_non_boolean_predicate_in_a_pivot_aggregate_is_asked_in_the_pivot() {
+        // There is no column to stand in for the predicate, so the condition stands alone as the
+        // aggregate of the same pivot.
+        let case = kept("stricter-a-non-boolean-predicate-folded-in-a-pivot-aggregate.case");
+        let found = settle_by_evaluating_the_condition(&case, &refusal(&case))
+            .expect("refused where the condition stands alone");
+        assert_eq!(found.showing, Showing::WhereTheConditionIsEvaluated);
+        assert!(found.probe.contains("LazyFrame.pivot"), "{}", found.probe);
+        assert!(!found.probe.contains("Expr.or_"), "{}", found.probe);
+        assert!(!found.probe.contains("Expr.has_nulls"), "{}", found.probe);
+        // Asked of the whole case, as the target asks it.
+        assert!(
+            settle_apart(&case, &refusal(&case), &predict(&case), &observe(&case))
+                .is_some_and(|found| found.showing == Showing::WhereTheConditionIsEvaluated)
+        );
+    }
+
+    #[test]
+    fn the_values_of_the_condition_that_stands_alone_are_made_to_differ() {
+        // Both values are the column `b`, which Polars takes for one expression and drops the
+        // predicate of, so the last value is a fill forward of it in the probe.
+        let case = sorted_by_a_condition(
+            &a_comparison_of_text_with_a_number(),
+            &col_json("b"),
+            Some(&col_json("b")),
+            &["Expr.has_nulls"],
+        );
+        let found =
+            settle_by_evaluating_the_condition(&case, &refused_as_a_predicate_that_is_no_boolean())
+                .expect("refused where the condition stands alone");
+        assert!(found.probe.contains("Expr.forward_fill"), "{}", found.probe);
+    }
+
+    #[test]
+    fn a_predicate_that_polars_accepts_where_the_condition_stands_alone_settles_nothing() {
+        // `f` is a `Boolean`, so the condition alone is allowed: whatever refused the case, it was
+        // not a predicate that Polars refuses once it evaluates it.
+        let case = sorted_by_a_condition(&col_json("f"), &col_json("b"), None, &["Expr.has_nulls"]);
+        assert_eq!(
+            settle_by_evaluating_the_condition(&case, &refused_as_a_predicate_that_is_no_boolean()),
+            None
+        );
+    }
+
+    #[test]
+    fn a_condition_that_is_refused_for_what_is_not_its_predicate_settles_nothing() {
+        // The value is refused whatever the predicate is: the same condition with the predicate
+        // made `true` is refused too, so the refusal is no evidence about the predicate.
+        let dt_date_of_text = r#"{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[{"entry":"Expr.cum_sum","arguments":{}}]}}"#;
+        let case = sorted_by_a_condition(
+            &a_comparison_of_text_with_a_number(),
+            dt_date_of_text,
+            None,
+            &["Expr.has_nulls"],
+        );
+        assert!(
+            (0..RUNS).any(|_| observe(&case).refusal.is_none()),
+            "Polars drops the sort key, so allows the case"
+        );
+        let evaluated = sorted_by_a_condition(
+            &a_comparison_of_text_with_a_number(),
+            dt_date_of_text,
+            None,
+            &[],
+        );
+        assert!(
+            (0..RUNS).any(|_| observe(&evaluated).refusal.is_some()),
+            "Polars refuses the condition where it evaluates it"
+        );
+        assert_eq!(
+            settle_by_evaluating_the_condition(&case, &refused_as_a_predicate_that_is_no_boolean()),
+            None
+        );
+    }
+
+    #[test]
+    fn only_the_rule_about_a_predicate_of_a_condition_is_asked_where_the_condition_stands_alone() {
+        let case = kept("stricter-a-non-boolean-predicate-in-a-sort-key-of-one-value.case");
+        let refused = refusal(&case);
+        for other in [
+            Source::Polars,
+            Source::Rule("filter-predicate-is-boolean"),
+            Source::Rule("key-is-elementwise"),
+        ] {
+            let other = Refused {
+                source: other,
+                ..refused.clone()
+            };
+            assert_eq!(settle_by_evaluating_the_condition(&case, &other), None);
+        }
+        // A refusal that is not of the predicate itself, but of a call inside it.
+        let inside = Refused {
+            place: refused.place.clone().then(Segment::Link(0)),
+            ..refused.clone()
+        };
+        assert_eq!(settle_by_evaluating_the_condition(&case, &inside), None);
+        // And one that is of the step as a whole.
+        let whole = Refused {
+            place: Place::of_step(0, StepId::new(STEP).ok()),
+            ..refused
+        };
+        assert_eq!(settle_by_evaluating_the_condition(&case, &whole), None);
+    }
+
+    #[test]
+    fn a_condition_with_no_value_cannot_stand_alone() {
+        // `when(p)` of a sort key alone is no expression Polars can run.
+        let text = format!(
+            r#"{{"a":"String","b":"List(Int64)","revision":1}}
+{{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.sort","arguments":{{"by":{{"many":[{{"expression":{{"start":{{"entry":"polars.when","arguments":{{"predicates":{{"many":[{}]}}}}}},"then":[]}}}}]}}}}}}}}]}}"#,
+            a_comparison_of_text_with_a_number()
+        );
+        if let Ok(case) = Case::decode(text.as_bytes()) {
+            assert_eq!(
+                settle_by_evaluating_the_condition(
+                    &case,
+                    &refused_as_a_predicate_that_is_no_boolean()
+                ),
+                None
+            );
+        }
     }
 }
