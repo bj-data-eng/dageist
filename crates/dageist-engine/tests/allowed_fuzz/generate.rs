@@ -971,6 +971,12 @@ impl Gen<'_> {
             slots.extend(position);
             let built: Vec<Built> = match (id, name) {
                 ("Expr.shift", _) => vec![self.scalar(name == "n")],
+                // Polars builds a text of as many characters as the length converts to, which for
+                // a timestamp is the microseconds since the epoch: a length that is a chain of
+                // any dtype can fill the memory, so it is the number 1 of a dtype, as a shift's.
+                ("Expr.str.pad_start" | "Expr.str.pad_end" | "Expr.str.zfill", "length") => {
+                    vec![self.scalar(false)]
+                }
                 ("Expr.replace" | "Expr.replace_strict", "old") => {
                     let built = self.replaced();
                     replaces_a_literal = built.expression.links().is_empty()
