@@ -179,6 +179,51 @@ fn a_method_that_takes_a_whole_number_by_default_is_offered_with_it() {
 }
 
 #[test]
+fn a_method_whose_first_parameter_defaults_to_none_is_offered_starting_without_it() {
+    let answer = invoke(
+        "offers_at",
+        json!({
+            "positions": [{ "kind": "outer", "name": "select" }],
+            "after": { "kind": "value", "dtype": "String", "shape": "many" }
+        }),
+    )
+    .expect("offers");
+    // `strip_chars(characters=None)`, its two sides and `over(partition_by=None)` start with
+    // nothing for the first parameter, which holds what Polars gives it when it is not given.
+    for (id, parameter) in [
+        ("Expr.str.strip_chars", "characters"),
+        ("Expr.str.strip_chars_start", "characters"),
+        ("Expr.str.strip_chars_end", "characters"),
+        ("Expr.over", "partition_by"),
+    ] {
+        assert_eq!(offered(&answer, id)["leftOut"], json!(parameter), "{id}");
+        assert_eq!(offered(&answer, id)["argument"], Value::Null, "{id}");
+    }
+    // A parameter that must be given, and one that starts with a default, are not left out.
+    for id in [
+        "Expr.str.head",
+        "Expr.str.starts_with",
+        "Expr.str.to_uppercase",
+    ] {
+        assert_eq!(offered(&answer, id)["leftOut"], Value::Null, "{id}");
+    }
+    let shifted = invoke(
+        "offers_at",
+        json!({
+            "positions": [{ "kind": "outer", "name": "select" }],
+            "after": { "kind": "value", "dtype": "Datetime(us)", "shape": "many" }
+        }),
+    )
+    .expect("offers");
+    assert_eq!(offered(&shifted, "Expr.shift")["leftOut"], Value::Null);
+    // A refused method starts without anything to leave out.
+    assert_eq!(
+        offered(&shifted, "Expr.str.strip_chars")["leftOut"],
+        Value::Null
+    );
+}
+
+#[test]
 fn what_may_start_an_expression_depends_on_where_it_stands() {
     let at = |outer_name: &str| {
         invoke(

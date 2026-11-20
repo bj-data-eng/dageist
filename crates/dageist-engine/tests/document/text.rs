@@ -297,3 +297,29 @@ fn a_trim_that_is_given_no_characters_is_complete_and_trims_whitespace() {
     assert_eq!(cells[0], Some("Company A"));
     assert_eq!(cells[2], Some("Company B"));
 }
+
+#[test]
+fn a_window_started_with_no_partition_is_refused_by_polars_until_it_is_given_one() {
+    // `over` starts without `partition_by`: Polars refuses a window that has neither it nor an
+    // order, with its own reason, and runs it once either is given.
+    let window =
+        |arguments: serde_json::Value| field_then("row_days", vec![call("Expr.over", arguments)]);
+    let bare = report_of(&selecting(window(json!({}))));
+    let refused = &bare.steps()[0];
+    let Outcome::Refused(refusal) = refused.outcome() else {
+        panic!("{:?}", refused.outcome());
+    };
+    assert!(
+        refusal
+            .to_string()
+            .contains("`partition_by` and `order_by`"),
+        "{refusal}"
+    );
+    let ordered = report_of(&selecting(window(json!({
+        "partition_by": crate::support::many(vec![field("owner")])
+    }))));
+    assert!(matches!(
+        ordered.steps()[0].outcome(),
+        Outcome::Valid { .. }
+    ));
+}
