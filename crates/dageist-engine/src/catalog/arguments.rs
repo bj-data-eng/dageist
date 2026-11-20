@@ -6,6 +6,16 @@ use polars::prelude::{DataType, Expr, LazyFrame, PolarsError};
 
 use super::{Entry, Kind, Parameter, PatternError, Shape, ValueType, check_pattern};
 
+/// What the text of a pattern stands for: a regular expression, or, where a flag such as `literal`
+/// says so, plain text that matches itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PatternMeans {
+    /// A regular expression, which must be one Polars can compile.
+    RegularExpression,
+    /// Plain text, which is never refused.
+    PlainText,
+}
+
 /// One filled-in argument, ready for Polars. Its variant follows the
 /// parameter's kind; a parameter of shape many or per item holds `Many`.
 #[derive(Clone)]
@@ -325,7 +335,7 @@ impl Arguments {
         }
     }
 
-    /// The pattern given for the required `parameter`, as it was typed. Where `plain_text` is true
+    /// The pattern given for the required `parameter`, as it was typed. Where it `means` plain text
     /// the text is no regular expression and is given as it is; otherwise Polars is asked whether
     /// it is one, which is the reason it is refused with where it is not.
     ///
@@ -333,11 +343,15 @@ impl Arguments {
     ///
     /// When none was given, another kind of argument was, or the text is a pattern that Polars
     /// cannot compile.
-    pub fn pattern(&self, parameter: &'static str, plain_text: bool) -> Result<String, BuildError> {
+    pub fn pattern(
+        &self,
+        parameter: &'static str,
+        means: PatternMeans,
+    ) -> Result<String, BuildError> {
         match self.get(parameter) {
             None => Err(BuildError::Missing { parameter }),
             Some(Argument::Pattern(text)) => {
-                if !plain_text {
+                if means == PatternMeans::RegularExpression {
                     check_pattern(text)
                         .map_err(|error| BuildError::NotAPattern { parameter, error })?;
                 }

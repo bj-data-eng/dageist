@@ -21,7 +21,8 @@ use polars::prelude::{
 
 use super::{
     Argument, Arguments, AsManyAs, Build, BuildError, Conditional, Dtypes, Entry, EntryId, Family,
-    Kind, Laziness, Parameter, ParameterDefault, Role, Shape, ValueType, Variadic, Writes,
+    Kind, Laziness, Parameter, ParameterDefault, PatternMeans, Role, Shape, ValueType, Variadic,
+    Writes,
 };
 
 const ANY: &[Dtypes] = &[Dtypes::Any];
@@ -387,7 +388,12 @@ fn index(
 /// is true, and otherwise a regular expression, which Polars is asked is one.
 fn pattern_with_literal(arguments: &Arguments) -> Result<(Expr, bool), BuildError> {
     let literal = arguments.flag("literal", false)?;
-    Ok((lit(arguments.pattern("pattern", literal)?), literal))
+    let means = if literal {
+        PatternMeans::PlainText
+    } else {
+        PatternMeans::RegularExpression
+    };
+    Ok((lit(arguments.pattern("pattern", means)?), literal))
 }
 
 /// The one character given for `parameter`, as Python's binding takes it, or `default` when it
@@ -1025,19 +1031,19 @@ fn str_replace_all(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError
 
 fn str_extract(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
     Ok(expr.str().extract(
-        lit(arguments.pattern("pattern", false)?),
+        lit(arguments.pattern("pattern", PatternMeans::RegularExpression)?),
         index(arguments, "group_index", 1)?,
     ))
 }
 
 fn str_extract_all(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
-    Ok(expr
-        .str()
-        .extract_all(lit(arguments.pattern("pattern", false)?)))
+    Ok(expr.str().extract_all(lit(
+        arguments.pattern("pattern", PatternMeans::RegularExpression)?
+    )))
 }
 
 fn str_extract_groups(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
-    let pattern = arguments.pattern("pattern", false)?;
+    let pattern = arguments.pattern("pattern", PatternMeans::RegularExpression)?;
     Ok(expr.str().extract_groups(&pattern)?)
 }
 

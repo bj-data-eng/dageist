@@ -24,7 +24,7 @@ mod starting;
 mod tests;
 mod words;
 
-pub use arguments::{Argument, Arguments, BuildError};
+pub use arguments::{Argument, Arguments, BuildError, PatternMeans};
 pub use comparison::Comparison;
 pub use condition::Conditional;
 pub use defaults::{DefaultValue, ParameterDefault};

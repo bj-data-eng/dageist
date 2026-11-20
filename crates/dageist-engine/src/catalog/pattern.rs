@@ -34,8 +34,8 @@ impl fmt::Display for PatternError {
 
 impl std::error::Error for PatternError {}
 
-impl From<PolarsError> for PatternError {
-    fn from(error: PolarsError) -> Self {
+impl PatternError {
+    fn of(error: &PolarsError) -> Self {
         Self {
             reason: error.to_string(),
         }
@@ -48,8 +48,11 @@ impl From<PolarsError> for PatternError {
 ///
 /// Polars' own reason, where the text is none.
 pub fn check_pattern(text: &str) -> Result<(), PatternError> {
-    lit("").str().extract_groups(text).map(drop)?;
-    Ok(())
+    lit("")
+        .str()
+        .extract_groups(text)
+        .map(drop)
+        .map_err(|error| PatternError::of(&error))
 }
 
 /// The dtype `str.extract_groups` gives of the pattern `text`, as Polars works it out from the
@@ -65,8 +68,13 @@ pub fn groups_dtype(text: &str) -> Result<DataType, PatternError> {
     let schema = Schema::from_iter([Field::new(name.clone(), DataType::String)]);
     let mut frame = DataFrame::empty_with_schema(&schema)
         .lazy()
-        .select([col(name).str().extract_groups(text)?]);
-    let schema = frame.collect_schema()?;
+        .select([col(name)
+            .str()
+            .extract_groups(text)
+            .map_err(|error| PatternError::of(&error))?]);
+    let schema = frame
+        .collect_schema()
+        .map_err(|error| PatternError::of(&error))?;
     schema
         .iter_values()
         .next()
