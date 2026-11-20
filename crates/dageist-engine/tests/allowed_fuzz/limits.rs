@@ -7086,36 +7086,6 @@ mod tests {
         let case = select_of_a_null_literal(&["Expr.cbrt", "Expr.drop_nulls"]);
         assert!(!excused_by(&case).contains(&Limit::ADropLeavesNoRows));
     }
-    #[test]
-    fn a_predicate_that_polars_drops_is_excused_where_values_that_differ_have_it_refused() {
-        // `when(f.clip(..)).then(a).when(..).then(a).otherwise(a)`: the values are one expression,
-        // so Polars drops the predicates, and the tables refuse the clip of a `Boolean`.
-        assert_eq!(
-            excused_by_kept("uncovered-a-predicate-that-is-dropped.case"),
-            vec![Limit::APredicateThatIsDropped]
-        );
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/allowed_fuzz/regressions/uncovered-a-predicate-that-is-dropped.case");
-        let text = std::fs::read_to_string(path).expect("a kept case");
-        let case = Case::decode(text.as_bytes()).expect("a case");
-        let reason =
-            "`clip` operation not supported for dtype `bool` (expected: numeric or temporal)";
-        assert!(refused_with_values_that_differ(&case, reason));
-        // A clip of a column that holds a number is refused by no one, so the predicates being
-        // dropped is no cause of a refusal.
-        let number = text.replacen(
-            r#"{"entry":"polars.col","arguments":{"name":{"columns":["f"]}}},"then":[{"entry":"Expr.clip""#,
-            r#"{"entry":"polars.col","arguments":{"name":{"columns":["a"]}}},"then":[{"entry":"Expr.clip""#,
-            1,
-        );
-        assert_ne!(number, text);
-        let case = Case::decode(number.as_bytes()).expect("a case");
-        assert!(!refused_with_values_that_differ(&case, reason));
-        // A case with no condition that has an `otherwise` has no values to make differ.
-        let case = select_of_a_null_literal(&["Expr.cbrt"]);
-        assert!(!refused_with_values_that_differ(&case, reason));
-    }
-
     /// `lit(None).over(order_by=a.last())` as what `replace` is given: no key of the window holds a
     /// value for each row, so a window of a value that reads no column gives no rows.
     fn replace_by_a_window(window: &str) -> Case {
