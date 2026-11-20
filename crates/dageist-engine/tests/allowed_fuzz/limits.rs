@@ -7180,6 +7180,31 @@ mod tests {
     }
 
     #[test]
+    fn a_value_of_another_length_is_excused_at_the_rows_where_polars_runs_them_in_one_piece() {
+        // At one thread and at two Polars does not broadcast a literal over the rows either, and
+        // refuses the replacement for the lengths of the rows: three, or the two of a piece.
+        let text = call(
+            "polars.lit",
+            vec![("value", Value::String("1d".to_owned()))],
+        );
+        for reason in [
+            "replacement value length (3) does not match string column length (1)",
+            "replacement value length (2) does not match string column length (1)",
+        ] {
+            assert_eq!(
+                refused_for_a_bound(
+                    &replacing_in(text.clone(), column("g")),
+                    None,
+                    Stage::Rows,
+                    reason
+                ),
+                vec![Limit::ALiteralTextBesideManyReplacementValues],
+                "{reason}"
+            );
+        }
+    }
+
+    #[test]
     fn a_value_of_another_length_is_not_excused_for_a_column_nor_at_the_rows_nor_at_a_place() {
         let text = || {
             call(
@@ -7197,12 +7222,12 @@ mod tests {
             ),
             vec![]
         );
-        // Only the empty table holds the literal against nothing.
+        // Only the rows and the empty table hold the literal against a value: a schema holds none.
         assert_eq!(
             refused_for_a_bound(
                 &replacing_in(text(), column("g")),
                 None,
-                Stage::Rows,
+                Stage::Schema,
                 ANOTHER_LENGTH
             ),
             vec![]
