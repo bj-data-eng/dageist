@@ -24,7 +24,7 @@ use crate::catalog::{
 
 use super::build::{
     column, condition_with, element, entry, expression, expressions, flag, integer, method,
-    null_of, one_of, step,
+    null_of, one_of, patterns, step,
 };
 use super::probe::{Plan, measure, outcome};
 use super::sample::Frames;
@@ -122,6 +122,11 @@ const LITERAL_IN_CONTEXTS: [(&str, &str); 5] = [
     ("Expr.replace_strict", "default"),
 ];
 
+/// The parameters whose value is not a null where the expression is built for a group, which has
+/// no other column to give: Polars reads the value of a replacement of every match as the one value
+/// every match is replaced by where it is a literal, and refuses a null.
+const NOT_NULL_FOR_A_GROUP: [(&str, &str); 1] = [("Expr.str.replace_all", "value")];
+
 /// The expression that stands for an argument of `dtype` for `parameter` of
 /// the entry `entry`: a column of that dtype; the number 1 of that dtype where
 /// Polars takes one value only; or a null of that dtype where the expression
@@ -133,7 +138,11 @@ fn argument_expression(
     scope: Scope,
 ) -> Result<Expr, BuildError> {
     if scope.group {
-        null_of(&dtype.dtype())
+        if NOT_NULL_FOR_A_GROUP.contains(&(entry, parameter)) {
+            one_of(&dtype.dtype()).or_else(|_| null_of(&dtype.dtype()))
+        } else {
+            null_of(&dtype.dtype())
+        }
     } else if SCALAR_ONLY.contains(&(entry, parameter))
         || (scope.literals && LITERAL_IN_CONTEXTS.contains(&(entry, parameter)))
     {
@@ -210,6 +219,10 @@ fn companions(
         if parameter == Some("default") {
             given.extend(stands_in("new").ok().map(|new| ("new", expression(new))));
         }
+    }
+    // A pattern that a method must be given is the harness's, which every one of them accepts.
+    if let Some(entry) = catalog::entry(entry) {
+        given.extend(patterns(entry));
     }
     given
 }

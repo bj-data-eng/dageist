@@ -3,11 +3,11 @@
 
 use std::fmt;
 
-use crate::catalog::{self, Applies, Entry, Kind};
+use crate::catalog::{self, Applies, Entry, Kind, PatternError};
 
 use super::adapt::could_be_taken_by_a_number;
 use super::context::Context;
-use super::dtype::{Representative, ResultDtype};
+use super::dtype::{Representative, ResultDtype, dtype_name};
 use super::rules::Rule;
 use super::table::{OptionValue, Outcome, Produces, Reason, Shape, Stage, Tables, is_method};
 use crate::catalog::DefaultValue;
@@ -80,6 +80,7 @@ pub struct Chosen<'a> {
     arguments: &'a [(&'a str, Representative)],
     options: &'a [(&'a str, &'a str)],
     unclassed: &'a [&'a str],
+    patterns: &'a [(&'a str, &'a str)],
     gives: Option<Representative>,
     many: bool,
 }
@@ -109,6 +110,16 @@ impl<'a> Chosen<'a> {
     #[must_use]
     pub const fn with_options(mut self, options: &'a [(&'a str, &'a str)]) -> Self {
         self.options = options;
+        self
+    }
+
+    /// The patterns given to pattern parameters, each by the parameter's name and the text as
+    /// typed, where the text is a regular expression: a pattern that a flag such as `literal`
+    /// makes plain text is not one. A text Polars cannot compile is refused, and the groups of one
+    /// given to a parameter that names the fields of what the method gives are what it gives.
+    #[must_use]
+    pub const fn with_patterns(mut self, patterns: &'a [(&'a str, &'a str)]) -> Self {
+        self.patterns = patterns;
         self
     }
 
@@ -197,6 +208,14 @@ impl Refusal {
         Self {
             source: RefusalSource::Rule(rule),
             reason: rule.statement().to_owned(),
+        }
+    }
+
+    /// A refusal by `rule` that adds what Polars says of the case, in its words.
+    fn rule_because(rule: Rule, said: &PatternError) -> Self {
+        Self {
+            source: RefusalSource::Rule(rule),
+            reason: format!("{}: {said}", rule.statement()),
         }
     }
 
@@ -749,6 +768,12 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
     if let Some(rule) = Rule::forbids(id, place.context) {
         return Err(Refusal::rule(rule));
     }
+    // A pattern Polars cannot compile is refused in Polars' words, whatever follows it.
+    for (_, text) in chosen.patterns {
+        if let Err(said) = catalog::check_pattern(text) {
+            return Err(Refusal::rule_because(Rule::PatternIsValid, &said));
+        }
+    }
     // What the options set are refused for, on the dtype of the value the method follows.
     if is_method(entry) {
         let receiver = match place.after {
@@ -809,6 +834,21 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         });
         if needs_a_dtype {
             result = None;
+        }
+        // A call whose pattern names the fields of what it gives, as `extract_groups` does, gives
+        // nothing until it is told the pattern, and then the struct Polars works out of it: the
+        // dtype table measured it with one pattern, whose groups are not the call's.
+        if let Some(parameter) = entry
+            .parameters()
+            .iter()
+            .find(|parameter| parameter.names_the_fields_of_the_result())
+        {
+            result = chosen
+                .patterns
+                .iter()
+                .find(|(name, _)| *name == parameter.name())
+                .and_then(|(_, text)| catalog::groups_dtype(text).ok())
+                .map(|dtype| ResultDtype::from_name(&dtype_name(&dtype)));
         }
         // A call that was not given what Polars needs to run it gives nothing
         // whatever its options: Polars refuses a window given neither key.

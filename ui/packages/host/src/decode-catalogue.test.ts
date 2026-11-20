@@ -62,6 +62,7 @@ describe('the catalogue the host sends', () => {
       'temporal',
       'text',
       'pieces',
+      'search',
       'window',
       'compare',
       'checks',
@@ -109,6 +110,30 @@ describe('the catalogue the host sends', () => {
         },
       ],
     });
+  });
+
+  it('is read with the pattern of a method as a kind of its own and the flag that makes it text', () => {
+    const entries = decodeCatalogue(catalogue).entries;
+    const kindOf = (id: string, name: string) =>
+      entries
+        .find((entry) => entry.id === id)
+        ?.parameters.find((parameter) => parameter.name === name)?.kind;
+    // `contains`, `replace_all` and the others that take `literal` say it; the others take a
+    // regular expression always.
+    expect(kindOf('Expr.str.contains', 'pattern')).toEqual({
+      kind: 'pattern',
+      plainTextFlag: 'literal',
+    });
+    expect(kindOf('Expr.str.replace_all', 'pattern')).toEqual({
+      kind: 'pattern',
+      plainTextFlag: 'literal',
+    });
+    expect(kindOf('Expr.str.extract_groups', 'pattern')).toEqual({
+      kind: 'pattern',
+      plainTextFlag: null,
+    });
+    // The flag is a parameter of the same entry, which the editor draws as it draws any flag.
+    expect(kindOf('Expr.str.contains', 'literal')).toEqual({ kind: 'flag' });
   });
 
   it('is read with the position of an expression parameter that a named position holds', () => {
@@ -189,7 +214,7 @@ describe('the catalogue the host sends', () => {
     );
     expect(refused.path).toBe(`$.entries[${String(shift)}].parameters[0].kind.kind`);
     expect(refused.problem).toBe(
-      'must be one of "expression", "column", "value", "flag", "choice", "dtype", "duration", "table", "path", "pairs", not "map"',
+      'must be one of "expression", "column", "value", "flag", "choice", "dtype", "duration", "pattern", "table", "path", "pairs", not "map"',
     );
   });
 

@@ -38,11 +38,15 @@
     },
     {
       "key": "text",
-      "title": "str · case, trim, pad"
+      "title": "str · case, trim, pad, replace"
     },
     {
       "key": "pieces",
       "title": "str · slice, split, join, length"
+    },
+    {
+      "key": "search",
+      "title": "str · find, count, extract"
     },
     {
       "key": "window",
@@ -2423,6 +2427,140 @@
       "parameters": []
     },
     {
+      "id": "Expr.str.contains",
+      "applies": "expression",
+      "family": "compare",
+      "name": "str.contains",
+      "hint": "true where the text has a match for a pattern",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "pattern",
+          "shown": "pattern",
+          "label": "matches",
+          "kind": {
+            "kind": "pattern",
+            "plainTextFlag": "literal"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "literal",
+          "shown": "literal",
+          "label": "as plain text",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null
+        },
+        {
+          "name": "strict",
+          "shown": "strict",
+          "label": "refuse a bad pattern",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": true
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": true
+          },
+          "start": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.count_matches",
+      "applies": "expression",
+      "family": "search",
+      "name": "str.count_matches",
+      "hint": "how many times a pattern matches in the text",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "pattern",
+          "shown": "pattern",
+          "label": "pattern",
+          "kind": {
+            "kind": "pattern",
+            "plainTextFlag": "literal"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "literal",
+          "shown": "literal",
+          "label": "as plain text",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null
+        }
+      ]
+    },
+    {
       "id": "Expr.str.ends_with",
       "applies": "expression",
       "family": "compare",
@@ -2447,6 +2585,213 @@
           "defaultSetting": null,
           "start": {
             "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.escape_regex",
+      "applies": "expression",
+      "family": "text",
+      "name": "str.escape_regex",
+      "hint": "put a backslash before each character that has a meaning in a pattern",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.str.extract",
+      "applies": "expression",
+      "family": "search",
+      "name": "str.extract",
+      "hint": "the text one group of the first match holds, nothing where there is none",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "pattern",
+          "shown": "pattern",
+          "label": "pattern",
+          "kind": {
+            "kind": "pattern",
+            "plainTextFlag": null
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "group_index",
+          "shown": "group_index",
+          "label": "group number",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 1
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 1,
+            "shown": "1"
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.extract_all",
+      "applies": "expression",
+      "family": "search",
+      "name": "str.extract_all",
+      "hint": "a list of every match of a pattern",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "pattern",
+          "shown": "pattern",
+          "label": "pattern",
+          "kind": {
+            "kind": "pattern",
+            "plainTextFlag": null
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.extract_groups",
+      "applies": "expression",
+      "family": "search",
+      "name": "str.extract_groups",
+      "hint": "a struct of the text each group of a pattern matched, its fields named as the groups are",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "pattern",
+          "shown": "pattern",
+          "label": "pattern",
+          "kind": {
+            "kind": "pattern",
+            "plainTextFlag": null
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.find",
+      "applies": "expression",
+      "family": "search",
+      "name": "str.find",
+      "hint": "where a pattern first matches, in bytes from the start, nothing where it does not",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "pattern",
+          "shown": "pattern",
+          "label": "pattern",
+          "kind": {
+            "kind": "pattern",
+            "plainTextFlag": "literal"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "literal",
+          "shown": "literal",
+          "label": "as plain text",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null
+        },
+        {
+          "name": "strict",
+          "shown": "strict",
+          "label": "refuse a bad pattern",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": true
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": true
+          },
+          "start": {
+            "kind": "flag",
+            "value": false
           },
           "position": null
         }
@@ -2667,6 +3012,179 @@
           },
           "start": {
             "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.replace",
+      "applies": "expression",
+      "family": "text",
+      "name": "str.replace",
+      "hint": "replace the first match of a pattern, or the first n, by a text where $1 and ${name} stand for what a group matched",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "pattern",
+          "shown": "pattern",
+          "label": "pattern",
+          "kind": {
+            "kind": "pattern",
+            "plainTextFlag": "literal"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "value",
+          "shown": "value",
+          "label": "with",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "literal",
+          "shown": "literal",
+          "label": "as plain text",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null
+        },
+        {
+          "name": "n",
+          "shown": "n",
+          "label": "how many",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 1
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 1,
+            "shown": "1"
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        }
+      ]
+    },
+    {
+      "id": "Expr.str.replace_all",
+      "applies": "expression",
+      "family": "text",
+      "name": "str.replace_all",
+      "hint": "replace every match of a pattern by a text where $1 and ${name} stand for what a group matched",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "pattern",
+          "shown": "pattern",
+          "label": "pattern",
+          "kind": {
+            "kind": "pattern",
+            "plainTextFlag": "literal"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "value",
+          "shown": "value",
+          "label": "with",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null
+        },
+        {
+          "name": "literal",
+          "shown": "literal",
+          "label": "as plain text",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
           },
           "position": null
         }

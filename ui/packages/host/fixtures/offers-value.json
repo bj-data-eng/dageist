@@ -1209,7 +1209,112 @@
       "leftOut": null
     },
     {
+      "entry": "Expr.str.contains",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "expected String type, got: datetime[μs]"
+        }
+      },
+      "argument": null,
+      "leftOut": null
+    },
+    {
+      "entry": "Expr.str.count_matches",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
+        }
+      },
+      "argument": null,
+      "leftOut": null
+    },
+    {
       "entry": "Expr.str.ends_with",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "expected String type, got: datetime[μs]"
+        }
+      },
+      "argument": null,
+      "leftOut": null
+    },
+    {
+      "entry": "Expr.str.escape_regex",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
+        }
+      },
+      "argument": null,
+      "leftOut": null
+    },
+    {
+      "entry": "Expr.str.extract",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "expected String type, got: datetime[μs]"
+        }
+      },
+      "argument": null,
+      "leftOut": null
+    },
+    {
+      "entry": "Expr.str.extract_all",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
+        }
+      },
+      "argument": null,
+      "leftOut": null
+    },
+    {
+      "entry": "Expr.str.extract_groups",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
+        }
+      },
+      "argument": null,
+      "leftOut": null
+    },
+    {
+      "entry": "Expr.str.find",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -1306,6 +1411,36 @@
             "stage": "rows"
           },
           "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
+        }
+      },
+      "argument": null,
+      "leftOut": null
+    },
+    {
+      "entry": "Expr.str.replace",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "expected String type, got: datetime[μs]"
+        }
+      },
+      "argument": null,
+      "leftOut": null
+    },
+    {
+      "entry": "Expr.str.replace_all",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "expected String type, got: datetime[μs]"
         }
       },
       "argument": null,

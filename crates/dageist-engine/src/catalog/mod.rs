@@ -18,6 +18,7 @@ mod condition;
 mod defaults;
 mod entries;
 mod left_out;
+mod pattern;
 mod starting;
 #[cfg(test)]
 mod tests;
@@ -28,6 +29,7 @@ pub use comparison::Comparison;
 pub use condition::Conditional;
 pub use defaults::{DefaultValue, ParameterDefault};
 pub use left_out::{LeftOut, Reason, left_out};
+pub use pattern::{PatternError, check_pattern, groups_dtype};
 pub use starting::{Setting, StepFrame, StepStart, start_step};
 pub use words::{SummaryPhrase, SummaryWord, Words, WordsError, english};
 
@@ -97,16 +99,20 @@ pub enum Family {
     Aggregate,
     /// Dates and times: the `dt` namespace.
     Temporal,
-    /// Changing the text itself: its case, the characters trimmed from its ends, padding and
-    /// reversing, which are the methods of the `str` namespace that give text.
+    /// Changing the text itself: its case, the characters trimmed from its ends, padding,
+    /// reversing, and replacing what matches a pattern, which are the methods of the `str`
+    /// namespace that give text.
     Text,
     /// Taking text apart, and measuring it: `str.slice`, `str.head`, `str.split`, `str.join` and
     /// the lengths, which give a piece of the text, a list of pieces, one text or a count.
     Pieces,
+    /// Finding in text by a pattern: where it matches, how often, and what it matches:
+    /// `str.find`, `str.count_matches`, `str.extract` and the like, which each take the pattern.
+    Search,
     /// Working within groups: `over`.
     Window,
     /// Comparisons and tests that give a Boolean: `eq`, `gt`, `eq_missing`, `is_between`,
-    /// `is_close`, `is_null`, `str.starts_with`, and the like.
+    /// `is_close`, `is_null`, `str.starts_with`, `str.contains`, and the like.
     Compare,
     /// Tests of what a value is, or of whether it is repeated: `is_nan`, `is_infinite`,
     /// `is_unique`, `is_first_distinct`, and the like, which give a Boolean.
@@ -126,7 +132,7 @@ pub enum Family {
 
 impl Family {
     /// Every family, in the order they are offered.
-    pub const ALL: [Self; 19] = [
+    pub const ALL: [Self; 20] = [
         Self::Steps,
         Self::Rows,
         Self::Cumulative,
@@ -138,6 +144,7 @@ impl Family {
         Self::Temporal,
         Self::Text,
         Self::Pieces,
+        Self::Search,
         Self::Window,
         Self::Compare,
         Self::Checks,
@@ -163,6 +170,7 @@ impl Family {
             Self::Temporal => "temporal",
             Self::Text => "text",
             Self::Pieces => "pieces",
+            Self::Search => "search",
             Self::Window => "window",
             Self::Compare => "compare",
             Self::Checks => "checks",
@@ -282,6 +290,12 @@ pub enum Kind {
     Dtype,
     /// A Polars duration string, such as `1mo` or `-2d`.
     Duration,
+    /// A regular expression, as Polars reads one: the syntax of Rust's `regex` crate, compiled with
+    /// the settings Polars compiles it with. It is text typed in, and a document that holds one
+    /// that is no pattern is still a document: the step is refused at the parameter, with the
+    /// reason, when it is built. Where the parameter has a flag that makes it plain text, as
+    /// `literal` does, see [`Parameter::plain_text_flag`].
+    Pattern,
     /// A frame from the graph.
     Table,
     /// A file, folder or cloud location.
@@ -414,6 +428,8 @@ pub struct Parameter {
     lenient_beside: Option<&'static str>,
     adapts_numbers_only: bool,
     broadcasts: bool,
+    plain_text_flag: Option<&'static str>,
+    names_the_fields_of_the_result: bool,
 }
 
 impl Parameter {
@@ -435,6 +451,8 @@ impl Parameter {
             lenient_beside: None,
             adapts_numbers_only: false,
             broadcasts: true,
+            plain_text_flag: None,
+            names_the_fields_of_the_result: false,
         }
     }
 
@@ -515,6 +533,29 @@ impl Parameter {
     /// of many gives many.
     const fn not_broadcasting(mut self) -> Self {
         self.broadcasts = false;
+        self
+    }
+
+    /// The same parameter, a pattern that Polars takes as plain text where the flag `flag` of the
+    /// same entry is true, as `literal` makes it: the text is then no regular expression, whatever
+    /// it holds.
+    const fn with_plain_text_flag(mut self, flag: &'static str) -> Self {
+        assert!(
+            matches!(self.kind, Kind::Pattern),
+            "only a pattern is plain text by a flag"
+        );
+        self.plain_text_flag = Some(flag);
+        self
+    }
+
+    /// The same parameter, a pattern whose groups name the fields of the struct the method gives,
+    /// so that what the method gives is not known until the pattern is.
+    const fn naming_the_fields_of_the_result(mut self) -> Self {
+        assert!(
+            matches!(self.kind, Kind::Pattern),
+            "only a pattern names the fields of a result"
+        );
+        self.names_the_fields_of_the_result = true;
         self
     }
 
@@ -624,6 +665,22 @@ impl Parameter {
     #[must_use]
     pub const fn broadcasts(&self) -> bool {
         self.broadcasts
+    }
+
+    /// The flag of the same entry that makes the pattern plain text where it is true, if there is
+    /// one: Polars' `literal`. The text of a pattern whose flag is true is not read as a regular
+    /// expression, so it is never refused for being no pattern.
+    #[must_use]
+    pub const fn plain_text_flag(&self) -> Option<&'static str> {
+        self.plain_text_flag
+    }
+
+    /// Whether the groups of the pattern name the fields of the struct the method gives, as
+    /// `str.extract_groups` makes of a pattern, so that the dtype of what it gives depends on the
+    /// pattern given and not on the dtype it follows alone.
+    #[must_use]
+    pub const fn names_the_fields_of_the_result(&self) -> bool {
+        self.names_the_fields_of_the_result
     }
 
     /// Whether a number typed without a dtype that is given to the parameter takes the dtype of

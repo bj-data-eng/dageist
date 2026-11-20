@@ -373,14 +373,27 @@ export function DtypeDrawing({
   );
 }
 
-/** What is typed into a literal: a number of a stated type, text, a duration, a path or a date. */
-export type LiteralType = 'integer' | 'float' | 'string' | 'date' | 'any' | 'duration' | 'path';
+/**
+ * What is typed into a literal: a number of a stated type, text, a duration, a pattern, a path or
+ * a date.
+ */
+export type LiteralType =
+  | 'integer'
+  | 'float'
+  | 'string'
+  | 'date'
+  | 'any'
+  | 'duration'
+  | 'pattern'
+  | 'path';
 
 /** Returns what the engine is asked a text is typed into, for a literal of `type`. */
 function typedInto(type: LiteralType): TypedKind {
   switch (type) {
     case 'duration':
       return { kind: 'duration' };
+    case 'pattern':
+      return { kind: 'pattern' };
     case 'path':
       return { kind: 'path' };
     default:
@@ -396,6 +409,7 @@ const LITERAL_PLACEHOLDERS: Readonly<Record<LiteralType, string>> = {
   date: 'Type a date, such as 2026-03-10',
   any: 'Type a number or text',
   duration: 'Type a duration, such as 1mo',
+  pattern: 'Type a pattern, such as [aeiou]',
   path: 'Type a path',
 };
 
@@ -407,6 +421,7 @@ const LITERAL_WAITING: Readonly<Record<LiteralType, string>> = {
   date: 'date',
   any: 'number or text',
   duration: 'duration',
+  pattern: 'pattern',
   path: 'path',
 };
 
@@ -435,7 +450,7 @@ function literalOffers(
   });
 }
 
-/** Draws something typed into the search box of its list: a value, a duration or a path. */
+/** Draws something typed into the search box of its list: a value, a duration, a pattern or a path. */
 export function LiteralDrawing({
   type,
   describedAs,
@@ -445,7 +460,7 @@ export function LiteralDrawing({
   onChange,
 }: DrawingProps<LiteralSetting | null> & { readonly type: LiteralType }): React.JSX.Element {
   const placeholder = LITERAL_PLACEHOLDERS[type];
-  const waiting = type === 'duration' || type === 'path' ? type : 'value';
+  const waiting = type === 'duration' || type === 'pattern' || type === 'path' ? type : 'value';
   const list = useListState();
   // The engine reads what is typed, only while the list is open.
   const readings = useReadTyped(
@@ -578,6 +593,17 @@ function OneDrawing({
         <LiteralDrawing
           {...common}
           type="duration"
+          value={literalOf(setting)}
+          onChange={(literal) => {
+            onChange(literal);
+          }}
+        />
+      );
+    case 'pattern':
+      return (
+        <LiteralDrawing
+          {...common}
+          type="pattern"
           value={literalOf(setting)}
           onChange={(literal) => {
             onChange(literal);

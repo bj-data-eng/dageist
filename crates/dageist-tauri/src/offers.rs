@@ -235,6 +235,8 @@ pub(crate) enum TypedRequest {
     },
     /// A Polars duration string.
     Duration,
+    /// A regular expression.
+    Pattern,
     /// A file, folder or cloud location.
     Path,
 }
@@ -245,6 +247,7 @@ impl From<TypedRequest> for Typed {
             TypedRequest::Expression => Self::Expression,
             TypedRequest::Value { value_type } => Self::Value(value_type.into()),
             TypedRequest::Duration => Self::Duration,
+            TypedRequest::Pattern => Self::Pattern,
             TypedRequest::Path => Self::Path,
         }
     }

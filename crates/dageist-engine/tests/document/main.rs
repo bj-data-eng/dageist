@@ -11,6 +11,7 @@ mod inputs;
 mod join_keys;
 mod nesting;
 mod nulls;
+mod patterns;
 mod preview;
 mod reading;
 mod refusals;

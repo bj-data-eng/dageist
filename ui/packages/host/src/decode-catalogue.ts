@@ -58,6 +58,13 @@ const readKind: Decode<KindView> = readTagged<KindView>('kind', {
   },
   dtype: { fields: [], read: () => ({ kind: 'dtype' }) },
   duration: { fields: [], read: () => ({ kind: 'duration' }) },
+  pattern: {
+    fields: ['plainTextFlag'],
+    read: (fields, path) => ({
+      kind: 'pattern',
+      plainTextFlag: readField(fields, path, 'plainTextFlag', readNullable(readString)),
+    }),
+  },
   table: { fields: [], read: () => ({ kind: 'table' }) },
   path: { fields: [], read: () => ({ kind: 'path' }) },
   pairs: {

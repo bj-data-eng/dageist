@@ -12,7 +12,7 @@ use crate::allowed::table::Shape;
 use crate::allowed::{After, Chosen, Context, Outer, Place, offer};
 use crate::catalog::{self, Applies, Argument, Entry, Kind, Shape as ParameterShape};
 
-use super::build::{column, expression, expressions, method, null_of, one_of, step};
+use super::build::{column, expression, expressions, method, null_of, one_of, patterns, step};
 use super::probe::measure;
 use super::sample::Frames;
 
@@ -31,7 +31,7 @@ fn arguments(
     operand: Representative,
     column_named: &str,
 ) -> Vec<(&'static str, Argument)> {
-    let mut given: Vec<(&'static str, Argument)> = Vec::new();
+    let mut given: Vec<(&'static str, Argument)> = patterns(entry);
     for parameter in entry.parameters() {
         if !matches!(parameter.kind(), Kind::Expression(_)) {
             continue;
@@ -104,7 +104,7 @@ fn found(entry: &'static Entry, name: &str) -> Option<(Representative, Represent
 
 /// The parameters that Polars allows no operand of many for, with why: nothing is measured of them.
 /// `over`'s keys are met by the window, which has a rule of its own.
-const NOT_MEASURED: [(&str, &str, &str); 6] = [
+const NOT_MEASURED: [(&str, &str, &str); 8] = [
     ("Expr.over", "more_exprs", "a key of the window"),
     ("Expr.replace", "new", "the values a replacement lists"),
     (
@@ -116,6 +116,16 @@ const NOT_MEASURED: [(&str, &str, &str); 6] = [
         "Expr.replace_strict",
         "default",
         "the values a replacement lists",
+    ),
+    (
+        "Expr.str.replace",
+        "value",
+        "Polars refuses many values beside a text of one",
+    ),
+    (
+        "Expr.str.replace_all",
+        "value",
+        "Polars refuses many values beside a text of one",
     ),
     ("Expr.shift", "n", "Polars takes one value only"),
     ("Expr.shift", "fill_value", "Polars takes one value only"),

@@ -345,11 +345,27 @@ pub enum Limit {
     /// `replace_strict` given no default: the case run again with each given a null default is
     /// not refused for it.
     AStrictReplacementGivenNoDefault,
+    /// A replacement of every match refuses a value that is null where Polars reads the value
+    /// as one value, which it does of a literal, and of a piece of one row where it runs rows in
+    /// pieces, as it does at more threads than the tables were measured with. The tables measured
+    /// the value as a column of three rows in one piece, which Polars meets row by row and leaves
+    /// a null row of unchanged. Polars refusing the rows or the empty table with the refusal that
+    /// the value cannot be null, which has no place, in a case with a `str.replace_all`: the case
+    /// run again with the value of each made a text literal is not refused for it.
+    AReplacementOfEveryMatchGivenANullValue,
+    /// Polars replaces more than the first match only of plain text and of one value: a pattern
+    /// that is a regular expression, or a value that is many, is refused for a count above one.
+    /// The tables measured the replacement of the first match, which is the count Python gives it
+    /// by default. Polars refusing the rows or the empty table with the refusal that a replacement
+    /// of a pattern or of many values with a count above one is not yet supported, which has no
+    /// place, in a case with a `str.replace` that is given a count above one: the case run again
+    /// with each count left out is not refused for it.
+    AReplacementOfMoreThanTheFirstMatch,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 27] = [
+    pub const ALL: [Self; 29] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -377,6 +393,8 @@ impl Limit {
         Self::ADropOfNansInAWindow,
         Self::ANullStructToFill,
         Self::AStrictReplacementGivenNoDefault,
+        Self::AReplacementOfEveryMatchGivenANullValue,
+        Self::AReplacementOfMoreThanTheFirstMatch,
     ];
 
     /// The name a kept case is filed under.
@@ -409,6 +427,12 @@ impl Limit {
             Self::ADropOfNansInAWindow => "a-drop-of-nans-in-a-window",
             Self::ANullStructToFill => "a-null-struct-to-fill",
             Self::AStrictReplacementGivenNoDefault => "a-strict-replacement-given-no-default",
+            Self::AReplacementOfEveryMatchGivenANullValue => {
+                "a-replacement-of-every-match-given-a-null-value"
+            }
+            Self::AReplacementOfMoreThanTheFirstMatch => {
+                "a-replacement-of-more-than-the-first-match"
+            }
         }
     }
 
@@ -483,6 +507,12 @@ impl Limit {
             }
             Self::AStrictReplacementGivenNoDefault => {
                 "a strict replacement given no default refuses a value it does not list and values of a dtype a default lets pass, where the tables measured it given a default and listing every value"
+            }
+            Self::AReplacementOfEveryMatchGivenANullValue => {
+                "a replacement of every match refuses a value that is null where Polars reads it as one value, a literal or a piece of one row, where the tables measured the value as a column of three rows in one piece"
+            }
+            Self::AReplacementOfMoreThanTheFirstMatch => {
+                "Polars replaces more than the first match only of plain text and of one value, and refuses a pattern or many values, where the tables measured the replacement of the first match"
             }
             Self::ANullStructToFill => {
                 "a shift, and the first, the last, the minimum and the maximum of nothing, give a null, which a fill by a strategy refuses a struct for, where the sample's struct holds none"
@@ -1768,6 +1798,86 @@ fn refused_for_an_incomplete_mapping_with_defaults(case: &Case, reason: &str) ->
     })
 }
 
+/// What Polars says of a replacement of every match whose value is null where it reads it as one.
+const A_NULL_VALUE_OF_A_REPLACEMENT: &str = "value cannot be 'null' in 'replace' expression";
+
+/// What Polars says of a replacement of a pattern, or of many values, that is given a count above
+/// one.
+const A_COUNT_OF_A_REPLACEMENT: &str = "with 'n > 1' not yet supported";
+
+/// The case with each replacement given no count, which is the first match.
+fn case_without_counts(case: &Case) -> Option<Case> {
+    case_changed(case, &|call| {
+        if !is(call, "Expr.str.replace") || call.argument("n").is_none() {
+            return None;
+        }
+        let given: Vec<(&str, Value)> = call
+            .arguments()
+            .iter()
+            .filter(|given| given.parameter() != "n")
+            .map(|given| (given.parameter(), given.value().clone()))
+            .collect();
+        Call::new(catalog::entry("Expr.str.replace")?, given).ok()
+    })
+}
+
+/// Whether Polars refuses the case for a count above one still when each replacement is given
+/// none: the count is then no cause. `None` where no replacement has one to leave out.
+fn refused_for_a_count_without_counts(case: &Case) -> Option<bool> {
+    changed(case_without_counts(case), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| refusal.reason.contains(A_COUNT_OF_A_REPLACEMENT))
+        })
+    })
+}
+
+/// A text literal, which is no null.
+fn a_text_literal() -> Option<Expression> {
+    let literal = Call::new(
+        catalog::entry("polars.lit")?,
+        vec![("value", Value::String("x".to_owned()))],
+    )
+    .ok()?;
+    Expression::new(Start::Call(literal), Vec::new()).ok()
+}
+
+/// The case with the value of each replacement of every match made a text literal.
+fn case_with_text_values(case: &Case) -> Option<Case> {
+    case_changed(case, &|call| {
+        if !is(call, "Expr.str.replace_all") {
+            return None;
+        }
+        let given: Vec<(&str, Value)> = call
+            .arguments()
+            .iter()
+            .map(|given| {
+                let value = if given.parameter() == "value" {
+                    Value::Expression(a_text_literal()?)
+                } else {
+                    given.value().clone()
+                };
+                Some((given.parameter(), value))
+            })
+            .collect::<Option<_>>()?;
+        Call::new(catalog::entry("Expr.str.replace_all")?, given).ok()
+    })
+}
+
+/// Whether Polars refuses the case for a null value still when the value of each replacement of
+/// every match is text: the value is then no cause. `None` where no replacement of every match
+/// has one to change.
+fn refused_for_a_null_value_with_text_values(case: &Case) -> Option<bool> {
+    changed(case_with_text_values(case), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| refusal.reason.contains(A_NULL_VALUE_OF_A_REPLACEMENT))
+        })
+    })
+}
+
 /// Whether the call drops the nulls or the NaNs of what it follows.
 fn is_a_drop(call: &Call) -> bool {
     is(call, "Expr.drop_nulls") || is(call, "Expr.drop_nans")
@@ -2761,6 +2871,31 @@ fn applies(
                         .iter()
                         .any(|(_, held)| holds_a_fill_by_a_strategy_in_a_condition(held))
                         && refused_for_a_strategy_without_strategies(case) == Some(false))
+        }
+        (Limit::AReplacementOfMoreThanTheFirstMatch, Disagreement::PolarsRefuses(refusal)) => {
+            // The count is the cause where Polars stops refusing it once each replacement is
+            // given none, which is the first match.
+            unplaced(refusal)
+                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                && refusal.reason.contains(A_COUNT_OF_A_REPLACEMENT)
+                && held.iter().any(|(_, held)| {
+                    any_call(held, &|call| {
+                        is(call, "Expr.str.replace")
+                            && matches!(call.argument("n"), Some(Value::Integer(count)) if *count > 1)
+                    })
+                })
+                && refused_for_a_count_without_counts(case) == Some(false)
+        }
+        (Limit::AReplacementOfEveryMatchGivenANullValue, Disagreement::PolarsRefuses(refusal)) => {
+            // The value is the cause where Polars stops refusing it as null once the value of
+            // each replacement of every match is text.
+            unplaced(refusal)
+                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                && refusal.reason.contains(A_NULL_VALUE_OF_A_REPLACEMENT)
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &|call| is(call, "Expr.str.replace_all")))
+                && refused_for_a_null_value_with_text_values(case) == Some(false)
         }
         (Limit::AStrictReplacementGivenNoDefault, Disagreement::PolarsRefuses(refusal)) => {
             unplaced(refusal)
@@ -6751,6 +6886,149 @@ mod tests {
         // A default maps every value, so the refusal is not for the want of one.
         assert_eq!(
             refused_for_a_bound(&strict(true), None, Stage::Rows, reason),
+            vec![]
+        );
+    }
+
+    // ----- A replacement of every match given a null value
+
+    const NULL_VALUE: &str = "value cannot be 'null' in 'replace' expression";
+
+    fn replacing_every_match_by(value: Call) -> Case {
+        let replace = call(
+            "Expr.str.replace_all",
+            vec![
+                ("pattern", Value::Pattern("a".to_owned())),
+                ("value", Value::Expression(chain(value, &[]))),
+            ],
+        );
+        select(vec![chain_of(column("g"), vec![replace])])
+    }
+
+    #[test]
+    fn a_null_value_is_excused_for_a_replacement_of_every_match_given_a_null_literal_or_a_column() {
+        // A literal is one value, and a null of it is refused as Polars refuses it. A column
+        // is refused where Polars runs its rows in pieces of one, which the control cannot show:
+        // the control is that the value made text is not refused, which holds for both.
+        for value in [null(), column("b")] {
+            for stage in [Stage::Rows, Stage::Empty] {
+                assert_eq!(
+                    refused_for_a_bound(
+                        &replacing_every_match_by(value.clone()),
+                        None,
+                        stage,
+                        NULL_VALUE
+                    ),
+                    vec![Limit::AReplacementOfEveryMatchGivenANullValue]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_null_value_is_not_excused_for_a_value_that_is_text_nor_for_another_replacement() {
+        // The value is text already: the control is the case itself, which shows nothing, so
+        // the limit does not apply.
+        let text = call("polars.lit", vec![("value", Value::String("x".to_owned()))]);
+        assert_eq!(
+            refused_for_a_bound(
+                &replacing_every_match_by(text),
+                None,
+                Stage::Rows,
+                NULL_VALUE
+            ),
+            vec![]
+        );
+        // A replacement of the first match, and a strict one, are not one of every match.
+        let first = call(
+            "Expr.str.replace",
+            vec![
+                ("pattern", Value::Pattern("a".to_owned())),
+                ("value", Value::Expression(chain(null(), &[]))),
+            ],
+        );
+        let case = select(vec![chain_of(column("g"), vec![first])]);
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, NULL_VALUE),
+            vec![]
+        );
+        // Another refusal of the rows, or one that is at a place, is not the value's.
+        assert_eq!(
+            refused_for_a_bound(
+                &replacing_every_match_by(null()),
+                None,
+                Stage::Rows,
+                "invalid series dtype: expected `String`"
+            ),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(
+                &replacing_every_match_by(null()),
+                Some(Place::of_step(0, None).then(Segment::Parameter("exprs".to_owned()))),
+                Stage::Rows,
+                NULL_VALUE
+            ),
+            vec![]
+        );
+    }
+
+    // ----- A replacement of more than the first match
+
+    const MORE_THAN_THE_FIRST: &str = "regex replacement with 'n > 1' not yet supported";
+    const MORE_THAN_THE_FIRST_OF_MANY: &str =
+        "multivalue replacement with 'n > 1' not yet supported";
+
+    fn replacing_matches(pattern: &str, count: Option<i64>, value: Expression) -> Case {
+        let mut given = vec![
+            ("pattern", Value::Pattern(pattern.to_owned())),
+            ("value", Value::Expression(value)),
+        ];
+        given.extend(count.map(|count| ("n", Value::Integer(count))));
+        select(vec![chain_of(
+            column("g"),
+            vec![call("Expr.str.replace", given)],
+        )])
+    }
+
+    #[test]
+    fn a_count_above_one_is_excused_for_a_replacement_of_a_pattern_or_of_many_values() {
+        for (reason, case) in [
+            (
+                MORE_THAN_THE_FIRST,
+                replacing_matches("x*", Some(2), chain(column("h"), &[])),
+            ),
+            (
+                MORE_THAN_THE_FIRST_OF_MANY,
+                replacing_matches("x", Some(3), chain(column("h"), &[])),
+            ),
+        ] {
+            for stage in [Stage::Rows, Stage::Empty] {
+                assert_eq!(
+                    refused_for_a_bound(&case, None, stage, reason),
+                    vec![Limit::AReplacementOfMoreThanTheFirstMatch],
+                    "{reason}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_count_above_one_is_not_excused_without_one_given_nor_by_another_refusal() {
+        // No count is given, or one that replaces the first match or none: the control is the
+        // case itself, or Polars refuses it still, so the count is no cause.
+        for count in [None, Some(1), Some(0), Some(-1)] {
+            let case = replacing_matches("x*", count, chain(column("h"), &[]));
+            assert_eq!(
+                refused_for_a_bound(&case, None, Stage::Rows, MORE_THAN_THE_FIRST),
+                vec![],
+                "{count:?}"
+            );
+        }
+        // A replacement of every match has no count, and another reason is no count's.
+        let case = replacing_matches("x*", Some(2), chain(column("h"), &[]));
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, "invalid series dtype"),
             vec![]
         );
     }

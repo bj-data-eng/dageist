@@ -332,7 +332,14 @@ fn polars_words(rule: &str) -> &'static [&'static str] {
             "is not allowed in this context",
         ],
         "join-key-names-are-not-repeated" => &["repeated key names"],
-        "replacement-values-match-in-number" => &["must have the same length as"],
+        // The engine words a pattern it refuses with Polars' own words after its own, and
+        // Polars words every refusal of a regular expression, which a size limit is one of,
+        // as a regex error.
+        "pattern-is-valid" => &["regex error"],
+        "replacement-values-match-in-number" => &[
+            "must have the same length as",
+            "does not match string column length",
+        ],
         _ => &[],
     }
 }

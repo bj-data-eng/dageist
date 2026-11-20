@@ -1013,6 +1013,20 @@ impl Gen<'_> {
                         class,
                     }]
                 }
+                // What a replacement puts in place of a match is often text, with the references to
+                // a group of the match that a pattern gives it meaning for.
+                ("Expr.str.replace" | "Expr.str.replace_all", "value") if self.draw.chance(50) => {
+                    let text = self.draw.pick(&["_", "$1", "${g}", "<$0>", "$$", ""]);
+                    let literal = call(
+                        "polars.lit",
+                        vec![("value", Value::String(text.to_owned()))],
+                    );
+                    vec![Built {
+                        expression: Expression::new(Start::Call(literal), Vec::new())
+                            .expect("a start"),
+                        class: Some(Representative::String),
+                    }]
+                }
                 ("Expr.over", "partition_by" | "order_by" | "more_exprs") => {
                     let count = if name == "more_exprs" {
                         1
@@ -1058,6 +1072,7 @@ impl Gen<'_> {
         given.extend(self.dtype_arguments(entry));
         given.extend(self.numbers(entry, &given));
         given.extend(self.texts(entry));
+        given.extend(self.patterns(entry));
         if id == "Expr.over" {
             let ordered = given.iter().any(|(name, _)| *name == "order_by");
             let optioned = given
@@ -1128,6 +1143,11 @@ impl Gen<'_> {
                 "digits" => Value::Integer(self.draw.pick(&[1, 2, 3, 6, 15, 40])),
                 "decimals" => Value::Integer(self.draw.pick(&[0, 1, 2, 3, 5, 12, 50, 310, 400])),
                 "limit" => Value::Integer(self.draw.pick(&[0, 1, 2, 5])),
+                // The index of the group `extract` takes: the whole match, a group, or one the
+                // pattern lacks, which Polars gives a null for.
+                "group_index" => Value::Integer(self.draw.pick(&[0, 1, 2, 5])),
+                // How many matches `replace` replaces: none, some, or all of them below zero.
+                "n" => Value::Integer(self.draw.pick(&[-1, 0, 1, 1, 2, 3])),
                 "abs_tol" | "rel_tol" => Value::Float(self.draw.pick(&[0.0, 0.5, 1e-9, 1.0])),
                 other => panic!("the generator does not know what to give {other}"),
             };
@@ -1155,6 +1175,27 @@ impl Gen<'_> {
             texts.push((name, Value::String(value.to_owned())));
         }
         texts
+    }
+
+    /// The patterns a method is given for the parameters that take one, drawn from a small fixed
+    /// set: regular expressions with groups, named groups, classes, anchors and flags, and some
+    /// that Polars cannot compile, so that the refusal of a pattern is checked as the pattern is.
+    /// One that is no regular expression is plain text where `literal` is set, which is drawn
+    /// apart from it.
+    fn patterns(&mut self, entry: &'static Entry) -> Vec<(&'static str, Value)> {
+        entry
+            .parameters()
+            .iter()
+            .filter(|parameter| parameter.kind() == Kind::Pattern)
+            .map(|parameter| {
+                let text = if self.draw.chance(25) {
+                    self.draw.pick(&INVALID_PATTERNS)
+                } else {
+                    self.draw.pick(&VALID_PATTERNS)
+                };
+                (parameter.name(), Value::Pattern(text.to_owned()))
+            })
+            .collect()
     }
 
     /// The dtypes a method is given for the parameters that take one: the dtype a cast gives,
@@ -1211,6 +1252,42 @@ impl Gen<'_> {
         )
     }
 }
+
+/// Patterns Polars compiles: with and without groups, named groups in both of Rust's spellings,
+/// classes, anchors, alternation, flags, an empty pattern and plain text.
+const VALID_PATTERNS: [&str; 14] = [
+    "a",
+    "(a)",
+    "(?<g>a)",
+    r"(\d)(\w)?",
+    "[a-z]+",
+    "^1",
+    "d$",
+    r"\d+",
+    ".",
+    "(?i)D",
+    "(?P<x>\\d)(?P<y>d)",
+    "a|d",
+    "",
+    "x*",
+];
+
+/// Patterns Polars cannot compile, each for a reason of its own: an unclosed group and class, a
+/// repetition that ends before it begins, a name that is no name, a group named twice, a flag and
+/// a property that do not exist, an escape with nothing after it, and a repetition with nothing to
+/// repeat.
+const INVALID_PATTERNS: [&str; 10] = [
+    "(",
+    "[a",
+    "a{2,1}",
+    "(?<1>a)",
+    "(?<n>a)(?<n>d)",
+    "(?z)a",
+    r"\p{Nothing}",
+    "\\",
+    "*a",
+    "a)",
+];
 
 /// The class every value of a condition has, when they have the same one.
 fn unify(values: &[Option<Representative>]) -> Option<Representative> {

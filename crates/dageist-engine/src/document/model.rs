@@ -84,6 +84,8 @@ pub enum Value {
     Dtype(Dtype),
     /// A Polars duration string, such as `1mo`.
     Duration(String),
+    /// A regular expression, as typed.
+    Pattern(String),
     /// The name of a connected table.
     Table(String),
     /// A file, folder or cloud location.
@@ -110,6 +112,7 @@ impl Value {
             Self::Choice(word) => Argument::Choice(word.clone()),
             Self::Dtype(dtype) => Argument::Dtype(dtype.as_polars().clone()),
             Self::Duration(text) => Argument::Duration(text.clone()),
+            Self::Pattern(text) => Argument::Pattern(text.clone()),
             Self::Table(_) => Argument::Table(polars::prelude::LazyFrame::default()),
             Self::Path(text) => Argument::Path(text.clone()),
             Self::Pairs(pairs) => Argument::Pairs(
@@ -230,7 +233,8 @@ fn arguments_refused(
         BuildError::UnknownParameter { parameter } => (Some(parameter.clone()), Vec::new()),
         BuildError::Repeated { parameter }
         | BuildError::Missing { parameter }
-        | BuildError::OutOfRange { parameter, .. } => (Some((*parameter).to_owned()), Vec::new()),
+        | BuildError::OutOfRange { parameter, .. }
+        | BuildError::NotAPattern { parameter, .. } => (Some((*parameter).to_owned()), Vec::new()),
         BuildError::WrongKind { parameter, .. } | BuildError::UnknownChoice { parameter, .. } => {
             let found = entry
                 .parameters()
@@ -268,6 +272,7 @@ fn fits(kind: Kind, value: &Value) -> bool {
         | (Kind::Flag, Value::Flag(_))
         | (Kind::Dtype, Value::Dtype(_))
         | (Kind::Duration, Value::Duration(_))
+        | (Kind::Pattern, Value::Pattern(_))
         | (Kind::Table, Value::Table(_))
         | (Kind::Path, Value::Path(_)) => true,
         (Kind::Choice(words), Value::Choice(word)) => words.contains(&word.as_str()),

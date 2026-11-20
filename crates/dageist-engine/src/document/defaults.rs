@@ -89,6 +89,7 @@ impl Value {
                 Self::String(value)
                 | Self::Choice(value)
                 | Self::Duration(value)
+                | Self::Pattern(value)
                 | Self::Path(value),
                 DefaultValue::Text(default),
             ) => value == default,

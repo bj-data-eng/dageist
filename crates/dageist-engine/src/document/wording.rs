@@ -29,9 +29,11 @@ pub(super) fn scalar(value: &Value) -> Option<String> {
         },
         Value::Integer(number) => number.to_string(),
         Value::Float(number) => float(*number),
-        Value::String(text) | Value::Choice(text) | Value::Duration(text) | Value::Path(text) => {
-            string(text)
-        }
+        Value::String(text)
+        | Value::Choice(text)
+        | Value::Duration(text)
+        | Value::Pattern(text)
+        | Value::Path(text) => string(text),
         Value::Flag(Some(true)) => "True".to_owned(),
         Value::Flag(Some(false)) => "False".to_owned(),
         Value::Flag(None) => "None".to_owned(),

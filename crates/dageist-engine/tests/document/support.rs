@@ -68,3 +68,8 @@ pub fn step(id: &str, entry: &str, arguments: Value) -> Value {
 pub fn document(steps: Vec<Value>) -> String {
     json!({ "version": 1, "steps": steps }).to_string()
 }
+
+/// The argument that is the pattern `text`.
+pub fn pattern(text: &str) -> Value {
+    json!({ "pattern": text })
+}

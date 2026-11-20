@@ -68,6 +68,12 @@ enum KindView {
     },
     Dtype,
     Duration,
+    /// A regular expression. Where the entry has a flag that makes the text plain text, as
+    /// `literal` does, the flag's parameter name.
+    Pattern {
+        #[serde(rename = "plainTextFlag")]
+        plain_text_flag: Option<&'static str>,
+    },
     Table,
     Path,
     Pairs {
@@ -413,6 +419,9 @@ fn kind_of(
         },
         Kind::Dtype => KindView::Dtype,
         Kind::Duration => KindView::Duration,
+        Kind::Pattern => KindView::Pattern {
+            plain_text_flag: parameter.plain_text_flag(),
+        },
         Kind::Table => KindView::Table,
         Kind::Path => KindView::Path,
         Kind::Pairs(key, value) => KindView::Pairs {
@@ -921,6 +930,7 @@ mod tests {
                 "temporal",
                 "text",
                 "pieces",
+                "search",
                 "window",
                 "compare",
                 "checks",

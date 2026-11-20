@@ -528,6 +528,7 @@ function settingArgument(
       return numberArgument(kind, setting.value, setting.float === true, wrong);
     case 'text':
       if (kind.kind === 'duration') return { duration: setting.value };
+      if (kind.kind === 'pattern') return { pattern: setting.value };
       if (kind.kind === 'path') return { path: setting.value };
       return { string: setting.value };
     case 'word':

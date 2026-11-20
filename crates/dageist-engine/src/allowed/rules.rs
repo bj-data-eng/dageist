@@ -36,19 +36,24 @@ pub enum Rule {
     /// A join's own key is elementwise: it holds no aggregate beside a column,
     /// no column compared with a null, and no replacement of values that are not literals.
     KeyIsElementwise,
-    /// A replacement is given as many new values as old ones, or one, and a strict one a
-    /// default of as many values as what it follows, or one.
+    /// A pattern is a regular expression Polars can compile, unless the text is plain text by a
+    /// flag such as `literal`.
+    PatternIsValid,
+    /// A replacement is given as many new values as old ones, or one, a strict one a
+    /// default of as many values as what it follows, or one, and the replacement of text a value
+    /// of as many as the text it follows, or one.
     ReplacementValuesMatchInNumber,
 }
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::ConditionPredicateIsBoolean,
         Self::ElementOnlyInPivotAggregate,
         Self::FilterPredicateIsBoolean,
         Self::JoinKeyNamesAreNotRepeated,
         Self::KeyIsElementwise,
+        Self::PatternIsValid,
         Self::PivotAggregateGivesOneValue,
         Self::ReplacementValuesMatchInNumber,
     ];
@@ -63,6 +68,7 @@ impl Rule {
             Self::FilterPredicateIsBoolean => "filter-predicate-is-boolean",
             Self::JoinKeyNamesAreNotRepeated => "join-key-names-are-not-repeated",
             Self::KeyIsElementwise => "key-is-elementwise",
+            Self::PatternIsValid => "pattern-is-valid",
             Self::ReplacementValuesMatchInNumber => "replacement-values-match-in-number",
         }
     }
@@ -91,8 +97,9 @@ impl Rule {
             Self::KeyIsElementwise => {
                 "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a column be compared with a null, nor a replacement take a value that reads a column"
             }
+            Self::PatternIsValid => "a pattern must be a valid regular expression",
             Self::ReplacementValuesMatchInNumber => {
-                "a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one"
+                "a replacement takes as many new values as old ones, or one, a strict one a default of as many values as what it follows, or one, and the replacement of text a value of as many as the text it follows, or one"
             }
         }
     }
@@ -108,7 +115,7 @@ impl Rule {
             Self::PivotAggregateGivesOneValue => context == Context::step(Outer::PivotAggregate),
             Self::JoinKeyNamesAreNotRepeated | Self::KeyIsElementwise => context.is_join_key(),
             // A matter of the values a call is given, whatever context it stands in.
-            Self::ReplacementValuesMatchInNumber => false,
+            Self::PatternIsValid | Self::ReplacementValuesMatchInNumber => false,
             Self::ConditionPredicateIsBoolean | Self::FilterPredicateIsBoolean => {
                 self.needs_boolean_end(context)
             }
@@ -203,6 +210,7 @@ impl Rule {
             | Self::ElementOnlyInPivotAggregate
             | Self::JoinKeyNamesAreNotRepeated
             | Self::KeyIsElementwise
+            | Self::PatternIsValid
             | Self::ReplacementValuesMatchInNumber => false,
         }
     }

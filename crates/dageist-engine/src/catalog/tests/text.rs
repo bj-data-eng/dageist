@@ -3,9 +3,9 @@
 //! a length is a `UInt32`, a test is a `Boolean`, a split is a list of text and a join is one
 //! text.
 
-use polars::prelude::{DataFrame, DataType, IntoLazy, col, df, lit};
+use polars::prelude::{DataFrame, DataType, Field, IntoLazy, col, df, lit};
 
-use crate::catalog::{Argument, Arguments, BuildError};
+use crate::catalog::{Argument, Arguments, BuildError, check_pattern, groups_dtype};
 
 use super::build::{dtype_of, expression_arg, flag, method, none, run, text};
 
@@ -484,4 +484,447 @@ fn a_method_of_text_refuses_whole_numbers() {
             "{id} refuses whole numbers"
         );
     }
+}
+
+#[test]
+fn a_pattern_is_asked_of_polars_and_refused_in_its_words_where_it_is_no_regular_expression() {
+    // Each of these is a regular expression Rust's `regex` crate refuses, for the reason Polars
+    // gives in its words, which names the place in the pattern.
+    for (pattern, reason) in [
+        ("(", "unclosed group"),
+        ("[a", "unclosed character class"),
+        ("a{2,1}", "invalid repetition count range"),
+        ("(?<n>a)(?<n>d)", "duplicate capture group name"),
+        ("(?z)a", "unrecognized flag"),
+        (r"\p{Nothing}", "Unicode property not found"),
+        ("\\", "incomplete escape sequence"),
+        ("*a", "repetition operator missing expression"),
+        ("a)", "unopened group"),
+        ("(?:a{1000}){1000}", "exceeds size limit"),
+    ] {
+        let error = check_pattern(pattern).expect_err(pattern);
+        assert!(error.reason().contains(reason), "{pattern}: {error}");
+        // Polars refuses the same pattern when it runs a method that compiles it.
+        let rows = df!("t" => ["a"]).unwrap();
+        let polars = rows
+            .lazy()
+            .select([col("t").str().contains(lit(pattern), true)])
+            .collect()
+            .expect_err(pattern);
+        assert!(polars.to_string().contains(reason), "{pattern}: {polars}");
+        // The catalogue's build refuses it too, at the parameter, and not before it is built.
+        let given = given("pattern", Argument::Pattern(pattern.to_owned()));
+        let Err(BuildError::NotAPattern { parameter, .. }) =
+            method("Expr.str.contains", col("t"), &given)
+        else {
+            panic!("{pattern} is refused");
+        };
+        assert_eq!(parameter, "pattern");
+    }
+    // Regular expressions Polars compiles, among them an empty one and one that is plain text.
+    for pattern in [
+        "a", "(a)", "(?<g>a)", "[a-z]+", r"\d+", "^1", "(?i)D", "", "x*",
+    ] {
+        assert_eq!(check_pattern(pattern), Ok(()), "{pattern}");
+    }
+}
+
+#[test]
+fn a_pattern_that_a_flag_makes_plain_text_is_never_refused_for_being_no_regular_expression() {
+    // `(` is no regular expression, and as plain text it is found where the text holds it.
+    let words = df!("t" => [Some("f(x)"), Some("fx"), None]).unwrap();
+    let contains = |literal: bool| {
+        let given =
+            given("pattern", Argument::Pattern("(".to_owned())).with("literal", flag(literal));
+        method("Expr.str.contains", col("t"), &given)
+    };
+    assert!(matches!(
+        contains(false),
+        Err(BuildError::NotAPattern {
+            parameter: "pattern",
+            ..
+        })
+    ));
+    let found = run(words.lazy().select([contains(true).unwrap().alias("out")]));
+    let found: Vec<Option<bool>> = found
+        .column("out")
+        .expect("a column")
+        .bool()
+        .expect("booleans")
+        .iter()
+        .collect();
+    assert_eq!(found, [Some(true), Some(false), None]);
+    // A method that has no flag takes its pattern as a regular expression, always.
+    let extract = given("pattern", Argument::Pattern("(".to_owned()));
+    assert!(matches!(
+        method("Expr.str.extract", col("t"), &extract),
+        Err(BuildError::NotAPattern { .. })
+    ));
+}
+
+#[test]
+fn the_fields_a_pattern_names_are_the_struct_polars_works_out_of_its_groups() {
+    // A group has the name it is given, and the number it has where it has none: Polars names a
+    // field of the struct that `extract_groups` gives so, and every one is text.
+    let field = |name: &str| Field::new(name.into(), DataType::String);
+    for (pattern, fields) in [
+        ("(?<year>\\d{4})-(\\d{2})", vec!["year", "2"]),
+        ("(a)(b)(c)", vec!["1", "2", "3"]),
+        ("(?<g>a)", vec!["g"]),
+        ("(?:a)b", vec![]),
+        ("", vec![]),
+    ] {
+        let expected = DataType::Struct(fields.into_iter().map(field).collect());
+        assert_eq!(groups_dtype(pattern).expect(pattern), expected, "{pattern}");
+        // What a step gives is the dtype the method has once it is built.
+        let given = given("pattern", Argument::Pattern(pattern.to_owned()));
+        let built = method("Expr.str.extract_groups", col("s"), &given).expect("it builds");
+        assert_eq!(dtype_of(&built), expected, "{pattern}");
+    }
+    assert!(groups_dtype("(").is_err());
+}
+
+// ---------------------------------------------------------------------------
+// The methods that take a pattern, against what Polars' documentation shows and what Python
+// Polars 2.1 gives: the expected cells are written here by hand.
+
+fn pattern(text: &str) -> Argument {
+    Argument::Pattern(text.to_owned())
+}
+
+/// The rows the methods of patterns are run on: a null, a text with a dollar sign, two dates.
+fn dated() -> DataFrame {
+    df!("t" => [
+        Some("Crab"),
+        Some("cat and dog"),
+        Some("rab$bit"),
+        None,
+        Some("2024-03-10 x 2025-04-11"),
+    ])
+    .unwrap()
+}
+
+fn column_of<T>(
+    frame: &DataFrame,
+    id: &str,
+    arguments: &Arguments,
+    read: impl Fn(&polars::prelude::Column) -> Vec<Option<T>>,
+) -> Vec<Option<T>> {
+    let expr = method(id, col("t"), arguments).expect("the method builds");
+    let out = run(frame.clone().lazy().select([expr.alias("out")]));
+    read(out.column("out").expect("a column"))
+}
+
+fn booleans(frame: &DataFrame, id: &str, arguments: &Arguments) -> Vec<Option<bool>> {
+    column_of(frame, id, arguments, |out| {
+        out.bool().expect("booleans").iter().collect()
+    })
+}
+
+fn counts(frame: &DataFrame, id: &str, arguments: &Arguments) -> Vec<Option<u32>> {
+    column_of(frame, id, arguments, |out| {
+        out.u32().expect("counts").iter().collect()
+    })
+}
+
+#[test]
+fn a_test_for_a_pattern_finds_a_regular_expression_or_plain_text_as_the_flag_says() {
+    let rows = dated();
+    let given = |text: &str| given("pattern", pattern(text));
+    assert_eq!(
+        booleans(&rows, "Expr.str.contains", &given("cat|bit")),
+        [Some(false), Some(true), Some(true), None, Some(false)]
+    );
+    // `$` is the end of the text as a pattern, and a dollar sign as plain text.
+    assert_eq!(
+        booleans(&rows, "Expr.str.contains", &given("rab$")),
+        [Some(true), Some(false), Some(false), None, Some(false)]
+    );
+    assert_eq!(
+        booleans(
+            &rows,
+            "Expr.str.contains",
+            &given("rab$").with("literal", flag(true))
+        ),
+        [Some(false), Some(false), Some(true), None, Some(false)]
+    );
+    // A flag of the pattern, as the syntax of Rust's `regex` has them.
+    assert_eq!(
+        booleans(&rows, "Expr.str.contains", &given("(?i)CRAB")),
+        [Some(true), Some(false), Some(false), None, Some(false)]
+    );
+    // A test gives a `Boolean`, a null for a null.
+    assert_eq!(
+        dtype_of(&method("Expr.str.contains", col("s"), &given("a")).unwrap()),
+        DataType::Boolean
+    );
+}
+
+#[test]
+fn matches_are_counted_and_found_by_their_place_in_bytes() {
+    let rows = dated();
+    let digits = || given("pattern", pattern(r"\d"));
+    assert_eq!(
+        counts(&rows, "Expr.str.count_matches", &digits()),
+        [Some(0), Some(0), Some(0), None, Some(16)]
+    );
+    let a = || given("pattern", pattern("a"));
+    assert_eq!(
+        counts(
+            &rows,
+            "Expr.str.count_matches",
+            &a().with("literal", flag(true))
+        ),
+        [Some(1), Some(2), Some(1), None, Some(0)]
+    );
+    // The place is where the first match starts, counted in bytes from 0, and nothing where
+    // there is none.
+    assert_eq!(
+        counts(&rows, "Expr.str.find", &a()),
+        [Some(2), Some(1), Some(1), None, None]
+    );
+    let dollar = || given("pattern", pattern("$"));
+    assert_eq!(
+        counts(
+            &rows,
+            "Expr.str.find",
+            &dollar().with("literal", flag(true))
+        ),
+        [None, None, Some(3), None, None]
+    );
+    // `é` takes two bytes, so what follows it is two places further than its characters say.
+    let accented = df!("t" => ["aé b"]).unwrap();
+    assert_eq!(
+        counts(&accented, "Expr.str.find", &given("pattern", pattern("b"))),
+        [Some(4)]
+    );
+    for id in ["Expr.str.count_matches", "Expr.str.find"] {
+        assert_eq!(
+            dtype_of(&method(id, col("s"), &a()).unwrap()),
+            DataType::UInt32,
+            "{id}"
+        );
+    }
+}
+
+#[test]
+fn a_replacement_puts_text_for_the_first_match_or_for_each_and_refers_to_groups_as_the_regex_crate_does()
+ {
+    let rows = dated();
+    let replacing = |text: &str, with: &str| {
+        given("pattern", pattern(text)).with("value", expression_arg(lit(with)))
+    };
+    assert_eq!(
+        texts(&rows, "Expr.str.replace", &replacing("a", "_")),
+        some(&[
+            Some("Cr_b"),
+            Some("c_t and dog"),
+            Some("r_b$bit"),
+            None,
+            Some("2024-03-10 x 2025-04-11")
+        ])
+    );
+    assert_eq!(
+        texts(&rows, "Expr.str.replace_all", &replacing("a", "_")),
+        some(&[
+            Some("Cr_b"),
+            Some("c_t _nd dog"),
+            Some("r_b$bit"),
+            None,
+            Some("2024-03-10 x 2025-04-11")
+        ])
+    );
+    // `$1` and `${name}` are the text of a group of the match, and `$$` is a dollar sign.
+    assert_eq!(
+        texts(
+            &rows,
+            "Expr.str.replace",
+            &replacing(r"(\d{4})-(\d{2})-(\d{2})", "${3}/$2/$1")
+        ),
+        some(&[
+            Some("Crab"),
+            Some("cat and dog"),
+            Some("rab$bit"),
+            None,
+            Some("10/03/2024 x 2025-04-11")
+        ])
+    );
+    assert_eq!(
+        texts(
+            &rows,
+            "Expr.str.replace_all",
+            &replacing(r"(?<y>\d{4})-(\d{2})-(\d{2})", "${y}")
+        ),
+        some(&[
+            Some("Crab"),
+            Some("cat and dog"),
+            Some("rab$bit"),
+            None,
+            Some("2024 x 2025")
+        ])
+    );
+    assert_eq!(
+        texts(&rows, "Expr.str.replace", &replacing("b", "$$"))
+            .into_iter()
+            .take(3)
+            .collect::<Vec<_>>(),
+        some(&[Some("Cra$"), Some("cat and dog"), Some("ra$$bit")])
+    );
+    // As plain text, the pattern and what replaces it mean what they say, `$1` included.
+    assert_eq!(
+        texts(
+            &rows,
+            "Expr.str.replace",
+            &replacing("b", "$1").with("literal", flag(true))
+        )
+        .into_iter()
+        .take(3)
+        .collect::<Vec<_>>(),
+        some(&[Some("Cra$1"), Some("cat and dog"), Some("ra$1$bit")])
+    );
+    // The first `n` matches of plain text: two of the three `a` of a text that holds them.
+    let counted = df!("t" => ["banana"]).unwrap();
+    for (n, expected) in [(0, "banana"), (1, "b_nana"), (2, "b_n_na"), (-1, "b_n_n_")] {
+        let arguments = replacing("a", "_")
+            .with("literal", flag(true))
+            .with("n", Argument::Integer(n));
+        assert_eq!(
+            texts(&counted, "Expr.str.replace", &arguments),
+            some(&[Some(expected)]),
+            "n = {n}"
+        );
+    }
+}
+
+#[test]
+fn a_group_is_extracted_by_its_number_and_every_match_by_the_pattern() {
+    let rows = dated();
+    let dates = || given("pattern", pattern(r"(\d{4})-(\d{2})"));
+    // Group 1 is the default, 0 is the whole match, and a group the pattern lacks is a null.
+    assert_eq!(
+        texts(&rows, "Expr.str.extract", &dates()),
+        some(&[None, None, None, None, Some("2024")])
+    );
+    for (index, expected) in [(0, "2024-03"), (2, "03")] {
+        let arguments = dates().with("group_index", Argument::Integer(index));
+        assert_eq!(
+            texts(&rows, "Expr.str.extract", &arguments)
+                .into_iter()
+                .last()
+                .flatten(),
+            Some(expected.to_owned()),
+            "group {index}"
+        );
+    }
+    let lacking = dates().with("group_index", Argument::Integer(5));
+    assert_eq!(
+        texts(&rows, "Expr.str.extract", &lacking)
+            .into_iter()
+            .last()
+            .flatten(),
+        None
+    );
+    // A negative index is no unsigned whole number, as Python's binding refuses it.
+    let negative = dates().with("group_index", Argument::Integer(-1));
+    assert!(matches!(
+        method("Expr.str.extract", col("t"), &negative),
+        Err(BuildError::OutOfRange { .. })
+    ));
+    // Every match, as a list of text: none for a text that has none, and a null for a null.
+    let all = column_of(
+        &rows,
+        "Expr.str.extract_all",
+        &given("pattern", pattern(r"\d+")),
+        |out| {
+            let lists = out.list().expect("lists").clone();
+            (0..lists.len())
+                .map(|at| {
+                    lists.get_as_series(at).map(|row| {
+                        row.str()
+                            .expect("text")
+                            .iter()
+                            .map(|piece| piece.expect("a match").to_owned())
+                            .collect::<Vec<_>>()
+                    })
+                })
+                .collect()
+        },
+    );
+    assert_eq!(
+        all,
+        [
+            Some(vec![]),
+            Some(vec![]),
+            Some(vec![]),
+            None,
+            Some(
+                ["2024", "03", "10", "2025", "04", "11"]
+                    .map(str::to_owned)
+                    .to_vec()
+            )
+        ]
+    );
+    assert_eq!(
+        dtype_of(
+            &method(
+                "Expr.str.extract_all",
+                col("s"),
+                &given("pattern", pattern("a"))
+            )
+            .unwrap()
+        ),
+        DataType::List(Box::new(DataType::String))
+    );
+}
+
+#[test]
+fn the_groups_of_a_pattern_are_the_fields_of_a_struct_of_what_each_matched() {
+    let rows = dated();
+    let arguments = given("pattern", pattern(r"(?<year>\d{4})-(\d{2})"));
+    let expr = method("Expr.str.extract_groups", col("t"), &arguments).expect("it builds");
+    let out = run(rows.lazy().select([expr.alias("out")]));
+    let grouped = out
+        .column("out")
+        .expect("a column")
+        .struct_()
+        .expect("a struct")
+        .clone();
+    let cells = |name: &str| -> Vec<Option<String>> {
+        grouped
+            .field_by_name(name)
+            .expect("a field")
+            .str()
+            .expect("text")
+            .iter()
+            .map(|cell| cell.map(str::to_owned))
+            .collect()
+    };
+    // A text with a match fills each field; one without leaves each field a null.
+    assert_eq!(
+        cells("year").last().cloned().flatten(),
+        Some("2024".to_owned())
+    );
+    assert_eq!(cells("2").last().cloned().flatten(), Some("03".to_owned()));
+    assert_eq!(cells("year")[0], None);
+    // A pattern with no groups is a struct with no fields, which Polars allows.
+    let none = given("pattern", pattern("a"));
+    assert_eq!(
+        dtype_of(&method("Expr.str.extract_groups", col("s"), &none).unwrap()),
+        DataType::Struct(Vec::new())
+    );
+}
+
+#[test]
+fn the_characters_of_a_pattern_are_escaped_to_mean_themselves() {
+    let rows = dated();
+    assert_eq!(
+        texts(&rows, "Expr.str.escape_regex", &none()),
+        some(&[
+            Some("Crab"),
+            Some("cat and dog"),
+            Some(r"rab\$bit"),
+            None,
+            Some(r"2024\-03\-10 x 2025\-04\-11")
+        ])
+    );
 }

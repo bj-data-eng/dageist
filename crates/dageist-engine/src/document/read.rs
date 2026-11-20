@@ -187,6 +187,7 @@ fn read_value(json: &Json) -> Result<Value, Refusal> {
                 .map_err(|error| Refusal::new(Cause::Dtype(error)))?,
         ),
         "duration" => Value::Duration(string("duration", inner)?.to_owned()),
+        "pattern" => Value::Pattern(string("pattern", inner)?.to_owned()),
         "table" => Value::Table(string("table", inner)?.to_owned()),
         "path" => Value::Path(string("path", inner)?.to_owned()),
         "pairs" => Value::Pairs(

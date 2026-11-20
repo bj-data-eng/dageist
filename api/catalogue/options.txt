@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 3688 combinations: 2685 allowed; 32 refused when Polars resolved the schema, 971 when it ran the rows, 0 when it ran the empty table.
+# 4052 combinations: 2699 allowed; 332 refused when Polars resolved the schema, 1021 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.cast | Array(Int64, 2) | dtype=Boolean | refused rows: cannot cast Array type (inner: 'Int64', to: 'Boolean')
 Expr.cast | Array(Int64, 2) | dtype=Boolean, strict=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Boolean')
@@ -2946,6 +2946,266 @@ Expr.round | UInt64 | mode=half_away_from_zero | allowed UInt64 many
 Expr.round | UInt64 | mode=half_to_even | allowed UInt64 many
 Expr.round | UInt8 | mode=half_away_from_zero | allowed UInt8 many
 Expr.round | UInt8 | mode=half_to_even | allowed UInt8 many
+Expr.str.contains | Array(Int64, 2) | literal=false, strict=false | refused schema: expected String type, got: array[i64, 2]
+Expr.str.contains | Array(Int64, 2) | literal=false, strict=true | refused schema: expected String type, got: array[i64, 2]
+Expr.str.contains | Array(Int64, 2) | literal=true, strict=false | refused schema: expected String type, got: array[i64, 2]
+Expr.str.contains | Array(Int64, 2) | literal=true, strict=true | refused schema: expected String type, got: array[i64, 2]
+Expr.str.contains | Boolean | literal=false, strict=false | refused schema: expected String type, got: bool
+Expr.str.contains | Boolean | literal=false, strict=true | refused schema: expected String type, got: bool
+Expr.str.contains | Boolean | literal=true, strict=false | refused schema: expected String type, got: bool
+Expr.str.contains | Boolean | literal=true, strict=true | refused schema: expected String type, got: bool
+Expr.str.contains | Date | literal=false, strict=false | refused schema: expected String type, got: date
+Expr.str.contains | Date | literal=false, strict=true | refused schema: expected String type, got: date
+Expr.str.contains | Date | literal=true, strict=false | refused schema: expected String type, got: date
+Expr.str.contains | Date | literal=true, strict=true | refused schema: expected String type, got: date
+Expr.str.contains | Datetime(us) | literal=false, strict=false | refused schema: expected String type, got: datetime[μs]
+Expr.str.contains | Datetime(us) | literal=false, strict=true | refused schema: expected String type, got: datetime[μs]
+Expr.str.contains | Datetime(us) | literal=true, strict=false | refused schema: expected String type, got: datetime[μs]
+Expr.str.contains | Datetime(us) | literal=true, strict=true | refused schema: expected String type, got: datetime[μs]
+Expr.str.contains | Datetime(us, UTC) | literal=false, strict=false | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.contains | Datetime(us, UTC) | literal=false, strict=true | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.contains | Datetime(us, UTC) | literal=true, strict=false | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.contains | Datetime(us, UTC) | literal=true, strict=true | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.contains | Decimal(10, 2) | literal=false, strict=false | refused schema: expected String type, got: decimal[10,2]
+Expr.str.contains | Decimal(10, 2) | literal=false, strict=true | refused schema: expected String type, got: decimal[10,2]
+Expr.str.contains | Decimal(10, 2) | literal=true, strict=false | refused schema: expected String type, got: decimal[10,2]
+Expr.str.contains | Decimal(10, 2) | literal=true, strict=true | refused schema: expected String type, got: decimal[10,2]
+Expr.str.contains | Duration(us) | literal=false, strict=false | refused schema: expected String type, got: duration[μs]
+Expr.str.contains | Duration(us) | literal=false, strict=true | refused schema: expected String type, got: duration[μs]
+Expr.str.contains | Duration(us) | literal=true, strict=false | refused schema: expected String type, got: duration[μs]
+Expr.str.contains | Duration(us) | literal=true, strict=true | refused schema: expected String type, got: duration[μs]
+Expr.str.contains | Float16 | literal=false, strict=false | refused schema: expected String type, got: f16
+Expr.str.contains | Float16 | literal=false, strict=true | refused schema: expected String type, got: f16
+Expr.str.contains | Float16 | literal=true, strict=false | refused schema: expected String type, got: f16
+Expr.str.contains | Float16 | literal=true, strict=true | refused schema: expected String type, got: f16
+Expr.str.contains | Float32 | literal=false, strict=false | refused schema: expected String type, got: f32
+Expr.str.contains | Float32 | literal=false, strict=true | refused schema: expected String type, got: f32
+Expr.str.contains | Float32 | literal=true, strict=false | refused schema: expected String type, got: f32
+Expr.str.contains | Float32 | literal=true, strict=true | refused schema: expected String type, got: f32
+Expr.str.contains | Float64 | literal=false, strict=false | refused schema: expected String type, got: f64
+Expr.str.contains | Float64 | literal=false, strict=true | refused schema: expected String type, got: f64
+Expr.str.contains | Float64 | literal=true, strict=false | refused schema: expected String type, got: f64
+Expr.str.contains | Float64 | literal=true, strict=true | refused schema: expected String type, got: f64
+Expr.str.contains | Int128 | literal=false, strict=false | refused schema: expected String type, got: i128
+Expr.str.contains | Int128 | literal=false, strict=true | refused schema: expected String type, got: i128
+Expr.str.contains | Int128 | literal=true, strict=false | refused schema: expected String type, got: i128
+Expr.str.contains | Int128 | literal=true, strict=true | refused schema: expected String type, got: i128
+Expr.str.contains | Int16 | literal=false, strict=false | refused schema: expected String type, got: i16
+Expr.str.contains | Int16 | literal=false, strict=true | refused schema: expected String type, got: i16
+Expr.str.contains | Int16 | literal=true, strict=false | refused schema: expected String type, got: i16
+Expr.str.contains | Int16 | literal=true, strict=true | refused schema: expected String type, got: i16
+Expr.str.contains | Int32 | literal=false, strict=false | refused schema: expected String type, got: i32
+Expr.str.contains | Int32 | literal=false, strict=true | refused schema: expected String type, got: i32
+Expr.str.contains | Int32 | literal=true, strict=false | refused schema: expected String type, got: i32
+Expr.str.contains | Int32 | literal=true, strict=true | refused schema: expected String type, got: i32
+Expr.str.contains | Int64 | literal=false, strict=false | refused schema: expected String type, got: i64
+Expr.str.contains | Int64 | literal=false, strict=true | refused schema: expected String type, got: i64
+Expr.str.contains | Int64 | literal=true, strict=false | refused schema: expected String type, got: i64
+Expr.str.contains | Int64 | literal=true, strict=true | refused schema: expected String type, got: i64
+Expr.str.contains | Int8 | literal=false, strict=false | refused schema: expected String type, got: i8
+Expr.str.contains | Int8 | literal=false, strict=true | refused schema: expected String type, got: i8
+Expr.str.contains | Int8 | literal=true, strict=false | refused schema: expected String type, got: i8
+Expr.str.contains | Int8 | literal=true, strict=true | refused schema: expected String type, got: i8
+Expr.str.contains | List(Int64) | literal=false, strict=false | refused schema: expected String type, got: list[i64]
+Expr.str.contains | List(Int64) | literal=false, strict=true | refused schema: expected String type, got: list[i64]
+Expr.str.contains | List(Int64) | literal=true, strict=false | refused schema: expected String type, got: list[i64]
+Expr.str.contains | List(Int64) | literal=true, strict=true | refused schema: expected String type, got: list[i64]
+Expr.str.contains | List(String) | literal=false, strict=false | refused schema: expected String type, got: list[str]
+Expr.str.contains | List(String) | literal=false, strict=true | refused schema: expected String type, got: list[str]
+Expr.str.contains | List(String) | literal=true, strict=false | refused schema: expected String type, got: list[str]
+Expr.str.contains | List(String) | literal=true, strict=true | refused schema: expected String type, got: list[str]
+Expr.str.contains | Null | literal=false, strict=false | refused schema: expected String type, got: null
+Expr.str.contains | Null | literal=false, strict=true | refused schema: expected String type, got: null
+Expr.str.contains | Null | literal=true, strict=false | refused schema: expected String type, got: null
+Expr.str.contains | Null | literal=true, strict=true | refused schema: expected String type, got: null
+Expr.str.contains | String | literal=false, strict=false | allowed Boolean many
+Expr.str.contains | String | literal=false, strict=true | allowed Boolean many
+Expr.str.contains | String | literal=true, strict=false | allowed Boolean many
+Expr.str.contains | String | literal=true, strict=true | allowed Boolean many
+Expr.str.contains | Struct(x: Int64, y: String) | literal=false, strict=false | refused schema: expected String type, got: struct[2]
+Expr.str.contains | Struct(x: Int64, y: String) | literal=false, strict=true | refused schema: expected String type, got: struct[2]
+Expr.str.contains | Struct(x: Int64, y: String) | literal=true, strict=false | refused schema: expected String type, got: struct[2]
+Expr.str.contains | Struct(x: Int64, y: String) | literal=true, strict=true | refused schema: expected String type, got: struct[2]
+Expr.str.contains | Time | literal=false, strict=false | refused schema: expected String type, got: time
+Expr.str.contains | Time | literal=false, strict=true | refused schema: expected String type, got: time
+Expr.str.contains | Time | literal=true, strict=false | refused schema: expected String type, got: time
+Expr.str.contains | Time | literal=true, strict=true | refused schema: expected String type, got: time
+Expr.str.contains | UInt128 | literal=false, strict=false | refused schema: expected String type, got: u128
+Expr.str.contains | UInt128 | literal=false, strict=true | refused schema: expected String type, got: u128
+Expr.str.contains | UInt128 | literal=true, strict=false | refused schema: expected String type, got: u128
+Expr.str.contains | UInt128 | literal=true, strict=true | refused schema: expected String type, got: u128
+Expr.str.contains | UInt16 | literal=false, strict=false | refused schema: expected String type, got: u16
+Expr.str.contains | UInt16 | literal=false, strict=true | refused schema: expected String type, got: u16
+Expr.str.contains | UInt16 | literal=true, strict=false | refused schema: expected String type, got: u16
+Expr.str.contains | UInt16 | literal=true, strict=true | refused schema: expected String type, got: u16
+Expr.str.contains | UInt32 | literal=false, strict=false | refused schema: expected String type, got: u32
+Expr.str.contains | UInt32 | literal=false, strict=true | refused schema: expected String type, got: u32
+Expr.str.contains | UInt32 | literal=true, strict=false | refused schema: expected String type, got: u32
+Expr.str.contains | UInt32 | literal=true, strict=true | refused schema: expected String type, got: u32
+Expr.str.contains | UInt64 | literal=false, strict=false | refused schema: expected String type, got: u64
+Expr.str.contains | UInt64 | literal=false, strict=true | refused schema: expected String type, got: u64
+Expr.str.contains | UInt64 | literal=true, strict=false | refused schema: expected String type, got: u64
+Expr.str.contains | UInt64 | literal=true, strict=true | refused schema: expected String type, got: u64
+Expr.str.contains | UInt8 | literal=false, strict=false | refused schema: expected String type, got: u8
+Expr.str.contains | UInt8 | literal=false, strict=true | refused schema: expected String type, got: u8
+Expr.str.contains | UInt8 | literal=true, strict=false | refused schema: expected String type, got: u8
+Expr.str.contains | UInt8 | literal=true, strict=true | refused schema: expected String type, got: u8
+Expr.str.count_matches | Array(Int64, 2) | literal=false | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`
+Expr.str.count_matches | Array(Int64, 2) | literal=true | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`
+Expr.str.count_matches | Boolean | literal=false | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `a`
+Expr.str.count_matches | Boolean | literal=true | refused rows: invalid series dtype: expected `String`, got `bool` for series with name `a`
+Expr.str.count_matches | Date | literal=false | refused rows: invalid series dtype: expected `String`, got `date` for series with name `a`
+Expr.str.count_matches | Date | literal=true | refused rows: invalid series dtype: expected `String`, got `date` for series with name `a`
+Expr.str.count_matches | Datetime(us) | literal=false | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`
+Expr.str.count_matches | Datetime(us) | literal=true | refused rows: invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`
+Expr.str.count_matches | Datetime(us, UTC) | literal=false | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `a`
+Expr.str.count_matches | Datetime(us, UTC) | literal=true | refused rows: invalid series dtype: expected `String`, got `datetime[μs, UTC]` for series with name `a`
+Expr.str.count_matches | Decimal(10, 2) | literal=false | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `a`
+Expr.str.count_matches | Decimal(10, 2) | literal=true | refused rows: invalid series dtype: expected `String`, got `decimal[10,2]` for series with name `a`
+Expr.str.count_matches | Duration(us) | literal=false | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `a`
+Expr.str.count_matches | Duration(us) | literal=true | refused rows: invalid series dtype: expected `String`, got `duration[μs]` for series with name `a`
+Expr.str.count_matches | Float16 | literal=false | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `a`
+Expr.str.count_matches | Float16 | literal=true | refused rows: invalid series dtype: expected `String`, got `f16` for series with name `a`
+Expr.str.count_matches | Float32 | literal=false | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `a`
+Expr.str.count_matches | Float32 | literal=true | refused rows: invalid series dtype: expected `String`, got `f32` for series with name `a`
+Expr.str.count_matches | Float64 | literal=false | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `a`
+Expr.str.count_matches | Float64 | literal=true | refused rows: invalid series dtype: expected `String`, got `f64` for series with name `a`
+Expr.str.count_matches | Int128 | literal=false | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `a`
+Expr.str.count_matches | Int128 | literal=true | refused rows: invalid series dtype: expected `String`, got `i128` for series with name `a`
+Expr.str.count_matches | Int16 | literal=false | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `a`
+Expr.str.count_matches | Int16 | literal=true | refused rows: invalid series dtype: expected `String`, got `i16` for series with name `a`
+Expr.str.count_matches | Int32 | literal=false | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `a`
+Expr.str.count_matches | Int32 | literal=true | refused rows: invalid series dtype: expected `String`, got `i32` for series with name `a`
+Expr.str.count_matches | Int64 | literal=false | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `a`
+Expr.str.count_matches | Int64 | literal=true | refused rows: invalid series dtype: expected `String`, got `i64` for series with name `a`
+Expr.str.count_matches | Int8 | literal=false | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `a`
+Expr.str.count_matches | Int8 | literal=true | refused rows: invalid series dtype: expected `String`, got `i8` for series with name `a`
+Expr.str.count_matches | List(Int64) | literal=false | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `a`
+Expr.str.count_matches | List(Int64) | literal=true | refused rows: invalid series dtype: expected `String`, got `list[i64]` for series with name `a`
+Expr.str.count_matches | List(String) | literal=false | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `a`
+Expr.str.count_matches | List(String) | literal=true | refused rows: invalid series dtype: expected `String`, got `list[str]` for series with name `a`
+Expr.str.count_matches | Null | literal=false | refused rows: invalid series dtype: expected `String`, got `null` for series with name `a`
+Expr.str.count_matches | Null | literal=true | refused rows: invalid series dtype: expected `String`, got `null` for series with name `a`
+Expr.str.count_matches | String | literal=false | allowed UInt32 many
+Expr.str.count_matches | String | literal=true | allowed UInt32 many
+Expr.str.count_matches | Struct(x: Int64, y: String) | literal=false | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `a`
+Expr.str.count_matches | Struct(x: Int64, y: String) | literal=true | refused rows: invalid series dtype: expected `String`, got `struct[2]` for series with name `a`
+Expr.str.count_matches | Time | literal=false | refused rows: invalid series dtype: expected `String`, got `time` for series with name `a`
+Expr.str.count_matches | Time | literal=true | refused rows: invalid series dtype: expected `String`, got `time` for series with name `a`
+Expr.str.count_matches | UInt128 | literal=false | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `a`
+Expr.str.count_matches | UInt128 | literal=true | refused rows: invalid series dtype: expected `String`, got `u128` for series with name `a`
+Expr.str.count_matches | UInt16 | literal=false | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `a`
+Expr.str.count_matches | UInt16 | literal=true | refused rows: invalid series dtype: expected `String`, got `u16` for series with name `a`
+Expr.str.count_matches | UInt32 | literal=false | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `a`
+Expr.str.count_matches | UInt32 | literal=true | refused rows: invalid series dtype: expected `String`, got `u32` for series with name `a`
+Expr.str.count_matches | UInt64 | literal=false | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `a`
+Expr.str.count_matches | UInt64 | literal=true | refused rows: invalid series dtype: expected `String`, got `u64` for series with name `a`
+Expr.str.count_matches | UInt8 | literal=false | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
+Expr.str.count_matches | UInt8 | literal=true | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
+Expr.str.find | Array(Int64, 2) | literal=false, strict=false | refused schema: expected String type, got: array[i64, 2]
+Expr.str.find | Array(Int64, 2) | literal=false, strict=true | refused schema: expected String type, got: array[i64, 2]
+Expr.str.find | Array(Int64, 2) | literal=true, strict=false | refused schema: expected String type, got: array[i64, 2]
+Expr.str.find | Array(Int64, 2) | literal=true, strict=true | refused schema: expected String type, got: array[i64, 2]
+Expr.str.find | Boolean | literal=false, strict=false | refused schema: expected String type, got: bool
+Expr.str.find | Boolean | literal=false, strict=true | refused schema: expected String type, got: bool
+Expr.str.find | Boolean | literal=true, strict=false | refused schema: expected String type, got: bool
+Expr.str.find | Boolean | literal=true, strict=true | refused schema: expected String type, got: bool
+Expr.str.find | Date | literal=false, strict=false | refused schema: expected String type, got: date
+Expr.str.find | Date | literal=false, strict=true | refused schema: expected String type, got: date
+Expr.str.find | Date | literal=true, strict=false | refused schema: expected String type, got: date
+Expr.str.find | Date | literal=true, strict=true | refused schema: expected String type, got: date
+Expr.str.find | Datetime(us) | literal=false, strict=false | refused schema: expected String type, got: datetime[μs]
+Expr.str.find | Datetime(us) | literal=false, strict=true | refused schema: expected String type, got: datetime[μs]
+Expr.str.find | Datetime(us) | literal=true, strict=false | refused schema: expected String type, got: datetime[μs]
+Expr.str.find | Datetime(us) | literal=true, strict=true | refused schema: expected String type, got: datetime[μs]
+Expr.str.find | Datetime(us, UTC) | literal=false, strict=false | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.find | Datetime(us, UTC) | literal=false, strict=true | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.find | Datetime(us, UTC) | literal=true, strict=false | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.find | Datetime(us, UTC) | literal=true, strict=true | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.find | Decimal(10, 2) | literal=false, strict=false | refused schema: expected String type, got: decimal[10,2]
+Expr.str.find | Decimal(10, 2) | literal=false, strict=true | refused schema: expected String type, got: decimal[10,2]
+Expr.str.find | Decimal(10, 2) | literal=true, strict=false | refused schema: expected String type, got: decimal[10,2]
+Expr.str.find | Decimal(10, 2) | literal=true, strict=true | refused schema: expected String type, got: decimal[10,2]
+Expr.str.find | Duration(us) | literal=false, strict=false | refused schema: expected String type, got: duration[μs]
+Expr.str.find | Duration(us) | literal=false, strict=true | refused schema: expected String type, got: duration[μs]
+Expr.str.find | Duration(us) | literal=true, strict=false | refused schema: expected String type, got: duration[μs]
+Expr.str.find | Duration(us) | literal=true, strict=true | refused schema: expected String type, got: duration[μs]
+Expr.str.find | Float16 | literal=false, strict=false | refused schema: expected String type, got: f16
+Expr.str.find | Float16 | literal=false, strict=true | refused schema: expected String type, got: f16
+Expr.str.find | Float16 | literal=true, strict=false | refused schema: expected String type, got: f16
+Expr.str.find | Float16 | literal=true, strict=true | refused schema: expected String type, got: f16
+Expr.str.find | Float32 | literal=false, strict=false | refused schema: expected String type, got: f32
+Expr.str.find | Float32 | literal=false, strict=true | refused schema: expected String type, got: f32
+Expr.str.find | Float32 | literal=true, strict=false | refused schema: expected String type, got: f32
+Expr.str.find | Float32 | literal=true, strict=true | refused schema: expected String type, got: f32
+Expr.str.find | Float64 | literal=false, strict=false | refused schema: expected String type, got: f64
+Expr.str.find | Float64 | literal=false, strict=true | refused schema: expected String type, got: f64
+Expr.str.find | Float64 | literal=true, strict=false | refused schema: expected String type, got: f64
+Expr.str.find | Float64 | literal=true, strict=true | refused schema: expected String type, got: f64
+Expr.str.find | Int128 | literal=false, strict=false | refused schema: expected String type, got: i128
+Expr.str.find | Int128 | literal=false, strict=true | refused schema: expected String type, got: i128
+Expr.str.find | Int128 | literal=true, strict=false | refused schema: expected String type, got: i128
+Expr.str.find | Int128 | literal=true, strict=true | refused schema: expected String type, got: i128
+Expr.str.find | Int16 | literal=false, strict=false | refused schema: expected String type, got: i16
+Expr.str.find | Int16 | literal=false, strict=true | refused schema: expected String type, got: i16
+Expr.str.find | Int16 | literal=true, strict=false | refused schema: expected String type, got: i16
+Expr.str.find | Int16 | literal=true, strict=true | refused schema: expected String type, got: i16
+Expr.str.find | Int32 | literal=false, strict=false | refused schema: expected String type, got: i32
+Expr.str.find | Int32 | literal=false, strict=true | refused schema: expected String type, got: i32
+Expr.str.find | Int32 | literal=true, strict=false | refused schema: expected String type, got: i32
+Expr.str.find | Int32 | literal=true, strict=true | refused schema: expected String type, got: i32
+Expr.str.find | Int64 | literal=false, strict=false | refused schema: expected String type, got: i64
+Expr.str.find | Int64 | literal=false, strict=true | refused schema: expected String type, got: i64
+Expr.str.find | Int64 | literal=true, strict=false | refused schema: expected String type, got: i64
+Expr.str.find | Int64 | literal=true, strict=true | refused schema: expected String type, got: i64
+Expr.str.find | Int8 | literal=false, strict=false | refused schema: expected String type, got: i8
+Expr.str.find | Int8 | literal=false, strict=true | refused schema: expected String type, got: i8
+Expr.str.find | Int8 | literal=true, strict=false | refused schema: expected String type, got: i8
+Expr.str.find | Int8 | literal=true, strict=true | refused schema: expected String type, got: i8
+Expr.str.find | List(Int64) | literal=false, strict=false | refused schema: expected String type, got: list[i64]
+Expr.str.find | List(Int64) | literal=false, strict=true | refused schema: expected String type, got: list[i64]
+Expr.str.find | List(Int64) | literal=true, strict=false | refused schema: expected String type, got: list[i64]
+Expr.str.find | List(Int64) | literal=true, strict=true | refused schema: expected String type, got: list[i64]
+Expr.str.find | List(String) | literal=false, strict=false | refused schema: expected String type, got: list[str]
+Expr.str.find | List(String) | literal=false, strict=true | refused schema: expected String type, got: list[str]
+Expr.str.find | List(String) | literal=true, strict=false | refused schema: expected String type, got: list[str]
+Expr.str.find | List(String) | literal=true, strict=true | refused schema: expected String type, got: list[str]
+Expr.str.find | Null | literal=false, strict=false | refused schema: expected String type, got: null
+Expr.str.find | Null | literal=false, strict=true | refused schema: expected String type, got: null
+Expr.str.find | Null | literal=true, strict=false | refused schema: expected String type, got: null
+Expr.str.find | Null | literal=true, strict=true | refused schema: expected String type, got: null
+Expr.str.find | String | literal=false, strict=false | allowed UInt32 many
+Expr.str.find | String | literal=false, strict=true | allowed UInt32 many
+Expr.str.find | String | literal=true, strict=false | allowed UInt32 many
+Expr.str.find | String | literal=true, strict=true | allowed UInt32 many
+Expr.str.find | Struct(x: Int64, y: String) | literal=false, strict=false | refused schema: expected String type, got: struct[2]
+Expr.str.find | Struct(x: Int64, y: String) | literal=false, strict=true | refused schema: expected String type, got: struct[2]
+Expr.str.find | Struct(x: Int64, y: String) | literal=true, strict=false | refused schema: expected String type, got: struct[2]
+Expr.str.find | Struct(x: Int64, y: String) | literal=true, strict=true | refused schema: expected String type, got: struct[2]
+Expr.str.find | Time | literal=false, strict=false | refused schema: expected String type, got: time
+Expr.str.find | Time | literal=false, strict=true | refused schema: expected String type, got: time
+Expr.str.find | Time | literal=true, strict=false | refused schema: expected String type, got: time
+Expr.str.find | Time | literal=true, strict=true | refused schema: expected String type, got: time
+Expr.str.find | UInt128 | literal=false, strict=false | refused schema: expected String type, got: u128
+Expr.str.find | UInt128 | literal=false, strict=true | refused schema: expected String type, got: u128
+Expr.str.find | UInt128 | literal=true, strict=false | refused schema: expected String type, got: u128
+Expr.str.find | UInt128 | literal=true, strict=true | refused schema: expected String type, got: u128
+Expr.str.find | UInt16 | literal=false, strict=false | refused schema: expected String type, got: u16
+Expr.str.find | UInt16 | literal=false, strict=true | refused schema: expected String type, got: u16
+Expr.str.find | UInt16 | literal=true, strict=false | refused schema: expected String type, got: u16
+Expr.str.find | UInt16 | literal=true, strict=true | refused schema: expected String type, got: u16
+Expr.str.find | UInt32 | literal=false, strict=false | refused schema: expected String type, got: u32
+Expr.str.find | UInt32 | literal=false, strict=true | refused schema: expected String type, got: u32
+Expr.str.find | UInt32 | literal=true, strict=false | refused schema: expected String type, got: u32
+Expr.str.find | UInt32 | literal=true, strict=true | refused schema: expected String type, got: u32
+Expr.str.find | UInt64 | literal=false, strict=false | refused schema: expected String type, got: u64
+Expr.str.find | UInt64 | literal=false, strict=true | refused schema: expected String type, got: u64
+Expr.str.find | UInt64 | literal=true, strict=false | refused schema: expected String type, got: u64
+Expr.str.find | UInt64 | literal=true, strict=true | refused schema: expected String type, got: u64
+Expr.str.find | UInt8 | literal=false, strict=false | refused schema: expected String type, got: u8
+Expr.str.find | UInt8 | literal=false, strict=true | refused schema: expected String type, got: u8
+Expr.str.find | UInt8 | literal=true, strict=false | refused schema: expected String type, got: u8
+Expr.str.find | UInt8 | literal=true, strict=true | refused schema: expected String type, got: u8
 Expr.str.join | Array(Int64, 2) | ignore_nulls=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'String')
 Expr.str.join | Array(Int64, 2) | ignore_nulls=true | refused rows: cannot cast Array type (inner: 'Int64', to: 'String')
 Expr.str.join | Boolean | ignore_nulls=false | allowed String one
@@ -2998,6 +3258,110 @@ Expr.str.join | UInt64 | ignore_nulls=false | allowed String one
 Expr.str.join | UInt64 | ignore_nulls=true | allowed String one
 Expr.str.join | UInt8 | ignore_nulls=false | allowed String one
 Expr.str.join | UInt8 | ignore_nulls=true | allowed String one
+Expr.str.replace | Array(Int64, 2) | literal=false | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | Array(Int64, 2) | literal=true | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace | Boolean | literal=false | refused schema: expected String type, got: bool
+Expr.str.replace | Boolean | literal=true | refused schema: expected String type, got: bool
+Expr.str.replace | Date | literal=false | refused schema: expected String type, got: date
+Expr.str.replace | Date | literal=true | refused schema: expected String type, got: date
+Expr.str.replace | Datetime(us) | literal=false | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | Datetime(us) | literal=true | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace | Datetime(us, UTC) | literal=false | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | Datetime(us, UTC) | literal=true | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace | Decimal(10, 2) | literal=false | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | Decimal(10, 2) | literal=true | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace | Duration(us) | literal=false | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | Duration(us) | literal=true | refused schema: expected String type, got: duration[μs]
+Expr.str.replace | Float16 | literal=false | refused schema: expected String type, got: f16
+Expr.str.replace | Float16 | literal=true | refused schema: expected String type, got: f16
+Expr.str.replace | Float32 | literal=false | refused schema: expected String type, got: f32
+Expr.str.replace | Float32 | literal=true | refused schema: expected String type, got: f32
+Expr.str.replace | Float64 | literal=false | refused schema: expected String type, got: f64
+Expr.str.replace | Float64 | literal=true | refused schema: expected String type, got: f64
+Expr.str.replace | Int128 | literal=false | refused schema: expected String type, got: i128
+Expr.str.replace | Int128 | literal=true | refused schema: expected String type, got: i128
+Expr.str.replace | Int16 | literal=false | refused schema: expected String type, got: i16
+Expr.str.replace | Int16 | literal=true | refused schema: expected String type, got: i16
+Expr.str.replace | Int32 | literal=false | refused schema: expected String type, got: i32
+Expr.str.replace | Int32 | literal=true | refused schema: expected String type, got: i32
+Expr.str.replace | Int64 | literal=false | refused schema: expected String type, got: i64
+Expr.str.replace | Int64 | literal=true | refused schema: expected String type, got: i64
+Expr.str.replace | Int8 | literal=false | refused schema: expected String type, got: i8
+Expr.str.replace | Int8 | literal=true | refused schema: expected String type, got: i8
+Expr.str.replace | List(Int64) | literal=false | refused schema: expected String type, got: list[i64]
+Expr.str.replace | List(Int64) | literal=true | refused schema: expected String type, got: list[i64]
+Expr.str.replace | List(String) | literal=false | refused schema: expected String type, got: list[str]
+Expr.str.replace | List(String) | literal=true | refused schema: expected String type, got: list[str]
+Expr.str.replace | Null | literal=false | refused schema: expected String type, got: null
+Expr.str.replace | Null | literal=true | refused schema: expected String type, got: null
+Expr.str.replace | String | literal=false | allowed String many
+Expr.str.replace | String | literal=true | allowed String many
+Expr.str.replace | Struct(x: Int64, y: String) | literal=false | refused schema: expected String type, got: struct[2]
+Expr.str.replace | Struct(x: Int64, y: String) | literal=true | refused schema: expected String type, got: struct[2]
+Expr.str.replace | Time | literal=false | refused schema: expected String type, got: time
+Expr.str.replace | Time | literal=true | refused schema: expected String type, got: time
+Expr.str.replace | UInt128 | literal=false | refused schema: expected String type, got: u128
+Expr.str.replace | UInt128 | literal=true | refused schema: expected String type, got: u128
+Expr.str.replace | UInt16 | literal=false | refused schema: expected String type, got: u16
+Expr.str.replace | UInt16 | literal=true | refused schema: expected String type, got: u16
+Expr.str.replace | UInt32 | literal=false | refused schema: expected String type, got: u32
+Expr.str.replace | UInt32 | literal=true | refused schema: expected String type, got: u32
+Expr.str.replace | UInt64 | literal=false | refused schema: expected String type, got: u64
+Expr.str.replace | UInt64 | literal=true | refused schema: expected String type, got: u64
+Expr.str.replace | UInt8 | literal=false | refused schema: expected String type, got: u8
+Expr.str.replace | UInt8 | literal=true | refused schema: expected String type, got: u8
+Expr.str.replace_all | Array(Int64, 2) | literal=false | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | Array(Int64, 2) | literal=true | refused schema: expected String type, got: array[i64, 2]
+Expr.str.replace_all | Boolean | literal=false | refused schema: expected String type, got: bool
+Expr.str.replace_all | Boolean | literal=true | refused schema: expected String type, got: bool
+Expr.str.replace_all | Date | literal=false | refused schema: expected String type, got: date
+Expr.str.replace_all | Date | literal=true | refused schema: expected String type, got: date
+Expr.str.replace_all | Datetime(us) | literal=false | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | Datetime(us) | literal=true | refused schema: expected String type, got: datetime[μs]
+Expr.str.replace_all | Datetime(us, UTC) | literal=false | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | Datetime(us, UTC) | literal=true | refused schema: expected String type, got: datetime[μs, UTC]
+Expr.str.replace_all | Decimal(10, 2) | literal=false | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | Decimal(10, 2) | literal=true | refused schema: expected String type, got: decimal[10,2]
+Expr.str.replace_all | Duration(us) | literal=false | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | Duration(us) | literal=true | refused schema: expected String type, got: duration[μs]
+Expr.str.replace_all | Float16 | literal=false | refused schema: expected String type, got: f16
+Expr.str.replace_all | Float16 | literal=true | refused schema: expected String type, got: f16
+Expr.str.replace_all | Float32 | literal=false | refused schema: expected String type, got: f32
+Expr.str.replace_all | Float32 | literal=true | refused schema: expected String type, got: f32
+Expr.str.replace_all | Float64 | literal=false | refused schema: expected String type, got: f64
+Expr.str.replace_all | Float64 | literal=true | refused schema: expected String type, got: f64
+Expr.str.replace_all | Int128 | literal=false | refused schema: expected String type, got: i128
+Expr.str.replace_all | Int128 | literal=true | refused schema: expected String type, got: i128
+Expr.str.replace_all | Int16 | literal=false | refused schema: expected String type, got: i16
+Expr.str.replace_all | Int16 | literal=true | refused schema: expected String type, got: i16
+Expr.str.replace_all | Int32 | literal=false | refused schema: expected String type, got: i32
+Expr.str.replace_all | Int32 | literal=true | refused schema: expected String type, got: i32
+Expr.str.replace_all | Int64 | literal=false | refused schema: expected String type, got: i64
+Expr.str.replace_all | Int64 | literal=true | refused schema: expected String type, got: i64
+Expr.str.replace_all | Int8 | literal=false | refused schema: expected String type, got: i8
+Expr.str.replace_all | Int8 | literal=true | refused schema: expected String type, got: i8
+Expr.str.replace_all | List(Int64) | literal=false | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | List(Int64) | literal=true | refused schema: expected String type, got: list[i64]
+Expr.str.replace_all | List(String) | literal=false | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | List(String) | literal=true | refused schema: expected String type, got: list[str]
+Expr.str.replace_all | Null | literal=false | refused schema: expected String type, got: null
+Expr.str.replace_all | Null | literal=true | refused schema: expected String type, got: null
+Expr.str.replace_all | String | literal=false | allowed String many
+Expr.str.replace_all | String | literal=true | allowed String many
+Expr.str.replace_all | Struct(x: Int64, y: String) | literal=false | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | Struct(x: Int64, y: String) | literal=true | refused schema: expected String type, got: struct[2]
+Expr.str.replace_all | Time | literal=false | refused schema: expected String type, got: time
+Expr.str.replace_all | Time | literal=true | refused schema: expected String type, got: time
+Expr.str.replace_all | UInt128 | literal=false | refused schema: expected String type, got: u128
+Expr.str.replace_all | UInt128 | literal=true | refused schema: expected String type, got: u128
+Expr.str.replace_all | UInt16 | literal=false | refused schema: expected String type, got: u16
+Expr.str.replace_all | UInt16 | literal=true | refused schema: expected String type, got: u16
+Expr.str.replace_all | UInt32 | literal=false | refused schema: expected String type, got: u32
+Expr.str.replace_all | UInt32 | literal=true | refused schema: expected String type, got: u32
+Expr.str.replace_all | UInt64 | literal=false | refused schema: expected String type, got: u64
+Expr.str.replace_all | UInt64 | literal=true | refused schema: expected String type, got: u64
+Expr.str.replace_all | UInt8 | literal=false | refused schema: expected String type, got: u8
+Expr.str.replace_all | UInt8 | literal=true | refused schema: expected String type, got: u8
 Expr.str.split | Array(Int64, 2) | inclusive=false, literal=false | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`
 Expr.str.split | Array(Int64, 2) | inclusive=false, literal=true | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`
 Expr.str.split | Array(Int64, 2) | inclusive=false, strict=false | refused rows: invalid series dtype: expected `String`, got `array[i64, 2]` for series with name `a`

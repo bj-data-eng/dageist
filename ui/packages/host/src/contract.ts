@@ -71,6 +71,11 @@ export type KindView =
   | { readonly kind: 'choice'; readonly words: readonly ChoiceView[] }
   | { readonly kind: 'dtype' }
   | { readonly kind: 'duration' }
+  /**
+   * A regular expression, as Polars reads one. `plainTextFlag` names the flag of the same entry
+   * that makes the text plain text where it is true, such as `literal`, or is `null`.
+   */
+  | { readonly kind: 'pattern'; readonly plainTextFlag: string | null }
   | { readonly kind: 'table' }
   | { readonly kind: 'path' }
   | { readonly kind: 'pairs'; readonly key: KindView; readonly value: KindView };
@@ -439,6 +444,7 @@ export const RULE_NAMES = [
   'filter-predicate-is-boolean',
   'join-key-names-are-not-repeated',
   'key-is-elementwise',
+  'pattern-is-valid',
   'replacement-values-match-in-number',
 ] as const;
 
@@ -676,13 +682,14 @@ export interface FitsRequest {
 
 /**
  * What a text is typed into, as the catalogue writes the kind of a parameter that takes a typed
- * value: an expression, a literal of a type, a duration or a path. The engine reads the text as
+ * value: an expression, a literal of a type, a duration, a pattern or a path. The engine reads the text as
  * that slot takes it.
  */
 export type TypedKind =
   | { readonly kind: 'expression' }
   | { readonly kind: 'value'; readonly type: ValueTypeView }
   | { readonly kind: 'duration' }
+  | { readonly kind: 'pattern' }
   | { readonly kind: 'path' };
 
 /**

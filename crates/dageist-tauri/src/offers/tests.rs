@@ -155,7 +155,7 @@ fn what_follows_a_datetime_is_what_polars_allows_of_it_with_the_reason_for_the_r
                 .expect("an id")
                 .starts_with("LazyFrame."))
     );
-    assert_eq!(answer["entries"].as_array().expect("entries").len(), 120);
+    assert_eq!(answer["entries"].as_array().expect("entries").len(), 129);
 }
 
 #[test]
@@ -639,6 +639,12 @@ fn a_typed_text_reads_as_the_slot_it_is_typed_into_takes_it() {
     assert_eq!(
         read(json!({ "kind": "path" }), "data/claims.parquet")["readings"],
         json!([{ "kind": "read", "literal": { "kind": "text", "value": "data/claims.parquet", "shown": "data/claims.parquet" }, "dtype": null, "fit": null }])
+    );
+    // A pattern is carried as typed with no dtype, a half-typed one included: the step says, with
+    // Polars' reason, where it is no regular expression.
+    assert_eq!(
+        read(json!({ "kind": "pattern" }), "(Comp")["readings"],
+        json!([{ "kind": "read", "literal": { "kind": "text", "value": "(Comp", "shown": "(Comp" }, "dtype": null, "fit": null }])
     );
     // A date is read as Polars reads one and carried as the day, a duration as Polars reads a
     // duration string and carried as typed.

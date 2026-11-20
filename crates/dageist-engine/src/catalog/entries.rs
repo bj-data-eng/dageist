@@ -207,6 +207,31 @@ const FILL_CHAR: Parameter = optional(
     "' '",
 );
 
+/// `pattern`: the regular expression a method of text looks for. Polars takes a pattern as an
+/// expression, so that a column of them is one for each row; the catalogue holds one typed in,
+/// which is what the editor and the designer of patterns work on.
+const PATTERN: Parameter = required("pattern", Kind::Pattern, Shape::One);
+
+/// A `pattern` that is plain text where `literal` is true, and so no regular expression.
+const PATTERN_OR_TEXT: Parameter = PATTERN.with_plain_text_flag("literal");
+
+/// `literal`: whether the pattern is plain text. Python's default for the methods that search and
+/// replace is a regular expression.
+const LITERAL: Parameter = flag("literal", "False").keyword_only();
+
+/// `strict`: whether a pattern that is no regular expression is refused. Polars asks it of each
+/// row's pattern where they are a column; the catalogue's is typed in, and is refused for it
+/// whatever `strict` says, as the editor holds every part to what Polars accepts.
+const STRICT: Parameter = flag("strict", "True").keyword_only();
+
+/// What a replacement puts in place of what the pattern matches. Where the pattern is a regular
+/// expression, `$1` and `${name}` stand for the text of a group of the match, and `$$` for a
+/// dollar sign. Polars takes one value or as many as the text it follows has, and refuses many
+/// beside one value, which it does not meet with each of them.
+const REPLACEMENT: Parameter = required("value", EXPRESSION, Shape::One)
+    .given_as_many_as(AsManyAs::TheReceiver)
+    .not_broadcasting();
+
 /// A tolerance `is_close` takes: a number from zero, which Python passes on as a float.
 const fn tolerance(name: &'static str, default: &'static str) -> Parameter {
     optional(name, Kind::Value(ValueType::Float), Shape::One, default).keyword_only()
@@ -330,6 +355,42 @@ fn signed(arguments: &Arguments, parameter: &'static str) -> Result<i32, BuildEr
         }
         Some(other) => Err(Arguments::wrong(parameter, "a whole number", other)),
     }
+}
+
+/// The whole number given for `parameter`, which Python passes on as it is, or `default` when it
+/// was not given.
+fn whole(arguments: &Arguments, parameter: &'static str, default: i64) -> Result<i64, BuildError> {
+    match arguments.get(parameter) {
+        None => Ok(default),
+        Some(Argument::Integer(value)) => Ok(*value),
+        Some(other) => Err(Arguments::wrong(parameter, "a whole number", other)),
+    }
+}
+
+/// The index of a group that Python passes on as an unsigned whole number, or `default` when it
+/// was not given: a negative number is refused, as Python's binding refuses it.
+fn index(
+    arguments: &Arguments,
+    parameter: &'static str,
+    default: usize,
+) -> Result<usize, BuildError> {
+    match arguments.get(parameter) {
+        None => Ok(default),
+        Some(Argument::Integer(value)) => {
+            usize::try_from(*value).map_err(|_| BuildError::OutOfRange {
+                parameter,
+                expected: "a whole number from 0",
+            })
+        }
+        Some(other) => Err(Arguments::wrong(parameter, "a whole number", other)),
+    }
+}
+
+/// The pattern `pattern` of a call that takes `literal`, as a literal: plain text where `literal`
+/// is true, and otherwise a regular expression, which Polars is asked is one.
+fn pattern_with_literal(arguments: &Arguments) -> Result<(Expr, bool), BuildError> {
+    let literal = arguments.flag("literal", false)?;
+    Ok((lit(arguments.pattern("pattern", literal)?), literal))
 }
 
 /// The one character given for `parameter`, as Python's binding takes it, or `default` when it
@@ -919,6 +980,72 @@ fn str_join(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
     Ok(expr
         .str()
         .join(&delimiter, arguments.flag("ignore_nulls", true)?))
+}
+
+fn str_contains(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let (pattern, literal) = pattern_with_literal(arguments)?;
+    // `strict` is for a pattern, as `literal` true takes plain text that is never refused.
+    Ok(if literal {
+        expr.str().contains_literal(pattern)
+    } else {
+        expr.str()
+            .contains(pattern, arguments.flag("strict", true)?)
+    })
+}
+
+fn str_count_matches(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let (pattern, literal) = pattern_with_literal(arguments)?;
+    Ok(expr.str().count_matches(pattern, literal))
+}
+
+fn str_find(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let (pattern, literal) = pattern_with_literal(arguments)?;
+    Ok(if literal {
+        expr.str().find_literal(pattern)
+    } else {
+        expr.str().find(pattern, arguments.flag("strict", true)?)
+    })
+}
+
+/// As Python's `replace` takes its arguments: the first `n` matches are replaced, and all of them
+/// where `n` is below zero.
+fn str_replace(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let (pattern, literal) = pattern_with_literal(arguments)?;
+    Ok(expr.str().replace_n(
+        pattern,
+        arguments.required_expression("value")?,
+        literal,
+        whole(arguments, "n", 1)?,
+    ))
+}
+
+fn str_replace_all(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let (pattern, literal) = pattern_with_literal(arguments)?;
+    Ok(expr
+        .str()
+        .replace_all(pattern, arguments.required_expression("value")?, literal))
+}
+
+fn str_extract(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.str().extract(
+        lit(arguments.pattern("pattern", false)?),
+        index(arguments, "group_index", 1)?,
+    ))
+}
+
+fn str_extract_all(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr
+        .str()
+        .extract_all(lit(arguments.pattern("pattern", false)?)))
+}
+
+fn str_extract_groups(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let pattern = arguments.pattern("pattern", false)?;
+    Ok(expr.str().extract_groups(&pattern)?)
+}
+
+fn str_escape_regex(expr: Expr, _arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.str().escape_regex())
 }
 
 fn dt_date(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
@@ -2079,12 +2206,76 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(sqrt),
     },
     Entry {
+        id: EntryId("Expr.str.contains"),
+        family: Family::Compare,
+        accepts: STRING,
+        parameters: &[PATTERN_OR_TEXT, LITERAL, STRICT],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_contains),
+    },
+    Entry {
+        id: EntryId("Expr.str.count_matches"),
+        family: Family::Search,
+        accepts: STRING,
+        parameters: &[PATTERN_OR_TEXT, LITERAL],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_count_matches),
+    },
+    Entry {
         id: EntryId("Expr.str.ends_with"),
         family: Family::Compare,
         accepts: STRING,
         parameters: &[required("suffix", EXPRESSION, Shape::One)],
         laziness: Laziness::Lazy,
         build: Build::Expression(str_ends_with),
+    },
+    Entry {
+        id: EntryId("Expr.str.escape_regex"),
+        family: Family::Text,
+        accepts: STRING,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_escape_regex),
+    },
+    Entry {
+        id: EntryId("Expr.str.extract"),
+        family: Family::Search,
+        accepts: STRING,
+        parameters: &[
+            PATTERN,
+            optional(
+                "group_index",
+                Kind::Value(ValueType::Integer),
+                Shape::One,
+                "1",
+            ),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_extract),
+    },
+    Entry {
+        id: EntryId("Expr.str.extract_all"),
+        family: Family::Search,
+        accepts: STRING,
+        parameters: &[PATTERN],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_extract_all),
+    },
+    Entry {
+        id: EntryId("Expr.str.extract_groups"),
+        family: Family::Search,
+        accepts: STRING,
+        parameters: &[PATTERN.naming_the_fields_of_the_result()],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_extract_groups),
+    },
+    Entry {
+        id: EntryId("Expr.str.find"),
+        family: Family::Search,
+        accepts: STRING,
+        parameters: &[PATTERN_OR_TEXT, LITERAL, STRICT],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_find),
     },
     Entry {
         id: EntryId("Expr.str.head"),
@@ -2141,6 +2332,27 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[a_length("length"), FILL_CHAR],
         laziness: Laziness::Lazy,
         build: Build::Expression(str_pad_start),
+    },
+    Entry {
+        id: EntryId("Expr.str.replace"),
+        family: Family::Text,
+        accepts: STRING,
+        parameters: &[
+            PATTERN_OR_TEXT,
+            REPLACEMENT,
+            LITERAL,
+            optional("n", Kind::Value(ValueType::Integer), Shape::One, "1").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_replace),
+    },
+    Entry {
+        id: EntryId("Expr.str.replace_all"),
+        family: Family::Text,
+        accepts: STRING,
+        parameters: &[PATTERN_OR_TEXT, REPLACEMENT, LITERAL],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(str_replace_all),
     },
     Entry {
         id: EntryId("Expr.str.reverse"),

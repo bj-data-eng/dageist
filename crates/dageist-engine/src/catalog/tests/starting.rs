@@ -335,6 +335,14 @@ fn a_parameter_that_must_be_given_or_has_a_value_by_default_is_not_left_out_at_t
         ("Expr.round", "decimals", "a number"),
         // It is a list that Python leaves empty, which is not `None`.
         ("Expr.and_", "others", "an empty list"),
+        // A pattern is typed in, and a method that looks for one has none until it is.
+        (
+            "Expr.str.contains",
+            "pattern",
+            "required, and no expression",
+        ),
+        ("Expr.str.extract", "pattern", "required, and no expression"),
+        ("Expr.str.replace", "value", "required"),
     ] {
         assert!(!parameter(id, name).starts_left_out(), "{id} {name}: {why}");
     }
@@ -352,4 +360,11 @@ fn the_first_parameter_a_method_starts_without_is_named_by_the_allowed_module() 
     assert_eq!(left_out_at_start(entry("Expr.shift")), None);
     assert_eq!(left_out_at_start(entry("Expr.str.slice")), None);
     assert_eq!(left_out_at_start(entry("Expr.str.to_uppercase")), None);
+    // A method whose first parameter is a pattern starts without one given: it is to be typed.
+    assert_eq!(left_out_at_start(entry("Expr.str.contains")), None);
+    assert_eq!(left_out_at_start(entry("Expr.str.extract_groups")), None);
+    assert_eq!(
+        parameter("Expr.str.contains", "pattern").start_setting(),
+        Setting::ToGive
+    );
 }

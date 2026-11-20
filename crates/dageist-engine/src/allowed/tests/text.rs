@@ -452,3 +452,163 @@ fn a_negative_whole_number_typed_as_a_length_is_refused_by_polars_and_gives_no_d
         Seen::Ran(_)
     ));
 }
+
+// ---------------------------------------------------------------------------
+// The methods that take a pattern
+
+#[test]
+fn what_a_method_of_a_pattern_gives_is_what_polars_gives_of_it() {
+    let place = select_after(Representative::String);
+    for (id, result) in [
+        ("Expr.str.contains", "Boolean"),
+        ("Expr.str.count_matches", "UInt32"),
+        ("Expr.str.find", "UInt32"),
+        ("Expr.str.extract", "String"),
+        ("Expr.str.extract_all", "List(String)"),
+        ("Expr.str.escape_regex", "String"),
+    ] {
+        let verdict = offer(entry(id), &place, &Chosen::default());
+        assert_eq!(result_of(&verdict), Some(result), "{id}: {verdict:?}");
+    }
+    let replaced = offer(
+        entry("Expr.str.replace_all"),
+        &place,
+        &Chosen::default().with_arguments(&[("value", Representative::String)]),
+    );
+    assert_eq!(result_of(&replaced), Some("String"), "{replaced:?}");
+    // Polars refuses each where it follows what is not text, at the stage the tables say.
+    for (id, plan) in [
+        ("Expr.str.contains", col("a").str().contains(lit("a"), true)),
+        ("Expr.str.extract_all", col("a").str().extract_all(lit("a"))),
+    ] {
+        let refused = offer(
+            entry(id),
+            &select_after(Representative::Int64),
+            &Chosen::default(),
+        );
+        let Some(Seen::Refused(stage)) =
+            Some(selected(Representative::Int64, Representative::Int64, plan))
+        else {
+            panic!("Polars refuses {id} after a whole number");
+        };
+        assert_eq!(
+            refused.refusal().map(|refusal| refusal.source()),
+            Some(RefusalSource::Polars(stage)),
+            "{id}"
+        );
+    }
+}
+
+#[test]
+fn a_call_whose_pattern_names_the_fields_it_gives_gives_nothing_until_it_is_told_the_pattern() {
+    let place = select_after(Representative::String);
+    let told = |pattern: &'static str| {
+        offer(
+            entry("Expr.str.extract_groups"),
+            &place,
+            &Chosen::default().with_patterns(&[("pattern", pattern)]),
+        )
+    };
+    // The dtype table measured one pattern, whose fields are not the call's.
+    let untold = offer(entry("Expr.str.extract_groups"), &place, &Chosen::default());
+    assert!(untold.is_allowed(), "{untold:?}");
+    assert_eq!(result_of(&untold), None);
+    // Told the pattern, it gives the struct Polars works out of its groups.
+    assert_eq!(
+        result_of(&told("(?<year>\\d{4})-(\\d{2})")),
+        Some("Struct(year: String, 2: String)")
+    );
+    assert_eq!(result_of(&told("(a)")), Some("Struct(1: String)"));
+    assert_eq!(result_of(&told("a")), Some("Struct()"));
+    let class = told("(a)")
+        .allowance()
+        .and_then(|allowance| allowance.result())
+        .and_then(|result| result.class());
+    assert_eq!(class, Some(Representative::Struct));
+    // The methods that do not name the fields of their result give what the table says, whatever
+    // pattern they are told.
+    let extracted = offer(
+        entry("Expr.str.extract"),
+        &place,
+        &Chosen::default().with_patterns(&[("pattern", "(a)")]),
+    );
+    assert_eq!(result_of(&extracted), Some("String"));
+}
+
+#[test]
+fn a_pattern_polars_cannot_compile_is_refused_by_a_rule_in_polars_words_and_before_the_tables() {
+    let place = select_after(Representative::String);
+    for id in [
+        "Expr.str.contains",
+        "Expr.str.replace_all",
+        "Expr.str.extract_groups",
+    ] {
+        let verdict = offer(
+            entry(id),
+            &place,
+            &Chosen::default().with_patterns(&[("pattern", "(a")]),
+        );
+        let refusal = verdict
+            .refusal()
+            .unwrap_or_else(|| panic!("{id}: {verdict:?}"));
+        assert_eq!(
+            refusal.source(),
+            RefusalSource::Rule(crate::allowed::Rule::PatternIsValid),
+            "{id}"
+        );
+        assert!(
+            refusal
+                .reason()
+                .starts_with("a pattern must be a valid regular expression: "),
+            "{refusal}"
+        );
+        assert!(refusal.reason().contains("unclosed group"), "{refusal}");
+    }
+    // It is refused where the value it follows is no text too: the pattern is no matter of it.
+    let after_a_number = offer(
+        entry("Expr.str.contains"),
+        &select_after(Representative::Int64),
+        &Chosen::default().with_patterns(&[("pattern", "(a")]),
+    );
+    assert_eq!(
+        after_a_number.refusal().map(|refusal| refusal.source()),
+        Some(RefusalSource::Rule(crate::allowed::Rule::PatternIsValid))
+    );
+    // A valid one is judged by the tables as it was.
+    let valid = offer(
+        entry("Expr.str.contains"),
+        &place,
+        &Chosen::default().with_patterns(&[("pattern", "(a)")]),
+    );
+    assert!(valid.is_allowed(), "{valid:?}");
+}
+
+#[test]
+fn the_options_of_the_methods_that_take_a_pattern_are_free_beside_each_other() {
+    for (id, pair) in [
+        (
+            "Expr.str.contains",
+            [("literal", "true"), ("strict", "false")],
+        ),
+        (
+            "Expr.str.contains",
+            [("literal", "false"), ("strict", "true")],
+        ),
+        ("Expr.str.find", [("literal", "true"), ("strict", "true")]),
+    ] {
+        let verdict = options(entry(id), &pair);
+        assert!(verdict.is_ok(), "{id} {pair:?}: {verdict:?}");
+    }
+    for id in [
+        "Expr.str.count_matches",
+        "Expr.str.replace",
+        "Expr.str.replace_all",
+    ] {
+        for word in ["true", "false"] {
+            assert!(
+                options(entry(id), &[("literal", word)]).is_ok(),
+                "{id} {word}"
+            );
+        }
+    }
+}

@@ -626,6 +626,7 @@ impl Builder<'_> {
                 | BuildError::WrongKind { parameter, .. }
                 | BuildError::UnknownChoice { parameter, .. }
                 | BuildError::OutOfRange { parameter, .. }
+                | BuildError::NotAPattern { parameter, .. }
                 | BuildError::Repeated { parameter } => Some((*parameter).to_owned()),
                 BuildError::UnknownParameter { parameter } => Some(parameter.clone()),
                 BuildError::OutOfOrder { .. } | BuildError::Polars(_) => None,
@@ -747,6 +748,7 @@ impl Builder<'_> {
             Value::Choice(word) => Argument::Choice(word.clone()),
             Value::Dtype(dtype) => Argument::Dtype(dtype.as_polars().clone()),
             Value::Duration(text) => Argument::Duration(text.clone()),
+            Value::Pattern(text) => Argument::Pattern(text.clone()),
             Value::Path(text) => Argument::Path(text.clone()),
             Value::Table(name) => match self.inputs.table(name) {
                 Some(table) => Argument::Table(table),

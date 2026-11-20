@@ -53,7 +53,8 @@ const fn next_rule(rule: Rule) -> Option<Rule> {
         Rule::ElementOnlyInPivotAggregate => Some(Rule::FilterPredicateIsBoolean),
         Rule::FilterPredicateIsBoolean => Some(Rule::JoinKeyNamesAreNotRepeated),
         Rule::JoinKeyNamesAreNotRepeated => Some(Rule::KeyIsElementwise),
-        Rule::KeyIsElementwise => Some(Rule::PivotAggregateGivesOneValue),
+        Rule::KeyIsElementwise => Some(Rule::PatternIsValid),
+        Rule::PatternIsValid => Some(Rule::PivotAggregateGivesOneValue),
         Rule::PivotAggregateGivesOneValue => Some(Rule::ReplacementValuesMatchInNumber),
         Rule::ReplacementValuesMatchInNumber => None,
     }
