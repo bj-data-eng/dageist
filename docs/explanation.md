@@ -505,9 +505,12 @@ What Polars does with each is what the tables say, and some of it is not what a 
   match of a pattern where it is false, which Polars builds as its regex split, with the match kept
   by `inclusive`. `strict` is for a pattern: where the separator is no regex, a strict split is
   refused when rows run and one that is not strict gives a null, so beside plain text `strict`
-  changes nothing, as in Python. The separator is an expression, which may be a column of patterns,
-  so it is not a parameter of the pattern kind, and Polars checks it when the rows run, not when
-  the step is built. The table has no line for an option of a method that has several alone, only
+  changes nothing, as in Python. The separator is an expression, which may be a column of patterns, so
+  it is not a parameter of the pattern kind. Where it is text typed in and `literal` is false it is held to
+  a pattern as one is: refused at the separator, with Polars' words, by the build and by the rule
+  `pattern-is-valid`, whatever `strict` says. A separator that is a column is Polars' to check, row by row,
+  when the rows run and not when the step is built, and `strict` decides there whether a row that is no
+  regex is refused or gives a null. The table has no line for an option of a method that has several alone, only
   for each pair of them, so an option set alone is judged by the lines that pair its word with the
   others at their defaults, and refused when Polars refuses the pair; a step's lines are not read
   so, for they are measured with the arguments the harness gives the step.
@@ -545,7 +548,8 @@ asked. A dependency on `regex` or `regex-syntax` was not needed.
   expression depends on the flag, which the step knows and the slot does not, so the step says
   it, with its reason, where it is built.
 - `str.split` takes its separator as an expression, which may be a column of patterns, so the
-  separator is not of the pattern kind, and where `literal` is false Polars checks it when the rows run.
+  separator is not of the pattern kind. Text typed in as the separator is held to a pattern where
+  `literal` is false, as one is; a column of them is Polars' to check when the rows run.
 
 What the methods are, and the families that hold them. Each is Polars' own name with `str.` in front of it.
 `str.contains`, a test that gives true or false, stands in Comparison with `str.starts_with`, where a person
@@ -1429,7 +1433,7 @@ with groups, named groups in both spellings, classes, anchors, alternation and f
 cannot, an unclosed group or class, a repetition that ends before it begins, a group whose name is
 none or is named twice, a flag or a property that does not exist, an escape with nothing after it, a repetition of nothing and
 an unopened group, so that the refusal of a pattern is checked as the pattern is, with the rule that
-asks Polars, and a replacement's value is often text with a reference to a group. `n` and a group
+asks Polars, a replacement's value is often text with a reference to a group, and a split's separator is often text drawn from the same two sets. `n` and a group
 number are drawn from a few values, and a limit holds the count that Polars refuses.
 
 ## What The Step Editor Storyboard Has Settled

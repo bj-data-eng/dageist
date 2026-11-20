@@ -10,7 +10,7 @@
 
 use std::fmt;
 
-use crate::catalog::{Argument, Build, Entry, Kind, Parameter, Shape, ValueType};
+use crate::catalog::{Argument, Build, DefaultValue, Entry, Kind, Parameter, Shape, ValueType};
 
 use super::dtype::Dtype;
 use super::error::{Cause, Place, Position, Refusal, Segment};
@@ -210,6 +210,43 @@ impl Call {
     #[must_use]
     pub fn arguments(&self) -> &[Given] {
         &self.arguments
+    }
+
+    /// The patterns the call was given that are regular expressions, each by its parameter's name and
+    /// as typed: a value of the pattern kind, and the separator of a split, which is an expression,
+    /// where it is text typed in and nothing more. Text that the flag of its parameter makes plain
+    /// text, as `literal` does, is none, and a separator that is a column is Polars' to check when it
+    /// runs the rows.
+    pub(crate) fn patterns(&self) -> Vec<(&'static str, &str)> {
+        let entry = self.entry;
+        entry
+            .parameters()
+            .iter()
+            .filter_map(|parameter| {
+                let text = match (self.argument(parameter.name())?, parameter.kind()) {
+                    (Value::Pattern(text), Kind::Pattern) => text,
+                    (Value::Expression(expression), Kind::Expression(_)) => typed_text(expression)?,
+                    _ => return None,
+                };
+                let plain =
+                    parameter
+                        .plain_text_flag()
+                        .is_some_and(|flag| match self.argument(flag) {
+                            Some(Value::Flag(Some(set))) => *set,
+                            _ => entry
+                                .parameters()
+                                .iter()
+                                .find(|other| other.name() == flag)
+                                .is_some_and(|other| {
+                                    other.default().value() == DefaultValue::Flag(true)
+                                }),
+                        });
+                // An expression is a pattern only where a flag says it may be one.
+                let may_be_one =
+                    parameter.kind() == Kind::Pattern || parameter.plain_text_flag().is_some();
+                (may_be_one && !plain).then_some((parameter.name(), text.as_str()))
+            })
+            .collect()
     }
 
     /// The argument given for `parameter`, if there is one.
@@ -630,5 +667,23 @@ impl Document {
     #[must_use]
     pub fn steps(&self) -> &[Step] {
         &self.steps
+    }
+}
+
+/// The text `expression` is when it is a text typed in and nothing more: a literal with no dtype and
+/// no methods after it.
+fn typed_text(expression: &Expression) -> Option<&String> {
+    if !expression.links().is_empty() {
+        return None;
+    }
+    let Start::Call(call) = expression.start() else {
+        return None;
+    };
+    if call.entry().id().as_str() != "polars.lit" || call.arguments().len() != 1 {
+        return None;
+    }
+    match call.argument("value")? {
+        Value::String(text) => Some(text),
+        _ => None,
     }
 }

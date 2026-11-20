@@ -1013,6 +1013,24 @@ impl Gen<'_> {
                         class,
                     }]
                 }
+                // A separator is often text typed in: a pattern where `literal` is false, which
+                // is then one Polars cannot compile now and then, and plain text where it is not.
+                ("Expr.str.split", "by") if self.draw.chance(50) => {
+                    let text = if self.draw.chance(40) {
+                        self.draw.pick(&INVALID_PATTERNS)
+                    } else {
+                        self.draw.pick(&VALID_PATTERNS)
+                    };
+                    let literal = call(
+                        "polars.lit",
+                        vec![("value", Value::String(text.to_owned()))],
+                    );
+                    vec![Built {
+                        expression: Expression::new(Start::Call(literal), Vec::new())
+                            .expect("a start"),
+                        class: Some(Representative::String),
+                    }]
+                }
                 // What a replacement puts in place of a match is often text, with the references to
                 // a group of the match that a pattern gives it meaning for.
                 ("Expr.str.replace" | "Expr.str.replace_all", "value") if self.draw.chance(50) => {

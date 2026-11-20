@@ -538,11 +538,12 @@ impl Parameter {
 
     /// The same parameter, a pattern that Polars takes as plain text where the flag `flag` of the
     /// same entry is true, as `literal` makes it: the text is then no regular expression, whatever
-    /// it holds.
+    /// it holds. An expression parameter that has one, as the separator of a split has, is a pattern
+    /// where it is text typed in and the flag is not true.
     const fn with_plain_text_flag(mut self, flag: &'static str) -> Self {
         assert!(
-            matches!(self.kind, Kind::Pattern),
-            "only a pattern is plain text by a flag"
+            matches!(self.kind, Kind::Pattern | Kind::Expression(_)),
+            "only a pattern, or an expression that may be typed as one, is plain text by a flag"
         );
         self.plain_text_flag = Some(flag);
         self
@@ -669,7 +670,8 @@ impl Parameter {
 
     /// The flag of the same entry that makes the pattern plain text where it is true, if there is
     /// one: Polars' `literal`. The text of a pattern whose flag is true is not read as a regular
-    /// expression, so it is never refused for being no pattern.
+    /// expression, so it is never refused for being no pattern. The separator of a split, an
+    /// expression, has it too: typed text is then a pattern where the flag is false.
     #[must_use]
     pub const fn plain_text_flag(&self) -> Option<&'static str> {
         self.plain_text_flag

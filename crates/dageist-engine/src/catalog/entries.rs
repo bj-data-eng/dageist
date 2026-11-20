@@ -2381,7 +2381,9 @@ pub(super) const ENTRIES: &[Entry] = &[
         family: Family::Pieces,
         accepts: STRING,
         parameters: &[
-            required("by", EXPRESSION, Shape::One),
+            // A column of separators is Polars' to check, row by row; text typed in is a pattern
+            // where `literal` is false, and is refused as one.
+            required("by", EXPRESSION, Shape::One).with_plain_text_flag("literal"),
             flag("inclusive", "False").keyword_only(),
             flag("literal", "True").keyword_only(),
             flag("strict", "True").keyword_only(),

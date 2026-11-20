@@ -29,7 +29,7 @@ use crate::allowed::{
     is_count, is_left_unresolved, is_refused_as_a_count, is_required, operand_adapts,
     receiver_beside,
 };
-use crate::catalog::{Applies, AsManyAs, Comparison, DefaultValue, Entry, Kind};
+use crate::catalog::{Applies, AsManyAs, Comparison, Entry, Kind};
 
 use super::error::{Place, Segment};
 use super::inputs::Inputs;
@@ -398,32 +398,6 @@ fn option_words(call: &Call) -> (Vec<(String, String)>, bool) {
         words.extend(word.map(|word| (given.parameter().to_owned(), word)));
     }
     (words, unknown)
-}
-
-/// The patterns `call` was given that are regular expressions, each by its parameter's name and as
-/// typed: a pattern that the flag of its parameter makes plain text, as `literal` does, is none.
-fn patterns_of(call: &Call) -> Vec<(&'static str, &str)> {
-    let entry = call.entry();
-    entry
-        .parameters()
-        .iter()
-        .filter_map(|parameter| {
-            let Some(Value::Pattern(text)) = call.argument(parameter.name()) else {
-                return None;
-            };
-            let plain = parameter
-                .plain_text_flag()
-                .is_some_and(|flag| match call.argument(flag) {
-                    Some(Value::Flag(Some(set))) => *set,
-                    _ => entry
-                        .parameters()
-                        .iter()
-                        .find(|other| other.name() == flag)
-                        .is_some_and(|other| other.default().value() == DefaultValue::Flag(true)),
-                });
-            (!plain).then_some((parameter.name(), text.as_str()))
-        })
-        .collect()
 }
 
 /// The class a literal has, when its dtype is known without another operand:
@@ -1204,7 +1178,7 @@ impl Walker<'_> {
             .iter()
             .map(|(name, word)| (name.as_str(), word.as_str()))
             .collect();
-        let patterns = patterns_of(link);
+        let patterns = link.patterns();
         let place = OfferPlace::new(context, after);
         // Two arguments that meet in the supertype of their dtypes are judged each apart, so
         // where their dtypes differ, whether Polars finds a supertype is not known, and what

@@ -11,7 +11,13 @@ fn a_flag_that_makes_a_pattern_plain_text_is_a_flag_of_the_same_entry_with_a_def
             let Some(flag) = parameter.plain_text_flag() else {
                 continue;
             };
-            assert_eq!(parameter.kind(), Kind::Pattern, "{}", entry.id().as_str());
+            // The separator of a split is an expression, which text typed in makes a pattern.
+            let id = entry.id().as_str();
+            assert!(
+                parameter.kind() == Kind::Pattern
+                    || (id == "Expr.str.split" && matches!(parameter.kind(), Kind::Expression(_))),
+                "{id}"
+            );
             let flagged = entry
                 .parameters()
                 .iter()
@@ -26,8 +32,9 @@ fn a_flag_that_makes_a_pattern_plain_text_is_a_flag_of_the_same_entry_with_a_def
             seen += 1;
         }
     }
-    // `contains`, `count_matches`, `find`, `replace` and `replace_all`, which take `literal`.
-    assert_eq!(seen, 5);
+    // `contains`, `count_matches`, `find`, `replace`, `replace_all` and `split`, which take
+    // `literal`.
+    assert_eq!(seen, 6);
 }
 
 #[test]
