@@ -2657,6 +2657,71 @@ mod tests {
         assert!(!ties_the_refusal_to_the_mismatch(true, true, true, false));
     }
 
+    /// A pivot whose aggregate is `element()` followed by `links`, each a call without
+    /// arguments, on `a` of the dtype `receiver`.
+    fn pivot_of_the_element(receiver: &str, links: &[(&str, &str)]) -> Case {
+        let calls: Vec<String> = links
+            .iter()
+            .map(|(id, arguments)| format!(r#"{{"entry":"{id}","arguments":{arguments}}}"#))
+            .collect();
+        let text = format!(
+            r#"{{"a":"{receiver}","b":"Date","revision":1}}
+{{"version":1,"steps":[{{"id":"s","call":{{"entry":"LazyFrame.pivot","arguments":{{"on":{{"columns":["h"]}},"on_columns":{{"table":"on_h"}},"values":{{"columns":["a"]}},"aggregate_function":{{"expression":{{"start":{{"entry":"polars.element","arguments":{{}}}},"then":[{}]}}}}}}}}}}]}}"#,
+            calls.join(",")
+        );
+        Case::decode(text.as_bytes()).expect("a case")
+    }
+
+    #[test]
+    fn a_call_in_a_pivots_aggregate_is_refused_on_the_element_where_it_holds_the_values_it_gets() {
+        // `element().str.pad_start(null).cast(Int8)`: a pad by a null gives nulls, which every dtype
+        // holds, so Polars allows the cast, which the tables refuse for the text of the sample's
+        // rows. The group's values are those of the column `a`, which is text, so `element()` is
+        // the text that reaches the cast and Polars refuses the cast of it.
+        let found = settled_apart("stricter-a-null-count-before-a-cast-in-a-pivot-aggregate.case")
+            .expect("the cast of the element, in the same pivot");
+        assert!(
+            found.reason.contains("conversion from `str`"),
+            "{}",
+            found.reason
+        );
+        assert!(found.probe.contains("LazyFrame.pivot"), "{}", found.probe);
+        assert!(found.probe.contains("polars.element"), "{}", found.probe);
+        assert!(
+            !found.probe.contains("Expr.str.pad_start"),
+            "{}",
+            found.probe
+        );
+    }
+
+    #[test]
+    fn a_call_in_a_pivots_aggregate_is_not_asked_on_the_element_where_another_dtype_reaches_it() {
+        // The element is whole numbers, and a cast to text gives the text that reaches the cast to
+        // a whole number, which is no dtype of the element: no value of the aggregate stands for it.
+        let case = pivot_of_the_element(
+            "Int64",
+            &[
+                ("Expr.cast", r#"{"dtype":{"dtype":"String"}}"#),
+                ("Expr.cast", r#"{"dtype":{"dtype":"Int8"}}"#),
+            ],
+        );
+        let place = Place::of_step(0, StepId::new(STEP).ok())
+            .then(Segment::Parameter("aggregate_function".to_owned()))
+            .then(Segment::Link(1));
+        let refused = Refused {
+            source: Source::Polars,
+            at: place.to_string(),
+            place,
+            stage: Some(dageist_engine::allowed::Stage::Rows),
+            reason: "conversion from `str` to `i8` failed in column 'a' for 2 out of 3 values: [\"1d\", \"2d\"]".to_owned(),
+            argument_unknown: false,
+        };
+        assert_eq!(
+            settle_on_a_value(&case, &refused, &predict(&case), &observe(&case)),
+            None
+        );
+    }
+
     #[test]
     fn the_catalogue_has_what_a_probe_is_made_of() {
         for id in ["LazyFrame.select", "LazyFrame.pivot", "LazyFrame.filter"] {
