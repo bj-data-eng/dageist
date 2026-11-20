@@ -1,0 +1,2 @@
+{"a":"String","b":"String","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.select","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"string":"1d"}}},"then":[{"entry":"Expr.str.replace","arguments":{"pattern":{"pattern":"a|d"},"value":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["g"]}}},"then":[]}}}}]}}]}}}}]}
