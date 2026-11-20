@@ -5166,6 +5166,39 @@ mod tests {
     }
 
     #[test]
+    fn a_division_by_zero_of_the_sum_of_nothing_is_excused_at_the_empty_table() {
+        // The sum of no rows is zero, a divisor a table of rows does not give: Polars refuses the
+        // empty table, which holds a zero where the sample's rows hold none.
+        let case = with_a_decimal(select(vec![chain_of(
+            column("b"),
+            vec![
+                call("Expr.sum", Vec::new()),
+                compared_with("Expr.floordiv", chain(column("a"), &["Expr.sum"])),
+            ],
+        )]));
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Empty, DIVISION_BY_ZERO, Vec::new()),
+            vec![Limit::ADivisionByZero]
+        );
+        // Only the rows and the empty table hold a divisor: the schema holds none, and neither
+        // does a place.
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Schema, DIVISION_BY_ZERO, Vec::new()),
+            vec![]
+        );
+        assert_eq!(
+            polars_refuses(
+                &case,
+                Some(link_of("exprs", 0, 0)),
+                Stage::Empty,
+                DIVISION_BY_ZERO,
+                Vec::new()
+            ),
+            vec![]
+        );
+    }
+
+    #[test]
     fn a_division_by_zero_is_not_excused_without_a_decimal_nor_a_division_nor_at_a_place() {
         let divided = || {
             select(vec![chain_of(
