@@ -7,7 +7,7 @@ use dageist_engine::document::{Document, Outcome, Report, RunCause, Segment, Ste
 use serde_json::{Value, json};
 
 use crate::claims::{claims, inputs};
-use crate::support::{call, document, field_then, named, step, text};
+use crate::support::{call, chain, document, field_then, named, step, text};
 
 /// The one-step document that selects `expression` as the column `out`.
 fn selecting(expression: Value) -> String {
@@ -175,4 +175,215 @@ fn a_cut_moment_is_a_moment_and_the_walk_says_so() {
         .and_then(|allowance| allowance.result())
         .expect("the walk says what it gives");
     assert_eq!(result.class(), Some(Representative::Datetime));
+}
+
+/// A call whose argument `time_zone` is the zone `zone`, or no zone for `None`.
+fn in_zone(id: &str, zone: Option<&str>) -> Value {
+    call(id, json!({ "time_zone": { "time_zone": zone } }))
+}
+
+/// A call whose arguments are `time_zone` and the words `ambiguous` and `non_existent`.
+fn localized(zone: &str, ambiguous: &str, non_existent: &str) -> Value {
+    call(
+        "Expr.dt.replace_time_zone",
+        json!({
+            "time_zone": { "time_zone": zone },
+            "ambiguous": { "choice": ambiguous },
+            "non_existent": { "choice": non_existent },
+        }),
+    )
+}
+
+/// The moment `microseconds` after the start of 1970, a `Datetime`, with `then` after it.
+fn moment_then(microseconds: i64, then: Vec<Value>) -> Value {
+    chain(
+        call(
+            "polars.lit",
+            json!({
+                "value": { "integer": microseconds },
+                "dtype": { "dtype": "Datetime(time_unit='us', time_zone=None)" },
+            }),
+        ),
+        then,
+    )
+}
+
+fn hour() -> Value {
+    call("Expr.dt.hour", json!({}))
+}
+
+#[test]
+fn the_clock_of_a_moment_is_kept_by_a_new_zone_and_its_instant_by_a_converted_one() {
+    // 13:30 on the 2nd of March 2026 is 18:30 in UTC where it was read in New York, which keeps
+    // to the standard time, five hours behind UTC, until the second Sunday of March, the 8th, and
+    // four behind after it.
+    let written = selecting(moments_then_all(vec![
+        in_zone("Expr.dt.replace_time_zone", Some("America/New_York")),
+        in_zone("Expr.dt.convert_time_zone", Some("UTC")),
+        hour(),
+    ]));
+    let report = report_of(&written);
+    assert!(
+        matches!(report.steps()[0].outcome(), Outcome::Valid { .. }),
+        "{:?}",
+        report.steps()[0].outcome()
+    );
+    let expected: Vec<Option<String>> = [18, 12, 15, 14, 22, 15, 21]
+        .iter()
+        .map(|hour| Some(hour.to_string()))
+        .collect();
+    assert_eq!(cells(&written), expected);
+    // The clock is what it was, in the zone it was given.
+    let written = selecting(moments_then_all(vec![
+        in_zone("Expr.dt.replace_time_zone", Some("America/New_York")),
+        hour(),
+    ]));
+    let expected: Vec<Option<String>> = [13, 7, 10, 9, 17, 11, 16]
+        .iter()
+        .map(|hour| Some(hour.to_string()))
+        .collect();
+    assert_eq!(cells(&written), expected);
+}
+
+fn moments_then_all(then: Vec<Value>) -> Value {
+    field_then("timestamp", then)
+}
+
+#[test]
+fn the_offsets_of_a_zone_are_a_length_of_time_that_is_one_hour_more_in_the_summer() {
+    // New York is five hours behind UTC all year, and an hour ahead of that from the 8th of March.
+    let total = |id: &str| {
+        selecting(moments_then_all(vec![
+            in_zone("Expr.dt.replace_time_zone", Some("America/New_York")),
+            call(id, json!({})),
+            call("Expr.dt.total_hours", json!({})),
+        ]))
+    };
+    let base: Vec<Option<String>> = vec![Some("-5".to_owned()); 7];
+    assert_eq!(cells(&total("Expr.dt.base_utc_offset")), base);
+    let summer: Vec<Option<String>> = [0, 0, 0, 0, 0, 1, 0]
+        .iter()
+        .map(|hours| Some(hours.to_string()))
+        .collect();
+    assert_eq!(cells(&total("Expr.dt.dst_offset")), summer);
+}
+
+#[test]
+fn a_clock_that_is_read_twice_or_never_is_resolved_as_the_words_say() {
+    // 01:30 on the 3rd of November 2024 happens twice in New York, at 05:30 and at 06:30 UTC.
+    let twice = 1_730_597_400_000_000;
+    let in_utc = |ambiguous: &str| {
+        selecting(moment_then(
+            twice,
+            vec![
+                localized("America/New_York", ambiguous, "raise"),
+                in_zone("Expr.dt.convert_time_zone", Some("UTC")),
+                hour(),
+            ],
+        ))
+    };
+    assert_eq!(cells(&in_utc("earliest")), [Some("5".to_owned())]);
+    assert_eq!(cells(&in_utc("latest")), [Some("6".to_owned())]);
+    assert_eq!(cells(&in_utc("null")), [None]);
+    let report = report_of(&in_utc("raise"));
+    assert!(
+        matches!(report.steps()[0].rows(), StepRows::Failed(_)),
+        "{:?}",
+        report.steps()[0].rows()
+    );
+    // 02:30 on the 10th of March 2024 never happens in New York, which skips from 02:00 to 03:00.
+    let never = 1_710_037_800_000_000;
+    let skipped = |non_existent: &str| {
+        selecting(moment_then(
+            never,
+            vec![localized("America/New_York", "raise", non_existent), hour()],
+        ))
+    };
+    assert_eq!(cells(&skipped("null")), [None]);
+    let report = report_of(&skipped("raise"));
+    assert!(
+        matches!(report.steps()[0].rows(), StepRows::Failed(_)),
+        "{:?}",
+        report.steps()[0].rows()
+    );
+}
+
+#[test]
+fn a_time_zone_that_is_none_is_refused_at_the_parameter_in_polars_words() {
+    for id in ["Expr.dt.replace_time_zone", "Expr.dt.convert_time_zone"] {
+        let written = selecting(moments_then_all(vec![in_zone(id, Some("Not/AZone"))]));
+        let report = report_of(&written);
+        let step = &report.steps()[0];
+        let Outcome::Refused(refusal) = step.outcome() else {
+            panic!("{id}: {:?}", step.outcome());
+        };
+        assert_eq!(
+            refusal.place().path().last(),
+            Some(&Segment::Parameter("time_zone".to_owned())),
+            "{id}"
+        );
+        let words = refusal.cause().to_string();
+        assert!(
+            words.contains("unable to parse time zone: 'Not/AZone'"),
+            "{id}: {words}"
+        );
+        let walked = step.walk().refusal().expect("the walk refuses it");
+        assert!(
+            matches!(walked.refusal().source(), RefusalSource::Rule(rule)
+                if rule.name() == "time-zone-is-valid"),
+            "{id}: {:?}",
+            walked.refusal().source()
+        );
+    }
+}
+
+#[test]
+fn no_time_zone_takes_the_zone_off_and_only_replace_takes_it() {
+    let written = selecting(moments_then_all(vec![
+        in_zone("Expr.dt.replace_time_zone", Some("UTC")),
+        in_zone("Expr.dt.replace_time_zone", None),
+    ]));
+    let report = report_of(&written);
+    assert!(
+        matches!(report.steps()[0].outcome(), Outcome::Valid { .. }),
+        "{:?}",
+        report.steps()[0].outcome()
+    );
+    // The walk says each gives a moment, with a zone and without one.
+    let walked = report.steps()[0]
+        .walk()
+        .expressions()
+        .iter()
+        .find(|walked| walked.calls().len() == 3)
+        .expect("the step's expression");
+    let classes: Vec<Option<Representative>> = walked
+        .calls()
+        .iter()
+        .skip(1)
+        .map(|standing| {
+            standing
+                .verdict()
+                .and_then(|verdict| verdict.allowance())
+                .and_then(|allowance| allowance.result())
+                .and_then(|result| result.class())
+        })
+        .collect();
+    assert_eq!(
+        classes,
+        [
+            Some(Representative::DatetimeZoned),
+            Some(Representative::Datetime)
+        ]
+    );
+    // A conversion to no zone is no conversion: Python's `convert_time_zone` takes a zone.
+    let written = selecting(moments_then_all(vec![in_zone(
+        "Expr.dt.convert_time_zone",
+        None,
+    )]));
+    let report = report_of(&written);
+    assert!(
+        matches!(report.steps()[0].outcome(), Outcome::Refused(_)),
+        "{:?}",
+        report.steps()[0].outcome()
+    );
 }
