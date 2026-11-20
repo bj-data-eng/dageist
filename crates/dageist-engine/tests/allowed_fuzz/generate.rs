@@ -1267,6 +1267,59 @@ mod tests {
         written.contains("\"Expr.shift\"") && written.contains("\"integer\":-")
     }
 
+    /// Whether every call of `id` in the JSON `value` is given as `length` a literal alone.
+    fn lengths_are_literals(value: &serde_json::Value, ids: &[&str], found: &mut usize) -> bool {
+        match value {
+            serde_json::Value::Object(map) => {
+                let mut fine = true;
+                if map
+                    .get("entry")
+                    .and_then(|entry| entry.as_str())
+                    .is_some_and(|entry| ids.contains(&entry))
+                    && let Some(length) = map.get("arguments").and_then(|given| given.get("length"))
+                {
+                    *found += 1;
+                    let expression = &length["expression"];
+                    fine = expression["then"].as_array().is_some_and(Vec::is_empty)
+                        && expression["start"]["entry"] == "polars.lit";
+                }
+                fine && map
+                    .values()
+                    .all(|inside| lengths_are_literals(inside, ids, found))
+            }
+            serde_json::Value::Array(items) => items
+                .iter()
+                .all(|inside| lengths_are_literals(inside, ids, found)),
+            _ => true,
+        }
+    }
+
+    #[test]
+    fn the_length_a_text_is_padded_to_is_a_literal_that_cannot_be_a_huge_number() {
+        // A date, a time or a timestamp that is a length converts to the number it counts, which
+        // for a timestamp is the microseconds since the epoch, and Polars builds a text of that many
+        // characters: a case that never ends and fills the memory, which is no table's business.
+        // The generator gives a length as a literal of the number 1, as it gives the shift of `shift`.
+        let mut found = 0;
+        for offset in 0..8000_u64 {
+            let Some(case) = generate(&entropy(offset)) else {
+                continue;
+            };
+            let document: serde_json::Value =
+                serde_json::from_str(case.document.write().as_str()).expect("a document");
+            assert!(
+                lengths_are_literals(
+                    &document,
+                    &["Expr.str.pad_start", "Expr.str.pad_end", "Expr.str.zfill"],
+                    &mut found
+                ),
+                "{}",
+                case.document.write()
+            );
+        }
+        assert!(found > 5, "the cases pad text only {found} times");
+    }
+
     #[test]
     fn the_cases_include_a_shift_back_and_a_shift_forward() {
         // The limit for what a shift leaves null follows the direction of the
