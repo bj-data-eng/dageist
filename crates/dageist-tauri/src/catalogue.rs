@@ -850,6 +850,32 @@ mod tests {
     }
 
     #[test]
+    fn a_parameter_says_whether_a_step_must_give_it() {
+        let view = view();
+        let needed = |id: &str, name: &str| parameter(&view, id, name)["needed"].clone();
+        // What Python requires, and what a step always gives one of, as a fill's value and a clip's
+        // bounds, must be given; what Python leaves out, as the characters a trim takes off, need not.
+        for (id, name) in [
+            ("Expr.shift", "fill_value"),
+            ("Expr.str.strip_chars", "characters"),
+            ("Expr.str.strip_chars_start", "characters"),
+            ("Expr.str.strip_chars_end", "characters"),
+            ("Expr.str.slice", "length"),
+        ] {
+            assert_eq!(needed(id, name), json!(false), "{id} {name}");
+        }
+        for (id, name) in [
+            ("Expr.str.slice", "offset"),
+            ("Expr.str.head", "n"),
+            ("Expr.fill_null", "value"),
+            ("Expr.clip", "lower_bound"),
+            ("Expr.add", "other"),
+        ] {
+            assert_eq!(needed(id, name), json!(true), "{id} {name}");
+        }
+    }
+
+    #[test]
     fn a_parameter_carries_what_it_holds_by_default_and_what_it_is_first_set_to() {
         let view = view();
         let setting = |id: &str, name: &str, which: &str| parameter(&view, id, name)[which].clone();

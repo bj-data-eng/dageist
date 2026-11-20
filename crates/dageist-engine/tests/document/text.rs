@@ -264,3 +264,36 @@ fn a_negative_length_typed_as_a_whole_number_is_refused_by_polars_and_gives_the_
     let report = report_of(&selecting(headed));
     assert!(matches!(report.steps()[0].outcome(), Outcome::Valid { .. }));
 }
+
+#[test]
+fn a_trim_that_is_given_no_characters_is_complete_and_trims_whitespace() {
+    // The editor starts `strip_chars` with nothing for `characters`, which Python leaves out: the
+    // step is complete, runs, and takes the whitespace off both ends.
+    let trimmed = field_then(
+        "owner",
+        vec![
+            call(
+                "Expr.str.pad_start",
+                json!({ "length": whole(13), "fill_char": { "string": " " } }),
+            ),
+            call("Expr.str.pad_end", json!({ "length": whole(15) })),
+            call("Expr.str.strip_chars", json!({})),
+        ],
+    );
+    let written = selecting(trimmed);
+    let report = report_of(&written);
+    let step = &report.steps()[0];
+    assert!(
+        matches!(step.outcome(), Outcome::Valid { .. }),
+        "{:?}",
+        step.outcome()
+    );
+    assert_eq!(step.walk().refusal(), None);
+    let preview = Document::read(&written)
+        .expect("a document")
+        .preview(&inputs(), &claims(), &StepId::new("s").expect("an id"), 100)
+        .expect("the rows");
+    let cells: Vec<Option<&str>> = preview.rows().iter().map(|row| row[0].as_deref()).collect();
+    assert_eq!(cells[0], Some("Company A"));
+    assert_eq!(cells[2], Some("Company B"));
+}
