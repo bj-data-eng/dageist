@@ -296,19 +296,18 @@ fn a_join_casts_what_it_joins_to_text_and_refuses_what_cannot_be_cast() {
 }
 
 #[test]
-fn a_split_by_a_pattern_is_refused_with_the_reason_and_a_split_by_text_is_not() {
+fn a_split_is_offered_by_a_pattern_and_by_text_and_with_either_flag_beside_them() {
     assert!(options(entry("Expr.str.split"), &[("literal", "true")]).is_ok());
-    let refused = options(entry("Expr.str.split"), &[("literal", "false")])
-        .expect_err("a split by a pattern is not offered");
-    assert!(refused.reason().contains("pattern"), "{refused}");
-    // The other flags are free beside a literal split.
-    assert!(
-        options(
-            entry("Expr.str.split"),
-            &[("inclusive", "true"), ("literal", "true")]
-        )
-        .is_ok()
-    );
+    let by_a_pattern = options(entry("Expr.str.split"), &[("literal", "false")]);
+    assert!(by_a_pattern.is_ok(), "{by_a_pattern:?}");
+    for pair in [
+        [("inclusive", "true"), ("literal", "true")],
+        [("inclusive", "true"), ("literal", "false")],
+        [("literal", "false"), ("strict", "false")],
+    ] {
+        let verdict = options(entry("Expr.str.split"), &pair);
+        assert!(verdict.is_ok(), "{pair:?}: {verdict:?}");
+    }
 }
 
 #[test]

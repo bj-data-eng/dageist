@@ -324,27 +324,7 @@ fn a_fill_character_is_one_character_as_python_takes_it() {
 #[test]
 fn a_split_gives_a_list_of_text_and_keeps_the_separator_only_when_asked() {
     let words = df!("t" => [Some("foo bar"), Some("foo_bar"), Some("foo_bar_baz"), None]).unwrap();
-    let split = |arguments: &Arguments| -> Vec<Option<Vec<String>>> {
-        let expr = method("Expr.str.split", col("t"), arguments).expect("the method builds");
-        let out = run(words.clone().lazy().select([expr.alias("out")]));
-        let lists = out
-            .column("out")
-            .expect("a column")
-            .list()
-            .expect("lists")
-            .clone();
-        (0..lists.len())
-            .map(|at| {
-                lists.get_as_series(at).map(|row| {
-                    row.str()
-                        .expect("text")
-                        .iter()
-                        .map(|piece| piece.expect("a piece").to_owned())
-                        .collect()
-                })
-            })
-            .collect()
-    };
+    let split = |arguments: &Arguments| pieces(&words, arguments);
     let by = || given("by", expression_arg(lit("_")));
     let list = |pieces: &[&str]| Some(pieces.iter().map(|piece| (*piece).to_owned()).collect());
     assert_eq!(
@@ -371,18 +351,100 @@ fn a_split_gives_a_list_of_text_and_keeps_the_separator_only_when_asked() {
     );
 }
 
+/// The pieces `Expr.str.split` makes of each row of `words`, a null row as `None`.
+fn pieces(words: &DataFrame, arguments: &Arguments) -> Vec<Option<Vec<String>>> {
+    let expr = method("Expr.str.split", col("t"), arguments).expect("the method builds");
+    let out = run(words.clone().lazy().select([expr.alias("out")]));
+    let lists = out
+        .column("out")
+        .expect("a column")
+        .list()
+        .expect("lists")
+        .clone();
+    (0..lists.len())
+        .map(|at| {
+            lists.get_as_series(at).map(|row| {
+                row.str()
+                    .expect("text")
+                    .iter()
+                    .map(|piece| piece.expect("a piece").to_owned())
+                    .collect()
+            })
+        })
+        .collect()
+}
+
 #[test]
-fn a_split_by_a_pattern_waits_for_the_kind_of_parameter_that_holds_one() {
-    let by = given("by", expression_arg(lit("_")));
-    let refused = method("Expr.str.split", col("t"), &by.with("literal", flag(false)));
-    let Err(BuildError::Polars(error)) = refused else {
-        panic!("a split by a pattern is refused");
+fn a_split_by_a_pattern_splits_where_the_pattern_matches_as_the_documentation_shows() {
+    // The documentation splits at a run of digits, and keeps what it matched with the piece
+    // before it where it is asked to.
+    let words = df!("t" => [Some("foo1bar"), Some("foo99bar"), Some("foo1bar2baz"), None]).unwrap();
+    let by = || given("by", expression_arg(lit(r"\d+"))).with("literal", flag(false));
+    let list = |pieces: &[&str]| Some(pieces.iter().map(|piece| (*piece).to_owned()).collect());
+    assert_eq!(
+        pieces(&words, &by()),
+        [
+            list(&["foo", "bar"]),
+            list(&["foo", "bar"]),
+            list(&["foo", "bar", "baz"]),
+            None
+        ]
+    );
+    assert_eq!(
+        pieces(&words, &by().with("inclusive", flag(true))),
+        [
+            list(&["foo1", "bar"]),
+            list(&["foo99", "bar"]),
+            list(&["foo1", "bar2", "baz"]),
+            None
+        ]
+    );
+    // A pattern gives the same dtype as a literal separator does.
+    assert_eq!(
+        dtype_of(&method("Expr.str.split", col("s"), &by()).unwrap()),
+        DataType::List(Box::new(DataType::String))
+    );
+}
+
+#[test]
+fn a_split_treats_its_separator_as_plain_text_when_literal_and_ignores_strict_then() {
+    // The same separator is a pattern or plain text by the flag: `.` is any character as a
+    // pattern and only a dot as text.
+    let words = df!("t" => ["a.b"]).unwrap();
+    let by = || given("by", expression_arg(lit(".")));
+    let list = |pieces: &[&str]| Some(pieces.iter().map(|piece| (*piece).to_owned()).collect());
+    assert_eq!(
+        pieces(&words, &by().with("literal", flag(true))),
+        [list(&["a", "b"])]
+    );
+    assert_eq!(
+        pieces(&words, &by().with("literal", flag(false))),
+        [list(&["", "", "", ""])]
+    );
+    // `strict` is for a pattern, so beside a literal split it changes nothing, as in Python.
+    assert_eq!(
+        pieces(&words, &by().with("strict", flag(false))),
+        [list(&["a", "b"])]
+    );
+}
+
+#[test]
+fn a_split_by_a_pattern_that_is_not_one_is_refused_when_strict_and_gives_null_when_not() {
+    let words = df!("t" => ["a(b"]).unwrap();
+    let broken = |strict: bool| {
+        given("by", expression_arg(lit("(")))
+            .with("literal", flag(false))
+            .with("strict", flag(strict))
     };
-    assert!(error.to_string().contains("pattern"), "{error}");
-    // `strict` only matters to a pattern, so a literal split ignores it as Python does.
-    let by = given("by", expression_arg(lit("_")));
-    let strict = method("Expr.str.split", col("t"), &by.with("strict", flag(false)));
-    assert!(strict.is_ok());
+    let expr = method("Expr.str.split", col("t"), &broken(true)).expect("the method builds");
+    let refused = words.clone().lazy().select([expr]).collect();
+    assert!(
+        refused
+            .expect_err("a strict split refuses a pattern that is no regex")
+            .to_string()
+            .contains("regex"),
+    );
+    assert_eq!(pieces(&words, &broken(false)), [None]);
 }
 
 #[test]
