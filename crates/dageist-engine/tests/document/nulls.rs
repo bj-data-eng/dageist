@@ -210,6 +210,44 @@ fn an_aggregate_of_a_condition_of_identical_values_is_one_value_and_is_counted_a
 }
 
 #[test]
+fn a_text_method_of_one_value_given_many_is_many_values_as_polars_gives_them() {
+    // Polars meets the one value of a text literal with each of the many values of the operand, so
+    // what follows is as many values as the table has rows: a strict replacement of it given a
+    // default of three is allowed, as Polars allows it, and not refused by the rule for the number
+    // of values of a replacement. A parameter of a method of text is no operand that adapts a
+    // number's dtype, and it is met just the same.
+    for (method, parameter, operand) in [
+        ("Expr.str.starts_with", "prefix", field("k")),
+        ("Expr.str.ends_with", "suffix", field("k")),
+        ("Expr.str.head", "n", field("a")),
+        ("Expr.str.tail", "n", field("a")),
+        ("Expr.str.pad_start", "length", field("a")),
+        ("Expr.str.strip_chars", "characters", field("b")),
+        ("Expr.str.split", "by", field("b")),
+    ] {
+        let mut chain = vec![call(method, json!({ parameter: operand }))];
+        // What replaces the values it gives is a column of three values, whatever they are.
+        if method != "Expr.str.split" {
+            chain.push(call(
+                "Expr.replace_strict",
+                json!({ "old": field("a"), "new": field("f"), "default": field("f") }),
+            ));
+        }
+        let expression = json!({ "expression": {
+            "start": call("polars.lit", json!({ "value": { "string": "abc" } })),
+            "then": chain,
+        } });
+        let report = report_of("LazyFrame.select", select(vec![expression]));
+        assert_eq!(walk(&report).refusal(), None, "{method}");
+        assert!(
+            polars_says(&report).is_none(),
+            "{method}: {:?}",
+            outcome(&report)
+        );
+    }
+}
+
+#[test]
 fn a_strict_replacement_given_a_default_of_many_values_beside_one_value_is_refused_as_polars_does()
 {
     let strict = |default: Value| {
