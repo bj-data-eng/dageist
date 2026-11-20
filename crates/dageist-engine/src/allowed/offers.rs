@@ -836,6 +836,13 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
             After::Value { dtype, .. } => Some(dtype),
             _ => None,
         };
+        // An argument given is refused before an option is: the line of the call that has it says
+        // what Polars does of the call, where the option is measured with none.
+        if let Some(dtype) = receiver
+            && !chosen.arguments.is_empty()
+        {
+            on_receiver(entry, dtype, chosen.arguments, chosen.options)?;
+        }
         check_options(entry, receiver, chosen.options)?;
         check_conversions(entry, chosen)?;
     }
