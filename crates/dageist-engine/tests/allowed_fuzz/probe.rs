@@ -30,7 +30,9 @@
 //!   and again with each literal it is given a column of its dtype too, for a
 //!   literal hides what Polars skips as it hides what it evaluates.
 //!   And once more with the receiver and every argument a column of the dtype that reaches it,
-//!   so that nothing an argument holds is refused before the call is.
+//!   so that nothing an argument holds is refused before the call is. In a pivot's aggregate the
+//!   call stands on `element`, which holds the values of the column `a`, where that is the dtype
+//!   the tables say reaches the call.
 //! - [`settle_as_a_key`]: a refusal that a join's key is not elementwise is of the
 //!   position, so the part that holds the refused call is the whole key of the
 //!   same join, and what comes before the call as a key is not refused for it:
@@ -743,6 +745,32 @@ fn dtype_given(
     }
 }
 
+/// The class of the dtype that the tables say reaches the call at `link` of the expression at
+/// `held`, where Polars was not asked.
+fn predicted_dtype_reaching(
+    held: &Place,
+    link: usize,
+    predicted: &Prediction,
+) -> Option<Representative> {
+    let traced = predicted
+        .expressions
+        .iter()
+        .find(|traced| traced.place == *held)?;
+    match link.checked_sub(1) {
+        None => traced.start,
+        Some(before) => *traced.links.get(before)?,
+    }
+}
+
+/// Whether the case is a pivot that takes the values of the column `a`, which the target's pivots
+/// all do: the `element` of its aggregate holds them.
+fn takes_the_values_of_a(case: &Case) -> bool {
+    matches!(
+        case.document.steps()[0].call().argument("values"),
+        Some(Value::Columns(names)) if names.as_slice() == ["a"]
+    )
+}
+
 /// Asks Polars about the call the tables refused where it cannot be asked
 /// as it is written: the chain before it may give a constant, or a column of
 /// nulls, however the rows are, and Polars then does not evaluate the call. The
@@ -772,23 +800,41 @@ pub fn settle_on_a_value(
     let [Segment::Link(link)] = found.rest else {
         return None;
     };
-    if found.in_the_aggregate {
-        return None;
-    }
     let consumed = refused.place.path().len() - found.rest.len();
     let held = refused.place.path()[..consumed]
         .iter()
         .cloned()
         .fold(Place::of_step(0, StepId::new(STEP).ok()), Place::then);
-    let class = dtype_reaching(&held, *link, predicted, observed)?;
-    let name = call(
-        "polars.col",
-        vec![("name", Value::Columns(vec![STAND_IN.to_owned()]))],
-    )?;
+    // Polars is not asked of the dtype that reaches a call in a pivot's aggregate, for what it says
+    // of a prefix is said in a select, where `element` stands nowhere: the tables' is taken.
+    let class = if found.in_the_aggregate {
+        predicted_dtype_reaching(&held, *link, predicted)?
+    } else {
+        dtype_reaching(&held, *link, predicted, observed)?
+    };
+    // A pivot's aggregate reads no column to stand in, but its `element` holds the values of the
+    // column the pivot takes the values of, `a`, which is of the dtype that reaches the call where
+    // that is the dtype of `a`.
+    let name = if found.in_the_aggregate {
+        if class != case.receiver || !takes_the_values_of_a(case) {
+            return None;
+        }
+        call("polars.element", Vec::new())?
+    } else {
+        call(
+            "polars.col",
+            vec![("name", Value::Columns(vec![STAND_IN.to_owned()]))],
+        )?
+    };
     let refused_call = found.expression.links().get(*link)?;
     // The call as written, and then with each literal it is given a column of its
     // dtype, which Polars cannot fold or broadcast as it can a literal.
-    let literals = operand_causes(refused_call, &refused.place, false);
+    let literals = if found.in_the_aggregate {
+        // No column stands in for a literal there either.
+        Vec::new()
+    } else {
+        operand_causes(refused_call, &refused.place, false)
+    };
     let literal_classes = literals
         .iter()
         .map(|cause| class_of(cause, observed))
@@ -803,8 +849,9 @@ pub fn settle_on_a_value(
     // And with every argument a column of the dtype that reaches its end, so that nothing an
     // argument holds, as a call the tables allow without knowing a dtype, is refused before the
     // call is.
-    if let Some((columns, argument_classes)) =
-        call_on_columns(refused_call, &refused.place, predicted, observed)
+    if !found.in_the_aggregate
+        && let Some((columns, argument_classes)) =
+            call_on_columns(refused_call, &refused.place, predicted, observed)
     {
         attempts.push((columns, [vec![class], argument_classes].concat()));
     }
@@ -816,6 +863,11 @@ pub fn settle_on_a_value(
             document: document_of(case, &found, part, false)?,
         };
         let at = place_of_the_part(&found, false).then(Segment::Link(0));
+        let classes = if found.in_the_aggregate {
+            Vec::new()
+        } else {
+            classes
+        };
         let tables = Tables::standing(found.on_the_other_table, &classes)?;
         let refusal = refused_as(&probed, tables, refused, &[at])?;
         Some(Settled {
