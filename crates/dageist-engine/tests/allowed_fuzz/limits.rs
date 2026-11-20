@@ -4285,6 +4285,70 @@ mod tests {
         );
     }
 
+    const TEXT_COUNT: &str = "conversion from `str` to `u64` failed in column 'b' for 2 out of 3 values: [\"1d\", \"2d\"]";
+
+    #[test]
+    fn a_failed_cast_at_a_count_of_characters_is_excused_where_a_count_is_no_bare_column() {
+        // Polars converts a count to a whole number, and text that reads as one is converted, where
+        // the tables measured the text of the sample's rows, a duration no number reads.
+        let at_the_call = link_of("exprs", 0, 0);
+        for count in [
+            whole(1),
+            chain(null(), &[]),
+            chain(column("k"), &["Expr.sqrt"]),
+        ] {
+            for (id, parameter) in [
+                ("Expr.str.pad_end", "length"),
+                ("Expr.str.zfill", "length"),
+                ("Expr.str.head", "n"),
+                ("Expr.str.slice", "offset"),
+            ] {
+                let counted = call(id, vec![(parameter, Value::Expression(count.clone()))]);
+                let case = select(vec![chain_of(column("g"), vec![counted])]);
+                assert_eq!(
+                    tables_refuse(&case, at_the_call.clone(), ROWS, TEXT_COUNT),
+                    vec![Limit::ABoundWithValuesOfItsOwn],
+                    "{id}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_failed_cast_at_a_count_is_not_excused_by_a_bare_column_or_another_call() {
+        // A bare column holds the sample's rows as the tables measured them, and Polars refuses it
+        // the same way.
+        let at_the_call = link_of("exprs", 0, 0);
+        let bare = call(
+            "Expr.str.pad_end",
+            vec![("length", Value::Expression(chain(column("b"), &[])))],
+        );
+        let case = select(vec![chain_of(column("g"), vec![bare])]);
+        assert_eq!(
+            tables_refuse(&case, at_the_call.clone(), ROWS, TEXT_COUNT),
+            vec![]
+        );
+        // A text method given no count converts nothing, and a refusal of another call is not the
+        // count's.
+        let counted = call(
+            "Expr.str.pad_end",
+            vec![("length", Value::Expression(whole(1)))],
+        );
+        let case = select(vec![chain_of(
+            column("g"),
+            vec![counted, call("Expr.str.to_uppercase", Vec::new())],
+        )]);
+        assert_eq!(
+            tables_refuse(&case, link_of("exprs", 0, 1), ROWS, TEXT_COUNT),
+            vec![]
+        );
+        let plain = select(vec![chain_of(
+            column("g"),
+            vec![call("Expr.str.to_uppercase", Vec::new())],
+        )]);
+        assert_eq!(tables_refuse(&plain, at_the_call, ROWS, TEXT_COUNT), vec![]);
+    }
+
     // ----- A window over a literal
 
     const SCHEMA_SAYS_FLOAT: &str = "the schema says Datetime(us, UTC) and the rows give Float64";
