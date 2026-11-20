@@ -53,13 +53,27 @@ export interface InputValue {
   readonly name: string;
 }
 
+/**
+ * A value that is left out: the parameter is not given, and holds what Polars gives it then. The
+ * engine says which parameters a method starts so, and what it is complete without.
+ */
+export interface LeftOutValue {
+  readonly kind: 'leftOut';
+}
+
 /** A value that is still to be picked. It stands for nothing until it is. */
 export interface UnsetValue {
   readonly kind: 'unset';
 }
 
 /** A value a condition compares with or returns. */
-export type Value = ColumnValue | LiteralValue | ChainValue | InputValue | UnsetValue;
+export type Value =
+  | ColumnValue
+  | LiteralValue
+  | ChainValue
+  | InputValue
+  | UnsetValue
+  | LeftOutValue;
 
 declare const COMPARISON: unique symbol;
 

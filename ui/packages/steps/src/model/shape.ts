@@ -95,6 +95,7 @@ export function isValue(value: unknown, comparisons: Comparisons): value is Valu
     case 'input':
       return typeof value.name === 'string';
     case 'unset':
+    case 'leftOut':
       return true;
     default:
       return false;

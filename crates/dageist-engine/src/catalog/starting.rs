@@ -71,6 +71,21 @@ impl Parameter {
         }
     }
 
+    /// Whether a method that takes the parameter first starts without giving it: it is an
+    /// expression, or a list of them, that a step need not give and that Polars leaves to its default
+    /// when it is not given, `None`, as the characters a trim takes off are, which are then
+    /// whitespace. The method is complete as it starts, and the document does not mention the
+    /// parameter; giving it a value is the person's choice. A parameter that must be given, or
+    /// that has a value of its own by default, is not left out: it is still to be given or starts
+    /// with its default.
+    #[must_use]
+    pub fn starts_left_out(&self) -> bool {
+        matches!(self.shape(), Shape::One | Shape::Many)
+            && matches!(self.kind(), Kind::Expression(_))
+            && !self.is_needed()
+            && matches!(self.default().value(), DefaultValue::Unset)
+    }
+
     /// What the parameter is set to when it is first added, which is something
     /// that differs from its default: a list starts with one item still to be
     /// given and pairs with none; a flag starts as the opposite of its default,

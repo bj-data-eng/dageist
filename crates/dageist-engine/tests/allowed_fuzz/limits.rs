@@ -189,6 +189,7 @@ pub enum Limit {
     /// or a difference of the sample's values can be. Polars refusing the rows with
     /// the reason that it divides a Decimal by zero, which has no place, in a case with a
     /// Decimal as a column, that holds a division, a floor division or a remainder.
+    /// The empty table holds one too: the sum of no rows is zero.
     ADivisionByZero,
     /// Polars panicking has no place, and is gated by its reason. A panic of
     /// Polars is an internal check that failed. The tables record
@@ -230,16 +231,18 @@ pub enum Limit {
     /// value's: the case run again with the bounds of every `clip` undone and the values of
     /// every replacement made null is not refused for a failed conversion.
     ABoundTheDtypeCannotHold,
-    /// Polars casts a bound of `clip` to the dtype it clips, and a bound whose values that dtype
+    /// Polars casts a bound of `clip` to the dtype it clips, and a count of characters that a
+    /// method of text takes to a whole number, and a bound or a count whose values that dtype
     /// holds is cast whatever its dtype is: text that reads as the number, a list or another
-    /// dtype that holds nothing but nulls. The tables measured a bound as a column of the
-    /// sample's rows, whose text is a duration no number reads and whose lists no dtype holds,
-    /// so they refuse the cast of a dtype to another that the values of another bound pass. The
-    /// tables refusing, when they run rows, with a failed conversion or a failed cast of a
-    /// dtype, at a `clip` that has a bound that is not a bare column, which Polars allows, and
-    /// where the tables, asked again with the computed bounds of every clip undone, no longer
-    /// refuse a clip. A bound that is a bare column holds the sample's rows, as the tables
-    /// measured it, so a refusal that is its own is not this, whatever the other bound is.
+    /// dtype that holds nothing but nulls. The tables measured a bound or a count as a column of
+    /// the sample's rows, whose text is a duration no number reads and whose lists no dtype
+    /// holds, so they refuse the cast of a dtype to another that the values of another bound pass.
+    /// The tables refusing, when they run rows, with a failed conversion or a failed cast of a
+    /// dtype, at a `clip` that has a bound, or a method of text that has a count, that is not a
+    /// bare column, which Polars allows, and where the tables, asked again with the computed
+    /// bounds of every clip undone and the computed counts the whole number 1, no longer refuse
+    /// the call. A bound or a count that is a bare column holds the sample's rows, as the tables
+    /// measured it, so a refusal that is its own is not this, whatever the other one is.
     ABoundWithValuesOfItsOwn,
     /// A window whose partition holds no column gives Polars' streaming engine no rows, so
     /// what follows it in a chain that starts from a literal is never evaluated, and the rows
@@ -275,9 +278,11 @@ pub enum Limit {
     /// two dtypes, refuses it at the call for the tables' reason.
     ABitwiseCallInAJoinKey,
     /// A strict `cast`, a test of closeness and a fill by a value or of NaN, which convert what
-    /// they meet to the dtype that holds both as one does, and a `replace_strict` asked for a
-    /// dtype and given no default, which converts what replaces to it as one (given a default it
-    /// converts as a cast that gives a null does), refuse the rows when a value of the column
+    /// they meet to the dtype that holds both as one does, a method of text that is given a count
+    /// of characters (`str.head`, `str.tail`, `str.slice`, `str.pad_start`, `str.pad_end` and
+    /// `str.zfill`), which converts it to a whole number as one does, and a `replace_strict` asked
+    /// for a dtype and given no default, which converts what replaces to it as one (given a default
+    /// it converts as a cast that gives a null does), refuse the rows when a value of the column
     /// they follow or give is one the dtype cannot hold: a number out of its range, or below zero beside an unsigned dtype, the
     /// infinity or the not-a-number of a float beside a whole number, or text that does not read
     /// as the number. The tables measured a cast on the sample's rows, whose values every dtype
@@ -285,9 +290,12 @@ pub enum Limit {
     /// and so may a table with no rows, where the sum of nothing is a value for a root or a
     /// logarithm to give an infinity. Polars refusing the rows, the empty table's too, with a
     /// failed conversion that has no place, in a case with a strict `cast`, a test of closeness,
-    /// a fill by a value or of NaN, or a strict replacement given a dtype and no default: the
-    /// case run again with each cast made not strict, each test a comparison, each fill a fill
-    /// forward and each replacement not asked for a dtype is not refused for a failed conversion.
+    /// a fill by a value or of NaN, a count of characters, or a strict replacement given a dtype
+    /// and no default: the case run again with each cast made not strict, each test a comparison,
+    /// each fill a fill forward, each count the whole number 1 and each replacement not asked for
+    /// a dtype is not refused for a failed conversion. A literal is one value that Polars converts
+    /// when it works out the schema, so the refusal may be the schema's, and then it names the
+    /// scalar the literal is.
     ACastOfAValueTheDtypeCannotHold,
     /// `drop_nulls` and `drop_nans` leave the values that are not null or not NaN, so a column
     /// that holds one has fewer values than the table has rows, which Polars refuses to meet the
@@ -423,7 +431,7 @@ impl Limit {
                 "Polars meets an operand of the dtype Null of a bitwise call where select does not, and refuses it, though the tables allowed the call as a Boolean"
             }
             Self::ADivisionByZero => {
-                "Polars refuses to divide a Decimal by zero, which the sample's values never give the tables"
+                "Polars refuses to divide a Decimal by zero, which the sample's values never give the tables, though a sum of no rows is zero"
             }
             Self::AValueBeyondADecimal => {
                 "a UInt128 beyond the digits of a decimal cannot be cast to it, which the tables measured on values within it"
@@ -465,10 +473,10 @@ impl Limit {
                 "Polars does not check the dtypes of a bitwise call in a join's key as it does in select, so it accepts a call the tables refuse for them"
             }
             Self::ABoundWithValuesOfItsOwn => {
-                "Polars casts the values of a bound of clip to the dtype it clips, which the tables measured as the sample's rows, and a bound with others passes"
+                "Polars casts the values of a bound of clip to the dtype it clips, and a count of characters to a whole number, which the tables measured as the sample's rows, and a bound or a count with others passes"
             }
             Self::ACastOfAValueTheDtypeCannotHold => {
-                "a strict cast, which a test of closeness and a fill by a value make of what they meet, refuses a value its dtype cannot hold, which the tables measured only with the sample's rows, whose values every number dtype holds"
+                "a strict cast, which a test of closeness, a fill by a value and a count of characters make of what they meet, refuses a value its dtype cannot hold, which the tables measured only with the sample's rows, whose values every number dtype holds"
             }
             Self::ADropChangesTheLengths => {
                 "a drop of nulls or of NaNs leaves fewer values where the rows hold one, which the tables measured on a column that holds none"
@@ -498,9 +506,10 @@ fn is(call: &Call, id: &str) -> bool {
     call.entry().id().as_str() == id
 }
 
-const ONE_VALUE: [&str; 8] = [
+const ONE_VALUE: [&str; 9] = [
     "Expr.has_nulls",
     "Expr.null_count",
+    "Expr.str.join",
     "Expr.sum",
     "Expr.min",
     "Expr.max",
@@ -1596,7 +1605,8 @@ pub fn case_changed(case: &Case, change: &dyn Fn(&Call) -> Option<Call>) -> Opti
 /// the one dtype that holds both as a strict cast does, and a strict replacement asked for a dtype
 /// and given no default.
 fn is_a_strict_cast(call: &Call) -> bool {
-    is(call, "Expr.is_close")
+    is_a_count_of_characters(call)
+        || is(call, "Expr.is_close")
         || (is(call, "Expr.fill_null") && call.argument("value").is_some())
         || is(call, "Expr.fill_nan")
         // Given no default it converts what replaces to the dtype strictly, and given one it
@@ -1612,13 +1622,77 @@ fn is_a_strict_cast(call: &Call) -> bool {
             && !matches!(call.argument("strict"), Some(Value::Flag(Some(false)))))
 }
 
+/// The methods of text that take a count of characters, and the parameters that hold it: Polars
+/// converts a count to a whole number strictly, to a signed one for where to start and how many
+/// to keep from the start or the end, and to an unsigned one for how long, so that a negative
+/// length, the infinity or the not-a-number of a float, or a value out of the range is refused
+/// when the rows run.
+const COUNTS_OF_CHARACTERS: [(&str, &[&str]); 6] = [
+    ("Expr.str.head", &["n"]),
+    ("Expr.str.pad_end", &["length"]),
+    ("Expr.str.pad_start", &["length"]),
+    ("Expr.str.slice", &["offset", "length"]),
+    ("Expr.str.tail", &["n"]),
+    ("Expr.str.zfill", &["length"]),
+];
+
+/// The parameters of the call that hold a count of characters, which are given, if it is a method
+/// of text that takes one.
+fn counts_of(call: &Call) -> Vec<&'static str> {
+    COUNTS_OF_CHARACTERS
+        .iter()
+        .filter(|(id, _)| is(call, id))
+        .flat_map(|(_, names)| names.iter().copied())
+        .filter(|name| call.argument(name).is_some())
+        .collect()
+}
+
+/// Whether the call is a method of text that is given a count of characters.
+fn is_a_count_of_characters(call: &Call) -> bool {
+    !counts_of(call).is_empty()
+}
+
+/// The whole number 1 as a literal, which every count converts without a failure.
+fn the_number_one() -> Option<Expression> {
+    let literal = Call::new(
+        catalog::entry("polars.lit")?,
+        vec![("value", Value::Integer(1))],
+    )
+    .ok()?;
+    Expression::new(Start::Call(literal), Vec::new()).ok()
+}
+
+/// The call with the count of every parameter that holds one made the whole number 1, which
+/// converts without a failure.
+fn without_counts(call: &Call) -> Option<Call> {
+    let counts = counts_of(call);
+    let one = the_number_one()?;
+    let given: Vec<(&str, Value)> = call
+        .arguments()
+        .iter()
+        .map(|given| {
+            let value = if counts.contains(&given.parameter()) {
+                Value::Expression(one.clone())
+            } else {
+                given.value().clone()
+            };
+            (given.parameter(), value)
+        })
+        .collect();
+    Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
+}
+
 /// The case with no strict cast: each gives a null where a value does not convert, a test of
 /// closeness is the comparison of what it compares and a fill by a value a fill forward, which
-/// convert nothing, and a replacement is not asked for a dtype, which converts nothing.
+/// convert nothing, a count of characters is the whole number 1, which converts without a failure,
+/// and a replacement is not asked for a dtype, which converts nothing.
 fn case_without_strict_casts(case: &Case) -> Option<Case> {
     case_changed(case, &|call| {
         if !is_a_strict_cast(call) {
             return None;
+        }
+        if is_a_count_of_characters(call) {
+            return without_counts(call);
         }
         if is(call, "Expr.is_close") {
             let other = call.argument("other")?.clone();
@@ -2129,25 +2203,59 @@ fn is_a_bare_column(expression: &Expression) -> bool {
         && matches!(expression.start(), Start::Call(call) if is(call, "polars.col"))
 }
 
-/// Whether the call is a `clip` with a bound that is not a bare column: one that may hold other
-/// values than the sample's rows.
-fn has_a_bound_of_its_own(call: &Call) -> bool {
-    is(call, "Expr.clip")
-        && ["lower_bound", "upper_bound"].iter().any(|bound| {
-            matches!(call.argument(bound), Some(Value::Expression(expression)) if !is_a_bare_column(expression))
+/// The parameters of the call that hold an expression that is not a bare column: one that may hold
+/// other values than the sample's rows.
+fn computed(call: &Call, parameters: &[&str]) -> Vec<String> {
+    parameters
+        .iter()
+        .filter(|parameter| {
+            matches!(call.argument(parameter), Some(Value::Expression(expression)) if !is_a_bare_column(expression))
         })
+        .map(|parameter| (*parameter).to_owned())
+        .collect()
 }
 
-/// The case with the computed bounds of every `clip` undone, which are the bounds that hold
-/// values of their own; a bound that is a bare column stays.
+/// The parameters of a `clip` that hold a bound, and of a method of text that holds a count of
+/// characters, that is not a bare column.
+fn computed_values_cast(call: &Call) -> Vec<String> {
+    if is(call, "Expr.clip") {
+        computed(call, &["lower_bound", "upper_bound"])
+    } else {
+        let counts = counts_of(call);
+        computed(call, &counts)
+    }
+}
+
+/// Whether the call is a `clip` with a bound, or a method of text with a count of characters, that
+/// is not a bare column: one that may hold other values than the sample's rows.
+fn has_a_bound_of_its_own(call: &Call) -> bool {
+    !computed_values_cast(call).is_empty()
+}
+
+/// The case with the computed bounds of every `clip` undone, and the computed counts of characters
+/// of every method of text made the whole number 1, which are the bounds and the counts that hold
+/// values of their own; a bound or a count that is a bare column stays.
 fn case_without_computed_bounds(case: &Case) -> Option<Case> {
-    case_without(case, &|call, parameter| {
-        is(call, "Expr.clip")
-            && matches!(parameter, "lower_bound" | "upper_bound")
-            && matches!(
-                call.argument(parameter),
-                Some(Value::Expression(expression)) if !is_a_bare_column(expression)
-            )
+    case_changed(case, &|call| {
+        let computed = computed_values_cast(call);
+        if computed.is_empty() {
+            return None;
+        }
+        let clipped = is(call, "Expr.clip");
+        let one = the_number_one()?;
+        let given: Vec<(&str, Value)> = call
+            .arguments()
+            .iter()
+            .filter(|given| !(clipped && computed.iter().any(|name| name == given.parameter())))
+            .map(|given| {
+                if !clipped && computed.iter().any(|name| name == given.parameter()) {
+                    (given.parameter(), Value::Expression(one.clone()))
+                } else {
+                    (given.parameter(), given.value().clone())
+                }
+            })
+            .collect();
+        Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
     })
 }
 
@@ -2161,7 +2269,7 @@ fn the_bare_bounds_alone_are_refused(case: &Case) -> bool {
                 && is_a_failed_cast(&refused.reason)
                 && locate(&control, &refused.place)
                     .call
-                    .is_some_and(|call| is(call, "Expr.clip"))
+                    .is_some_and(|call| is(call, "Expr.clip") || is_a_count_of_characters(call))
         }
         _ => false,
     })
@@ -2171,6 +2279,13 @@ fn the_bare_bounds_alone_are_refused(case: &Case) -> bool {
 /// failed conversion of values or of a list's type.
 fn is_a_failed_cast(reason: &str) -> bool {
     is_a_failed_conversion(reason) || reason.starts_with("cannot cast ")
+}
+
+/// Whether Polars refused a literal that it converts when it works out the schema, as it does one
+/// value that it can fold, not a column that it converts when the rows run: it names the scalar
+/// the literal is, and says it of the schema.
+fn is_a_literal_that_failed_to_convert(refusal: &Refusal) -> bool {
+    refusal.stage == Stage::Schema && refusal.reason.contains("failed in column 'scalar'")
 }
 
 /// Whether the reason is that of a value that could not be cast: Polars' words for it, which
@@ -2887,9 +3002,9 @@ fn applies(
                 && refused_on_columns_as_a_select(case, refused)
         }
         (Limit::ADivisionByZero, Disagreement::PolarsRefuses(refusal)) => {
-            // The rows hold the divisor; a table with no rows holds none.
+            // The rows hold the divisor, and so does the empty table, whose sum is zero.
             unplaced(refusal)
-                && refusal.stage == Stage::Rows
+                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
                 && refusal.reason.contains("division by zero Decimal")
                 && [case.receiver, case.argument].contains(&Representative::Decimal)
                 && held.iter().any(|(_, held)| {
@@ -2949,9 +3064,10 @@ fn applies(
                 && refused_for_a_failed_conversion_without_bounds(case) == Some(false)
         }
         (Limit::ABoundWithValuesOfItsOwn, Disagreement::PolarsAllows(refused)) => {
-            // A clip casts nothing but its bounds, so a failed cast of the rows at the clip is
-            // a bound's, and it is the one with values of its own where it is no bare column and
-            // the tables do not refuse the clip without it.
+            // A clip casts nothing but its bounds, and a method of text its counts, so a failed
+            // cast of the rows at the call is a bound's or a count's, and it is the one with
+            // values of its own where it is no bare column and the tables do not refuse the call
+            // without it.
             refused.stage == Some(TableStage::Rows)
                 && is_a_failed_cast(&refused.reason)
                 && locate(case, &refused.place)
@@ -3002,10 +3118,13 @@ fn applies(
         }
         (Limit::ACastOfAValueTheDtypeCannotHold, Disagreement::PolarsRefuses(refusal)) => {
             // The rows hold the value, and so may a table with no rows, where an aggregate of
-            // nothing, as the sum, is a value of its own for the cast to meet. The cast is the
-            // cause where Polars stops refusing for a failed conversion once no cast is strict.
+            // nothing, as the sum, is a value of its own for the cast to meet. A literal is
+            // converted when the schema is worked out, so the refusal is the schema's, naming the
+            // scalar. The cast is the cause where Polars stops refusing for a failed conversion
+            // once no cast is strict.
             unplaced(refusal)
-                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                && (matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                    || is_a_literal_that_failed_to_convert(refusal))
                 && is_a_failed_conversion(&refusal.reason)
                 && held
                     .iter()
@@ -4204,6 +4323,70 @@ mod tests {
         );
     }
 
+    const TEXT_COUNT: &str = "conversion from `str` to `u64` failed in column 'b' for 2 out of 3 values: [\"1d\", \"2d\"]";
+
+    #[test]
+    fn a_failed_cast_at_a_count_of_characters_is_excused_where_a_count_is_no_bare_column() {
+        // Polars converts a count to a whole number, and text that reads as one is converted, where
+        // the tables measured the text of the sample's rows, a duration no number reads.
+        let at_the_call = link_of("exprs", 0, 0);
+        for count in [
+            whole(1),
+            chain(null(), &[]),
+            chain(column("k"), &["Expr.sqrt"]),
+        ] {
+            for (id, parameter) in [
+                ("Expr.str.pad_end", "length"),
+                ("Expr.str.zfill", "length"),
+                ("Expr.str.head", "n"),
+                ("Expr.str.slice", "offset"),
+            ] {
+                let counted = call(id, vec![(parameter, Value::Expression(count.clone()))]);
+                let case = select(vec![chain_of(column("g"), vec![counted])]);
+                assert_eq!(
+                    tables_refuse(&case, at_the_call.clone(), ROWS, TEXT_COUNT),
+                    vec![Limit::ABoundWithValuesOfItsOwn],
+                    "{id}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_failed_cast_at_a_count_is_not_excused_by_a_bare_column_or_another_call() {
+        // A bare column holds the sample's rows as the tables measured them, and Polars refuses it
+        // the same way.
+        let at_the_call = link_of("exprs", 0, 0);
+        let bare = call(
+            "Expr.str.pad_end",
+            vec![("length", Value::Expression(chain(column("b"), &[])))],
+        );
+        let case = select(vec![chain_of(column("g"), vec![bare])]);
+        assert_eq!(
+            tables_refuse(&case, at_the_call.clone(), ROWS, TEXT_COUNT),
+            vec![]
+        );
+        // A text method given no count converts nothing, and a refusal of another call is not the
+        // count's.
+        let counted = call(
+            "Expr.str.pad_end",
+            vec![("length", Value::Expression(whole(1)))],
+        );
+        let case = select(vec![chain_of(
+            column("g"),
+            vec![counted, call("Expr.str.to_uppercase", Vec::new())],
+        )]);
+        assert_eq!(
+            tables_refuse(&case, link_of("exprs", 0, 1), ROWS, TEXT_COUNT),
+            vec![]
+        );
+        let plain = select(vec![chain_of(
+            column("g"),
+            vec![call("Expr.str.to_uppercase", Vec::new())],
+        )]);
+        assert_eq!(tables_refuse(&plain, at_the_call, ROWS, TEXT_COUNT), vec![]);
+    }
+
     // ----- A window over a literal
 
     const SCHEMA_SAYS_FLOAT: &str = "the schema says Datetime(us, UTC) and the rows give Float64";
@@ -4980,6 +5163,39 @@ mod tests {
         assert_eq!(
             polars_refuses(&other_side, None, Stage::Rows, DIVISION_BY_ZERO, Vec::new()),
             vec![Limit::ADivisionByZero]
+        );
+    }
+
+    #[test]
+    fn a_division_by_zero_of_the_sum_of_nothing_is_excused_at_the_empty_table() {
+        // The sum of no rows is zero, a divisor a table of rows does not give: Polars refuses the
+        // empty table, which holds a zero where the sample's rows hold none.
+        let case = with_a_decimal(select(vec![chain_of(
+            column("b"),
+            vec![
+                call("Expr.sum", Vec::new()),
+                compared_with("Expr.floordiv", chain(column("a"), &["Expr.sum"])),
+            ],
+        )]));
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Empty, DIVISION_BY_ZERO, Vec::new()),
+            vec![Limit::ADivisionByZero]
+        );
+        // Only the rows and the empty table hold a divisor: the schema holds none, and neither
+        // does a place.
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Schema, DIVISION_BY_ZERO, Vec::new()),
+            vec![]
+        );
+        assert_eq!(
+            polars_refuses(
+                &case,
+                Some(link_of("exprs", 0, 0)),
+                Stage::Empty,
+                DIVISION_BY_ZERO,
+                Vec::new()
+            ),
+            vec![]
         );
     }
 
@@ -6305,6 +6521,124 @@ mod tests {
         )]);
         assert_eq!(
             refused_for_a_bound(&comparison, None, Stage::Rows, CLOSE_NOT_HELD),
+            vec![]
+        );
+    }
+
+    const COUNT_NOT_HELD: &str =
+        "conversion from `f64` to `u64` failed in column 'k' for 1 out of 1 values: [-2.262654]";
+
+    /// A count of characters that holds a negative number of a float: the cosine of `k`, cotangent
+    /// of which is `-2.26` in the first row.
+    fn a_negative_count() -> Expression {
+        chain(column("k"), &["Expr.cos", "Expr.cot"])
+    }
+
+    #[test]
+    fn a_failed_conversion_is_excused_where_a_count_of_characters_is_why() {
+        // Polars converts each count to a whole number strictly, and stops refusing once each is
+        // the whole number 1.
+        for (id, parameter) in [
+            ("Expr.str.head", "n"),
+            ("Expr.str.tail", "n"),
+            ("Expr.str.slice", "offset"),
+            ("Expr.str.pad_start", "length"),
+            ("Expr.str.pad_end", "length"),
+            ("Expr.str.zfill", "length"),
+        ] {
+            let counted = call(id, vec![(parameter, Value::Expression(a_negative_count()))]);
+            let case = select(vec![chain_of(column("g"), vec![counted])]);
+            assert_eq!(
+                refused_for_a_bound(&case, None, Stage::Rows, COUNT_NOT_HELD),
+                vec![Limit::ACastOfAValueTheDtypeCannotHold],
+                "{id}"
+            );
+        }
+        // The length of a slice is converted too, beside an offset that is not the cause.
+        let slice = call(
+            "Expr.str.slice",
+            vec![
+                ("offset", Value::Expression(whole(1))),
+                ("length", Value::Expression(a_negative_count())),
+            ],
+        );
+        let case = select(vec![chain_of(column("g"), vec![slice])]);
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, COUNT_NOT_HELD),
+            vec![Limit::ACastOfAValueTheDtypeCannotHold]
+        );
+    }
+
+    #[test]
+    fn a_failed_conversion_is_not_excused_by_a_method_of_text_that_counts_nothing() {
+        // Text that is not asked to count converts nothing, so the failed conversion is not its
+        // count's, and the control is the case itself.
+        let case = select(vec![chain_of(
+            column("g"),
+            vec![call("Expr.str.to_uppercase", Vec::new())],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, COUNT_NOT_HELD),
+            vec![]
+        );
+        // A method of text that is given a column to strip is no count either.
+        let stripped = call(
+            "Expr.str.strip_chars",
+            vec![("characters", Value::Expression(a_negative_count()))],
+        );
+        let case = select(vec![chain_of(column("g"), vec![stripped])]);
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, COUNT_NOT_HELD),
+            vec![]
+        );
+    }
+
+    const LITERAL_COUNT_NOT_HELD: &str =
+        "conversion from `i128` to `u64` failed in column 'scalar' for 1 out of 1 values: [-1]";
+
+    #[test]
+    fn a_failed_conversion_of_a_literal_count_is_excused_at_the_schema_where_a_count_is_why() {
+        // A literal is one value that Polars converts when it works out the schema, where a column
+        // is converted when the rows run, so the refusal is of the schema and names the scalar.
+        for (id, parameter) in [
+            ("Expr.str.pad_start", "length"),
+            ("Expr.str.zfill", "length"),
+            ("Expr.str.slice", "length"),
+        ] {
+            let mut given = vec![(parameter, Value::Expression(whole(-1)))];
+            if parameter == "length" && id == "Expr.str.slice" {
+                given.push(("offset", Value::Expression(whole(1))));
+            }
+            let case = select(vec![chain_of(column("g"), vec![call(id, given)])]);
+            assert_eq!(
+                refused_for_a_bound(&case, None, Stage::Schema, LITERAL_COUNT_NOT_HELD),
+                vec![Limit::ACastOfAValueTheDtypeCannotHold],
+                "{id}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_failed_conversion_at_the_schema_is_excused_only_for_the_scalar_of_a_case_with_a_count() {
+        let counted = call(
+            "Expr.str.zfill",
+            vec![("length", Value::Expression(whole(-1)))],
+        );
+        let case = select(vec![chain_of(column("g"), vec![counted])]);
+        // A column that a conversion fails for is the rows', and Polars names it when it runs them.
+        let of_a_column =
+            "conversion from `i128` to `u64` failed in column 'k' for 1 out of 1 values: [-1]";
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Schema, of_a_column),
+            vec![]
+        );
+        // A scalar that no count or cast is why: the text is not asked to count anything.
+        let plain = select(vec![chain_of(
+            column("g"),
+            vec![call("Expr.str.to_uppercase", Vec::new())],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(&plain, None, Stage::Schema, LITERAL_COUNT_NOT_HELD),
             vec![]
         );
     }

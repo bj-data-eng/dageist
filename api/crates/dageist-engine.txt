@@ -251,6 +251,7 @@ pub fn dageist_engine::allowed::argument_dtypes(entry: &dageist_engine::catalog:
 pub fn dageist_engine::allowed::default_argument(entry: &'static dageist_engine::catalog::Entry, place: &dageist_engine::allowed::Place) -> core::option::Option<dageist_engine::allowed::DefaultArgument>
 pub fn dageist_engine::allowed::dtype_name(dtype: &polars_core::datatypes::dtype::DataType) -> alloc::string::String
 pub fn dageist_engine::allowed::fit(candidate: &dageist_engine::allowed::Candidate, slot: &dageist_engine::allowed::Slot<'_>) -> core::option::Option<dageist_engine::allowed::Fit>
+pub fn dageist_engine::allowed::left_out_at_start(entry: &'static dageist_engine::catalog::Entry) -> core::option::Option<&'static str>
 pub fn dageist_engine::allowed::offer(entry: &'static dageist_engine::catalog::Entry, place: &dageist_engine::allowed::Place, chosen: &dageist_engine::allowed::Chosen<'_>) -> dageist_engine::allowed::Verdict
 pub fn dageist_engine::allowed::offer_input(place: &dageist_engine::allowed::Place, dtype: dageist_engine::allowed::Representative, shape: dageist_engine::allowed::Shape) -> dageist_engine::allowed::Verdict
 pub fn dageist_engine::allowed::offers(place: &dageist_engine::allowed::Place) -> alloc::vec::Vec<dageist_engine::allowed::Offer>
@@ -379,15 +380,17 @@ pub dageist_engine::catalog::Family::Cumulative
 pub dageist_engine::catalog::Family::Logic
 pub dageist_engine::catalog::Family::Maths
 pub dageist_engine::catalog::Family::Nulls
+pub dageist_engine::catalog::Family::Pieces
 pub dageist_engine::catalog::Family::Rounding
 pub dageist_engine::catalog::Family::Rows
 pub dageist_engine::catalog::Family::Start
 pub dageist_engine::catalog::Family::Steps
 pub dageist_engine::catalog::Family::Temporal
+pub dageist_engine::catalog::Family::Text
 pub dageist_engine::catalog::Family::Trigonometry
 pub dageist_engine::catalog::Family::Window
 impl dageist_engine::catalog::Family
-pub const dageist_engine::catalog::Family::ALL: [Self; 17]
+pub const dageist_engine::catalog::Family::ALL: [Self; 19]
 pub const fn dageist_engine::catalog::Family::key(self) -> &'static str
 pub enum dageist_engine::catalog::Kind
 pub dageist_engine::catalog::Kind::Choice(&'static [&'static str])
@@ -422,8 +425,11 @@ pub dageist_engine::catalog::Role::Divisor
 pub dageist_engine::catalog::Role::Exponent
 pub dageist_engine::catalog::Role::Filler
 pub dageist_engine::catalog::Role::FloorDivisor
+pub dageist_engine::catalog::Role::Length
 pub dageist_engine::catalog::Role::Operand
 pub dageist_engine::catalog::Role::Plain
+impl dageist_engine::catalog::Role
+pub const fn dageist_engine::catalog::Role::is_a_count(self) -> bool
 pub enum dageist_engine::catalog::Setting
 pub dageist_engine::catalog::Setting::Comparison
 pub dageist_engine::catalog::Setting::Comparison::entry: &'static str
@@ -567,6 +573,7 @@ pub struct dageist_engine::catalog::Parameter
 impl dageist_engine::catalog::Parameter
 pub const fn dageist_engine::catalog::Parameter::adapts_numbers_only(&self) -> bool
 pub const fn dageist_engine::catalog::Parameter::as_many_as(&self) -> core::option::Option<dageist_engine::catalog::AsManyAs>
+pub const fn dageist_engine::catalog::Parameter::broadcasts(&self) -> bool
 pub const fn dageist_engine::catalog::Parameter::converts(&self) -> &'static [&'static str]
 pub const fn dageist_engine::catalog::Parameter::default(&self) -> dageist_engine::catalog::ParameterDefault
 pub const fn dageist_engine::catalog::Parameter::in_place_of(&self) -> core::option::Option<&'static str>
@@ -583,6 +590,7 @@ pub const fn dageist_engine::catalog::Parameter::writes(&self) -> dageist_engine
 impl dageist_engine::catalog::Parameter
 pub fn dageist_engine::catalog::Parameter::default_setting(&self) -> core::option::Option<dageist_engine::catalog::Setting>
 pub fn dageist_engine::catalog::Parameter::start_setting(&self) -> dageist_engine::catalog::Setting
+pub fn dageist_engine::catalog::Parameter::starts_left_out(&self) -> bool
 pub struct dageist_engine::catalog::StepFrame<'a>
 pub dageist_engine::catalog::StepFrame::columns: &'a [alloc::string::String]
 pub dageist_engine::catalog::StepFrame::tables: &'a [alloc::string::String]

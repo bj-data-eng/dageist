@@ -971,6 +971,12 @@ impl Gen<'_> {
             slots.extend(position);
             let built: Vec<Built> = match (id, name) {
                 ("Expr.shift", _) => vec![self.scalar(name == "n")],
+                // Polars builds a text of as many characters as the length converts to, which for
+                // a timestamp is the microseconds since the epoch: a length that is a chain of
+                // any dtype can fill the memory, so it is the number 1 of a dtype, as a shift's.
+                ("Expr.str.pad_start" | "Expr.str.pad_end" | "Expr.str.zfill", "length") => {
+                    vec![self.scalar(false)]
+                }
                 ("Expr.replace" | "Expr.replace_strict", "old") => {
                     let built = self.replaced();
                     replaces_a_literal = built.expression.links().is_empty()
@@ -1051,6 +1057,7 @@ impl Gen<'_> {
         }
         given.extend(self.dtype_arguments(entry));
         given.extend(self.numbers(entry, &given));
+        given.extend(self.texts(entry));
         if id == "Expr.over" {
             let ordered = given.iter().any(|(name, _)| *name == "order_by");
             let optioned = given
@@ -1127,6 +1134,27 @@ impl Gen<'_> {
             numbers.push((name, value));
         }
         numbers
+    }
+
+    /// The texts a method is given for the parameters that take one: what `join` puts between the
+    /// values it joins, and the one character that `pad_start` and `pad_end` add. A fill character
+    /// is one character, as Python's binding takes it, and the others, which differ in how many
+    /// bytes they take, show the lengths in characters and in bytes apart.
+    fn texts(&mut self, entry: &'static Entry) -> Vec<(&'static str, Value)> {
+        let mut texts = Vec::new();
+        for parameter in entry.parameters() {
+            if parameter.kind() != Kind::Value(ValueType::String) || !self.draw.chance(50) {
+                continue;
+            }
+            let name = parameter.name();
+            let value = match name {
+                "delimiter" => self.draw.pick(&["", "-", ", ", "é", "ab"]),
+                "fill_char" => self.draw.pick(&["*", "0", " ", "é", "-"]),
+                other => panic!("the generator does not know what to give {other}"),
+            };
+            texts.push((name, Value::String(value.to_owned())));
+        }
+        texts
     }
 
     /// The dtypes a method is given for the parameters that take one: the dtype a cast gives,
@@ -1243,6 +1271,59 @@ mod tests {
     fn shifts_back(case: &Case) -> bool {
         let written = case.document.write();
         written.contains("\"Expr.shift\"") && written.contains("\"integer\":-")
+    }
+
+    /// Whether every call of `id` in the JSON `value` is given as `length` a literal alone.
+    fn lengths_are_literals(value: &serde_json::Value, ids: &[&str], found: &mut usize) -> bool {
+        match value {
+            serde_json::Value::Object(map) => {
+                let mut fine = true;
+                if map
+                    .get("entry")
+                    .and_then(|entry| entry.as_str())
+                    .is_some_and(|entry| ids.contains(&entry))
+                    && let Some(length) = map.get("arguments").and_then(|given| given.get("length"))
+                {
+                    *found += 1;
+                    let expression = &length["expression"];
+                    fine = expression["then"].as_array().is_some_and(Vec::is_empty)
+                        && expression["start"]["entry"] == "polars.lit";
+                }
+                fine && map
+                    .values()
+                    .all(|inside| lengths_are_literals(inside, ids, found))
+            }
+            serde_json::Value::Array(items) => items
+                .iter()
+                .all(|inside| lengths_are_literals(inside, ids, found)),
+            _ => true,
+        }
+    }
+
+    #[test]
+    fn the_length_a_text_is_padded_to_is_a_literal_that_cannot_be_a_huge_number() {
+        // A date, a time or a timestamp that is a length converts to the number it counts, which
+        // for a timestamp is the microseconds since the epoch, and Polars builds a text of that many
+        // characters: a case that never ends and fills the memory, which is no table's business.
+        // The generator gives a length as a literal of the number 1, as it gives the shift of `shift`.
+        let mut found = 0;
+        for offset in 0..8000_u64 {
+            let Some(case) = generate(&entropy(offset)) else {
+                continue;
+            };
+            let document: serde_json::Value =
+                serde_json::from_str(case.document.write().as_str()).expect("a document");
+            assert!(
+                lengths_are_literals(
+                    &document,
+                    &["Expr.str.pad_start", "Expr.str.pad_end", "Expr.str.zfill"],
+                    &mut found
+                ),
+                "{}",
+                case.document.write()
+            );
+        }
+        assert!(found > 5, "the cases pad text only {found} times");
     }
 
     #[test]

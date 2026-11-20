@@ -9,7 +9,7 @@ use super::adapt::could_be_taken_by_a_number;
 use super::context::Context;
 use super::dtype::{Representative, ResultDtype};
 use super::rules::Rule;
-use super::table::{Outcome, Produces, Reason, Shape, Stage, Tables, is_method};
+use super::table::{OptionValue, Outcome, Produces, Reason, Shape, Stage, Tables, is_method};
 use crate::catalog::DefaultValue;
 
 /// What an expression has so far, where an entry would follow it.
@@ -1090,6 +1090,61 @@ fn check_conversions(entry: &Entry, chosen: &Chosen<'_>) -> Result<(), Refusal> 
     Ok(())
 }
 
+/// Whether the option `name` of `entry` may be set to `word`, where the other options are at their
+/// defaults, as the lines of the option table that pair it with an option at its default say.
+/// `Ok` where no line does.
+fn alone_in_a_pair(
+    entry: &Entry,
+    receiver: Option<Representative>,
+    name: &str,
+    word: &str,
+) -> Result<(), Refusal> {
+    let tables = Tables::committed();
+    let id = entry.id().as_str();
+    let at_default = |(other, set): &(&str, String)| {
+        entry
+            .parameters()
+            .iter()
+            .find(|parameter| parameter.name() == *other)
+            .is_some_and(|parameter| default_word(parameter).as_deref() == Some(set.as_str()))
+    };
+    let mut lines: Vec<(&Vec<OptionValue>, &Outcome)> = Vec::new();
+    for ((line_id, line_receiver, line), outcome) in &tables.options {
+        if *line_id != id
+            || *line_receiver != receiver
+            || line.len() != 2
+            || !line
+                .iter()
+                .any(|(set, value)| *set == name && value == word)
+        {
+            continue;
+        }
+        let others: Vec<&(&str, String)> = line
+            .iter()
+            .filter(|(set, value)| !(*set == name && value == word))
+            .collect();
+        if others.iter().all(|other| at_default(other)) {
+            lines.push((line, outcome));
+        }
+    }
+    first_refusal(lines)
+}
+
+/// The refusal of the first of `lines`, in the order of what they set, if any is refused: the
+/// lines come from a map that has no order, so the reason is chosen by the options, and a refusal
+/// is preferred where the lines disagree, for Polars refusing the option beside one of its pairs
+/// is refusing it.
+fn first_refusal(mut lines: Vec<(&Vec<OptionValue>, &Outcome)>) -> Result<(), Refusal> {
+    lines.sort_by_key(|(first, _)| *first);
+    lines
+        .into_iter()
+        .find_map(|(_, outcome)| match outcome {
+            Outcome::Refused(reason) => Some(Refusal::polars(reason)),
+            Outcome::Allowed(_) => None,
+        })
+        .map_or(Ok(()), Err)
+}
+
 /// Whether the options `chosen` of `entry` may be set together where a method follows a value
 /// of the dtype `receiver`, or for a step, which follows none.
 fn check_options(
@@ -1120,10 +1175,20 @@ fn check_options(
         named.sort_by_key(|(name, _)| position(name));
         named
     };
-    let check = |key: Vec<(&'static str, String)>| match tables.options.get(&(id, receiver, key)) {
-        Some(Outcome::Refused(reason)) => Err(Refusal::polars(reason)),
-        Some(Outcome::Allowed(_)) | None => Ok(()),
-    };
+    let check =
+        |key: Vec<(&'static str, String)>| match tables.options.get(&(id, receiver, key.clone())) {
+            Some(Outcome::Refused(reason)) => Err(Refusal::polars(reason)),
+            Some(Outcome::Allowed(_)) => Ok(()),
+            // A method with several options has no line for one of them alone. It is set to its
+            // word beside every other option at its default, so the lines that say that are
+            // asked: Polars refusing the pair is refusing the option. A step is measured with the
+            // arguments the harness gives it, which a pair of its options is refused for as well,
+            // as a cross join is given keys, so its lines say nothing of one option alone.
+            None => match key.as_slice() {
+                [(name, word)] if is_method(entry) => alone_in_a_pair(entry, receiver, name, word),
+                _ => Ok(()),
+            },
+        };
     match named.as_slice() {
         [] => Ok(()),
         [one] => check(vec![one.clone()]),
@@ -1153,5 +1218,88 @@ fn check_options(
             }
             Ok(())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn refused(text: &str) -> Outcome {
+        Outcome::Refused(Reason {
+            stage: Stage::Schema,
+            text: text.to_owned(),
+        })
+    }
+
+    #[test]
+    fn a_refusal_is_preferred_where_the_lines_that_pair_an_option_disagree() {
+        let (first, second) = (
+            vec![("a", "false".to_owned()), ("z", "true".to_owned())],
+            vec![("b", "false".to_owned()), ("z", "true".to_owned())],
+        );
+        let allowed = Outcome::Allowed(None);
+        let no = refused("no");
+        // However the lines come, the refusal is found, and it is the same.
+        for lines in [
+            vec![(&first, &allowed), (&second, &no)],
+            vec![(&second, &no), (&first, &allowed)],
+        ] {
+            let found = first_refusal(lines).expect_err("a refusal");
+            assert_eq!(found.reason(), "no");
+        }
+        assert!(first_refusal(vec![(&first, &allowed), (&second, &allowed)]).is_ok());
+        assert!(first_refusal(Vec::new()).is_ok());
+    }
+
+    #[test]
+    fn the_refusal_of_two_lines_is_the_one_whose_options_come_first_whatever_the_order_given() {
+        let (first, second) = (
+            vec![("a", "false".to_owned()), ("z", "true".to_owned())],
+            vec![("b", "false".to_owned()), ("z", "true".to_owned())],
+        );
+        let (one, other) = (refused("one"), refused("other"));
+        for lines in [
+            vec![(&first, &one), (&second, &other)],
+            vec![(&second, &other), (&first, &one)],
+        ] {
+            assert_eq!(first_refusal(lines).expect_err("a refusal").reason(), "one");
+        }
+    }
+
+    fn entry(id: &str) -> &'static Entry {
+        catalog::entry(id).unwrap_or_else(|| panic!("no entry {id}"))
+    }
+
+    #[test]
+    fn a_method_with_one_option_other_than_a_split_is_judged_by_its_own_lines() {
+        // `dt.total_days(fractional)` has the one option, so the table has a line for each word.
+        for word in ["true", "false"] {
+            assert!(options(entry("Expr.dt.total_days"), &[("fractional", word)]).is_ok());
+        }
+    }
+
+    #[test]
+    fn a_method_with_several_options_is_judged_the_same_every_time_by_the_pairs_of_each() {
+        // `over` has several options and no line for one alone, and Polars refuses none of its
+        // words: each is allowed, as often as it is asked.
+        for word in ["group_to_rows", "join", "explode"] {
+            for _ in 0..3 {
+                assert!(options(entry("Expr.over"), &[("mapping_strategy", word)]).is_ok());
+            }
+        }
+        // A split by a pattern is refused with the same reason every time.
+        let reasons: Vec<String> = (0..4)
+            .map(|_| {
+                options(entry("Expr.str.split"), &[("literal", "false")])
+                    .expect_err("refused")
+                    .reason()
+                    .to_owned()
+            })
+            .collect();
+        assert!(
+            reasons.windows(2).all(|pair| pair[0] == pair[1]),
+            "{reasons:?}"
+        );
     }
 }

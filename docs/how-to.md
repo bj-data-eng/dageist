@@ -421,6 +421,21 @@ differs. Run them when the generator's Cargo or rustdoc handling changes:
 env -u CARGO_TARGET_DIR CARGO_NET_OFFLINE=true cargo test --offline --locked --manifest-path api/generator/Cargo.toml --lib -- --ignored
 ```
 
+## Add Entries To The Catalogue
+
+A new entry is data in `crates/dageist-engine/src/catalog/entries.rs` and its words in
+`en.toml`, with each parameter as the signature in `api/polars/python.txt` has it. Refresh
+[the tables](#refresh-the-tables-of-allowed-combinations) and the
+[snapshots the host writes](#refresh-the-offers-snapshots), then run the engine's tests, which check
+the entry against Polars: its dtypes, its parameters and defaults, its words, and the facts the walk
+reads. A method with an expression parameter is checked by
+`allowed::tests::broadcast`: for each such parameter it gives Polars a receiver of one value and a
+column for the operand, and holds the catalogue's `broadcasts` to whether the result is many values,
+so a parameter that Polars does not meet a receiver of one value with each value of, as one that takes
+one value only, has to say so with `not_broadcasting`. A test that cannot measure a parameter is
+listed there with the reason. Last, run the fuzz target for more seeds than the engine's tests do,
+[as below](#check-the-tables-against-polars).
+
 ## Refresh The Tables Of Allowed Combinations
 
 The files `dtypes.txt`, `contexts.txt` and `options.txt` in
@@ -545,8 +560,12 @@ Polars by hand, and decide which it is:
   has an `otherwise`, which Polars drops where the values of the condition are one
   expression, the case with the last value of each condition made a fill forward of what
   it was, where Polars refusing it for the tables' reason shows that the predicate is one
-  it skips. A call that the tables judge by each of its values beside a companion,
-  `replace`, `replace_strict`, `is_between` and `is_close`, counts when Polars refuses
+  it skips; and, for a predicate that the rule that a condition's predicate be a `Boolean`
+  refused where no column of its dtype can be asked or no column is to be had, as in a
+  pivot's aggregate, the condition alone with what follows it removed, where Polars refusing
+  it in the predicate, and allowing it with the predicate made `true`, shows that a sort key
+  of one value or a fold to `true` is why Polars never evaluated it. A call that the tables
+  judge by each of its values beside a companion, `replace`, `replace_strict`, `is_between` and `is_close`, counts when Polars refuses
   the part at the call, or in what the call is given, whatever words it uses, for the
   value the tables refused first is not always the one Polars meets; the limit for a
   literal asks the same of the case run again with columns, and for a comparison that

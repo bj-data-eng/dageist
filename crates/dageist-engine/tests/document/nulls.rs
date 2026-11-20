@@ -154,6 +154,100 @@ fn a_replacement_given_one_new_value_beside_many_old_values_or_equally_many_is_n
 }
 
 #[test]
+fn a_method_that_follows_a_condition_of_identical_values_beside_many_predicates_is_not_one_value() {
+    // `when(f).then(1).otherwise(1).mod(1)`: the values are one expression, so Polars may drop
+    // the predicate and the condition is one value or three, and a method that gives a value for
+    // each of what it follows, as the remainder does, gives the same number. It is no aggregate
+    // that gives one value of any, so what is not counted is still not counted after it: Polars
+    // allows the strict replacement with a default of three that it would refuse beside one value.
+    let one = || {
+        json!({ "expression": { "start": call("polars.lit", json!({
+            "value": { "integer": 1 }, "dtype": dtype("Int32") })), "then": [] } })
+    };
+    let condition = json!({ "expression": {
+        "start": call("polars.when", json!({ "predicates": many(vec![field("f")]) })),
+        "then": [
+            call("When.then", json!({ "statement": one() })),
+            call("Then.otherwise", json!({ "statement": one() })),
+            call("Expr.mod", json!({ "other": whole(1) })),
+            call("Expr.replace_strict", json!({
+                "old": field("a"), "new": field("f"), "default": field("f") })),
+        ],
+    } });
+    let report = report_of("LazyFrame.select", select(vec![condition]));
+    assert_eq!(walk(&report).refusal(), None);
+    assert!(polars_says(&report).is_none(), "{:?}", outcome(&report));
+    assert!(matches!(outcome(&report), Outcome::Valid { .. }));
+}
+
+#[test]
+fn an_aggregate_of_a_condition_of_identical_values_is_one_value_and_is_counted_as_polars_counts_it()
+{
+    // The sum of the condition is one value whatever Polars does with the condition, so a strict
+    // replacement of it given a default of three values is refused by the rule, as Polars refuses
+    // it.
+    let one = || {
+        json!({ "expression": { "start": call("polars.lit", json!({
+            "value": { "integer": 1 }, "dtype": dtype("Int32") })), "then": [] } })
+    };
+    let condition = json!({ "expression": {
+        "start": call("polars.when", json!({ "predicates": many(vec![field("f")]) })),
+        "then": [
+            call("When.then", json!({ "statement": one() })),
+            call("Then.otherwise", json!({ "statement": one() })),
+            call("Expr.sum", json!({})),
+            call("Expr.replace_strict", json!({
+                "old": field("a"), "new": field("f"), "default": field("f") })),
+        ],
+    } });
+    let report = report_of("LazyFrame.select", select(vec![condition]));
+    let refusal = walk(&report).refusal().expect("the walk refuses it");
+    assert_eq!(
+        refusal.refusal().source(),
+        RefusalSource::Rule(Rule::ReplacementValuesMatchInNumber)
+    );
+    assert!(polars_says(&report).is_some(), "{:?}", outcome(&report));
+}
+
+#[test]
+fn a_text_method_of_one_value_given_many_is_many_values_as_polars_gives_them() {
+    // Polars meets the one value of a text literal with each of the many values of the operand, so
+    // what follows is as many values as the table has rows: a strict replacement of it given a
+    // default of three is allowed, as Polars allows it, and not refused by the rule for the number
+    // of values of a replacement. A parameter of a method of text is no operand that adapts a
+    // number's dtype, and it is met just the same.
+    for (method, parameter, operand) in [
+        ("Expr.str.starts_with", "prefix", field("k")),
+        ("Expr.str.ends_with", "suffix", field("k")),
+        ("Expr.str.head", "n", field("a")),
+        ("Expr.str.tail", "n", field("a")),
+        ("Expr.str.pad_start", "length", field("a")),
+        ("Expr.str.strip_chars", "characters", field("b")),
+        ("Expr.str.split", "by", field("b")),
+    ] {
+        let mut chain = vec![call(method, json!({ parameter: operand }))];
+        // What replaces the values it gives is a column of three values, whatever they are.
+        if method != "Expr.str.split" {
+            chain.push(call(
+                "Expr.replace_strict",
+                json!({ "old": field("a"), "new": field("f"), "default": field("f") }),
+            ));
+        }
+        let expression = json!({ "expression": {
+            "start": call("polars.lit", json!({ "value": { "string": "abc" } })),
+            "then": chain,
+        } });
+        let report = report_of("LazyFrame.select", select(vec![expression]));
+        assert_eq!(walk(&report).refusal(), None, "{method}");
+        assert!(
+            polars_says(&report).is_none(),
+            "{method}: {:?}",
+            outcome(&report)
+        );
+    }
+}
+
+#[test]
 fn a_strict_replacement_given_a_default_of_many_values_beside_one_value_is_refused_as_polars_does()
 {
     let strict = |default: Value| {

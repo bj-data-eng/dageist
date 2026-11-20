@@ -303,6 +303,39 @@ describe('what the document cannot hold', () => {
     });
   });
 
+  it('writes no hole for a method the engine started without its first argument, and leaves it out', () => {
+    // `strip_chars(characters=None)` trims whitespace: the engine started the method without
+    // `characters`, which is complete, and the document does not mention the parameter.
+    for (const name of ['str.strip_chars', 'str.strip_chars_start', 'str.strip_chars_end']) {
+      const step = adding('x', {
+        kind: 'chain',
+        id: 'c1',
+        chain: {
+          source: { kind: 'column', column: 'owner' },
+          methods: [{ id: 'm1', name, argument: { kind: 'leftOut' }, options: NO_OPTIONS }],
+        },
+      });
+
+      const result = translate(catalogue, [step]);
+
+      expect(result.steps[0], name).toMatchObject({ kind: 'sent', holes: new Map() });
+      const link = at(JSON.parse(result.text), [
+        'steps',
+        0,
+        'call',
+        'arguments',
+        'named_exprs',
+        'pairs',
+        0,
+        1,
+        'expression',
+        'then',
+        0,
+      ]);
+      expect(link, name).toEqual({ entry: `Expr.${name}`, arguments: {} });
+    }
+  });
+
   it('writes a hole for the field a chain starts from when none is picked yet', () => {
     const step = adding('x', {
       kind: 'chain',

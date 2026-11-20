@@ -73,6 +73,8 @@ export interface PreparedOffer {
   readonly ends: Ends;
   /** What a method that may stand starts with for its first parameter, if the tables allow Polars' default. */
   readonly argument: DefaultArgumentView | null;
+  /** The first parameter the method starts without giving, which holds Polars' default, or `null`. */
+  readonly leftOut: string | null;
 }
 
 /** The calls of one family. */
@@ -117,6 +119,7 @@ export function prepareOffers(
       stoppedBy: verdict.kind === 'refused' ? 'engine' : limit === null ? null : 'editor',
       ends: verdict.kind === 'allowed' ? endsOf(verdict.ending) : { kind: 'notKnown' },
       argument: verdict.kind === 'allowed' ? offered.argument : null,
+      leftOut: verdict.kind === 'allowed' ? offered.leftOut : null,
     });
   }
   const present = families.filter((family) => family.offers.length > 0);

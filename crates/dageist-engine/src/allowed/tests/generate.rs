@@ -192,6 +192,8 @@ fn companions(
         // The default and what replaces meet in one dtype, so each is tested with the other of
         // the dtype the argument has.
         ("Expr.replace_strict", Some("default")) => vec![("old", own())],
+        // A slice that is tested for its length starts at a place: the second character.
+        ("Expr.str.slice", Some("length")) => vec![("offset", expression(integer(1)))],
         ("Expr.is_between", Some("lower_bound")) => vec![("upper_bound", own())],
         ("Expr.is_between", Some("upper_bound")) => vec![("lower_bound", own())],
         _ => Vec::new(),
@@ -709,6 +711,15 @@ fn context_plan(
     host(context.outer(), held, frames, empty)
 }
 
+/// Whether a key of the dtype cannot be cast to the dtype of the other table's key, as a list, an
+/// array and a struct are no number.
+const fn cannot_be_cast_to_a_key(dtype: &DataType) -> bool {
+    matches!(
+        dtype,
+        DataType::List(_) | DataType::Array(_, _) | DataType::Struct(_)
+    )
+}
+
 /// The dtype the expression that stands at `context` has, which a join key
 /// must be matched by.
 fn held_dtype(context: Context, subject: Subject<'_>, probe: &Frames) -> DataType {
@@ -977,16 +988,22 @@ fn context_line(
     );
     let probe = Frames::new(receiver_dtype, argument_dtype, &DataType::Int64);
     // Where the chain ends in a join key, the other table's key has the dtype
-    // the key has. Where it goes on, the key is cast to the dtype of the other.
-    let key =
-        if chain == Chain::Ends && matches!(context.outer(), Outer::JoinLeft | Outer::JoinRight) {
-            held_dtype(context, &*subject, &probe)
-        } else {
-            KEY
-        };
+    // the key has. Where it goes on, the key is cast to the dtype of the other, which a list, an
+    // array or a struct cannot be: such a key is no whole number, and the call is measured as the
+    // end of the chain, with the other table's key the dtype the key has, as Polars joins on one.
+    let in_a_join_key = matches!(context.outer(), Outer::JoinLeft | Outer::JoinRight);
+    let held = in_a_join_key.then(|| held_dtype(context, &*subject, &probe));
+    let measured = match &held {
+        Some(dtype) if chain == Chain::Continues && cannot_be_cast_to_a_key(dtype) => Chain::Ends,
+        _ => chain,
+    };
+    let key = match &held {
+        Some(dtype) if measured == Chain::Ends => dtype.clone(),
+        _ => KEY,
+    };
     let frames = Frames::new(receiver_dtype, argument_dtype, &key);
     let plan =
-        |frames: &Frames, empty: bool| context_plan(context, chain, &*subject, frames, empty);
+        |frames: &Frames, empty: bool| context_plan(context, measured, &*subject, frames, empty);
     let measured = measure(&plan, &frames);
     let outcome = match measured {
         Err(reason) => Outcome::Refused(reason),

@@ -52,8 +52,8 @@ describe('the methods the engine offers after a timestamp', () => {
 
   it('are grouped by family, the shortest group first, and those of a length in the catalogue order', () => {
     // The methods of each family: window one, rows, cumulative and conversion three, aggregate and
-    // logic four, rounding and temporal five, maths seven, checks and nulls eight, arithmetic
-    // eleven, compare twelve and trigonometry fifteen.
+    // logic four, rounding and temporal five, maths and pieces of text seven, checks and nulls
+    // eight, arithmetic eleven, text and compare twelve and fourteen, and trigonometry fifteen.
     expect(families.map((family) => [family.key, family.offers.length])).toEqual([
       ['window', 1],
       ['rows', 3],
@@ -64,10 +64,12 @@ describe('the methods the engine offers after a timestamp', () => {
       ['rounding', 5],
       ['temporal', 5],
       ['maths', 7],
+      ['pieces', 7],
       ['checks', 8],
       ['nulls', 8],
       ['arithmetic', 11],
-      ['compare', 12],
+      ['text', 12],
+      ['compare', 14],
       ['trigonometry', 15],
     ]);
     expect(families[0]?.title).toBe('Window');
@@ -102,6 +104,19 @@ describe('the methods the engine offers after a timestamp', () => {
       expect(offerNamed(name)).toMatchObject({ stoppedBy: 'engine' });
     }
     expect(offerNamed('is_nan')?.reason).toContain('is_nan');
+  });
+
+  it('hold the methods of text under Polars’ names, which a timestamp is refused by Polars for', () => {
+    // The names are those of Polars' `str` namespace, kept whole, and the hints say them in words.
+    expect(offerNamed('str.to_uppercase')).toMatchObject({ family: 'text', stoppedBy: 'engine' });
+    expect(offerNamed('str.len_chars')).toMatchObject({ family: 'pieces', stoppedBy: 'engine' });
+    expect(offerNamed('str.starts_with')).toMatchObject({ family: 'compare', stoppedBy: 'engine' });
+    expect(offerNamed('str.len_chars')?.hint).toBe('length in characters');
+    expect(offerNamed('str.zfill')?.hint).toBe('add zeros at the start up to a length');
+    expect(offerNamed('str.to_uppercase')?.reason).toContain('expected `String`');
+    // Only the join of text casts a timestamp, which is allowed.
+    expect(offerNamed('str.join')).toMatchObject({ family: 'pieces', reason: null });
+    expect(offerNamed('to_uppercase')).toBeUndefined();
   });
 
   it('hold the maths and rounding under Polars’ names, with the plain words in the hints', () => {

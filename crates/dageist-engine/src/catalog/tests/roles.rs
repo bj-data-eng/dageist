@@ -1,6 +1,7 @@
 //! The parameters that meet the value their method follows in a way of their own,
 //! as Polars' documentation describes the methods: the other side of arithmetic
-//! and of a comparison, the value `shift` fills with, and the rows it counts.
+//! and of a comparison, the value `shift` fills with, and the rows it counts and the characters a
+//! method of text counts.
 
 use crate::catalog::{self, Role};
 
@@ -48,6 +49,13 @@ fn only_the_operands_the_fill_the_row_count_the_power_and_the_divisors_have_a_ro
             ("Expr.replace_strict", "old", Role::Bound),
             ("Expr.shift", "fill_value", Role::Filler),
             ("Expr.shift", "n", Role::Count),
+            ("Expr.str.head", "n", Role::Count),
+            ("Expr.str.pad_end", "length", Role::Length),
+            ("Expr.str.pad_start", "length", Role::Length),
+            ("Expr.str.slice", "length", Role::Length),
+            ("Expr.str.slice", "offset", Role::Count),
+            ("Expr.str.tail", "n", Role::Count),
+            ("Expr.str.zfill", "length", Role::Length),
             ("Expr.sub", "other", Role::Operand),
             ("Expr.truediv", "other", Role::Divisor),
             ("Expr.xor", "other", Role::Operand),

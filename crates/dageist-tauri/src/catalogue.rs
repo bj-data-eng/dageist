@@ -919,6 +919,8 @@ mod tests {
                 "rounding",
                 "aggregate",
                 "temporal",
+                "text",
+                "pieces",
                 "window",
                 "compare",
                 "checks",

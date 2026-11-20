@@ -25,10 +25,11 @@ use crate::allowed::{
     Place as OfferPlace, Position as Slot, Refusal, Representative, Shape, Unknown, Verdict,
 };
 use crate::allowed::{
-    Loose, Receiver, adapted_dtype, adapts_numbers_only, could_be_taken_by_a_number, is_count,
-    is_left_unresolved, is_required, operand_adapts, receiver_beside,
+    Loose, Receiver, adapted_dtype, adapts_numbers_only, broadcasts, could_be_taken_by_a_number,
+    is_count, is_left_unresolved, is_refused_as_a_count, is_required, operand_adapts,
+    receiver_beside,
 };
-use crate::catalog::{Applies, AsManyAs, Comparison, Entry, Kind, Role};
+use crate::catalog::{Applies, AsManyAs, Comparison, Entry, Kind};
 
 use super::error::{Place, Segment};
 use super::inputs::Inputs;
@@ -434,7 +435,7 @@ fn loose_number(call: &Call) -> Option<Loose> {
 fn takes_an_operand(entry: &Entry) -> bool {
     entry.applies() == Applies::Expression
         && entry.parameters().iter().any(|parameter| {
-            matches!(parameter.kind(), Kind::Expression(_)) && parameter.role() != Role::Count
+            matches!(parameter.kind(), Kind::Expression(_)) && !parameter.role().is_a_count()
         })
 }
 
@@ -899,17 +900,11 @@ impl Walker<'_> {
                 branches_are_one = false;
             }
             // A method that gives one value of the many that a condition of identical values may
-            // give is one value however the optimizer treats the condition.
-            if branches_are_one
-                && link.entry().applies() == Applies::Expression
-                && matches!(
-                    next,
-                    Cur::Value {
-                        shape: Shape::One,
-                        ..
-                    }
-                )
-            {
+            // give is one value however the optimizer treats the condition. It is one by its own
+            // nature, as an aggregate is, where the one value after a method that follows the
+            // condition and gives a value for each of what it follows is only the one that the
+            // condition may be, which is not counted.
+            if branches_are_one && is_one_value(link) {
                 branches_are_one = false;
             }
             cur = next;
@@ -1132,7 +1127,9 @@ impl Walker<'_> {
         let resolved: Vec<(&str, Option<Representative>, Option<Loose>)> = arguments
             .iter()
             .map(|(name, operand)| {
-                let counts = operand.loose.is_some_and(Loose::is_whole);
+                let counts = operand.loose.is_some_and(|number| {
+                    number.is_whole() && !is_refused_as_a_count(entry, name, number)
+                });
                 let hidden = entry.applies() == Applies::Expression
                     && operand.loose.is_some()
                     && !(counts && is_count(entry, name));
@@ -1442,12 +1439,13 @@ fn broadcast(link: &Call, arguments: &[(String, Operand)], shape: Shape) -> Shap
             Shape::Many
         };
     }
-    // What a replacement lists is a table of values, which gives no more values than what it
-    // follows, as many values as that table holds.
-    let given_many = !matches!(entry.id().as_str(), "Expr.replace" | "Expr.replace_strict")
-        && arguments.iter().any(|(name, operand)| {
-            operand.shape == Shape::Many && operand_adapts(entry, name) && !is_count(entry, name)
-        });
+    // Polars meets a receiver of one value with each value of an operand of many, whatever the
+    // parameter is: a fact about the method, which the catalogue holds apart from how a number
+    // typed without a dtype adapts. What a replacement lists is a table of values, which gives no
+    // more values than what it follows, and a shift takes one value only: neither broadcasts.
+    let given_many = arguments
+        .iter()
+        .any(|(name, operand)| operand.shape == Shape::Many && broadcasts(entry, name));
     if shape == Shape::One && given_many {
         Shape::Many
     } else {
@@ -1510,7 +1508,7 @@ fn operands(call: &Call) -> Vec<&Expression> {
     found
 }
 
-const ONE_VALUE: [&str; 8] = [
+const ONE_VALUE: [&str; 9] = [
     "Expr.sum",
     "Expr.min",
     "Expr.max",
@@ -1519,6 +1517,7 @@ const ONE_VALUE: [&str; 8] = [
     "Expr.last",
     "Expr.has_nulls",
     "Expr.null_count",
+    "Expr.str.join",
 ];
 
 fn is_one_value(call: &Call) -> bool {

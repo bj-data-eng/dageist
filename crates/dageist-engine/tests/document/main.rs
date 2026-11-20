@@ -18,6 +18,7 @@ mod shown;
 mod summary;
 mod support;
 mod syntax;
+mod text;
 mod untyped;
 mod walk;
 mod writing;

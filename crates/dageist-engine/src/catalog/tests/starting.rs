@@ -304,3 +304,52 @@ fn every_argument_a_new_step_starts_with_is_a_parameter_of_its_entry() {
         }
     }
 }
+
+#[test]
+fn a_method_starts_without_a_first_expression_a_step_need_not_give_and_python_leaves_to_none() {
+    // `strip_chars(characters=None)` and its two sides, and `over(partition_by=None, ...)`: Python
+    // takes them out, and the method is complete as it starts.
+    for (id, name) in [
+        ("Expr.str.strip_chars", "characters"),
+        ("Expr.str.strip_chars_start", "characters"),
+        ("Expr.str.strip_chars_end", "characters"),
+        ("Expr.over", "partition_by"),
+    ] {
+        assert!(parameter(id, name).starts_left_out(), "{id} {name}");
+    }
+}
+
+#[test]
+fn a_parameter_that_must_be_given_or_has_a_value_by_default_is_not_left_out_at_the_start() {
+    for (id, name, why) in [
+        // Python requires it.
+        ("Expr.str.head", "n", "required"),
+        ("Expr.add", "other", "required"),
+        // A step always gives one of the bounds and a fill's value.
+        ("Expr.clip", "lower_bound", "needed"),
+        ("Expr.fill_null", "value", "needed"),
+        // It has a value by default, which the method starts with.
+        ("Expr.shift", "n", "a default of 1"),
+        // It is a flag, a choice or a number, not an expression.
+        ("Expr.is_between", "closed", "a choice"),
+        ("Expr.round", "decimals", "a number"),
+        // It is a list that Python leaves empty, which is not `None`.
+        ("Expr.and_", "others", "an empty list"),
+    ] {
+        assert!(!parameter(id, name).starts_left_out(), "{id} {name}: {why}");
+    }
+}
+
+#[test]
+fn the_first_parameter_a_method_starts_without_is_named_by_the_allowed_module() {
+    use crate::allowed::left_out_at_start;
+    assert_eq!(
+        left_out_at_start(entry("Expr.str.strip_chars")),
+        Some("characters")
+    );
+    assert_eq!(left_out_at_start(entry("Expr.over")), Some("partition_by"));
+    // A later parameter that is optional is an option, which starts to be given when it is added.
+    assert_eq!(left_out_at_start(entry("Expr.shift")), None);
+    assert_eq!(left_out_at_start(entry("Expr.str.slice")), None);
+    assert_eq!(left_out_at_start(entry("Expr.str.to_uppercase")), None);
+}

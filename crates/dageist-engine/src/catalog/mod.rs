@@ -97,10 +97,16 @@ pub enum Family {
     Aggregate,
     /// Dates and times: the `dt` namespace.
     Temporal,
+    /// Changing the text itself: its case, the characters trimmed from its ends, padding and
+    /// reversing, which are the methods of the `str` namespace that give text.
+    Text,
+    /// Taking text apart, and measuring it: `str.slice`, `str.head`, `str.split`, `str.join` and
+    /// the lengths, which give a piece of the text, a list of pieces, one text or a count.
+    Pieces,
     /// Working within groups: `over`.
     Window,
     /// Comparisons and tests that give a Boolean: `eq`, `gt`, `eq_missing`, `is_between`,
-    /// `is_close`, `is_null`, and the like.
+    /// `is_close`, `is_null`, `str.starts_with`, and the like.
     Compare,
     /// Tests of what a value is, or of whether it is repeated: `is_nan`, `is_infinite`,
     /// `is_unique`, `is_first_distinct`, and the like, which give a Boolean.
@@ -120,7 +126,7 @@ pub enum Family {
 
 impl Family {
     /// Every family, in the order they are offered.
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 19] = [
         Self::Steps,
         Self::Rows,
         Self::Cumulative,
@@ -130,6 +136,8 @@ impl Family {
         Self::Rounding,
         Self::Aggregate,
         Self::Temporal,
+        Self::Text,
+        Self::Pieces,
         Self::Window,
         Self::Compare,
         Self::Checks,
@@ -153,6 +161,8 @@ impl Family {
             Self::Rounding => "rounding",
             Self::Aggregate => "aggregate",
             Self::Temporal => "temporal",
+            Self::Text => "text",
+            Self::Pieces => "pieces",
             Self::Window => "window",
             Self::Compare => "compare",
             Self::Checks => "checks",
@@ -308,6 +318,11 @@ pub enum Role {
     /// A count or an index of rows, as `shift`'s `n` is. A whole number there is
     /// that dtype and adapts to nothing.
     Count,
+    /// How long a text is made, as `str.pad_start`'s length is: a count as [`Role::Count`] is, which
+    /// Polars converts to an unsigned whole number, so a whole number typed without a dtype that
+    /// is below zero is refused when the schema is worked out, where a count of rows or of
+    /// characters from an end may be negative.
+    Length,
     /// The power a value is raised to, as `pow`'s `exponent` is. A number typed
     /// without a dtype adapts to the value the method follows, but that value
     /// does not adapt to it: a number raised to a power is the dtype it has.
@@ -335,6 +350,15 @@ pub enum Role {
     /// with a fraction to a whole number beside whole numbers. The value the method follows does
     /// not adapt to it, and keeps the dtype it has.
     Bound,
+}
+
+impl Role {
+    /// Whether the parameter counts rows or characters, which a whole number typed without a dtype
+    /// is that dtype of and adapts to nothing.
+    #[must_use]
+    pub const fn is_a_count(self) -> bool {
+        matches!(self, Self::Count | Self::Length)
+    }
 }
 
 /// What a parameter that gives a number of values is given as many of as.
@@ -389,6 +413,7 @@ pub struct Parameter {
     converts: &'static [&'static str],
     lenient_beside: Option<&'static str>,
     adapts_numbers_only: bool,
+    broadcasts: bool,
 }
 
 impl Parameter {
@@ -409,6 +434,7 @@ impl Parameter {
             converts: &[],
             lenient_beside: None,
             adapts_numbers_only: false,
+            broadcasts: true,
         }
     }
 
@@ -478,6 +504,17 @@ impl Parameter {
     /// a dtype, say nothing of what the method gives with it.
     const fn adapting_numbers_only(mut self) -> Self {
         self.adapts_numbers_only = true;
+        self
+    }
+
+    /// The same parameter, of which Polars does not meet a receiver of one value with each of
+    /// many values: it takes one value only, as `shift`'s rows and fill, which Polars refuses
+    /// many values of, or the values it takes are listed and met by a rule of their own, as the
+    /// values of a replacement are. Every other expression parameter of a method is met by a
+    /// receiver of one value with each of its values, so a method of one value given an operand
+    /// of many gives many.
+    const fn not_broadcasting(mut self) -> Self {
+        self.broadcasts = false;
         self
     }
 
@@ -577,6 +614,16 @@ impl Parameter {
     #[must_use]
     pub const fn lenient_beside(&self) -> Option<&'static str> {
         self.lenient_beside
+    }
+
+    /// Whether a receiver of one value is met with each of the many values the parameter is given,
+    /// so that the method gives as many: Polars broadcasts the receiver against the operand. It is
+    /// a fact about the method in Polars, apart from how a number typed without a dtype adapts,
+    /// which the role says. True for every expression parameter but those that take one value only
+    /// or list the values they take.
+    #[must_use]
+    pub const fn broadcasts(&self) -> bool {
+        self.broadcasts
     }
 
     /// Whether a number typed without a dtype that is given to the parameter takes the dtype of

@@ -247,6 +247,7 @@ function expressionBody(
 ): Body {
   switch (value.kind) {
     case 'unset':
+    case 'leftOut':
       return { start: holeAt(context, path, 'Pick a value.', wrong), links: [] };
     case 'column':
       if (value.column === '') {
@@ -286,15 +287,20 @@ function expressionArgument(
   return { expression: expressionJson(start, links) };
 }
 
-/** Writes the argument of a method for the parameter its entry takes first. */
+/**
+ * Writes the argument of a method for the parameter its entry takes first, or `null` where it is
+ * left out: the engine started the method without it, and it is not mentioned, which leaves it to
+ * its default, as `strip_chars` leaves its characters to the whitespace.
+ */
 function methodArgument(
   context: Context,
   parameter: ParameterView,
   method: Method,
   path: Path,
   wrong: readonly string[],
-): Json {
+): Json | null {
   const given = method.argument ?? { kind: 'unset' };
+  if (given.kind === 'leftOut') return null;
   if (given.kind === 'unset') {
     // Still to be picked: a hole stands for it, so the method before it is still walked.
     const message = `Give ${method.name} a value or a field (${parameter.label}).`;
@@ -319,13 +325,14 @@ function methodCall(context: Context, method: Method, link: number, path: Path):
   const args: Record<string, Json> = {};
   if (rule !== null) {
     const parameter = rule.parameter.name;
-    args[parameter] = methodArgument(
+    const written = methodArgument(
       context,
       rule.parameter,
       method,
       under(here, `parameter:${parameter}`),
       wrong,
     );
+    if (written !== null) args[parameter] = written;
   }
   Object.assign(
     args,

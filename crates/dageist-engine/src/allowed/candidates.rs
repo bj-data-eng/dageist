@@ -11,7 +11,8 @@
 use crate::catalog::{self, DefaultValue, Entry, Kind, ParameterDefault};
 
 use super::adapt::{
-    Loose, adapted_dtype, is_count, is_left_unresolved, is_required, operand_adapts,
+    Loose, adapted_dtype, is_count, is_left_unresolved, is_refused_as_a_count, is_required,
+    operand_adapts,
 };
 use super::context::Context;
 use super::dtype::Representative;
@@ -159,8 +160,9 @@ pub fn fit(candidate: &Candidate, slot: &Slot<'_>) -> Option<Fit> {
                 verdict: found,
             });
         };
-        let counts =
-            loose.is_some_and(Loose::is_whole) && is_count(argument.entry, argument.parameter);
+        let counts = loose.is_some_and(|number| {
+            number.is_whole() && !is_refused_as_a_count(argument.entry, argument.parameter, number)
+        }) && is_count(argument.entry, argument.parameter);
         verdict = Some(Verdict::Allowed(
             if loose.is_none() || adapted.is_some() || counts {
                 allowance
@@ -228,6 +230,16 @@ impl DefaultArgument {
     pub const fn literal(&self) -> &Literal {
         &self.literal
     }
+}
+
+/// The first parameter of the method `entry` that it starts without giving, because a step need
+/// not give it and Polars leaves it to its default, when the first parameter is one: the
+/// characters a trim takes off, which are then whitespace. `None` where the method takes no
+/// expression first, or its first parameter must be given or has a value of its own by default.
+#[must_use]
+pub fn left_out_at_start(entry: &'static Entry) -> Option<&'static str> {
+    let parameter = entry.parameters().first()?;
+    parameter.starts_left_out().then(|| parameter.name())
 }
 
 /// The argument the method `entry` starts with where it stands at `place`:
