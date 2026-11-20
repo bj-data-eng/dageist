@@ -899,17 +899,11 @@ impl Walker<'_> {
                 branches_are_one = false;
             }
             // A method that gives one value of the many that a condition of identical values may
-            // give is one value however the optimizer treats the condition.
-            if branches_are_one
-                && link.entry().applies() == Applies::Expression
-                && matches!(
-                    next,
-                    Cur::Value {
-                        shape: Shape::One,
-                        ..
-                    }
-                )
-            {
+            // give is one value however the optimizer treats the condition. It is one by its own
+            // nature, as an aggregate is, where the one value after a method that follows the
+            // condition and gives a value for each of what it follows is only the one that the
+            // condition may be, which is not counted.
+            if branches_are_one && is_one_value(link) {
                 branches_are_one = false;
             }
             cur = next;

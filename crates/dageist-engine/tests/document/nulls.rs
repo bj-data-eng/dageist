@@ -181,6 +181,35 @@ fn a_method_that_follows_a_condition_of_identical_values_beside_many_predicates_
 }
 
 #[test]
+fn an_aggregate_of_a_condition_of_identical_values_is_one_value_and_is_counted_as_polars_counts_it()
+{
+    // The sum of the condition is one value whatever Polars does with the condition, so a strict
+    // replacement of it given a default of three values is refused by the rule, as Polars refuses
+    // it.
+    let one = || {
+        json!({ "expression": { "start": call("polars.lit", json!({
+            "value": { "integer": 1 }, "dtype": dtype("Int32") })), "then": [] } })
+    };
+    let condition = json!({ "expression": {
+        "start": call("polars.when", json!({ "predicates": many(vec![field("f")]) })),
+        "then": [
+            call("When.then", json!({ "statement": one() })),
+            call("Then.otherwise", json!({ "statement": one() })),
+            call("Expr.sum", json!({})),
+            call("Expr.replace_strict", json!({
+                "old": field("a"), "new": field("f"), "default": field("f") })),
+        ],
+    } });
+    let report = report_of("LazyFrame.select", select(vec![condition]));
+    let refusal = walk(&report).refusal().expect("the walk refuses it");
+    assert_eq!(
+        refusal.refusal().source(),
+        RefusalSource::Rule(Rule::ReplacementValuesMatchInNumber)
+    );
+    assert!(polars_says(&report).is_some(), "{:?}", outcome(&report));
+}
+
+#[test]
 fn a_strict_replacement_given_a_default_of_many_values_beside_one_value_is_refused_as_polars_does()
 {
     let strict = |default: Value| {
