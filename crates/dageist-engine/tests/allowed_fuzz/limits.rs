@@ -230,16 +230,18 @@ pub enum Limit {
     /// value's: the case run again with the bounds of every `clip` undone and the values of
     /// every replacement made null is not refused for a failed conversion.
     ABoundTheDtypeCannotHold,
-    /// Polars casts a bound of `clip` to the dtype it clips, and a bound whose values that dtype
+    /// Polars casts a bound of `clip` to the dtype it clips, and a count of characters that a
+    /// method of text takes to a whole number, and a bound or a count whose values that dtype
     /// holds is cast whatever its dtype is: text that reads as the number, a list or another
-    /// dtype that holds nothing but nulls. The tables measured a bound as a column of the
-    /// sample's rows, whose text is a duration no number reads and whose lists no dtype holds,
-    /// so they refuse the cast of a dtype to another that the values of another bound pass. The
-    /// tables refusing, when they run rows, with a failed conversion or a failed cast of a
-    /// dtype, at a `clip` that has a bound that is not a bare column, which Polars allows, and
-    /// where the tables, asked again with the computed bounds of every clip undone, no longer
-    /// refuse a clip. A bound that is a bare column holds the sample's rows, as the tables
-    /// measured it, so a refusal that is its own is not this, whatever the other bound is.
+    /// dtype that holds nothing but nulls. The tables measured a bound or a count as a column of
+    /// the sample's rows, whose text is a duration no number reads and whose lists no dtype
+    /// holds, so they refuse the cast of a dtype to another that the values of another bound pass.
+    /// The tables refusing, when they run rows, with a failed conversion or a failed cast of a
+    /// dtype, at a `clip` that has a bound, or a method of text that has a count, that is not a
+    /// bare column, which Polars allows, and where the tables, asked again with the computed
+    /// bounds of every clip undone and the computed counts the whole number 1, no longer refuse
+    /// the call. A bound or a count that is a bare column holds the sample's rows, as the tables
+    /// measured it, so a refusal that is its own is not this, whatever the other one is.
     ABoundWithValuesOfItsOwn,
     /// A window whose partition holds no column gives Polars' streaming engine no rows, so
     /// what follows it in a chain that starts from a literal is never evaluated, and the rows
@@ -470,7 +472,7 @@ impl Limit {
                 "Polars does not check the dtypes of a bitwise call in a join's key as it does in select, so it accepts a call the tables refuse for them"
             }
             Self::ABoundWithValuesOfItsOwn => {
-                "Polars casts the values of a bound of clip to the dtype it clips, which the tables measured as the sample's rows, and a bound with others passes"
+                "Polars casts the values of a bound of clip to the dtype it clips, and a count of characters to a whole number, which the tables measured as the sample's rows, and a bound or a count with others passes"
             }
             Self::ACastOfAValueTheDtypeCannotHold => {
                 "a strict cast, which a test of closeness, a fill by a value and a count of characters make of what they meet, refuses a value its dtype cannot hold, which the tables measured only with the sample's rows, whose values every number dtype holds"
@@ -2200,25 +2202,69 @@ fn is_a_bare_column(expression: &Expression) -> bool {
         && matches!(expression.start(), Start::Call(call) if is(call, "polars.col"))
 }
 
-/// Whether the call is a `clip` with a bound that is not a bare column: one that may hold other
-/// values than the sample's rows.
-fn has_a_bound_of_its_own(call: &Call) -> bool {
-    is(call, "Expr.clip")
-        && ["lower_bound", "upper_bound"].iter().any(|bound| {
-            matches!(call.argument(bound), Some(Value::Expression(expression)) if !is_a_bare_column(expression))
+/// The parameters of the call that hold an expression that is not a bare column: one that may hold
+/// other values than the sample's rows.
+fn computed(call: &Call, parameters: &[&str]) -> Vec<String> {
+    parameters
+        .iter()
+        .filter(|parameter| {
+            matches!(call.argument(parameter), Some(Value::Expression(expression)) if !is_a_bare_column(expression))
         })
+        .map(|parameter| (*parameter).to_owned())
+        .collect()
 }
 
-/// The case with the computed bounds of every `clip` undone, which are the bounds that hold
-/// values of their own; a bound that is a bare column stays.
+/// The parameters of a `clip` that hold a bound, and of a method of text that holds a count of
+/// characters, that is not a bare column.
+fn computed_values_cast(call: &Call) -> Vec<String> {
+    if is(call, "Expr.clip") {
+        computed(call, &["lower_bound", "upper_bound"])
+    } else {
+        let counts = counts_of(call);
+        computed(call, &counts)
+    }
+}
+
+/// Whether the call is a `clip` with a bound, or a method of text with a count of characters, that
+/// is not a bare column: one that may hold other values than the sample's rows.
+fn has_a_bound_of_its_own(call: &Call) -> bool {
+    !computed_values_cast(call).is_empty()
+}
+
+/// The case with the computed bounds of every `clip` undone, and the computed counts of characters
+/// of every method of text made the whole number 1, which are the bounds and the counts that hold
+/// values of their own; a bound or a count that is a bare column stays.
 fn case_without_computed_bounds(case: &Case) -> Option<Case> {
-    case_without(case, &|call, parameter| {
-        is(call, "Expr.clip")
-            && matches!(parameter, "lower_bound" | "upper_bound")
-            && matches!(
-                call.argument(parameter),
-                Some(Value::Expression(expression)) if !is_a_bare_column(expression)
-            )
+    case_changed(case, &|call| {
+        let computed = computed_values_cast(call);
+        if computed.is_empty() {
+            return None;
+        }
+        let clipped = is(call, "Expr.clip");
+        let one = Expression::new(
+            Start::Call(
+                Call::new(
+                    catalog::entry("polars.lit")?,
+                    vec![("value", Value::Integer(1))],
+                )
+                .ok()?,
+            ),
+            Vec::new(),
+        )
+        .ok()?;
+        let given: Vec<(&str, Value)> = call
+            .arguments()
+            .iter()
+            .filter(|given| !(clipped && computed.iter().any(|name| name == given.parameter())))
+            .map(|given| {
+                if !clipped && computed.iter().any(|name| name == given.parameter()) {
+                    (given.parameter(), Value::Expression(one.clone()))
+                } else {
+                    (given.parameter(), given.value().clone())
+                }
+            })
+            .collect();
+        Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
     })
 }
 
@@ -2232,7 +2278,7 @@ fn the_bare_bounds_alone_are_refused(case: &Case) -> bool {
                 && is_a_failed_cast(&refused.reason)
                 && locate(&control, &refused.place)
                     .call
-                    .is_some_and(|call| is(call, "Expr.clip"))
+                    .is_some_and(|call| is(call, "Expr.clip") || is_a_count_of_characters(call))
         }
         _ => false,
     })
@@ -3027,9 +3073,10 @@ fn applies(
                 && refused_for_a_failed_conversion_without_bounds(case) == Some(false)
         }
         (Limit::ABoundWithValuesOfItsOwn, Disagreement::PolarsAllows(refused)) => {
-            // A clip casts nothing but its bounds, so a failed cast of the rows at the clip is
-            // a bound's, and it is the one with values of its own where it is no bare column and
-            // the tables do not refuse the clip without it.
+            // A clip casts nothing but its bounds, and a method of text its counts, so a failed
+            // cast of the rows at the call is a bound's or a count's, and it is the one with
+            // values of its own where it is no bare column and the tables do not refuse the call
+            // without it.
             refused.stage == Some(TableStage::Rows)
                 && is_a_failed_cast(&refused.reason)
                 && locate(case, &refused.place)
