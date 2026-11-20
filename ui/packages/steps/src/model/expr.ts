@@ -91,7 +91,7 @@ export function startingArgument(
  * that is not set, set to what is still to be given. The engine names the slots, and the editor
  * only draws them: a pattern, what replaces a match, the dtype a cast gives.
  */
-export function startedOptions(
+export function slotOptions(
   catalogue: Catalogue,
   name: MethodName,
   slots: readonly string[],

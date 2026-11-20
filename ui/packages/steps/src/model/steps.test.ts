@@ -4,7 +4,7 @@ import { decodeCatalogue } from '@dageist/host';
 
 import catalogueFixture from '../../../host/fixtures/catalogue.json';
 import { indexCatalogue } from './catalogue';
-import { startedOptions, startingArgument, swappedArgument } from './expr';
+import { slotOptions, startingArgument, swappedArgument } from './expr';
 import { NO_OPTIONS, expressionSetting } from './settings';
 import { stepItems } from './steps';
 import type { Step } from './steps';
@@ -103,21 +103,21 @@ describe('the options a method that is added starts with', () => {
   it('are the slots the engine names, each still to be given, and none where it names none', () => {
     // `str.replace(pattern, value)`: the engine names both, and the editor sets each to what is
     // still to be given.
-    expect(startedOptions(catalogue, 'str.replace', ['pattern', 'value'], NO_OPTIONS)).toEqual({
+    expect(slotOptions(catalogue, 'str.replace', ['pattern', 'value'], NO_OPTIONS)).toEqual({
       pattern: { kind: 'unset' },
       value: { kind: 'unset' },
     });
-    expect(startedOptions(catalogue, 'cast', ['dtype'], NO_OPTIONS)).toEqual({
+    expect(slotOptions(catalogue, 'cast', ['dtype'], NO_OPTIONS)).toEqual({
       dtype: { kind: 'unset' },
     });
-    expect(startedOptions(catalogue, 'str.contains', [], NO_OPTIONS)).toBe(NO_OPTIONS);
+    expect(slotOptions(catalogue, 'str.contains', [], NO_OPTIONS)).toBe(NO_OPTIONS);
     // A name the method has no parameter of is not a slot of it.
-    expect(startedOptions(catalogue, 'str.contains', ['other'], NO_OPTIONS)).toBe(NO_OPTIONS);
+    expect(slotOptions(catalogue, 'str.contains', ['other'], NO_OPTIONS)).toBe(NO_OPTIONS);
   });
 
   it('keep what is already set when a method is swapped, and start what the new method lacks', () => {
     const given = { pattern: { kind: 'text', value: 'a', shown: 'a' } } as const;
-    expect(startedOptions(catalogue, 'str.replace_all', ['pattern', 'value'], given)).toEqual({
+    expect(slotOptions(catalogue, 'str.replace_all', ['pattern', 'value'], given)).toEqual({
       pattern: { kind: 'text', value: 'a', shown: 'a' },
       value: { kind: 'unset' },
     });
