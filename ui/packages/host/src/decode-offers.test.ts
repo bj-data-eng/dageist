@@ -112,6 +112,17 @@ describe('the offers at a place', () => {
     expect(entries.find((entry) => entry.entry === 'Expr.dt.date')?.argument).toBeNull();
   });
 
+  it('give the slots a method starts with, which a step must give and Polars gives no default', () => {
+    const entries = decodeOffers(offersValue).entries;
+    const slots = (id: string) => entries.find((entry) => entry.entry === id)?.slots;
+    // A cast gives the dtype it is told, and `is_between` a bound besides the one it takes first.
+    expect(slots('Expr.cast')).toEqual(['dtype']);
+    expect(slots('Expr.is_between')).toEqual(['upper_bound']);
+    // A parameter with a default is an option, and a method the engine refuses starts with none.
+    expect(slots('Expr.shift')).toEqual([]);
+    expect(slots('Expr.str.replace')).toEqual([]);
+  });
+
   it('continue an unfinished condition with the links that follow it', () => {
     const allowed = decodeOffers(offersCondition)
       .entries.filter((entry) => entry.verdict.kind === 'allowed')

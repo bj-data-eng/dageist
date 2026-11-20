@@ -265,6 +265,7 @@ pub fn dageist_engine::allowed::rule_forbids(entry: &dageist_engine::catalog::En
 pub fn dageist_engine::allowed::rule_forbids_a_key_known_not_elementwise(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_repeated_pair_of_key_names(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_replacement_values_of_other_numbers() -> core::result::Result<(), dageist_engine::allowed::Refusal>
+pub fn dageist_engine::allowed::slots_at_start(entry: &'static dageist_engine::catalog::Entry) -> alloc::vec::Vec<&'static str>
 pub mod dageist_engine::catalog
 pub enum dageist_engine::catalog::Applies
 pub dageist_engine::catalog::Applies::Condition

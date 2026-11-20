@@ -12,7 +12,8 @@ import type { Catalogue } from './catalogue';
 import { argumentOf, methodEntry } from './catalogue';
 import { literalValue } from './literal';
 import type { Options } from './settings';
-import { optionParameters } from './settings';
+import { optionOf, optionParameters } from './settings';
+import { startOf } from './started';
 import type { Value } from './source';
 
 /** A method by its Polars name, such as `shift` or `dt.date`. */
@@ -83,6 +84,25 @@ export function startingArgument(
     return literalValue(offered.literal);
   }
   return leftOut === rule.parameter.name ? { kind: 'leftOut' } : { kind: 'unset' };
+}
+
+/**
+ * Returns `options` with each slot of the method `name` that the engine says it starts with, and
+ * that is not set, set to what is still to be given. The engine names the slots, and the editor
+ * only draws them: a pattern, what replaces a match, the dtype a cast gives.
+ */
+export function startedOptions(
+  catalogue: Catalogue,
+  name: MethodName,
+  slots: readonly string[],
+  options: Options,
+): Options {
+  const filled = methodOptionParameters(catalogue, name)
+    .filter(
+      (parameter) => slots.includes(parameter.name) && optionOf(options, parameter.name) === null,
+    )
+    .map((parameter) => [parameter.name, startOf(parameter)] as const);
+  return filled.length === 0 ? options : { ...options, ...Object.fromEntries(filled) };
 }
 
 /**

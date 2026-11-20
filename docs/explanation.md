@@ -604,7 +604,14 @@ it, and draws every parameter by its kind. A method's first expression
 parameter is written inline. Any other parameter of a method or step is an
 option: the list its name opens offers the rest by name. The editor writes
 every option that is set into the document; the engine decides which are at
-their default. A step's own parameters are drawn by kind too: sort's keys and
+their default. A parameter that a step must give and Polars gives no default, beyond that first one, is not
+left to be found in that list: the engine names it as a slot the method starts with (`slots` in the
+offers, from `slots_at_start`), and the editor starts the method with an option for each, set to what is
+still to be given. They are the pattern of the methods that take one, what `str.replace` puts in place of
+a match, the dtype a `cast` gives and `is_between`'s upper bound. A slot that takes an expression is a hole
+until it is picked, so the engine walks the step up to it; one that takes a literal has nothing to stand for
+it in the document, so the step waits, with the reason, until it is given. A parameter that has a default, or that
+Python leaves to `None`, stays an option to add. A step's own parameters are drawn by kind too: sort's keys and
 their per-item `descending`, select's expressions, join's table, keys and
 `how`, a rename's pairs, and a pivot's aggregate, which is a chain from
 `pl.element()`. A new

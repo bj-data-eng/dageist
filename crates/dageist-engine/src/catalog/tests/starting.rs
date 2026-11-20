@@ -368,3 +368,97 @@ fn the_first_parameter_a_method_starts_without_is_named_by_the_allowed_module() 
         Setting::ToGive
     );
 }
+
+#[test]
+fn a_method_starts_with_a_slot_for_each_parameter_a_step_must_give_and_is_incomplete_for_those_only()
+ {
+    use polars::prelude::{DataType, col, lit};
+
+    use super::build::{expression_arg, method};
+    use crate::allowed::slots_at_start;
+    use crate::catalog::{Argument, Arguments, BuildError};
+
+    let value = || expression_arg(lit("_"));
+    // The slots of each method, and what fills each: Python requires them and gives no default.
+    // The first parameter, where it is an expression, is the argument and not among them.
+    /// A method, its slots, and what fills each and gives the argument.
+    type Case = (
+        &'static str,
+        &'static [&'static str],
+        Vec<(&'static str, Argument)>,
+    );
+    let cases: [Case; 5] = [
+        (
+            "Expr.str.contains",
+            &["pattern"],
+            vec![("pattern", Argument::Pattern("a".to_owned()))],
+        ),
+        (
+            "Expr.str.replace",
+            &["pattern", "value"],
+            vec![
+                ("pattern", Argument::Pattern("a".to_owned())),
+                ("value", value()),
+            ],
+        ),
+        (
+            "Expr.str.replace_all",
+            &["pattern", "value"],
+            vec![
+                ("pattern", Argument::Pattern("a".to_owned())),
+                ("value", value()),
+            ],
+        ),
+        (
+            "Expr.cast",
+            &["dtype"],
+            vec![("dtype", Argument::Dtype(DataType::String))],
+        ),
+        (
+            "Expr.is_between",
+            &["upper_bound"],
+            vec![
+                ("lower_bound", expression_arg(col("i"))),
+                ("upper_bound", expression_arg(col("i"))),
+            ],
+        ),
+    ];
+    for (id, slots, given) in cases {
+        assert_eq!(slots_at_start(entry(id)), slots, "{id}");
+        // Given every slot, and the argument where there is one, the method is complete.
+        let complete = Arguments::new();
+        let complete = given.iter().fold(complete, |arguments, (name, argument)| {
+            arguments.with(name, argument.clone())
+        });
+        assert!(method(id, col("s"), &complete).is_ok(), "{id}");
+        // Left without any one slot, it is refused for that slot, and no other.
+        for slot in slots {
+            let without = given
+                .iter()
+                .filter(|(name, _)| name != slot)
+                .fold(Arguments::new(), |arguments, (name, argument)| {
+                    arguments.with(name, argument.clone())
+                });
+            let refused = method(id, col("s"), &without);
+            assert!(
+                matches!(&refused, Err(BuildError::Missing { parameter }) if parameter == slot),
+                "{id} without {slot}: {refused:?}"
+            );
+        }
+    }
+    // A parameter with a default, or left to None, is an option and no slot, and so is the
+    // argument and what is no method.
+    for id in [
+        "Expr.str.head",
+        "Expr.str.strip_chars",
+        "Expr.str.pad_start",
+        "Expr.str.to_uppercase",
+        "Expr.shift",
+        "Expr.round",
+        "Expr.over",
+        "polars.col",
+        "LazyFrame.sort",
+    ] {
+        assert_eq!(slots_at_start(entry(id)), Vec::<&str>::new(), "{id}");
+    }
+}

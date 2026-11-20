@@ -730,6 +730,12 @@ export interface EntryOfferView {
    * Polars gives it when it is not given, or `null`. The method is complete as it starts.
    */
   readonly leftOut: string | null;
+  /**
+   * The parameters a method that may stand starts with as slots to fill, besides its argument:
+   * those a step must give and Polars gives no default, such as a pattern. They are options the
+   * method starts with already set to what is still to be given.
+   */
+  readonly slots: readonly string[];
 }
 
 /** Every call that stands in an expression, offered or refused at a place. Mirrors `OffersView` in crates/dageist-tauri/src/offers.rs. */
