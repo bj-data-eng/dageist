@@ -346,10 +346,10 @@ pub enum Limit {
     /// not refused for it.
     AStrictReplacementGivenNoDefault,
     /// A replacement of every match refuses a value that is null where Polars reads the value
-    /// as one value, which it does of a literal, and of a piece of one row where it runs rows in
-    /// pieces, as it does at more threads than the tables were measured with. The tables measured
-    /// the value as a column of three rows in one piece, which Polars meets row by row and leaves
-    /// a null row of unchanged. Polars refusing the rows or the empty table with the refusal that
+    /// as one value, which it does of a literal, and of a piece of one row where its streaming
+    /// engine runs the rows in pieces, whose length depends on how the rows are shared among the
+    /// threads. The tables measured the value as a column of three rows in one piece, which Polars
+    /// meets row by row and leaves a null row of unchanged. Polars refusing the rows or the empty table with the refusal that
     /// the value cannot be null, which has no place, in a case with a `str.replace_all`, or a
     /// `str.replace` given a count below zero, which replaces every match: the case run again with
     /// the value of each made a text literal is not refused for it.
@@ -362,10 +362,13 @@ pub enum Limit {
     /// place, in a case with a `str.replace` that is given a count above one: the case run again
     /// with each count left out is not refused for it.
     AReplacementOfMoreThanTheFirstMatch,
-    /// A literal text is one value that Polars broadcasts over the rows of a table only where it runs
-    /// them in pieces, as it does at four threads and more, and never over a table with no rows, so a
-    /// replacement of it given many values is refused where the column of text the tables measured it
-    /// with is not: the rows of the table and the column's agree. Polars refusing the rows, or the
+    /// A literal text is one value, which Polars' streaming engine broadcasts over the rows of a table
+    /// only where each piece it runs them in is no longer than that one value, and never over a table
+    /// with no rows, so a replacement of it given many values is refused where the column of text the
+    /// tables measured it with is not: its rows and the table's agree. How long a piece is depends on
+    /// how the rows are shared among the threads, so the three rows of the target's tables are refused
+    /// at one thread and at two, where a piece is longer than one, and pass at three and more. Polars
+    /// refusing the rows, or the
     /// empty table, with the refusal that the value's length does not match the text's, which has no
     /// place, in a case with a replacement in a chain that starts from a literal: the case run again
     /// with each such literal a column of text is not refused for it.

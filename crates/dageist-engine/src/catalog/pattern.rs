@@ -4,7 +4,9 @@
 //! with its own settings. The catalogue does not parse one itself: it asks Polars, through the one
 //! method that compiles a pattern when it is built and not when rows run, `str.extract_groups`,
 //! which needs the groups of the pattern to name the fields of the struct it gives. What that
-//! refuses is what every method of text that takes a pattern would refuse of it when it ran.
+//! refuses is, nearly always, what a method of text that takes a pattern would refuse of it when it
+//! ran: `contains` takes a fast path for a pattern that is a chain of literals, which it does not
+//! compile.
 
 use std::fmt;
 

@@ -336,10 +336,7 @@ fn polars_words(rule: &str) -> &'static [&'static str] {
         // Polars words every refusal of a regular expression, which a size limit is one of,
         // as a regex error.
         "pattern-is-valid" => &["regex error"],
-        "replacement-values-match-in-number" => &[
-            "must have the same length as",
-            "does not match string column length",
-        ],
+        "replacement-values-match-in-number" => &["must have the same length as"],
         _ => &[],
     }
 }
