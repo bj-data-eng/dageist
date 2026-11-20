@@ -20,7 +20,8 @@
           "reason": "this continues a condition that is at its chained then"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "ChainedThen.when",
@@ -33,7 +34,8 @@
           "reason": "this continues a condition that is at its chained then"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "ChainedWhen.then",
@@ -46,7 +48,8 @@
           "reason": "this continues a condition that is at its chained when"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.abs",
@@ -59,7 +62,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.add",
@@ -72,7 +76,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.and_",
@@ -85,7 +90,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.arccos",
@@ -98,7 +104,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.arccosh",
@@ -111,7 +118,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.arcsin",
@@ -124,7 +132,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.arcsinh",
@@ -137,7 +146,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.arctan",
@@ -150,7 +160,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.arctanh",
@@ -163,7 +174,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.backward_fill",
@@ -176,7 +188,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.cast",
@@ -189,7 +202,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.cbrt",
@@ -202,7 +216,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.ceil",
@@ -215,7 +230,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.clip",
@@ -228,7 +244,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.cos",
@@ -241,7 +258,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.cosh",
@@ -254,7 +272,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.cot",
@@ -267,7 +286,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.cum_count",
@@ -280,7 +300,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.cum_max",
@@ -293,7 +314,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.cum_sum",
@@ -306,7 +328,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.degrees",
@@ -319,7 +342,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.drop_nans",
@@ -332,7 +356,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.drop_nulls",
@@ -345,7 +370,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.dt.date",
@@ -358,7 +384,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.dt.month_start",
@@ -371,7 +398,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.dt.offset_by",
@@ -384,7 +412,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.dt.time",
@@ -397,7 +426,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.dt.total_days",
@@ -410,7 +440,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.eq",
@@ -423,7 +454,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.eq_missing",
@@ -436,7 +468,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.erf",
@@ -449,7 +482,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.erfc",
@@ -462,7 +496,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.exp",
@@ -475,7 +510,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.fill_nan",
@@ -488,7 +524,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.fill_null",
@@ -501,7 +538,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.first",
@@ -514,7 +552,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.floor",
@@ -527,7 +566,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.floordiv",
@@ -540,7 +580,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.forward_fill",
@@ -553,7 +594,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.ge",
@@ -566,7 +608,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.gt",
@@ -579,7 +622,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.has_nulls",
@@ -592,7 +636,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_between",
@@ -605,7 +650,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_close",
@@ -618,7 +664,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_duplicated",
@@ -631,7 +678,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_finite",
@@ -644,7 +692,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_first_distinct",
@@ -657,7 +706,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_infinite",
@@ -670,7 +720,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_last_distinct",
@@ -683,7 +734,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_nan",
@@ -696,7 +748,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_not_nan",
@@ -709,7 +762,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_not_null",
@@ -722,7 +776,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_null",
@@ -735,7 +790,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_unique",
@@ -748,7 +804,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.last",
@@ -761,7 +818,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.le",
@@ -774,7 +832,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.len",
@@ -787,7 +846,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.log",
@@ -800,7 +860,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.log1p",
@@ -813,7 +874,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.lt",
@@ -826,7 +888,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.max",
@@ -839,7 +902,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.min",
@@ -852,7 +916,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.mod",
@@ -865,7 +930,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.mul",
@@ -878,7 +944,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.ne",
@@ -891,7 +958,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.ne_missing",
@@ -904,7 +972,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.neg",
@@ -917,7 +986,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.not_",
@@ -930,7 +1000,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.null_count",
@@ -943,7 +1014,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.or_",
@@ -956,7 +1028,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.over",
@@ -969,7 +1042,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.pow",
@@ -982,7 +1056,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.radians",
@@ -995,7 +1070,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.replace",
@@ -1008,7 +1084,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.replace_strict",
@@ -1021,7 +1098,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.round",
@@ -1034,7 +1112,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.round_sig_figs",
@@ -1047,7 +1126,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.shift",
@@ -1060,7 +1140,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.sign",
@@ -1073,7 +1154,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.sin",
@@ -1086,7 +1168,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.sinh",
@@ -1099,7 +1182,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.sqrt",
@@ -1112,7 +1196,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.ends_with",
@@ -1125,7 +1210,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.head",
@@ -1138,7 +1224,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.join",
@@ -1151,7 +1238,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.len_bytes",
@@ -1164,7 +1252,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.len_chars",
@@ -1177,7 +1266,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.pad_end",
@@ -1190,7 +1280,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.pad_start",
@@ -1203,7 +1294,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.reverse",
@@ -1216,7 +1308,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.slice",
@@ -1229,7 +1322,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.split",
@@ -1242,7 +1336,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.starts_with",
@@ -1255,7 +1350,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.strip_chars",
@@ -1268,7 +1364,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.strip_chars_end",
@@ -1281,7 +1378,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.strip_chars_start",
@@ -1294,7 +1392,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.strip_prefix",
@@ -1307,7 +1406,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.strip_suffix",
@@ -1320,7 +1420,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.tail",
@@ -1333,7 +1434,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.to_lowercase",
@@ -1346,7 +1448,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.to_titlecase",
@@ -1359,7 +1462,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.to_uppercase",
@@ -1372,7 +1476,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.zfill",
@@ -1385,7 +1490,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.sub",
@@ -1398,7 +1504,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.sum",
@@ -1411,7 +1518,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.tan",
@@ -1424,7 +1532,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.tanh",
@@ -1437,7 +1546,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.truediv",
@@ -1450,7 +1560,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.truncate",
@@ -1463,7 +1574,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.xor",
@@ -1476,7 +1588,8 @@
           "reason": "a method needs the value it applies to before it"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Then.otherwise",
@@ -1489,7 +1602,8 @@
           "reason": "this continues a condition that is at its then"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Then.when",
@@ -1502,7 +1616,8 @@
           "reason": "this continues a condition that is at its then"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "When.then",
@@ -1515,7 +1630,8 @@
           "reason": "this continues a condition that is at its when"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "polars.col",
@@ -1527,7 +1643,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "polars.element",
@@ -1541,7 +1658,8 @@
           "reason": "`polars.element` stands only in a pivot's aggregate"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "polars.lit",
@@ -1553,7 +1671,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "polars.when",
@@ -1565,7 +1684,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     }
   ]
 }

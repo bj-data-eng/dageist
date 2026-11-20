@@ -265,9 +265,15 @@ export function ValueSlot({
       wrong: column === null,
       lines: fieldHint(column),
     };
-  } else if (value.kind === 'unset') {
+  } else if (value.kind === 'unset' || value.kind === 'leftOut') {
     // Nothing is picked yet, so the slot says what goes there, in the colour of what is missing.
-    shown = { label: 'value', tone: 'value', look: 'none', wrong: true, lines: [] };
+    shown = {
+      label: 'value',
+      tone: 'value',
+      look: 'none',
+      wrong: value.kind === 'unset',
+      lines: [],
+    };
   } else {
     shown = { ...literalBlock(value), tone: 'value', wrong: false, lines: [] };
   }

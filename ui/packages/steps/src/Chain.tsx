@@ -43,7 +43,6 @@ import { wrongId } from './model/document';
 import type { ArgumentRule, Method, MethodName } from './model/expr';
 import {
   argumentRule,
-  mayBeLeftOut,
   methodOptionParameters,
   startingArgument,
   swappedArgument,
@@ -148,6 +147,7 @@ function shownArgument(
 ): { label: string; tone: Tone; look: Look } {
   switch (argument.kind) {
     case 'unset':
+    case 'leftOut':
       return { label: rule.parameter.shown, tone: 'value', look: 'none' };
     case 'column':
       return { label: argument.column, tone: 'column', look: 'plain' };
@@ -235,7 +235,7 @@ function ArgumentSlot({
         label={shown.label}
         tone={shown.tone}
         look={shown.look}
-        wrong={wrong || (argument.kind === 'unset' && !mayBeLeftOut(rule.parameter))}
+        wrong={wrong || argument.kind === 'unset'}
         openNow={fresh.id === method.id}
         describedAs={`${rule.shown}: ${rule.parameter.label}`}
         placeholder="Type a value, or search the fields"
@@ -320,7 +320,7 @@ function MethodLink({
     replace({
       id: method.id,
       name,
-      argument: swappedArgument(catalogue, method.argument, name, picked.argument),
+      argument: swappedArgument(catalogue, method.argument, name, picked.argument, picked.leftOut),
       // What is set carries over to a method that takes the same parameter.
       options: next === null ? NO_OPTIONS : carriedOptions(method.options, entry, next),
     });
@@ -472,7 +472,7 @@ export function ChainBlocks({
     const method = {
       id: nextId('method'),
       name,
-      argument: startingArgument(catalogue, name, picked.argument),
+      argument: startingArgument(catalogue, name, picked.argument, picked.leftOut),
       options: NO_OPTIONS,
     };
     const methods = [...chain.methods];

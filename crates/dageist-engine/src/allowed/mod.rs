@@ -49,7 +49,7 @@ pub(crate) use adapt::{
 };
 pub use candidates::{
     ArgumentSlot, Candidate, DefaultArgument, Fit, OptionOffer, OptionWord, Slot, default_argument,
-    fit, option_offers,
+    fit, left_out_at_start, option_offers,
 };
 pub use context::{Context, Nested, Outer, Position};
 pub use dtype::{Representative, ResultDtype, dtype_name};

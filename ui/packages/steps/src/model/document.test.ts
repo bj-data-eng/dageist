@@ -303,16 +303,16 @@ describe('what the document cannot hold', () => {
     });
   });
 
-  it('writes no hole for a method whose first argument is optional and not given, and leaves it out', () => {
-    // `strip_chars(characters=None)` trims whitespace: a method that starts with nothing for
-    // `characters` is complete, and the document does not mention the parameter.
+  it('writes no hole for a method the engine started without its first argument, and leaves it out', () => {
+    // `strip_chars(characters=None)` trims whitespace: the engine started the method without
+    // `characters`, which is complete, and the document does not mention the parameter.
     for (const name of ['str.strip_chars', 'str.strip_chars_start', 'str.strip_chars_end']) {
       const step = adding('x', {
         kind: 'chain',
         id: 'c1',
         chain: {
           source: { kind: 'column', column: 'owner' },
-          methods: [{ id: 'm1', name, argument: UNSET_VALUE, options: NO_OPTIONS }],
+          methods: [{ id: 'm1', name, argument: { kind: 'leftOut' }, options: NO_OPTIONS }],
         },
       });
 

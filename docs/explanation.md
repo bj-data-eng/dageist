@@ -477,13 +477,14 @@ What Polars does with each is what the tables say, and some of it is not what a 
   of a slice are signed: a negative count of `str.head` leaves out that many from the end, and a
   negative offset of `str.slice` counts from the end.
 - `characters` of the three trims is optional and Python's default is `None`, which trims
-  whitespace. The catalogue says which parameters a step must give (`needed`), and a method whose
-  first parameter is not needed and defaults to `None` starts with nothing for it: the step is
-  complete, the document does not mention the parameter, and the slot shows its label, which a
-  value or a field is picked in. A first parameter that is needed, or that has a value of its own
-  by default, as the rows `shift` counts, is still to be picked or starts with the default. `over`
-  is the one earlier method this holds for: its `partition_by` is left out until it is given, and
-  Polars refuses a window that has neither it nor an order, with its reason.
+  whitespace. The engine says what a method starts with, and a method whose first parameter a
+  step need not give and Python leaves to `None` starts without it: the offers name it
+  (`leftOut`), the step is complete as it starts, the document does not mention the parameter,
+  and the slot shows its label, which a value or a field is picked in. The view follows what the
+  engine names, and reads nothing off the parameter itself. A first parameter that is needed, or
+  that has a value of its own by default, as the rows `shift` counts, is still to be picked or
+  starts with the default. `over` is the one earlier method this holds for: it starts without
+  `partition_by`, and Polars refuses a window that has neither it nor an order, with its reason.
 - `fill_char` is one character, as Python's binding takes it, so the build refuses text of
   another length with that reason, and the document keeps it as a value, not an expression.
 - A split gives a list of text for each row, and Polars joins on a list, so a split may be a join's

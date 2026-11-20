@@ -14,38 +14,62 @@ const catalogue = indexCatalogue(decodeCatalogue(catalogueFixture));
 describe('the argument of a method that is added', () => {
   it('is the default the engine allowed, a number typed in', () => {
     expect(
-      startingArgument(catalogue, 'shift', {
-        parameter: 'n',
-        literal: { kind: 'integer', value: 1, shown: '1' },
-      }),
+      startingArgument(
+        catalogue,
+        'shift',
+        { parameter: 'n', literal: { kind: 'integer', value: 1, shown: '1' } },
+        null,
+      ),
     ).toEqual({ kind: 'literal', value: 1, shown: '1' });
   });
 
   it('is still to be picked where the engine allowed none, and none for a method that takes none', () => {
-    expect(startingArgument(catalogue, 'shift', null)).toEqual({ kind: 'unset' });
+    expect(startingArgument(catalogue, 'shift', null, null)).toEqual({ kind: 'unset' });
     // An argument the engine allowed for another parameter is not this one's.
     expect(
-      startingArgument(catalogue, 'shift', {
-        parameter: 'fill_value',
-        literal: { kind: 'text', value: 'x', shown: 'x' },
-      }),
+      startingArgument(
+        catalogue,
+        'shift',
+        { parameter: 'fill_value', literal: { kind: 'text', value: 'x', shown: 'x' } },
+        null,
+      ),
     ).toEqual({ kind: 'unset' });
-    expect(startingArgument(catalogue, 'is_null', null)).toBeNull();
-    expect(startingArgument(catalogue, 'nothing', null)).toBeNull();
+    expect(startingArgument(catalogue, 'is_null', null, null)).toBeNull();
+    expect(startingArgument(catalogue, 'nothing', null, null)).toBeNull();
+  });
+
+  it('is left out where the engine says the method starts without the parameter', () => {
+    // `strip_chars(characters=None)`: the engine names `characters`, and the editor follows it.
+    expect(startingArgument(catalogue, 'str.strip_chars', null, 'characters')).toEqual({
+      kind: 'leftOut',
+    });
+    // Another parameter's name is not this one's, and a default the engine offered wins.
+    expect(startingArgument(catalogue, 'str.strip_chars', null, 'other')).toEqual({
+      kind: 'unset',
+    });
+    expect(startingArgument(catalogue, 'str.strip_chars', null, null)).toEqual({ kind: 'unset' });
+    expect(
+      swappedArgument(catalogue, { kind: 'leftOut' }, 'str.strip_chars_end', null, 'characters'),
+    ).toEqual({ kind: 'leftOut' });
   });
 
   it('is kept when a method is swapped, and the new method’s own where there was none', () => {
     const kept = { kind: 'column', column: 'a' } as const;
-    expect(swappedArgument(catalogue, kept, 'sub', null)).toBe(kept);
-    expect(swappedArgument(catalogue, { kind: 'unset' }, 'shift', null)).toEqual({ kind: 'unset' });
+    expect(swappedArgument(catalogue, kept, 'sub', null, null)).toBe(kept);
+    expect(swappedArgument(catalogue, { kind: 'unset' }, 'shift', null, null)).toEqual({
+      kind: 'unset',
+    });
     expect(
-      swappedArgument(catalogue, null, 'shift', {
-        parameter: 'n',
-        literal: { kind: 'integer', value: 1, shown: '1' },
-      }),
+      swappedArgument(
+        catalogue,
+        null,
+        'shift',
+        { parameter: 'n', literal: { kind: 'integer', value: 1, shown: '1' } },
+        null,
+      ),
     ).toEqual({ kind: 'literal', value: 1, shown: '1' });
     // A method that takes no argument has none to keep.
-    expect(swappedArgument(catalogue, kept, 'is_null', null)).toBeNull();
+    expect(swappedArgument(catalogue, kept, 'is_null', null, null)).toBeNull();
   });
 });
 

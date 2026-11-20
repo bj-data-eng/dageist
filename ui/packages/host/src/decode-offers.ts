@@ -72,11 +72,12 @@ const readDefaultArgument: Decode<DefaultArgumentView> = readRecord(
 );
 
 const readEntryOffer: Decode<EntryOfferView> = readRecord(
-  ['entry', 'verdict', 'argument'],
+  ['entry', 'verdict', 'argument', 'leftOut'],
   (fields, path) => ({
     entry: readField(fields, path, 'entry', readString),
     verdict: readField(fields, path, 'verdict', readVerdict),
     argument: readField(fields, path, 'argument', readNullable(readDefaultArgument)),
+    leftOut: readField(fields, path, 'leftOut', readNullable(readString)),
   }),
 );
 

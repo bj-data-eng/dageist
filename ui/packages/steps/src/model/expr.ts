@@ -51,16 +51,6 @@ export function argumentRule(catalogue: Catalogue, name: MethodName): ArgumentRu
 }
 
 /**
- * Whether a method may start with nothing for the parameter, which then holds what Polars leaves
- * it when it is not given: a parameter that a step need not give and whose default is Python's
- * `None`, as the characters `strip_chars` takes off are. One that is needed, or that has a value
- * of its own by default, is still to be picked.
- */
-export function mayBeLeftOut(parameter: ParameterView): boolean {
-  return !parameter.needed && parameter.default.kind === 'none';
-}
-
-/**
  * Returns the parameters of the method `name` that can be added to it: all
  * but the argument that is drawn where the method is.
  */
@@ -77,18 +67,22 @@ export function methodOptionParameters(
 /**
  * Returns the argument the method `name` starts with when it is added to a
  * chain, or `null` when it takes none. It is the default the engine allowed
- * there, `offered`, a number or text typed in; anything else is still to be
+ * there, `offered`, a number or text typed in, or left out where the engine says
+ * the method starts without the parameter, `leftOut`; anything else is still to be
  * picked.
  */
 export function startingArgument(
   catalogue: Catalogue,
   name: MethodName,
   offered: DefaultArgumentView | null,
+  leftOut: string | null,
 ): Value | null {
   const rule = argumentRule(catalogue, name);
   if (rule === null) return null;
-  if (offered === null || offered.parameter !== rule.parameter.name) return { kind: 'unset' };
-  return literalValue(offered.literal);
+  if (offered !== null && offered.parameter === rule.parameter.name) {
+    return literalValue(offered.literal);
+  }
+  return leftOut === rule.parameter.name ? { kind: 'leftOut' } : { kind: 'unset' };
 }
 
 /**
@@ -102,11 +96,12 @@ export function swappedArgument(
   argument: Value | null,
   name: MethodName,
   offered: DefaultArgumentView | null,
+  leftOut: string | null,
 ): Value | null {
   const rule = argumentRule(catalogue, name);
   if (rule === null) return null;
-  if (argument === null || argument.kind === 'unset') {
-    return startingArgument(catalogue, name, offered);
+  if (argument === null || argument.kind === 'unset' || argument.kind === 'leftOut') {
+    return startingArgument(catalogue, name, offered, leftOut);
   }
   return argument;
 }

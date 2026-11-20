@@ -179,11 +179,6 @@ export interface ParameterView {
   readonly label: string;
   readonly kind: KindView;
   readonly shape: ShapeView;
-  /**
-   * Whether a step must give the parameter. One that is not needed may be left out, which leaves
-   * what it holds to its default.
-   */
-  readonly needed: boolean;
   /** Polars' default, read by the engine. */
   readonly default: DefaultView;
   /**
@@ -723,6 +718,11 @@ export interface EntryOfferView {
   readonly verdict: VerdictView;
   /** What a method that may stand is given when it is added, or `null`. */
   readonly argument: DefaultArgumentView | null;
+  /**
+   * The first parameter a method that may stand starts without giving, which then holds what
+   * Polars gives it when it is not given, or `null`. The method is complete as it starts.
+   */
+  readonly leftOut: string | null;
 }
 
 /** Every call that stands in an expression, offered or refused at a place. Mirrors `OffersView` in crates/dageist-tauri/src/offers.rs. */

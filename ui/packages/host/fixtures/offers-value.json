@@ -22,7 +22,8 @@
           "reason": "this continues a condition that is at its chained then"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "ChainedThen.when",
@@ -35,7 +36,8 @@
           "reason": "this continues a condition that is at its chained then"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "ChainedWhen.then",
@@ -48,7 +50,8 @@
           "reason": "this continues a condition that is at its chained when"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.abs",
@@ -62,7 +65,8 @@
           "reason": "`abs` operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.add",
@@ -74,7 +78,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.and_",
@@ -88,7 +93,8 @@
           "reason": "& not allowed on datetime[μs] and i8"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.arccos",
@@ -102,7 +108,8 @@
           "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.arccosh",
@@ -116,7 +123,8 @@
           "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.arcsin",
@@ -130,7 +138,8 @@
           "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.arcsinh",
@@ -144,7 +153,8 @@
           "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.arctan",
@@ -158,7 +168,8 @@
           "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.arctanh",
@@ -172,7 +183,8 @@
           "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.backward_fill",
@@ -184,7 +196,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.cast",
@@ -196,7 +209,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.cbrt",
@@ -210,7 +224,8 @@
           "reason": "the schema says Datetime(us) and the rows give Float64"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.ceil",
@@ -224,7 +239,8 @@
           "reason": "`ceil` operation not supported for dtype `datetime[μs]` (expected: numeric)"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.clip",
@@ -236,7 +252,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.cos",
@@ -250,7 +267,8 @@
           "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.cosh",
@@ -264,7 +282,8 @@
           "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.cot",
@@ -278,7 +297,8 @@
           "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.cum_count",
@@ -290,7 +310,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.cum_max",
@@ -302,7 +323,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.cum_sum",
@@ -316,7 +338,8 @@
           "reason": "`cum_sum` operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.degrees",
@@ -330,7 +353,8 @@
           "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.drop_nans",
@@ -342,7 +366,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.drop_nulls",
@@ -354,7 +379,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.dt.date",
@@ -366,7 +392,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.dt.month_start",
@@ -378,7 +405,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.dt.offset_by",
@@ -390,7 +418,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.dt.time",
@@ -402,7 +431,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.dt.total_days",
@@ -416,7 +446,8 @@
           "reason": "invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.eq",
@@ -428,7 +459,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.eq_missing",
@@ -440,7 +472,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.erf",
@@ -454,7 +487,8 @@
           "reason": "`erf` operation not supported for dtype `datetime[μs]` as argument 0"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.erfc",
@@ -468,7 +502,8 @@
           "reason": "`erfc` operation not supported for dtype `datetime[μs]` as argument 0"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.exp",
@@ -482,7 +517,8 @@
           "reason": "`exp` operation not supported for dtype `datetime[μs]` as argument 0"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.fill_nan",
@@ -496,7 +532,8 @@
           "reason": "failed to determine supertype of datetime[μs] and i8"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.fill_null",
@@ -508,7 +545,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.first",
@@ -520,7 +558,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.floor",
@@ -534,7 +573,8 @@
           "reason": "`floor` operation not supported for dtype `datetime[μs]` (expected: numeric)"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.floordiv",
@@ -548,7 +588,8 @@
           "reason": "// not allowed on datetime[μs] and i8"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.forward_fill",
@@ -560,7 +601,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.ge",
@@ -572,7 +614,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.gt",
@@ -584,7 +627,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.has_nulls",
@@ -596,7 +640,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_between",
@@ -608,7 +653,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_close",
@@ -620,7 +666,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_duplicated",
@@ -632,7 +679,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_finite",
@@ -646,7 +694,8 @@
           "reason": "`is_finite` operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_first_distinct",
@@ -658,7 +707,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_infinite",
@@ -672,7 +722,8 @@
           "reason": "`is_infinite` operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_last_distinct",
@@ -684,7 +735,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_nan",
@@ -698,7 +750,8 @@
           "reason": "`is_nan` operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_not_nan",
@@ -712,7 +765,8 @@
           "reason": "`is_not_nan` operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_not_null",
@@ -724,7 +778,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_null",
@@ -736,7 +791,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.is_unique",
@@ -748,7 +804,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.last",
@@ -760,7 +817,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.le",
@@ -772,7 +830,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.len",
@@ -784,7 +843,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.log",
@@ -798,7 +858,8 @@
           "reason": "`log` operation not supported for dtype `datetime[μs]` as argument 0"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.log1p",
@@ -812,7 +873,8 @@
           "reason": "`log1p` operation not supported for dtype `datetime[μs]` as argument 0"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.lt",
@@ -824,7 +886,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.max",
@@ -836,7 +899,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.min",
@@ -848,7 +912,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.mod",
@@ -862,7 +927,8 @@
           "reason": "% not allowed on datetime[μs] and i8"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.mul",
@@ -876,7 +942,8 @@
           "reason": "* not allowed on datetime[μs] and i8"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.ne",
@@ -888,7 +955,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.ne_missing",
@@ -900,7 +968,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.neg",
@@ -914,7 +983,8 @@
           "reason": "`neg` operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.not_",
@@ -928,7 +998,8 @@
           "reason": "dtype Datetime('μs') not supported in 'not' operation"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.null_count",
@@ -940,7 +1011,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.or_",
@@ -954,7 +1026,8 @@
           "reason": "| not allowed on datetime[μs] and i8"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.over",
@@ -966,7 +1039,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": "partition_by"
     },
     {
       "entry": "Expr.pow",
@@ -980,7 +1054,8 @@
           "reason": "`pow` operation not supported for dtype `datetime[μs]` as base"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.radians",
@@ -994,7 +1069,8 @@
           "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.replace",
@@ -1006,7 +1082,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.replace_strict",
@@ -1018,7 +1095,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.round",
@@ -1032,7 +1110,8 @@
           "reason": "rounding ('half_to_even') operation not supported for dtype `datetime[μs]` (expected: numeric)"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.round_sig_figs",
@@ -1046,7 +1125,8 @@
           "reason": "`round_sig_figs` operation not supported for dtype `datetime[μs]` (expected: numeric)"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.shift",
@@ -1065,7 +1145,8 @@
           "value": 1,
           "shown": "1"
         }
-      }
+      },
+      "leftOut": null
     },
     {
       "entry": "Expr.sign",
@@ -1079,7 +1160,8 @@
           "reason": "`sign` operation not supported for dtype `datetime[μs]` as argument 0"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.sin",
@@ -1093,7 +1175,8 @@
           "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.sinh",
@@ -1107,7 +1190,8 @@
           "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.sqrt",
@@ -1121,7 +1205,8 @@
           "reason": "the schema says Datetime(us) and the rows give Float64"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.ends_with",
@@ -1135,7 +1220,8 @@
           "reason": "expected String type, got: datetime[μs]"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.head",
@@ -1149,7 +1235,8 @@
           "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.join",
@@ -1161,7 +1248,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.len_bytes",
@@ -1175,7 +1263,8 @@
           "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.len_chars",
@@ -1189,7 +1278,8 @@
           "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.pad_end",
@@ -1203,7 +1293,8 @@
           "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.pad_start",
@@ -1217,7 +1308,8 @@
           "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.reverse",
@@ -1231,7 +1323,8 @@
           "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.slice",
@@ -1245,7 +1338,8 @@
           "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.split",
@@ -1259,7 +1353,8 @@
           "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.starts_with",
@@ -1273,7 +1368,8 @@
           "reason": "expected String type, got: datetime[μs]"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.strip_chars",
@@ -1287,7 +1383,8 @@
           "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.strip_chars_end",
@@ -1301,7 +1398,8 @@
           "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.strip_chars_start",
@@ -1315,7 +1413,8 @@
           "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.strip_prefix",
@@ -1329,7 +1428,8 @@
           "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.strip_suffix",
@@ -1343,7 +1443,8 @@
           "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.tail",
@@ -1357,7 +1458,8 @@
           "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.to_lowercase",
@@ -1371,7 +1473,8 @@
           "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.to_titlecase",
@@ -1385,7 +1488,8 @@
           "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.to_uppercase",
@@ -1399,7 +1503,8 @@
           "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.str.zfill",
@@ -1413,7 +1518,8 @@
           "reason": "invalid series dtype: expected `String`, got `datetime[μs]` for series with name `a`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.sub",
@@ -1425,7 +1531,8 @@
           "kind": "allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.sum",
@@ -1439,7 +1546,8 @@
           "reason": "`sum` operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.tan",
@@ -1453,7 +1561,8 @@
           "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.tanh",
@@ -1467,7 +1576,8 @@
           "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.truediv",
@@ -1481,7 +1591,8 @@
           "reason": "division of 'Datetime' datatype is not allowed"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.truncate",
@@ -1495,7 +1606,8 @@
           "reason": "truncation ('to_zero') operation not supported for dtype `datetime[μs]` (expected: numeric)"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Expr.xor",
@@ -1509,7 +1621,8 @@
           "reason": "^ not allowed on datetime[μs] and i8"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Then.otherwise",
@@ -1522,7 +1635,8 @@
           "reason": "this continues a condition that is at its then"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "Then.when",
@@ -1535,7 +1649,8 @@
           "reason": "this continues a condition that is at its then"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "When.then",
@@ -1548,7 +1663,8 @@
           "reason": "this continues a condition that is at its when"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "polars.col",
@@ -1561,7 +1677,8 @@
           "reason": "an expression starts here only once: a start cannot follow a value"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "polars.element",
@@ -1574,7 +1691,8 @@
           "reason": "an expression starts here only once: a start cannot follow a value"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "polars.lit",
@@ -1587,7 +1705,8 @@
           "reason": "an expression starts here only once: a start cannot follow a value"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     },
     {
       "entry": "polars.when",
@@ -1600,7 +1719,8 @@
           "reason": "`polars.when` starts an expression and follows nothing"
         }
       },
-      "argument": null
+      "argument": null,
+      "leftOut": null
     }
   ]
 }

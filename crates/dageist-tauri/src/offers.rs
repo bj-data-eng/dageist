@@ -288,12 +288,16 @@ struct DefaultArgumentView {
 
 /// An entry and whether it may stand at the place.
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct EntryOfferView {
     entry: &'static str,
     verdict: VerdictView,
     /// What a method is given when it is added: only for a method that may
     /// stand, and has a default that the tables allow as its argument.
     argument: Option<DefaultArgumentView>,
+    /// The first parameter a method that may stand starts without giving, which holds what
+    /// Polars gives it when it is not given: the method is complete as it starts.
+    left_out: Option<&'static str>,
 }
 
 /// Every call that stands in an expression, offered or refused at a place.
@@ -429,10 +433,16 @@ pub fn offers_view(
                     parameter: default.parameter(),
                     literal: literal_view(default.literal()),
                 });
+            let left_out = offer
+                .verdict()
+                .is_allowed()
+                .then(|| allowed::left_out_at_start(entry))
+                .flatten();
             EntryOfferView {
                 entry: entry.id().as_str(),
                 verdict: verdict_view(offer.verdict()),
                 argument,
+                left_out,
             }
         })
         .collect();

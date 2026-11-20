@@ -243,10 +243,6 @@ struct ParameterView {
     label: String,
     kind: KindView,
     shape: ShapeView,
-    /// Whether a step must give it: Python requires it, or a step always gives at least one of
-    /// it and the parameters that stand for it. A parameter that is not needed may be left out,
-    /// which leaves what it holds to its default.
-    needed: bool,
     /// Polars' default, read by the engine.
     default: DefaultView,
     /// What the parameter holds when it is not given, as a setting, or `None`
@@ -443,7 +439,6 @@ fn parameter_view(
         })?,
         kind: kind_view(entry, parameter, words)?,
         shape: shape_view(parameter.shape()),
-        needed: parameter.is_needed(),
         default: default_view(parameter.default()),
         default_setting: parameter.default_setting().as_ref().map(setting_view),
         start: setting_view(&parameter.start_setting()),
@@ -570,7 +565,6 @@ mod tests {
                         "label": "rows",
                         "kind": { "kind": "expression" },
                         "shape": { "shape": "one" },
-                        "needed": false,
                         "default": { "kind": "integer", "value": 1 },
                         "defaultSetting": { "kind": "integer", "value": 1, "shown": "1" },
                         "start": { "kind": "unset" },
@@ -582,7 +576,6 @@ mod tests {
                         "label": "fill with",
                         "kind": { "kind": "expression" },
                         "shape": { "shape": "one" },
-                        "needed": false,
                         "default": { "kind": "none" },
                         "defaultSetting": null,
                         "start": { "kind": "unset" },
@@ -607,7 +600,6 @@ mod tests {
                 "label": "kind of join",
                 "kind": { "kind": "choice", "words": words },
                 "shape": { "shape": "one" },
-                "needed": false,
                 "default": { "kind": "text", "value": "inner" },
                 "defaultSetting": { "kind": "word", "value": "inner" },
                 "start": { "kind": "word", "value": "left" },
@@ -628,7 +620,6 @@ mod tests {
                 "label": "descending",
                 "kind": { "kind": "flag" },
                 "shape": { "shape": "perItem", "of": "by" },
-                "needed": false,
                 "default": { "kind": "flag", "value": false },
                 "defaultSetting": { "kind": "flag", "value": false },
                 "start": { "kind": "flag", "value": true },
@@ -856,32 +847,6 @@ mod tests {
                 "UInt128"
             ])
         );
-    }
-
-    #[test]
-    fn a_parameter_says_whether_a_step_must_give_it() {
-        let view = view();
-        let needed = |id: &str, name: &str| parameter(&view, id, name)["needed"].clone();
-        // What Python requires, and what a step always gives one of, as a fill's value and a clip's
-        // bounds, must be given; what Python leaves out, as the characters a trim takes off, need not.
-        for (id, name) in [
-            ("Expr.shift", "fill_value"),
-            ("Expr.str.strip_chars", "characters"),
-            ("Expr.str.strip_chars_start", "characters"),
-            ("Expr.str.strip_chars_end", "characters"),
-            ("Expr.str.slice", "length"),
-        ] {
-            assert_eq!(needed(id, name), json!(false), "{id} {name}");
-        }
-        for (id, name) in [
-            ("Expr.str.slice", "offset"),
-            ("Expr.str.head", "n"),
-            ("Expr.fill_null", "value"),
-            ("Expr.clip", "lower_bound"),
-            ("Expr.add", "other"),
-        ] {
-            assert_eq!(needed(id, name), json!(true), "{id} {name}");
-        }
     }
 
     #[test]

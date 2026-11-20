@@ -143,7 +143,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -177,7 +176,6 @@
           "shape": {
             "shape": "many"
           },
-          "needed": false,
           "default": {
             "kind": "empty"
           },
@@ -211,7 +209,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "empty"
           },
@@ -243,7 +240,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -287,7 +283,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -318,7 +313,6 @@
           "shape": {
             "shape": "many"
           },
-          "needed": true,
           "default": {
             "kind": "empty"
           },
@@ -415,7 +409,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "none"
           },
@@ -446,7 +439,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -466,7 +458,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": true
@@ -491,7 +482,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": false
@@ -547,7 +537,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "none"
           },
@@ -567,7 +556,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "none"
           },
@@ -628,7 +616,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": false
@@ -664,7 +651,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": false
@@ -700,7 +686,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": false
@@ -786,7 +771,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -827,7 +811,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": false
@@ -863,7 +846,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -894,7 +876,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -955,7 +936,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -986,7 +966,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "none"
           },
@@ -1036,7 +1015,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "none"
           },
@@ -1058,7 +1036,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "none"
           },
@@ -1089,7 +1066,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": false
@@ -1135,7 +1111,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -1167,7 +1142,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "none"
           },
@@ -1198,7 +1172,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -1229,7 +1202,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -1270,7 +1242,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -1290,7 +1261,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -1328,7 +1298,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "text",
             "value": "both"
@@ -1364,7 +1333,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -1385,7 +1353,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "float",
             "value": 0.0
@@ -1411,7 +1378,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "float",
             "value": 1e-9
@@ -1436,7 +1402,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": false
@@ -1572,7 +1537,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": false
@@ -1608,7 +1572,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -1649,7 +1612,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "float",
             "value": 2.718281828459045
@@ -1695,7 +1657,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -1746,7 +1707,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -1777,7 +1737,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -1808,7 +1767,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -1839,7 +1797,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -1900,7 +1857,6 @@
           "shape": {
             "shape": "many"
           },
-          "needed": true,
           "default": {
             "kind": "empty"
           },
@@ -1936,7 +1892,6 @@
           "shape": {
             "shape": "many"
           },
-          "needed": false,
           "default": {
             "kind": "none"
           },
@@ -1964,7 +1919,6 @@
           "shape": {
             "shape": "many"
           },
-          "needed": false,
           "default": {
             "kind": "empty"
           },
@@ -1992,7 +1946,6 @@
           "shape": {
             "shape": "many"
           },
-          "needed": false,
           "default": {
             "kind": "none"
           },
@@ -2020,7 +1973,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": false
@@ -2045,7 +1997,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": false
@@ -2084,7 +2035,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "text",
             "value": "group_to_rows"
@@ -2120,7 +2070,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -2161,7 +2110,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -2181,7 +2129,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "none"
           },
@@ -2212,7 +2159,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -2232,7 +2178,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "none"
           },
@@ -2252,7 +2197,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "none"
           },
@@ -2272,7 +2216,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "none"
           },
@@ -2304,7 +2247,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "integer",
             "value": 0
@@ -2339,7 +2281,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "text",
             "value": "half_to_even"
@@ -2376,7 +2317,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -2407,7 +2347,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "integer",
             "value": 1
@@ -2432,7 +2371,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "none"
           },
@@ -2503,7 +2441,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -2534,7 +2471,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -2566,7 +2502,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "text",
             "value": ""
@@ -2591,7 +2526,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": true
@@ -2647,7 +2581,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -2668,7 +2601,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "text",
             "value": " "
@@ -2704,7 +2636,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -2725,7 +2656,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "text",
             "value": " "
@@ -2771,7 +2701,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -2791,7 +2720,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "none"
           },
@@ -2822,7 +2750,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -2842,7 +2769,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": false
@@ -2867,7 +2793,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": true
@@ -2892,7 +2817,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": true
@@ -2928,7 +2852,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -2959,7 +2882,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "none"
           },
@@ -2990,7 +2912,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "none"
           },
@@ -3021,7 +2942,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "none"
           },
@@ -3052,7 +2972,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -3083,7 +3002,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -3114,7 +3032,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -3175,7 +3092,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -3206,7 +3122,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -3267,7 +3182,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -3299,7 +3213,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "integer",
             "value": 0
@@ -3335,7 +3248,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -3366,7 +3278,6 @@
           "shape": {
             "shape": "many"
           },
-          "needed": false,
           "default": {
             "kind": "empty"
           },
@@ -3400,7 +3311,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "empty"
           },
@@ -3432,7 +3342,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -3452,7 +3361,6 @@
           "shape": {
             "shape": "many"
           },
-          "needed": false,
           "default": {
             "kind": "none"
           },
@@ -3510,7 +3418,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "text",
             "value": "inner"
@@ -3535,7 +3442,6 @@
           "shape": {
             "shape": "many"
           },
-          "needed": false,
           "default": {
             "kind": "none"
           },
@@ -3563,7 +3469,6 @@
           "shape": {
             "shape": "many"
           },
-          "needed": false,
           "default": {
             "kind": "none"
           },
@@ -3592,7 +3497,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "text",
             "value": "_right"
@@ -3635,7 +3539,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "text",
             "value": "m:m"
@@ -3660,7 +3563,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": false
@@ -3685,7 +3587,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "none"
           },
@@ -3728,7 +3629,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "none"
           },
@@ -3771,7 +3671,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "text",
             "value": "auto"
@@ -3796,7 +3695,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": true
@@ -3821,7 +3719,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": false
@@ -3857,7 +3754,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -3877,7 +3773,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -3897,7 +3792,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "none"
           },
@@ -3917,7 +3811,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "none"
           },
@@ -3937,7 +3830,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "none"
           },
@@ -3960,7 +3852,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": false
@@ -3986,7 +3877,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "text",
             "value": "_"
@@ -4021,7 +3911,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "text",
             "value": "auto"
@@ -4064,7 +3953,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -4085,7 +3973,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": true
@@ -4121,7 +4008,6 @@
           "shape": {
             "shape": "many"
           },
-          "needed": false,
           "default": {
             "kind": "empty"
           },
@@ -4155,7 +4041,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "empty"
           },
@@ -4190,7 +4075,6 @@
           "shape": {
             "shape": "many"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -4218,7 +4102,6 @@
           "shape": {
             "shape": "many"
           },
-          "needed": false,
           "default": {
             "kind": "empty"
           },
@@ -4247,7 +4130,6 @@
             "shape": "perItem",
             "of": "by"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": false
@@ -4273,7 +4155,6 @@
             "shape": "perItem",
             "of": "by"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": false
@@ -4298,7 +4179,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": false
@@ -4323,7 +4203,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": true
@@ -4359,7 +4238,6 @@
           "shape": {
             "shape": "many"
           },
-          "needed": false,
           "default": {
             "kind": "empty"
           },
@@ -4393,7 +4271,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "empty"
           },
@@ -4428,7 +4305,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -4462,7 +4338,6 @@
           "shape": {
             "shape": "many"
           },
-          "needed": false,
           "default": {
             "kind": "empty"
           },
@@ -4496,7 +4371,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "empty"
           },
@@ -4528,7 +4402,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -4562,7 +4435,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -4582,7 +4454,6 @@
           "shape": {
             "shape": "many"
           },
-          "needed": false,
           "default": {
             "kind": "empty"
           },
@@ -4629,7 +4500,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": true,
           "default": {
             "kind": "required"
           },
@@ -4649,7 +4519,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "none"
           },
@@ -4669,7 +4538,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "flag",
             "value": false
@@ -4705,7 +4573,6 @@
           "shape": {
             "shape": "many"
           },
-          "needed": false,
           "default": {
             "kind": "empty"
           },
@@ -4739,7 +4606,6 @@
           "shape": {
             "shape": "one"
           },
-          "needed": false,
           "default": {
             "kind": "empty"
           },
