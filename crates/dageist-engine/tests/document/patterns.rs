@@ -206,3 +206,40 @@ fn a_replacement_of_many_values_for_one_text_is_refused_by_the_rule_and_by_polar
         "{error}"
     );
 }
+
+#[test]
+fn a_replacement_of_an_aggregate_by_many_values_is_met_by_each_as_polars_meets_it() {
+    // The first owner is one value, `Company A`, and what replaces its capital `A` is the owner
+    // of each of the seven rows: Polars meets the one with each of the many, for the rows and for
+    // a table with no rows, and the rule for the number of values of a replacement has no say.
+    let written = selecting(json!({ "expression": {
+        "start": crate::support::col_call("owner"),
+        "then": [
+            call("Expr.first", json!({})),
+            call(
+                "Expr.str.replace",
+                json!({ "pattern": pattern("A"), "value": crate::support::field("owner") }),
+            ),
+        ],
+    } }));
+    let report = report_of(&written);
+    assert_eq!(report.steps()[0].walk().refusal(), None);
+    assert!(
+        matches!(report.steps()[0].outcome(), Outcome::Valid { .. }),
+        "{:?}",
+        report.steps()[0].outcome()
+    );
+    let cells = cells(&written);
+    assert_eq!(cells.len(), 7);
+    assert_eq!(cells[0].as_deref(), Some("Company Company A"));
+    assert_eq!(cells[2].as_deref(), Some("Company Company B"));
+    let no_rows = Document::read(&written)
+        .expect("a document")
+        .run_on(&inputs(), &claims().clear())
+        .expect("the claims have a schema");
+    assert!(
+        matches!(no_rows.steps()[0].rows(), StepRows::Counted(_)),
+        "{:?}",
+        no_rows.steps()[0].rows()
+    );
+}

@@ -73,7 +73,9 @@ fn gives(
         // column and the operand a literal.
         let call = method(
             entry,
-            if one_valued {
+            if one_valued && AGGREGATE_RECEIVER.contains(&(entry.id().as_str(), name)) {
+                column("a").first()
+            } else if one_valued {
                 literal_of(&receiver.dtype())
             } else {
                 column("a")
@@ -102,9 +104,18 @@ fn found(entry: &'static Entry, name: &str) -> Option<(Representative, Represent
     })
 }
 
+/// The parameters measured with an aggregate of the column `a` as the receiver of one value, and
+/// not a literal: Polars meets a text of one value that is an aggregate with each value of what
+/// replaces it, and refuses a literal text beside them for a table with no rows, which the tables
+/// count as refused, so a literal receiver measures nothing of them.
+const AGGREGATE_RECEIVER: [(&str, &str); 2] = [
+    ("Expr.str.replace", "value"),
+    ("Expr.str.replace_all", "value"),
+];
+
 /// The parameters that Polars allows no operand of many for, with why: nothing is measured of them.
 /// `over`'s keys are met by the window, which has a rule of its own.
-const NOT_MEASURED: [(&str, &str, &str); 8] = [
+const NOT_MEASURED: [(&str, &str, &str); 6] = [
     ("Expr.over", "more_exprs", "a key of the window"),
     ("Expr.replace", "new", "the values a replacement lists"),
     (
@@ -116,16 +127,6 @@ const NOT_MEASURED: [(&str, &str, &str); 8] = [
         "Expr.replace_strict",
         "default",
         "the values a replacement lists",
-    ),
-    (
-        "Expr.str.replace",
-        "value",
-        "Polars refuses many values beside a text of one",
-    ),
-    (
-        "Expr.str.replace_all",
-        "value",
-        "Polars refuses many values beside a text of one",
     ),
     ("Expr.shift", "n", "Polars takes one value only"),
     ("Expr.shift", "fill_value", "Polars takes one value only"),

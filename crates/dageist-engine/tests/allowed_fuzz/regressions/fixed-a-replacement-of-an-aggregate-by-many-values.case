@@ -1,0 +1,2 @@
+{"a":"Date","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.with_columns","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["g"]}}},"then":[{"entry":"Expr.max","arguments":{}},{"entry":"Expr.str.replace","arguments":{"value":{"expression":{"start":{"entry":"polars.col","arguments":{"name":{"columns":["f"]}}},"then":[]}},"pattern":{"pattern":"(?<g>a)"}}}]}}]}}}}]}
