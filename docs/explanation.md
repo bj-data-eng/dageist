@@ -1472,8 +1472,8 @@ counts are the same at one thread, at two and at the machine's own, and so are t
 refused by the rule that is stricter by design, of 157 pivot cases. The others are not: Polars' thread
 count changes which reason it gives where the tables and Polars both refuse, and a case in which
 Polars panics at some counts and not at others moves a case between them, so the cases refused where
-Polars does not evaluate the part are 5 or 6, while the cases that agree are 783, those refused by
-both for another reason 121 and those a limit excused 6, at the three counts measured. The test
+Polars does not evaluate the part are 5 or 6, while the cases that agree are 784, those refused by
+both for another reason 120 and those a limit excused 6, at the three counts measured. The test
 asserts none of those.
 
 | Limit | Excuses |
