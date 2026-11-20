@@ -260,6 +260,9 @@ struct ParameterView {
     /// Where the expression the parameter holds stands, when a named position
     /// holds it. The tables of allowed combinations are asked at that place.
     position: Option<PositionView>,
+    /// Whether the editor offers the parameter: it lists it among a method's options. One that is
+    /// not is in Python's signature and changes nothing here.
+    offered: bool,
 }
 
 /// What an entry is applied to.
@@ -452,6 +455,7 @@ fn parameter_view(
         default_setting: parameter.default_setting().as_ref().map(setting_view),
         start: setting_view(&parameter.start_setting()),
         position: Position::of_parameter(id.as_str(), parameter.name()).map(position_view),
+        offered: parameter.offered(),
     })
 }
 
@@ -602,7 +606,8 @@ mod tests {
                         "default": { "kind": "integer", "value": 1 },
                         "defaultSetting": { "kind": "integer", "value": 1, "shown": "1" },
                         "start": { "kind": "unset" },
-                        "position": null
+                        "position": null,
+                        "offered": true
                     },
                     {
                         "name": "fill_value",
@@ -613,7 +618,8 @@ mod tests {
                         "default": { "kind": "none" },
                         "defaultSetting": null,
                         "start": { "kind": "unset" },
-                        "position": null
+                        "position": null,
+                        "offered": true
                     }
                 ]
             })
@@ -637,7 +643,8 @@ mod tests {
                 "default": { "kind": "text", "value": "inner" },
                 "defaultSetting": { "kind": "word", "value": "inner" },
                 "start": { "kind": "word", "value": "left" },
-                "position": null
+                "position": null,
+                "offered": true
             })
         );
     }
@@ -657,7 +664,8 @@ mod tests {
                 "default": { "kind": "flag", "value": false },
                 "defaultSetting": { "kind": "flag", "value": false },
                 "start": { "kind": "flag", "value": true },
-                "position": null
+                "position": null,
+                "offered": true
             })
         );
     }

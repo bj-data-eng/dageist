@@ -597,6 +597,7 @@ pub const fn dageist_engine::catalog::Parameter::kind(&self) -> dageist_engine::
 pub const fn dageist_engine::catalog::Parameter::lenient_beside(&self) -> core::option::Option<&'static str>
 pub const fn dageist_engine::catalog::Parameter::name(&self) -> &'static str
 pub const fn dageist_engine::catalog::Parameter::names_the_fields_of_the_result(&self) -> bool
+pub const fn dageist_engine::catalog::Parameter::offered(&self) -> bool
 pub const fn dageist_engine::catalog::Parameter::plain_text_flag(&self) -> core::option::Option<&'static str>
 pub const fn dageist_engine::catalog::Parameter::role(&self) -> dageist_engine::catalog::Role
 pub const fn dageist_engine::catalog::Parameter::shape(&self) -> dageist_engine::catalog::Shape

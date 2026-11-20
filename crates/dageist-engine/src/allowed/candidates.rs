@@ -397,6 +397,7 @@ pub fn option_offers(entry: &Entry, chosen: &[(&str, &str)]) -> Vec<OptionOffer>
     entry
         .parameters()
         .iter()
+        .filter(|parameter| parameter.offered())
         .filter_map(|parameter| {
             let words: Vec<String> = match parameter.kind() {
                 Kind::Flag => vec!["true".to_owned(), "false".to_owned()],

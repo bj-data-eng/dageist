@@ -430,6 +430,7 @@ pub struct Parameter {
     broadcasts: bool,
     plain_text_flag: Option<&'static str>,
     names_the_fields_of_the_result: bool,
+    offered: bool,
 }
 
 impl Parameter {
@@ -453,6 +454,7 @@ impl Parameter {
             broadcasts: true,
             plain_text_flag: None,
             names_the_fields_of_the_result: false,
+            offered: true,
         }
     }
 
@@ -546,6 +548,14 @@ impl Parameter {
             "only a pattern, or an expression that may be typed as one, is plain text by a flag"
         );
         self.plain_text_flag = Some(flag);
+        self
+    }
+
+    /// The same parameter, which the editor does not offer: it is in Python's signature and so in the
+    /// catalogue, but setting it changes nothing here, as `strict` of a method that takes a pattern
+    /// typed in, which is refused when it is none whatever `strict` says.
+    const fn not_offered(mut self) -> Self {
+        self.offered = false;
         self
     }
 
@@ -666,6 +676,14 @@ impl Parameter {
     #[must_use]
     pub const fn broadcasts(&self) -> bool {
         self.broadcasts
+    }
+
+    /// Whether the editor offers the parameter: it lists it among the options a method can be given,
+    /// and the engine says what words it may be set to. A parameter that is not offered is in the
+    /// catalogue for Python's signature alone, and nothing that sets it changes what a step does.
+    #[must_use]
+    pub const fn offered(&self) -> bool {
+        self.offered
     }
 
     /// The flag of the same entry that makes the pattern plain text where it is true, if there is

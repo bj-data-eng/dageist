@@ -221,9 +221,13 @@ const PATTERN_OR_TEXT: Parameter = PATTERN.with_plain_text_flag("literal");
 const LITERAL: Parameter = flag("literal", "False").keyword_only();
 
 /// `strict`: whether a pattern that is no regular expression is refused. Polars asks it of each
-/// row's pattern where they are a column; the catalogue's is typed in, and is refused for it
-/// whatever `strict` says, as the editor holds every part to what Polars accepts.
+/// row's pattern where they are a column, which a split's separator may be, so it is offered there.
 const STRICT: Parameter = flag("strict", "True").keyword_only();
+
+/// `strict` of a method whose pattern is typed in, which is refused when it is none whatever
+/// `strict` says, as the editor holds every part to what Polars accepts: it is in Python's
+/// signature, and the editor does not offer it.
+const TYPED_STRICT: Parameter = STRICT.not_offered();
 
 /// What a replacement puts in place of what the pattern matches. Where the pattern is a regular
 /// expression, `$1` and `${name}` stand for the text of a group of the match, and `$$` for a
@@ -2212,7 +2216,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         id: EntryId("Expr.str.contains"),
         family: Family::Compare,
         accepts: STRING,
-        parameters: &[PATTERN_OR_TEXT, LITERAL, STRICT],
+        parameters: &[PATTERN_OR_TEXT, LITERAL, TYPED_STRICT],
         laziness: Laziness::Lazy,
         build: Build::Expression(str_contains),
     },
@@ -2276,7 +2280,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         id: EntryId("Expr.str.find"),
         family: Family::Search,
         accepts: STRING,
-        parameters: &[PATTERN_OR_TEXT, LITERAL, STRICT],
+        parameters: &[PATTERN_OR_TEXT, LITERAL, TYPED_STRICT],
         laziness: Laziness::Lazy,
         build: Build::Expression(str_find),
     },

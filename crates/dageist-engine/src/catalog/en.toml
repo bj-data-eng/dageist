@@ -516,7 +516,7 @@ label = "as plain text"
 
 [entries."Expr.str.contains".parameters.strict]
 name = "strict"
-label = "no effect: a bad pattern is always refused"
+label = "refuse a bad pattern"
 
 [entries."Expr.str.count_matches"]
 name = "str.count_matches"
@@ -584,7 +584,7 @@ label = "as plain text"
 
 [entries."Expr.str.find".parameters.strict]
 name = "strict"
-label = "no effect: a bad pattern is always refused"
+label = "refuse a bad pattern"
 
 [entries."Expr.str.head"]
 name = "str.head"
@@ -708,7 +708,7 @@ label = "as plain text"
 
 [entries."Expr.str.split".parameters.strict]
 name = "strict"
-label = "refuse a bad pattern in a column"
+label = "refuse a bad pattern"
 
 [entries."Expr.str.starts_with"]
 name = "str.starts_with"

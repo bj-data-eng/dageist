@@ -198,6 +198,11 @@ export interface ParameterView {
    * holds it; the engine's tables are asked at that place.
    */
   readonly position: PositionView | null;
+  /**
+   * Whether the editor offers the parameter among a method's options. One that is not is in
+   * Python's signature and changes nothing here.
+   */
+  readonly offered: boolean;
 }
 
 /** What an entry is applied to, mirroring `Applies` in the engine's catalogue; `condition` is one link of `when`, `then` and `otherwise`. */

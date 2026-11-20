@@ -226,6 +226,36 @@ fn the_options_of_an_entry_come_with_their_default_and_the_words_it_may_be_set_t
 }
 
 #[test]
+fn a_flag_that_changes_nothing_here_is_in_the_signature_and_is_not_offered() {
+    use crate::catalog::Kind;
+    let parameter_names = |id: &str| -> Vec<&'static str> {
+        entry(id)
+            .parameters()
+            .iter()
+            .filter(|parameter| parameter.kind() == Kind::Flag)
+            .map(|parameter| parameter.name())
+            .collect()
+    };
+    let offered = |id: &str| -> Vec<&'static str> {
+        option_offers(entry(id), &[])
+            .iter()
+            .map(|option| option.parameter())
+            .collect()
+    };
+    // Python takes `strict` of `contains` and `find`, and a typed pattern that is none is refused
+    // whatever it says, so the engine says nothing of what it may be set to.
+    for id in ["Expr.str.contains", "Expr.str.find"] {
+        assert_eq!(parameter_names(id), ["literal", "strict"], "{id}");
+        assert_eq!(offered(id), ["literal"], "{id}");
+    }
+    // A split's separator may be a column of patterns, which `strict` decides for.
+    assert_eq!(
+        offered("Expr.str.split"),
+        ["inclusive", "literal", "strict"]
+    );
+}
+
+#[test]
 fn a_word_is_refused_for_the_reason_polars_gives_beside_the_options_already_chosen() {
     // A join that takes no keys, a cross join, is refused with any validation; an anti join
     // is refused only the validations that count matches on both sides.

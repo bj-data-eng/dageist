@@ -5,7 +5,7 @@ import { decodeCatalogue } from '@dageist/host';
 import catalogueFixture from '../../../host/fixtures/catalogue.json';
 import { indexCatalogue } from './catalogue';
 import { slotOptions, startingArgument, swappedArgument } from './expr';
-import { NO_OPTIONS, expressionSetting } from './settings';
+import { NO_OPTIONS, expressionSetting, optionParameters } from './settings';
 import { stepItems } from './steps';
 import type { Step } from './steps';
 
@@ -121,5 +121,20 @@ describe('the options a method that is added starts with', () => {
       pattern: { kind: 'text', value: 'a', shown: 'a' },
       value: { kind: 'unset' },
     });
+  });
+});
+
+/** The names of the parameters of `entryId` that can be given as options. */
+const optionNames = (entryId: string): readonly string[] => {
+  const entry = catalogue.entries.get(entryId);
+  if (entry === undefined) throw new Error(`no entry ${entryId}`);
+  return optionParameters(entry, []).map((parameter) => parameter.name);
+};
+
+describe('the options a method can be given', () => {
+  it('leave out a parameter the engine does not offer, and list the others', () => {
+    expect(optionNames('Expr.str.contains')).toEqual(['pattern', 'literal']);
+    expect(optionNames('Expr.str.find')).toEqual(['pattern', 'literal']);
+    expect(optionNames('Expr.str.split')).toContain('strict');
   });
 });

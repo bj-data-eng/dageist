@@ -541,7 +541,8 @@ for the size limit of the compile it does not make. A dependency on `regex` or `
   Polars': a step that holds a half-typed pattern is a document, and is reported as refused at the
   pattern, whatever follows it. A pattern is refused whatever `strict` says: that flag is for a
   column of patterns, where a row's may be none, and a typed one is held to what Polars accepts. The `strict` of `str.contains` and `str.find` is
-  therefore shown with a label that says it has no effect; that of `str.split` is for a separator that is a column.
+  therefore kept in the catalogue for Python's signature and not offered, which a parameter's `offered` says, and
+  the editor does not list it; that of `str.split` is offered, for a separator that is a column.
 - The flag `literal`, where Polars has one (`str.contains`, `str.count_matches`, `str.find`,
   `str.replace` and `str.replace_all`), makes the pattern plain text. The catalogue names it as the
   pattern parameter's plain-text flag, the build reads the pattern as a regular expression only
