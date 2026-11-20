@@ -487,9 +487,11 @@ fn on_receiver(
     let required: Vec<&'static str> = required_expressions(entry)
         .filter(|parameter| !stood_in_for.contains(parameter))
         .collect();
-    if required.is_empty() && stood_in_for.is_empty() {
-        fit = Some(line(None, None)?);
-    }
+    // What the method is refused for with none of its arguments, which it is measured with where
+    // it needs none. Where arguments are given, the lines of the calls that have them say what
+    // Polars does of the call, and which of two failures it meets first, as it converts a part it
+    // is given before it meets the value it follows, so the refusal of an argument is the one told.
+    let alone = (required.is_empty() && stood_in_for.is_empty()).then(|| line(None, None));
     // What the arguments given decide: each is measured on its own, so what
     // the method gives is what they agree on, and not known where they do not.
     let mut given_fits: Vec<Fit> = Vec::new();
@@ -501,6 +503,9 @@ fn on_receiver(
             .find(|parameter| parameter == name)
             .ok_or_else(|| Refusal::structure(format!("{id} has no parameter {name}")))?;
         given_fits.push(line(Some(parameter), Some(*dtype))?);
+    }
+    if let Some(alone) = alone {
+        fit = Some(alone?);
     }
     if let Some(first) = given_fits.first() {
         let same_result = given_fits.iter().all(|found| found.result == first.result);

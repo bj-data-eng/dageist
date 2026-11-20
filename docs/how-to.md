@@ -436,7 +436,11 @@ one value only, has to say so with `not_broadcasting`. A test that cannot measur
 listed there with the reason. A parameter of the [pattern kind](explanation.md#the-pattern-kind) is
 given the harness's pattern, one with a named group that every method of text accepts, wherever the
 generator of the tables builds the call; a pattern that names the fields of what the method gives, as
-`str.extract_groups` does, has its result named by the pattern at the walk and not by the table.
+`str.extract_groups` does, has its result named by the pattern at the walk and not by the table. A
+parameter of the time zone kind is given the zone `UTC` and a required choice its first word, and `dt.strftime` the
+format `iso`, which every dtype takes, wherever the generator builds the call; what the zone a call is given
+decides of what it gives, a moment in it or in none, is the walk's, as is whether a duration typed into a method that
+reads one is a duration Polars reads, which it asks of Polars with the dtype that the method follows.
 Last, run the fuzz target for more seeds than the engine's tests do,
 [as below](#check-the-tables-against-polars).
 

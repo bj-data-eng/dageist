@@ -1216,6 +1216,12 @@ a `fill_value` of text makes a `shift` give text, and where two arguments give
 different results the result is not known. A `Struct` is two fields, an `Array`
 of two, and a `Decimal` of ten digits: the tables say nothing of other sizes.
 
+Where a method is given an argument, the line of the call that has it says what Polars does of the call, and
+that is the refusal told when the argument is refused, before the line of the method with none of its
+arguments, which is told when none is given. The two can refuse for different reasons: `dt.replace`
+converts a part it is given before it meets the value it follows, so text given text as the month is
+refused for the failed conversion, and the call with no part is refused for the text being no moment.
+
 ### What The Tables Are Checked Against
 
 The tables are measured one combination at a time, so whether they predict what
@@ -1460,15 +1466,15 @@ an expected rejection that names both reasons.
 The tally ends with the totals of the cases that agreed, that both refused for another
 reason, that a limit excused, that were refused where Polars does not evaluate the
 part, that a rule stricter by design refused, and that disagreed. The fixed seed's
-1000 cases give none disagreeing; 16 of those that agree are refused by the rule against a
-repeated pair of key names, and the tables could not be asked past a point in 22 more. These
-counts are the same at one thread, at two and at the machine's own, and so are the 10 cases
-refused where Polars does not evaluate the part. The others are not: Polars' thread count
-changes which reason it gives where the tables and Polars both refuse, and a case in which
-Polars panics at some counts and not at others moves a case between them, so the cases that
-agree are 806 to 808, those refused by both for another reason are 98 or 99, those a limit
-excused are 6 or 7 and those refused by the rule that is stricter by design are 72 or 73
-of 157 or 158 pivot cases. The test asserts none of those.
+1000 cases give none disagreeing; 19 of those that agree are refused by the rule against a
+repeated pair of key names, and the tables could not be asked past a point in 27 more. These
+counts are the same at one thread, at two and at the machine's own, and so are the 69 cases
+refused by the rule that is stricter by design, of 157 pivot cases. The others are not: Polars' thread
+count changes which reason it gives where the tables and Polars both refuse, and a case in which
+Polars panics at some counts and not at others moves a case between them, so the cases refused where
+Polars does not evaluate the part are 5 or 6, while the cases that agree are 783, those refused by
+both for another reason 121 and those a limit excused 6, at the three counts measured. The test
+asserts none of those.
 
 | Limit | Excuses |
 | --- | --- |
