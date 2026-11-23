@@ -657,7 +657,7 @@ fn is(call: &Call, id: &str) -> bool {
     call.entry().id().as_str() == id
 }
 
-const ONE_VALUE: [&str; 11] = [
+const ONE_VALUE: [&str; 31] = [
     "Expr.has_nulls",
     "Expr.null_count",
     "Expr.n_unique",
@@ -669,6 +669,26 @@ const ONE_VALUE: [&str; 11] = [
     "Expr.len",
     "Expr.first",
     "Expr.last",
+    "Expr.mean",
+    "Expr.median",
+    "Expr.std",
+    "Expr.var",
+    "Expr.quantile",
+    "Expr.product",
+    "Expr.skew",
+    "Expr.kurtosis",
+    "Expr.entropy",
+    "Expr.arg_max",
+    "Expr.arg_min",
+    "Expr.nan_max",
+    "Expr.nan_min",
+    "Expr.all",
+    "Expr.any",
+    "Expr.approx_n_unique",
+    "Expr.approx_quantile",
+    "Expr.bitwise_and",
+    "Expr.bitwise_or",
+    "Expr.bitwise_xor",
 ];
 
 fn is_one_value(call: &Call) -> bool {

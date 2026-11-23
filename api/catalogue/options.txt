@@ -32,8 +32,372 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 6784 combinations: 4382 allowed; 713 refused when Polars resolved the schema, 1689 when it ran the rows, 0 when it ran the empty table.
+# 7616 combinations: 4988 allowed; 851 refused when Polars resolved the schema, 1777 when it ran the rows, 0 when it ran the empty table.
 #
+Expr.all | Array(Int64, 2) | ignore_nulls=false | refused schema: expected boolean input for 'all()' (got array[i64, 2])
+Expr.all | Array(Int64, 2) | ignore_nulls=true | refused schema: expected boolean input for 'all_ignore_nulls()' (got array[i64, 2])
+Expr.all | Boolean | ignore_nulls=false | allowed Boolean one
+Expr.all | Boolean | ignore_nulls=true | allowed Boolean one
+Expr.all | Date | ignore_nulls=false | refused schema: expected boolean input for 'all()' (got date)
+Expr.all | Date | ignore_nulls=true | refused schema: expected boolean input for 'all_ignore_nulls()' (got date)
+Expr.all | Datetime(us) | ignore_nulls=false | refused schema: expected boolean input for 'all()' (got datetime[μs])
+Expr.all | Datetime(us) | ignore_nulls=true | refused schema: expected boolean input for 'all_ignore_nulls()' (got datetime[μs])
+Expr.all | Datetime(us, UTC) | ignore_nulls=false | refused schema: expected boolean input for 'all()' (got datetime[μs, UTC])
+Expr.all | Datetime(us, UTC) | ignore_nulls=true | refused schema: expected boolean input for 'all_ignore_nulls()' (got datetime[μs, UTC])
+Expr.all | Decimal(10, 2) | ignore_nulls=false | allowed Boolean one
+Expr.all | Decimal(10, 2) | ignore_nulls=true | allowed Boolean one
+Expr.all | Duration(us) | ignore_nulls=false | refused schema: expected boolean input for 'all()' (got duration[μs])
+Expr.all | Duration(us) | ignore_nulls=true | refused schema: expected boolean input for 'all_ignore_nulls()' (got duration[μs])
+Expr.all | Float16 | ignore_nulls=false | allowed Boolean one
+Expr.all | Float16 | ignore_nulls=true | allowed Boolean one
+Expr.all | Float32 | ignore_nulls=false | allowed Boolean one
+Expr.all | Float32 | ignore_nulls=true | allowed Boolean one
+Expr.all | Float64 | ignore_nulls=false | allowed Boolean one
+Expr.all | Float64 | ignore_nulls=true | allowed Boolean one
+Expr.all | Int128 | ignore_nulls=false | allowed Boolean one
+Expr.all | Int128 | ignore_nulls=true | allowed Boolean one
+Expr.all | Int16 | ignore_nulls=false | allowed Boolean one
+Expr.all | Int16 | ignore_nulls=true | allowed Boolean one
+Expr.all | Int32 | ignore_nulls=false | allowed Boolean one
+Expr.all | Int32 | ignore_nulls=true | allowed Boolean one
+Expr.all | Int64 | ignore_nulls=false | allowed Boolean one
+Expr.all | Int64 | ignore_nulls=true | allowed Boolean one
+Expr.all | Int8 | ignore_nulls=false | allowed Boolean one
+Expr.all | Int8 | ignore_nulls=true | allowed Boolean one
+Expr.all | List(Int64) | ignore_nulls=false | refused schema: expected boolean input for 'all()' (got list[i64])
+Expr.all | List(Int64) | ignore_nulls=true | refused schema: expected boolean input for 'all_ignore_nulls()' (got list[i64])
+Expr.all | List(String) | ignore_nulls=false | refused schema: expected boolean input for 'all()' (got list[str])
+Expr.all | List(String) | ignore_nulls=true | refused schema: expected boolean input for 'all_ignore_nulls()' (got list[str])
+Expr.all | Null | ignore_nulls=false | allowed Boolean one
+Expr.all | Null | ignore_nulls=true | allowed Boolean one
+Expr.all | String | ignore_nulls=false | refused rows: casting from Utf8View to Boolean not supported
+Expr.all | String | ignore_nulls=true | refused rows: casting from Utf8View to Boolean not supported
+Expr.all | Struct(x: Int64, y: String) | ignore_nulls=false | refused schema: expected boolean input for 'all()' (got struct[2])
+Expr.all | Struct(x: Int64, y: String) | ignore_nulls=true | refused schema: expected boolean input for 'all_ignore_nulls()' (got struct[2])
+Expr.all | Time | ignore_nulls=false | refused schema: expected boolean input for 'all()' (got time)
+Expr.all | Time | ignore_nulls=true | refused schema: expected boolean input for 'all_ignore_nulls()' (got time)
+Expr.all | UInt128 | ignore_nulls=false | allowed Boolean one
+Expr.all | UInt128 | ignore_nulls=true | allowed Boolean one
+Expr.all | UInt16 | ignore_nulls=false | allowed Boolean one
+Expr.all | UInt16 | ignore_nulls=true | allowed Boolean one
+Expr.all | UInt32 | ignore_nulls=false | allowed Boolean one
+Expr.all | UInt32 | ignore_nulls=true | allowed Boolean one
+Expr.all | UInt64 | ignore_nulls=false | allowed Boolean one
+Expr.all | UInt64 | ignore_nulls=true | allowed Boolean one
+Expr.all | UInt8 | ignore_nulls=false | allowed Boolean one
+Expr.all | UInt8 | ignore_nulls=true | allowed Boolean one
+Expr.any | Array(Int64, 2) | ignore_nulls=false | refused schema: expected boolean input for 'any()' (got array[i64, 2])
+Expr.any | Array(Int64, 2) | ignore_nulls=true | refused schema: expected boolean input for 'any_ignore_nulls()' (got array[i64, 2])
+Expr.any | Boolean | ignore_nulls=false | allowed Boolean one
+Expr.any | Boolean | ignore_nulls=true | allowed Boolean one
+Expr.any | Date | ignore_nulls=false | refused schema: expected boolean input for 'any()' (got date)
+Expr.any | Date | ignore_nulls=true | refused schema: expected boolean input for 'any_ignore_nulls()' (got date)
+Expr.any | Datetime(us) | ignore_nulls=false | refused schema: expected boolean input for 'any()' (got datetime[μs])
+Expr.any | Datetime(us) | ignore_nulls=true | refused schema: expected boolean input for 'any_ignore_nulls()' (got datetime[μs])
+Expr.any | Datetime(us, UTC) | ignore_nulls=false | refused schema: expected boolean input for 'any()' (got datetime[μs, UTC])
+Expr.any | Datetime(us, UTC) | ignore_nulls=true | refused schema: expected boolean input for 'any_ignore_nulls()' (got datetime[μs, UTC])
+Expr.any | Decimal(10, 2) | ignore_nulls=false | allowed Boolean one
+Expr.any | Decimal(10, 2) | ignore_nulls=true | allowed Boolean one
+Expr.any | Duration(us) | ignore_nulls=false | refused schema: expected boolean input for 'any()' (got duration[μs])
+Expr.any | Duration(us) | ignore_nulls=true | refused schema: expected boolean input for 'any_ignore_nulls()' (got duration[μs])
+Expr.any | Float16 | ignore_nulls=false | allowed Boolean one
+Expr.any | Float16 | ignore_nulls=true | allowed Boolean one
+Expr.any | Float32 | ignore_nulls=false | allowed Boolean one
+Expr.any | Float32 | ignore_nulls=true | allowed Boolean one
+Expr.any | Float64 | ignore_nulls=false | allowed Boolean one
+Expr.any | Float64 | ignore_nulls=true | allowed Boolean one
+Expr.any | Int128 | ignore_nulls=false | allowed Boolean one
+Expr.any | Int128 | ignore_nulls=true | allowed Boolean one
+Expr.any | Int16 | ignore_nulls=false | allowed Boolean one
+Expr.any | Int16 | ignore_nulls=true | allowed Boolean one
+Expr.any | Int32 | ignore_nulls=false | allowed Boolean one
+Expr.any | Int32 | ignore_nulls=true | allowed Boolean one
+Expr.any | Int64 | ignore_nulls=false | allowed Boolean one
+Expr.any | Int64 | ignore_nulls=true | allowed Boolean one
+Expr.any | Int8 | ignore_nulls=false | allowed Boolean one
+Expr.any | Int8 | ignore_nulls=true | allowed Boolean one
+Expr.any | List(Int64) | ignore_nulls=false | refused schema: expected boolean input for 'any()' (got list[i64])
+Expr.any | List(Int64) | ignore_nulls=true | refused schema: expected boolean input for 'any_ignore_nulls()' (got list[i64])
+Expr.any | List(String) | ignore_nulls=false | refused schema: expected boolean input for 'any()' (got list[str])
+Expr.any | List(String) | ignore_nulls=true | refused schema: expected boolean input for 'any_ignore_nulls()' (got list[str])
+Expr.any | Null | ignore_nulls=false | allowed Boolean one
+Expr.any | Null | ignore_nulls=true | allowed Boolean one
+Expr.any | String | ignore_nulls=false | refused rows: casting from Utf8View to Boolean not supported
+Expr.any | String | ignore_nulls=true | refused rows: casting from Utf8View to Boolean not supported
+Expr.any | Struct(x: Int64, y: String) | ignore_nulls=false | refused schema: expected boolean input for 'any()' (got struct[2])
+Expr.any | Struct(x: Int64, y: String) | ignore_nulls=true | refused schema: expected boolean input for 'any_ignore_nulls()' (got struct[2])
+Expr.any | Time | ignore_nulls=false | refused schema: expected boolean input for 'any()' (got time)
+Expr.any | Time | ignore_nulls=true | refused schema: expected boolean input for 'any_ignore_nulls()' (got time)
+Expr.any | UInt128 | ignore_nulls=false | allowed Boolean one
+Expr.any | UInt128 | ignore_nulls=true | allowed Boolean one
+Expr.any | UInt16 | ignore_nulls=false | allowed Boolean one
+Expr.any | UInt16 | ignore_nulls=true | allowed Boolean one
+Expr.any | UInt32 | ignore_nulls=false | allowed Boolean one
+Expr.any | UInt32 | ignore_nulls=true | allowed Boolean one
+Expr.any | UInt64 | ignore_nulls=false | allowed Boolean one
+Expr.any | UInt64 | ignore_nulls=true | allowed Boolean one
+Expr.any | UInt8 | ignore_nulls=false | allowed Boolean one
+Expr.any | UInt8 | ignore_nulls=true | allowed Boolean one
+Expr.approx_quantile | Array(Int64, 2) | method=auto, error_tightness=empirical | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+Expr.approx_quantile | Array(Int64, 2) | method=auto, error_tightness=formal | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+Expr.approx_quantile | Array(Int64, 2) | method=kll, error_tightness=empirical | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+Expr.approx_quantile | Array(Int64, 2) | method=kll, error_tightness=formal | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+Expr.approx_quantile | Array(Int64, 2) | method=req_both, error_tightness=empirical | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+Expr.approx_quantile | Array(Int64, 2) | method=req_both, error_tightness=formal | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+Expr.approx_quantile | Array(Int64, 2) | method=req_hi, error_tightness=empirical | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+Expr.approx_quantile | Array(Int64, 2) | method=req_hi, error_tightness=formal | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+Expr.approx_quantile | Array(Int64, 2) | method=req_lo, error_tightness=empirical | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+Expr.approx_quantile | Array(Int64, 2) | method=req_lo, error_tightness=formal | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+Expr.approx_quantile | Boolean | method=auto, error_tightness=empirical | allowed Boolean one
+Expr.approx_quantile | Boolean | method=auto, error_tightness=formal | allowed Boolean one
+Expr.approx_quantile | Boolean | method=kll, error_tightness=empirical | allowed Boolean one
+Expr.approx_quantile | Boolean | method=kll, error_tightness=formal | allowed Boolean one
+Expr.approx_quantile | Boolean | method=req_both, error_tightness=empirical | allowed Boolean one
+Expr.approx_quantile | Boolean | method=req_both, error_tightness=formal | allowed Boolean one
+Expr.approx_quantile | Boolean | method=req_hi, error_tightness=empirical | allowed Boolean one
+Expr.approx_quantile | Boolean | method=req_hi, error_tightness=formal | allowed Boolean one
+Expr.approx_quantile | Boolean | method=req_lo, error_tightness=empirical | allowed Boolean one
+Expr.approx_quantile | Boolean | method=req_lo, error_tightness=formal | allowed Boolean one
+Expr.approx_quantile | Date | method=auto, error_tightness=empirical | allowed Date one
+Expr.approx_quantile | Date | method=auto, error_tightness=formal | allowed Date one
+Expr.approx_quantile | Date | method=kll, error_tightness=empirical | allowed Date one
+Expr.approx_quantile | Date | method=kll, error_tightness=formal | allowed Date one
+Expr.approx_quantile | Date | method=req_both, error_tightness=empirical | allowed Date one
+Expr.approx_quantile | Date | method=req_both, error_tightness=formal | allowed Date one
+Expr.approx_quantile | Date | method=req_hi, error_tightness=empirical | allowed Date one
+Expr.approx_quantile | Date | method=req_hi, error_tightness=formal | allowed Date one
+Expr.approx_quantile | Date | method=req_lo, error_tightness=empirical | allowed Date one
+Expr.approx_quantile | Date | method=req_lo, error_tightness=formal | allowed Date one
+Expr.approx_quantile | Datetime(us) | method=auto, error_tightness=empirical | allowed Datetime(us) one
+Expr.approx_quantile | Datetime(us) | method=auto, error_tightness=formal | allowed Datetime(us) one
+Expr.approx_quantile | Datetime(us) | method=kll, error_tightness=empirical | allowed Datetime(us) one
+Expr.approx_quantile | Datetime(us) | method=kll, error_tightness=formal | allowed Datetime(us) one
+Expr.approx_quantile | Datetime(us) | method=req_both, error_tightness=empirical | allowed Datetime(us) one
+Expr.approx_quantile | Datetime(us) | method=req_both, error_tightness=formal | allowed Datetime(us) one
+Expr.approx_quantile | Datetime(us) | method=req_hi, error_tightness=empirical | allowed Datetime(us) one
+Expr.approx_quantile | Datetime(us) | method=req_hi, error_tightness=formal | allowed Datetime(us) one
+Expr.approx_quantile | Datetime(us) | method=req_lo, error_tightness=empirical | allowed Datetime(us) one
+Expr.approx_quantile | Datetime(us) | method=req_lo, error_tightness=formal | allowed Datetime(us) one
+Expr.approx_quantile | Datetime(us, UTC) | method=auto, error_tightness=empirical | allowed Datetime(us, UTC) one
+Expr.approx_quantile | Datetime(us, UTC) | method=auto, error_tightness=formal | allowed Datetime(us, UTC) one
+Expr.approx_quantile | Datetime(us, UTC) | method=kll, error_tightness=empirical | allowed Datetime(us, UTC) one
+Expr.approx_quantile | Datetime(us, UTC) | method=kll, error_tightness=formal | allowed Datetime(us, UTC) one
+Expr.approx_quantile | Datetime(us, UTC) | method=req_both, error_tightness=empirical | allowed Datetime(us, UTC) one
+Expr.approx_quantile | Datetime(us, UTC) | method=req_both, error_tightness=formal | allowed Datetime(us, UTC) one
+Expr.approx_quantile | Datetime(us, UTC) | method=req_hi, error_tightness=empirical | allowed Datetime(us, UTC) one
+Expr.approx_quantile | Datetime(us, UTC) | method=req_hi, error_tightness=formal | allowed Datetime(us, UTC) one
+Expr.approx_quantile | Datetime(us, UTC) | method=req_lo, error_tightness=empirical | allowed Datetime(us, UTC) one
+Expr.approx_quantile | Datetime(us, UTC) | method=req_lo, error_tightness=formal | allowed Datetime(us, UTC) one
+Expr.approx_quantile | Decimal(10, 2) | method=auto, error_tightness=empirical | allowed Decimal(10, 2) one
+Expr.approx_quantile | Decimal(10, 2) | method=auto, error_tightness=formal | allowed Decimal(10, 2) one
+Expr.approx_quantile | Decimal(10, 2) | method=kll, error_tightness=empirical | allowed Decimal(10, 2) one
+Expr.approx_quantile | Decimal(10, 2) | method=kll, error_tightness=formal | allowed Decimal(10, 2) one
+Expr.approx_quantile | Decimal(10, 2) | method=req_both, error_tightness=empirical | allowed Decimal(10, 2) one
+Expr.approx_quantile | Decimal(10, 2) | method=req_both, error_tightness=formal | allowed Decimal(10, 2) one
+Expr.approx_quantile | Decimal(10, 2) | method=req_hi, error_tightness=empirical | allowed Decimal(10, 2) one
+Expr.approx_quantile | Decimal(10, 2) | method=req_hi, error_tightness=formal | allowed Decimal(10, 2) one
+Expr.approx_quantile | Decimal(10, 2) | method=req_lo, error_tightness=empirical | allowed Decimal(10, 2) one
+Expr.approx_quantile | Decimal(10, 2) | method=req_lo, error_tightness=formal | allowed Decimal(10, 2) one
+Expr.approx_quantile | Duration(us) | method=auto, error_tightness=empirical | allowed Duration(us) one
+Expr.approx_quantile | Duration(us) | method=auto, error_tightness=formal | allowed Duration(us) one
+Expr.approx_quantile | Duration(us) | method=kll, error_tightness=empirical | allowed Duration(us) one
+Expr.approx_quantile | Duration(us) | method=kll, error_tightness=formal | allowed Duration(us) one
+Expr.approx_quantile | Duration(us) | method=req_both, error_tightness=empirical | allowed Duration(us) one
+Expr.approx_quantile | Duration(us) | method=req_both, error_tightness=formal | allowed Duration(us) one
+Expr.approx_quantile | Duration(us) | method=req_hi, error_tightness=empirical | allowed Duration(us) one
+Expr.approx_quantile | Duration(us) | method=req_hi, error_tightness=formal | allowed Duration(us) one
+Expr.approx_quantile | Duration(us) | method=req_lo, error_tightness=empirical | allowed Duration(us) one
+Expr.approx_quantile | Duration(us) | method=req_lo, error_tightness=formal | allowed Duration(us) one
+Expr.approx_quantile | Float16 | method=auto, error_tightness=empirical | allowed Float16 one
+Expr.approx_quantile | Float16 | method=auto, error_tightness=formal | allowed Float16 one
+Expr.approx_quantile | Float16 | method=kll, error_tightness=empirical | allowed Float16 one
+Expr.approx_quantile | Float16 | method=kll, error_tightness=formal | allowed Float16 one
+Expr.approx_quantile | Float16 | method=req_both, error_tightness=empirical | allowed Float16 one
+Expr.approx_quantile | Float16 | method=req_both, error_tightness=formal | allowed Float16 one
+Expr.approx_quantile | Float16 | method=req_hi, error_tightness=empirical | allowed Float16 one
+Expr.approx_quantile | Float16 | method=req_hi, error_tightness=formal | allowed Float16 one
+Expr.approx_quantile | Float16 | method=req_lo, error_tightness=empirical | allowed Float16 one
+Expr.approx_quantile | Float16 | method=req_lo, error_tightness=formal | allowed Float16 one
+Expr.approx_quantile | Float32 | method=auto, error_tightness=empirical | allowed Float32 one
+Expr.approx_quantile | Float32 | method=auto, error_tightness=formal | allowed Float32 one
+Expr.approx_quantile | Float32 | method=kll, error_tightness=empirical | allowed Float32 one
+Expr.approx_quantile | Float32 | method=kll, error_tightness=formal | allowed Float32 one
+Expr.approx_quantile | Float32 | method=req_both, error_tightness=empirical | allowed Float32 one
+Expr.approx_quantile | Float32 | method=req_both, error_tightness=formal | allowed Float32 one
+Expr.approx_quantile | Float32 | method=req_hi, error_tightness=empirical | allowed Float32 one
+Expr.approx_quantile | Float32 | method=req_hi, error_tightness=formal | allowed Float32 one
+Expr.approx_quantile | Float32 | method=req_lo, error_tightness=empirical | allowed Float32 one
+Expr.approx_quantile | Float32 | method=req_lo, error_tightness=formal | allowed Float32 one
+Expr.approx_quantile | Float64 | method=auto, error_tightness=empirical | allowed Float64 one
+Expr.approx_quantile | Float64 | method=auto, error_tightness=formal | allowed Float64 one
+Expr.approx_quantile | Float64 | method=kll, error_tightness=empirical | allowed Float64 one
+Expr.approx_quantile | Float64 | method=kll, error_tightness=formal | allowed Float64 one
+Expr.approx_quantile | Float64 | method=req_both, error_tightness=empirical | allowed Float64 one
+Expr.approx_quantile | Float64 | method=req_both, error_tightness=formal | allowed Float64 one
+Expr.approx_quantile | Float64 | method=req_hi, error_tightness=empirical | allowed Float64 one
+Expr.approx_quantile | Float64 | method=req_hi, error_tightness=formal | allowed Float64 one
+Expr.approx_quantile | Float64 | method=req_lo, error_tightness=empirical | allowed Float64 one
+Expr.approx_quantile | Float64 | method=req_lo, error_tightness=formal | allowed Float64 one
+Expr.approx_quantile | Int128 | method=auto, error_tightness=empirical | allowed Int128 one
+Expr.approx_quantile | Int128 | method=auto, error_tightness=formal | allowed Int128 one
+Expr.approx_quantile | Int128 | method=kll, error_tightness=empirical | allowed Int128 one
+Expr.approx_quantile | Int128 | method=kll, error_tightness=formal | allowed Int128 one
+Expr.approx_quantile | Int128 | method=req_both, error_tightness=empirical | allowed Int128 one
+Expr.approx_quantile | Int128 | method=req_both, error_tightness=formal | allowed Int128 one
+Expr.approx_quantile | Int128 | method=req_hi, error_tightness=empirical | allowed Int128 one
+Expr.approx_quantile | Int128 | method=req_hi, error_tightness=formal | allowed Int128 one
+Expr.approx_quantile | Int128 | method=req_lo, error_tightness=empirical | allowed Int128 one
+Expr.approx_quantile | Int128 | method=req_lo, error_tightness=formal | allowed Int128 one
+Expr.approx_quantile | Int16 | method=auto, error_tightness=empirical | allowed Int16 one
+Expr.approx_quantile | Int16 | method=auto, error_tightness=formal | allowed Int16 one
+Expr.approx_quantile | Int16 | method=kll, error_tightness=empirical | allowed Int16 one
+Expr.approx_quantile | Int16 | method=kll, error_tightness=formal | allowed Int16 one
+Expr.approx_quantile | Int16 | method=req_both, error_tightness=empirical | allowed Int16 one
+Expr.approx_quantile | Int16 | method=req_both, error_tightness=formal | allowed Int16 one
+Expr.approx_quantile | Int16 | method=req_hi, error_tightness=empirical | allowed Int16 one
+Expr.approx_quantile | Int16 | method=req_hi, error_tightness=formal | allowed Int16 one
+Expr.approx_quantile | Int16 | method=req_lo, error_tightness=empirical | allowed Int16 one
+Expr.approx_quantile | Int16 | method=req_lo, error_tightness=formal | allowed Int16 one
+Expr.approx_quantile | Int32 | method=auto, error_tightness=empirical | allowed Int32 one
+Expr.approx_quantile | Int32 | method=auto, error_tightness=formal | allowed Int32 one
+Expr.approx_quantile | Int32 | method=kll, error_tightness=empirical | allowed Int32 one
+Expr.approx_quantile | Int32 | method=kll, error_tightness=formal | allowed Int32 one
+Expr.approx_quantile | Int32 | method=req_both, error_tightness=empirical | allowed Int32 one
+Expr.approx_quantile | Int32 | method=req_both, error_tightness=formal | allowed Int32 one
+Expr.approx_quantile | Int32 | method=req_hi, error_tightness=empirical | allowed Int32 one
+Expr.approx_quantile | Int32 | method=req_hi, error_tightness=formal | allowed Int32 one
+Expr.approx_quantile | Int32 | method=req_lo, error_tightness=empirical | allowed Int32 one
+Expr.approx_quantile | Int32 | method=req_lo, error_tightness=formal | allowed Int32 one
+Expr.approx_quantile | Int64 | method=auto, error_tightness=empirical | allowed Int64 one
+Expr.approx_quantile | Int64 | method=auto, error_tightness=formal | allowed Int64 one
+Expr.approx_quantile | Int64 | method=kll, error_tightness=empirical | allowed Int64 one
+Expr.approx_quantile | Int64 | method=kll, error_tightness=formal | allowed Int64 one
+Expr.approx_quantile | Int64 | method=req_both, error_tightness=empirical | allowed Int64 one
+Expr.approx_quantile | Int64 | method=req_both, error_tightness=formal | allowed Int64 one
+Expr.approx_quantile | Int64 | method=req_hi, error_tightness=empirical | allowed Int64 one
+Expr.approx_quantile | Int64 | method=req_hi, error_tightness=formal | allowed Int64 one
+Expr.approx_quantile | Int64 | method=req_lo, error_tightness=empirical | allowed Int64 one
+Expr.approx_quantile | Int64 | method=req_lo, error_tightness=formal | allowed Int64 one
+Expr.approx_quantile | Int8 | method=auto, error_tightness=empirical | allowed Int8 one
+Expr.approx_quantile | Int8 | method=auto, error_tightness=formal | allowed Int8 one
+Expr.approx_quantile | Int8 | method=kll, error_tightness=empirical | allowed Int8 one
+Expr.approx_quantile | Int8 | method=kll, error_tightness=formal | allowed Int8 one
+Expr.approx_quantile | Int8 | method=req_both, error_tightness=empirical | allowed Int8 one
+Expr.approx_quantile | Int8 | method=req_both, error_tightness=formal | allowed Int8 one
+Expr.approx_quantile | Int8 | method=req_hi, error_tightness=empirical | allowed Int8 one
+Expr.approx_quantile | Int8 | method=req_hi, error_tightness=formal | allowed Int8 one
+Expr.approx_quantile | Int8 | method=req_lo, error_tightness=empirical | allowed Int8 one
+Expr.approx_quantile | Int8 | method=req_lo, error_tightness=formal | allowed Int8 one
+Expr.approx_quantile | List(Int64) | method=auto, error_tightness=empirical | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.approx_quantile | List(Int64) | method=auto, error_tightness=formal | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.approx_quantile | List(Int64) | method=kll, error_tightness=empirical | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.approx_quantile | List(Int64) | method=kll, error_tightness=formal | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.approx_quantile | List(Int64) | method=req_both, error_tightness=empirical | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.approx_quantile | List(Int64) | method=req_both, error_tightness=formal | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.approx_quantile | List(Int64) | method=req_hi, error_tightness=empirical | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.approx_quantile | List(Int64) | method=req_hi, error_tightness=formal | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.approx_quantile | List(Int64) | method=req_lo, error_tightness=empirical | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.approx_quantile | List(Int64) | method=req_lo, error_tightness=formal | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.approx_quantile | List(String) | method=auto, error_tightness=empirical | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.approx_quantile | List(String) | method=auto, error_tightness=formal | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.approx_quantile | List(String) | method=kll, error_tightness=empirical | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.approx_quantile | List(String) | method=kll, error_tightness=formal | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.approx_quantile | List(String) | method=req_both, error_tightness=empirical | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.approx_quantile | List(String) | method=req_both, error_tightness=formal | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.approx_quantile | List(String) | method=req_hi, error_tightness=empirical | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.approx_quantile | List(String) | method=req_hi, error_tightness=formal | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.approx_quantile | List(String) | method=req_lo, error_tightness=empirical | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.approx_quantile | List(String) | method=req_lo, error_tightness=formal | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.approx_quantile | Null | method=auto, error_tightness=empirical | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+Expr.approx_quantile | Null | method=auto, error_tightness=formal | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+Expr.approx_quantile | Null | method=kll, error_tightness=empirical | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+Expr.approx_quantile | Null | method=kll, error_tightness=formal | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+Expr.approx_quantile | Null | method=req_both, error_tightness=empirical | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+Expr.approx_quantile | Null | method=req_both, error_tightness=formal | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+Expr.approx_quantile | Null | method=req_hi, error_tightness=empirical | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+Expr.approx_quantile | Null | method=req_hi, error_tightness=formal | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+Expr.approx_quantile | Null | method=req_lo, error_tightness=empirical | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+Expr.approx_quantile | Null | method=req_lo, error_tightness=formal | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+Expr.approx_quantile | String | method=auto, error_tightness=empirical | allowed String one
+Expr.approx_quantile | String | method=auto, error_tightness=formal | allowed String one
+Expr.approx_quantile | String | method=kll, error_tightness=empirical | allowed String one
+Expr.approx_quantile | String | method=kll, error_tightness=formal | allowed String one
+Expr.approx_quantile | String | method=req_both, error_tightness=empirical | allowed String one
+Expr.approx_quantile | String | method=req_both, error_tightness=formal | allowed String one
+Expr.approx_quantile | String | method=req_hi, error_tightness=empirical | allowed String one
+Expr.approx_quantile | String | method=req_hi, error_tightness=formal | allowed String one
+Expr.approx_quantile | String | method=req_lo, error_tightness=empirical | allowed String one
+Expr.approx_quantile | String | method=req_lo, error_tightness=formal | allowed String one
+Expr.approx_quantile | Struct(x: Int64, y: String) | method=auto, error_tightness=empirical | refused schema: must specify one field in the struct
+Expr.approx_quantile | Struct(x: Int64, y: String) | method=auto, error_tightness=formal | refused schema: must specify one field in the struct
+Expr.approx_quantile | Struct(x: Int64, y: String) | method=kll, error_tightness=empirical | refused schema: must specify one field in the struct
+Expr.approx_quantile | Struct(x: Int64, y: String) | method=kll, error_tightness=formal | refused schema: must specify one field in the struct
+Expr.approx_quantile | Struct(x: Int64, y: String) | method=req_both, error_tightness=empirical | refused schema: must specify one field in the struct
+Expr.approx_quantile | Struct(x: Int64, y: String) | method=req_both, error_tightness=formal | refused schema: must specify one field in the struct
+Expr.approx_quantile | Struct(x: Int64, y: String) | method=req_hi, error_tightness=empirical | refused schema: must specify one field in the struct
+Expr.approx_quantile | Struct(x: Int64, y: String) | method=req_hi, error_tightness=formal | refused schema: must specify one field in the struct
+Expr.approx_quantile | Struct(x: Int64, y: String) | method=req_lo, error_tightness=empirical | refused schema: must specify one field in the struct
+Expr.approx_quantile | Struct(x: Int64, y: String) | method=req_lo, error_tightness=formal | refused schema: must specify one field in the struct
+Expr.approx_quantile | Time | method=auto, error_tightness=empirical | allowed Time one
+Expr.approx_quantile | Time | method=auto, error_tightness=formal | allowed Time one
+Expr.approx_quantile | Time | method=kll, error_tightness=empirical | allowed Time one
+Expr.approx_quantile | Time | method=kll, error_tightness=formal | allowed Time one
+Expr.approx_quantile | Time | method=req_both, error_tightness=empirical | allowed Time one
+Expr.approx_quantile | Time | method=req_both, error_tightness=formal | allowed Time one
+Expr.approx_quantile | Time | method=req_hi, error_tightness=empirical | allowed Time one
+Expr.approx_quantile | Time | method=req_hi, error_tightness=formal | allowed Time one
+Expr.approx_quantile | Time | method=req_lo, error_tightness=empirical | allowed Time one
+Expr.approx_quantile | Time | method=req_lo, error_tightness=formal | allowed Time one
+Expr.approx_quantile | UInt128 | method=auto, error_tightness=empirical | allowed UInt128 one
+Expr.approx_quantile | UInt128 | method=auto, error_tightness=formal | allowed UInt128 one
+Expr.approx_quantile | UInt128 | method=kll, error_tightness=empirical | allowed UInt128 one
+Expr.approx_quantile | UInt128 | method=kll, error_tightness=formal | allowed UInt128 one
+Expr.approx_quantile | UInt128 | method=req_both, error_tightness=empirical | allowed UInt128 one
+Expr.approx_quantile | UInt128 | method=req_both, error_tightness=formal | allowed UInt128 one
+Expr.approx_quantile | UInt128 | method=req_hi, error_tightness=empirical | allowed UInt128 one
+Expr.approx_quantile | UInt128 | method=req_hi, error_tightness=formal | allowed UInt128 one
+Expr.approx_quantile | UInt128 | method=req_lo, error_tightness=empirical | allowed UInt128 one
+Expr.approx_quantile | UInt128 | method=req_lo, error_tightness=formal | allowed UInt128 one
+Expr.approx_quantile | UInt16 | method=auto, error_tightness=empirical | allowed UInt16 one
+Expr.approx_quantile | UInt16 | method=auto, error_tightness=formal | allowed UInt16 one
+Expr.approx_quantile | UInt16 | method=kll, error_tightness=empirical | allowed UInt16 one
+Expr.approx_quantile | UInt16 | method=kll, error_tightness=formal | allowed UInt16 one
+Expr.approx_quantile | UInt16 | method=req_both, error_tightness=empirical | allowed UInt16 one
+Expr.approx_quantile | UInt16 | method=req_both, error_tightness=formal | allowed UInt16 one
+Expr.approx_quantile | UInt16 | method=req_hi, error_tightness=empirical | allowed UInt16 one
+Expr.approx_quantile | UInt16 | method=req_hi, error_tightness=formal | allowed UInt16 one
+Expr.approx_quantile | UInt16 | method=req_lo, error_tightness=empirical | allowed UInt16 one
+Expr.approx_quantile | UInt16 | method=req_lo, error_tightness=formal | allowed UInt16 one
+Expr.approx_quantile | UInt32 | method=auto, error_tightness=empirical | allowed UInt32 one
+Expr.approx_quantile | UInt32 | method=auto, error_tightness=formal | allowed UInt32 one
+Expr.approx_quantile | UInt32 | method=kll, error_tightness=empirical | allowed UInt32 one
+Expr.approx_quantile | UInt32 | method=kll, error_tightness=formal | allowed UInt32 one
+Expr.approx_quantile | UInt32 | method=req_both, error_tightness=empirical | allowed UInt32 one
+Expr.approx_quantile | UInt32 | method=req_both, error_tightness=formal | allowed UInt32 one
+Expr.approx_quantile | UInt32 | method=req_hi, error_tightness=empirical | allowed UInt32 one
+Expr.approx_quantile | UInt32 | method=req_hi, error_tightness=formal | allowed UInt32 one
+Expr.approx_quantile | UInt32 | method=req_lo, error_tightness=empirical | allowed UInt32 one
+Expr.approx_quantile | UInt32 | method=req_lo, error_tightness=formal | allowed UInt32 one
+Expr.approx_quantile | UInt64 | method=auto, error_tightness=empirical | allowed UInt64 one
+Expr.approx_quantile | UInt64 | method=auto, error_tightness=formal | allowed UInt64 one
+Expr.approx_quantile | UInt64 | method=kll, error_tightness=empirical | allowed UInt64 one
+Expr.approx_quantile | UInt64 | method=kll, error_tightness=formal | allowed UInt64 one
+Expr.approx_quantile | UInt64 | method=req_both, error_tightness=empirical | allowed UInt64 one
+Expr.approx_quantile | UInt64 | method=req_both, error_tightness=formal | allowed UInt64 one
+Expr.approx_quantile | UInt64 | method=req_hi, error_tightness=empirical | allowed UInt64 one
+Expr.approx_quantile | UInt64 | method=req_hi, error_tightness=formal | allowed UInt64 one
+Expr.approx_quantile | UInt64 | method=req_lo, error_tightness=empirical | allowed UInt64 one
+Expr.approx_quantile | UInt64 | method=req_lo, error_tightness=formal | allowed UInt64 one
+Expr.approx_quantile | UInt8 | method=auto, error_tightness=empirical | allowed UInt8 one
+Expr.approx_quantile | UInt8 | method=auto, error_tightness=formal | allowed UInt8 one
+Expr.approx_quantile | UInt8 | method=kll, error_tightness=empirical | allowed UInt8 one
+Expr.approx_quantile | UInt8 | method=kll, error_tightness=formal | allowed UInt8 one
+Expr.approx_quantile | UInt8 | method=req_both, error_tightness=empirical | allowed UInt8 one
+Expr.approx_quantile | UInt8 | method=req_both, error_tightness=formal | allowed UInt8 one
+Expr.approx_quantile | UInt8 | method=req_hi, error_tightness=empirical | allowed UInt8 one
+Expr.approx_quantile | UInt8 | method=req_hi, error_tightness=formal | allowed UInt8 one
+Expr.approx_quantile | UInt8 | method=req_lo, error_tightness=empirical | allowed UInt8 one
+Expr.approx_quantile | UInt8 | method=req_lo, error_tightness=formal | allowed UInt8 one
 Expr.arg_sort | Array(Int64, 2) | descending=false, nulls_last=false | allowed UInt32 many
 Expr.arg_sort | Array(Int64, 2) | descending=false, nulls_last=true | allowed UInt32 many
 Expr.arg_sort | Array(Int64, 2) | descending=true, nulls_last=false | allowed UInt32 many
@@ -2036,6 +2400,110 @@ Expr.cum_max | UInt64 | reverse=false | allowed UInt64 many
 Expr.cum_max | UInt64 | reverse=true | allowed UInt64 many
 Expr.cum_max | UInt8 | reverse=false | allowed UInt8 many
 Expr.cum_max | UInt8 | reverse=true | allowed UInt8 many
+Expr.cum_min | Array(Int64, 2) | reverse=false | refused rows: `cum_min` operation not supported for dtype `array[i64, 2]`
+Expr.cum_min | Array(Int64, 2) | reverse=true | refused rows: `cum_min` operation not supported for dtype `array[i64, 2]`
+Expr.cum_min | Boolean | reverse=false | allowed Boolean many
+Expr.cum_min | Boolean | reverse=true | allowed Boolean many
+Expr.cum_min | Date | reverse=false | allowed Date many
+Expr.cum_min | Date | reverse=true | allowed Date many
+Expr.cum_min | Datetime(us) | reverse=false | allowed Datetime(us) many
+Expr.cum_min | Datetime(us) | reverse=true | allowed Datetime(us) many
+Expr.cum_min | Datetime(us, UTC) | reverse=false | allowed Datetime(us, UTC) many
+Expr.cum_min | Datetime(us, UTC) | reverse=true | allowed Datetime(us, UTC) many
+Expr.cum_min | Decimal(10, 2) | reverse=false | allowed Decimal(10, 2) many
+Expr.cum_min | Decimal(10, 2) | reverse=true | allowed Decimal(10, 2) many
+Expr.cum_min | Duration(us) | reverse=false | allowed Duration(us) many
+Expr.cum_min | Duration(us) | reverse=true | allowed Duration(us) many
+Expr.cum_min | Float16 | reverse=false | allowed Float16 many
+Expr.cum_min | Float16 | reverse=true | allowed Float16 many
+Expr.cum_min | Float32 | reverse=false | allowed Float32 many
+Expr.cum_min | Float32 | reverse=true | allowed Float32 many
+Expr.cum_min | Float64 | reverse=false | allowed Float64 many
+Expr.cum_min | Float64 | reverse=true | allowed Float64 many
+Expr.cum_min | Int128 | reverse=false | allowed Int128 many
+Expr.cum_min | Int128 | reverse=true | allowed Int128 many
+Expr.cum_min | Int16 | reverse=false | allowed Int16 many
+Expr.cum_min | Int16 | reverse=true | allowed Int16 many
+Expr.cum_min | Int32 | reverse=false | allowed Int32 many
+Expr.cum_min | Int32 | reverse=true | allowed Int32 many
+Expr.cum_min | Int64 | reverse=false | allowed Int64 many
+Expr.cum_min | Int64 | reverse=true | allowed Int64 many
+Expr.cum_min | Int8 | reverse=false | allowed Int8 many
+Expr.cum_min | Int8 | reverse=true | allowed Int8 many
+Expr.cum_min | List(Int64) | reverse=false | refused rows: `cum_min` operation not supported for dtype `list[i64]`
+Expr.cum_min | List(Int64) | reverse=true | refused rows: `cum_min` operation not supported for dtype `list[i64]`
+Expr.cum_min | List(String) | reverse=false | refused rows: `cum_min` operation not supported for dtype `list[str]`
+Expr.cum_min | List(String) | reverse=true | refused rows: `cum_min` operation not supported for dtype `list[str]`
+Expr.cum_min | Null | reverse=false | refused rows: `cum_min` operation not supported for dtype `null`
+Expr.cum_min | Null | reverse=true | refused rows: `cum_min` operation not supported for dtype `null`
+Expr.cum_min | String | reverse=false | allowed String many
+Expr.cum_min | String | reverse=true | allowed String many
+Expr.cum_min | Struct(x: Int64, y: String) | reverse=false | refused rows: `cum_min` operation not supported for dtype `struct[2]`
+Expr.cum_min | Struct(x: Int64, y: String) | reverse=true | refused rows: `cum_min` operation not supported for dtype `struct[2]`
+Expr.cum_min | Time | reverse=false | allowed Time many
+Expr.cum_min | Time | reverse=true | allowed Time many
+Expr.cum_min | UInt128 | reverse=false | allowed UInt128 many
+Expr.cum_min | UInt128 | reverse=true | allowed UInt128 many
+Expr.cum_min | UInt16 | reverse=false | allowed UInt16 many
+Expr.cum_min | UInt16 | reverse=true | allowed UInt16 many
+Expr.cum_min | UInt32 | reverse=false | allowed UInt32 many
+Expr.cum_min | UInt32 | reverse=true | allowed UInt32 many
+Expr.cum_min | UInt64 | reverse=false | allowed UInt64 many
+Expr.cum_min | UInt64 | reverse=true | allowed UInt64 many
+Expr.cum_min | UInt8 | reverse=false | allowed UInt8 many
+Expr.cum_min | UInt8 | reverse=true | allowed UInt8 many
+Expr.cum_prod | Array(Int64, 2) | reverse=false | refused rows: `cum_prod` operation not supported for dtype `array[i64, 2]`
+Expr.cum_prod | Array(Int64, 2) | reverse=true | refused rows: `cum_prod` operation not supported for dtype `array[i64, 2]`
+Expr.cum_prod | Boolean | reverse=false | allowed Int64 many
+Expr.cum_prod | Boolean | reverse=true | allowed Int64 many
+Expr.cum_prod | Date | reverse=false | refused rows: `cum_prod` operation not supported for dtype `date`
+Expr.cum_prod | Date | reverse=true | refused rows: `cum_prod` operation not supported for dtype `date`
+Expr.cum_prod | Datetime(us) | reverse=false | refused rows: `cum_prod` operation not supported for dtype `datetime[μs]`
+Expr.cum_prod | Datetime(us) | reverse=true | refused rows: `cum_prod` operation not supported for dtype `datetime[μs]`
+Expr.cum_prod | Datetime(us, UTC) | reverse=false | refused rows: `cum_prod` operation not supported for dtype `datetime[μs, UTC]`
+Expr.cum_prod | Datetime(us, UTC) | reverse=true | refused rows: `cum_prod` operation not supported for dtype `datetime[μs, UTC]`
+Expr.cum_prod | Decimal(10, 2) | reverse=false | refused rows: `cum_prod` operation not supported for dtype `decimal[10,2]`
+Expr.cum_prod | Decimal(10, 2) | reverse=true | refused rows: `cum_prod` operation not supported for dtype `decimal[10,2]`
+Expr.cum_prod | Duration(us) | reverse=false | refused rows: `cum_prod` operation not supported for dtype `duration[μs]`
+Expr.cum_prod | Duration(us) | reverse=true | refused rows: `cum_prod` operation not supported for dtype `duration[μs]`
+Expr.cum_prod | Float16 | reverse=false | allowed Float16 many
+Expr.cum_prod | Float16 | reverse=true | allowed Float16 many
+Expr.cum_prod | Float32 | reverse=false | allowed Float32 many
+Expr.cum_prod | Float32 | reverse=true | allowed Float32 many
+Expr.cum_prod | Float64 | reverse=false | allowed Float64 many
+Expr.cum_prod | Float64 | reverse=true | allowed Float64 many
+Expr.cum_prod | Int128 | reverse=false | allowed Int128 many
+Expr.cum_prod | Int128 | reverse=true | allowed Int128 many
+Expr.cum_prod | Int16 | reverse=false | allowed Int64 many
+Expr.cum_prod | Int16 | reverse=true | allowed Int64 many
+Expr.cum_prod | Int32 | reverse=false | allowed Int64 many
+Expr.cum_prod | Int32 | reverse=true | allowed Int64 many
+Expr.cum_prod | Int64 | reverse=false | allowed Int64 many
+Expr.cum_prod | Int64 | reverse=true | allowed Int64 many
+Expr.cum_prod | Int8 | reverse=false | allowed Int64 many
+Expr.cum_prod | Int8 | reverse=true | allowed Int64 many
+Expr.cum_prod | List(Int64) | reverse=false | refused rows: `cum_prod` operation not supported for dtype `list[i64]`
+Expr.cum_prod | List(Int64) | reverse=true | refused rows: `cum_prod` operation not supported for dtype `list[i64]`
+Expr.cum_prod | List(String) | reverse=false | refused rows: `cum_prod` operation not supported for dtype `list[str]`
+Expr.cum_prod | List(String) | reverse=true | refused rows: `cum_prod` operation not supported for dtype `list[str]`
+Expr.cum_prod | Null | reverse=false | refused rows: `cum_prod` operation not supported for dtype `null`
+Expr.cum_prod | Null | reverse=true | refused rows: `cum_prod` operation not supported for dtype `null`
+Expr.cum_prod | String | reverse=false | refused rows: `cum_prod` operation not supported for dtype `str`
+Expr.cum_prod | String | reverse=true | refused rows: `cum_prod` operation not supported for dtype `str`
+Expr.cum_prod | Struct(x: Int64, y: String) | reverse=false | refused rows: `cum_prod` operation not supported for dtype `struct[2]`
+Expr.cum_prod | Struct(x: Int64, y: String) | reverse=true | refused rows: `cum_prod` operation not supported for dtype `struct[2]`
+Expr.cum_prod | Time | reverse=false | refused rows: `cum_prod` operation not supported for dtype `time`
+Expr.cum_prod | Time | reverse=true | refused rows: `cum_prod` operation not supported for dtype `time`
+Expr.cum_prod | UInt128 | reverse=false | refused rows: the schema says Int64 and the rows give UInt128
+Expr.cum_prod | UInt128 | reverse=true | refused rows: the schema says Int64 and the rows give UInt128
+Expr.cum_prod | UInt16 | reverse=false | allowed Int64 many
+Expr.cum_prod | UInt16 | reverse=true | allowed Int64 many
+Expr.cum_prod | UInt32 | reverse=false | allowed Int64 many
+Expr.cum_prod | UInt32 | reverse=true | allowed Int64 many
+Expr.cum_prod | UInt64 | reverse=false | allowed UInt64 many
+Expr.cum_prod | UInt64 | reverse=true | allowed UInt64 many
+Expr.cum_prod | UInt8 | reverse=false | allowed Int64 many
+Expr.cum_prod | UInt8 | reverse=true | allowed Int64 many
 Expr.cum_sum | Array(Int64, 2) | reverse=false | refused rows: `cum_sum` operation not supported for dtype `array[i64, 2]`
 Expr.cum_sum | Array(Int64, 2) | reverse=true | refused rows: `cum_sum` operation not supported for dtype `array[i64, 2]`
 Expr.cum_sum | Boolean | reverse=false | allowed UInt32 many
@@ -3206,6 +3674,58 @@ Expr.dt.total_seconds | UInt64 | fractional=false | refused rows: invalid series
 Expr.dt.total_seconds | UInt64 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u64` for series with name `a`
 Expr.dt.total_seconds | UInt8 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
 Expr.dt.total_seconds | UInt8 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
+Expr.entropy | Array(Int64, 2) | normalize=false | refused schema: `entropy` operation not supported for dtype `array[i64, 2]` as argument 0
+Expr.entropy | Array(Int64, 2) | normalize=true | refused schema: `entropy` operation not supported for dtype `array[i64, 2]` as argument 0
+Expr.entropy | Boolean | normalize=false | allowed Float64 one
+Expr.entropy | Boolean | normalize=true | allowed Float64 one
+Expr.entropy | Date | normalize=false | refused schema: `entropy` operation not supported for dtype `date` as argument 0
+Expr.entropy | Date | normalize=true | refused schema: `entropy` operation not supported for dtype `date` as argument 0
+Expr.entropy | Datetime(us) | normalize=false | refused schema: `entropy` operation not supported for dtype `datetime[μs]` as argument 0
+Expr.entropy | Datetime(us) | normalize=true | refused schema: `entropy` operation not supported for dtype `datetime[μs]` as argument 0
+Expr.entropy | Datetime(us, UTC) | normalize=false | refused schema: `entropy` operation not supported for dtype `datetime[μs, UTC]` as argument 0
+Expr.entropy | Datetime(us, UTC) | normalize=true | refused schema: `entropy` operation not supported for dtype `datetime[μs, UTC]` as argument 0
+Expr.entropy | Decimal(10, 2) | normalize=false | allowed Float64 one
+Expr.entropy | Decimal(10, 2) | normalize=true | allowed Float64 one
+Expr.entropy | Duration(us) | normalize=false | refused schema: `entropy` operation not supported for dtype `duration[μs]` as argument 0
+Expr.entropy | Duration(us) | normalize=true | refused schema: `entropy` operation not supported for dtype `duration[μs]` as argument 0
+Expr.entropy | Float16 | normalize=false | allowed Float16 one
+Expr.entropy | Float16 | normalize=true | allowed Float16 one
+Expr.entropy | Float32 | normalize=false | allowed Float32 one
+Expr.entropy | Float32 | normalize=true | allowed Float32 one
+Expr.entropy | Float64 | normalize=false | allowed Float64 one
+Expr.entropy | Float64 | normalize=true | allowed Float64 one
+Expr.entropy | Int128 | normalize=false | allowed Float64 one
+Expr.entropy | Int128 | normalize=true | allowed Float64 one
+Expr.entropy | Int16 | normalize=false | allowed Float64 one
+Expr.entropy | Int16 | normalize=true | allowed Float64 one
+Expr.entropy | Int32 | normalize=false | allowed Float64 one
+Expr.entropy | Int32 | normalize=true | allowed Float64 one
+Expr.entropy | Int64 | normalize=false | allowed Float64 one
+Expr.entropy | Int64 | normalize=true | allowed Float64 one
+Expr.entropy | Int8 | normalize=false | allowed Float64 one
+Expr.entropy | Int8 | normalize=true | allowed Float64 one
+Expr.entropy | List(Int64) | normalize=false | refused schema: `entropy` operation not supported for dtype `list[i64]` as argument 0
+Expr.entropy | List(Int64) | normalize=true | refused schema: `entropy` operation not supported for dtype `list[i64]` as argument 0
+Expr.entropy | List(String) | normalize=false | refused schema: `entropy` operation not supported for dtype `list[str]` as argument 0
+Expr.entropy | List(String) | normalize=true | refused schema: `entropy` operation not supported for dtype `list[str]` as argument 0
+Expr.entropy | Null | normalize=false | refused schema: `entropy` operation not supported for dtype `null` as argument 0
+Expr.entropy | Null | normalize=true | refused schema: `entropy` operation not supported for dtype `null` as argument 0
+Expr.entropy | String | normalize=false | refused schema: `entropy` operation not supported for dtype `str` as argument 0
+Expr.entropy | String | normalize=true | refused schema: `entropy` operation not supported for dtype `str` as argument 0
+Expr.entropy | Struct(x: Int64, y: String) | normalize=false | refused schema: `entropy` operation not supported for dtype `struct[2]` as argument 0
+Expr.entropy | Struct(x: Int64, y: String) | normalize=true | refused schema: `entropy` operation not supported for dtype `struct[2]` as argument 0
+Expr.entropy | Time | normalize=false | refused schema: `entropy` operation not supported for dtype `time` as argument 0
+Expr.entropy | Time | normalize=true | refused schema: `entropy` operation not supported for dtype `time` as argument 0
+Expr.entropy | UInt128 | normalize=false | allowed Float64 one
+Expr.entropy | UInt128 | normalize=true | allowed Float64 one
+Expr.entropy | UInt16 | normalize=false | allowed Float64 one
+Expr.entropy | UInt16 | normalize=true | allowed Float64 one
+Expr.entropy | UInt32 | normalize=false | allowed Float64 one
+Expr.entropy | UInt32 | normalize=true | allowed Float64 one
+Expr.entropy | UInt64 | normalize=false | allowed Float64 one
+Expr.entropy | UInt64 | normalize=true | allowed Float64 one
+Expr.entropy | UInt8 | normalize=false | allowed Float64 one
+Expr.entropy | UInt8 | normalize=true | allowed Float64 one
 Expr.fill_null | Array(Int64, 2) | strategy=backward | allowed Array(Int64, 2) many
 Expr.fill_null | Array(Int64, 2) | strategy=forward | allowed Array(Int64, 2) many
 Expr.fill_null | Array(Int64, 2) | strategy=max | refused rows: fill null strategy not yet supported for dtype: array[i64, 2]
@@ -3596,6 +4116,110 @@ Expr.is_close | UInt64 | nans_equal=false | allowed Boolean many
 Expr.is_close | UInt64 | nans_equal=true | allowed Boolean many
 Expr.is_close | UInt8 | nans_equal=false | allowed Boolean many
 Expr.is_close | UInt8 | nans_equal=true | allowed Boolean many
+Expr.kurtosis | Array(Int64, 2) | fisher=false, bias=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Float64')
+Expr.kurtosis | Array(Int64, 2) | fisher=false, bias=true | refused rows: cannot cast Array type (inner: 'Int64', to: 'Float64')
+Expr.kurtosis | Array(Int64, 2) | fisher=true, bias=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Float64')
+Expr.kurtosis | Array(Int64, 2) | fisher=true, bias=true | refused rows: cannot cast Array type (inner: 'Int64', to: 'Float64')
+Expr.kurtosis | Boolean | fisher=false, bias=false | allowed Float64 one
+Expr.kurtosis | Boolean | fisher=false, bias=true | allowed Float64 one
+Expr.kurtosis | Boolean | fisher=true, bias=false | allowed Float64 one
+Expr.kurtosis | Boolean | fisher=true, bias=true | allowed Float64 one
+Expr.kurtosis | Date | fisher=false, bias=false | allowed Float64 one
+Expr.kurtosis | Date | fisher=false, bias=true | allowed Float64 one
+Expr.kurtosis | Date | fisher=true, bias=false | allowed Float64 one
+Expr.kurtosis | Date | fisher=true, bias=true | allowed Float64 one
+Expr.kurtosis | Datetime(us) | fisher=false, bias=false | allowed Float64 one
+Expr.kurtosis | Datetime(us) | fisher=false, bias=true | allowed Float64 one
+Expr.kurtosis | Datetime(us) | fisher=true, bias=false | allowed Float64 one
+Expr.kurtosis | Datetime(us) | fisher=true, bias=true | allowed Float64 one
+Expr.kurtosis | Datetime(us, UTC) | fisher=false, bias=false | allowed Float64 one
+Expr.kurtosis | Datetime(us, UTC) | fisher=false, bias=true | allowed Float64 one
+Expr.kurtosis | Datetime(us, UTC) | fisher=true, bias=false | allowed Float64 one
+Expr.kurtosis | Datetime(us, UTC) | fisher=true, bias=true | allowed Float64 one
+Expr.kurtosis | Decimal(10, 2) | fisher=false, bias=false | allowed Float64 one
+Expr.kurtosis | Decimal(10, 2) | fisher=false, bias=true | allowed Float64 one
+Expr.kurtosis | Decimal(10, 2) | fisher=true, bias=false | allowed Float64 one
+Expr.kurtosis | Decimal(10, 2) | fisher=true, bias=true | allowed Float64 one
+Expr.kurtosis | Duration(us) | fisher=false, bias=false | allowed Float64 one
+Expr.kurtosis | Duration(us) | fisher=false, bias=true | allowed Float64 one
+Expr.kurtosis | Duration(us) | fisher=true, bias=false | allowed Float64 one
+Expr.kurtosis | Duration(us) | fisher=true, bias=true | allowed Float64 one
+Expr.kurtosis | Float16 | fisher=false, bias=false | allowed Float64 one
+Expr.kurtosis | Float16 | fisher=false, bias=true | allowed Float64 one
+Expr.kurtosis | Float16 | fisher=true, bias=false | allowed Float64 one
+Expr.kurtosis | Float16 | fisher=true, bias=true | allowed Float64 one
+Expr.kurtosis | Float32 | fisher=false, bias=false | allowed Float64 one
+Expr.kurtosis | Float32 | fisher=false, bias=true | allowed Float64 one
+Expr.kurtosis | Float32 | fisher=true, bias=false | allowed Float64 one
+Expr.kurtosis | Float32 | fisher=true, bias=true | allowed Float64 one
+Expr.kurtosis | Float64 | fisher=false, bias=false | allowed Float64 one
+Expr.kurtosis | Float64 | fisher=false, bias=true | allowed Float64 one
+Expr.kurtosis | Float64 | fisher=true, bias=false | allowed Float64 one
+Expr.kurtosis | Float64 | fisher=true, bias=true | allowed Float64 one
+Expr.kurtosis | Int128 | fisher=false, bias=false | allowed Float64 one
+Expr.kurtosis | Int128 | fisher=false, bias=true | allowed Float64 one
+Expr.kurtosis | Int128 | fisher=true, bias=false | allowed Float64 one
+Expr.kurtosis | Int128 | fisher=true, bias=true | allowed Float64 one
+Expr.kurtosis | Int16 | fisher=false, bias=false | allowed Float64 one
+Expr.kurtosis | Int16 | fisher=false, bias=true | allowed Float64 one
+Expr.kurtosis | Int16 | fisher=true, bias=false | allowed Float64 one
+Expr.kurtosis | Int16 | fisher=true, bias=true | allowed Float64 one
+Expr.kurtosis | Int32 | fisher=false, bias=false | allowed Float64 one
+Expr.kurtosis | Int32 | fisher=false, bias=true | allowed Float64 one
+Expr.kurtosis | Int32 | fisher=true, bias=false | allowed Float64 one
+Expr.kurtosis | Int32 | fisher=true, bias=true | allowed Float64 one
+Expr.kurtosis | Int64 | fisher=false, bias=false | allowed Float64 one
+Expr.kurtosis | Int64 | fisher=false, bias=true | allowed Float64 one
+Expr.kurtosis | Int64 | fisher=true, bias=false | allowed Float64 one
+Expr.kurtosis | Int64 | fisher=true, bias=true | allowed Float64 one
+Expr.kurtosis | Int8 | fisher=false, bias=false | allowed Float64 one
+Expr.kurtosis | Int8 | fisher=false, bias=true | allowed Float64 one
+Expr.kurtosis | Int8 | fisher=true, bias=false | allowed Float64 one
+Expr.kurtosis | Int8 | fisher=true, bias=true | allowed Float64 one
+Expr.kurtosis | List(Int64) | fisher=false, bias=false | refused rows: cannot cast List type (inner: 'Int64', to: 'Float64')
+Expr.kurtosis | List(Int64) | fisher=false, bias=true | refused rows: cannot cast List type (inner: 'Int64', to: 'Float64')
+Expr.kurtosis | List(Int64) | fisher=true, bias=false | refused rows: cannot cast List type (inner: 'Int64', to: 'Float64')
+Expr.kurtosis | List(Int64) | fisher=true, bias=true | refused rows: cannot cast List type (inner: 'Int64', to: 'Float64')
+Expr.kurtosis | List(String) | fisher=false, bias=false | refused rows: cannot cast List type (inner: 'String', to: 'Float64')
+Expr.kurtosis | List(String) | fisher=false, bias=true | refused rows: cannot cast List type (inner: 'String', to: 'Float64')
+Expr.kurtosis | List(String) | fisher=true, bias=false | refused rows: cannot cast List type (inner: 'String', to: 'Float64')
+Expr.kurtosis | List(String) | fisher=true, bias=true | refused rows: cannot cast List type (inner: 'String', to: 'Float64')
+Expr.kurtosis | Null | fisher=false, bias=false | allowed Float64 one
+Expr.kurtosis | Null | fisher=false, bias=true | allowed Float64 one
+Expr.kurtosis | Null | fisher=true, bias=false | allowed Float64 one
+Expr.kurtosis | Null | fisher=true, bias=true | allowed Float64 one
+Expr.kurtosis | String | fisher=false, bias=false | refused rows: conversion from `str` to `f64` failed in column 'a' for 2 out of 3 values: ["1d", "2d"]
+Expr.kurtosis | String | fisher=false, bias=true | refused rows: conversion from `str` to `f64` failed in column 'a' for 2 out of 3 values: ["1d", "2d"]
+Expr.kurtosis | String | fisher=true, bias=false | refused rows: conversion from `str` to `f64` failed in column 'a' for 2 out of 3 values: ["1d", "2d"]
+Expr.kurtosis | String | fisher=true, bias=true | refused rows: conversion from `str` to `f64` failed in column 'a' for 2 out of 3 values: ["1d", "2d"]
+Expr.kurtosis | Struct(x: Int64, y: String) | fisher=false, bias=false | refused rows: conversion from `struct[2]` to `struct[2]` failed in column 'a' for 2 out of 3 values: [{1,"a"}, {3,"c"}]
+Expr.kurtosis | Struct(x: Int64, y: String) | fisher=false, bias=true | refused rows: conversion from `struct[2]` to `struct[2]` failed in column 'a' for 2 out of 3 values: [{1,"a"}, {3,"c"}]
+Expr.kurtosis | Struct(x: Int64, y: String) | fisher=true, bias=false | refused rows: conversion from `struct[2]` to `struct[2]` failed in column 'a' for 2 out of 3 values: [{1,"a"}, {3,"c"}]
+Expr.kurtosis | Struct(x: Int64, y: String) | fisher=true, bias=true | refused rows: conversion from `struct[2]` to `struct[2]` failed in column 'a' for 2 out of 3 values: [{1,"a"}, {3,"c"}]
+Expr.kurtosis | Time | fisher=false, bias=false | allowed Float64 one
+Expr.kurtosis | Time | fisher=false, bias=true | allowed Float64 one
+Expr.kurtosis | Time | fisher=true, bias=false | allowed Float64 one
+Expr.kurtosis | Time | fisher=true, bias=true | allowed Float64 one
+Expr.kurtosis | UInt128 | fisher=false, bias=false | allowed Float64 one
+Expr.kurtosis | UInt128 | fisher=false, bias=true | allowed Float64 one
+Expr.kurtosis | UInt128 | fisher=true, bias=false | allowed Float64 one
+Expr.kurtosis | UInt128 | fisher=true, bias=true | allowed Float64 one
+Expr.kurtosis | UInt16 | fisher=false, bias=false | allowed Float64 one
+Expr.kurtosis | UInt16 | fisher=false, bias=true | allowed Float64 one
+Expr.kurtosis | UInt16 | fisher=true, bias=false | allowed Float64 one
+Expr.kurtosis | UInt16 | fisher=true, bias=true | allowed Float64 one
+Expr.kurtosis | UInt32 | fisher=false, bias=false | allowed Float64 one
+Expr.kurtosis | UInt32 | fisher=false, bias=true | allowed Float64 one
+Expr.kurtosis | UInt32 | fisher=true, bias=false | allowed Float64 one
+Expr.kurtosis | UInt32 | fisher=true, bias=true | allowed Float64 one
+Expr.kurtosis | UInt64 | fisher=false, bias=false | allowed Float64 one
+Expr.kurtosis | UInt64 | fisher=false, bias=true | allowed Float64 one
+Expr.kurtosis | UInt64 | fisher=true, bias=false | allowed Float64 one
+Expr.kurtosis | UInt64 | fisher=true, bias=true | allowed Float64 one
+Expr.kurtosis | UInt8 | fisher=false, bias=false | allowed Float64 one
+Expr.kurtosis | UInt8 | fisher=false, bias=true | allowed Float64 one
+Expr.kurtosis | UInt8 | fisher=true, bias=false | allowed Float64 one
+Expr.kurtosis | UInt8 | fisher=true, bias=true | allowed Float64 one
 Expr.last | Array(Int64, 2) | ignore_nulls=false | allowed Array(Int64, 2) one
 Expr.last | Array(Int64, 2) | ignore_nulls=true | allowed Array(Int64, 2) one
 Expr.last | Boolean | ignore_nulls=false | allowed Boolean one
@@ -4064,6 +4688,162 @@ Expr.over | UInt8 | nulls_last=false, mapping_strategy=join | allowed List(UInt8
 Expr.over | UInt8 | nulls_last=true, mapping_strategy=explode | allowed UInt8 many
 Expr.over | UInt8 | nulls_last=true, mapping_strategy=group_to_rows | allowed UInt8 many
 Expr.over | UInt8 | nulls_last=true, mapping_strategy=join | allowed List(UInt8) many
+Expr.quantile | Array(Int64, 2) | interpolation=equiprobable | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+Expr.quantile | Array(Int64, 2) | interpolation=higher | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+Expr.quantile | Array(Int64, 2) | interpolation=linear | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+Expr.quantile | Array(Int64, 2) | interpolation=lower | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+Expr.quantile | Array(Int64, 2) | interpolation=midpoint | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+Expr.quantile | Array(Int64, 2) | interpolation=nearest | refused schema: casting from Int64 to FixedSizeList(Field { name: "item", dtype: Int64, is_nullable: true, metadata: None }, 2) not supported
+Expr.quantile | Boolean | interpolation=equiprobable | refused rows: `quantile` operation not supported for dtype `bool`
+Expr.quantile | Boolean | interpolation=higher | refused rows: `quantile` operation not supported for dtype `bool`
+Expr.quantile | Boolean | interpolation=linear | refused rows: `quantile` operation not supported for dtype `bool`
+Expr.quantile | Boolean | interpolation=lower | refused rows: `quantile` operation not supported for dtype `bool`
+Expr.quantile | Boolean | interpolation=midpoint | refused rows: `quantile` operation not supported for dtype `bool`
+Expr.quantile | Boolean | interpolation=nearest | refused rows: `quantile` operation not supported for dtype `bool`
+Expr.quantile | Date | interpolation=equiprobable | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+Expr.quantile | Date | interpolation=higher | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+Expr.quantile | Date | interpolation=linear | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+Expr.quantile | Date | interpolation=lower | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+Expr.quantile | Date | interpolation=midpoint | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+Expr.quantile | Date | interpolation=nearest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+Expr.quantile | Datetime(us) | interpolation=equiprobable | allowed Datetime(us) one
+Expr.quantile | Datetime(us) | interpolation=higher | allowed Datetime(us) one
+Expr.quantile | Datetime(us) | interpolation=linear | allowed Datetime(us) one
+Expr.quantile | Datetime(us) | interpolation=lower | allowed Datetime(us) one
+Expr.quantile | Datetime(us) | interpolation=midpoint | allowed Datetime(us) one
+Expr.quantile | Datetime(us) | interpolation=nearest | allowed Datetime(us) one
+Expr.quantile | Datetime(us, UTC) | interpolation=equiprobable | allowed Datetime(us, UTC) one
+Expr.quantile | Datetime(us, UTC) | interpolation=higher | allowed Datetime(us, UTC) one
+Expr.quantile | Datetime(us, UTC) | interpolation=linear | allowed Datetime(us, UTC) one
+Expr.quantile | Datetime(us, UTC) | interpolation=lower | allowed Datetime(us, UTC) one
+Expr.quantile | Datetime(us, UTC) | interpolation=midpoint | allowed Datetime(us, UTC) one
+Expr.quantile | Datetime(us, UTC) | interpolation=nearest | allowed Datetime(us, UTC) one
+Expr.quantile | Decimal(10, 2) | interpolation=equiprobable | allowed Float64 one
+Expr.quantile | Decimal(10, 2) | interpolation=higher | allowed Float64 one
+Expr.quantile | Decimal(10, 2) | interpolation=linear | allowed Float64 one
+Expr.quantile | Decimal(10, 2) | interpolation=lower | allowed Float64 one
+Expr.quantile | Decimal(10, 2) | interpolation=midpoint | allowed Float64 one
+Expr.quantile | Decimal(10, 2) | interpolation=nearest | allowed Float64 one
+Expr.quantile | Duration(us) | interpolation=equiprobable | allowed Duration(us) one
+Expr.quantile | Duration(us) | interpolation=higher | allowed Duration(us) one
+Expr.quantile | Duration(us) | interpolation=linear | allowed Duration(us) one
+Expr.quantile | Duration(us) | interpolation=lower | allowed Duration(us) one
+Expr.quantile | Duration(us) | interpolation=midpoint | allowed Duration(us) one
+Expr.quantile | Duration(us) | interpolation=nearest | allowed Duration(us) one
+Expr.quantile | Float16 | interpolation=equiprobable | allowed Float16 one
+Expr.quantile | Float16 | interpolation=higher | allowed Float16 one
+Expr.quantile | Float16 | interpolation=linear | allowed Float16 one
+Expr.quantile | Float16 | interpolation=lower | allowed Float16 one
+Expr.quantile | Float16 | interpolation=midpoint | allowed Float16 one
+Expr.quantile | Float16 | interpolation=nearest | allowed Float16 one
+Expr.quantile | Float32 | interpolation=equiprobable | allowed Float32 one
+Expr.quantile | Float32 | interpolation=higher | allowed Float32 one
+Expr.quantile | Float32 | interpolation=linear | allowed Float32 one
+Expr.quantile | Float32 | interpolation=lower | allowed Float32 one
+Expr.quantile | Float32 | interpolation=midpoint | allowed Float32 one
+Expr.quantile | Float32 | interpolation=nearest | allowed Float32 one
+Expr.quantile | Float64 | interpolation=equiprobable | allowed Float64 one
+Expr.quantile | Float64 | interpolation=higher | allowed Float64 one
+Expr.quantile | Float64 | interpolation=linear | allowed Float64 one
+Expr.quantile | Float64 | interpolation=lower | allowed Float64 one
+Expr.quantile | Float64 | interpolation=midpoint | allowed Float64 one
+Expr.quantile | Float64 | interpolation=nearest | allowed Float64 one
+Expr.quantile | Int128 | interpolation=equiprobable | allowed Float64 one
+Expr.quantile | Int128 | interpolation=higher | allowed Float64 one
+Expr.quantile | Int128 | interpolation=linear | allowed Float64 one
+Expr.quantile | Int128 | interpolation=lower | allowed Float64 one
+Expr.quantile | Int128 | interpolation=midpoint | allowed Float64 one
+Expr.quantile | Int128 | interpolation=nearest | allowed Float64 one
+Expr.quantile | Int16 | interpolation=equiprobable | allowed Float64 one
+Expr.quantile | Int16 | interpolation=higher | allowed Float64 one
+Expr.quantile | Int16 | interpolation=linear | allowed Float64 one
+Expr.quantile | Int16 | interpolation=lower | allowed Float64 one
+Expr.quantile | Int16 | interpolation=midpoint | allowed Float64 one
+Expr.quantile | Int16 | interpolation=nearest | allowed Float64 one
+Expr.quantile | Int32 | interpolation=equiprobable | allowed Float64 one
+Expr.quantile | Int32 | interpolation=higher | allowed Float64 one
+Expr.quantile | Int32 | interpolation=linear | allowed Float64 one
+Expr.quantile | Int32 | interpolation=lower | allowed Float64 one
+Expr.quantile | Int32 | interpolation=midpoint | allowed Float64 one
+Expr.quantile | Int32 | interpolation=nearest | allowed Float64 one
+Expr.quantile | Int64 | interpolation=equiprobable | allowed Float64 one
+Expr.quantile | Int64 | interpolation=higher | allowed Float64 one
+Expr.quantile | Int64 | interpolation=linear | allowed Float64 one
+Expr.quantile | Int64 | interpolation=lower | allowed Float64 one
+Expr.quantile | Int64 | interpolation=midpoint | allowed Float64 one
+Expr.quantile | Int64 | interpolation=nearest | allowed Float64 one
+Expr.quantile | Int8 | interpolation=equiprobable | allowed Float64 one
+Expr.quantile | Int8 | interpolation=higher | allowed Float64 one
+Expr.quantile | Int8 | interpolation=linear | allowed Float64 one
+Expr.quantile | Int8 | interpolation=lower | allowed Float64 one
+Expr.quantile | Int8 | interpolation=midpoint | allowed Float64 one
+Expr.quantile | Int8 | interpolation=nearest | allowed Float64 one
+Expr.quantile | List(Int64) | interpolation=equiprobable | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.quantile | List(Int64) | interpolation=higher | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.quantile | List(Int64) | interpolation=linear | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.quantile | List(Int64) | interpolation=lower | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.quantile | List(Int64) | interpolation=midpoint | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.quantile | List(Int64) | interpolation=nearest | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.quantile | List(String) | interpolation=equiprobable | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.quantile | List(String) | interpolation=higher | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.quantile | List(String) | interpolation=linear | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.quantile | List(String) | interpolation=lower | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.quantile | List(String) | interpolation=midpoint | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.quantile | List(String) | interpolation=nearest | refused schema: casting from Int64 to list type is not supported Hint: Use pl.list(expr) to turn the Int64 column into a column of single-element lists.
+Expr.quantile | Null | interpolation=equiprobable | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+Expr.quantile | Null | interpolation=higher | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+Expr.quantile | Null | interpolation=linear | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+Expr.quantile | Null | interpolation=lower | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+Expr.quantile | Null | interpolation=midpoint | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+Expr.quantile | Null | interpolation=nearest | refused schema: conversion from `i64` to `null` failed in column 'literal' for 1 out of 1 values: [1]
+Expr.quantile | String | interpolation=equiprobable | refused rows: `quantile` operation not supported for dtype `str`
+Expr.quantile | String | interpolation=higher | refused rows: `quantile` operation not supported for dtype `str`
+Expr.quantile | String | interpolation=linear | refused rows: `quantile` operation not supported for dtype `str`
+Expr.quantile | String | interpolation=lower | refused rows: `quantile` operation not supported for dtype `str`
+Expr.quantile | String | interpolation=midpoint | refused rows: `quantile` operation not supported for dtype `str`
+Expr.quantile | String | interpolation=nearest | refused rows: `quantile` operation not supported for dtype `str`
+Expr.quantile | Struct(x: Int64, y: String) | interpolation=equiprobable | refused schema: must specify one field in the struct
+Expr.quantile | Struct(x: Int64, y: String) | interpolation=higher | refused schema: must specify one field in the struct
+Expr.quantile | Struct(x: Int64, y: String) | interpolation=linear | refused schema: must specify one field in the struct
+Expr.quantile | Struct(x: Int64, y: String) | interpolation=lower | refused schema: must specify one field in the struct
+Expr.quantile | Struct(x: Int64, y: String) | interpolation=midpoint | refused schema: must specify one field in the struct
+Expr.quantile | Struct(x: Int64, y: String) | interpolation=nearest | refused schema: must specify one field in the struct
+Expr.quantile | Time | interpolation=equiprobable | allowed Time one
+Expr.quantile | Time | interpolation=higher | allowed Time one
+Expr.quantile | Time | interpolation=linear | allowed Time one
+Expr.quantile | Time | interpolation=lower | allowed Time one
+Expr.quantile | Time | interpolation=midpoint | allowed Time one
+Expr.quantile | Time | interpolation=nearest | allowed Time one
+Expr.quantile | UInt128 | interpolation=equiprobable | allowed Float64 one
+Expr.quantile | UInt128 | interpolation=higher | allowed Float64 one
+Expr.quantile | UInt128 | interpolation=linear | allowed Float64 one
+Expr.quantile | UInt128 | interpolation=lower | allowed Float64 one
+Expr.quantile | UInt128 | interpolation=midpoint | allowed Float64 one
+Expr.quantile | UInt128 | interpolation=nearest | allowed Float64 one
+Expr.quantile | UInt16 | interpolation=equiprobable | allowed Float64 one
+Expr.quantile | UInt16 | interpolation=higher | allowed Float64 one
+Expr.quantile | UInt16 | interpolation=linear | allowed Float64 one
+Expr.quantile | UInt16 | interpolation=lower | allowed Float64 one
+Expr.quantile | UInt16 | interpolation=midpoint | allowed Float64 one
+Expr.quantile | UInt16 | interpolation=nearest | allowed Float64 one
+Expr.quantile | UInt32 | interpolation=equiprobable | allowed Float64 one
+Expr.quantile | UInt32 | interpolation=higher | allowed Float64 one
+Expr.quantile | UInt32 | interpolation=linear | allowed Float64 one
+Expr.quantile | UInt32 | interpolation=lower | allowed Float64 one
+Expr.quantile | UInt32 | interpolation=midpoint | allowed Float64 one
+Expr.quantile | UInt32 | interpolation=nearest | allowed Float64 one
+Expr.quantile | UInt64 | interpolation=equiprobable | allowed Float64 one
+Expr.quantile | UInt64 | interpolation=higher | allowed Float64 one
+Expr.quantile | UInt64 | interpolation=linear | allowed Float64 one
+Expr.quantile | UInt64 | interpolation=lower | allowed Float64 one
+Expr.quantile | UInt64 | interpolation=midpoint | allowed Float64 one
+Expr.quantile | UInt64 | interpolation=nearest | allowed Float64 one
+Expr.quantile | UInt8 | interpolation=equiprobable | allowed Float64 one
+Expr.quantile | UInt8 | interpolation=higher | allowed Float64 one
+Expr.quantile | UInt8 | interpolation=linear | allowed Float64 one
+Expr.quantile | UInt8 | interpolation=lower | allowed Float64 one
+Expr.quantile | UInt8 | interpolation=midpoint | allowed Float64 one
+Expr.quantile | UInt8 | interpolation=nearest | allowed Float64 one
 Expr.rank | Array(Int64, 2) | method=average, descending=false | allowed Float64 many
 Expr.rank | Array(Int64, 2) | method=average, descending=true | allowed Float64 many
 Expr.rank | Array(Int64, 2) | method=dense, descending=false | allowed UInt32 many
@@ -4428,6 +5208,58 @@ Expr.round | UInt64 | mode=half_away_from_zero | allowed UInt64 many
 Expr.round | UInt64 | mode=half_to_even | allowed UInt64 many
 Expr.round | UInt8 | mode=half_away_from_zero | allowed UInt8 many
 Expr.round | UInt8 | mode=half_to_even | allowed UInt8 many
+Expr.skew | Array(Int64, 2) | bias=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Float64')
+Expr.skew | Array(Int64, 2) | bias=true | refused rows: cannot cast Array type (inner: 'Int64', to: 'Float64')
+Expr.skew | Boolean | bias=false | allowed Float64 one
+Expr.skew | Boolean | bias=true | allowed Float64 one
+Expr.skew | Date | bias=false | allowed Float64 one
+Expr.skew | Date | bias=true | allowed Float64 one
+Expr.skew | Datetime(us) | bias=false | allowed Float64 one
+Expr.skew | Datetime(us) | bias=true | allowed Float64 one
+Expr.skew | Datetime(us, UTC) | bias=false | allowed Float64 one
+Expr.skew | Datetime(us, UTC) | bias=true | allowed Float64 one
+Expr.skew | Decimal(10, 2) | bias=false | allowed Float64 one
+Expr.skew | Decimal(10, 2) | bias=true | allowed Float64 one
+Expr.skew | Duration(us) | bias=false | allowed Float64 one
+Expr.skew | Duration(us) | bias=true | allowed Float64 one
+Expr.skew | Float16 | bias=false | allowed Float64 one
+Expr.skew | Float16 | bias=true | allowed Float64 one
+Expr.skew | Float32 | bias=false | allowed Float64 one
+Expr.skew | Float32 | bias=true | allowed Float64 one
+Expr.skew | Float64 | bias=false | allowed Float64 one
+Expr.skew | Float64 | bias=true | allowed Float64 one
+Expr.skew | Int128 | bias=false | allowed Float64 one
+Expr.skew | Int128 | bias=true | allowed Float64 one
+Expr.skew | Int16 | bias=false | allowed Float64 one
+Expr.skew | Int16 | bias=true | allowed Float64 one
+Expr.skew | Int32 | bias=false | allowed Float64 one
+Expr.skew | Int32 | bias=true | allowed Float64 one
+Expr.skew | Int64 | bias=false | allowed Float64 one
+Expr.skew | Int64 | bias=true | allowed Float64 one
+Expr.skew | Int8 | bias=false | allowed Float64 one
+Expr.skew | Int8 | bias=true | allowed Float64 one
+Expr.skew | List(Int64) | bias=false | refused rows: cannot cast List type (inner: 'Int64', to: 'Float64')
+Expr.skew | List(Int64) | bias=true | refused rows: cannot cast List type (inner: 'Int64', to: 'Float64')
+Expr.skew | List(String) | bias=false | refused rows: cannot cast List type (inner: 'String', to: 'Float64')
+Expr.skew | List(String) | bias=true | refused rows: cannot cast List type (inner: 'String', to: 'Float64')
+Expr.skew | Null | bias=false | allowed Float64 one
+Expr.skew | Null | bias=true | allowed Float64 one
+Expr.skew | String | bias=false | refused rows: conversion from `str` to `f64` failed in column 'a' for 2 out of 3 values: ["1d", "2d"]
+Expr.skew | String | bias=true | refused rows: conversion from `str` to `f64` failed in column 'a' for 2 out of 3 values: ["1d", "2d"]
+Expr.skew | Struct(x: Int64, y: String) | bias=false | refused rows: conversion from `struct[2]` to `struct[2]` failed in column 'a' for 2 out of 3 values: [{1,"a"}, {3,"c"}]
+Expr.skew | Struct(x: Int64, y: String) | bias=true | refused rows: conversion from `struct[2]` to `struct[2]` failed in column 'a' for 2 out of 3 values: [{1,"a"}, {3,"c"}]
+Expr.skew | Time | bias=false | allowed Float64 one
+Expr.skew | Time | bias=true | allowed Float64 one
+Expr.skew | UInt128 | bias=false | allowed Float64 one
+Expr.skew | UInt128 | bias=true | allowed Float64 one
+Expr.skew | UInt16 | bias=false | allowed Float64 one
+Expr.skew | UInt16 | bias=true | allowed Float64 one
+Expr.skew | UInt32 | bias=false | allowed Float64 one
+Expr.skew | UInt32 | bias=true | allowed Float64 one
+Expr.skew | UInt64 | bias=false | allowed Float64 one
+Expr.skew | UInt64 | bias=true | allowed Float64 one
+Expr.skew | UInt8 | bias=false | allowed Float64 one
+Expr.skew | UInt8 | bias=true | allowed Float64 one
 Expr.sort | Array(Int64, 2) | descending=false, nulls_last=false | allowed Array(Int64, 2) many
 Expr.sort | Array(Int64, 2) | descending=false, nulls_last=true | allowed Array(Int64, 2) many
 Expr.sort | Array(Int64, 2) | descending=true, nulls_last=false | allowed Array(Int64, 2) many

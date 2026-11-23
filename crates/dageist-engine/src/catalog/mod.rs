@@ -373,6 +373,11 @@ pub enum Role {
     /// the number is, which a select resolves to a `Float64` where it ends and a sort key or a
     /// join's key does not.
     Base,
+    /// A share from 0 to 1 that a statistic reads, as `quantile`'s is. A number typed without a dtype
+    /// is the number it is, whatever the value the method follows is, and adapts to nothing: an
+    /// `Int32` where it is whole and a `Float64` where it has a fraction. Polars reads the number
+    /// and not its dtype, so the call gives the same whichever it is.
+    Share,
     /// A limit a value is held to, as `clip`'s bounds are. A number typed without a dtype is cast
     /// to the dtype of the value the method follows, as strictly as Polars can: it refuses a
     /// number that dtype cannot hold, where an operand's would widen the dtype, and cuts a number

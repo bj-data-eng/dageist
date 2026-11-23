@@ -141,6 +141,13 @@ pub fn left_out() -> &'static [LeftOut] {
 //   many as the receiver, one value given a column of many giving one, so the number of values
 //   depends on the dtype of `other` where `broadcasts` says it for the parameter alone. A
 //   Python list given as `other` is a list of literals, which waits for a list kind too.
+// - `Expr.item` gives the single value of an expression and refuses one that has none or more than
+//   one, with "aggregation 'item' expected a single value, got 4 values": whether a column or a
+//   chain of many values is accepted depends on how many rows the table holds, which is a count of
+//   values that the data decide, the shape that `Expr.filter` and its kin wait for. Polars takes
+//   it after an aggregate, which is one value, and refuses it after a column of the sample's three
+//   rows, so the tables would refuse it where a table of one row takes it. `allow_empty` only
+//   admits a table of no rows. It waits for that shape.
 // - `Expr.search_sorted` gives a place for each value of `element` and not for each value it
 //   follows: a column of many values searched for one value gives one, and one value searched
 //   for a column gives many, so the count of values is the argument's, which the walk, that gives
@@ -209,13 +216,7 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.__truediv__", Reason::NeverOffered),
     LeftOut::new("Expr.__xor__", Reason::NeverOffered),
     LeftOut::new("Expr.alias", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.all", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.any", Reason::NotYetCatalogued),
     LeftOut::new("Expr.append", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.approx_n_unique", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.approx_quantile", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.arg_max", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.arg_min", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arg_true", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arg_unique", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.agg", Reason::NotYetCatalogued),
@@ -264,15 +265,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.bin_intervals", Reason::NotYetCatalogued),
     LeftOut::new("Expr.bin_quantiles", Reason::NotYetCatalogued),
     LeftOut::new("Expr.bin_ranks", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.bitwise_and", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.bitwise_count_ones", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.bitwise_count_zeros", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.bitwise_leading_ones", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.bitwise_leading_zeros", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.bitwise_or", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.bitwise_trailing_ones", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.bitwise_trailing_zeros", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.bitwise_xor", Reason::NotYetCatalogued),
     LeftOut::new("Expr.bottom_k", Reason::NotYetCatalogued),
     LeftOut::new("Expr.bottom_k_by", Reason::NotYetCatalogued),
     LeftOut::new("Expr.cat.ends_with", Reason::NotYetCatalogued),
@@ -282,15 +274,12 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.cat.slice", Reason::NotYetCatalogued),
     LeftOut::new("Expr.cat.starts_with", Reason::NotYetCatalogued),
     LeftOut::new("Expr.cat.to", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.cum_min", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.cum_prod", Reason::NotYetCatalogued),
     LeftOut::new("Expr.cumulative_eval", Reason::NotYetCatalogued),
     LeftOut::new("Expr.cut", Reason::Deprecated),
     LeftOut::new("Expr.deserialize", Reason::NotYetCatalogued),
     LeftOut::new("Expr.dot", Reason::NotYetCatalogued),
     LeftOut::new("Expr.dt.add_business_days", Reason::NotYetCatalogued),
     LeftOut::new("Expr.dt.is_business_day", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.entropy", Reason::NotYetCatalogued),
     LeftOut::new("Expr.ewm_mean", Reason::NotYetCatalogued),
     LeftOut::new("Expr.ewm_mean_by", Reason::NotYetCatalogued),
     LeftOut::new("Expr.ewm_std", Reason::NotYetCatalogued),
@@ -318,7 +307,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.is_in", Reason::NotYetCatalogued),
     LeftOut::new("Expr.is_sorted", Reason::NotYetCatalogued),
     LeftOut::new("Expr.item", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.kurtosis", Reason::NotYetCatalogued),
     LeftOut::new("Expr.limit", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.__getitem__", Reason::NotYetCatalogued),
     LeftOut::new("Expr.list.agg", Reason::NotYetCatalogued),
@@ -379,8 +367,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.map_batches", Reason::TakesPythonFunction),
     LeftOut::new("Expr.map_elements", Reason::TakesPythonFunction),
     LeftOut::new("Expr.max_by", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.mean", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.median", Reason::NotYetCatalogued),
     LeftOut::new("Expr.meta.__eq__", Reason::NotYetCatalogued),
     LeftOut::new("Expr.meta.__ne__", Reason::NotYetCatalogued),
     LeftOut::new("Expr.meta.as_expression", Reason::NotYetCatalogued),
@@ -417,15 +403,11 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.name.suffix_fields", Reason::NotYetCatalogued),
     LeftOut::new("Expr.name.to_lowercase", Reason::NotYetCatalogued),
     LeftOut::new("Expr.name.to_uppercase", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.nan_max", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.nan_min", Reason::NotYetCatalogued),
     LeftOut::new("Expr.peak_max", Reason::NotYetCatalogued),
     LeftOut::new("Expr.peak_min", Reason::NotYetCatalogued),
     LeftOut::new("Expr.pipe", Reason::TakesPythonFunction),
     LeftOut::new("Expr.pipe_with_dtype", Reason::TakesPythonFunction),
-    LeftOut::new("Expr.product", Reason::NotYetCatalogued),
     LeftOut::new("Expr.qcut", Reason::Deprecated),
-    LeftOut::new("Expr.quantile", Reason::NotYetCatalogued),
     LeftOut::new("Expr.reinterpret", Reason::NotYetCatalogued),
     LeftOut::new("Expr.repeat_by", Reason::NotYetCatalogued),
     LeftOut::new("Expr.reshape", Reason::NotYetCatalogued),
@@ -456,9 +438,7 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.search_sorted", Reason::NotYetCatalogued),
     LeftOut::new("Expr.set_sorted", Reason::NotYetCatalogued),
     LeftOut::new("Expr.shuffle", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.skew", Reason::NotYetCatalogued),
     LeftOut::new("Expr.slice", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.std", Reason::NotYetCatalogued),
     LeftOut::new("Expr.str.contains_any", Reason::NotYetCatalogued),
     LeftOut::new("Expr.str.decode", Reason::NotYetCatalogued),
     LeftOut::new("Expr.str.encode", Reason::NotYetCatalogued),
@@ -493,7 +473,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.unique_counts", Reason::NotYetCatalogued),
     LeftOut::new("Expr.upper_bound", Reason::NotYetCatalogued),
     LeftOut::new("Expr.value_counts", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.var", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.__contains__", Reason::NeverOffered),
     LeftOut::new("LazyFrame.__eq__", Reason::NeverOffered),
     LeftOut::new("LazyFrame.__ge__", Reason::NeverOffered),

@@ -26,8 +26,8 @@ use crate::allowed::{
 };
 use crate::allowed::{
     Loose, Receiver, adapted_dtype, adapts_numbers_only, broadcasts, could_be_taken_by_a_number,
-    is_count, is_left_unresolved, is_refused_as_a_count, is_required, operand_adapts,
-    receiver_beside,
+    is_count, is_left_unresolved, is_refused_as_a_count, is_required, keeps_its_dtype,
+    operand_adapts, receiver_beside,
 };
 use crate::catalog::{self, Applies, AsManyAs, Comparison, Entry, Kind, Role};
 
@@ -1673,7 +1673,8 @@ impl Walker<'_> {
                 });
                 let hidden = entry.applies() == Applies::Expression
                     && operand.loose.is_some()
-                    && !(counts && is_count(entry, name));
+                    && !(counts && is_count(entry, name))
+                    && !keeps_its_dtype(entry, name);
                 let dtype = if hidden {
                     operand
                         .loose
@@ -2068,7 +2069,7 @@ fn operands(call: &Call) -> Vec<&Expression> {
     found
 }
 
-pub(super) const ONE_VALUE: [&str; 11] = [
+pub(super) const ONE_VALUE: [&str; 31] = [
     "Expr.sum",
     "Expr.min",
     "Expr.max",
@@ -2080,6 +2081,26 @@ pub(super) const ONE_VALUE: [&str; 11] = [
     "Expr.n_unique",
     "Expr.count",
     "Expr.str.join",
+    "Expr.mean",
+    "Expr.median",
+    "Expr.std",
+    "Expr.var",
+    "Expr.quantile",
+    "Expr.product",
+    "Expr.skew",
+    "Expr.kurtosis",
+    "Expr.entropy",
+    "Expr.arg_max",
+    "Expr.arg_min",
+    "Expr.nan_max",
+    "Expr.nan_min",
+    "Expr.all",
+    "Expr.any",
+    "Expr.approx_n_unique",
+    "Expr.approx_quantile",
+    "Expr.bitwise_and",
+    "Expr.bitwise_or",
+    "Expr.bitwise_xor",
 ];
 
 fn is_one_value(call: &Call) -> bool {
