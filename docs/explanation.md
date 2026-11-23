@@ -714,7 +714,7 @@ What Polars does with each is what the tables say, and some of it is not what a 
   list of literal patterns that Polars matches all at once, wait for a kind that holds a list of texts, typed or
   connected; `str.split_exact` and `str.splitn` give a struct that waits for `struct.field`.
 
-The catalogue holds the seven steps, the expression methods the storyboard
+The catalogue holds the twenty steps, the expression methods the storyboard
 uses, the aggregates `sum`, `min`, `max` and `len`, the six comparisons and the six
 others that compare, the arithmetic of `add`, `sub`, `mul`, `truediv`, `floordiv`, `mod`,
 `pow`, `neg`, `abs`, `sign` and `clip`, the maths, trigonometry and rounding above, the nulls,
