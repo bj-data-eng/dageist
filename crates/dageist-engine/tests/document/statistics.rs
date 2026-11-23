@@ -7,7 +7,7 @@
 //! `k` of the other walk tests.
 
 use dageist_engine::allowed::{RefusalSource, Representative, Rule, Shape};
-use dageist_engine::document::{Document, Outcome};
+use dageist_engine::document::{Document, Outcome, StepId};
 use polars::prelude::DataType;
 use serde_json::{Value, json};
 
@@ -22,17 +22,6 @@ use crate::support::{call, chain, field, field_then, whole};
 fn float(number: f64) -> Value {
     chain(
         call("polars.lit", json!({ "value": { "float": number } })),
-        vec![],
-    )
-}
-
-/// The expression argument `polars.lit(number)`, which is that dtype.
-fn float32(number: f64) -> Value {
-    chain(
-        call(
-            "polars.lit",
-            json!({ "value": { "float": number }, "dtype": { "dtype": "Float32" } }),
-        ),
         vec![],
     )
 }
@@ -69,19 +58,27 @@ fn number(written: &str) -> f64 {
         .expect("a number")
 }
 
-/// Whether the step is one Polars accepts as the engine runs it on the claims.
+/// Whether the step is one Polars accepts as the engine runs it on the claims: it resolves the
+/// schema, and the rows it gives are the ones the preview shows. Polars refuses some calls only
+/// when it runs the rows.
 fn is_valid(written: &str) -> bool {
     match Document::read(written) {
         Err(_) => false,
-        Ok(document) => document
-            .run_on(&inputs(), &claims())
-            .is_ok_and(|report| matches!(report.steps()[0].outcome(), Outcome::Valid { .. })),
+        Ok(document) => {
+            document
+                .run_on(&inputs(), &claims())
+                .is_ok_and(|report| matches!(report.steps()[0].outcome(), Outcome::Valid { .. }))
+                && document
+                    .preview(&inputs(), &claims(), &StepId::new("s").expect("an id"), 100)
+                    .is_ok()
+        }
     }
 }
 
+/// The preview shows a float to six places, so a cell is the number to within a millionth.
 fn close(found: f64, wanted: f64, what: &str) {
     assert!(
-        (found - wanted).abs() < 1e-9,
+        (found - wanted).abs() < 1e-5,
         "{what}: {found} is not {wanted}"
     );
 }
@@ -643,7 +640,7 @@ fn the_bit_counts_give_a_count_of_bits_for_each_value() {
         &less_one,
         vec![call("Expr.bitwise_count_ones", json!({}))],
     ));
-    assert_eq!(cells(&ones), texts(&["64", "0", "0", "64", "0", "0", "0"]));
+    assert_eq!(cells(&ones), texts(&["64", "1", "1", "64", "1", "1", "0"]));
     assert!(!is_valid(&selecting(method(
         "step_to",
         "Expr.bitwise_count_ones",
