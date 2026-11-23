@@ -493,6 +493,11 @@ pub fn same_reason(source: &Source, tables: &str, probe: &str) -> bool {
             probe.contains("boolean") && (probe.contains("expected") || probe.contains("must be"))
         }
         Source::Rule(rule) if *rule == COUNT_RULE => probe.contains("must have the same length as"),
+        // Polars finds no dtype that two zones have in common, and says it of a comparison as it
+        // does of a difference or a fill.
+        Source::Rule(rule) if *rule == ZONE_RULE => {
+            ZONE_WORDS.iter().any(|said| probe.contains(said))
+        }
         _ => false,
     }
 }
@@ -560,13 +565,24 @@ fn predicate_probe(found: &Found, rule: &str, predicate: Expression) -> Option<P
 fn probe_of_the_part(found: &Found, source: &Source) -> Option<Probe> {
     match source {
         Source::Polars => chain_probe(found),
-        Source::Rule(rule) if *rule == COUNT_RULE => chain_probe(found),
+        Source::Rule(rule) if *rule == COUNT_RULE || *rule == ZONE_RULE => chain_probe(found),
         Source::Rule(rule) if PREDICATE_RULES.contains(rule) => {
             predicate_probe(found, rule, found_predicate(found)?)
         }
         _ => None,
     }
 }
+
+/// The rule that moments compared, subtracted, filled or bound by one another be in one time zone,
+/// whose refusal Polars shows by the dtype that two zones have in common, which is none.
+const ZONE_RULE: &str = "moments-share-a-zone";
+
+/// What Polars says of two zones that have no dtype in common.
+const ZONE_WORDS: [&str; 3] = [
+    "could not evaluate",
+    "failed to determine supertype",
+    "is incompatible with expected type",
+];
 
 /// The rule that a replacement take as many values as it is given the number of, whose refusal
 /// Polars shows by the lengths it refuses the call for.
