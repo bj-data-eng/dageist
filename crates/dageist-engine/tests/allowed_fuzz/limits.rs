@@ -2115,17 +2115,38 @@ fn refused_for_a_part_of_a_date_with_ones(case: &Case) -> Option<bool> {
     })
 }
 
-/// The case with each part that a `dt.replace` is given made the Boolean `false`, which is a day
-/// and a month of 0, that no date has, where Polars evaluates the part.
-fn case_with_false_as_the_parts(case: &Case) -> Option<Case> {
-    let zero = Expression::new(
-        Start::Call(
-            Call::new(
-                catalog::entry("polars.lit")?,
-                vec![("value", Value::Flag(Some(false)))],
-            )
-            .ok()?,
-        ),
+/// Whether the reason is that text could not be converted to the whole number of a part, as the
+/// text of a column of durations is not.
+fn is_a_failed_conversion_of_text(reason: &str) -> bool {
+    is_a_failed_conversion(reason) && reason.starts_with("conversion from `str` to `")
+}
+
+/// Whether the call is a `dt.replace` whose parts are each a literal of text, as `"1"` is, which
+/// Polars converts to the number where the plan is made, whether or not it evaluates the part,
+/// where the tables, which measured a column of text that is none, refuse it. A part that is a
+/// column of text is not one: Polars converts it when it evaluates the part, which it may not.
+fn is_given_only_literals_of_text(call: &Call) -> bool {
+    let literal_of_text = |expression: &Expression| {
+        expression.links().is_empty()
+            && matches!(expression.start(), Start::Call(start)
+                if is(start, "polars.lit")
+                    && (matches!(start.argument("value"), Some(Value::String(_)))
+                        || matches!(start.argument("dtype"), Some(Value::Dtype(dtype)) if dtype.to_string() == "String")))
+    };
+    is_a_replacement_given_a_part(call)
+        && PARTS_OF_A_DATE
+            .iter()
+            .all(|part| match call.argument(part) {
+                Some(Value::Expression(expression)) => literal_of_text(expression),
+                Some(_) => false,
+                None => true,
+            })
+}
+
+/// The case with each part that a `dt.replace` is given made the literal `value`.
+fn case_with_the_parts_as(case: &Case, value: Value) -> Option<Case> {
+    let literal = Expression::new(
+        Start::Call(Call::new(catalog::entry("polars.lit")?, vec![("value", value)]).ok()?),
         Vec::new(),
     )
     .ok()?;
@@ -2138,7 +2159,7 @@ fn case_with_false_as_the_parts(case: &Case) -> Option<Case> {
             .iter()
             .map(|given| {
                 let value = if PARTS_OF_A_DATE.contains(&given.parameter()) {
-                    Value::Expression(zero.clone())
+                    Value::Expression(literal.clone())
                 } else {
                     given.value().clone()
                 };
@@ -2149,27 +2170,27 @@ fn case_with_false_as_the_parts(case: &Case) -> Option<Case> {
     })
 }
 
-/// Whether Polars refuses the case for invalid components with each part `false`: it then evaluates
-/// the part, and the part is a cause. Polars that never evaluates a part allows it. `None` where no
-/// `dt.replace` is given a part.
-fn refused_for_components_with_false_as_the_parts(case: &Case) -> Option<bool> {
-    changed(case_with_false_as_the_parts(case), case).map(|control| {
+/// Whether Polars refuses the case for what `reason` says with each part the literal `value`: it
+/// then evaluates the part, and what it refuses is a cause. Polars that never evaluates a part
+/// allows the case. `None` where no `dt.replace` is given a part.
+fn refused_for_a_part_with(case: &Case, value: Value, reason: fn(&str) -> bool) -> Option<bool> {
+    changed(case_with_the_parts_as(case, value), case).map(|control| {
         (0..RUNS).any(|_| {
             observe(&control)
                 .refusal
-                .is_some_and(|refusal| is_a_refusal_of_the_components_of_a_date(&refusal.reason))
+                .is_some_and(|refusal| reason(&refusal.reason))
         })
     })
 }
 
-/// Whether the tables stop refusing the case for invalid components once each part of a date is the
-/// number 1, which they then judge as the column of whole numbers they measured. The case may be
-/// refused for another reason still, as a pivot's aggregate is by its rule.
-fn the_tables_allow_the_parts_as_ones(case: &Case) -> bool {
-    changed(case_with_ones_as_the_parts(case), case).is_some_and(|control| {
+/// Whether the tables stop refusing the case for what `reason` says once each part is the number 1,
+/// which they then judge as the column of whole numbers they measured. The case may be refused for
+/// another reason still, as a pivot's aggregate is by its rule.
+fn the_tables_stop_refusing_the_parts_as_ones(case: &Case, reason: fn(&str) -> bool) -> bool {
+    changed(case_with_the_parts_as(case, Value::Integer(1)), case).is_some_and(|control| {
         !matches!(
             predict(&control).verdict,
-            Verdict::Refuses(refused) if is_a_refusal_of_the_components_of_a_date(&refused.reason)
+            Verdict::Refuses(refused) if reason(&refused.reason)
         )
     })
 }
@@ -3510,15 +3531,38 @@ fn applies(
                 && refused_for_a_part_of_a_date_with_ones(case) == Some(false)
         }
         (Limit::APartOfADateThatDependsOnTheRows, Disagreement::PolarsAllows(refused)) => {
-            // The values of the column the tables measured are the cause where the tables allow the
-            // case once each part is the number 1.
+            // The values of the column the tables measured are the cause where the tables stop
+            // refusing the case once each part is the number 1, and where Polars refuses it, with
+            // each part made a value that no part takes, for the reason the tables gave, which
+            // shows that it evaluates the part and does not skip it: day 0 for the invalid
+            // components, and text that is no number for a failed conversion of text.
             refused.stage == Some(TableStage::Rows)
-                && is_a_refusal_of_the_components_of_a_date(&refused.reason)
                 && locate(case, &refused.place)
                     .call
                     .is_some_and(is_a_replacement_given_a_part)
-                && the_tables_allow_the_parts_as_ones(case)
-                && refused_for_components_with_false_as_the_parts(case) == Some(true)
+                && if is_a_refusal_of_the_components_of_a_date(&refused.reason) {
+                    the_tables_stop_refusing_the_parts_as_ones(
+                        case,
+                        is_a_refusal_of_the_components_of_a_date,
+                    ) && refused_for_a_part_with(
+                        case,
+                        Value::Flag(Some(false)),
+                        is_a_refusal_of_the_components_of_a_date,
+                    ) == Some(true)
+                } else if is_a_failed_conversion_of_text(&refused.reason)
+                    && locate(case, &refused.place)
+                        .call
+                        .is_some_and(is_given_only_literals_of_text)
+                {
+                    the_tables_stop_refusing_the_parts_as_ones(case, is_a_failed_conversion_of_text)
+                        && refused_for_a_part_with(
+                            case,
+                            Value::String("x".to_owned()),
+                            is_a_failed_conversion_of_text,
+                        ) == Some(true)
+                } else {
+                    false
+                }
         }
         (Limit::AFormatTheDtypeCannotWrite, Disagreement::PolarsRefuses(refusal)) => {
             // The format is the cause where Polars stops refusing the dtype once each format is
@@ -8079,14 +8123,23 @@ mod tests {
         let pivot = kept(
             "uncovered-a-part-of-a-date-that-depends-on-the-rows--the-tables-refuse-a-part-polars-runs.case",
         );
-        assert!(the_tables_allow_the_parts_as_ones(&pivot));
+        assert!(the_tables_stop_refusing_the_parts_as_ones(
+            &pivot,
+            is_a_refusal_of_the_components_of_a_date
+        ));
         // Where each part is the number 1 already, the control is the case itself, which shows
         // nothing, and where no call is given a part there is no control.
         let ones = replacing("day", whole(1));
-        assert!(!the_tables_allow_the_parts_as_ones(&ones));
+        assert!(!the_tables_stop_refusing_the_parts_as_ones(
+            &ones,
+            is_a_refusal_of_the_components_of_a_date
+        ));
         assert_eq!(refused_for_a_part_of_a_date_with_ones(&ones), None);
         let none = select(vec![chain(column("a"), &["Expr.cum_sum"])]);
-        assert!(!the_tables_allow_the_parts_as_ones(&none));
+        assert!(!the_tables_stop_refusing_the_parts_as_ones(
+            &none,
+            is_a_refusal_of_the_components_of_a_date
+        ));
         assert_eq!(refused_for_a_part_of_a_date_with_ones(&none), None);
     }
 
@@ -8144,6 +8197,116 @@ mod tests {
         );
         assert!(observe(&case).refusal.is_none());
         assert_eq!(excused_by(&case), vec![]);
+    }
+
+    /// `sort(by=[when(a.is_null()).then(a.dt.replace(day = b)), len()])` over dates and text: a sort key
+    /// of one value, whose text part, a column, Polars never evaluates.
+    fn a_text_part_that_a_sort_key_of_one_value_skips() -> Case {
+        let replace = call(
+            "Expr.dt.replace",
+            vec![("day", Value::Expression(chain(column("b"), &[])))],
+        );
+        let when = call(
+            "polars.when",
+            vec![(
+                "predicates",
+                many(vec![chain(column("a"), &["Expr.is_null"])]),
+            )],
+        );
+        let then = call(
+            "When.then",
+            vec![(
+                "statement",
+                Value::Expression(chain_of(column("a"), vec![replace])),
+            )],
+        );
+        let key = chain_of(when, vec![then]);
+        let length = chain(column("a"), &["Expr.len"]);
+        let sorted = case_of(call(
+            "LazyFrame.sort",
+            vec![("by", many(vec![key, length]))],
+        ));
+        Case {
+            receiver: Representative::Date,
+            argument: Representative::String,
+            ..sorted
+        }
+    }
+
+    #[test]
+    fn a_text_part_is_excused_where_the_tables_refuse_its_conversion_and_polars_runs_it() {
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-part-of-a-date-that-depends-on-the-rows--a-text-part-the-tables-refuse.case"
+            ),
+            vec![Limit::APartOfADateThatDependsOnTheRows]
+        );
+    }
+
+    #[test]
+    fn a_text_part_that_polars_never_evaluates_is_no_part_that_depends_on_the_rows() {
+        // The tables refuse the conversion of the column of durations they measured, and Polars
+        // allows the case because the key is one value that it never evaluates the column of: the
+        // part is no literal that writes a number, which is what the limit blames, so it does not
+        // excuse it, though the case run with the part a text that is no number is refused, as a
+        // literal is converted where the plan is made.
+        let case = a_text_part_that_a_sort_key_of_one_value_skips();
+        let prediction = predict(&case);
+        assert!(
+            matches!(&prediction.verdict, Verdict::Refuses(refused)
+                if is_a_failed_conversion_of_text(&refused.reason)),
+            "{:?}",
+            prediction.verdict
+        );
+        assert!(observe(&case).refusal.is_none());
+        assert_eq!(excused_by(&case), vec![]);
+    }
+
+    fn any_call_in_step(step: &Call, found: &dyn Fn(&Call) -> bool) -> bool {
+        operands(step).iter().any(|(_, held)| any_call(held, found))
+    }
+
+    #[test]
+    fn a_conversion_of_text_is_a_part_the_tables_blame_only_where_the_number_1_ends_the_refusal() {
+        // Where each part is the number 1 already, or none is given, the control is the case itself,
+        // which shows nothing.
+        let ones = replacing("day", whole(1));
+        assert!(!the_tables_stop_refusing_the_parts_as_ones(
+            &ones,
+            is_a_failed_conversion_of_text
+        ));
+        // A column is no literal of text, whatever it holds; a literal of text is one, whatever it
+        // writes, for Polars reads it where the plan is made.
+        let column_part = replacing("day", chain(column("b"), &[]));
+        assert!(!any_call_in_step(
+            column_part.document.steps()[0].call(),
+            &is_given_only_literals_of_text
+        ));
+        for text in ["1", "x"] {
+            let literal = replacing(
+                "day",
+                chain(
+                    call(
+                        "polars.lit",
+                        vec![("value", Value::String(text.to_owned()))],
+                    ),
+                    &[],
+                ),
+            );
+            assert!(any_call_in_step(
+                literal.document.steps()[0].call(),
+                &is_given_only_literals_of_text
+            ));
+        }
+        let none = select(vec![chain(column("a"), &["Expr.cum_sum"])]);
+        assert_eq!(
+            refused_for_a_part_with(
+                &none,
+                Value::String("x".to_owned()),
+                is_a_failed_conversion_of_text
+            ),
+            None
+        );
     }
 
     // ----- A moment beyond the range of a unit
