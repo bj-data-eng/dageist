@@ -7979,6 +7979,62 @@ mod tests {
         assert_eq!(refused_for_a_part_of_a_date_with_ones(&none), None);
     }
 
+    /// `sort(by=[when(a.is_null()).then(a.dt.replace(day = lit(false))), len()])` over dates: a sort key
+    /// of one value, whose part Polars never evaluates.
+    fn a_part_that_a_sort_key_of_one_value_skips() -> Case {
+        let replace = call(
+            "Expr.dt.replace",
+            vec![(
+                "day",
+                Value::Expression(chain(
+                    call("polars.lit", vec![("value", Value::Flag(Some(false)))]),
+                    &[],
+                )),
+            )],
+        );
+        let when = call(
+            "polars.when",
+            vec![(
+                "predicates",
+                many(vec![chain(column("a"), &["Expr.is_null"])]),
+            )],
+        );
+        let then = call(
+            "When.then",
+            vec![(
+                "statement",
+                Value::Expression(chain_of(column("a"), vec![replace])),
+            )],
+        );
+        let key = chain_of(when, vec![then]);
+        let length = chain(column("a"), &["Expr.len"]);
+        let sorted = case_of(call(
+            "LazyFrame.sort",
+            vec![("by", many(vec![key, length]))],
+        ));
+        Case {
+            receiver: Representative::Date,
+            ..sorted
+        }
+    }
+
+    #[test]
+    fn a_part_that_polars_never_evaluates_is_no_part_that_depends_on_the_rows() {
+        // The tables refuse the day 0 that `false` is, and Polars allows the case because the key
+        // is one value that it never evaluates the part of: the limit must not excuse it, for the
+        // case run with the day `false` where Polars does evaluate it is allowed too.
+        let case = a_part_that_a_sort_key_of_one_value_skips();
+        let prediction = predict(&case);
+        assert!(
+            matches!(&prediction.verdict, Verdict::Refuses(refused)
+                if is_a_refusal_of_the_components_of_a_date(&refused.reason)),
+            "{:?}",
+            prediction.verdict
+        );
+        assert!(observe(&case).refusal.is_none());
+        assert_eq!(excused_by(&case), vec![]);
+    }
+
     // ----- A struct with no fields
 
     const NO_KEY: &str = "at least one key is required in a group_by operation";
