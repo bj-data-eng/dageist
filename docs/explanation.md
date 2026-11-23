@@ -516,6 +516,46 @@ What Polars does with each is what the tables say, and some of it is not what a 
   others at their defaults, and refused when Polars refuses the pair; a step's lines are not read
   so, for they are measured with the arguments the harness gives the step.
 
+The methods that put values in another order, and those that compare a value with its neighbours or count
+what is distinct, are a family of their own and parts of three that exist. Order holds `sort`, `sort_by`,
+`reverse`, `arg_sort` and `rank`, which are swapped for one another where they take the same arguments, as
+`sort` and `arg_sort` take `descending` and `nulls_last`. Rows gains `diff`, `pct_change` and `rle_id`
+beside `shift`, which also look at the rows around a value, and Aggregate `n_unique` and `count`. Every
+name is Polars' own.
+
+What Polars does with each is what the tables say, and some of it is not what a name suggests:
+
+- Each of the five of Order, `diff`, `pct_change` and `rle_id` gives as many values as the value it
+  follows, one value for one, which the tables measure; `n_unique` and `count` give one. `n_unique` counts
+  a null as a value and `count` counts the values that are not null, and both are aggregates, so a join's
+  key may hold either alone and not beside a column, which `key-is-elementwise` asks of every aggregate the
+  walk knows. `sort`, `sort_by`, `reverse`, `arg_sort`, `rank`, `diff`, `pct_change` and `rle_id` look at the
+  whole column, so none of them is elementwise, which a join's key must be, and the tables say so.
+- `rank` gives a `Float64` for `average` and a `UInt32` for every other `method`, and `arg_sort` and `rle_id`
+  a `UInt32`. A `rank` of `random` takes a `seed`, a whole number from zero that Python passes as an unsigned
+  64-bit number, and is another order each time it runs without one. `diff` of dates and moments is a length
+  of time, `diff` takes the numbers and the dates, times and lengths of time that a subtraction takes and
+  refuses text and a `Boolean`, and `pct_change` is the quotient of a value and the one `n` rows before it,
+  less one, a float.
+- `n` of `diff` and `pct_change` is a count of rows as `shift`'s is: one value, which Polars refuses many
+  values of with `'n' must be a scalar value` or `n must be a single value`, and a whole number typed
+  without a dtype is that dtype. The tables measure it as one value, as they measure `shift`'s, and the
+  fuzz target draws it so.
+- `sort_by` takes the keys it sorts by as `by` and `more_by`, as a sort step does, a flag of `descending`
+  and of `nulls_last` for each of them or one for all. Polars meets a receiver of one value with each value
+  of the keys of many, so the sum of a column sorted by a column is as many values as the column; a column
+  sorted by a key of one value is the column.
+- `diff` has a `null_behavior`, whose `drop` leaves out the first `n` values and so gives fewer values than
+  the table has rows, which the tables cannot say. The catalogue holds the one word `ignore`, which is
+  Python's default, and does not offer the parameter, so a step always keeps every row.
+- The methods that give as many values as the rows or the arguments decide, `filter`, `unique`, `head`,
+  `tail`, `slice`, `top_k`, `bottom_k`, `gather_every`, `gather`, `arg_unique` and `mode`, are not
+  catalogued, and neither are `is_in`, `search_sorted` and `interpolate`. `left_out.rs` gives the reason
+  of each: Polars refuses a method that gives some other number of values beside a column, in a filter's
+  predicate, a sort key or a window's key, with a message about lengths, and the walk has a shape for
+  one value and for as many as the table has rows only. [Issue 129](https://github.com/bj-data-eng/dageist/issues/129)
+  is the shape that holds them.
+
 ### The Pattern Kind
 
 The methods of text that look for or replace what matches a regular expression take their pattern as a

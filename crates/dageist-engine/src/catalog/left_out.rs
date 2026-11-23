@@ -128,6 +128,12 @@ pub fn left_out() -> &'static [LeftOut] {
 //   `Expr.diff`'s `drop` does, which the editor does not offer, so `diff` is catalogued with
 //   `ignore` only. A chain that goes on to an aggregate is one value whatever count its first
 //   method gives, but the method itself stands in a place of its own first.
+// - `Expr.interpolate` gives as many values as it follows, but whether Polars takes a column depends
+//   on its rows: it interpolates a column of `Boolean` that holds no null to a `Float64` and panics
+//   on one that holds a null, and the method `nearest` does the same for text and arrays, where the
+//   tables measured the sample's rows, which hold a null, and refuse them. A column that holds no
+//   null is accepted by Polars and refused by the tables, so it waits for a way to say that a
+//   column holds no null.
 // - `Expr.is_in` takes `other` as a list column, whose row is met by the receiver's, or as a
 //   column of the receiver's own dtype, which Python Polars 2.1 deprecates as ambiguous and Rust
 //   reads as the whole column's set of values. The first gives as many values as the two meet, a
