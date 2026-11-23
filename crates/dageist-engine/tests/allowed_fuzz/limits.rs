@@ -7539,6 +7539,67 @@ mod tests {
     }
 
     #[test]
+    fn a_date_made_of_literals_is_a_value_a_strict_cast_cannot_hold_and_the_cast_is_why() {
+        // A date made of the numbers 1, 1 and 1.5 is the first of January of the year 1, which a
+        // cast to a whole number of eight bits cannot hold, and Polars converts the literal when it
+        // works out the schema, naming it the scalar and the call that casts it. The tables measured
+        // the dates of 1970.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-cast-of-a-value-the-dtype-cannot-hold--a-date-made-of-literals.case"
+            ),
+            vec![Limit::ACastOfAValueTheDtypeCannotHold]
+        );
+        let scalar = "conversion from `date` to `u8` failed in column 'scalar' for 1 out of 1 values: [0001-01-01]";
+        let date = || {
+            call(
+                "polars.date",
+                vec![
+                    ("year", Value::Expression(whole(1))),
+                    ("month", Value::Expression(whole(1))),
+                    ("day", Value::Expression(whole(1))),
+                ],
+            )
+        };
+        let strict = select(vec![chain_of(
+            date(),
+            vec![cast_to(Representative::UInt8, Vec::new())],
+        )]);
+        let at_the_cast = || link_of("exprs", 0, 0);
+        // A refusal at the cast that the case holds is the cast's.
+        assert_eq!(
+            refused_for_a_bound(&strict, Some(at_the_cast()), Stage::Schema, scalar,),
+            vec![Limit::ACastOfAValueTheDtypeCannotHold]
+        );
+        // A refusal at another call, or of a column and not of a scalar, is not.
+        let elsewhere = select(vec![chain_of(
+            date(),
+            vec![
+                cast_to(Representative::UInt8, Vec::new()),
+                call("Expr.cum_sum", Vec::new()),
+            ],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(
+                &elsewhere,
+                Some(link_of("exprs", 0, 1)),
+                Stage::Schema,
+                scalar,
+            ),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(
+                &strict,
+                Some(at_the_cast()),
+                Stage::Schema,
+                "conversion from `date` to `u8` failed in column 'a' for 1 out of 3 values: [0001-01-01]",
+            ),
+            vec![]
+        );
+    }
+
+    #[test]
     fn a_failed_conversion_is_excused_where_a_strict_cast_is_why() {
         // The cast that is told nothing, and the one told to be strict, refuse a value that its
         // dtype cannot hold; Polars stops refusing once no cast is strict.
