@@ -523,6 +523,35 @@ DAGEIST_FUZZ_SEED=7 DAGEIST_FUZZ_CASES=20000 cargo test --offline --locked -p da
   --test allowed_fuzz a_campaign -- --ignored --nocapture --test-threads=1
 ```
 
+A campaign draws its methods evenly, so the more methods the catalogue holds, the
+fewer cases of a seed hold any one of them, and the fewer still hold two together. To
+check the methods a change is about as deeply as before, focus the campaign on them.
+Name them in `DAGEIST_FUZZ_FOCUS`, separated by commas: a method by its name,
+`dt.replace`, or by its identifier in the catalogue, `Expr.dt.replace`, and every method
+of a namespace by a name that ends in a dot, `dt.`.
+
+Every case of a focused campaign then holds at least one of them. Where a chain draws
+another method, it draws one of them instead one time in four, and the rest of the case
+is drawn as without a focus. A case that still holds none is drawn again, and the tally
+counts how many were. Unset or empty, the variable names no focus, and a seed makes the
+same cases as without it. A name that is no method of an expression is refused, and the
+refusal names it. A campaign focused on the methods of `dt` and on `replace_strict`:
+
+```sh
+DAGEIST_FUZZ_FOCUS=dt.,replace_strict DAGEIST_FUZZ_SEED=7 DAGEIST_FUZZ_CASES=8000 \
+  cargo test --offline --locked -p dageist-engine --test allowed_fuzz a_campaign \
+  -- --ignored --nocapture --test-threads=1
+```
+
+A batch of new methods lands when focused campaigns on them agree: fresh seeds
+focused on the batch's methods of an expression, each run at the default number of
+threads and again with `POLARS_MAX_THREADS=2 RAYON_NUM_THREADS=2`, for Polars meets
+some parts differently on fewer threads. A focus names methods of an expression only:
+a chain starts from a column, a literal, `element` or `when`, so a function that
+starts one, such as a constructor, is refused. A broad campaign, with no focus, runs
+apart from the focused ones, once for each batch or on a schedule. A disagreement it
+finds outside the batch is filed as an issue and does not hold the batch back.
+
 The case that is about to run is written to `current.case` in that directory
 first, so a case that does not return is found. To run one kept case again, and
 see what the tables predicted and Polars did, name its file:
