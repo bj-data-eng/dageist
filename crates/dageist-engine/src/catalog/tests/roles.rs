@@ -25,6 +25,7 @@ fn only_the_operands_the_fill_the_row_count_the_power_and_the_divisors_have_a_ro
             ("Expr.and_", "others", Role::Operand),
             ("Expr.clip", "lower_bound", Role::Bound),
             ("Expr.clip", "upper_bound", Role::Bound),
+            ("Expr.diff", "n", Role::Count),
             ("Expr.eq", "other", Role::Operand),
             ("Expr.eq_missing", "other", Role::Operand),
             ("Expr.fill_nan", "value", Role::Filler),
@@ -43,6 +44,7 @@ fn only_the_operands_the_fill_the_row_count_the_power_and_the_divisors_have_a_ro
             ("Expr.ne", "other", Role::Operand),
             ("Expr.ne_missing", "other", Role::Operand),
             ("Expr.or_", "others", Role::Operand),
+            ("Expr.pct_change", "n", Role::Count),
             ("Expr.pow", "exponent", Role::Exponent),
             ("Expr.replace", "new", Role::Bound),
             ("Expr.replace", "old", Role::Bound),
@@ -91,6 +93,8 @@ fn a_parameter_that_holds_one_value_for_each_item_of_another_is_a_flag_or_a_choi
     assert_eq!(
         per_item,
         [
+            ("Expr.sort_by", "descending"),
+            ("Expr.sort_by", "nulls_last"),
             ("LazyFrame.sort", "descending"),
             ("LazyFrame.sort", "nulls_last")
         ]

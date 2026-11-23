@@ -108,7 +108,12 @@ fn argument_for(entry: &Entry, parameter: &str, value: Expr) -> Argument {
 }
 
 /// The parameters Polars takes only as a single value, not as a column.
-const SCALAR_ONLY: [(&str, &str); 2] = [("Expr.shift", "n"), ("Expr.shift", "fill_value")];
+const SCALAR_ONLY: [(&str, &str); 4] = [
+    ("Expr.shift", "n"),
+    ("Expr.shift", "fill_value"),
+    ("Expr.diff", "n"),
+    ("Expr.pct_change", "n"),
+];
 
 /// The parts of a date that the functions which make one take, whose calendar has no month and no
 /// day of 0, which a Boolean column holds as false.
@@ -239,6 +244,8 @@ fn companions(
         }
         // The format that every dtype of a date or a time takes.
         ("Expr.dt.strftime", _) => vec![("format", Argument::String("iso".to_owned()))],
+        // The keys that a sort by must be given, beside the further keys that are tested.
+        ("Expr.sort_by", Some("more_by")) => vec![("by", expressions(vec![scope.start()]))],
         ("Expr.is_between", Some("lower_bound")) => vec![("upper_bound", own())],
         ("Expr.is_between", Some("upper_bound")) => vec![("lower_bound", own())],
         _ => Vec::new(),

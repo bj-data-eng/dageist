@@ -657,9 +657,11 @@ fn is(call: &Call, id: &str) -> bool {
     call.entry().id().as_str() == id
 }
 
-const ONE_VALUE: [&str; 9] = [
+const ONE_VALUE: [&str; 11] = [
     "Expr.has_nulls",
     "Expr.null_count",
+    "Expr.n_unique",
+    "Expr.count",
     "Expr.str.join",
     "Expr.sum",
     "Expr.min",
