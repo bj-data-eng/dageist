@@ -92,8 +92,9 @@ pub enum Limit {
     ///   replacement replaces, no supertype of two dtypes, a fill by a strategy for a dtype, or
     ///   the plan saying another dtype than the rows give;
     /// - the tables refusing a failed conversion, which Polars allows, of the values a
-    ///   replacement lists, of a cast of a literal, or of a cast that follows a comparison or an
-    ///   arithmetic with a null;
+    ///   replacement lists, of a cast of a literal, of a skew or a kurtosis of one, which convert
+    ///   what they follow to a float, or of a cast that follows a comparison or an arithmetic with
+    ///   a null;
     /// - Polars refusing the empty table, with no place, for an operation not supported, a null
     ///   dtype, or a conversion to `null`;
     /// - Polars refusing the rows, with no place, of an aggregate that holds a quantile, for a
@@ -4166,6 +4167,10 @@ fn applies(
                                         || (starts_from_a_function_of_literals(chain)
                                             && converts_when_selected(&frames, chain, at + 1))
                                 }))
+                                // A skew and a kurtosis convert what they follow to a float, which
+                                // a text literal that reads as a number does.
+                                || ((is(call, "Expr.skew") || is(call, "Expr.kurtosis"))
+                                    && locus.chain.is_some_and(starts_from_a_literal))
                         })
                     })
         }
@@ -4925,6 +4930,44 @@ mod tests {
                 at_the_cast(),
                 "conversion from `date` to `u8` failed in column 'scalar' for 1 out of 1 values: [0001-01-01]"
             ),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_pivot_aggregate_is_excused_for_a_skew_of_a_literal_text_and_not_for_the_values_of_a_group()
+    {
+        // The text literal 1 converts to the float a skew reads, where the tables measured the
+        // sample's text, whose values no float reads.
+        assert_eq!(
+            excused_by_kept("uncovered-a-group-aggregate--a-skew-of-a-literal-text.case"),
+            vec![Limit::AGroupAggregate]
+        );
+        let text = "conversion from `str` to `f64` failed in column 'a' for 2 out of 3 values: [\"1d\", \"2d\"]";
+        let at_the_call = || at(&[parameter("aggregate_function"), Segment::Link(0)]);
+        let one = || call("polars.lit", vec![("value", Value::String("1".to_owned()))]);
+        for entry in ["Expr.skew", "Expr.kurtosis"] {
+            let case = pivot(chain_of(one(), vec![call(entry, Vec::new())]));
+            assert_eq!(
+                refused_by_the_tables_at(&case, at_the_call(), text),
+                vec![Limit::AGroupAggregate],
+                "{entry}"
+            );
+            // The values of a group are no literal: they are what the tables measured.
+            let group = pivot(chain_of(
+                call("polars.element", Vec::new()),
+                vec![call(entry, Vec::new())],
+            ));
+            assert_eq!(
+                refused_by_the_tables_at(&group, at_the_call(), text),
+                vec![],
+                "{entry}"
+            );
+        }
+        // A call that does not convert what it follows is refused for it by no kernel of a group.
+        let running = pivot(chain_of(one(), vec![call("Expr.cum_sum", Vec::new())]));
+        assert_eq!(
+            refused_by_the_tables_at(&running, at_the_call(), text),
             vec![]
         );
     }
