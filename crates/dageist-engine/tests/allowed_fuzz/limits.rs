@@ -6578,9 +6578,14 @@ mod tests {
             "polars.time",
             vec![("microsecond", Value::Expression(part))],
         );
+        counting(chain_of(time, Vec::new()))
+    }
+
+    /// `select(polars.from_epoch(counted))`.
+    fn counting(counted: Expression) -> Case {
         let epoch = call(
             "polars.from_epoch",
-            vec![("column", Value::Expression(chain_of(time, Vec::new())))],
+            vec![("column", Value::Expression(counted))],
         );
         select(vec![chain_of(epoch, Vec::new())])
     }
@@ -6623,6 +6628,33 @@ mod tests {
                 said
             ),
             vec![Limit::AShiftThatLeavesNulls]
+        );
+    }
+
+    #[test]
+    fn a_drop_of_only_nulls_leaves_nothing_to_meet_and_a_drop_of_numbers_does_not() {
+        assert_eq!(
+            excused_by_kept("uncovered-a-shift-that-leaves-nulls--a-drop-of-only-nulls.case"),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        let at_the_start = || at(&[parameter("exprs"), Segment::Item(0), Segment::Start]);
+        let said = "casting from Time to Datetime('μs') not supported; consider using `dt.combine`";
+        let dropped = |part: &str| {
+            counting(chain_of(
+                call(
+                    "polars.time",
+                    vec![("microsecond", Value::Expression(chain(column(part), &[])))],
+                ),
+                vec![call("Expr.drop_nulls", Vec::new())],
+            ))
+        };
+        assert_eq!(
+            tables_refuse(&dropped("g"), at_the_start(), ROWS, said),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        assert_eq!(
+            tables_refuse(&dropped("u"), at_the_start(), ROWS, said),
+            vec![]
         );
     }
 
