@@ -46,8 +46,9 @@ pub enum Rule {
     ReplacementValuesMatchInNumber,
     /// A time zone is one Polars reads: a name of the time zone database, or a fixed offset.
     TimeZoneIsValid,
-    /// The operands of a comparison, a difference, a fill and the bounds of an interval, where they are
-    /// moments, are in one time zone: Polars finds no dtype that two zones have in common.
+    /// The operands of a comparison, a difference, a fill and the bounds of an interval, the values of
+    /// a condition, and the new values of a replacement and its default, where they are moments, are in
+    /// one time zone: Polars finds no dtype that two zones have in common.
     MomentsShareAZone,
     /// A window is given a value as long as its input, which a value of one row that a part widens is
     /// not.
@@ -120,7 +121,7 @@ impl Rule {
                 "a window takes a value as long as its input, and a value of one row that a part widens, as dt.replace's parts do, is not: Polars refuses the length of its output"
             }
             Self::MomentsShareAZone => {
-                "moments that are compared, subtracted, filled or bound by one another must be in one time zone: Polars finds no dtype that two zones have in common"
+                "moments that are compared, subtracted, filled, bound by one another, or given as the values of a condition or as a replacement's new values and default, must be in one time zone: Polars finds no dtype that two zones have in common, and fails where a shift is filled with a moment of another zone"
             }
             Self::PatternIsValid => "a pattern must be a valid regular expression",
             Self::ReplacementValuesMatchInNumber => {

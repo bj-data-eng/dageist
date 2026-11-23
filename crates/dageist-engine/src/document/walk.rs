@@ -290,6 +290,8 @@ enum Cur {
     Condition {
         state: ConditionState,
         values: Vec<Valued>,
+        /// The zone of each value, where it is a moment whose zone is known, in the order of `values`.
+        zones: Vec<Option<Zone>>,
         /// Whether every predicate and value so far gives one value, which a
         /// condition of them gives too.
         single: bool,
@@ -868,23 +870,67 @@ impl Walker<'_> {
         arguments: &[(String, Operand)],
         receiver: Option<Zone>,
     ) -> Option<(String, String)> {
-        let Some(Zone::Named(first)) = receiver else {
+        let zone_of = |name: &str| {
+            arguments
+                .iter()
+                .find(|(given, _)| given == name)
+                .and_then(|(_, operand)| operand.zone)
+        };
+        let differ = |first: Option<Zone>, second: Option<Zone>| match (first, second) {
+            (Some(Zone::Named(first)), Some(Zone::Named(second))) if first != second => {
+                Some((self.zones[first].clone(), self.zones[second].clone()))
+            }
+            _ => None,
+        };
+        entry.parameters().iter().find_map(|parameter| {
+            let own = zone_of(parameter.name())?;
+            // An operand is met with the value it follows, as a comparison, a difference, a fill and
+            // the bounds of an interval are; a parameter that shares a dtype with another is met with
+            // that one, as the default of a replacement is with its new values, and the value it
+            // follows is no matter.
+            if matches!(parameter.role(), Role::Operand | Role::Filler)
+                && let Some(clash) = differ(receiver, Some(own))
+            {
+                return Some(clash);
+            }
+            let partner = parameter.shares_a_dtype_with()?;
+            differ(zone_of(partner), Some(own))
+        })
+    }
+
+    /// The names of two zones of the values a condition has when this link ends it, where both are
+    /// known and they differ: Polars finds no dtype that the moments of two zones have in common.
+    fn condition_zone_clash(
+        &self,
+        entry: &Entry,
+        cur: &Cur,
+        arguments: &[(String, Operand)],
+    ) -> Option<(String, String)> {
+        if !matches!(
+            entry.id().as_str(),
+            "Then.otherwise" | "ChainedThen.otherwise"
+        ) {
+            return None;
+        }
+        let Cur::Condition { zones, .. } = cur else {
             return None;
         };
-        arguments.iter().find_map(|(name, operand)| {
-            let parameter = entry
-                .parameters()
-                .iter()
-                .find(|parameter| parameter.name() == name)?;
-            let meets = matches!(parameter.role(), Role::Operand | Role::Filler)
-                || parameter.shares_a_dtype_with().is_some();
-            match operand.zone {
-                Some(Zone::Named(second)) if meets && second != first => {
-                    Some((self.zones[first].clone(), self.zones[second].clone()))
-                }
+        let last = arguments
+            .iter()
+            .find(|(name, _)| name == "statement")
+            .and_then(|(_, operand)| operand.zone);
+        let known: Vec<usize> = zones
+            .iter()
+            .copied()
+            .chain(std::iter::once(last))
+            .filter_map(|zone| match zone {
+                Some(Zone::Named(at)) => Some(at),
                 _ => None,
-            }
-        })
+            })
+            .collect();
+        let first = *known.first()?;
+        let other = known.iter().find(|at| **at != first)?;
+        Some((self.zones[first].clone(), self.zones[*other].clone()))
     }
 
     /// The zone the walk holds under `name`.
@@ -1017,6 +1063,7 @@ impl Walker<'_> {
                             Cur::Condition {
                                 state: ConditionState::When,
                                 values: Vec::new(),
+                                zones: Vec::new(),
                                 single: start_arguments
                                     .iter()
                                     .all(|(_, operand)| operand.shape == Shape::One),
@@ -1299,7 +1346,9 @@ impl Walker<'_> {
         }
         // Moments in two zones that a method is given to compare, subtract, fill or bind by one
         // another have no dtype in common.
-        let clash = self.zone_clash(entry, arguments, zone);
+        let clash = self
+            .zone_clash(entry, arguments, zone)
+            .or_else(|| self.condition_zone_clash(entry, &cur, arguments));
         let clash_of_zones = clash
             .as_ref()
             .map(|(first, second)| (first.as_str(), second.as_str()));
@@ -1620,6 +1669,7 @@ impl Walker<'_> {
                 Applies::Condition,
                 Cur::Condition {
                     mut values,
+                    mut zones,
                     single,
                     values_single,
                     known,
@@ -1632,10 +1682,12 @@ impl Walker<'_> {
                 let state = match entry.id().as_str() {
                     "When.then" => {
                         values.push(statement_class);
+                        zones.push(statement.and_then(|operand| operand.zone));
                         ConditionState::Then
                     }
                     "ChainedWhen.then" => {
                         values.push(statement_class);
+                        zones.push(statement.and_then(|operand| operand.zone));
                         ConditionState::ChainedThen
                     }
                     "Then.when" | "ChainedThen.when" => ConditionState::ChainedWhen,
@@ -1668,6 +1720,7 @@ impl Walker<'_> {
                 Cur::Condition {
                     state,
                     values,
+                    zones,
                     single,
                     values_single,
                     known,

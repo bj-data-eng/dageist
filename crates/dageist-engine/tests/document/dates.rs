@@ -4,6 +4,7 @@
 
 use dageist_engine::allowed::{RefusalSource, Representative};
 use dageist_engine::document::{Document, Outcome, Report, RunCause, Segment, StepId, StepRows};
+use polars::prelude::IntoLazy;
 use serde_json::{Value, json};
 
 use crate::claims::{claims, inputs};
@@ -568,6 +569,12 @@ fn moments_in_different_zones_are_no_operands_of_a_comparison_a_difference_or_a_
         ("Expr.le", "other"),
         ("Expr.eq", "other"),
         ("Expr.eq_missing", "other"),
+        ("Expr.ne_missing", "other"),
+        ("Expr.ne", "other"),
+        ("Expr.lt", "other"),
+        ("Expr.gt", "other"),
+        ("Expr.ge", "other"),
+        ("Expr.is_between", "lower_bound"),
         ("Expr.sub", "other"),
         ("Expr.fill_null", "value"),
     ] {
@@ -697,7 +704,12 @@ fn the_values_of_a_condition_and_a_fill_value_are_moments_in_one_zone() {
         "Expr.shift",
         json!({ "fill_value": moment_in("UTC") }),
     ));
-    let report = report_of(&selecting(moments_then_all(links)));
+    // Polars panics when it runs the rows of such a fill, so the step is only run on the schema.
+    let written = selecting(moments_then_all(links));
+    let report = Document::read(&written)
+        .expect("a document")
+        .run(&inputs(), claims().lazy())
+        .expect("the claims have a schema");
     refused_for_the_zones(&report, "shift", &["Europe/Berlin", "UTC"]);
 }
 
