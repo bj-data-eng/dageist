@@ -97,7 +97,12 @@ pub enum Limit {
     /// - Polars refusing the empty table, with no place, for an operation not supported, a null
     ///   dtype, or a conversion to `null`.
     ///
-    /// None has a control that a rerun of Polars could give: the cause is that the group's
+    /// A cast of a value that literals alone make, by a function that makes a date, a moment or a
+    /// length of time of them, is one too where the same chain through the cast, run in a select on
+    /// the sample, is converted without a failure: it converts a null or a number that no group's
+    /// text is.
+    ///
+    /// None of the others has a control that a rerun of Polars could give: the cause is that the group's
     /// kernels run what `select` refuses or converts otherwise, which no case in `select` shows,
     /// so the gate is the pivot and the reason, and the kept cases and tests state each.
     AGroupAggregate,
@@ -1650,6 +1655,57 @@ fn leaves_only_nulls(
         .is_some_and(|rows| !rows.is_empty() && rows.iter().all(|cell| *cell == Cell::Null))
 }
 
+/// Whether `expression` starts from a function that makes a value of what it is given, as the
+/// ones that make a date, a moment or a length of time do, and what it is given reads no column and
+/// no group's values: the value is made of literals alone.
+fn starts_from_a_function_of_literals(expression: &Expression) -> bool {
+    matches!(expression.start(), Start::Call(start)
+    if start.entry().applies() == catalog::Applies::Function
+        && !is(start, "polars.col")
+        && !is(start, "polars.lit")
+        && !is(start, "polars.element")
+        && !operands(start).is_empty()
+        && !operands(start).into_iter().any(|(_, operand)| {
+            any_call(operand, &|call| is(call, "polars.col") || is(call, "polars.element"))
+        }))
+}
+
+/// Whether the first `upto` links of `expression`, run alone in a select on the sample, are
+/// converted without a failure: Polars then makes the value and the conversion where no group
+/// is, so a group's kernels are no cause. A select that Polars refuses is no proof.
+fn converts_when_selected(frames: &Frames, expression: &Expression, upto: usize) -> bool {
+    let Ok(part) = Expression::new(
+        expression.start().clone(),
+        expression.links()[..upto.min(expression.links().len())].to_vec(),
+    ) else {
+        return false;
+    };
+    let (Some(select), Ok(id)) = (catalog::entry("LazyFrame.select"), StepId::new("s")) else {
+        return false;
+    };
+    let Ok(call) = Call::new(
+        select,
+        vec![(
+            "named_exprs",
+            Value::Pairs(vec![(
+                Value::Columns(vec!["out".to_owned()]),
+                Value::Expression(part),
+            )]),
+        )],
+    ) else {
+        return false;
+    };
+    let Ok(step) = Step::new(id.clone(), call) else {
+        return false;
+    };
+    let Ok(document) = Document::new(vec![step]) else {
+        return false;
+    };
+    document
+        .preview(&frames.inputs(false), &frames.rows, &id, 100)
+        .is_ok()
+}
+
 /// Whether Polars gives a null in each row of the left table for the first `upto` links of
 /// `expression`, which is run alone in a select on the sample: a call that the rows the target
 /// follows know nothing of, as a slice by an offset that is no number, may give only nulls.
@@ -2263,26 +2319,87 @@ fn is_a_failed_conversion_of_text(reason: &str) -> bool {
     is_a_failed_conversion(reason) && reason.starts_with("conversion from `str` to `")
 }
 
-/// Whether the call is a `dt.replace` whose parts are each a literal of text, as `"1"` is, which
+/// Whether the expression is a literal of text, as `"1"` is, and nothing more.
+fn is_a_literal_of_text(expression: &Expression) -> bool {
+    expression.links().is_empty()
+        && matches!(expression.start(), Start::Call(start)
+            if is(start, "polars.lit")
+                && (matches!(start.argument("value"), Some(Value::String(_)))
+                    || matches!(start.argument("dtype"), Some(Value::Dtype(dtype)) if dtype.to_string() == "String")))
+}
+
+/// Whether the call is given parts that are each a literal, one of them of text, as `"1"` is, which
 /// Polars converts to the number where the plan is made, whether or not it evaluates the part,
 /// where the tables, which measured a column of text that is none, refuse it. A part that is a
-/// column of text is not one: Polars converts it when it evaluates the part, which it may not.
-fn is_given_only_literals_of_text(call: &Call) -> bool {
-    let literal_of_text = |expression: &Expression| {
-        expression.links().is_empty()
-            && matches!(expression.start(), Start::Call(start)
-                if is(start, "polars.lit")
-                    && (matches!(start.argument("value"), Some(Value::String(_)))
-                        || matches!(start.argument("dtype"), Some(Value::Dtype(dtype)) if dtype.to_string() == "String")))
+/// column or a chain is not one: Polars converts it when it evaluates the part, which it may not.
+fn is_given_only_literals_one_of_text(call: &Call) -> bool {
+    let literal = |expression: &Expression| {
+        is_a_literal_of_text(expression)
+            || (expression.links().is_empty()
+                && matches!(expression.start(), Start::Call(start) if is(start, "polars.lit")))
     };
+    let mut text = false;
     is_given_a_part_of_a_date(call)
         && PARTS_OF_A_DATE
             .iter()
             .all(|part| match call.argument(part) {
-                Some(Value::Expression(expression)) => literal_of_text(expression),
+                Some(Value::Expression(expression)) => {
+                    text |= is_a_literal_of_text(expression);
+                    literal(expression)
+                }
                 Some(_) => false,
                 None => true,
             })
+        && text
+}
+
+/// The case with each part that a call is given that is a literal of text made the literal
+/// `value`, and the other parts as they are.
+fn case_with_the_text_parts_as(case: &Case, value: Value) -> Option<Case> {
+    let literal = Expression::new(
+        Start::Call(Call::new(catalog::entry("polars.lit")?, vec![("value", value)]).ok()?),
+        Vec::new(),
+    )
+    .ok()?;
+    case_changed(case, &|call| {
+        if !is_given_a_part_of_a_date(call) {
+            return None;
+        }
+        let given: Vec<(&str, Value)> = call
+            .arguments()
+            .iter()
+            .map(|given| {
+                let value = match given.value() {
+                    Value::Expression(part)
+                        if PARTS_OF_A_DATE.contains(&given.parameter())
+                            && is_a_literal_of_text(part) =>
+                    {
+                        Value::Expression(literal.clone())
+                    }
+                    other => other.clone(),
+                };
+                (given.parameter(), value)
+            })
+            .collect();
+        Call::new(call.entry(), given).ok()
+    })
+}
+
+/// Whether Polars refuses the case for what `reason` says with each literal of text that a part is
+/// made the text `x`, which no part reads as a number: it then evaluates the part, and what it
+/// refuses is a cause. `None` where no call is given a part.
+fn refused_for_a_text_part_as_x(case: &Case, reason: fn(&str) -> bool) -> Option<bool> {
+    changed(
+        case_with_the_text_parts_as(case, Value::String("x".to_owned())),
+        case,
+    )
+    .map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| reason(&refusal.reason))
+        })
+    })
 }
 
 /// The case with each part that a call is given made the literal `value`.
@@ -3701,14 +3818,11 @@ fn applies(
                 } else if is_a_failed_conversion_of_text(&refused.reason)
                     && locate(case, &refused.place)
                         .call
-                        .is_some_and(is_given_only_literals_of_text)
+                        .is_some_and(is_given_only_literals_one_of_text)
                 {
                     the_tables_stop_refusing_the_parts_as_ones(case, is_a_failed_conversion_of_text)
-                        && refused_for_a_part_with(
-                            case,
-                            Value::String("x".to_owned()),
-                            is_a_failed_conversion_of_text,
-                        ) == Some(true)
+                        && refused_for_a_text_part_as_x(case, is_a_failed_conversion_of_text)
+                            == Some(true)
                 } else {
                     false
                 }
@@ -3871,6 +3985,7 @@ fn applies(
                     || refusal.reason.contains("` to `null` failed"))
         }
         (Limit::AGroupAggregate, Disagreement::PolarsAllows(refused)) => {
+            let frames = Frames::with_key(case.receiver, case.argument, None);
             // The kernels that take the values of a group accept what the ones of
             // `select` refuse: a dtype of an aggregate, a comparison, a cast, a
             // struct, or a window over a group.
@@ -3912,6 +4027,8 @@ fn applies(
                                 && locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
                                     starts_from_a_literal(chain)
                                         || chain.links()[..at].iter().any(compares_with_a_null)
+                                        || (starts_from_a_function_of_literals(chain)
+                                            && converts_when_selected(&frames, chain, at + 1))
                                 }))
                         })
                     })
@@ -8864,7 +8981,7 @@ mod tests {
         let column_part = replacing("day", chain(column("b"), &[]));
         assert!(!any_call_in_step(
             column_part.document.steps()[0].call(),
-            &is_given_only_literals_of_text
+            &is_given_only_literals_one_of_text
         ));
         for text in ["1", "x"] {
             let literal = replacing(
@@ -8879,7 +8996,7 @@ mod tests {
             );
             assert!(any_call_in_step(
                 literal.document.steps()[0].call(),
-                &is_given_only_literals_of_text
+                &is_given_only_literals_one_of_text
             ));
         }
         let none = select(vec![chain(column("a"), &["Expr.cum_sum"])]);
