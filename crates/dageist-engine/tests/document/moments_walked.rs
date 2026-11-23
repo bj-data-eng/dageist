@@ -315,3 +315,24 @@ fn a_moment_or_a_length_of_time_of_numbers_typed_in_is_no_join_key_because_polar
         assert_eq!(walk.refusal(), None, "{function} {arguments}");
     }
 }
+
+#[test]
+fn what_a_function_gives_is_not_said_where_the_dtype_of_an_argument_is_not_known() {
+    // A column the table does not have has no dtype, so the tables are not asked of the argument,
+    // and Polars, which may refuse the argument for its dtype, is not said to give a date.
+    let walk = walk_of(
+        "polars.date",
+        json!({ "year": whole(2026), "month": whole(1), "day": field("missing") }),
+    );
+    assert_eq!(gives(&walk), None);
+    assert!(walk.not_known().is_some());
+    // Where every argument is known, it is.
+    let known = walk_of(
+        "polars.date",
+        json!({ "year": whole(2026), "month": whole(1), "day": field("k") }),
+    );
+    assert_eq!(
+        gives(&known),
+        select_after(Representative::Date, Shape::Many)
+    );
+}
