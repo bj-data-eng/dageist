@@ -355,6 +355,8 @@ fn polars_words(rule: &str) -> &'static [&'static str] {
             "is not allowed in this context",
         ],
         "join-key-names-are-not-repeated" => &["repeated key names"],
+        // Polars makes a literal of a moment of numbers typed in and names it by an alias.
+        "folded-function-is-no-join-key" => &["'alias' is not allowed in a join key"],
         // The engine words a pattern it refuses with Polars' own words after its own, and
         // Polars words every refusal of a regular expression, which a size limit is one of,
         // as a regex error.

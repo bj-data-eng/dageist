@@ -491,6 +491,32 @@ fn first_part_name(start: &Call, first: &str, parts: &[&str], may_fold: bool) ->
     }
 }
 
+/// Whether Polars folds the call into a literal, which it names by an alias: a moment, with no
+/// zone, or a length of time whose every part is a number typed in, given or left to the number 0.
+/// The values may stop it, which the document does not decide: a month of 13 is no moment, and
+/// Polars then keeps the call and refuses it when the rows run.
+fn is_folded_into_a_literal(start: &Call) -> bool {
+    let (parts, zoned): (&[&str], bool) = match start.entry().id().as_str() {
+        "polars.datetime" => (
+            &PARTS_OF_A_MOMENT,
+            matches!(start.argument("time_zone"), Some(Value::TimeZone(Some(_)))),
+        ),
+        "polars.duration" => (&PARTS_OF_A_LENGTH, false),
+        _ => return false,
+    };
+    let a_number = |value: Option<&Value>| match value {
+        None => true,
+        Some(Value::Expression(part)) => {
+            part.links().is_empty()
+                && matches!(part.start(), Start::Call(call)
+                    if call.entry().id().as_str() == "polars.lit"
+                        && matches!(call.argument("value"), Some(Value::Integer(_) | Value::Float(_))))
+        }
+        Some(_) => false,
+    };
+    !zoned && parts.iter().all(|part| a_number(start.argument(part)))
+}
+
 /// The word of a flag or a choice, as the option table writes it.
 fn option_word(value: &Value) -> Option<String> {
     match value {
@@ -1190,11 +1216,14 @@ impl Walker<'_> {
                 } else {
                     chosen
                 };
-                let verdict = allowed::offer(
-                    start.entry(),
-                    &OfferPlace::new(context, After::Start),
-                    &chosen,
-                );
+                let verdict = match allowed::rule_forbids_a_folded_function_in_a_join_key(context) {
+                    Err(refusal) if is_folded_into_a_literal(start) => Verdict::Refused(refusal),
+                    _ => allowed::offer(
+                        start.entry(),
+                        &OfferPlace::new(context, After::Start),
+                        &chosen,
+                    ),
+                };
                 match &verdict {
                     Verdict::Refused(refusal) => self.refuse(refusal, false),
                     Verdict::Allowed(allowance) => {

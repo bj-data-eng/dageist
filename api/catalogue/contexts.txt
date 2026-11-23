@@ -49,6 +49,7 @@
 #   duration-is-valid: a duration typed in must be a duration string Polars reads.
 #   element-only-in-pivot-aggregate: `polars.element` stands only in a pivot's aggregate.
 #   filter-predicate-is-boolean: a filter's predicate must be Boolean.
+#   folded-function-is-no-join-key: a moment or a length of time made of numbers typed in is folded by Polars into a literal named by an alias, which a join's key may not hold: give it a column among its parts, or make it in a step before the join.
 #   join-key-names-are-not-repeated: a join may not pair the same two output column names twice: where two keys on one side are named alike, the keys they are paired with must be named differently.
 #   key-is-elementwise: a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a column be compared with a null, nor a replacement take a value that reads a column.
 #   moments-share-a-zone: moments that are compared, subtracted, filled, bound by one another, or given as the values of a condition or as a replacement's new values and default, must be in one time zone: Polars finds no dtype that two zones have in common, and fails where a shift is filled with a moment of another zone.
@@ -10406,8 +10407,8 @@ polars.datetime | join_left > over.order_by | continues | - | - | - | refused sc
 polars.datetime | join_left > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.datetime | join_left > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.datetime | join_left > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-polars.datetime | join_left | continues | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Datetime(us) many
-polars.datetime | join_left | ends | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Datetime(us) many
+polars.datetime | join_left | continues | - | - | folded-function-is-no-join-key,join-key-names-are-not-repeated,key-is-elementwise | allowed Datetime(us) many
+polars.datetime | join_left | ends | - | - | folded-function-is-no-join-key,join-key-names-are-not-repeated,key-is-elementwise | allowed Datetime(us) many
 polars.datetime | join_right > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Datetime(us) many
 polars.datetime | join_right > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs]` for series with name `datetime`
 polars.datetime | join_right > condition.value | continues | - | - | - | allowed Datetime(us) many
@@ -10416,8 +10417,8 @@ polars.datetime | join_right > over.order_by | continues | - | - | - | refused s
 polars.datetime | join_right > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.datetime | join_right > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.datetime | join_right > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-polars.datetime | join_right | continues | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Datetime(us) many
-polars.datetime | join_right | ends | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Datetime(us) many
+polars.datetime | join_right | continues | - | - | folded-function-is-no-join-key,join-key-names-are-not-repeated,key-is-elementwise | allowed Datetime(us) many
+polars.datetime | join_right | ends | - | - | folded-function-is-no-join-key,join-key-names-are-not-repeated,key-is-elementwise | allowed Datetime(us) many
 polars.datetime | pivot_aggregate > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Datetime(us) many
 polars.datetime | pivot_aggregate > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `datetime[μs]` for series with name `datetime`
 polars.datetime | pivot_aggregate > condition.value | continues | - | - | - | allowed Datetime(us) many
@@ -10466,8 +10467,8 @@ polars.duration | join_left > over.order_by | continues | - | - | - | refused sc
 polars.duration | join_left > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.duration | join_left > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.duration | join_left > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-polars.duration | join_left | continues | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Duration(us) many
-polars.duration | join_left | ends | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Duration(us) many
+polars.duration | join_left | continues | - | - | folded-function-is-no-join-key,join-key-names-are-not-repeated,key-is-elementwise | allowed Duration(us) many
+polars.duration | join_left | ends | - | - | folded-function-is-no-join-key,join-key-names-are-not-repeated,key-is-elementwise | allowed Duration(us) many
 polars.duration | join_right > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Duration(us) many
 polars.duration | join_right > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `duration[μs]` for series with name `literal`
 polars.duration | join_right > condition.value | continues | - | - | - | allowed Duration(us) many
@@ -10476,8 +10477,8 @@ polars.duration | join_right > over.order_by | continues | - | - | - | refused s
 polars.duration | join_right > over.order_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.duration | join_right > over.partition_by | continues | - | - | - | refused schema: all join key expressions must be elementwise.
 polars.duration | join_right > over.partition_by | ends | - | - | - | refused schema: all join key expressions must be elementwise.
-polars.duration | join_right | continues | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Duration(us) many
-polars.duration | join_right | ends | - | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Duration(us) many
+polars.duration | join_right | continues | - | - | folded-function-is-no-join-key,join-key-names-are-not-repeated,key-is-elementwise | allowed Duration(us) many
+polars.duration | join_right | ends | - | - | folded-function-is-no-join-key,join-key-names-are-not-repeated,key-is-elementwise | allowed Duration(us) many
 polars.duration | pivot_aggregate > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed Duration(us) many
 polars.duration | pivot_aggregate > condition.predicate | ends | - | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `duration[μs]` for series with name `literal`
 polars.duration | pivot_aggregate > condition.value | continues | - | - | - | allowed Duration(us) many

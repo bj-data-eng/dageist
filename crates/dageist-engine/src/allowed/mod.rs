@@ -59,8 +59,9 @@ pub(crate) use offers::same_for_any_number;
 pub use offers::{
     After, Allowance, Chosen, ConditionState, Ending, Offer, Place, Refusal, RefusalSource,
     Unknown, Verdict, argument_dtypes, offer, offer_input, offers, options, rule_forbids,
-    rule_forbids_a_key_known_not_elementwise, rule_forbids_a_repeated_pair_of_key_names,
-    rule_forbids_a_window_over_a_widened_value, rule_forbids_replacement_values_of_other_numbers,
+    rule_forbids_a_folded_function_in_a_join_key, rule_forbids_a_key_known_not_elementwise,
+    rule_forbids_a_repeated_pair_of_key_names, rule_forbids_a_window_over_a_widened_value,
+    rule_forbids_replacement_values_of_other_numbers,
 };
 pub use rules::Rule;
 pub use table::{Outcome, Produces, Reason, Shape, Stage};

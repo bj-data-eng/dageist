@@ -1214,6 +1214,18 @@ pub fn rule_forbids_replacement_values_of_other_numbers() -> Result<(), Refusal>
     Err(Refusal::rule(Rule::ReplacementValuesMatchInNumber))
 }
 
+/// The refusal of a moment or a length of time made of numbers typed in, which the caller has found,
+/// where `context` holds one of a join's own keys, if the rule refuses it there. Polars makes a
+/// literal of such a call and names it by an alias, which a key may not hold.
+///
+/// # Errors
+///
+/// The rule, as a refusal that says it in its words.
+pub fn rule_forbids_a_folded_function_in_a_join_key(context: Context) -> Result<(), Refusal> {
+    Rule::forbids_a_folded_function_in_a_key(context)
+        .map_or(Ok(()), |rule| Err(Refusal::rule(rule)))
+}
+
 /// The refusal of a window given a value of one row that a part widens, which the caller has found.
 ///
 /// # Errors

@@ -28,6 +28,9 @@ pub enum Rule {
     FilterPredicateIsBoolean,
     /// `polars.element` stands only in a pivot's aggregate.
     ElementOnlyInPivotAggregate,
+    /// A moment or a length of time made of numbers typed in is no join's key: Polars makes a
+    /// literal of the call and names it by an alias, which a key may not hold.
+    FoldedFunctionIsNoJoinKey,
     /// A join pairs no two output column names twice: the keys of each side
     /// are named by the column they read, and a key that repeats the name of
     /// an earlier one, beside a key on the other side that repeats the name it
@@ -57,11 +60,12 @@ pub enum Rule {
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 13] = [
         Self::ConditionPredicateIsBoolean,
         Self::DurationIsValid,
         Self::ElementOnlyInPivotAggregate,
         Self::FilterPredicateIsBoolean,
+        Self::FoldedFunctionIsNoJoinKey,
         Self::JoinKeyNamesAreNotRepeated,
         Self::KeyIsElementwise,
         Self::MomentsShareAZone,
@@ -81,6 +85,7 @@ impl Rule {
             Self::DurationIsValid => "duration-is-valid",
             Self::ElementOnlyInPivotAggregate => "element-only-in-pivot-aggregate",
             Self::FilterPredicateIsBoolean => "filter-predicate-is-boolean",
+            Self::FoldedFunctionIsNoJoinKey => "folded-function-is-no-join-key",
             Self::JoinKeyNamesAreNotRepeated => "join-key-names-are-not-repeated",
             Self::KeyIsElementwise => "key-is-elementwise",
             Self::MomentsShareAZone => "moments-share-a-zone",
@@ -109,6 +114,9 @@ impl Rule {
                 "`polars.element` stands only in a pivot's aggregate"
             }
             Self::FilterPredicateIsBoolean => "a filter's predicate must be Boolean",
+            Self::FoldedFunctionIsNoJoinKey => {
+                "a moment or a length of time made of numbers typed in is folded by Polars into a literal named by an alias, which a join's key may not hold: give it a column among its parts, or make it in a step before the join"
+            }
             Self::JoinKeyNamesAreNotRepeated => {
                 "a join may not pair the same two output column names twice: where two keys on one side are named alike, the keys they are paired with must be named differently"
             }
@@ -140,6 +148,9 @@ impl Rule {
             Self::ElementOnlyInPivotAggregate => entry == "polars.element",
             Self::PivotAggregateGivesOneValue => context == Context::step(Outer::PivotAggregate),
             Self::JoinKeyNamesAreNotRepeated | Self::KeyIsElementwise => context.is_join_key(),
+            Self::FoldedFunctionIsNoJoinKey => {
+                context.is_join_key() && matches!(entry, "polars.datetime" | "polars.duration")
+            }
             // A matter of the values a call is given, whatever context it stands in.
             Self::DurationIsValid
             | Self::MomentsShareAZone
@@ -178,6 +189,16 @@ impl Rule {
     #[must_use]
     pub(super) fn forbids_non_elementwise_key(context: Context) -> Option<Self> {
         context.is_join_key().then_some(Self::KeyIsElementwise)
+    }
+
+    /// The rule that forbids a moment or a length of time made of numbers typed in, where
+    /// `context` is a join's own key, if it does. Whether the call is made of nothing else is a
+    /// matter of its arguments, which the caller found.
+    #[must_use]
+    pub(super) fn forbids_a_folded_function_in_a_key(context: Context) -> Option<Self> {
+        context
+            .is_join_key()
+            .then_some(Self::FoldedFunctionIsNoJoinKey)
     }
 
     /// The rule that forbids a join's keys to repeat a pair of output names,
@@ -239,6 +260,7 @@ impl Rule {
             }
             Self::PivotAggregateGivesOneValue
             | Self::ElementOnlyInPivotAggregate
+            | Self::FoldedFunctionIsNoJoinKey
             | Self::JoinKeyNamesAreNotRepeated
             | Self::KeyIsElementwise
             | Self::DurationIsValid
