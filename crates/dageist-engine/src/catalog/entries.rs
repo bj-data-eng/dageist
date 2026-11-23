@@ -1678,7 +1678,7 @@ fn frame_gather_every(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFra
 }
 
 fn frame_reverse(frame: LazyFrame, _: &Arguments) -> Result<LazyFrame, BuildError> {
-    Ok(frame.reverse())
+    Ok(height_preserving(frame, LazyFrame::reverse))
 }
 
 /// As Python's `drop` takes its columns: by name, each name read as a pattern where it is one, and

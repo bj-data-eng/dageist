@@ -587,7 +587,7 @@ What Polars does with each is what the document tests say, and some of it is not
   and so on, of every column. Polars refuses an `n` of zero when it runs rows. Python runs it, as it runs
   every step that selects over every column, beside a column of its own that holds an empty struct for each
   row and is dropped after, so that a table of no columns keeps the height it gathers, and the build does
-  the same.
+  the same. It runs `reverse` that way too, so a reverse of no columns keeps its rows.
 - `drop` takes its columns by name, as Python's `*columns` does, each name read as a pattern where it is
   one, and refuses a name the table lacks only where `strict` is true. Dropping every column leaves a
   table with no column and the rows it had.
