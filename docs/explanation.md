@@ -593,22 +593,26 @@ What Polars does with each is what the tables say, and some of it is not what a 
 - `quantile` takes a share and an `interpolation`, `nearest` unless it is given one of its six words. The share
   is an expression of one value: Polars refuses many values with "polars does not support varying quantiles yet",
   and a value outside 0 to 1 or a null when the rows run, so the tables measure it as the number 1 of the dtype it
-  has, as they do `shift`'s rows, and the fuzz target draws it so. A number typed in is the number it is,
-  whatever the value the method follows is, so the share has a role of its own. It takes the numeric dtypes
-  only: Polars reads a text or a moment as the share it writes in a select, and refuses it where a window or a
-  pivot's aggregate evaluates the values of a group, which the tables do not measure, so the editor offers a
-  number and the fuzz target draws one. It takes numbers and the
-  temporal dtypes, gives a `Float64` or the narrow float it follows, and gives a moment, a time of day or a length of time for
-  one, and refuses a `Boolean` and text. A quantile of a `Date` panics in Polars when the table has no rows,
-  which the tables run too, so they refuse it. Python also takes a list of shares, for which the quantile is a
-  list of values: a list of literals is a kind that waits, and a share that is a list is refused by the tables,
+  has, as they do `shift`'s rows, and the fuzz target draws it so. A number typed in as the share is the number it
+  is, whatever the value the method follows is, so the share has a role of its own. The share takes the numeric
+  dtypes only: Polars reads a text or a moment as the share it writes in a select, and refuses it where a window or
+  a pivot's aggregate evaluates the values of a group, which the tables do not measure, so the editor offers a
+  number and the fuzz target draws one. The value the quantile follows takes numbers and the temporal dtypes, and
+  the quantile gives a `Float64` or the narrow float it follows, and a moment, a time of day or a length of time
+  for one of those; it refuses a `Boolean` and text. A quantile of a `Date` panics in Polars when the table has no
+  rows, which the tables run too, so they refuse it. Python also takes a list of shares, for which the quantile is
+  a list of values: a list of literals is a kind that waits, and a share that is a list is refused by the tables,
   which measured it as a number.
 - `approx_quantile` takes the same share, with `method` of five words, `error`, which Polars refuses unless it is
-  from 2^-32 up to but not including 1, and `error_tightness`. It keeps the dtype of what it follows, whole
-  numbers, booleans, text and moments included, and refuses a `Null`, lists, arrays and structs. Unlike the exact quantile it
-  meets a column of shares and gives one value for each of them, so it broadcasts, which the broadcast test measures with a
-  column of shares made from the sample's, for the sample's own numbers are no share. The tables measure it
-  with the number 1, as they do the exact one.
+  from 2^-32 up to but not including 1, and `error_tightness`. It keeps the dtype of the value it follows, whole
+  numbers, booleans, text and moments included, and refuses a `Null`, lists, arrays and structs. Unlike the exact
+  quantile, on the streaming engine, which is the engine steps run on, `approx_quantile` meets a column of shares
+  and gives one value for each of them, so it broadcasts, which the broadcast test measures with a column of shares
+  made from the sample's, for the sample's own numbers are no share. Python's in-memory engine refuses a column of
+  shares for it as it does for the exact quantile. The tables measure the share as the number 1, as they do the
+  exact one's. On the streaming engine the approximate quantile of a literal is refused, with a null quantile, where
+  it stands in a value of a condition's branch or in the predicate of a `when` after the first, and not in a select, a
+  filter, a sort key, a join key, a window or the predicate of the first `when`: a limit covers it.
 - `arg_max` and `arg_min` give the row of the first largest or smallest value as a `UInt32` and take every
   dtype; a null is neither. `nan_max` and `nan_min` give what `max` and `min` give, except that a NaN is the
   largest or the smallest where the values hold one. `any` and `all` give a `Boolean`
@@ -1756,7 +1760,7 @@ asserts none of those.
 | A moment beyond the range of a unit | `dt.cast_time_unit` to nanoseconds multiplies the count of a moment, and Polars refuses one outside the years that nanoseconds hold, such as the first of January of the year 1, when the rows run. The tables measured moments of 1970 and after. Polars refusing the rows or the empty table with the refusal that a conversion to a moment counted in nanoseconds failed, which has no place, in a case with a `dt.cast_time_unit` given nanoseconds: the case run again with each unit made milliseconds, which a moment cannot overflow, is not refused for it. |
 | A replacement of an aggregate in a window key | Polars' streaming engine does not meet a text of one value, a literal or an aggregate, with each of the many values of a replacement in the order key of a window, or in a key inside it, which it does in a select, where the tables measured the replacement. It refuses the lengths at every thread count. Polars refusing the rows or the empty table with the refusal that the length of the value does not match that of the text, which has no place, in a case with a window and a replacement: the case run again with the value of each replacement made a text literal is not refused for it, and nor is the case run again with each window made a fill. |
 | A replacement of a literal aggregate in a branch | Polars' streaming engine refuses a replacement of the aggregate of a literal text, which is one value, where it stands in a branch of a condition, and meets it where it stands in a select, in a sum, in a window or in memory. It reads the pattern of the replacement as many values, and what it says depends on how it splits the rows of the table: that the length of the pattern is dynamic where a piece of them is longer than one row, and that the pattern is null where it is not. The tables measured the replacement in select, on columns. Polars refusing the rows or the empty table with either refusal, which has no place, in a case with a branch of a condition that holds a chain that starts from a literal and replaces after an aggregate: the case run again with each such literal a column of text is not refused for it. |
-| An approximate quantile of a literal in a branch | Polars refuses the approximate quantile of a literal, which is one value, where it stands in a branch of a condition, and meets it where it stands in a select, or on a column in the branch: it reads the quantile as null. The tables measured the call in a branch on columns. Polars refusing the rows or the empty table with the refusal that the quantile must not contain null values, which has no place, in a case with a branch of a condition that holds a chain that starts from a literal and takes an approximate quantile: the case run again with each such literal a column is not refused for it, so a share that is a null, which a column is refused for as well, is excused by nothing. |
+| An approximate quantile of a literal in a condition | Polars' streaming engine refuses the approximate quantile of a literal, which is one value, where it stands in a value of a branch of a condition, or in the predicate of a `when` after the first, and meets it in a select, a filter, a sort key, a join key, a window, the predicate of the first `when`, and on a column in the condition: it reads the quantile as null. The tables measured the call in a condition on columns. Polars refusing the rows or the empty table with the refusal that the quantile must not contain null values, which has no place, in a case with a condition that holds in a value or in a later predicate a chain that starts from a literal and takes an approximate quantile: the case run again with each such literal a column is not refused for it, so a share that is a null, which a column is refused for as well, is excused by nothing. |
 | A bitwise call in a join's key | Polars refuses some dtypes of `and_`, `or_` and `xor` when it works out the schema of a select, a filter or a sort key, and accepts them in a join's key, on either side: it checks the dtypes of a bitwise call there less than anywhere else (the pairs it accepts are listed below the table). The tables measured a bitwise call in select, and refuse it for the dtypes it is given; for an argument whose dtype they do not know, for one it might have. The tables refusing, with a reason that names the two dtypes of a bitwise call (`^ not allowed on date and i8`, `\| on Boolean and Int64 is not supported`), at an `and_`, `or_` or `xor` in one of a join's own keys, which Polars allows; the key is why only where Polars, asked to select the refused call on a column of each of the two dtypes the reason names, refuses it at that call for the tables' reason, which a call whose dtypes select accepts, a refusal about another call, a step that is no join and the key of a window do not meet. |
 
 
