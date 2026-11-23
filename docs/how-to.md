@@ -441,6 +441,11 @@ parameter of the time zone kind is given the zone `UTC` and a required choice it
 format `iso`, which every dtype takes, wherever the generator builds the call; what the zone a call is given
 decides of what it gives, a moment in it or in none, is the walk's, as is whether a duration typed into a method that
 reads one is a duration Polars reads, which it asks of Polars with the dtype that the method follows.
+A new step of a table also needs what a new step starts with, in `start_step` in
+`crates/dageist-engine/src/catalog/starting.rs`, and, where it has a flag or a choice, what the generator
+of the option table gives it to run on, in `option_step` under `crates/dageist-engine/src/allowed/tests/`.
+A step that holds no expression is drawn for itself by the fuzz target, where it is listed among the
+`Plain` steps of `allowed_fuzz/generate.rs` with the arguments Polars takes of it.
 Last, run the fuzz target for more seeds than the engine's tests do,
 [as below](#check-the-tables-against-polars).
 
@@ -530,7 +535,11 @@ Name them in `DAGEIST_FUZZ_FOCUS`, separated by commas: a method by its name,
 `dt.replace`, or by its identifier in the catalogue, `Expr.dt.replace`, every method
 of a namespace by a name that ends in a dot, `dt.`, and a function that starts a chain and
 takes expressions, such as the ones that make a date or a moment, by its name, `date`, or its
-identifier, `polars.date`. A function that takes none, `col` and `lit`, is no focus.
+identifier, `polars.date`. A function that takes none, `col` and `lit`, is no focus. A step of a table that
+the target draws for itself, as it holds no chain (`reverse`, `head`, `limit`, `tail`, `slice`, `first`,
+`last`, `gather_every`, `drop`, `drop_nulls`, `drop_nans`, `fill_nan` and `with_row_index`), is named by
+its identifier, `LazyFrame.head`, and `LazyFrame.` names all of them, for a name such as `reverse` is that
+of the method of an expression. A campaign focused on steps draws one of them for six cases of ten.
 
 Every case of a focused campaign then holds at least one of them. Where a chain draws
 another method, or draws its start, it draws one of them instead one time in four, and the
