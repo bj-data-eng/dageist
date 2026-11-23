@@ -6503,6 +6503,61 @@ mod tests {
         assert_eq!(excused(vec![shift(), call("Expr.max", Vec::new())]), vec![]);
     }
 
+    /// `select(polars.from_epoch(polars.time(microsecond=part)).<link>)`, which meets a moment that
+    /// Polars makes null in each row where a part is.
+    fn counting_a_time_of(part: Expression) -> Case {
+        let time = call(
+            "polars.time",
+            vec![("microsecond", Value::Expression(part))],
+        );
+        let epoch = call(
+            "polars.from_epoch",
+            vec![("column", Value::Expression(chain_of(time, Vec::new())))],
+        );
+        select(vec![chain_of(epoch, Vec::new())])
+    }
+
+    #[test]
+    fn a_moment_made_of_text_is_only_nulls_and_one_made_of_numbers_is_not() {
+        // The text of a column is no number, so Polars makes a null of it in each row, and a null
+        // meets a cast that the tables refused for the dtype of a time of day.
+        assert_eq!(
+            excused_by_kept("uncovered-a-shift-that-leaves-nulls--a-moment-made-of-text.case"),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        let at_the_start = || at(&[parameter("exprs"), Segment::Item(0), Segment::Start]);
+        let said = "casting from Time to Datetime('μs') not supported; consider using `dt.combine`";
+        // A column of numbers holds a time of day in each row that has no null: nothing excused.
+        assert_eq!(
+            tables_refuse(
+                &counting_a_time_of(chain(column("u"), &[])),
+                at_the_start(),
+                ROWS,
+                said
+            ),
+            vec![]
+        );
+        // The sample's null is in the middle row of `a` and `b` only, and the other rows hold one.
+        assert_eq!(
+            tables_refuse(
+                &counting_a_time_of(chain(column("a"), &[])),
+                at_the_start(),
+                ROWS,
+                said
+            ),
+            vec![]
+        );
+        assert_eq!(
+            tables_refuse(
+                &counting_a_time_of(chain(column("g"), &[])),
+                at_the_start(),
+                ROWS,
+                said
+            ),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+    }
+
     #[test]
     fn the_last_of_a_shift_is_null_only_in_a_column_that_has_the_sample_null() {
         // `a` and `b` hold a null in the middle row, which one shift puts last. The
