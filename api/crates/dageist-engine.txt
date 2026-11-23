@@ -114,6 +114,7 @@ pub dageist_engine::allowed::Rule::ConditionPredicateIsBoolean
 pub dageist_engine::allowed::Rule::DurationIsValid
 pub dageist_engine::allowed::Rule::ElementOnlyInPivotAggregate
 pub dageist_engine::allowed::Rule::FilterPredicateIsBoolean
+pub dageist_engine::allowed::Rule::FoldedFunctionIsNoJoinKey
 pub dageist_engine::allowed::Rule::JoinKeyNamesAreNotRepeated
 pub dageist_engine::allowed::Rule::KeyIsElementwise
 pub dageist_engine::allowed::Rule::MomentsShareAZone
@@ -123,7 +124,7 @@ pub dageist_engine::allowed::Rule::ReplacementValuesMatchInNumber
 pub dageist_engine::allowed::Rule::TimeZoneIsValid
 pub dageist_engine::allowed::Rule::WindowInputIsNotWidened
 impl dageist_engine::allowed::Rule
-pub const dageist_engine::allowed::Rule::ALL: [Self; 12]
+pub const dageist_engine::allowed::Rule::ALL: [Self; 13]
 pub fn dageist_engine::allowed::Rule::from_name(name: &str) -> core::option::Option<Self>
 pub const fn dageist_engine::allowed::Rule::name(self) -> &'static str
 pub const fn dageist_engine::allowed::Rule::statement(self) -> &'static str
@@ -184,6 +185,8 @@ impl<'a> dageist_engine::allowed::Chosen<'a>
 pub const fn dageist_engine::allowed::Chosen<'a>::following(self, unit: core::option::Option<polars_core::datatypes::temporal::time_unit::TimeUnit>) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::giving(self, dtype: dageist_engine::allowed::Representative) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::giving_many(self) -> Self
+pub const fn dageist_engine::allowed::Chosen<'a>::giving_one(self) -> Self
+pub const fn dageist_engine::allowed::Chosen<'a>::in_zone(self, zone: core::option::Option<&'a str>) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_arguments(self, arguments: &'a [(&'a str, dageist_engine::allowed::Representative)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_durations(self, durations: &'a [(&'a str, &'a str, dageist_engine::catalog::DurationUse)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_options(self, options: &'a [(&'a str, &'a str)]) -> Self
@@ -271,6 +274,7 @@ pub fn dageist_engine::allowed::option_offers(entry: &dageist_engine::catalog::E
 pub fn dageist_engine::allowed::options(entry: &dageist_engine::catalog::Entry, chosen: &[(&str, &str)]) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::read_typed(text: &str, typed: dageist_engine::allowed::Typed) -> alloc::vec::Vec<core::result::Result<dageist_engine::allowed::Read, dageist_engine::allowed::Unread>>
 pub fn dageist_engine::allowed::rule_forbids(entry: &dageist_engine::catalog::Entry, context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
+pub fn dageist_engine::allowed::rule_forbids_a_folded_function_in_a_join_key(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_key_known_not_elementwise(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_repeated_pair_of_key_names(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_window_over_a_widened_value() -> core::result::Result<(), dageist_engine::allowed::Refusal>
