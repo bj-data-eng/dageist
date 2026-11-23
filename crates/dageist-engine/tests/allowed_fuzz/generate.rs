@@ -103,10 +103,72 @@ enum Host {
     /// A join's `on`, which both tables read.
     JoinOn,
     Pivot,
+    /// A step that holds no chain: the step itself is what is under test.
+    Plain(Plain),
 }
 
+/// The steps that are drawn for themselves: they hold values and the names of columns, not
+/// expressions, so what is left to chance is the arguments and the dtypes of the table they run
+/// on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Plain {
+    Reverse,
+    Head,
+    Limit,
+    Tail,
+    Slice,
+    First,
+    Last,
+    GatherEvery,
+    Drop,
+    DropNulls,
+    DropNans,
+    FillNan,
+    WithRowIndex,
+}
+
+impl Plain {
+    const ALL: [Self; 13] = [
+        Self::Reverse,
+        Self::Head,
+        Self::Limit,
+        Self::Tail,
+        Self::Slice,
+        Self::First,
+        Self::Last,
+        Self::GatherEvery,
+        Self::Drop,
+        Self::DropNulls,
+        Self::DropNans,
+        Self::FillNan,
+        Self::WithRowIndex,
+    ];
+
+    const fn id(self) -> &'static str {
+        match self {
+            Self::Reverse => "LazyFrame.reverse",
+            Self::Head => "LazyFrame.head",
+            Self::Limit => "LazyFrame.limit",
+            Self::Tail => "LazyFrame.tail",
+            Self::Slice => "LazyFrame.slice",
+            Self::First => "LazyFrame.first",
+            Self::Last => "LazyFrame.last",
+            Self::GatherEvery => "LazyFrame.gather_every",
+            Self::Drop => "LazyFrame.drop",
+            Self::DropNulls => "LazyFrame.drop_nulls",
+            Self::DropNans => "LazyFrame.drop_nans",
+            Self::FillNan => "LazyFrame.fill_nan",
+            Self::WithRowIndex => "LazyFrame.with_row_index",
+        }
+    }
+}
+
+/// The weight of each step that is drawn for itself, beside the hundred and eight that the hosts of
+/// a chain weigh together.
+const PLAIN_WEIGHT: usize = 2;
+
 impl Host {
-    const ALL: [(usize, Self); 8] = [
+    const ALL: [(usize, Self); 21] = [
         (22, Self::Select),
         (8, Self::WithColumns),
         (16, Self::Filter),
@@ -115,10 +177,24 @@ impl Host {
         (10, Self::JoinRight),
         (8, Self::JoinOn),
         (18, Self::Pivot),
+        (PLAIN_WEIGHT, Self::Plain(Plain::Reverse)),
+        (PLAIN_WEIGHT, Self::Plain(Plain::Head)),
+        (PLAIN_WEIGHT, Self::Plain(Plain::Limit)),
+        (PLAIN_WEIGHT, Self::Plain(Plain::Tail)),
+        (PLAIN_WEIGHT, Self::Plain(Plain::Slice)),
+        (PLAIN_WEIGHT, Self::Plain(Plain::First)),
+        (PLAIN_WEIGHT, Self::Plain(Plain::Last)),
+        (PLAIN_WEIGHT, Self::Plain(Plain::GatherEvery)),
+        (PLAIN_WEIGHT, Self::Plain(Plain::Drop)),
+        (PLAIN_WEIGHT, Self::Plain(Plain::DropNulls)),
+        (PLAIN_WEIGHT, Self::Plain(Plain::DropNans)),
+        (PLAIN_WEIGHT, Self::Plain(Plain::FillNan)),
+        (PLAIN_WEIGHT, Self::Plain(Plain::WithRowIndex)),
     ];
 
     fn step(self) -> &'static str {
         match self {
+            Self::Plain(plain) => plain.id(),
             Self::Select => "LazyFrame.select",
             Self::WithColumns => "LazyFrame.with_columns",
             Self::Filter => "LazyFrame.filter",
@@ -138,6 +214,7 @@ impl Host {
             Self::JoinRight => "right_on",
             Self::JoinOn => "on",
             Self::Pivot => "aggregate_function",
+            Self::Plain(plain) => unreachable!("{} holds no chain", plain.id()),
         }
     }
 
@@ -150,7 +227,7 @@ impl Host {
         match self {
             Self::JoinRight => &["ra", "rb", "rf", "rk", "rg", "rh"],
             Self::JoinOn => &["u", "u", "u", "u", "u", "u", "u", "a", "k"],
-            Self::Pivot => &[],
+            Self::Pivot | Self::Plain(_) => &[],
             _ => &["a", "b", "f", "k", "g", "h"],
         }
     }
@@ -285,6 +362,14 @@ fn method_name(entry: &Entry) -> &str {
 /// How often, in a hundred, a focused campaign puts back a method out of its focus for one in it.
 const FOCUS_PERCENT: usize = 25;
 
+/// How often, in a hundred, a campaign focused on steps draws one of them for the case.
+const FOCUS_STEP_PERCENT: usize = 60;
+
+/// The steps a case may be drawn for, which a focus names by their identifiers.
+fn plain_steps() -> Vec<&'static Entry> {
+    Plain::ALL.iter().map(|plain| entry(plain.id())).collect()
+}
+
 /// The methods of an expression and the functions that start a chain a campaign focuses on. Where
 /// a chain draws a method that is not one of them, it draws one that is, one time in four, as it
 /// does where it draws a start, and the rest of the case is drawn as without a focus. A focus on
@@ -293,23 +378,28 @@ const FOCUS_PERCENT: usize = 25;
 pub struct Focus {
     /// In the catalogue's order, each once.
     methods: Vec<&'static Entry>,
+    /// The steps that are drawn for themselves, in the catalogue's order, each once.
+    steps: Vec<&'static Entry>,
     /// The functions that start a chain, in the catalogue's order, each once.
     starts: Vec<&'static Entry>,
 }
 
 impl Focus {
-    /// The focus that `text` names: methods and functions that start a chain, separated by
+    /// The focus that `text` names: methods, functions that start a chain and steps, separated by
     /// commas, each by its name, `dt.replace` or `date_range`, or by the catalogue's identifier,
     /// `Expr.dt.replace` or `polars.date_range`; a name that ends in a dot, `dt.`, names every
-    /// method whose name it begins. Text that names nothing is no focus.
+    /// method whose name it begins. A step that is drawn for itself is named by its identifier,
+    /// `LazyFrame.head`, or by `LazyFrame.` for all of them, as a method of a table has the name of
+    /// a method of an expression. Text that names nothing is no focus.
     ///
     /// # Errors
     ///
-    /// Where a name is of no method of an expression and of no function that makes a moment in the
-    /// catalogue, it says which.
+    /// Where a name is of no method of an expression, of no function that makes a moment and of no
+    /// step that is drawn for itself in the catalogue, it says which.
     pub fn parse(text: &str) -> Result<Option<Self>, String> {
         let methods = methods();
         let starts = function_starts();
+        let steps = plain_steps();
         let mut chosen: Vec<&'static Entry> = Vec::new();
         for name in text
             .split(',')
@@ -335,11 +425,20 @@ impl Focus {
                     .copied()
                     .filter(|entry| !function.ends_with('.') && start_name(entry) == function),
             );
+            named.extend(steps.iter().copied().filter(|entry| {
+                let id = entry.id().as_str();
+                if name == "LazyFrame." {
+                    true
+                } else {
+                    id == name
+                }
+            }));
             if named.is_empty() {
                 return Err(format!(
-                    "DAGEIST_FUZZ_FOCUS names `{name}`, which is no method of an expression and no \
-                     function that makes a moment in the catalogue: name a method as `dt.replace`, \
-                     the methods of a namespace as `dt.` and a function as `date_range`"
+                    "DAGEIST_FUZZ_FOCUS names `{name}`, which is no method of an expression, no \
+                     function that makes a moment and no step in the catalogue: name a method as \
+                     `dt.replace`, the methods of a namespace as `dt.`, a function as \
+                     `date_range` and a step as `LazyFrame.head`"
                 ));
             }
             chosen.extend(named);
@@ -349,6 +448,10 @@ impl Focus {
         }
         Ok(Some(Self {
             methods: methods
+                .into_iter()
+                .filter(|entry| chosen.iter().any(|named| named.id() == entry.id()))
+                .collect(),
+            steps: steps
                 .into_iter()
                 .filter(|entry| chosen.iter().any(|named| named.id() == entry.id()))
                 .collect(),
@@ -365,6 +468,7 @@ impl Focus {
             .iter()
             .map(|entry| method_name(entry))
             .chain(self.starts.iter().map(|entry| start_name(entry)))
+            .chain(self.steps.iter().map(|entry| entry.id().as_str()))
             .collect::<Vec<_>>()
             .join(", ")
     }
@@ -373,6 +477,7 @@ impl Focus {
         self.methods
             .iter()
             .chain(&self.starts)
+            .chain(&self.steps)
             .any(|held| held.id() == entry.id())
     }
 
@@ -416,6 +521,18 @@ pub fn generate(bytes: &[u8], focus: Option<&Focus>) -> Option<Case> {
     let receiver = draw.pick(&Representative::ALL);
     let argument = draw.pick(&Representative::ALL);
     let host = draw.weighted(&Host::ALL);
+    // A campaign focused on steps draws one of them for most cases, and nothing more is drawn
+    // for one that is focused on methods only.
+    let host = match focus.filter(|focus| !focus.steps.is_empty()) {
+        Some(focus) if draw.chance(FOCUS_STEP_PERCENT) => {
+            let step = draw.pick(&focus.steps);
+            Plain::ALL
+                .into_iter()
+                .find(|plain| plain.id() == step.id().as_str())
+                .map_or(host, Host::Plain)
+        }
+        _ => host,
+    };
     let mut generator = Gen {
         draw,
         focus,
@@ -436,6 +553,9 @@ pub fn generate(bytes: &[u8], focus: Option<&Focus>) -> Option<Case> {
 
 impl Gen<'_> {
     fn document(&mut self) -> Document {
+        if let Host::Plain(plain) = self.host {
+            return self.plain_document(plain);
+        }
         let host = self.host;
         let step_id = host.step();
         let mut slots = vec![
@@ -493,6 +613,7 @@ impl Gen<'_> {
                 ("values", Value::Columns(vec!["a".to_owned()])),
                 ("aggregate_function", Value::Expression(held_one())),
             ],
+            Host::Plain(_) => unreachable!("a step without a chain is drawn apart"),
         };
         given.extend(self.options(entry(step_id)));
         let step = Step::new(
@@ -501,6 +622,111 @@ impl Gen<'_> {
         )
         .expect("a step of a lazy frame");
         Document::new(vec![step]).expect("one step")
+    }
+
+    // -----------------------------------------------------------------------
+    // Steps drawn for themselves
+
+    /// The document of a step that holds no chain: its options, as the option table reads them,
+    /// and arguments that Polars takes, drawn from the columns of the sample tables. A column the
+    /// table lacks is drawn only where Polars is told to leave it: that a name is no column is
+    /// Polars' to refuse, and no table says it.
+    fn plain_document(&mut self, plain: Plain) -> Document {
+        let id = plain.id();
+        let options = self.options(entry(id));
+        let strict = options
+            .iter()
+            .find(|(name, _)| *name == "strict")
+            .and_then(|(_, value)| match value {
+                Value::Flag(flag) => *flag,
+                _ => None,
+            })
+            .unwrap_or(true);
+        let mut given: Vec<(&str, Value)> = Vec::new();
+        match plain {
+            Plain::Reverse | Plain::First | Plain::Last => {}
+            Plain::GatherEvery => {
+                // Polars refuses an `n` of zero, which no table says.
+                let every = self.draw.pick(&[1_i64, 2, 3, 9]);
+                given.push(("n", Value::Integer(every)));
+                if self.draw.chance(50) {
+                    let offset = self.draw.pick(&[0_i64, 1, 2, 9]);
+                    given.push(("offset", Value::Integer(offset)));
+                }
+            }
+            Plain::Head | Plain::Limit | Plain::Tail => {
+                if self.draw.chance(70) {
+                    let count = self.draw.pick(&[0_i64, 1, 2, 3, 10]);
+                    given.push(("n", Value::Integer(count)));
+                }
+            }
+            Plain::Slice => {
+                let offset = self.draw.pick(&[-5_i64, -3, -1, 0, 1, 2, 5]);
+                given.push(("offset", Value::Integer(offset)));
+                if self.draw.chance(60) {
+                    let length = self.draw.pick(&[0_i64, 1, 2, 10]);
+                    given.push(("length", Value::Integer(length)));
+                }
+            }
+            Plain::Drop => {
+                let items = self.draw.below(4);
+                let mut columns = Vec::new();
+                for _ in 0..items {
+                    let names = self.names(!strict);
+                    columns.push(Value::Columns(names));
+                }
+                given.push(("columns", Value::Many(columns)));
+            }
+            Plain::DropNulls | Plain::DropNans => {
+                if self.draw.chance(65) {
+                    let names = self.names(false);
+                    given.push(("subset", Value::Columns(names)));
+                }
+            }
+            Plain::FillNan => {
+                let value = match self.draw.below(6) {
+                    0 => Value::Integer(0),
+                    1 => Value::Integer(-1),
+                    2 => Value::Float(0.5),
+                    3 => Value::String("x".to_owned()),
+                    4 => Value::Flag(Some(true)),
+                    _ => Value::Flag(None),
+                };
+                given.push(("value", value));
+            }
+            Plain::WithRowIndex => {
+                if self.draw.chance(50) {
+                    let name = self.draw.pick(&["i", "row_number", "n"]);
+                    given.push(("name", Value::String(name.to_owned())));
+                }
+                if self.draw.chance(50) {
+                    let offset = self.draw.pick(&[0_i64, 1, 7, 1000]);
+                    given.push(("offset", Value::Integer(offset)));
+                }
+            }
+        }
+        given.extend(options);
+        let step = Step::new(StepId::new(STEP).expect("an identifier"), call(id, given))
+            .expect("a step of a lazy frame");
+        Document::new(vec![step]).expect("one step")
+    }
+
+    /// Up to three names of columns of the sample table, each once. A name the table lacks may be
+    /// among them where `missing` is true, which is where Polars is told to leave such a column.
+    /// The dtype of a column is no reason to leave it out: the engine's walk says which columns
+    /// `drop_nans` is refused for.
+    fn names(&mut self, missing: bool) -> Vec<String> {
+        let mut pool: Vec<&str> = vec!["a", "b", "f", "k", "g", "h", "u"];
+        if missing {
+            pool.push("zz");
+        }
+        let count = self.draw.below(4).min(pool.len());
+        let mut names = Vec::new();
+        for _ in 0..count {
+            let at = self.draw.below(pool.len());
+            names.push(pool.remove(at).to_owned());
+        }
+        names
     }
 
     // -----------------------------------------------------------------------
@@ -2110,12 +2336,15 @@ mod tests {
     }
 
     /// The identifiers of the steps drawn for themselves.
-    const STEPS: [&str; 10] = [
+    const STEPS: [&str; 13] = [
         "LazyFrame.reverse",
         "LazyFrame.head",
         "LazyFrame.limit",
         "LazyFrame.tail",
         "LazyFrame.slice",
+        "LazyFrame.first",
+        "LazyFrame.last",
+        "LazyFrame.gather_every",
         "LazyFrame.drop",
         "LazyFrame.drop_nulls",
         "LazyFrame.drop_nans",
