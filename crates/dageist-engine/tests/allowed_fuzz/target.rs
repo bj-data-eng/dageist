@@ -429,12 +429,24 @@ impl CaseTarget for AllowedTarget {
     }
 
     fn generate(&self, input: &[u8]) -> Result<Generation<Case>> {
-        match generate(input, self.focus.as_ref()) {
-            Some(case) => Ok(Generation::Generated(case)),
-            None => Ok(Generation::Rejected(GenerationRejection::new(
+        let Some(case) = generate(input, self.focus.as_ref()) else {
+            return Ok(Generation::Rejected(GenerationRejection::new(
                 "too little entropy to make a case from",
-            )?)),
+            )?));
+        };
+        // A focused campaign checks the methods in focus in every case, so a case drawn without
+        // one is drawn again.
+        if self
+            .focus
+            .as_ref()
+            .is_some_and(|focus| !focus.is_held_by(&case.document))
+        {
+            tally("drawn again: no method in focus");
+            return Ok(Generation::Rejected(GenerationRejection::new(
+                "the case holds no method in focus",
+            )?));
         }
+        Ok(Generation::Generated(case))
     }
 
     fn evaluate(&self, case: &Case) -> Result<CaseOutcome> {

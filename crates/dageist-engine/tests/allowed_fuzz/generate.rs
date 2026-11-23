@@ -245,7 +245,8 @@ const FOCUS_PERCENT: usize = 25;
 
 /// The methods of an expression a campaign focuses on. Where a chain draws a method that is not
 /// one of them, it draws one that is, one time in four, and the rest of the case is drawn as
-/// without a focus. A focus on every method changes nothing.
+/// without a focus. A focus on every method changes nothing. The target draws again a case that
+/// holds none of them.
 #[derive(Debug)]
 pub struct Focus {
     /// In the catalogue's order, each once.
@@ -310,6 +311,37 @@ impl Focus {
 
     fn holds(&self, entry: &Entry) -> bool {
         self.methods.iter().any(|method| method.id() == entry.id())
+    }
+
+    /// Whether `document` calls a method in focus anywhere: in a step, a chain or what a call is
+    /// given.
+    pub fn is_held_by(&self, document: &Document) -> bool {
+        document
+            .steps()
+            .iter()
+            .any(|step| self.is_in_call(step.call()))
+    }
+
+    fn is_in_call(&self, call: &Call) -> bool {
+        self.holds(call.entry())
+            || call
+                .arguments()
+                .iter()
+                .any(|given| self.is_in_value(given.value()))
+    }
+
+    fn is_in_value(&self, value: &Value) -> bool {
+        match value {
+            Value::Expression(expression) => {
+                matches!(expression.start(), Start::Call(start) if self.is_in_call(start))
+                    || expression.links().iter().any(|link| self.is_in_call(link))
+            }
+            Value::Many(items) => items.iter().any(|item| self.is_in_value(item)),
+            Value::Pairs(pairs) => pairs
+                .iter()
+                .any(|(key, value)| self.is_in_value(key) || self.is_in_value(value)),
+            _ => false,
+        }
     }
 }
 
