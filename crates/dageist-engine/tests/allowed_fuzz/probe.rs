@@ -2484,6 +2484,54 @@ mod tests {
     }
 
     #[test]
+    fn a_start_given_a_literal_is_settled_by_polars_refusing_it_given_a_column() {
+        // `join(right_on=[datetime(1, from_epoch(lit(null, List(Int64))), rk).len()])`: the tables
+        // refuse the count of a null list for the dtype of the list, Polars never evaluates what
+        // the length of a call is the length of, and allows the literal where the call is asked
+        // alone, which it folds. Given a column of the dtype of the literal, it refuses the count
+        // for the tables' reason.
+        let case = kept("stricter-a-start-given-a-null-list-polars-folds-under-a-length.case");
+        let refused = refusal(&case);
+        assert_eq!(settle(&case, &refused), None);
+        let found = settle_apart(&case, &refused, &predict(&case), &observe(&case))
+            .expect("a count that Polars refuses of a column");
+        assert!(found.probe.contains("polars.from_epoch"), "{}", found.probe);
+        assert!(
+            found.reason.contains("cannot cast List"),
+            "{}",
+            found.reason
+        );
+        assert_eq!(found.showing, Showing::TheSameReason);
+    }
+
+    #[test]
+    fn a_start_is_not_settled_where_polars_allows_it_given_a_column_too() {
+        // The tables refused a count of a whole number that Polars allows for a column of whole
+        // numbers as well, so the literal is no reason, and the part is evaluated and accepted.
+        let case = Case::decode(
+            br#"{"a":"Int64","b":"Int64","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.select","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.from_epoch","arguments":{"column":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":1}}},"then":[]}}}},"then":[]}}]}}}}]}"#,
+        )
+        .expect("a case");
+        let place = Place::of_step(0, StepId::new("s").ok())
+            .then(Segment::Parameter("exprs".to_owned()))
+            .then(Segment::Item(0))
+            .then(Segment::Start);
+        let refused = Refused {
+            source: Source::Polars,
+            at: place.to_string(),
+            place,
+            stage: Some(dageist_engine::allowed::Stage::Rows),
+            reason: "cannot cast List type (inner: 'Int64', to: 'Datetime(\'μs\')')".to_owned(),
+            argument_unknown: false,
+        };
+        assert_eq!(
+            settle_apart(&case, &refused, &predict(&case), &observe(&case)),
+            None
+        );
+    }
+
+    #[test]
     fn a_comparison_given_no_known_dtype_is_settled_by_polars_refusing_it() {
         // `sort(by=when(b <= b - 1).then(b).last())` of `List(Int64)`: the tables
         // do not know what `b - 1` gives, and refuse the comparison for every
