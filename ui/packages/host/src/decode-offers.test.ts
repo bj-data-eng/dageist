@@ -345,13 +345,58 @@ describe('what each step starts with', () => {
 
   it('has one for each step of the list, ordered by identifier', () => {
     expect(starts.map((start) => start.entry)).toEqual([
+      'LazyFrame.drop',
+      'LazyFrame.drop_nans',
+      'LazyFrame.drop_nulls',
+      'LazyFrame.fill_nan',
       'LazyFrame.filter',
+      'LazyFrame.first',
+      'LazyFrame.gather_every',
+      'LazyFrame.head',
       'LazyFrame.join',
+      'LazyFrame.last',
+      'LazyFrame.limit',
       'LazyFrame.pivot',
       'LazyFrame.rename',
+      'LazyFrame.reverse',
       'LazyFrame.select',
+      'LazyFrame.slice',
       'LazyFrame.sort',
+      'LazyFrame.tail',
       'LazyFrame.with_columns',
+      'LazyFrame.with_row_index',
+    ]);
+  });
+
+  it('gives a step that cuts or numbers a table only what it cannot do without', () => {
+    // Each of these is complete as Polars runs it with nothing given: five rows, every column,
+    // the rows as they are and a count from zero.
+    for (const entry of [
+      'LazyFrame.drop_nans',
+      'LazyFrame.drop_nulls',
+      'LazyFrame.first',
+      'LazyFrame.head',
+      'LazyFrame.last',
+      'LazyFrame.limit',
+      'LazyFrame.reverse',
+      'LazyFrame.tail',
+      'LazyFrame.with_row_index',
+    ]) {
+      expect(startOf(entry).arguments, entry).toEqual([]);
+    }
+    // A drop needs a column to drop, a slice where it starts, a gather every nth row and a fill the
+    // value it fills with, each still to be given.
+    expect(startOf('LazyFrame.drop').arguments).toEqual([
+      { parameter: 'columns', setting: { kind: 'list', items: [{ kind: 'unset' }] } },
+    ]);
+    expect(startOf('LazyFrame.slice').arguments).toEqual([
+      { parameter: 'offset', setting: { kind: 'unset' } },
+    ]);
+    expect(startOf('LazyFrame.gather_every').arguments).toEqual([
+      { parameter: 'n', setting: { kind: 'unset' } },
+    ]);
+    expect(startOf('LazyFrame.fill_nan').arguments).toEqual([
+      { parameter: 'value', setting: { kind: 'unset' } },
     ]);
   });
 

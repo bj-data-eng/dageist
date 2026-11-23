@@ -551,14 +551,79 @@ What Polars does with each is what the tables say, and some of it is not what a 
 - `diff` has a `null_behavior`, whose `drop` leaves out the first `n` values and so gives fewer values than
   the table has rows, which the tables cannot say. The catalogue holds the one word `ignore`, which is
   Python's default, and does not offer the parameter, so a step always keeps every row.
-- The methods that give as many values as the rows or the arguments decide, `filter`, `unique`, `head`,
-  `tail`, `slice`, `limit`, `top_k`, `bottom_k`, `gather_every`, `gather`, `arg_unique`, `mode` and
-  `unique_counts`, are not
-  catalogued, and neither are `is_in`, `search_sorted` and `interpolate`. `left_out.rs` gives the reason
+- The methods of an expression that give as many values as the rows or the arguments decide, `filter`,
+  `unique`, `head`, `tail`, `slice`, `limit`, `top_k`, `bottom_k`, `gather_every`, `gather`, `arg_unique`,
+  `mode` and `unique_counts`, are not catalogued (the steps of a table that share some of their names are,
+  [below](#the-steps-that-cut-and-number-a-table)), and neither are `is_in`, `search_sorted` and `interpolate`. `left_out.rs` gives the reason
   of each: Polars refuses a method that gives some other number of values beside a column, in a filter's
   predicate, a sort key or a window's key, with a message about lengths, and the walk has a shape for
   one value and for as many as the table has rows only. [Issue 129](https://github.com/bj-data-eng/dageist/issues/129)
   is the shape that holds them.
+
+### The Steps That Cut And Number A Table
+
+Thirteen more steps of a lazy frame are in the family Steps beside `filter`, `sort` and `rename`, each
+under Polars' own name: `reverse`, `head`, `limit`, `tail`, `slice`, `first`, `last` and `gather_every`
+keep some of the rows, `drop` removes columns, `drop_nulls` and `drop_nans` drop the rows that hold a
+null or a NaN, `fill_nan` fills the NaN of the floating-point columns and `with_row_index` puts a count of
+the rows first. They are built as Python Polars 2.1.0 builds them, and the hints are where the plain
+words go.
+
+A step's result is a table, so the number of its rows is not stated before the rows run, as it is
+for the methods of an expression that give as many values as the data decide: the engine reads the
+schema from Polars and counts the rows a step kept of those it was given when it runs the working
+window, and the next step is given the table that one gave. A `tail` of three rows then a `head` of two
+is two rows, as the report counts them.
+
+What Polars does with each is what the document tests say, and some of it is not what a name suggests:
+
+- `head`, `limit` and `tail` take `n`, which Python's binding passes on as an unsigned 32-bit number, so a
+  build refuses a negative one and one above it; Python refuses them as `ValueError` and `OverflowError`.
+  `limit` is `head` under another name, and both are offered because both are Polars' names. `slice`
+  takes a signed `offset`, counted from the end where it is negative, and a `length` that is left out
+  as the most rows an index holds; a negative length is refused. `first` is the slice of the first row
+  and `last` the tail of one, so a table with no rows has none.
+- `gather_every` takes `n` and `offset` as unsigned numbers and gathers the rows `offset`, `offset + n`,
+  and so on, of every column. Polars refuses an `n` of zero when it runs rows. Python runs it, as it runs
+  every step that selects over every column, beside a column of its own that holds an empty struct for each
+  row and is dropped after, so that a table of no columns keeps the height it gathers, and the build does
+  the same. It runs `reverse` that way too, so a reverse of no columns keeps its rows.
+- `drop` takes its columns by name, as Python's `*columns` does, each name read as a pattern where it is
+  one, and refuses a name the table lacks only where `strict` is true. Dropping every column leaves a
+  table with no column and the rows it had.
+- `drop_nulls` looks at every column unless it is given a `subset`, and `drop_nans` at the floating-point
+  columns; a name the table lacks is refused. Given a `subset`, `drop_nans` takes a column Polars can test
+  for a NaN, and refuses another when it runs rows, with the words of `is_nan`: a whole number holds no
+  NaN and is no reason to drop a row, text is refused. The walk says so beforehand, by asking the tables
+  of `is_nan` for each column the `subset` names, which is the one step the tables judge by the
+  method that Polars makes of it. A `subset` that is empty looks at no column.
+- `fill_nan` takes `value` as Python makes it of a number, a text, a flag or none: a literal with no
+  dtype, which Polars fills the NaN of each floating-point column with, and where it is text the column
+  becomes text. A whole number or a text column holds no NaN and keeps its dtype. Python also takes an
+  expression, which the step does not: its place is no position of the tables.
+- `with_row_index` gives a `UInt32` column named `name`, which is `index` unless it is told, first, counting
+  from `offset`, which Python's binding passes on as an unsigned 32-bit number, so it refuses one below
+  zero or above it. Polars refuses a name that a column of the table has already, with `duplicate column
+  name`.
+
+The other methods of a lazy frame that cut or reshape a table are not catalogued yet, each with its
+reason in `left_out.rs`:
+
+- `unique` keeps one of the rows that repeat, and which one is the choice of `keep`, whose default `any` is
+  whichever Polars meets first, in no promised order without `maintain_order`; a step that shows its rows
+  cannot state them twice, which waits for a decision on what such a step shows. Its `subset` also takes
+  expressions, a position no table is measured in.
+- `fill_null` and `shift` run a method of an expression over every column, `fill_null` choosing the
+  columns by the Python type of its value, and both take expressions where no table is measured;
+  `cast` takes a dtype for each column, a pair no view draws yet, and is judged by the tables of `Expr.cast`
+  for every pair; `top_k` and `bottom_k` take their keys as expressions. A step that is judged by the table
+  of a method for each of its columns, with the arguments it gives each, is a shape of its own, of which
+  `drop_nans` is the case with no argument.
+- The frame aggregates `max`, `min`, `sum`, `mean`, `median`, `std`, `var`, `quantile`, `count` and
+  `null_count` are functions of the table of their own, and not the methods of an expression that
+  share their names: the sum of text is a null, which `Expr.sum` refuses, so no table says what each gives
+  for each dtype. `explode` refuses any column that is no list or array, which no table measures, and
+  `polars.concat` takes several tables, which no step takes.
 
 ### The Pattern Kind
 
@@ -649,7 +714,7 @@ What Polars does with each is what the tables say, and some of it is not what a 
   list of literal patterns that Polars matches all at once, wait for a kind that holds a list of texts, typed or
   connected; `str.split_exact` and `str.splitn` give a struct that waits for `struct.field`.
 
-The catalogue holds the seven steps, the expression methods the storyboard
+The catalogue holds the twenty steps, the expression methods the storyboard
 uses, the aggregates `sum`, `min`, `max` and `len`, the six comparisons and the six
 others that compare, the arithmetic of `add`, `sub`, `mul`, `truediv`, `floordiv`, `mod`,
 `pow`, `neg`, `abs`, `sign` and `clip`, the maths, trigonometry and rounding above, the nulls,
@@ -1335,7 +1400,11 @@ conditions nested two deep and `over`'s keys inside them, a second key beside a 
 key (a copy of it, its column taken as one value or tested for a null, or a chain of
 its own, paired with the same column of the other table or another), a join's `on`,
 which reads the one column `u` that both tables hold, sets of the options of
-each call, the whole numbers that a rounding keeps, and one bound or both for a `clip`. For each it takes the engine's
+each call, the whole numbers that a rounding keeps, and one bound or both for a `clip`; or one of the
+[steps that cut and number a table](#the-steps-that-cut-and-number-a-table), which holds no chain and is
+drawn with the arguments Polars takes of it (counts and offsets, names of the columns of the sample table, a
+name the table lacks only where `drop` is not strict, the value `fill_nan` fills with), whatever the dtypes of
+`a` and `b` are. For each it takes the engine's
 [walk](#which-combinations-polars-allows) of the case, which asks `offer` at the
 place each call stands in whether the call may stand and what it gives, whether
 each expression a position holds may end there, and `options` of the options a
@@ -1556,7 +1625,7 @@ rule a probe shows right where Polars does not evaluate the part. Any other rule
 refuses what Polars allows is a disagreement. The target compares nothing
 more of a case that the rule by design refuses and Polars allows: the dtypes before the
 refusal are compared, but whether Polars allows the rest is not. That rule is stricter
-wherever it refuses, which is about half of the pivot cases (80 of the 175 of
+wherever it refuses, which is about half of the pivot cases (61 of the 144 of
 the fixed seed, and the same share in longer campaigns), so those pivot aggregates are checked
 little; the tally counts the pivot cases and those the rule refuses apart.
 
@@ -1577,11 +1646,11 @@ an expected rejection that names both reasons.
 The tally ends with the totals of the cases that agreed, that both refused for another
 reason, that a limit excused, that were refused where Polars does not evaluate the
 part, that a rule stricter by design refused, and that disagreed. The fixed seed's
-1000 cases give none disagreeing; 13 of those that agree are refused by the rule against a
-repeated pair of key names, and the tables could not be asked past a point in 42 more. These
-counts are the same at one thread, at two and at the machine's own, and so are the 80 cases
-refused by the rule that is stricter by design, of 175 pivot cases, the 9 that a limit excused, the
-10 refused where Polars does not evaluate the part, the 748 that agree and the 130 refused by both
+1000 cases give none disagreeing; 7 of those that agree are refused by the rule against a
+repeated pair of key names, and the tables could not be asked past a point in 31 more. These
+counts are the same at one thread, at two and at the machine's own, and so are the 61 cases
+refused by the rule that is stricter by design, of 144 pivot cases, the 8 that a limit excused, the
+7 refused where Polars does not evaluate the part, the 809 that agree and the 99 refused by both
 for another reason. Another seed's counts may differ between thread counts: Polars' thread count changes which reason it
 gives where the tables and Polars both refuse, and a case in which Polars panics at some counts and
 not at others moves a case between them. The test

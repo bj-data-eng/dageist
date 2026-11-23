@@ -230,6 +230,21 @@ pub fn start_step(entry: &Entry, frame: &StepFrame<'_>) -> Option<StepStart> {
             ("values", Setting::ToGive),
             ("aggregate_function", Setting::Element(PIVOT_AGGREGATE)),
         ],
+        "LazyFrame.drop" => vec![start_of("columns")?],
+        "LazyFrame.fill_nan" => vec![start_of("value")?],
+        "LazyFrame.slice" => vec![start_of("offset")?],
+        "LazyFrame.gather_every" => vec![start_of("n")?],
+        // What Polars does with each of these as it is: five rows, every column, the rows as
+        // they are, a count from zero.
+        "LazyFrame.drop_nans"
+        | "LazyFrame.drop_nulls"
+        | "LazyFrame.first"
+        | "LazyFrame.head"
+        | "LazyFrame.last"
+        | "LazyFrame.limit"
+        | "LazyFrame.reverse"
+        | "LazyFrame.tail"
+        | "LazyFrame.with_row_index" => Vec::new(),
         _ => return None,
     };
     Some(StepStart { arguments })

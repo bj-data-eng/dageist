@@ -16,8 +16,8 @@ use polars::prelude::{
     AnyValue, ClosedInterval, DataType, DatetimeArgs, DurationArgs, Expr, FillNullStrategy,
     JoinBuildSide, JoinCoalesce, JoinType, JoinValidation, LazyFrame, MaintainOrderJoin, NULL,
     NamedFrom, NonExistent, Operator, PolarsError, RankMethod, RankOptions, RoundMode, Scalar,
-    Series, SortMultipleOptions, SortOptions, TimeUnit, TimeZone, WindowMapping, all,
-    all_horizontal, binary_expr, col, cols, datetime, duration, element, lit, when,
+    Selector, Series, SortMultipleOptions, SortOptions, TimeUnit, TimeZone, WindowMapping, all,
+    all_horizontal, binary_expr, by_name, col, cols, datetime, duration, element, lit, when,
 };
 use polars::series::ops::NullBehavior;
 
@@ -1607,6 +1607,119 @@ fn sort(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildError
     Ok(frame.sort_by_exprs(by, options))
 }
 
+/// The number of rows `head`, `limit` and `tail` take: Python's binding passes it on as an
+/// unsigned 32-bit number, so a negative one and one that is too large are refused.
+fn row_count(arguments: &Arguments) -> Result<u32, BuildError> {
+    unsigned(arguments, "n", 5)
+}
+
+fn frame_head(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
+    Ok(frame.slice(0, row_count(arguments)?))
+}
+
+fn frame_tail(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
+    Ok(frame.tail(row_count(arguments)?))
+}
+
+fn frame_slice(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
+    let offset = match arguments.get("offset") {
+        None => {
+            return Err(BuildError::Missing {
+                parameter: "offset",
+            });
+        }
+        Some(Argument::Integer(offset)) => *offset,
+        Some(other) => return Err(Arguments::wrong("offset", "a whole number", other)),
+    };
+    // Python leaves the length out as the most rows an index holds, and refuses a negative one.
+    let length = optional_unsigned(arguments, "length")?.unwrap_or(u32::MAX);
+    Ok(frame.slice(offset, length))
+}
+
+fn frame_first(frame: LazyFrame, _: &Arguments) -> Result<LazyFrame, BuildError> {
+    Ok(frame.slice(0, 1))
+}
+
+fn frame_last(frame: LazyFrame, _: &Arguments) -> Result<LazyFrame, BuildError> {
+    Ok(frame.tail(1))
+}
+
+/// The name of the column Python's `LazyFrame` gives a table for a step that selects over every
+/// column, so that a table of no columns keeps its height.
+const HEIGHT_COLUMN: &str = "__POLARS_INTERNAL_HEIGHT_COLUMN";
+
+/// As Python's `_height_preserving` runs `operation`: on the table with a column of its own that
+/// holds one empty struct for each row, which it drops from what the operation gives. A table of
+/// no columns has the height of its rows that way, and an operation that gathers or keeps rows
+/// gives it the height it gathers.
+fn height_preserving(
+    frame: LazyFrame,
+    operation: impl FnOnce(LazyFrame) -> LazyFrame,
+) -> LazyFrame {
+    let height = lit(Scalar::new(
+        DataType::Struct(Vec::new()),
+        AnyValue::StructOwned(Box::new((Vec::new(), Vec::new()))),
+    ))
+    .alias(HEIGHT_COLUMN);
+    operation(frame.with_columns([height])).drop(by_name([HEIGHT_COLUMN], true, true))
+}
+
+/// Python gathers every `n`th row of every column, from the `offset`th, and takes both as unsigned
+/// numbers. Polars refuses an `n` of zero when it runs the rows.
+fn frame_gather_every(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
+    if arguments.get("n").is_none() {
+        return Err(BuildError::Missing { parameter: "n" });
+    }
+    let n = index(arguments, "n", 0)?;
+    let offset = index(arguments, "offset", 0)?;
+    Ok(height_preserving(frame, |frame| {
+        frame.select([col("*").gather_every(n, offset)])
+    }))
+}
+
+fn frame_reverse(frame: LazyFrame, _: &Arguments) -> Result<LazyFrame, BuildError> {
+    Ok(height_preserving(frame, LazyFrame::reverse))
+}
+
+/// As Python's `drop` takes its columns: by name, each name read as a pattern where it is one, and
+/// a name the table lacks refused where `strict` is true.
+fn frame_drop(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
+    let names = arguments.columns("columns")?;
+    Ok(frame.drop(by_name(names, arguments.flag("strict", true)?, true)))
+}
+
+/// The columns `drop_nulls` and `drop_nans` look at, if the step names them.
+fn subset(arguments: &Arguments) -> Result<Option<Selector>, BuildError> {
+    arguments
+        .get("subset")
+        .map(|_| arguments.columns("subset").map(cols))
+        .transpose()
+}
+
+fn frame_drop_nulls(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
+    Ok(frame.drop_nulls(subset(arguments)?))
+}
+
+fn frame_drop_nans(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
+    Ok(frame.drop_nans(subset(arguments)?))
+}
+
+/// As Python's `fill_nan` makes a value that is not an expression: a literal, as `lit` makes one
+/// without a dtype.
+fn frame_fill_nan(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
+    let value = arguments
+        .get("value")
+        .ok_or(BuildError::Missing { parameter: "value" })?;
+    Ok(frame.fill_nan(untyped_literal("value", value)?))
+}
+
+fn frame_with_row_index(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
+    let name = arguments
+        .string("name")?
+        .unwrap_or_else(|| "index".to_owned());
+    Ok(frame.with_row_index(name, Some(unsigned(arguments, "offset", 0)?)))
+}
+
 fn select(frame: LazyFrame, arguments: &Arguments) -> Result<LazyFrame, BuildError> {
     Ok(frame.select(positional_and_named(arguments)?))
 }
@@ -1772,6 +1885,24 @@ fn polars_element(_: &Arguments) -> Result<Expr, BuildError> {
     Ok(element())
 }
 
+/// A literal as Python's `lit` makes one of a value it is given without a dtype: a number typed
+/// without a dtype stays loose, as in Python, and Polars gives it the dtype its other operand
+/// needs, or the narrowest it fits.
+fn untyped_literal(parameter: &'static str, value: &Argument) -> Result<Expr, BuildError> {
+    match value {
+        Argument::Integer(value) => Ok(lit(*value)),
+        Argument::Float(value) => Ok(lit(*value)),
+        Argument::String(value) => Ok(lit(value.as_str())),
+        Argument::Flag(Some(value)) => Ok(lit(*value)),
+        Argument::Flag(None) => Ok(lit(NULL)),
+        other => Err(Arguments::wrong(
+            parameter,
+            "a number, text or a flag",
+            other,
+        )),
+    }
+}
+
 fn polars_lit(arguments: &Arguments) -> Result<Expr, BuildError> {
     if arguments.flag("allow_object", false)? {
         return Err(refused(
@@ -1787,16 +1918,7 @@ fn polars_lit(arguments: &Arguments) -> Result<Expr, BuildError> {
         Some(other) => return Err(Arguments::wrong("dtype", "a dtype", other)),
     };
     let Some(dtype) = dtype else {
-        // A number typed without a dtype stays loose, as in Python: Polars gives it the
-        // dtype its other operand needs, or the narrowest it fits.
-        return match value {
-            Argument::Integer(value) => Ok(lit(*value)),
-            Argument::Float(value) => Ok(lit(*value)),
-            Argument::String(value) => Ok(lit(value.as_str())),
-            Argument::Flag(Some(value)) => Ok(lit(*value)),
-            Argument::Flag(None) => Ok(lit(NULL)),
-            other => Err(Arguments::wrong("value", "a number, text or a flag", other)),
-        };
+        return untyped_literal("value", value);
     };
     // With a dtype, Python casts a one-value series and makes a scalar of it.
     let name = "literal".into();
@@ -3305,12 +3427,79 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(xor),
     },
     Entry {
+        id: EntryId("LazyFrame.drop"),
+        family: Family::Steps,
+        accepts: &[],
+        parameters: &[
+            starred("columns", Kind::Column),
+            flag("strict", "True").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Frame(frame_drop),
+    },
+    Entry {
+        id: EntryId("LazyFrame.drop_nans"),
+        family: Family::Steps,
+        accepts: &[],
+        parameters: &[optional("subset", Kind::Column, Shape::One, "None")],
+        laziness: Laziness::Lazy,
+        build: Build::Frame(frame_drop_nans),
+    },
+    Entry {
+        id: EntryId("LazyFrame.drop_nulls"),
+        family: Family::Steps,
+        accepts: &[],
+        parameters: &[optional("subset", Kind::Column, Shape::One, "None")],
+        laziness: Laziness::Lazy,
+        build: Build::Frame(frame_drop_nulls),
+    },
+    Entry {
+        id: EntryId("LazyFrame.fill_nan"),
+        family: Family::Steps,
+        accepts: &[],
+        parameters: &[required("value", Kind::Value(ValueType::Any), Shape::One)],
+        laziness: Laziness::Lazy,
+        build: Build::Frame(frame_fill_nan),
+    },
+    Entry {
         id: EntryId("LazyFrame.filter"),
         family: Family::Steps,
         accepts: &[],
         parameters: &[PREDICATES, CONSTRAINTS],
         laziness: Laziness::Lazy,
         build: Build::Frame(filter),
+    },
+    Entry {
+        id: EntryId("LazyFrame.first"),
+        family: Family::Steps,
+        accepts: &[],
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Frame(frame_first),
+    },
+    Entry {
+        id: EntryId("LazyFrame.gather_every"),
+        family: Family::Steps,
+        accepts: &[],
+        parameters: &[
+            required("n", Kind::Value(ValueType::Integer), Shape::One),
+            optional("offset", Kind::Value(ValueType::Integer), Shape::One, "0"),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Frame(frame_gather_every),
+    },
+    Entry {
+        id: EntryId("LazyFrame.head"),
+        family: Family::Steps,
+        accepts: &[],
+        parameters: &[optional(
+            "n",
+            Kind::Value(ValueType::Integer),
+            Shape::One,
+            "5",
+        )],
+        laziness: Laziness::Lazy,
+        build: Build::Frame(frame_head),
     },
     Entry {
         id: EntryId("LazyFrame.join"),
@@ -3345,6 +3534,27 @@ pub(super) const ENTRIES: &[Entry] = &[
         ],
         laziness: Laziness::Lazy,
         build: Build::Frame(join),
+    },
+    Entry {
+        id: EntryId("LazyFrame.last"),
+        family: Family::Steps,
+        accepts: &[],
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Frame(frame_last),
+    },
+    Entry {
+        id: EntryId("LazyFrame.limit"),
+        family: Family::Steps,
+        accepts: &[],
+        parameters: &[optional(
+            "n",
+            Kind::Value(ValueType::Integer),
+            Shape::One,
+            "5",
+        )],
+        laziness: Laziness::Lazy,
+        build: Build::Frame(frame_head),
     },
     Entry {
         id: EntryId("LazyFrame.pivot"),
@@ -3394,6 +3604,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Frame(rename),
     },
     Entry {
+        id: EntryId("LazyFrame.reverse"),
+        family: Family::Steps,
+        accepts: &[],
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Frame(frame_reverse),
+    },
+    Entry {
         id: EntryId("LazyFrame.select"),
         family: Family::Steps,
         accepts: &[],
@@ -3403,6 +3621,22 @@ pub(super) const ENTRIES: &[Entry] = &[
         ],
         laziness: Laziness::Lazy,
         build: Build::Frame(select),
+    },
+    Entry {
+        id: EntryId("LazyFrame.slice"),
+        family: Family::Steps,
+        accepts: &[],
+        parameters: &[
+            required("offset", Kind::Value(ValueType::Integer), Shape::One),
+            optional(
+                "length",
+                Kind::Value(ValueType::Integer),
+                Shape::One,
+                "None",
+            ),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Frame(frame_slice),
     },
     Entry {
         id: EntryId("LazyFrame.sort"),
@@ -3420,6 +3654,19 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Frame(sort),
     },
     Entry {
+        id: EntryId("LazyFrame.tail"),
+        family: Family::Steps,
+        accepts: &[],
+        parameters: &[optional(
+            "n",
+            Kind::Value(ValueType::Integer),
+            Shape::One,
+            "5",
+        )],
+        laziness: Laziness::Lazy,
+        build: Build::Frame(frame_tail),
+    },
+    Entry {
         id: EntryId("LazyFrame.with_columns"),
         family: Family::Steps,
         accepts: &[],
@@ -3429,6 +3676,22 @@ pub(super) const ENTRIES: &[Entry] = &[
         ],
         laziness: Laziness::Lazy,
         build: Build::Frame(with_columns),
+    },
+    Entry {
+        id: EntryId("LazyFrame.with_row_index"),
+        family: Family::Steps,
+        accepts: &[],
+        parameters: &[
+            optional(
+                "name",
+                Kind::Value(ValueType::String),
+                Shape::One,
+                "'index'",
+            ),
+            optional("offset", Kind::Value(ValueType::Integer), Shape::One, "0"),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Frame(frame_with_row_index),
     },
     Entry {
         id: EntryId("Then.otherwise"),

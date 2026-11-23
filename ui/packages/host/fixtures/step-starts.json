@@ -1,6 +1,41 @@
 {
   "starts": [
     {
+      "entry": "LazyFrame.drop",
+      "arguments": [
+        {
+          "parameter": "columns",
+          "setting": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "entry": "LazyFrame.drop_nans",
+      "arguments": []
+    },
+    {
+      "entry": "LazyFrame.drop_nulls",
+      "arguments": []
+    },
+    {
+      "entry": "LazyFrame.fill_nan",
+      "arguments": [
+        {
+          "parameter": "value",
+          "setting": {
+            "kind": "unset"
+          }
+        }
+      ]
+    },
+    {
       "entry": "LazyFrame.filter",
       "arguments": [
         {
@@ -22,6 +57,25 @@
           }
         }
       ]
+    },
+    {
+      "entry": "LazyFrame.first",
+      "arguments": []
+    },
+    {
+      "entry": "LazyFrame.gather_every",
+      "arguments": [
+        {
+          "parameter": "n",
+          "setting": {
+            "kind": "unset"
+          }
+        }
+      ]
+    },
+    {
+      "entry": "LazyFrame.head",
+      "arguments": []
     },
     {
       "entry": "LazyFrame.join",
@@ -63,6 +117,14 @@
           }
         }
       ]
+    },
+    {
+      "entry": "LazyFrame.last",
+      "arguments": []
+    },
+    {
+      "entry": "LazyFrame.limit",
+      "arguments": []
     },
     {
       "entry": "LazyFrame.pivot",
@@ -114,6 +176,10 @@
       ]
     },
     {
+      "entry": "LazyFrame.reverse",
+      "arguments": []
+    },
+    {
       "entry": "LazyFrame.select",
       "arguments": [
         {
@@ -147,6 +213,17 @@
       ]
     },
     {
+      "entry": "LazyFrame.slice",
+      "arguments": [
+        {
+          "parameter": "offset",
+          "setting": {
+            "kind": "unset"
+          }
+        }
+      ]
+    },
+    {
       "entry": "LazyFrame.sort",
       "arguments": [
         {
@@ -161,6 +238,10 @@
           }
         }
       ]
+    },
+    {
+      "entry": "LazyFrame.tail",
+      "arguments": []
     },
     {
       "entry": "LazyFrame.with_columns",
@@ -184,6 +265,10 @@
           }
         }
       ]
+    },
+    {
+      "entry": "LazyFrame.with_row_index",
+      "arguments": []
     }
   ]
 }

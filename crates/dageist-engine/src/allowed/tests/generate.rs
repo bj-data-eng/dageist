@@ -1296,6 +1296,10 @@ fn option_step(
             )]),
         )],
         "LazyFrame.sort" => vec![("by", expressions(vec![column("a")]))],
+        "LazyFrame.drop" => vec![(
+            "columns",
+            Argument::Many(vec![Argument::Columns(vec!["a".to_owned()])]),
+        )],
         other => panic!("teach the generator what {other} needs to run, as it has options"),
     };
     given.extend(options);

@@ -890,6 +890,10 @@ fn every_step_of_the_list_starts_with_what_the_engine_gives_it() {
     assert_eq!(
         answer,
         json!({ "starts": [
+            { "entry": "LazyFrame.drop", "arguments": [argument("columns", unset_list())] },
+            { "entry": "LazyFrame.drop_nans", "arguments": [] },
+            { "entry": "LazyFrame.drop_nulls", "arguments": [] },
+            { "entry": "LazyFrame.fill_nan", "arguments": [argument("value", unset())] },
             { "entry": "LazyFrame.filter", "arguments": [argument("predicates", json!({
                 "kind": "list",
                 "items": [{
@@ -899,12 +903,17 @@ fn every_step_of_the_list_starts_with_what_the_engine_gives_it() {
                     "other": { "kind": "unset" },
                 }],
             }))] },
+            { "entry": "LazyFrame.first", "arguments": [] },
+            { "entry": "LazyFrame.gather_every", "arguments": [argument("n", unset())] },
+            { "entry": "LazyFrame.head", "arguments": [] },
             { "entry": "LazyFrame.join", "arguments": [
                 argument("other", json!({ "kind": "word", "value": "step_names" })),
                 argument("left_on", unset_list()),
                 argument("right_on", unset_list()),
                 argument("how", json!({ "kind": "word", "value": "left" })),
             ] },
+            { "entry": "LazyFrame.last", "arguments": [] },
+            { "entry": "LazyFrame.limit", "arguments": [] },
             { "entry": "LazyFrame.pivot", "arguments": [
                 argument("on", unset()),
                 argument("on_columns", json!({ "kind": "word", "value": "step_names" })),
@@ -915,18 +924,22 @@ fn every_step_of_the_list_starts_with_what_the_engine_gives_it() {
             { "entry": "LazyFrame.rename", "arguments": [
                 argument("mapping", json!({ "kind": "pairs", "entries": [] })),
             ] },
+            { "entry": "LazyFrame.reverse", "arguments": [] },
             { "entry": "LazyFrame.select", "arguments": [
                 argument("exprs", json!({ "kind": "list", "items": [
                     { "kind": "field", "column": "dcn" },
                     { "kind": "field", "column": "owner" },
                 ] })),
             ] },
+            { "entry": "LazyFrame.slice", "arguments": [argument("offset", unset())] },
             { "entry": "LazyFrame.sort", "arguments": [argument("by", unset_list())] },
+            { "entry": "LazyFrame.tail", "arguments": [] },
             { "entry": "LazyFrame.with_columns", "arguments": [
                 argument("named_exprs", json!({ "kind": "pairs", "entries": [
                     { "key": { "kind": "text", "value": "new_column", "shown": "new_column" }, "value": unset() },
                 ] })),
             ] },
+            { "entry": "LazyFrame.with_row_index", "arguments": [] },
         ] })
     );
 }

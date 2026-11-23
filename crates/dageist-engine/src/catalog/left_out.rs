@@ -148,6 +148,35 @@ pub fn left_out() -> &'static [LeftOut] {
 // - `Expr.str.split_exact` and `splitn` give a struct, whose fields a step reads with
 //   `Expr.struct.field`, which is not catalogued yet. `Expr.str.extract_groups` gives one too, and
 //   is catalogued, for its fields are named by the pattern and Polars says them.
+// - `LazyFrame.unique` keeps one of the rows that repeat, and its `keep` is `any` unless it is told
+//   another, which is whichever of them Polars meets first; without `maintain_order` the rows are
+//   in no order Polars promises either. What the step gives is not a table the engine can state
+//   twice, which a step that shows its rows needs, so it waits for a decision on what a step of
+//   rows that nothing fixes shows. Its `subset` also takes expressions beside names, which is a
+//   position no table is measured in.
+// - `LazyFrame.fill_null` and `shift` run a method of an expression over every column. Python
+//   picks the columns `fill_null` fills by the Python type of its value, a number the numbers and
+//   a text the text, and a strategy goes to every column, and `shift` takes its rows and its fill
+//   as expressions. Whether Polars takes a column depends on its dtype and on what each is given,
+//   as the tables of the method say, so the step is judged by the table of that method for every
+//   column. `drop_nans` is the one step that is, for it gives `is_nan` no argument; a step whose
+//   arguments meet each column is a shape of its own.
+// - `LazyFrame.top_k` and `bottom_k` take `by` as expressions, which is a position none of the
+//   tables is measured in, as the keys of a sort are.
+// - `LazyFrame.max`, `min`, `sum`, `mean`, `median`, `std`, `var`, `quantile`, `count` and
+//   `null_count` aggregate every column by a function of the table of their own, and not by the
+//   method of an expression of that name: the sum of a column of text is a null, which `Expr.sum`
+//   refuses. No table measures what each gives for each dtype, and `quantile` takes its quantile
+//   as an expression.
+// - `LazyFrame.cast` takes a mapping of columns to dtypes, a pairs parameter of a column and a
+//   dtype, and a dtype alone for every column. What Polars takes depends on the dtype of each
+//   column and the one it is cast to, which the tables say of `Expr.cast` for one column; a step
+//   is judged by it for each pair, which is the shape `fill_null` waits for as well.
+// - `LazyFrame.explode` takes the columns of lists and arrays and refuses any other dtype, which
+//   no table measures, for `Expr.explode` is not catalogued either.
+// - `polars.concat` takes several tables, which are no receiver of a step: a step is a method
+//   of the table before it, and a function that gives a table from a list of them is not an
+//   entry of any applies-to the catalogue has.
 const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.__abs__", Reason::NeverOffered),
     LeftOut::new("Expr.__add__", Reason::NeverOffered),
@@ -486,29 +515,20 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("LazyFrame.count", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.describe", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.deserialize", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.drop", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.drop_nans", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.drop_nulls", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.dtypes", Reason::NeverOffered),
     LeftOut::new("LazyFrame.execute", Reason::NeverOffered),
     LeftOut::new("LazyFrame.explain", Reason::NeverOffered),
     LeftOut::new("LazyFrame.explode", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.fill_nan", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.fill_null", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.first", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.from_lazyframe_resolver", Reason::PythonObject),
     LeftOut::new("LazyFrame.gather", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.gather_every", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.group_by", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.group_by_dynamic", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.head", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.inspect", Reason::NeverOffered),
     LeftOut::new("LazyFrame.interpolate", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.join_asof", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.join_where", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.last", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.lazy", Reason::NeverOffered),
-    LeftOut::new("LazyFrame.limit", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.map_batches", Reason::TakesPythonFunction),
     LeftOut::new("LazyFrame.match_to_schema", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.max", Reason::NotYetCatalogued),
@@ -522,7 +542,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("LazyFrame.quantile", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.remote", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.remove", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.reverse", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.rolling", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.schema", Reason::NeverOffered),
     LeftOut::new("LazyFrame.select_seq", Reason::NotYetCatalogued),
@@ -538,11 +557,9 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("LazyFrame.sink_ipc", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.sink_ndjson", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.sink_parquet", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.slice", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.sql", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.std", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.sum", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.tail", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.top_k", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.unique", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.unnest", Reason::NotYetCatalogued),
@@ -551,7 +568,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("LazyFrame.var", Reason::NotYetCatalogued),
     LeftOut::new("LazyFrame.width", Reason::NeverOffered),
     LeftOut::new("LazyFrame.with_columns_seq", Reason::NotYetCatalogued),
-    LeftOut::new("LazyFrame.with_row_index", Reason::NotYetCatalogued),
     LeftOut::new("LazyGroupBy.agg", Reason::NotYetCatalogued),
     LeftOut::new("LazyGroupBy.all", Reason::NotYetCatalogued),
     LeftOut::new("LazyGroupBy.first", Reason::NotYetCatalogued),

@@ -50,6 +50,32 @@ fn a_parameter_holds_when_it_is_not_given_what_polars_gives_it() {
         ("LazyFrame.join", "other", None),
         ("LazyFrame.select", "exprs", None),
         ("LazyFrame.rename", "mapping", None),
+        // `head(n=5)`, `with_row_index(name='index', offset=0)` and `drop(*columns, strict=True)`.
+        ("LazyFrame.head", "n", Some(Setting::Integer(5))),
+        ("LazyFrame.limit", "n", Some(Setting::Integer(5))),
+        ("LazyFrame.tail", "n", Some(Setting::Integer(5))),
+        (
+            "LazyFrame.with_row_index",
+            "name",
+            Some(Setting::Text("index".to_owned())),
+        ),
+        (
+            "LazyFrame.with_row_index",
+            "offset",
+            Some(Setting::Integer(0)),
+        ),
+        ("LazyFrame.drop", "strict", Some(Setting::Flag(true))),
+        // `slice(offset, length=None)`, `fill_nan(value)` and `drop_nulls(subset=None)`.
+        ("LazyFrame.slice", "offset", None),
+        ("LazyFrame.slice", "length", None),
+        ("LazyFrame.gather_every", "n", None),
+        (
+            "LazyFrame.gather_every",
+            "offset",
+            Some(Setting::Integer(0)),
+        ),
+        ("LazyFrame.fill_nan", "value", None),
+        ("LazyFrame.drop_nulls", "subset", None),
     ];
     for (entry_id, name, expected) in cases {
         assert_eq!(
@@ -89,6 +115,11 @@ fn a_parameter_that_is_added_starts_with_something_that_differs_from_its_default
         ("LazyFrame.join", "suffix", Setting::ToGive),
         ("Expr.shift", "n", Setting::ToGive),
         ("LazyFrame.join", "other", Setting::ToGive),
+        // `drop` takes a list of columns, and its flag starts as the opposite of its default.
+        ("LazyFrame.drop", "columns", unset_list()),
+        ("LazyFrame.drop", "strict", Setting::Flag(false)),
+        ("LazyFrame.slice", "offset", Setting::ToGive),
+        ("LazyFrame.fill_nan", "value", Setting::ToGive),
     ];
     for (entry_id, name, expected) in cases {
         assert_eq!(
@@ -154,6 +185,42 @@ fn a_new_step_starts_with_what_it_cannot_be_built_without_still_to_be_given() {
                 Setting::ToGive
             )])
         )]
+    );
+}
+
+#[test]
+fn a_step_that_cuts_or_numbers_a_table_starts_with_only_what_it_cannot_do_without() {
+    // Each of these is complete as Polars runs it with nothing given: five rows, every column of
+    // the table looked at, the rows as they are, a count from zero.
+    for id in [
+        "LazyFrame.drop_nans",
+        "LazyFrame.drop_nulls",
+        "LazyFrame.first",
+        "LazyFrame.head",
+        "LazyFrame.last",
+        "LazyFrame.limit",
+        "LazyFrame.reverse",
+        "LazyFrame.tail",
+        "LazyFrame.with_row_index",
+    ] {
+        assert_eq!(started(id, &["a", "b"], &[]), [], "{id}");
+    }
+    // A slice needs where it starts, `drop` a column to drop and `fill_nan` the value it fills with.
+    assert_eq!(
+        started("LazyFrame.slice", &["a"], &[]),
+        [("offset", Setting::ToGive)]
+    );
+    assert_eq!(
+        started("LazyFrame.drop", &["a"], &[]),
+        [("columns", unset_list())]
+    );
+    assert_eq!(
+        started("LazyFrame.fill_nan", &["a"], &[]),
+        [("value", Setting::ToGive)]
+    );
+    assert_eq!(
+        started("LazyFrame.gather_every", &["a"], &[]),
+        [("n", Setting::ToGive)]
     );
 }
 
@@ -250,13 +317,26 @@ fn every_step_of_the_catalogue_has_a_start() {
         tables: &tables,
     };
     for id in [
+        "LazyFrame.drop",
+        "LazyFrame.drop_nans",
+        "LazyFrame.drop_nulls",
+        "LazyFrame.fill_nan",
         "LazyFrame.filter",
+        "LazyFrame.first",
+        "LazyFrame.gather_every",
+        "LazyFrame.head",
         "LazyFrame.join",
+        "LazyFrame.last",
+        "LazyFrame.limit",
         "LazyFrame.pivot",
         "LazyFrame.rename",
+        "LazyFrame.reverse",
         "LazyFrame.select",
+        "LazyFrame.slice",
         "LazyFrame.sort",
+        "LazyFrame.tail",
         "LazyFrame.with_columns",
+        "LazyFrame.with_row_index",
     ] {
         assert!(start_step(entry(id), &frame).is_some(), "{id} has no start");
     }
@@ -285,8 +365,8 @@ fn every_argument_a_new_step_starts_with_is_a_parameter_of_its_entry() {
         .iter()
         .filter_map(|entry| start_step(entry, &frame).map(|start| (entry, start)))
         .collect();
-    // The seven steps of the catalogue.
-    assert_eq!(steps.len(), 7);
+    // The twenty steps of the catalogue.
+    assert_eq!(steps.len(), 20);
     for (entry, start) in steps {
         for (name, _) in start.arguments() {
             assert!(
