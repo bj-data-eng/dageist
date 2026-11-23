@@ -378,6 +378,15 @@ fn key_name(key: &Expression) -> Option<String> {
             Some(Value::Expression(column)) => key_name(column),
             _ => None,
         },
+        // A moment and a length of time are named as the first of the parts they are made of,
+        // which is `literal` for one that is a number typed in, unless every part is one: Polars
+        // then folds the call into a literal where it can, and names it `datetime` or `duration`,
+        // or leaves it as a call where it cannot, which depends on the values.
+        "polars.datetime" => {
+            let zoned = matches!(start.argument("time_zone"), Some(Value::TimeZone(Some(_))));
+            first_part_name(start, "year", &PARTS_OF_A_MOMENT, !zoned)
+        }
+        "polars.duration" => first_part_name(start, "weeks", &PARTS_OF_A_LENGTH, true),
         "polars.when" => key
             .links()
             .iter()
@@ -432,6 +441,53 @@ fn made_dtype(start: &Call) -> Option<DataType> {
             _ => DataType::Datetime(TimeUnit::Microseconds, None),
         }),
         _ => None,
+    }
+}
+
+/// The parts a moment is made of, which `polars.datetime` folds into a literal where all are.
+const PARTS_OF_A_MOMENT: [&str; 7] = [
+    "year",
+    "month",
+    "day",
+    "hour",
+    "minute",
+    "second",
+    "microsecond",
+];
+
+/// The parts a length of time is made of, which `polars.duration` folds into a literal where all
+/// are.
+const PARTS_OF_A_LENGTH: [&str; 8] = [
+    "weeks",
+    "days",
+    "hours",
+    "minutes",
+    "seconds",
+    "milliseconds",
+    "microseconds",
+    "nanoseconds",
+];
+
+/// The output name of a function that makes a moment or a length of time of `parts`, which is the
+/// name of the first part it is given, `literal` for one that is a number typed in or is not given.
+/// Where `may_fold` and every part is a number typed in and nothing more, Polars makes a literal
+/// of the call where the values fit, which it names otherwise, so the name is not known.
+fn first_part_name(start: &Call, first: &str, parts: &[&str], may_fold: bool) -> Option<String> {
+    let bare_literal = |value: Option<&Value>| match value {
+        None => true,
+        Some(Value::Expression(part)) => {
+            part.links().is_empty()
+                && matches!(part.start(), Start::Call(call)
+                    if call.entry().id().as_str() == "polars.lit")
+        }
+        Some(_) => false,
+    };
+    if may_fold && parts.iter().all(|part| bare_literal(start.argument(part))) {
+        return None;
+    }
+    match start.argument(first) {
+        Some(Value::Expression(part)) => key_name(part),
+        _ => Some("literal".to_owned()),
     }
 }
 
