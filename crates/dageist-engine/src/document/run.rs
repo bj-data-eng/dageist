@@ -749,13 +749,6 @@ impl Builder<'_> {
                 return self.built(Err(BuildError::NotAPattern { parameter, error }));
             }
         }
-        // A duration typed in is a duration string where the call takes it so, and is refused at
-        // its place when Polars reads it as none: Polars would refuse it only when the rows run.
-        for (parameter, text, using) in call.durations() {
-            if let Err(error) = check_duration(text, using, &any_moment()) {
-                return self.built(Err(BuildError::NotADuration { parameter, error }));
-            }
-        }
         self.built(call.entry().arguments(given))
     }
 
@@ -842,6 +835,25 @@ impl Builder<'_> {
         let mut links = Vec::with_capacity(expression.links().len());
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
+            // A duration typed in is a duration string where the call takes it so, and is refused
+            // at its place when Polars reads it as none for the moment it is given to, whose dtype,
+            // unit and zone included, is the one the value before the call has where it is
+            // worked out, and the finest `Datetime` otherwise: Polars would refuse it only when
+            // the rows run, or panic.
+            let durations = link.durations();
+            if !durations.is_empty() {
+                let moment = match self.resolve(&state, from_element) {
+                    Some(Resolution::Dtype(dtype @ (DataType::Datetime(..) | DataType::Date))) => {
+                        dtype
+                    }
+                    _ => any_moment(),
+                };
+                for (parameter, text, using) in durations {
+                    if let Err(error) = check_duration(text, using, &moment) {
+                        return self.built(Err(BuildError::NotADuration { parameter, error }));
+                    }
+                }
+            }
             let arguments = self.arguments(link)?;
             state = match (link.entry().build(), state) {
                 (Build::Expression(build), Built::Expr(receiver)) => {

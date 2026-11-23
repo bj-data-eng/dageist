@@ -746,7 +746,9 @@ meant, which is not about the text.
 - Python's `replace_time_zone` takes `None` for the zone, which takes the zone off a moment and keeps
   its clock. The parameter says so, `takes_no_time_zone`, and the document writes it as a time
   zone that is null, which the editor draws as the word `None` below the typed zones. `convert_time_zone`
-  takes a zone only, and a document that gives it none is refused at the parameter.
+  takes a zone only, and a document that gives it none is refused at the parameter. Polars reads the
+  empty text as no zone, so `replace_time_zone` given it takes the zone off, and `convert_time_zone` given it
+  gives the zone UTC, which the walk says.
 - A moment is held in a zone or in none, so what the method gives depends on the zone it is given:
   a moment in the zone, and in none where it is given none. The tables, which were measured with the
   zone `UTC`, say only that a moment is given, so the walk says the rest: the dtype of the call is
@@ -802,9 +804,16 @@ and does not parse one itself. `check_duration` runs the method on one moment wi
 gives Polars' reason where it refuses, in Polars' words, up to the first blank line: a text with no
 amount or no unit, a unit that does not exist, a second sign, or, of the cut and the round, a length
 below zero. Polars refuses some of them only for the dtype of what it is given to, so the moment is
-of the dtype that the value before the method has where the walk knows it: a `Date` cannot be cut
-by a length of days and hours together, nor by a length of nothing, where a `Datetime` can. The build
-cannot know the dtype, and asks on a `Datetime`. An amount whose units add up to more than an `i64` of
+of the dtype that the value before the method has: a `Date` cannot be cut by a length of days and
+hours together, nor by a length of nothing, where a `Datetime` can, and a length of a nanosecond is
+none to a moment counted in microseconds, which Polars' rounding divides by and panics, in the words it
+panics with. The build works the dtype out from the schema, unit and zone included, where it traces the
+dtypes, and asks on a `Datetime` counted in nanoseconds otherwise; the walk follows the unit of a moment
+along its chain, from the column or the literal to each call that keeps it or gives it, so that what
+the tables, which were measured on microseconds, name `Datetime(us)` is named by the unit the chain has
+after a method of the `dt` namespace that keeps it. A unit that no such method gives is not followed
+past the method that does not keep it, and a method outside the namespace is named as the tables name
+it. An amount whose units add up to more than an `i64` of
 nanoseconds is refused before Polars is asked, in every build, as [a typed duration is](#how-a-typed-text-is-read).
 
 - A duration typed in that Polars refuses is refused where the step is built, at the parameter that

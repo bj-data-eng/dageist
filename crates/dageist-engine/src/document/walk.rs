@@ -18,7 +18,7 @@
 //! whose dtype is not known where a method follows it is not asked from there
 //! on, and the walk says it cannot tell.
 
-use polars::prelude::{Schema, SchemaRef};
+use polars::prelude::{DataType, Schema, SchemaRef, TimeUnit};
 
 use crate::allowed::{
     self, After, Chosen, ConditionState, Context, Ending, Literal, Nested, Outer,
@@ -259,6 +259,8 @@ struct Around {
     /// What the chain starts from, when that is a number typed without a dtype and the
     /// link follows it.
     receiver_loose: Option<Loose>,
+    /// The unit the moment or the length of time the link follows is counted in, where it is known.
+    unit: Option<TimeUnit>,
 }
 
 /// What a chain has so far.
@@ -398,6 +400,49 @@ fn option_words(call: &Call) -> (Vec<(String, String)>, bool) {
         words.extend(word.map(|word| (given.parameter().to_owned(), word)));
     }
     (words, unknown)
+}
+
+/// The unit a moment or a length of time of the dtype is counted in.
+const fn unit_of(dtype: &DataType) -> Option<TimeUnit> {
+    match dtype {
+        DataType::Datetime(unit, _) | DataType::Duration(unit) => Some(*unit),
+        _ => None,
+    }
+}
+
+/// The unit the word the tables write for a dtype, such as `Datetime(ns, UTC)`, counts in.
+fn unit_in_name(name: &str) -> Option<TimeUnit> {
+    let inside = name
+        .strip_prefix("Datetime(")
+        .or_else(|| name.strip_prefix("Duration("))?;
+    match inside.split([',', ')']).next()? {
+        "ns" => Some(TimeUnit::Nanoseconds),
+        "us" => Some(TimeUnit::Microseconds),
+        "ms" => Some(TimeUnit::Milliseconds),
+        _ => None,
+    }
+}
+
+/// The unit the chain is counted in after `link`, which follows a value counted in `before`: what a
+/// method that is given a unit says it gives, as the table writes it, and the unit it follows for
+/// the others, where they give a moment or a length of time.
+fn unit_after(link: &Call, before: Option<TimeUnit>, standing: &Standing) -> Option<TimeUnit> {
+    let result = standing.verdict()?.allowance()?.result()?;
+    if !matches!(
+        result.class(),
+        Some(Representative::Datetime | Representative::DatetimeZoned | Representative::Duration)
+    ) {
+        return None;
+    }
+    if link
+        .entry()
+        .parameters()
+        .iter()
+        .any(|parameter| parameter.name() == "time_unit")
+    {
+        return unit_in_name(result.name());
+    }
+    before
 }
 
 /// The class a literal has, when its dtype is known without another operand:
@@ -729,6 +774,36 @@ impl Walker<'_> {
         Representative::of(self.source.get(name)?)
     }
 
+    /// The unit the moment or the length of time a start gives is counted in, where its arguments
+    /// decide it: that of the column it reads, or of the dtype a literal is given.
+    fn start_unit(&self, start: &Call) -> Option<TimeUnit> {
+        match start.entry().id().as_str() {
+            "polars.col" => {
+                let Some(Value::Columns(names)) = start.argument("name") else {
+                    return None;
+                };
+                if Self::names_several(start) {
+                    return None;
+                }
+                unit_of(self.read_against()?.get(names.first()?)?)
+            }
+            "polars.lit" => match start.argument("dtype") {
+                Some(Value::Dtype(dtype)) => unit_of(dtype.as_polars()),
+                _ => None,
+            },
+            "polars.element" => {
+                let Some(Value::Columns(names)) = self.step.argument("values") else {
+                    return None;
+                };
+                let [name] = names.as_slice() else {
+                    return None;
+                };
+                unit_of(self.source.get(name)?)
+            }
+            _ => None,
+        }
+    }
+
     /// The class a start gives, where its arguments decide it.
     fn start_class(&self, start: &Call) -> Option<Representative> {
         match start.entry().id().as_str() {
@@ -859,6 +934,10 @@ impl Walker<'_> {
             .collect();
         let mut branches_are_one =
             statements.len() > 1 && statements.windows(2).all(|pair| pair[0] == pair[1]);
+        let mut unit = match expression.start() {
+            Start::Call(start) => self.start_unit(start),
+            _ => None,
+        };
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
             let arguments = self.arguments(link, values_end);
@@ -888,8 +967,10 @@ impl Walker<'_> {
                 Around {
                     branches_are_one,
                     receiver_loose,
+                    unit,
                 },
             );
+            unit = unit_after(link, unit, &standing);
             if branches_are_one
                 && all_single
                 && matches!(
@@ -1049,6 +1130,7 @@ impl Walker<'_> {
         let Around {
             branches_are_one,
             receiver_loose,
+            unit,
         } = around;
         let entry = link.entry();
         // A number typed without a dtype that a method takes another operand beside adapts to
@@ -1251,7 +1333,8 @@ impl Walker<'_> {
                     .with_options(&words)
                     .with_patterns(&patterns)
                     .with_durations(&durations)
-                    .with_time_zones(&time_zones),
+                    .with_time_zones(&time_zones)
+                    .following(unit),
             );
             let standing = Standing {
                 follows: Some(after),
@@ -1321,7 +1404,8 @@ impl Walker<'_> {
             .with_options(&words)
             .with_patterns(&patterns)
             .with_durations(&durations)
-            .with_time_zones(&time_zones);
+            .with_time_zones(&time_zones)
+            .following(unit);
         let chosen = match gives {
             Some(dtype) => chosen.giving(dtype),
             None => chosen,

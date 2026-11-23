@@ -227,7 +227,7 @@ impl fmt::Display for Representative {
     }
 }
 
-const fn unit_name(unit: TimeUnit) -> &'static str {
+pub(super) const fn unit_name(unit: TimeUnit) -> &'static str {
     match unit {
         TimeUnit::Nanoseconds => "ns",
         TimeUnit::Microseconds => "us",

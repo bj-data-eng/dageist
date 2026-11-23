@@ -120,3 +120,23 @@ fn what_a_method_refuses_of_a_duration_depends_on_the_dtype_of_what_it_is_given_
         Ok(())
     );
 }
+
+#[test]
+fn a_length_of_nanoseconds_is_read_of_a_moment_counted_in_them_and_refused_in_polars_words_of_others()
+ {
+    use polars::prelude::TimeUnit;
+    let counted = |unit| DataType::Datetime(unit, None);
+    assert_eq!(
+        check_duration("1ns", DurationUse::Round, &counted(TimeUnit::Nanoseconds)),
+        Ok(())
+    );
+    // Counted in microseconds the length is none, which Polars' rounding divides by and panics, in
+    // the words it panics with.
+    let error = check_duration("1ns", DurationUse::Round, &counted(TimeUnit::Microseconds))
+        .expect_err("a length of nothing");
+    assert!(
+        error.reason().contains("divisor of zero"),
+        "{}",
+        error.reason()
+    );
+}

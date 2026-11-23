@@ -12,10 +12,12 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use polars::prelude::{DataType, IntoLazy, TimeUnit, col, df, lit};
 
-/// The moment a duration is asked of when it is not known what it is given to: a `Datetime`.
+/// The moment a duration is asked of when it is not known what it is given to: a `Datetime` held in
+/// the finest unit, which refuses of a duration no more than one held in a coarser unit does, for a
+/// length of nanoseconds is none to a moment held in microseconds.
 #[must_use]
 pub const fn any_moment() -> DataType {
-    DataType::Datetime(TimeUnit::Microseconds, None)
+    DataType::Datetime(TimeUnit::Nanoseconds, None)
 }
 
 /// Why a text is no duration, in the words Polars gives.
@@ -66,13 +68,21 @@ pub fn check_duration(text: &str, using: DurationUse, on: &DataType) -> Result<(
         });
     }
     // What `fits_polars` lets through does not overflow Polars' parser; the catch is for a text
-    // that Polars panics on, as an amount of the unit of an index that its rounding cannot divide
-    // by.
+    // that Polars panics on.
     match catch_unwind(AssertUnwindSafe(|| ask_polars(text, using, on))) {
         Ok(Ok(())) => Ok(()),
         Ok(Err(reason)) => Err(DurationError { reason }),
-        Err(_) => Err(DurationError {
-            reason: "Polars fails when it uses this duration".to_owned(),
+        // What Polars says as it panics, as it does of a length of nothing, which a rounding cannot
+        // divide by.
+        Err(payload) => Err(DurationError {
+            reason: payload
+                .downcast_ref::<String>()
+                .map(String::as_str)
+                .or_else(|| payload.downcast_ref::<&str>().copied())
+                .map_or_else(
+                    || "Polars fails when it uses this duration".to_owned(),
+                    str::to_owned,
+                ),
         }),
     }
 }

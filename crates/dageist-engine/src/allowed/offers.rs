@@ -3,13 +3,13 @@
 
 use std::fmt;
 
-use polars::prelude::DataType;
+use polars::prelude::{DataType, TimeUnit, TimeZone};
 
 use crate::catalog::{self, Applies, DurationUse, Entry, Kind};
 
 use super::adapt::could_be_taken_by_a_number;
 use super::context::Context;
-use super::dtype::{Representative, ResultDtype, dtype_name};
+use super::dtype::{Representative, ResultDtype, dtype_name, unit_name};
 use super::rules::Rule;
 use super::table::{OptionValue, Outcome, Produces, Reason, Shape, Stage, Tables, is_method};
 use crate::catalog::DefaultValue;
@@ -85,6 +85,7 @@ pub struct Chosen<'a> {
     patterns: &'a [(&'a str, &'a str)],
     durations: &'a [(&'a str, &'a str, DurationUse)],
     time_zones: &'a [(&'a str, Option<&'a str>)],
+    unit: Option<TimeUnit>,
     gives: Option<Representative>,
     many: bool,
 }
@@ -146,6 +147,15 @@ impl<'a> Chosen<'a> {
     #[must_use]
     pub const fn with_time_zones(mut self, time_zones: &'a [(&'a str, Option<&'a str>)]) -> Self {
         self.time_zones = time_zones;
+        self
+    }
+
+    /// The unit the moment or the length of time the method follows is counted in, where the chain
+    /// knows it. The tables were measured on microseconds, so a method that keeps the unit gives
+    /// the one it follows, and a duration is asked of Polars on a moment counted in it.
+    #[must_use]
+    pub const fn following(mut self, unit: Option<TimeUnit>) -> Self {
+        self.unit = unit;
         self
     }
 
@@ -806,6 +816,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         }
     }
     // A duration Polars does not read is refused in Polars' words, whatever follows it.
+    let unit = chosen.unit.unwrap_or(TimeUnit::Microseconds);
     let moment = match place.after {
         After::Value {
             dtype: Representative::Date,
@@ -814,7 +825,8 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         After::Value {
             dtype: Representative::DatetimeZoned,
             ..
-        } => Representative::DatetimeZoned.dtype(),
+        } => DataType::Datetime(unit, Some(TimeZone::UTC)),
+        After::Value { .. } => DataType::Datetime(unit, None),
         _ => catalog::any_moment(),
     };
     for (_, text, using) in chosen.durations {
@@ -924,20 +936,49 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
                 .as_ref()
                 .is_some_and(|result| result.name().starts_with("Datetime("))
         {
+            let unit = unit_name(chosen.unit.unwrap_or(TimeUnit::Microseconds));
+            // Polars reads the empty text as no zone: a moment given it has none where the call
+            // takes a zone off, and the zone UTC where the call converts, which takes none.
+            let zoned = |zone: String| ResultDtype::from_name(&format!("Datetime({unit}, {zone})"));
+            let unzoned = || ResultDtype::from_name(&format!("Datetime({unit})"));
             result = match chosen
                 .time_zones
                 .iter()
                 .find(|(name, _)| *name == parameter.name())
             {
-                Some((_, Some(text))) => catalog::check_time_zone(text)
-                    .ok()
-                    .flatten()
-                    .map(|zone| ResultDtype::from_name(&format!("Datetime(us, {zone})")))
-                    .or_else(|| Some(ResultDtype::from_name("Datetime(us)"))),
-                Some((_, None)) => Some(ResultDtype::from_name("Datetime(us)")),
+                Some((_, Some(text))) => match catalog::check_time_zone(text).ok() {
+                    Some(Some(zone)) => Some(zoned(zone.to_string())),
+                    Some(None) if parameter.takes_no_time_zone() => Some(unzoned()),
+                    Some(None) => Some(zoned(TimeZone::UTC.to_string())),
+                    None => Some(unzoned()),
+                },
+                Some((_, None)) => Some(unzoned()),
                 None if parameter.takes_no_time_zone() => None,
                 None => result,
             };
+        } else if let Some(known) = chosen.unit
+            && known != TimeUnit::Microseconds
+            && entry.family() == catalog::Family::Temporal
+            && !entry
+                .parameters()
+                .iter()
+                .any(|parameter| parameter.name() == "time_unit")
+            && let Some(kept) = result
+                .as_ref()
+                .filter(|result| {
+                    matches!(
+                        result.class(),
+                        Some(Representative::Datetime | Representative::DatetimeZoned)
+                    )
+                })
+                .and_then(|result| result.name().strip_prefix("Datetime(us"))
+        {
+            // A method of the `dt` namespace keeps the unit of the moment it follows, which the
+            // tables, measured on microseconds, name as they were measured.
+            result = Some(ResultDtype::from_name(&format!(
+                "Datetime({}{kept}",
+                unit_name(known)
+            )));
         }
         // A call that was not given what Polars needs to run it gives nothing
         // whatever its options: Polars refuses a window given neither key.
