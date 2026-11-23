@@ -92,9 +92,9 @@ pub enum Limit {
     ///   replacement replaces, no supertype of two dtypes, a fill by a strategy for a dtype, or
     ///   the plan saying another dtype than the rows give;
     /// - the tables refusing a failed conversion, which Polars allows, of the values a
-    ///   replacement lists, of a cast of a literal, of a skew or a kurtosis of one, which convert
-    ///   what they follow to a float, or of a cast that follows a comparison or an arithmetic with
-    ///   a null;
+    ///   replacement lists, of a cast of a literal, or of a cast that follows a comparison or an
+    ///   arithmetic with a null, and of a skew or a kurtosis in the same places, which convert
+    ///   what they follow to a float as a cast does;
     /// - Polars refusing the empty table, with no place, for an operation not supported, a null
     ///   dtype, or a conversion to `null`;
     /// - Polars refusing the rows, with no place, of an aggregate that holds a quantile, for a
@@ -4160,17 +4160,17 @@ fn applies(
                             matches!(
                                 call.entry().id().as_str(),
                                 "Expr.replace" | "Expr.replace_strict"
-                            ) || (is(call, "Expr.cast")
+                            ) || ((is(call, "Expr.cast")
+                                // A skew and a kurtosis convert what they follow to a float, as
+                                // a cast does.
+                                || is(call, "Expr.skew")
+                                || is(call, "Expr.kurtosis"))
                                 && locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
                                     starts_from_a_literal(chain)
                                         || chain.links()[..at].iter().any(compares_with_a_null)
                                         || (starts_from_a_function_of_literals(chain)
                                             && converts_when_selected(&frames, chain, at + 1))
                                 }))
-                                // A skew and a kurtosis convert what they follow to a float, which
-                                // a text literal that reads as a number does.
-                                || ((is(call, "Expr.skew") || is(call, "Expr.kurtosis"))
-                                    && locus.chain.is_some_and(starts_from_a_literal))
                         })
                     })
         }
@@ -4964,6 +4964,32 @@ mod tests {
                 "{entry}"
             );
         }
+        // The values of a group that a null text is added to are nulls, which convert: the same
+        // reading as a cast's, so the chain the skew follows need not start from a literal.
+        let text_dtype = Dtype::new(Representative::String.dtype()).expect("a dtype");
+        let null_text = call(
+            "polars.lit",
+            vec![
+                ("value", Value::Flag(None)),
+                ("dtype", Value::Dtype(text_dtype)),
+            ],
+        );
+        let summed = pivot(chain_of(
+            call("polars.element", Vec::new()),
+            vec![
+                compared_with("Expr.add", chain(null_text, &[])),
+                call("Expr.skew", Vec::new()),
+            ],
+        ));
+        let at_the_skew = at(&[parameter("aggregate_function"), Segment::Link(1)]);
+        assert_eq!(
+            excused_by_kept("uncovered-a-group-aggregate--a-skew-of-a-sum-with-a-null-text.case"),
+            vec![Limit::AGroupAggregate]
+        );
+        assert_eq!(
+            refused_by_the_tables_at(&summed, at_the_skew, text),
+            vec![Limit::AGroupAggregate]
+        );
         // A call that does not convert what it follows is refused for it by no kernel of a group.
         let running = pivot(chain_of(one(), vec![call("Expr.cum_sum", Vec::new())]));
         assert_eq!(
