@@ -551,3 +551,51 @@ fn a_date_of_one_row_that_a_part_widens_is_no_input_of_a_window() {
     ]));
     assert_eq!(report_of(&many).steps()[0].walk().refusal(), None);
 }
+
+#[test]
+fn moments_in_different_zones_are_no_operands_of_a_comparison_a_difference_or_a_fill() {
+    // 02:00 in Berlin and in UTC are not the same dtype to Polars, which finds no dtype the two have
+    // in common, so it refuses to compare, subtract or fill them, as it does for any two dtypes that
+    // have none.
+    let berlin = || {
+        vec![
+            in_zone("Expr.dt.replace_time_zone", Some("UTC")),
+            in_zone("Expr.dt.convert_time_zone", Some("Europe/Berlin")),
+        ]
+    };
+    let utc = || moments_then_all(vec![in_zone("Expr.dt.replace_time_zone", Some("UTC"))]);
+    for (id, parameter) in [
+        ("Expr.le", "other"),
+        ("Expr.eq", "other"),
+        ("Expr.eq_missing", "other"),
+        ("Expr.sub", "other"),
+        ("Expr.fill_null", "value"),
+    ] {
+        let mut links = berlin();
+        links.push(call(id, json!({ parameter: utc() })));
+        let report = report_of(&selecting(moments_then_all(links)));
+        let walked = report.steps()[0]
+            .walk()
+            .refusal()
+            .unwrap_or_else(|| panic!("{id}: the walk refuses it"));
+        assert!(
+            matches!(walked.refusal().source(), RefusalSource::Rule(rule)
+                if rule.name() == "moments-share-a-zone"),
+            "{id}: {:?}",
+            walked.refusal().source()
+        );
+        assert!(
+            walked.refusal().reason().contains("Europe/Berlin"),
+            "{id}: {}",
+            walked.refusal().reason()
+        );
+    }
+    // The same zone is the same dtype, however the moment came to be in it.
+    let mut links = berlin();
+    links.push(call(
+        "Expr.le",
+        json!({ "other": moments_then_all(berlin()) }),
+    ));
+    let report = report_of(&selecting(moments_then_all(links)));
+    assert_eq!(report.steps()[0].walk().refusal(), None);
+}
