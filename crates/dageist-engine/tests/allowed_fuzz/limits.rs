@@ -37,7 +37,9 @@
 use dageist_engine::allowed::Representative;
 use dageist_engine::allowed::Stage as TableStage;
 use dageist_engine::catalog;
-use dageist_engine::document::{Call, Document, Expression, Place, Segment, Start, Step, Value};
+use dageist_engine::document::{
+    Call, Document, Dtype, Expression, Place, Segment, Start, Step, Value,
+};
 
 use super::case::Case;
 use super::frames::Frames;
@@ -417,8 +419,9 @@ pub enum Limit {
     /// case run again with each part made the number 1 is not refused for it. The tables refusing
     /// a call at the rows for invalid components that Polars allows, in a case with a call
     /// given a part: the tables then no longer refuse it for them with each part made the number 1,
-    /// and Polars refuses it for them with each part made `false`, which shows that it evaluates the
-    /// part and does not skip it.
+    /// and Polars refuses it for them with each part made `false`, or with each part made a whole
+    /// number with no null, which shows that it evaluates the part and does not skip it: a row where
+    /// a part is null is a null date whose other parts Polars does not check.
     APartOfADateThatDependsOnTheRows,
     /// `dt.cast_time_unit` to nanoseconds multiplies the count of a moment, and Polars refuses one
     /// outside the years that nanoseconds hold, such as the first of January of the year 1, when the
@@ -605,7 +608,7 @@ impl Limit {
                 "a cast of a moment to nanoseconds refuses one outside the years nanoseconds hold, when the rows run, where the tables measured moments of 1970 and after"
             }
             Self::APartOfADateThatDependsOnTheRows => {
-                "dt.replace, date, datetime and time refuse a part outside the calendar's range, or that does not convert, when the rows run, so it depends on the values of the rows, where the tables measured the values of one column"
+                "dt.replace, date, datetime and time refuse a part outside the calendar's range, or that does not convert, when the rows run, and check no part of a row where another is null, so it depends on the values of the rows, where the tables measured the values of one column beside parts that hold no null"
             }
             Self::AFormatTheDtypeCannotWrite => {
                 "a format writes the fields a dtype has and Polars refuses one it has none for, where the tables measured the format iso, which every dtype takes"
@@ -2175,6 +2178,76 @@ fn case_with_the_parts_as(case: &Case, value: Value) -> Option<Case> {
     })
 }
 
+/// The case with each part that a call is given turned into a whole number that holds no null: cast
+/// to `Int64`, where what does not convert is a null, and each null made the number 1.
+fn case_with_the_nulls_of_the_parts_filled(case: &Case) -> Option<Case> {
+    let one = Expression::new(
+        Start::Call(
+            Call::new(
+                catalog::entry("polars.lit")?,
+                vec![("value", Value::Integer(1))],
+            )
+            .ok()?,
+        ),
+        Vec::new(),
+    )
+    .ok()?;
+    let cast = Call::new(
+        catalog::entry("Expr.cast")?,
+        vec![
+            (
+                "dtype",
+                Value::Dtype(Dtype::new(Representative::Int64.dtype()).ok()?),
+            ),
+            ("strict", Value::Flag(Some(false))),
+        ],
+    )
+    .ok()?;
+    let fill = Call::new(
+        catalog::entry("Expr.fill_null")?,
+        vec![("value", Value::Expression(one))],
+    )
+    .ok()?;
+    case_changed(case, &|call| {
+        if !is_given_a_part_of_a_date(call) {
+            return None;
+        }
+        let given: Vec<(&str, Value)> = call
+            .arguments()
+            .iter()
+            .map(|given| {
+                let value = match given.value() {
+                    Value::Expression(part) if PARTS_OF_A_DATE.contains(&given.parameter()) => {
+                        let links = part
+                            .links()
+                            .iter()
+                            .cloned()
+                            .chain([cast.clone(), fill.clone()])
+                            .collect();
+                        Expression::new(part.start().clone(), links)
+                            .map_or_else(|_| given.value().clone(), Value::Expression)
+                    }
+                    other => other.clone(),
+                };
+                (given.parameter(), value)
+            })
+            .collect();
+        Call::new(call.entry(), given).ok()
+    })
+}
+
+/// Whether Polars refuses the case for invalid components once each part holds no null: the nulls
+/// that hid them were why it allowed the case. `None` where no call is given a part.
+fn refused_for_the_components_with_the_nulls_filled(case: &Case) -> Option<bool> {
+    changed(case_with_the_nulls_of_the_parts_filled(case), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| is_a_refusal_of_the_components_of_a_date(&refusal.reason))
+        })
+    })
+}
+
 /// Whether Polars refuses the case for what `reason` says with each part the literal `value`: it
 /// then evaluates the part, and what it refuses is a cause. Polars that never evaluates a part
 /// allows the case. `None` where no call is given a part.
@@ -3540,7 +3613,9 @@ fn applies(
             // refusing the case once each part is the number 1, and where Polars refuses it, with
             // each part made a value that no part takes, for the reason the tables gave, which
             // shows that it evaluates the part and does not skip it: day 0 for the invalid
-            // components, and text that is no number for a failed conversion of text.
+            // components, and text that is no number for a failed conversion of text. A part that
+            // holds a null in a row where another is invalid makes that row a null date, which
+            // Polars does not check: Polars refuses the components once each part holds no null.
             refused.stage == Some(TableStage::Rows)
                 && locate(case, &refused.place)
                     .call
@@ -3549,11 +3624,12 @@ fn applies(
                     the_tables_stop_refusing_the_parts_as_ones(
                         case,
                         is_a_refusal_of_the_components_of_a_date,
-                    ) && refused_for_a_part_with(
+                    ) && (refused_for_a_part_with(
                         case,
                         Value::Flag(Some(false)),
                         is_a_refusal_of_the_components_of_a_date,
                     ) == Some(true)
+                        || refused_for_the_components_with_the_nulls_filled(case) == Some(true))
                 } else if is_a_failed_conversion_of_text(&refused.reason)
                     && locate(case, &refused.place)
                         .call
