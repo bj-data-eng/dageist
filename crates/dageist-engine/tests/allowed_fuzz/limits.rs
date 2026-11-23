@@ -445,13 +445,15 @@ pub enum Limit {
     /// `dt.cast_time_unit` given nanoseconds: the case run again with each unit made milliseconds,
     /// which a moment cannot overflow, is not refused for it.
     AMomentBeyondTheRangeOfAUnit,
-    /// Polars refuses the approximate quantile of a literal, which is one value, where it stands in
-    /// a branch of a condition, with the reason that the quantile holds a null, and meets it where
-    /// it stands in a select or on a column in the branch. The tables measured the call
-    /// in a branch on columns. Polars refusing the rows or the empty table with that refusal, which
-    /// has no place, in a case with a branch of a condition that holds a chain that starts from a
-    /// literal and takes an approximate quantile: the case run again with each such literal a
-    /// column is not refused for it.
+    /// Polars' streaming engine refuses the approximate quantile of a literal, which is one value,
+    /// where it stands in a value of a branch of a condition, or in the predicate of a `when` after
+    /// the first, with the reason that the quantile holds a null. It meets it in a select, a
+    /// filter, a sort key, a join key, a window, the predicate of the first `when`, and on a column
+    /// in the condition. The tables measured the call in a condition on columns. Polars refusing
+    /// the rows or the empty table with that refusal, which has no place, in a case with a
+    /// condition that holds in a value or in a later predicate a chain that starts from a literal
+    /// and takes an approximate quantile: the case run again with each such literal a column is not
+    /// refused for it.
     AnApproximateQuantileOfALiteralInABranch,
 }
 
@@ -634,7 +636,7 @@ impl Limit {
                 "a cast of a moment to nanoseconds refuses one outside the years nanoseconds hold, when the rows run, where the tables measured moments of 1970 and after"
             }
             Self::AnApproximateQuantileOfALiteralInABranch => {
-                "Polars reads the quantile of an approximate quantile of a literal as null in a branch of a condition, which it does not in a select or on a column, where the tables measured the call"
+                "Polars reads the quantile of an approximate quantile of a literal as null in a value or a later predicate of a condition, which it does not in a select or on a column, where the tables measured the call"
             }
             Self::APartOfADateThatDependsOnTheRows => {
                 "dt.replace, date, datetime and time refuse a part outside the calendar's range, or that does not convert, when the rows run, so it depends on the values of the rows, where the tables measured the values of one column"
@@ -2681,8 +2683,15 @@ fn is_a_literal_approximate_quantile(expression: &Expression) -> bool {
             .any(|link| is(link, "Expr.approx_quantile"))
 }
 
-/// Whether an expression holds, at any depth, a value of a condition that is a chain `found`
-/// accepts or holds one.
+/// Whether the call is where a condition's values and later predicates are evaluated together: a
+/// value of a branch, or the predicate of a `when` that follows another. The predicate of the
+/// first `when` is not.
+fn is_a_branch_part(call: &Call) -> bool {
+    is_a_branch_value(call) || is(call, "Then.when") || is(call, "ChainedThen.when")
+}
+
+/// Whether an expression holds, at any depth, a part of a condition (a value, or the predicate of
+/// a `when` after the first) that is a chain `found` accepts or holds one.
 fn holds_in_a_branch(expression: &Expression, found: &dyn Fn(&Expression) -> bool) -> bool {
     let calls = std::iter::once(expression.start())
         .filter_map(|start| match start {
@@ -2692,7 +2701,7 @@ fn holds_in_a_branch(expression: &Expression, found: &dyn Fn(&Expression) -> boo
         .chain(expression.links());
     calls.into_iter().any(|call| {
         operands(call).into_iter().any(|(_, inside)| {
-            (is_a_branch_value(call) && holds_a_chain(inside, found))
+            (is_a_branch_part(call) && holds_a_chain(inside, found))
                 || holds_in_a_branch(inside, found)
         })
     })
