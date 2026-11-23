@@ -95,7 +95,10 @@ pub enum Limit {
     ///   replacement lists, of a cast of a literal, or of a cast that follows a comparison or an
     ///   arithmetic with a null;
     /// - Polars refusing the empty table, with no place, for an operation not supported, a null
-    ///   dtype, or a conversion to `null`.
+    ///   dtype, or a conversion to `null`;
+    /// - Polars refusing the rows, with no place, of an aggregate that holds a quantile, for a
+    ///   share that is no number: a select reads the text the share is written as, and the
+    ///   kernel that takes the values of a group does not.
     ///
     /// A cast of a value that literals alone make, by a function that makes a date, a moment or a
     /// length of time of them, is one too where the same chain through the cast, run in a select on
@@ -3999,12 +4002,22 @@ fn applies(
         (Limit::AGroupAggregate, Disagreement::PolarsRefuses(refusal)) => {
             // A table with no rows has no groups, and the values of an
             // aggregate over none have no dtype.
-            pivot
-                && refusal.stage == Stage::Empty
+            let of_nothing = refusal.stage == Stage::Empty
                 && (refusal.reason.contains("not supported")
                     || refusal.reason.contains("got `null`")
                     || refusal.reason.contains("got null")
-                    || refusal.reason.contains("` to `null` failed"))
+                    || refusal.reason.contains("` to `null` failed"));
+            // A select reads the text a share is written as, and the kernel that takes the values
+            // of a group refuses it as no number.
+            let a_text_share = unplaced(refusal)
+                && refusal.stage == Stage::Rows
+                && refusal
+                    .reason
+                    .contains("expected expression of dtype 'numeric' for quantile")
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &|call| is(call, "Expr.quantile")));
+            pivot && (of_nothing || a_text_share)
         }
         (Limit::AGroupAggregate, Disagreement::PolarsAllows(refused)) => {
             let frames = Frames::with_key(case.receiver, case.argument, None);
