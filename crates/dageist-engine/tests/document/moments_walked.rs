@@ -386,3 +386,26 @@ fn a_length_of_days_and_hours_is_refused_for_a_moment_in_a_zone_that_is_not_utc(
     }
     assert_eq!(truncated_in("UTC", "2d12h").refusal(), None);
 }
+
+#[test]
+fn a_folded_length_of_time_is_no_part_of_a_join_key_either() {
+    // Polars refuses an alias anywhere in a key, so a condition that gives the folded call as a
+    // value is refused as the call alone is.
+    let folded = || made_by("polars.duration", json!({}));
+    let key = chain(
+        call(
+            "polars.when",
+            json!({ "predicates": many(vec![field("f")]) }),
+        ),
+        vec![
+            call("When.then", json!({ "statement": folded() })),
+            call("Then.otherwise", json!({ "statement": folded() })),
+        ],
+    );
+    let walk = join_walk(key);
+    let refusal = walk.refusal().expect("an alias in the key");
+    let RefusalSource::Rule(rule) = refusal.refusal().source() else {
+        panic!("{refusal:?}");
+    };
+    assert_eq!(rule.name(), "folded-function-is-no-join-key");
+}
