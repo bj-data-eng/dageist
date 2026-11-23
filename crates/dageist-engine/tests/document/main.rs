@@ -7,6 +7,7 @@ mod dates;
 mod defaults;
 mod dtypes;
 mod floats;
+mod frames;
 mod holes;
 mod inputs;
 mod join_keys;
