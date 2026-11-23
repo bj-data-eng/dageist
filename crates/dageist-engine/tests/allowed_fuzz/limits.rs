@@ -7746,6 +7746,49 @@ mod tests {
     }
 
     #[test]
+    fn a_text_share_of_a_quantile_is_excused_in_a_pivots_aggregate_and_nowhere_else() {
+        // A select reads the text "1" as the share it writes, and the aggregate of a pivot, which
+        // runs the values of each group, refuses it as no number.
+        let reason = "expected expression of dtype 'numeric' for quantile, got 'str'";
+        let quantile = chain(column("a"), &["Expr.quantile"]);
+        let case = pivot(quantile.clone());
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Rows, reason, Vec::new()),
+            vec![Limit::AGroupAggregate]
+        );
+        // The same reason is no excuse in a select, in a pivot whose aggregate holds no quantile,
+        // at the empty table, for a refusal Polars placed, or in other words.
+        assert_eq!(
+            polars_refuses(
+                &select(vec![quantile]),
+                None,
+                Stage::Rows,
+                reason,
+                Vec::new()
+            ),
+            vec![]
+        );
+        let without = pivot(chain(column("a"), &["Expr.cum_sum"]));
+        assert_eq!(
+            polars_refuses(&without, None, Stage::Rows, reason, Vec::new()),
+            vec![]
+        );
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Empty, reason, Vec::new()),
+            vec![]
+        );
+        let placed = at(&[parameter("aggregate_function"), Segment::Link(0)]);
+        assert_eq!(
+            polars_refuses(&case, Some(placed), Stage::Rows, reason, Vec::new()),
+            vec![]
+        );
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Rows, "no", Vec::new()),
+            vec![]
+        );
+    }
+
+    #[test]
     fn a_pivot_aggregate_is_excused_by_the_kernel_reason_and_by_the_empty_table_with_one() {
         let case = pivot(chain(column("a"), &["Expr.cum_sum"]));
         let at_the_call = at(&[parameter("aggregate_function"), Segment::Link(0)]);
