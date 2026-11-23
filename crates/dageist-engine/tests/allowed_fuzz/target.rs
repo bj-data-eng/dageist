@@ -795,6 +795,10 @@ mod tests {
                 "joining with repeated key names; already joined on u and u",
             ),
             (
+                "folded-function-is-no-join-key",
+                "'alias' is not allowed in a join key, use 'with_columns' first",
+            ),
+            (
                 "filter-predicate-is-boolean",
                 "filter predicate must be of type `Boolean`, got `Int64`",
             ),
