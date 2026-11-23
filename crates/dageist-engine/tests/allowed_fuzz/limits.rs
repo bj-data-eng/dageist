@@ -6674,6 +6674,40 @@ mod tests {
     }
 
     #[test]
+    fn what_polars_gives_all_null_is_only_nulls_to_meet_and_what_it_gives_values_is_not() {
+        // `g.str.slice(offset=g)` has the text of a column for an offset, which is no whole
+        // number, so Polars gives a null in each row, and a count since 1970 of it meets only
+        // nulls where the tables refused the dtype of text.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-shift-that-leaves-nulls--a-slice-by-text-that-gives-only-nulls.case"
+            ),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        let at_the_start = || at(&[parameter("exprs"), Segment::Item(0), Segment::Start]);
+        let said =
+            "casting from string to datetime is not supported. It was removed in Polars 2.0.";
+        let sliced = |offset: Expression| {
+            counting(chain_of(
+                column("g"),
+                vec![call(
+                    "Expr.str.slice",
+                    vec![("offset", Value::Expression(offset))],
+                )],
+            ))
+        };
+        // A whole number for the offset keeps the text, which is what the tables refused.
+        assert_eq!(
+            tables_refuse(&sliced(whole(1)), at_the_start(), ROWS, said),
+            vec![]
+        );
+        assert_eq!(
+            tables_refuse(&sliced(chain(column("g"), &[])), at_the_start(), ROWS, said),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+    }
+
+    #[test]
     fn the_last_of_a_shift_is_null_only_in_a_column_that_has_the_sample_null() {
         // `a` and `b` hold a null in the middle row, which one shift puts last. The
         // columns `f`, `k`, `g`, `h` and `u` hold no null, so what is last after one
