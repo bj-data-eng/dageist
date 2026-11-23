@@ -14,6 +14,7 @@ mod moments;
 mod moments_walked;
 mod nesting;
 mod nulls;
+mod order;
 mod patterns;
 mod preview;
 mod reading;
