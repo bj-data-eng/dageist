@@ -500,3 +500,18 @@ fn gather_every_of_a_table_without_columns_keeps_the_height_it_gathers() {
     ]);
     assert_eq!(rows_through(&text, "s").expect("rows").len(), 2);
 }
+
+#[test]
+fn reverse_of_a_table_without_columns_keeps_its_height() {
+    // Python reverses beside a column of its own that it drops, as it gathers, so a table with no
+    // column keeps its rows: `(4, 0)` for four rows, where `select` of every column gives none.
+    let text = document(vec![
+        step(
+            "t",
+            "LazyFrame.drop",
+            json!({ "columns": many(vec![columns(&["a", "f", "s"])]) }),
+        ),
+        step("s", "LazyFrame.reverse", json!({})),
+    ]);
+    assert_eq!(rows_through(&text, "s").expect("rows").len(), 4);
+}
