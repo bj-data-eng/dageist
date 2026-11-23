@@ -534,23 +534,26 @@ What Polars does with each is what the tables say, and some of it is not what a 
 - `rank` gives a `Float64` for `average` and a `UInt32` for every other `method`, and `arg_sort` and `rle_id`
   a `UInt32`. A `rank` of `random` takes a `seed`, a whole number from zero that Python passes as an unsigned
   64-bit number, and is another order each time it runs without one. `diff` of dates and moments is a length
-  of time, in nanoseconds for a time of day, and of an unsigned whole number the signed one that holds every
-  difference (`UInt8` gives `Int16`); it takes the numbers and the dates, times and lengths of time that a
-  subtraction takes and refuses text and a `Boolean`, and `pct_change` is the quotient of a value and the one `n` rows before it,
+  of time, in nanoseconds for a time of day, and of an unsigned whole number up to `UInt64` the signed one
+  that holds every difference (`UInt8` gives `Int16`, `UInt64` gives `Int64`), where a `UInt128` stays a
+  `UInt128`; it takes what a subtraction takes, and refuses text, a `Boolean`, a list of text and a struct
+  that holds text, and `pct_change` is the quotient of a value and the one `n` rows before it,
   less one, a float.
 - `n` of `diff` and `pct_change` is a count of rows as `shift`'s is: one value, which Polars refuses many
   values of with `'n' must be a scalar value` or `n must be a single value`, and a whole number typed
   without a dtype is that dtype. The tables measure it as one value, as they measure `shift`'s, and the
   fuzz target draws it so.
 - `sort_by` takes the keys it sorts by as `by` and `more_by`, as a sort step does, a flag of `descending`
-  and of `nulls_last` for each of them or one for all. Polars meets a receiver of one value with each value
-  of the keys of many, so the sum of a column sorted by a column is as many values as the column; a column
-  sorted by a key of one value is the column.
+  and of `nulls_last` for each of them or one for all. In a lazy plan, which is how a step runs, Polars
+  meets a receiver of one value with each value of the keys of many (a `DataFrame.select` run at once
+  refuses it), so the sum of a column sorted by a column is as many values as the column; a column sorted
+  by a key of one value is the column.
 - `diff` has a `null_behavior`, whose `drop` leaves out the first `n` values and so gives fewer values than
   the table has rows, which the tables cannot say. The catalogue holds the one word `ignore`, which is
   Python's default, and does not offer the parameter, so a step always keeps every row.
 - The methods that give as many values as the rows or the arguments decide, `filter`, `unique`, `head`,
-  `tail`, `slice`, `top_k`, `bottom_k`, `gather_every`, `gather`, `arg_unique` and `mode`, are not
+  `tail`, `slice`, `limit`, `top_k`, `bottom_k`, `gather_every`, `gather`, `arg_unique`, `mode` and
+  `unique_counts`, are not
   catalogued, and neither are `is_in`, `search_sorted` and `interpolate`. `left_out.rs` gives the reason
   of each: Polars refuses a method that gives some other number of values beside a column, in a filter's
   predicate, a sort key or a window's key, with a message about lengths, and the walk has a shape for
@@ -1579,7 +1582,7 @@ repeated pair of key names, and the tables could not be asked past a point in 42
 counts are the same at one thread, at two and at the machine's own, and so are the 80 cases
 refused by the rule that is stricter by design, of 175 pivot cases, the 9 that a limit excused, the
 10 refused where Polars does not evaluate the part, the 748 that agree and the 130 refused by both
-for another reason. They need not be on another seed: Polars' thread count changes which reason it
+for another reason. Another seed's counts may differ between thread counts: Polars' thread count changes which reason it
 gives where the tables and Polars both refuse, and a case in which Polars panics at some counts and
 not at others moves a case between them. The test
 asserts none of those.
