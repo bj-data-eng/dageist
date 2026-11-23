@@ -13,10 +13,11 @@ use std::sync::Arc;
 use polars::chunked_array::cast::CastOptions;
 use polars::frame::PivotColumnNaming;
 use polars::prelude::{
-    AnyValue, ClosedInterval, DataType, Expr, FillNullStrategy, JoinBuildSide, JoinCoalesce,
-    JoinType, JoinValidation, LazyFrame, MaintainOrderJoin, NULL, NamedFrom, NonExistent, Operator,
-    PolarsError, RoundMode, Scalar, Series, SortMultipleOptions, SortOptions, TimeUnit, TimeZone,
-    WindowMapping, all, all_horizontal, binary_expr, col, cols, element, lit, when,
+    AnyValue, ClosedInterval, DataType, DatetimeArgs, DurationArgs, Expr, FillNullStrategy,
+    JoinBuildSide, JoinCoalesce, JoinType, JoinValidation, LazyFrame, MaintainOrderJoin, NULL,
+    NamedFrom, NonExistent, Operator, PolarsError, RoundMode, Scalar, Series, SortMultipleOptions,
+    SortOptions, TimeUnit, TimeZone, WindowMapping, all, all_horizontal, binary_expr, col, cols,
+    datetime, duration, element, lit, when,
 };
 
 use super::{
@@ -1732,6 +1733,102 @@ fn polars_lit(arguments: &Arguments) -> Result<Expr, BuildError> {
     )))
 }
 
+/// A part of a date or a time that is not given, which Python makes the number 0.
+fn part_or_zero(arguments: &Arguments, parameter: &'static str) -> Result<Expr, BuildError> {
+    Ok(arguments.expression(parameter)?.unwrap_or_else(|| lit(0)))
+}
+
+/// `polars.date`: Python makes a moment of the three parts and keeps its date, named `date`.
+fn polars_date(arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(datetime(DatetimeArgs::new(
+        arguments.required_expression("year")?,
+        arguments.required_expression("month")?,
+        arguments.required_expression("day")?,
+    ))
+    .cast(DataType::Date)
+    .alias("date"))
+}
+
+/// `polars.time`: Python makes a moment on the first of January 1970 of the parts and keeps its
+/// time, named `time`.
+fn polars_time(arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(datetime(DatetimeArgs {
+        hour: part_or_zero(arguments, "hour")?,
+        minute: part_or_zero(arguments, "minute")?,
+        second: part_or_zero(arguments, "second")?,
+        microsecond: part_or_zero(arguments, "microsecond")?,
+        ..DatetimeArgs::default()
+    })
+    .cast(DataType::Time)
+    .alias("time"))
+}
+
+/// `polars.datetime`: a moment of the parts, in the unit and the zone given, where a clock read
+/// twice is resolved by the word `ambiguous`.
+fn polars_datetime(arguments: &Arguments) -> Result<Expr, BuildError> {
+    let time_zone = match arguments.get("time_zone") {
+        None => None,
+        Some(_) => arguments.time_zone("time_zone", true)?,
+    };
+    Ok(datetime(DatetimeArgs {
+        year: arguments.required_expression("year")?,
+        month: arguments.required_expression("month")?,
+        day: arguments.required_expression("day")?,
+        hour: part_or_zero(arguments, "hour")?,
+        minute: part_or_zero(arguments, "minute")?,
+        second: part_or_zero(arguments, "second")?,
+        microsecond: part_or_zero(arguments, "microsecond")?,
+        time_unit: time_unit(arguments, "time_unit", TIME_UNIT, Some("us"))?,
+        time_zone,
+        ambiguous: lit(arguments.choice("ambiguous", AMBIGUOUS, "raise")?),
+    }))
+}
+
+/// `polars.duration`: a length of time of the parts, in the unit given, or in nanoseconds where
+/// nanoseconds are given and no unit is, as Python infers it, and in microseconds otherwise.
+fn polars_duration(arguments: &Arguments) -> Result<Expr, BuildError> {
+    let time_unit = if arguments.get("time_unit").is_some() {
+        time_unit(arguments, "time_unit", TIME_UNIT, None)?
+    } else if arguments.get("nanoseconds").is_some() {
+        TimeUnit::Nanoseconds
+    } else {
+        TimeUnit::Microseconds
+    };
+    Ok(duration(DurationArgs {
+        weeks: part_or_zero(arguments, "weeks")?,
+        days: part_or_zero(arguments, "days")?,
+        hours: part_or_zero(arguments, "hours")?,
+        minutes: part_or_zero(arguments, "minutes")?,
+        seconds: part_or_zero(arguments, "seconds")?,
+        milliseconds: part_or_zero(arguments, "milliseconds")?,
+        microseconds: part_or_zero(arguments, "microseconds")?,
+        nanoseconds: part_or_zero(arguments, "nanoseconds")?,
+        time_unit,
+    }))
+}
+
+/// `polars.from_epoch`: a count since the start of 1970 as Python reads it: a date for days, a
+/// moment in microseconds for seconds and milliseconds, which it scales by an `Int64`, and a
+/// moment in the unit itself for microseconds and nanoseconds.
+fn polars_from_epoch(arguments: &Arguments) -> Result<Expr, BuildError> {
+    let count = arguments.required_expression("column")?;
+    let scaled = |scale: i64| {
+        binary_expr(
+            count.clone(),
+            Operator::Multiply,
+            lit(Scalar::new(DataType::Int64, AnyValue::Int64(scale))),
+        )
+        .cast(DataType::Datetime(TimeUnit::Microseconds, None))
+    };
+    Ok(match arguments.choice("time_unit", EPOCH_UNIT, "s")? {
+        "d" => count.cast(DataType::Date),
+        "s" => scaled(1_000_000),
+        "ms" => scaled(1_000),
+        "ns" => count.cast(DataType::Datetime(TimeUnit::Nanoseconds, None)),
+        _ => count.cast(DataType::Datetime(TimeUnit::Microseconds, None)),
+    })
+}
+
 /// Every entry, ordered by identifier.
 pub(super) const ENTRIES: &[Entry] = &[
     Entry {
@@ -3177,12 +3274,74 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Function(polars_col),
     },
     Entry {
+        id: EntryId("polars.date"),
+        family: Family::Start,
+        accepts: &[],
+        parameters: &[
+            required("year", EXPRESSION, Shape::One),
+            required("month", EXPRESSION, Shape::One),
+            required("day", EXPRESSION, Shape::One),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Function(polars_date),
+    },
+    Entry {
+        id: EntryId("polars.datetime"),
+        family: Family::Start,
+        accepts: &[],
+        parameters: &[
+            required("year", EXPRESSION, Shape::One),
+            required("month", EXPRESSION, Shape::One),
+            required("day", EXPRESSION, Shape::One),
+            optional("hour", EXPRESSION, Shape::One, "None"),
+            optional("minute", EXPRESSION, Shape::One, "None"),
+            optional("second", EXPRESSION, Shape::One, "None"),
+            optional("microsecond", EXPRESSION, Shape::One, "None"),
+            optional("time_unit", Kind::Choice(TIME_UNIT), Shape::One, "'us'").keyword_only(),
+            optional("time_zone", Kind::TimeZone, Shape::One, "None")
+                .keyword_only()
+                .or_no_time_zone(),
+            optional("ambiguous", Kind::Choice(AMBIGUOUS), Shape::One, "'raise'").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Function(polars_datetime),
+    },
+    Entry {
+        id: EntryId("polars.duration"),
+        family: Family::Start,
+        accepts: &[],
+        parameters: &[
+            optional("weeks", EXPRESSION, Shape::One, "None").keyword_only(),
+            optional("days", EXPRESSION, Shape::One, "None").keyword_only(),
+            optional("hours", EXPRESSION, Shape::One, "None").keyword_only(),
+            optional("minutes", EXPRESSION, Shape::One, "None").keyword_only(),
+            optional("seconds", EXPRESSION, Shape::One, "None").keyword_only(),
+            optional("milliseconds", EXPRESSION, Shape::One, "None").keyword_only(),
+            optional("microseconds", EXPRESSION, Shape::One, "None").keyword_only(),
+            optional("nanoseconds", EXPRESSION, Shape::One, "None").keyword_only(),
+            optional("time_unit", Kind::Choice(TIME_UNIT), Shape::One, "None").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Function(polars_duration),
+    },
+    Entry {
         id: EntryId("polars.element"),
         family: Family::Start,
         accepts: &[],
         parameters: &[],
         laziness: Laziness::Lazy,
         build: Build::Function(polars_element),
+    },
+    Entry {
+        id: EntryId("polars.from_epoch"),
+        family: Family::Start,
+        accepts: &[],
+        parameters: &[
+            required("column", EXPRESSION, Shape::One),
+            optional("time_unit", Kind::Choice(EPOCH_UNIT), Shape::One, "'s'"),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Function(polars_from_epoch),
     },
     Entry {
         id: EntryId("polars.lit"),
@@ -3195,6 +3354,19 @@ pub(super) const ENTRIES: &[Entry] = &[
         ],
         laziness: Laziness::Lazy,
         build: Build::Function(polars_lit),
+    },
+    Entry {
+        id: EntryId("polars.time"),
+        family: Family::Start,
+        accepts: &[],
+        parameters: &[
+            optional("hour", EXPRESSION, Shape::One, "None"),
+            optional("minute", EXPRESSION, Shape::One, "None"),
+            optional("second", EXPRESSION, Shape::One, "None"),
+            optional("microsecond", EXPRESSION, Shape::One, "None"),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Function(polars_time),
     },
     Entry {
         id: EntryId("polars.when"),

@@ -74,11 +74,15 @@ fn a_sample_of_the_dtype_table_is_what_polars_does_when_the_call_is_made_by_hand
     let mut checked = 0;
     let mut gaps = 0;
     for line in committed.iter().step_by(23) {
-        let argument = line.argument.unwrap_or(line.receiver);
+        // A function that starts an expression has no receiver, and no line is rebuilt for it.
+        let Some(receiver) = line.receiver else {
+            continue;
+        };
+        let argument = line.argument.unwrap_or(receiver);
         let Some(call) = by_hand(line.entry, line.parameter, argument) else {
             continue;
         };
-        let frames = Frames::new(line.receiver, argument, &DataType::Int64);
+        let frames = Frames::new(receiver, argument, &DataType::Int64);
         let seen = match &call {
             Ok(call) => see(&frames.rows, &frames.empty, |frame| {
                 frame.select([call.clone()])
@@ -87,7 +91,7 @@ fn a_sample_of_the_dtype_table_is_what_polars_does_when_the_call_is_made_by_hand
         };
         let context = format!(
             "{} on {} with {:?} {}",
-            line.entry, line.receiver, line.parameter, argument
+            line.entry, receiver, line.parameter, argument
         );
         match (&line.outcome, seen) {
             (Outcome::Allowed(Some(produces)), Seen::Ran(dtype)) => {

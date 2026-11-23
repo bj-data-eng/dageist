@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 46254 combinations: 15198 allowed; 7516 refused when Polars resolved the schema, 23540 when it ran the rows, 0 when it ran the empty table.
+# 46854 combinations: 15623 allowed; 7626 refused when Polars resolved the schema, 23605 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.abs | - | Array(Int64, 2) | - | refused rows: `abs` operation not supported for dtype `array[i64, 2]`
 Expr.abs | - | Boolean | - | refused rows: `abs` operation not supported for dtype `bool`
@@ -46288,3 +46288,603 @@ Expr.xor | other | UInt8 | UInt16 | allowed UInt16 many
 Expr.xor | other | UInt8 | UInt32 | allowed UInt32 many
 Expr.xor | other | UInt8 | UInt64 | allowed UInt64 many
 Expr.xor | other | UInt8 | UInt8 | allowed UInt8 many
+polars.date | day | - | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int8')
+polars.date | day | - | Boolean | refused rows: Invalid date components (2026, 1, 0) supplied
+polars.date | day | - | Date | allowed Date many
+polars.date | day | - | Datetime(us) | allowed Date many
+polars.date | day | - | Datetime(us, UTC) | allowed Date many
+polars.date | day | - | Decimal(10, 2) | allowed Date many
+polars.date | day | - | Duration(us) | allowed Date many
+polars.date | day | - | Float16 | allowed Date many
+polars.date | day | - | Float32 | allowed Date many
+polars.date | day | - | Float64 | allowed Date many
+polars.date | day | - | Int128 | allowed Date many
+polars.date | day | - | Int16 | allowed Date many
+polars.date | day | - | Int32 | allowed Date many
+polars.date | day | - | Int64 | allowed Date many
+polars.date | day | - | Int8 | allowed Date many
+polars.date | day | - | List(Int64) | refused rows: cannot cast List type (inner: 'Int64', to: 'Int8')
+polars.date | day | - | List(String) | refused rows: cannot cast List type (inner: 'String', to: 'Int8')
+polars.date | day | - | Null | allowed Date many
+polars.date | day | - | String | allowed Date many
+polars.date | day | - | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `Int8`, got `struct[2]` for series with name `b`
+polars.date | day | - | Time | allowed Date many
+polars.date | day | - | UInt128 | allowed Date many
+polars.date | day | - | UInt16 | allowed Date many
+polars.date | day | - | UInt32 | allowed Date many
+polars.date | day | - | UInt64 | allowed Date many
+polars.date | day | - | UInt8 | allowed Date many
+polars.date | month | - | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int8')
+polars.date | month | - | Boolean | refused rows: Invalid date components (2026, 0, 1) supplied
+polars.date | month | - | Date | allowed Date many
+polars.date | month | - | Datetime(us) | allowed Date many
+polars.date | month | - | Datetime(us, UTC) | allowed Date many
+polars.date | month | - | Decimal(10, 2) | allowed Date many
+polars.date | month | - | Duration(us) | allowed Date many
+polars.date | month | - | Float16 | allowed Date many
+polars.date | month | - | Float32 | allowed Date many
+polars.date | month | - | Float64 | allowed Date many
+polars.date | month | - | Int128 | allowed Date many
+polars.date | month | - | Int16 | allowed Date many
+polars.date | month | - | Int32 | allowed Date many
+polars.date | month | - | Int64 | allowed Date many
+polars.date | month | - | Int8 | allowed Date many
+polars.date | month | - | List(Int64) | refused rows: cannot cast List type (inner: 'Int64', to: 'Int8')
+polars.date | month | - | List(String) | refused rows: cannot cast List type (inner: 'String', to: 'Int8')
+polars.date | month | - | Null | allowed Date many
+polars.date | month | - | String | allowed Date many
+polars.date | month | - | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `Int8`, got `struct[2]` for series with name `b`
+polars.date | month | - | Time | allowed Date many
+polars.date | month | - | UInt128 | allowed Date many
+polars.date | month | - | UInt16 | allowed Date many
+polars.date | month | - | UInt32 | allowed Date many
+polars.date | month | - | UInt64 | allowed Date many
+polars.date | month | - | UInt8 | allowed Date many
+polars.date | year | - | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int32')
+polars.date | year | - | Boolean | allowed Date many
+polars.date | year | - | Date | allowed Date many
+polars.date | year | - | Datetime(us) | allowed Date many
+polars.date | year | - | Datetime(us, UTC) | allowed Date many
+polars.date | year | - | Decimal(10, 2) | allowed Date many
+polars.date | year | - | Duration(us) | allowed Date many
+polars.date | year | - | Float16 | allowed Date many
+polars.date | year | - | Float32 | allowed Date many
+polars.date | year | - | Float64 | allowed Date many
+polars.date | year | - | Int128 | allowed Date many
+polars.date | year | - | Int16 | allowed Date many
+polars.date | year | - | Int32 | allowed Date many
+polars.date | year | - | Int64 | allowed Date many
+polars.date | year | - | Int8 | allowed Date many
+polars.date | year | - | List(Int64) | refused rows: cannot cast List type (inner: 'Int64', to: 'Int32')
+polars.date | year | - | List(String) | refused rows: cannot cast List type (inner: 'String', to: 'Int32')
+polars.date | year | - | Null | allowed Date many
+polars.date | year | - | String | allowed Date many
+polars.date | year | - | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `Int32`, got `struct[2]` for series with name `b`
+polars.date | year | - | Time | allowed Date many
+polars.date | year | - | UInt128 | allowed Date many
+polars.date | year | - | UInt16 | allowed Date many
+polars.date | year | - | UInt32 | allowed Date many
+polars.date | year | - | UInt64 | allowed Date many
+polars.date | year | - | UInt8 | allowed Date many
+polars.datetime | day | - | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int8')
+polars.datetime | day | - | Boolean | refused rows: Invalid date components (2026, 1, 0) supplied
+polars.datetime | day | - | Date | allowed Datetime(us) many
+polars.datetime | day | - | Datetime(us) | allowed Datetime(us) many
+polars.datetime | day | - | Datetime(us, UTC) | allowed Datetime(us) many
+polars.datetime | day | - | Decimal(10, 2) | allowed Datetime(us) many
+polars.datetime | day | - | Duration(us) | allowed Datetime(us) many
+polars.datetime | day | - | Float16 | allowed Datetime(us) many
+polars.datetime | day | - | Float32 | allowed Datetime(us) many
+polars.datetime | day | - | Float64 | allowed Datetime(us) many
+polars.datetime | day | - | Int128 | allowed Datetime(us) many
+polars.datetime | day | - | Int16 | allowed Datetime(us) many
+polars.datetime | day | - | Int32 | allowed Datetime(us) many
+polars.datetime | day | - | Int64 | allowed Datetime(us) many
+polars.datetime | day | - | Int8 | allowed Datetime(us) many
+polars.datetime | day | - | List(Int64) | refused rows: cannot cast List type (inner: 'Int64', to: 'Int8')
+polars.datetime | day | - | List(String) | refused rows: cannot cast List type (inner: 'String', to: 'Int8')
+polars.datetime | day | - | Null | allowed Datetime(us) many
+polars.datetime | day | - | String | allowed Datetime(us) many
+polars.datetime | day | - | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `Int8`, got `struct[2]` for series with name `b`
+polars.datetime | day | - | Time | allowed Datetime(us) many
+polars.datetime | day | - | UInt128 | allowed Datetime(us) many
+polars.datetime | day | - | UInt16 | allowed Datetime(us) many
+polars.datetime | day | - | UInt32 | allowed Datetime(us) many
+polars.datetime | day | - | UInt64 | allowed Datetime(us) many
+polars.datetime | day | - | UInt8 | allowed Datetime(us) many
+polars.datetime | hour | - | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int8')
+polars.datetime | hour | - | Boolean | allowed Datetime(us) many
+polars.datetime | hour | - | Date | allowed Datetime(us) many
+polars.datetime | hour | - | Datetime(us) | allowed Datetime(us) many
+polars.datetime | hour | - | Datetime(us, UTC) | allowed Datetime(us) many
+polars.datetime | hour | - | Decimal(10, 2) | allowed Datetime(us) many
+polars.datetime | hour | - | Duration(us) | allowed Datetime(us) many
+polars.datetime | hour | - | Float16 | allowed Datetime(us) many
+polars.datetime | hour | - | Float32 | allowed Datetime(us) many
+polars.datetime | hour | - | Float64 | allowed Datetime(us) many
+polars.datetime | hour | - | Int128 | allowed Datetime(us) many
+polars.datetime | hour | - | Int16 | allowed Datetime(us) many
+polars.datetime | hour | - | Int32 | allowed Datetime(us) many
+polars.datetime | hour | - | Int64 | allowed Datetime(us) many
+polars.datetime | hour | - | Int8 | allowed Datetime(us) many
+polars.datetime | hour | - | List(Int64) | refused rows: cannot cast List type (inner: 'Int64', to: 'Int8')
+polars.datetime | hour | - | List(String) | refused rows: cannot cast List type (inner: 'String', to: 'Int8')
+polars.datetime | hour | - | Null | allowed Datetime(us) many
+polars.datetime | hour | - | String | allowed Datetime(us) many
+polars.datetime | hour | - | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `Int8`, got `struct[2]` for series with name `b`
+polars.datetime | hour | - | Time | allowed Datetime(us) many
+polars.datetime | hour | - | UInt128 | allowed Datetime(us) many
+polars.datetime | hour | - | UInt16 | allowed Datetime(us) many
+polars.datetime | hour | - | UInt32 | allowed Datetime(us) many
+polars.datetime | hour | - | UInt64 | allowed Datetime(us) many
+polars.datetime | hour | - | UInt8 | allowed Datetime(us) many
+polars.datetime | microsecond | - | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int32')
+polars.datetime | microsecond | - | Boolean | allowed Datetime(us) many
+polars.datetime | microsecond | - | Date | allowed Datetime(us) many
+polars.datetime | microsecond | - | Datetime(us) | allowed Datetime(us) many
+polars.datetime | microsecond | - | Datetime(us, UTC) | allowed Datetime(us) many
+polars.datetime | microsecond | - | Decimal(10, 2) | allowed Datetime(us) many
+polars.datetime | microsecond | - | Duration(us) | allowed Datetime(us) many
+polars.datetime | microsecond | - | Float16 | allowed Datetime(us) many
+polars.datetime | microsecond | - | Float32 | allowed Datetime(us) many
+polars.datetime | microsecond | - | Float64 | allowed Datetime(us) many
+polars.datetime | microsecond | - | Int128 | allowed Datetime(us) many
+polars.datetime | microsecond | - | Int16 | allowed Datetime(us) many
+polars.datetime | microsecond | - | Int32 | allowed Datetime(us) many
+polars.datetime | microsecond | - | Int64 | allowed Datetime(us) many
+polars.datetime | microsecond | - | Int8 | allowed Datetime(us) many
+polars.datetime | microsecond | - | List(Int64) | refused rows: cannot cast List type (inner: 'Int64', to: 'Int32')
+polars.datetime | microsecond | - | List(String) | refused rows: cannot cast List type (inner: 'String', to: 'Int32')
+polars.datetime | microsecond | - | Null | allowed Datetime(us) many
+polars.datetime | microsecond | - | String | allowed Datetime(us) many
+polars.datetime | microsecond | - | Struct(x: Int64, y: String) | refused rows: Polars panicked: not implemented for Struct({'x': Int32, 'y': Int32})
+polars.datetime | microsecond | - | Time | allowed Datetime(us) many
+polars.datetime | microsecond | - | UInt128 | allowed Datetime(us) many
+polars.datetime | microsecond | - | UInt16 | allowed Datetime(us) many
+polars.datetime | microsecond | - | UInt32 | allowed Datetime(us) many
+polars.datetime | microsecond | - | UInt64 | allowed Datetime(us) many
+polars.datetime | microsecond | - | UInt8 | allowed Datetime(us) many
+polars.datetime | minute | - | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int8')
+polars.datetime | minute | - | Boolean | allowed Datetime(us) many
+polars.datetime | minute | - | Date | allowed Datetime(us) many
+polars.datetime | minute | - | Datetime(us) | allowed Datetime(us) many
+polars.datetime | minute | - | Datetime(us, UTC) | allowed Datetime(us) many
+polars.datetime | minute | - | Decimal(10, 2) | allowed Datetime(us) many
+polars.datetime | minute | - | Duration(us) | allowed Datetime(us) many
+polars.datetime | minute | - | Float16 | allowed Datetime(us) many
+polars.datetime | minute | - | Float32 | allowed Datetime(us) many
+polars.datetime | minute | - | Float64 | allowed Datetime(us) many
+polars.datetime | minute | - | Int128 | allowed Datetime(us) many
+polars.datetime | minute | - | Int16 | allowed Datetime(us) many
+polars.datetime | minute | - | Int32 | allowed Datetime(us) many
+polars.datetime | minute | - | Int64 | allowed Datetime(us) many
+polars.datetime | minute | - | Int8 | allowed Datetime(us) many
+polars.datetime | minute | - | List(Int64) | refused rows: cannot cast List type (inner: 'Int64', to: 'Int8')
+polars.datetime | minute | - | List(String) | refused rows: cannot cast List type (inner: 'String', to: 'Int8')
+polars.datetime | minute | - | Null | allowed Datetime(us) many
+polars.datetime | minute | - | String | allowed Datetime(us) many
+polars.datetime | minute | - | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `Int8`, got `struct[2]` for series with name `b`
+polars.datetime | minute | - | Time | allowed Datetime(us) many
+polars.datetime | minute | - | UInt128 | allowed Datetime(us) many
+polars.datetime | minute | - | UInt16 | allowed Datetime(us) many
+polars.datetime | minute | - | UInt32 | allowed Datetime(us) many
+polars.datetime | minute | - | UInt64 | allowed Datetime(us) many
+polars.datetime | minute | - | UInt8 | allowed Datetime(us) many
+polars.datetime | month | - | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int8')
+polars.datetime | month | - | Boolean | refused rows: Invalid date components (2026, 0, 1) supplied
+polars.datetime | month | - | Date | allowed Datetime(us) many
+polars.datetime | month | - | Datetime(us) | allowed Datetime(us) many
+polars.datetime | month | - | Datetime(us, UTC) | allowed Datetime(us) many
+polars.datetime | month | - | Decimal(10, 2) | allowed Datetime(us) many
+polars.datetime | month | - | Duration(us) | allowed Datetime(us) many
+polars.datetime | month | - | Float16 | allowed Datetime(us) many
+polars.datetime | month | - | Float32 | allowed Datetime(us) many
+polars.datetime | month | - | Float64 | allowed Datetime(us) many
+polars.datetime | month | - | Int128 | allowed Datetime(us) many
+polars.datetime | month | - | Int16 | allowed Datetime(us) many
+polars.datetime | month | - | Int32 | allowed Datetime(us) many
+polars.datetime | month | - | Int64 | allowed Datetime(us) many
+polars.datetime | month | - | Int8 | allowed Datetime(us) many
+polars.datetime | month | - | List(Int64) | refused rows: cannot cast List type (inner: 'Int64', to: 'Int8')
+polars.datetime | month | - | List(String) | refused rows: cannot cast List type (inner: 'String', to: 'Int8')
+polars.datetime | month | - | Null | allowed Datetime(us) many
+polars.datetime | month | - | String | allowed Datetime(us) many
+polars.datetime | month | - | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `Int8`, got `struct[2]` for series with name `b`
+polars.datetime | month | - | Time | allowed Datetime(us) many
+polars.datetime | month | - | UInt128 | allowed Datetime(us) many
+polars.datetime | month | - | UInt16 | allowed Datetime(us) many
+polars.datetime | month | - | UInt32 | allowed Datetime(us) many
+polars.datetime | month | - | UInt64 | allowed Datetime(us) many
+polars.datetime | month | - | UInt8 | allowed Datetime(us) many
+polars.datetime | second | - | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int8')
+polars.datetime | second | - | Boolean | allowed Datetime(us) many
+polars.datetime | second | - | Date | allowed Datetime(us) many
+polars.datetime | second | - | Datetime(us) | allowed Datetime(us) many
+polars.datetime | second | - | Datetime(us, UTC) | allowed Datetime(us) many
+polars.datetime | second | - | Decimal(10, 2) | allowed Datetime(us) many
+polars.datetime | second | - | Duration(us) | allowed Datetime(us) many
+polars.datetime | second | - | Float16 | allowed Datetime(us) many
+polars.datetime | second | - | Float32 | allowed Datetime(us) many
+polars.datetime | second | - | Float64 | allowed Datetime(us) many
+polars.datetime | second | - | Int128 | allowed Datetime(us) many
+polars.datetime | second | - | Int16 | allowed Datetime(us) many
+polars.datetime | second | - | Int32 | allowed Datetime(us) many
+polars.datetime | second | - | Int64 | allowed Datetime(us) many
+polars.datetime | second | - | Int8 | allowed Datetime(us) many
+polars.datetime | second | - | List(Int64) | refused rows: cannot cast List type (inner: 'Int64', to: 'Int8')
+polars.datetime | second | - | List(String) | refused rows: cannot cast List type (inner: 'String', to: 'Int8')
+polars.datetime | second | - | Null | allowed Datetime(us) many
+polars.datetime | second | - | String | allowed Datetime(us) many
+polars.datetime | second | - | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `Int8`, got `struct[2]` for series with name `b`
+polars.datetime | second | - | Time | allowed Datetime(us) many
+polars.datetime | second | - | UInt128 | allowed Datetime(us) many
+polars.datetime | second | - | UInt16 | allowed Datetime(us) many
+polars.datetime | second | - | UInt32 | allowed Datetime(us) many
+polars.datetime | second | - | UInt64 | allowed Datetime(us) many
+polars.datetime | second | - | UInt8 | allowed Datetime(us) many
+polars.datetime | year | - | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int32')
+polars.datetime | year | - | Boolean | allowed Datetime(us) many
+polars.datetime | year | - | Date | allowed Datetime(us) many
+polars.datetime | year | - | Datetime(us) | allowed Datetime(us) many
+polars.datetime | year | - | Datetime(us, UTC) | allowed Datetime(us) many
+polars.datetime | year | - | Decimal(10, 2) | allowed Datetime(us) many
+polars.datetime | year | - | Duration(us) | allowed Datetime(us) many
+polars.datetime | year | - | Float16 | allowed Datetime(us) many
+polars.datetime | year | - | Float32 | allowed Datetime(us) many
+polars.datetime | year | - | Float64 | allowed Datetime(us) many
+polars.datetime | year | - | Int128 | allowed Datetime(us) many
+polars.datetime | year | - | Int16 | allowed Datetime(us) many
+polars.datetime | year | - | Int32 | allowed Datetime(us) many
+polars.datetime | year | - | Int64 | allowed Datetime(us) many
+polars.datetime | year | - | Int8 | allowed Datetime(us) many
+polars.datetime | year | - | List(Int64) | refused rows: cannot cast List type (inner: 'Int64', to: 'Int32')
+polars.datetime | year | - | List(String) | refused rows: cannot cast List type (inner: 'String', to: 'Int32')
+polars.datetime | year | - | Null | allowed Datetime(us) many
+polars.datetime | year | - | String | allowed Datetime(us) many
+polars.datetime | year | - | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `Int32`, got `struct[2]` for series with name `b`
+polars.datetime | year | - | Time | allowed Datetime(us) many
+polars.datetime | year | - | UInt128 | allowed Datetime(us) many
+polars.datetime | year | - | UInt16 | allowed Datetime(us) many
+polars.datetime | year | - | UInt32 | allowed Datetime(us) many
+polars.datetime | year | - | UInt64 | allowed Datetime(us) many
+polars.datetime | year | - | UInt8 | allowed Datetime(us) many
+polars.duration | - | - | - | allowed Duration(us) one
+polars.duration | days | - | Array(Int64, 2) | refused schema: expected integer or float dtype, (got array[i64, 2]) in input 1 of duration
+polars.duration | days | - | Boolean | refused schema: expected integer or float dtype, (got bool) in input 1 of duration
+polars.duration | days | - | Date | refused schema: expected integer or float dtype, (got date) in input 1 of duration
+polars.duration | days | - | Datetime(us) | refused schema: expected integer or float dtype, (got datetime[μs]) in input 1 of duration
+polars.duration | days | - | Datetime(us, UTC) | refused schema: expected integer or float dtype, (got datetime[μs, UTC]) in input 1 of duration
+polars.duration | days | - | Decimal(10, 2) | refused schema: expected integer or float dtype, (got decimal[10,2]) in input 1 of duration
+polars.duration | days | - | Duration(us) | refused schema: expected integer or float dtype, (got duration[μs]) in input 1 of duration
+polars.duration | days | - | Float16 | allowed Duration(us) many
+polars.duration | days | - | Float32 | allowed Duration(us) many
+polars.duration | days | - | Float64 | allowed Duration(us) many
+polars.duration | days | - | Int128 | allowed Duration(us) many
+polars.duration | days | - | Int16 | allowed Duration(us) many
+polars.duration | days | - | Int32 | allowed Duration(us) many
+polars.duration | days | - | Int64 | allowed Duration(us) many
+polars.duration | days | - | Int8 | allowed Duration(us) many
+polars.duration | days | - | List(Int64) | refused schema: expected integer or float dtype, (got list[i64]) in input 1 of duration
+polars.duration | days | - | List(String) | refused schema: expected integer or float dtype, (got list[str]) in input 1 of duration
+polars.duration | days | - | Null | refused schema: expected integer or float dtype, (got null) in input 1 of duration
+polars.duration | days | - | String | refused schema: expected integer or float dtype, (got str) in input 1 of duration
+polars.duration | days | - | Struct(x: Int64, y: String) | refused schema: expected integer or float dtype, (got struct[2]) in input 1 of duration
+polars.duration | days | - | Time | refused schema: expected integer or float dtype, (got time) in input 1 of duration
+polars.duration | days | - | UInt128 | allowed Duration(us) many
+polars.duration | days | - | UInt16 | allowed Duration(us) many
+polars.duration | days | - | UInt32 | allowed Duration(us) many
+polars.duration | days | - | UInt64 | allowed Duration(us) many
+polars.duration | days | - | UInt8 | allowed Duration(us) many
+polars.duration | hours | - | Array(Int64, 2) | refused schema: expected integer or float dtype, (got array[i64, 2]) in input 2 of duration
+polars.duration | hours | - | Boolean | refused schema: expected integer or float dtype, (got bool) in input 2 of duration
+polars.duration | hours | - | Date | refused schema: expected integer or float dtype, (got date) in input 2 of duration
+polars.duration | hours | - | Datetime(us) | refused schema: expected integer or float dtype, (got datetime[μs]) in input 2 of duration
+polars.duration | hours | - | Datetime(us, UTC) | refused schema: expected integer or float dtype, (got datetime[μs, UTC]) in input 2 of duration
+polars.duration | hours | - | Decimal(10, 2) | refused schema: expected integer or float dtype, (got decimal[10,2]) in input 2 of duration
+polars.duration | hours | - | Duration(us) | refused schema: expected integer or float dtype, (got duration[μs]) in input 2 of duration
+polars.duration | hours | - | Float16 | allowed Duration(us) many
+polars.duration | hours | - | Float32 | allowed Duration(us) many
+polars.duration | hours | - | Float64 | allowed Duration(us) many
+polars.duration | hours | - | Int128 | allowed Duration(us) many
+polars.duration | hours | - | Int16 | allowed Duration(us) many
+polars.duration | hours | - | Int32 | allowed Duration(us) many
+polars.duration | hours | - | Int64 | allowed Duration(us) many
+polars.duration | hours | - | Int8 | allowed Duration(us) many
+polars.duration | hours | - | List(Int64) | refused schema: expected integer or float dtype, (got list[i64]) in input 2 of duration
+polars.duration | hours | - | List(String) | refused schema: expected integer or float dtype, (got list[str]) in input 2 of duration
+polars.duration | hours | - | Null | refused schema: expected integer or float dtype, (got null) in input 2 of duration
+polars.duration | hours | - | String | refused schema: expected integer or float dtype, (got str) in input 2 of duration
+polars.duration | hours | - | Struct(x: Int64, y: String) | refused schema: expected integer or float dtype, (got struct[2]) in input 2 of duration
+polars.duration | hours | - | Time | refused schema: expected integer or float dtype, (got time) in input 2 of duration
+polars.duration | hours | - | UInt128 | allowed Duration(us) many
+polars.duration | hours | - | UInt16 | allowed Duration(us) many
+polars.duration | hours | - | UInt32 | allowed Duration(us) many
+polars.duration | hours | - | UInt64 | allowed Duration(us) many
+polars.duration | hours | - | UInt8 | allowed Duration(us) many
+polars.duration | microseconds | - | Array(Int64, 2) | refused schema: expected integer or float dtype, (got array[i64, 2]) in input 6 of duration
+polars.duration | microseconds | - | Boolean | refused schema: expected integer or float dtype, (got bool) in input 6 of duration
+polars.duration | microseconds | - | Date | refused schema: expected integer or float dtype, (got date) in input 6 of duration
+polars.duration | microseconds | - | Datetime(us) | refused schema: expected integer or float dtype, (got datetime[μs]) in input 6 of duration
+polars.duration | microseconds | - | Datetime(us, UTC) | refused schema: expected integer or float dtype, (got datetime[μs, UTC]) in input 6 of duration
+polars.duration | microseconds | - | Decimal(10, 2) | refused schema: expected integer or float dtype, (got decimal[10,2]) in input 6 of duration
+polars.duration | microseconds | - | Duration(us) | refused schema: expected integer or float dtype, (got duration[μs]) in input 6 of duration
+polars.duration | microseconds | - | Float16 | allowed Duration(us) many
+polars.duration | microseconds | - | Float32 | allowed Duration(us) many
+polars.duration | microseconds | - | Float64 | allowed Duration(us) many
+polars.duration | microseconds | - | Int128 | allowed Duration(us) many
+polars.duration | microseconds | - | Int16 | allowed Duration(us) many
+polars.duration | microseconds | - | Int32 | allowed Duration(us) many
+polars.duration | microseconds | - | Int64 | allowed Duration(us) many
+polars.duration | microseconds | - | Int8 | allowed Duration(us) many
+polars.duration | microseconds | - | List(Int64) | refused schema: expected integer or float dtype, (got list[i64]) in input 6 of duration
+polars.duration | microseconds | - | List(String) | refused schema: expected integer or float dtype, (got list[str]) in input 6 of duration
+polars.duration | microseconds | - | Null | refused schema: expected integer or float dtype, (got null) in input 6 of duration
+polars.duration | microseconds | - | String | refused schema: expected integer or float dtype, (got str) in input 6 of duration
+polars.duration | microseconds | - | Struct(x: Int64, y: String) | refused schema: expected integer or float dtype, (got struct[2]) in input 6 of duration
+polars.duration | microseconds | - | Time | refused schema: expected integer or float dtype, (got time) in input 6 of duration
+polars.duration | microseconds | - | UInt128 | allowed Duration(us) many
+polars.duration | microseconds | - | UInt16 | allowed Duration(us) many
+polars.duration | microseconds | - | UInt32 | allowed Duration(us) many
+polars.duration | microseconds | - | UInt64 | allowed Duration(us) many
+polars.duration | microseconds | - | UInt8 | allowed Duration(us) many
+polars.duration | milliseconds | - | Array(Int64, 2) | refused schema: expected integer or float dtype, (got array[i64, 2]) in input 5 of duration
+polars.duration | milliseconds | - | Boolean | refused schema: expected integer or float dtype, (got bool) in input 5 of duration
+polars.duration | milliseconds | - | Date | refused schema: expected integer or float dtype, (got date) in input 5 of duration
+polars.duration | milliseconds | - | Datetime(us) | refused schema: expected integer or float dtype, (got datetime[μs]) in input 5 of duration
+polars.duration | milliseconds | - | Datetime(us, UTC) | refused schema: expected integer or float dtype, (got datetime[μs, UTC]) in input 5 of duration
+polars.duration | milliseconds | - | Decimal(10, 2) | refused schema: expected integer or float dtype, (got decimal[10,2]) in input 5 of duration
+polars.duration | milliseconds | - | Duration(us) | refused schema: expected integer or float dtype, (got duration[μs]) in input 5 of duration
+polars.duration | milliseconds | - | Float16 | allowed Duration(us) many
+polars.duration | milliseconds | - | Float32 | allowed Duration(us) many
+polars.duration | milliseconds | - | Float64 | allowed Duration(us) many
+polars.duration | milliseconds | - | Int128 | allowed Duration(us) many
+polars.duration | milliseconds | - | Int16 | allowed Duration(us) many
+polars.duration | milliseconds | - | Int32 | allowed Duration(us) many
+polars.duration | milliseconds | - | Int64 | allowed Duration(us) many
+polars.duration | milliseconds | - | Int8 | allowed Duration(us) many
+polars.duration | milliseconds | - | List(Int64) | refused schema: expected integer or float dtype, (got list[i64]) in input 5 of duration
+polars.duration | milliseconds | - | List(String) | refused schema: expected integer or float dtype, (got list[str]) in input 5 of duration
+polars.duration | milliseconds | - | Null | refused schema: expected integer or float dtype, (got null) in input 5 of duration
+polars.duration | milliseconds | - | String | refused schema: expected integer or float dtype, (got str) in input 5 of duration
+polars.duration | milliseconds | - | Struct(x: Int64, y: String) | refused schema: expected integer or float dtype, (got struct[2]) in input 5 of duration
+polars.duration | milliseconds | - | Time | refused schema: expected integer or float dtype, (got time) in input 5 of duration
+polars.duration | milliseconds | - | UInt128 | allowed Duration(us) many
+polars.duration | milliseconds | - | UInt16 | allowed Duration(us) many
+polars.duration | milliseconds | - | UInt32 | allowed Duration(us) many
+polars.duration | milliseconds | - | UInt64 | allowed Duration(us) many
+polars.duration | milliseconds | - | UInt8 | allowed Duration(us) many
+polars.duration | minutes | - | Array(Int64, 2) | refused schema: expected integer or float dtype, (got array[i64, 2]) in input 3 of duration
+polars.duration | minutes | - | Boolean | refused schema: expected integer or float dtype, (got bool) in input 3 of duration
+polars.duration | minutes | - | Date | refused schema: expected integer or float dtype, (got date) in input 3 of duration
+polars.duration | minutes | - | Datetime(us) | refused schema: expected integer or float dtype, (got datetime[μs]) in input 3 of duration
+polars.duration | minutes | - | Datetime(us, UTC) | refused schema: expected integer or float dtype, (got datetime[μs, UTC]) in input 3 of duration
+polars.duration | minutes | - | Decimal(10, 2) | refused schema: expected integer or float dtype, (got decimal[10,2]) in input 3 of duration
+polars.duration | minutes | - | Duration(us) | refused schema: expected integer or float dtype, (got duration[μs]) in input 3 of duration
+polars.duration | minutes | - | Float16 | allowed Duration(us) many
+polars.duration | minutes | - | Float32 | allowed Duration(us) many
+polars.duration | minutes | - | Float64 | allowed Duration(us) many
+polars.duration | minutes | - | Int128 | allowed Duration(us) many
+polars.duration | minutes | - | Int16 | allowed Duration(us) many
+polars.duration | minutes | - | Int32 | allowed Duration(us) many
+polars.duration | minutes | - | Int64 | allowed Duration(us) many
+polars.duration | minutes | - | Int8 | allowed Duration(us) many
+polars.duration | minutes | - | List(Int64) | refused schema: expected integer or float dtype, (got list[i64]) in input 3 of duration
+polars.duration | minutes | - | List(String) | refused schema: expected integer or float dtype, (got list[str]) in input 3 of duration
+polars.duration | minutes | - | Null | refused schema: expected integer or float dtype, (got null) in input 3 of duration
+polars.duration | minutes | - | String | refused schema: expected integer or float dtype, (got str) in input 3 of duration
+polars.duration | minutes | - | Struct(x: Int64, y: String) | refused schema: expected integer or float dtype, (got struct[2]) in input 3 of duration
+polars.duration | minutes | - | Time | refused schema: expected integer or float dtype, (got time) in input 3 of duration
+polars.duration | minutes | - | UInt128 | allowed Duration(us) many
+polars.duration | minutes | - | UInt16 | allowed Duration(us) many
+polars.duration | minutes | - | UInt32 | allowed Duration(us) many
+polars.duration | minutes | - | UInt64 | allowed Duration(us) many
+polars.duration | minutes | - | UInt8 | allowed Duration(us) many
+polars.duration | nanoseconds | - | Array(Int64, 2) | refused schema: expected integer or float dtype, (got array[i64, 2]) in input 7 of duration
+polars.duration | nanoseconds | - | Boolean | refused schema: expected integer or float dtype, (got bool) in input 7 of duration
+polars.duration | nanoseconds | - | Date | refused schema: expected integer or float dtype, (got date) in input 7 of duration
+polars.duration | nanoseconds | - | Datetime(us) | refused schema: expected integer or float dtype, (got datetime[μs]) in input 7 of duration
+polars.duration | nanoseconds | - | Datetime(us, UTC) | refused schema: expected integer or float dtype, (got datetime[μs, UTC]) in input 7 of duration
+polars.duration | nanoseconds | - | Decimal(10, 2) | refused schema: expected integer or float dtype, (got decimal[10,2]) in input 7 of duration
+polars.duration | nanoseconds | - | Duration(us) | refused schema: expected integer or float dtype, (got duration[μs]) in input 7 of duration
+polars.duration | nanoseconds | - | Float16 | allowed Duration(ns) many
+polars.duration | nanoseconds | - | Float32 | allowed Duration(ns) many
+polars.duration | nanoseconds | - | Float64 | allowed Duration(ns) many
+polars.duration | nanoseconds | - | Int128 | allowed Duration(ns) many
+polars.duration | nanoseconds | - | Int16 | allowed Duration(ns) many
+polars.duration | nanoseconds | - | Int32 | allowed Duration(ns) many
+polars.duration | nanoseconds | - | Int64 | allowed Duration(ns) many
+polars.duration | nanoseconds | - | Int8 | allowed Duration(ns) many
+polars.duration | nanoseconds | - | List(Int64) | refused schema: expected integer or float dtype, (got list[i64]) in input 7 of duration
+polars.duration | nanoseconds | - | List(String) | refused schema: expected integer or float dtype, (got list[str]) in input 7 of duration
+polars.duration | nanoseconds | - | Null | refused schema: expected integer or float dtype, (got null) in input 7 of duration
+polars.duration | nanoseconds | - | String | refused schema: expected integer or float dtype, (got str) in input 7 of duration
+polars.duration | nanoseconds | - | Struct(x: Int64, y: String) | refused schema: expected integer or float dtype, (got struct[2]) in input 7 of duration
+polars.duration | nanoseconds | - | Time | refused schema: expected integer or float dtype, (got time) in input 7 of duration
+polars.duration | nanoseconds | - | UInt128 | allowed Duration(ns) many
+polars.duration | nanoseconds | - | UInt16 | allowed Duration(ns) many
+polars.duration | nanoseconds | - | UInt32 | allowed Duration(ns) many
+polars.duration | nanoseconds | - | UInt64 | allowed Duration(ns) many
+polars.duration | nanoseconds | - | UInt8 | allowed Duration(ns) many
+polars.duration | seconds | - | Array(Int64, 2) | refused schema: expected integer or float dtype, (got array[i64, 2]) in input 4 of duration
+polars.duration | seconds | - | Boolean | refused schema: expected integer or float dtype, (got bool) in input 4 of duration
+polars.duration | seconds | - | Date | refused schema: expected integer or float dtype, (got date) in input 4 of duration
+polars.duration | seconds | - | Datetime(us) | refused schema: expected integer or float dtype, (got datetime[μs]) in input 4 of duration
+polars.duration | seconds | - | Datetime(us, UTC) | refused schema: expected integer or float dtype, (got datetime[μs, UTC]) in input 4 of duration
+polars.duration | seconds | - | Decimal(10, 2) | refused schema: expected integer or float dtype, (got decimal[10,2]) in input 4 of duration
+polars.duration | seconds | - | Duration(us) | refused schema: expected integer or float dtype, (got duration[μs]) in input 4 of duration
+polars.duration | seconds | - | Float16 | allowed Duration(us) many
+polars.duration | seconds | - | Float32 | allowed Duration(us) many
+polars.duration | seconds | - | Float64 | allowed Duration(us) many
+polars.duration | seconds | - | Int128 | allowed Duration(us) many
+polars.duration | seconds | - | Int16 | allowed Duration(us) many
+polars.duration | seconds | - | Int32 | allowed Duration(us) many
+polars.duration | seconds | - | Int64 | allowed Duration(us) many
+polars.duration | seconds | - | Int8 | allowed Duration(us) many
+polars.duration | seconds | - | List(Int64) | refused schema: expected integer or float dtype, (got list[i64]) in input 4 of duration
+polars.duration | seconds | - | List(String) | refused schema: expected integer or float dtype, (got list[str]) in input 4 of duration
+polars.duration | seconds | - | Null | refused schema: expected integer or float dtype, (got null) in input 4 of duration
+polars.duration | seconds | - | String | refused schema: expected integer or float dtype, (got str) in input 4 of duration
+polars.duration | seconds | - | Struct(x: Int64, y: String) | refused schema: expected integer or float dtype, (got struct[2]) in input 4 of duration
+polars.duration | seconds | - | Time | refused schema: expected integer or float dtype, (got time) in input 4 of duration
+polars.duration | seconds | - | UInt128 | allowed Duration(us) many
+polars.duration | seconds | - | UInt16 | allowed Duration(us) many
+polars.duration | seconds | - | UInt32 | allowed Duration(us) many
+polars.duration | seconds | - | UInt64 | allowed Duration(us) many
+polars.duration | seconds | - | UInt8 | allowed Duration(us) many
+polars.duration | weeks | - | Array(Int64, 2) | refused schema: expected integer or float dtype, (got array[i64, 2]) in input 0 of duration
+polars.duration | weeks | - | Boolean | refused schema: expected integer or float dtype, (got bool) in input 0 of duration
+polars.duration | weeks | - | Date | refused schema: expected integer or float dtype, (got date) in input 0 of duration
+polars.duration | weeks | - | Datetime(us) | refused schema: expected integer or float dtype, (got datetime[μs]) in input 0 of duration
+polars.duration | weeks | - | Datetime(us, UTC) | refused schema: expected integer or float dtype, (got datetime[μs, UTC]) in input 0 of duration
+polars.duration | weeks | - | Decimal(10, 2) | refused schema: expected integer or float dtype, (got decimal[10,2]) in input 0 of duration
+polars.duration | weeks | - | Duration(us) | refused schema: expected integer or float dtype, (got duration[μs]) in input 0 of duration
+polars.duration | weeks | - | Float16 | allowed Duration(us) many
+polars.duration | weeks | - | Float32 | allowed Duration(us) many
+polars.duration | weeks | - | Float64 | allowed Duration(us) many
+polars.duration | weeks | - | Int128 | allowed Duration(us) many
+polars.duration | weeks | - | Int16 | allowed Duration(us) many
+polars.duration | weeks | - | Int32 | allowed Duration(us) many
+polars.duration | weeks | - | Int64 | allowed Duration(us) many
+polars.duration | weeks | - | Int8 | allowed Duration(us) many
+polars.duration | weeks | - | List(Int64) | refused schema: expected integer or float dtype, (got list[i64]) in input 0 of duration
+polars.duration | weeks | - | List(String) | refused schema: expected integer or float dtype, (got list[str]) in input 0 of duration
+polars.duration | weeks | - | Null | refused schema: expected integer or float dtype, (got null) in input 0 of duration
+polars.duration | weeks | - | String | refused schema: expected integer or float dtype, (got str) in input 0 of duration
+polars.duration | weeks | - | Struct(x: Int64, y: String) | refused schema: expected integer or float dtype, (got struct[2]) in input 0 of duration
+polars.duration | weeks | - | Time | refused schema: expected integer or float dtype, (got time) in input 0 of duration
+polars.duration | weeks | - | UInt128 | allowed Duration(us) many
+polars.duration | weeks | - | UInt16 | allowed Duration(us) many
+polars.duration | weeks | - | UInt32 | allowed Duration(us) many
+polars.duration | weeks | - | UInt64 | allowed Duration(us) many
+polars.duration | weeks | - | UInt8 | allowed Duration(us) many
+polars.from_epoch | column | - | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'Datetime('μs')')
+polars.from_epoch | column | - | Boolean | allowed Datetime(us) many
+polars.from_epoch | column | - | Date | refused schema: * not allowed on date and i64
+polars.from_epoch | column | - | Datetime(us) | refused schema: * not allowed on datetime[μs] and i64
+polars.from_epoch | column | - | Datetime(us, UTC) | refused schema: * not allowed on datetime[μs, UTC] and i64
+polars.from_epoch | column | - | Decimal(10, 2) | refused rows: casting from Decimal(38, 2) to Datetime('μs') not supported
+polars.from_epoch | column | - | Duration(us) | refused rows: casting from Duration('μs') to Datetime('μs') not supported
+polars.from_epoch | column | - | Float16 | allowed Datetime(us) many
+polars.from_epoch | column | - | Float32 | allowed Datetime(us) many
+polars.from_epoch | column | - | Float64 | allowed Datetime(us) many
+polars.from_epoch | column | - | Int128 | allowed Datetime(us) many
+polars.from_epoch | column | - | Int16 | allowed Datetime(us) many
+polars.from_epoch | column | - | Int32 | allowed Datetime(us) many
+polars.from_epoch | column | - | Int64 | allowed Datetime(us) many
+polars.from_epoch | column | - | Int8 | allowed Datetime(us) many
+polars.from_epoch | column | - | List(Int64) | refused rows: cannot cast List type (inner: 'Int64', to: 'Datetime('μs')')
+polars.from_epoch | column | - | List(String) | refused rows: cannot mul columns: dtype was not list on all nesting levels: (left: list[str], right: i64)
+polars.from_epoch | column | - | Null | allowed Datetime(us) many
+polars.from_epoch | column | - | String | refused schema: arithmetic on dtypes str and i64 is not allowed (lhs: column 'b', rhs: expression `1000000`); try an explicit cast first
+polars.from_epoch | column | - | Struct(x: Int64, y: String) | refused schema: cannot * a struct with non-numeric field: (field: y, dtype: str)
+polars.from_epoch | column | - | Time | refused schema: * not allowed on time and i64
+polars.from_epoch | column | - | UInt128 | allowed Datetime(us) many
+polars.from_epoch | column | - | UInt16 | allowed Datetime(us) many
+polars.from_epoch | column | - | UInt32 | allowed Datetime(us) many
+polars.from_epoch | column | - | UInt64 | allowed Datetime(us) many
+polars.from_epoch | column | - | UInt8 | allowed Datetime(us) many
+polars.time | - | - | - | allowed Time one
+polars.time | hour | - | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int8')
+polars.time | hour | - | Boolean | allowed Time many
+polars.time | hour | - | Date | allowed Time many
+polars.time | hour | - | Datetime(us) | allowed Time many
+polars.time | hour | - | Datetime(us, UTC) | allowed Time many
+polars.time | hour | - | Decimal(10, 2) | allowed Time many
+polars.time | hour | - | Duration(us) | allowed Time many
+polars.time | hour | - | Float16 | allowed Time many
+polars.time | hour | - | Float32 | allowed Time many
+polars.time | hour | - | Float64 | allowed Time many
+polars.time | hour | - | Int128 | allowed Time many
+polars.time | hour | - | Int16 | allowed Time many
+polars.time | hour | - | Int32 | allowed Time many
+polars.time | hour | - | Int64 | allowed Time many
+polars.time | hour | - | Int8 | allowed Time many
+polars.time | hour | - | List(Int64) | refused rows: cannot cast List type (inner: 'Int64', to: 'Int8')
+polars.time | hour | - | List(String) | refused rows: cannot cast List type (inner: 'String', to: 'Int8')
+polars.time | hour | - | Null | allowed Time many
+polars.time | hour | - | String | allowed Time many
+polars.time | hour | - | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `Int8`, got `struct[2]` for series with name `b`
+polars.time | hour | - | Time | allowed Time many
+polars.time | hour | - | UInt128 | allowed Time many
+polars.time | hour | - | UInt16 | allowed Time many
+polars.time | hour | - | UInt32 | allowed Time many
+polars.time | hour | - | UInt64 | allowed Time many
+polars.time | hour | - | UInt8 | allowed Time many
+polars.time | microsecond | - | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int32')
+polars.time | microsecond | - | Boolean | allowed Time many
+polars.time | microsecond | - | Date | allowed Time many
+polars.time | microsecond | - | Datetime(us) | allowed Time many
+polars.time | microsecond | - | Datetime(us, UTC) | allowed Time many
+polars.time | microsecond | - | Decimal(10, 2) | allowed Time many
+polars.time | microsecond | - | Duration(us) | allowed Time many
+polars.time | microsecond | - | Float16 | allowed Time many
+polars.time | microsecond | - | Float32 | allowed Time many
+polars.time | microsecond | - | Float64 | allowed Time many
+polars.time | microsecond | - | Int128 | allowed Time many
+polars.time | microsecond | - | Int16 | allowed Time many
+polars.time | microsecond | - | Int32 | allowed Time many
+polars.time | microsecond | - | Int64 | allowed Time many
+polars.time | microsecond | - | Int8 | allowed Time many
+polars.time | microsecond | - | List(Int64) | refused rows: cannot cast List type (inner: 'Int64', to: 'Int32')
+polars.time | microsecond | - | List(String) | refused rows: cannot cast List type (inner: 'String', to: 'Int32')
+polars.time | microsecond | - | Null | allowed Time many
+polars.time | microsecond | - | String | allowed Time many
+polars.time | microsecond | - | Struct(x: Int64, y: String) | refused rows: Polars panicked: not implemented for Struct({'x': Int32, 'y': Int32})
+polars.time | microsecond | - | Time | allowed Time many
+polars.time | microsecond | - | UInt128 | allowed Time many
+polars.time | microsecond | - | UInt16 | allowed Time many
+polars.time | microsecond | - | UInt32 | allowed Time many
+polars.time | microsecond | - | UInt64 | allowed Time many
+polars.time | microsecond | - | UInt8 | allowed Time many
+polars.time | minute | - | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int8')
+polars.time | minute | - | Boolean | allowed Time many
+polars.time | minute | - | Date | allowed Time many
+polars.time | minute | - | Datetime(us) | allowed Time many
+polars.time | minute | - | Datetime(us, UTC) | allowed Time many
+polars.time | minute | - | Decimal(10, 2) | allowed Time many
+polars.time | minute | - | Duration(us) | allowed Time many
+polars.time | minute | - | Float16 | allowed Time many
+polars.time | minute | - | Float32 | allowed Time many
+polars.time | minute | - | Float64 | allowed Time many
+polars.time | minute | - | Int128 | allowed Time many
+polars.time | minute | - | Int16 | allowed Time many
+polars.time | minute | - | Int32 | allowed Time many
+polars.time | minute | - | Int64 | allowed Time many
+polars.time | minute | - | Int8 | allowed Time many
+polars.time | minute | - | List(Int64) | refused rows: cannot cast List type (inner: 'Int64', to: 'Int8')
+polars.time | minute | - | List(String) | refused rows: cannot cast List type (inner: 'String', to: 'Int8')
+polars.time | minute | - | Null | allowed Time many
+polars.time | minute | - | String | allowed Time many
+polars.time | minute | - | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `Int8`, got `struct[2]` for series with name `b`
+polars.time | minute | - | Time | allowed Time many
+polars.time | minute | - | UInt128 | allowed Time many
+polars.time | minute | - | UInt16 | allowed Time many
+polars.time | minute | - | UInt32 | allowed Time many
+polars.time | minute | - | UInt64 | allowed Time many
+polars.time | minute | - | UInt8 | allowed Time many
+polars.time | second | - | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int8')
+polars.time | second | - | Boolean | allowed Time many
+polars.time | second | - | Date | allowed Time many
+polars.time | second | - | Datetime(us) | allowed Time many
+polars.time | second | - | Datetime(us, UTC) | allowed Time many
+polars.time | second | - | Decimal(10, 2) | allowed Time many
+polars.time | second | - | Duration(us) | allowed Time many
+polars.time | second | - | Float16 | allowed Time many
+polars.time | second | - | Float32 | allowed Time many
+polars.time | second | - | Float64 | allowed Time many
+polars.time | second | - | Int128 | allowed Time many
+polars.time | second | - | Int16 | allowed Time many
+polars.time | second | - | Int32 | allowed Time many
+polars.time | second | - | Int64 | allowed Time many
+polars.time | second | - | Int8 | allowed Time many
+polars.time | second | - | List(Int64) | refused rows: cannot cast List type (inner: 'Int64', to: 'Int8')
+polars.time | second | - | List(String) | refused rows: cannot cast List type (inner: 'String', to: 'Int8')
+polars.time | second | - | Null | allowed Time many
+polars.time | second | - | String | allowed Time many
+polars.time | second | - | Struct(x: Int64, y: String) | refused rows: invalid series dtype: expected `Int8`, got `struct[2]` for series with name `b`
+polars.time | second | - | Time | allowed Time many
+polars.time | second | - | UInt128 | allowed Time many
+polars.time | second | - | UInt16 | allowed Time many
+polars.time | second | - | UInt32 | allowed Time many
+polars.time | second | - | UInt64 | allowed Time many
+polars.time | second | - | UInt8 | allowed Time many

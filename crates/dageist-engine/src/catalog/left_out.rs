@@ -103,6 +103,15 @@ pub fn left_out() -> &'static [LeftOut] {
 // - `Expr.dt.add_business_days` and `is_business_day` take `week_mask` and `holidays`, a week of seven
 //   flags and a list of dates, which are lists of literals, and a list of literals typed in, of
 //   flags or of dates, is a kind of its own that does not exist yet.
+// - `polars.date_range`, `datetime_range` and `time_range` make as many values as their bounds and
+//   their interval fit, from bounds that are one value each, and what a step may put beside them
+//   depends on how many that is: Polars refuses a range beside a column, in a select, a filter's
+//   predicate, a sort key or the key of a window, unless it makes one value or as many as the table
+//   has rows, and refuses it as a join's key, which is not elementwise. The tables measure a call
+//   on three rows and say `one` or `many` of it, and `many` is the table's rows, so a range has no
+//   shape that the walk can say: a count of values that its arguments decide, which `int_range`,
+//   `repeat` and `linear_space` need as well, is a shape of its own. The `*_ranges` functions give
+//   a list of each and wait for a list kind too.
 // - `Expr.str.split_exact` and `splitn` give a struct, whose fields a step reads with
 //   `Expr.struct.field`, which is not catalogued yet. `Expr.str.extract_groups` gives one too, and
 //   is catalogued, for its fields are named by the pattern and Polars says them.
@@ -562,14 +571,11 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("polars.cum_reduce", Reason::TakesPythonFunction),
     LeftOut::new("polars.cum_sum", Reason::NotYetCatalogued),
     LeftOut::new("polars.cum_sum_horizontal", Reason::NotYetCatalogued),
-    LeftOut::new("polars.date", Reason::NotYetCatalogued),
     LeftOut::new("polars.date_range", Reason::NotYetCatalogued),
     LeftOut::new("polars.date_ranges", Reason::NotYetCatalogued),
-    LeftOut::new("polars.datetime", Reason::NotYetCatalogued),
     LeftOut::new("polars.datetime_range", Reason::NotYetCatalogued),
     LeftOut::new("polars.datetime_ranges", Reason::NotYetCatalogued),
     LeftOut::new("polars.dtype_of", Reason::NotYetCatalogued),
-    LeftOut::new("polars.duration", Reason::NotYetCatalogued),
     LeftOut::new("polars.escape_regex", Reason::NeverOffered),
     LeftOut::new("polars.exclude", Reason::NotYetCatalogued),
     LeftOut::new("polars.explain_all", Reason::NeverOffered),
@@ -577,7 +583,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("polars.first", Reason::NotYetCatalogued),
     LeftOut::new("polars.fold", Reason::TakesPythonFunction),
     LeftOut::new("polars.format", Reason::NotYetCatalogued),
-    LeftOut::new("polars.from_epoch", Reason::NotYetCatalogued),
     LeftOut::new("polars.head", Reason::NotYetCatalogued),
     LeftOut::new("polars.implode", Reason::NotYetCatalogued),
     LeftOut::new("polars.int_range", Reason::NotYetCatalogued),
@@ -628,7 +633,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("polars.sum", Reason::NotYetCatalogued),
     LeftOut::new("polars.sum_horizontal", Reason::NotYetCatalogued),
     LeftOut::new("polars.tail", Reason::NotYetCatalogued),
-    LeftOut::new("polars.time", Reason::NotYetCatalogued),
     LeftOut::new("polars.time_range", Reason::NotYetCatalogued),
     LeftOut::new("polars.time_ranges", Reason::NotYetCatalogued),
     LeftOut::new("polars.union", Reason::NotYetCatalogued),

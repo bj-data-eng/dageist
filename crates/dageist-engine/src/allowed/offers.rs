@@ -11,7 +11,9 @@ use super::adapt::could_be_taken_by_a_number;
 use super::context::Context;
 use super::dtype::{Representative, ResultDtype, dtype_name, unit_name};
 use super::rules::Rule;
-use super::table::{OptionValue, Outcome, Produces, Reason, Shape, Stage, Tables, is_method};
+use super::table::{
+    OptionValue, Outcome, Produces, Reason, Shape, Stage, Tables, has_a_subject, is_method,
+};
 use crate::catalog::DefaultValue;
 
 /// What an expression has so far, where an entry would follow it.
@@ -485,14 +487,19 @@ impl Fit {
 /// be given and is not needs only some dtype of argument that fits.
 fn on_receiver(
     entry: &'static Entry,
-    receiver: Representative,
+    receiver: Option<Representative>,
     arguments: &[(&str, Representative)],
     options: &[(&str, &str)],
 ) -> Result<Fit, Refusal> {
     let tables = Tables::committed();
     let id = entry.id().as_str();
     let stood_in_for = stood_in_for(entry, options);
-    let missing = || Refusal::structure(format!("the tables hold nothing for {id} on {receiver}"));
+    let missing = || match receiver {
+        Some(receiver) => {
+            Refusal::structure(format!("the tables hold nothing for {id} on {receiver}"))
+        }
+        None => Refusal::structure(format!("the tables hold nothing for {id}")),
+    };
     let line = |parameter: Option<&'static str>, argument: Option<Representative>| match tables
         .dtypes
         .get(&(id, parameter, receiver, argument))
@@ -870,7 +877,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         if let Some(dtype) = receiver
             && !chosen.arguments.is_empty()
         {
-            on_receiver(entry, dtype, chosen.arguments, chosen.options)?;
+            on_receiver(entry, Some(dtype), chosen.arguments, chosen.options)?;
         }
         check_options(entry, receiver, chosen.options)?;
         check_conversions(entry, chosen)?;
@@ -885,7 +892,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         true,
     ) = (place.after, is_method(entry))
     {
-        let fit = on_receiver(entry, dtype, chosen.arguments, chosen.options)?;
+        let fit = on_receiver(entry, Some(dtype), chosen.arguments, chosen.options)?;
         (result, shape) = (fit.result.clone(), fit.shape);
         // And of the options chosen, which the option table says what they give
         // on the dtype of the value the method follows.
@@ -1204,7 +1211,7 @@ pub fn argument_dtypes(
         .filter_map(|argument| {
             tables
                 .dtypes
-                .get(&(id, Some(parameter), receiver, Some(argument)))
+                .get(&(id, Some(parameter), Some(receiver), Some(argument)))
                 .map(|outcome| (argument, outcome.clone()))
         })
         .collect()
@@ -1222,7 +1229,7 @@ pub fn argument_dtypes(
 ///
 /// The first pair, or single option, Polars refused, with its reason.
 pub fn options(entry: &Entry, chosen: &[(&str, &str)]) -> Result<(), Refusal> {
-    if !is_method(entry) {
+    if !has_a_subject(entry) {
         return check_options(entry, None, chosen);
     }
     let mut refusal = None;
@@ -1381,7 +1388,9 @@ fn check_options(
             // arguments the harness gives it, which a pair of its options is refused for as well,
             // as a cross join is given keys, so its lines say nothing of one option alone.
             None => match key.as_slice() {
-                [(name, word)] if is_method(entry) => alone_in_a_pair(entry, receiver, name, word),
+                [(name, word)] if has_a_subject(entry) => {
+                    alone_in_a_pair(entry, receiver, name, word)
+                }
                 _ => Ok(()),
             },
         };
