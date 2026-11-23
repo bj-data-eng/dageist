@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 6782 combinations: 4380 allowed; 713 refused when Polars resolved the schema, 1689 when it ran the rows, 0 when it ran the empty table.
+# 6784 combinations: 4382 allowed; 713 refused when Polars resolved the schema, 1689 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.arg_sort | Array(Int64, 2) | descending=false, nulls_last=false | allowed UInt32 many
 Expr.arg_sort | Array(Int64, 2) | descending=false, nulls_last=true | allowed UInt32 many
@@ -5884,6 +5884,8 @@ Expr.str.split | UInt8 | literal=false, strict=false | refused rows: invalid ser
 Expr.str.split | UInt8 | literal=false, strict=true | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
 Expr.str.split | UInt8 | literal=true, strict=false | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
 Expr.str.split | UInt8 | literal=true, strict=true | refused rows: invalid series dtype: expected `String`, got `u8` for series with name `a`
+LazyFrame.drop | - | strict=false | allowed -
+LazyFrame.drop | - | strict=true | allowed -
 LazyFrame.join | - | allow_parallel=false, force_parallel=false | allowed -
 LazyFrame.join | - | allow_parallel=false, force_parallel=true | allowed -
 LazyFrame.join | - | allow_parallel=true, force_parallel=false | allowed -

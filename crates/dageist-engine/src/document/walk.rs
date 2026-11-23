@@ -29,7 +29,7 @@ use crate::allowed::{
     is_count, is_left_unresolved, is_refused_as_a_count, is_required, operand_adapts,
     receiver_beside,
 };
-use crate::catalog::{Applies, AsManyAs, Comparison, Entry, Kind, Role};
+use crate::catalog::{self, Applies, AsManyAs, Comparison, Entry, Kind, Role};
 
 use super::error::{Place, Segment};
 use super::inputs::Inputs;
@@ -221,6 +221,7 @@ impl Step {
         };
         walker.arguments(self.call(), false);
         walker.step_options(self.call());
+        walker.nan_test_columns();
         walker.key_names();
         Walk {
             expressions: walker.walked,
@@ -746,6 +747,40 @@ impl Walker<'_> {
             .collect();
         if let Err(refusal) = allowed::options(step.entry(), &chosen) {
             self.refuse(&refusal, false);
+        }
+    }
+
+    /// Asks whether the columns that `drop_nans` is told to look at may each be tested for a NaN,
+    /// which is what Polars makes of them: it refuses a column that `is_nan` refuses, such as text,
+    /// when the rows run, with that method's words. The tables say which dtypes those are. The
+    /// columns it looks at when it is told none are the floating-point ones, which it accepts.
+    fn nan_test_columns(&mut self) {
+        if self.step.entry().id().as_str() != "LazyFrame.drop_nans" {
+            return;
+        }
+        let Some(Value::Columns(names)) = self.step.argument("subset") else {
+            return;
+        };
+        let Some(test) = catalog::entry("Expr.is_nan") else {
+            return;
+        };
+        for name in names {
+            let Some(class) = self.source.get(name).and_then(Representative::of) else {
+                continue;
+            };
+            let place = OfferPlace::new(
+                Context::step(Outer::Select),
+                After::Value {
+                    dtype: class,
+                    shape: Shape::Many,
+                },
+            );
+            if let Verdict::Refused(refusal) = allowed::offer(test, &place, &Chosen::default()) {
+                self.path = vec![Segment::Parameter("subset".to_owned())];
+                self.refuse(&refusal, false);
+                self.path.clear();
+                return;
+            }
         }
     }
 

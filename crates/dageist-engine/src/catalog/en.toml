@@ -1133,6 +1133,46 @@ hint = "true where exactly one is true, bit by bit on whole numbers"
 name = "other"
 label = "exclusive or"
 
+[entries."LazyFrame.drop"]
+name = "drop"
+hint = "some columns removed"
+head = "Drop columns"
+
+[entries."LazyFrame.drop".parameters.columns]
+name = "columns"
+label = "columns"
+
+[entries."LazyFrame.drop".parameters.strict]
+name = "strict"
+label = "fail on unknown column"
+
+[entries."LazyFrame.drop_nans"]
+name = "drop_nans"
+hint = "the rows that hold a NaN left out"
+head = "Drop NaN rows"
+
+[entries."LazyFrame.drop_nans".parameters.subset]
+name = "subset"
+label = "columns looked at"
+
+[entries."LazyFrame.drop_nulls"]
+name = "drop_nulls"
+hint = "the rows that hold an empty value left out"
+head = "Drop empty rows"
+
+[entries."LazyFrame.drop_nulls".parameters.subset]
+name = "subset"
+label = "columns looked at"
+
+[entries."LazyFrame.fill_nan"]
+name = "fill_nan"
+hint = "NaN replaced by a value in every float column"
+head = "Fill NaN"
+
+[entries."LazyFrame.fill_nan".parameters.value]
+name = "value"
+label = "replace NaN with"
+
 [entries."LazyFrame.filter"]
 name = "filter"
 hint = "the rows where a condition holds"
@@ -1145,6 +1185,33 @@ label = "conditions"
 [entries."LazyFrame.filter".parameters.constraints]
 name = "constraints"
 label = "columns equal to"
+
+[entries."LazyFrame.first"]
+name = "first"
+hint = "the first row"
+head = "First row"
+
+[entries."LazyFrame.gather_every"]
+name = "gather_every"
+hint = "every nth row"
+head = "Every nth row"
+
+[entries."LazyFrame.gather_every".parameters.n]
+name = "n"
+label = "every"
+
+[entries."LazyFrame.gather_every".parameters.offset]
+name = "offset"
+label = "start at"
+
+[entries."LazyFrame.head"]
+name = "head"
+hint = "the first rows"
+head = "First rows"
+
+[entries."LazyFrame.head".parameters.n]
+name = "n"
+label = "rows"
 
 [entries."LazyFrame.join"]
 name = "join"
@@ -1232,6 +1299,20 @@ label = "allow parallel work"
 name = "force_parallel"
 label = "force parallel work"
 
+[entries."LazyFrame.last"]
+name = "last"
+hint = "the last row"
+head = "Last row"
+
+[entries."LazyFrame.limit"]
+name = "limit"
+hint = "the first rows, as head"
+head = "First rows"
+
+[entries."LazyFrame.limit".parameters.n]
+name = "n"
+label = "rows"
+
 [entries."LazyFrame.pivot"]
 name = "pivot"
 hint = "the values of a field as columns"
@@ -1286,6 +1367,11 @@ label = "new names"
 name = "strict"
 label = "fail on unknown column"
 
+[entries."LazyFrame.reverse"]
+name = "reverse"
+hint = "the rows from the last to the first"
+head = "Reverse"
+
 [entries."LazyFrame.select"]
 name = "select"
 hint = "some of the columns"
@@ -1298,6 +1384,19 @@ label = "columns"
 [entries."LazyFrame.select".parameters.named_exprs]
 name = "named_exprs"
 label = "new columns"
+
+[entries."LazyFrame.slice"]
+name = "slice"
+hint = "some rows from a place on"
+head = "Rows from a place"
+
+[entries."LazyFrame.slice".parameters.offset]
+name = "offset"
+label = "start at"
+
+[entries."LazyFrame.slice".parameters.length]
+name = "length"
+label = "rows"
 
 [entries."LazyFrame.sort"]
 name = "sort"
@@ -1328,6 +1427,15 @@ label = "keep the order of ties"
 name = "multithreaded"
 label = "use many threads"
 
+[entries."LazyFrame.tail"]
+name = "tail"
+hint = "the last rows"
+head = "Last rows"
+
+[entries."LazyFrame.tail".parameters.n]
+name = "n"
+label = "rows"
+
 [entries."LazyFrame.with_columns"]
 name = "with_columns"
 hint = "a new column from a chain"
@@ -1340,6 +1448,19 @@ label = "columns"
 [entries."LazyFrame.with_columns".parameters.named_exprs]
 name = "named_exprs"
 label = "new columns"
+
+[entries."LazyFrame.with_row_index"]
+name = "with_row_index"
+hint = "a count of the rows as the first column"
+head = "Number rows"
+
+[entries."LazyFrame.with_row_index".parameters.name]
+name = "name"
+label = "name of the count"
+
+[entries."LazyFrame.with_row_index".parameters.offset]
+name = "offset"
+label = "start counting at"
 
 [entries."Then.otherwise"]
 name = "otherwise"
