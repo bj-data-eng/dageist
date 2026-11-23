@@ -599,3 +599,110 @@ fn moments_in_different_zones_are_no_operands_of_a_comparison_a_difference_or_a_
     let report = report_of(&selecting(moments_then_all(links)));
     assert_eq!(report.steps()[0].walk().refusal(), None);
 }
+
+/// The moment 1 microsecond after the start of 1970 in `zone`, a literal that has the zone.
+fn moment_in(zone: &str) -> Value {
+    chain(
+        call(
+            "polars.lit",
+            json!({
+                "value": { "integer": 1 },
+                "dtype": { "dtype": format!("Datetime(time_unit='us', time_zone='{zone}')") },
+            }),
+        ),
+        vec![],
+    )
+}
+
+fn in_utc() -> Vec<Value> {
+    vec![in_zone("Expr.dt.replace_time_zone", Some("UTC"))]
+}
+
+fn refused_for_the_zones(report: &Report, id: &str, zones: &[&str]) {
+    let walked = report.steps()[0]
+        .walk()
+        .refusal()
+        .unwrap_or_else(|| panic!("{id}: the walk refuses it"));
+    assert!(
+        matches!(walked.refusal().source(), RefusalSource::Rule(rule)
+            if rule.name() == "moments-share-a-zone"),
+        "{id}: {:?}",
+        walked.refusal().source()
+    );
+    for zone in zones {
+        assert!(
+            walked.refusal().reason().contains(zone),
+            "{id}: {}",
+            walked.refusal().reason()
+        );
+    }
+}
+
+#[test]
+fn a_replacement_is_judged_by_its_new_values_and_its_default_and_not_by_the_value_it_follows() {
+    // `replace_strict` of a moment in UTC by moments in Berlin gives moments in Berlin, whatever zone
+    // the value it follows is in; its default is met with the new values and must share their zone.
+    let replace = |new: Value, default: Value| {
+        let mut links = in_utc();
+        links.push(call(
+            "Expr.replace_strict",
+            json!({ "old": moment_in("UTC"), "new": new, "default": default }),
+        ));
+        selecting(moments_then_all(links))
+    };
+    let same = replace(moment_in("Europe/Berlin"), moment_in("Europe/Berlin"));
+    assert_eq!(report_of(&same).steps()[0].walk().refusal(), None);
+    let apart = replace(moment_in("Europe/Berlin"), moment_in("UTC"));
+    refused_for_the_zones(
+        &report_of(&apart),
+        "replace_strict",
+        &["Europe/Berlin", "UTC"],
+    );
+}
+
+#[test]
+fn the_values_of_a_condition_and_a_fill_value_are_moments_in_one_zone() {
+    let berlin = || {
+        let mut links = in_utc();
+        links.push(in_zone("Expr.dt.convert_time_zone", Some("Europe/Berlin")));
+        moments_then_all(links)
+    };
+    let utc = || moments_then_all(in_utc());
+    let condition = |then: Value, otherwise: Value| {
+        selecting(chain(
+            call(
+                "polars.when",
+                json!({ "predicates": crate::support::many(vec![field_then(
+                    "owner",
+                    vec![call("Expr.is_null", json!({}))],
+                )]) }),
+            ),
+            vec![
+                call("When.then", json!({ "statement": then })),
+                call("Then.otherwise", json!({ "statement": otherwise })),
+            ],
+        ))
+    };
+    let report = report_of(&condition(berlin(), utc()));
+    refused_for_the_zones(&report, "otherwise", &["Europe/Berlin", "UTC"]);
+    assert_eq!(
+        report_of(&condition(utc(), utc())).steps()[0]
+            .walk()
+            .refusal(),
+        None
+    );
+    // A fill of a shift is one of the values, and Polars cannot place a moment of another zone in it.
+    let mut links = berlin_links();
+    links.push(call(
+        "Expr.shift",
+        json!({ "fill_value": moment_in("UTC") }),
+    ));
+    let report = report_of(&selecting(moments_then_all(links)));
+    refused_for_the_zones(&report, "shift", &["Europe/Berlin", "UTC"]);
+}
+
+fn berlin_links() -> Vec<Value> {
+    let mut links = in_utc();
+    links.push(in_zone("Expr.dt.convert_time_zone", Some("Europe/Berlin")));
+    links
+}
