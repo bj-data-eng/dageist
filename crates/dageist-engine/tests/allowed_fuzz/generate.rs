@@ -2109,6 +2109,88 @@ mod tests {
         assert_eq!(compared, 2000);
     }
 
+    /// The identifiers of the steps drawn for themselves.
+    const STEPS: [&str; 10] = [
+        "LazyFrame.reverse",
+        "LazyFrame.head",
+        "LazyFrame.limit",
+        "LazyFrame.tail",
+        "LazyFrame.slice",
+        "LazyFrame.drop",
+        "LazyFrame.drop_nulls",
+        "LazyFrame.drop_nans",
+        "LazyFrame.fill_nan",
+        "LazyFrame.with_row_index",
+    ];
+
+    #[test]
+    fn a_focus_names_a_step_by_its_identifier_and_all_of_them_by_the_owner_and_a_dot() {
+        let one = Focus::parse("LazyFrame.head").unwrap().unwrap();
+        assert_eq!(one.names(), "LazyFrame.head");
+        let all = Focus::parse("LazyFrame.").unwrap().unwrap();
+        assert_eq!(all.names().split(", ").collect::<Vec<_>>(), STEPS);
+        // A step is named with methods and functions, each once.
+        let mixed = Focus::parse("over, LazyFrame.head, LazyFrame.head, date")
+            .unwrap()
+            .unwrap();
+        assert_eq!(mixed.names(), "over, date, LazyFrame.head");
+        // The name of a method of an expression that a step shares is of the method alone.
+        let method = Focus::parse("reverse").unwrap().unwrap();
+        assert_eq!(method.names(), "reverse");
+        assert_eq!(focused_ids(&method), ["Expr.reverse"]);
+    }
+
+    #[test]
+    fn every_step_that_is_drawn_for_itself_is_drawn_without_a_focus() {
+        let mut drawn = std::collections::BTreeSet::new();
+        for offset in 0..4000_u64 {
+            let Some(case) = generate(&entropy(offset), None) else {
+                continue;
+            };
+            let written = case.document.write();
+            for id in STEPS {
+                if written.contains(&format!("\"entry\":\"{id}\"")) {
+                    drawn.insert(id);
+                }
+            }
+        }
+        assert_eq!(drawn.into_iter().collect::<Vec<_>>(), {
+            let mut every = STEPS.to_vec();
+            every.sort_unstable();
+            every
+        });
+    }
+
+    #[test]
+    fn a_focus_on_a_step_draws_it_more_often_and_the_case_holds_it() {
+        let focus = Focus::parse("LazyFrame.slice").unwrap().unwrap();
+        let holding = |focus: Option<&Focus>| {
+            (0..2000_u64)
+                .filter_map(|offset| generate(&entropy(offset), focus))
+                .filter(|case| {
+                    case.document
+                        .write()
+                        .contains("\"entry\":\"LazyFrame.slice\"")
+                })
+                .count()
+        };
+        let (without, with) = (holding(None), holding(Some(&focus)));
+        assert!(
+            with > 4 * without.max(10),
+            "{with} focused cases against {without}"
+        );
+        for offset in 0..200_u64 {
+            if let Some(case) = generate(&entropy(offset), Some(&focus)) {
+                // A case that holds the step is judged to hold the focus.
+                assert_eq!(
+                    focus.is_held_by(&case.document),
+                    case.document.write().contains("LazyFrame.slice"),
+                    "offset {offset}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn a_focus_draws_its_methods_more_often() {
         let focus = Focus::parse("dt.replace").unwrap().unwrap();
