@@ -1849,10 +1849,21 @@ mod tests {
 
     #[test]
     fn a_draw_below_a_count_that_does_not_divide_256_gives_every_number_as_often() {
-        // 157 is the count of methods the catalogue once held; 256 mod 157 is 99, so a draw
-        // that reduces a byte gives each of the first 99 numbers twice as often as the others.
+        // 157 is a count of methods the catalogue has held; 256 mod 157 is 99, so a draw that
+        // reduces a byte gives each of the first 99 numbers twice as often as the others.
         let draws = 157 * 2000;
         assert_even(&tally(157, 157, draws), draws);
+    }
+
+    #[test]
+    fn a_draw_reads_again_where_its_bytes_are_at_or_above_the_largest_multiple_of_the_count() {
+        // One byte holds 256 numbers and one copy of 157, so 157 to 255 are read again.
+        assert_eq!(Draw::new(&[156]).below(157), 156);
+        assert_eq!(Draw::new(&[157, 3]).below(157), 3);
+        assert_eq!(Draw::new(&[255, 200, 0]).below(157), 0);
+        // Two bytes hold 65536 numbers and 218 copies of 300, which end at 65400.
+        assert_eq!(Draw::new(&[0xff, 0x77]).below(300), 299);
+        assert_eq!(Draw::new(&[0xff, 0x78, 0x01, 0x2c]).below(300), 0);
     }
 
     #[test]
