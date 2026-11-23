@@ -133,3 +133,22 @@ fn a_parameter_that_is_needed_without_being_required_is_one_of_which_a_step_give
         ]
     );
 }
+
+#[test]
+fn the_share_of_a_quantile_takes_numbers_only() {
+    // Polars reads a text or a moment as the share it writes in a select and refuses it where a
+    // window or a pivot's aggregate evaluates the values of a group, so the editor offers numbers.
+    for id in ["Expr.quantile", "Expr.approx_quantile"] {
+        let entry = catalog::entry(id).expect("an entry");
+        let share = entry
+            .parameters()
+            .iter()
+            .find(|parameter| parameter.name() == "quantile")
+            .expect("the share");
+        assert_eq!(
+            share.kind(),
+            catalog::Kind::Expression(&[catalog::Dtypes::Numeric]),
+            "{id}"
+        );
+    }
+}

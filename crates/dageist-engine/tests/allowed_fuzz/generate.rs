@@ -2529,6 +2529,64 @@ mod tests {
         assert!(found > 5, "the cases pad text only {found} times");
     }
 
+    /// Whether every share a quantile is given in the JSON `value` is a literal alone of a numeric
+    /// dtype, or of none, which is a number typed in.
+    fn shares_are_numbers(value: &serde_json::Value, found: &mut usize) -> bool {
+        const NUMERIC: [&str; 10] = [
+            "Int8", "Int16", "Int32", "Int64", "UInt8", "UInt16", "UInt32", "UInt64", "Float32",
+            "Float64",
+        ];
+        match value {
+            serde_json::Value::Object(map) => {
+                let mut fine = true;
+                if map
+                    .get("entry")
+                    .and_then(|entry| entry.as_str())
+                    .is_some_and(|entry| {
+                        entry == "Expr.quantile" || entry == "Expr.approx_quantile"
+                    })
+                    && let Some(share) =
+                        map.get("arguments").and_then(|given| given.get("quantile"))
+                {
+                    *found += 1;
+                    let expression = &share["expression"];
+                    let literal = &expression["start"];
+                    fine = expression["then"].as_array().is_some_and(Vec::is_empty)
+                        && literal["entry"] == "polars.lit"
+                        && literal["arguments"]["dtype"]["dtype"]
+                            .as_str()
+                            .is_none_or(|dtype| NUMERIC.contains(&dtype));
+                }
+                fine && map.values().all(|inside| shares_are_numbers(inside, found))
+            }
+            serde_json::Value::Array(items) => {
+                items.iter().all(|inside| shares_are_numbers(inside, found))
+            }
+            _ => true,
+        }
+    }
+
+    #[test]
+    fn the_share_of_a_quantile_is_a_number_as_the_editor_offers_it() {
+        // Polars reads a text or a moment as the share it writes in a select and refuses it where a
+        // window or a pivot's aggregate evaluates the values of a group, so the generator gives the
+        // share the editor offers: a number, typed in or the number 1 of a numeric dtype.
+        let mut found = 0;
+        for offset in 0..8000_u64 {
+            let Some(case) = generate(&entropy(offset), None) else {
+                continue;
+            };
+            let document: serde_json::Value =
+                serde_json::from_str(case.document.write().as_str()).expect("a document");
+            assert!(
+                shares_are_numbers(&document, &mut found),
+                "{}",
+                case.document.write()
+            );
+        }
+        assert!(found > 5, "the cases take a quantile only {found} times");
+    }
+
     #[test]
     fn the_cases_include_a_shift_back_and_a_shift_forward() {
         // The limit for what a shift leaves null follows the direction of the
