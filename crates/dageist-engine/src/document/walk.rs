@@ -2033,7 +2033,7 @@ fn operands(call: &Call) -> Vec<&Expression> {
     found
 }
 
-const ONE_VALUE: [&str; 11] = [
+pub(super) const ONE_VALUE: [&str; 11] = [
     "Expr.sum",
     "Expr.min",
     "Expr.max",
