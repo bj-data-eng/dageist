@@ -407,15 +407,15 @@ pub enum Limit {
     /// is not a valid one, which has no place, in a case that holds a method that writes a moment as
     /// text, given a format: the case run again with each format made `iso` is not refused for it.
     AFormatTheDtypeCannotWrite,
-    /// `dt.replace` converts each part it is given to a whole number of the width of the part and
-    /// refuses a value outside the calendar's range, and one that does not convert, when the rows
-    /// run, so what it does with a part that is no number written in depends on the values of the
-    /// rows. The tables measured the column that stands for an argument, whose values are 1 and 3, or
+    /// `dt.replace`, and the functions that make a date, a moment or a time of parts, convert each
+    /// part they are given to a whole number of the width of the part and refuse a value outside
+    /// the calendar's range, and one that does not convert, when the rows run, so what they do
+    /// with a part that is no number written in depends on the values of the rows. The tables measured the column that stands for an argument, whose values are 1 and 3, or
     /// true and false, of which false is a day of 0 that no date has. Polars refusing the rows or the
     /// empty table with the refusal that the components of a date or a time are invalid, or that a
-    /// value does not convert, which has no place, in a case with a `dt.replace` given a part: the
+    /// value does not convert, which has no place, in a case with a call given a part: the
     /// case run again with each part made the number 1 is not refused for it. The tables refusing
-    /// a call at the rows for invalid components that Polars allows, in a case with a `dt.replace`
+    /// a call at the rows for invalid components that Polars allows, in a case with a call
     /// given a part: the tables then no longer refuse it for them with each part made the number 1,
     /// and Polars refuses it for them with each part made `false`, which shows that it evaluates the
     /// part and does not skip it.
@@ -605,7 +605,7 @@ impl Limit {
                 "a cast of a moment to nanoseconds refuses one outside the years nanoseconds hold, when the rows run, where the tables measured moments of 1970 and after"
             }
             Self::APartOfADateThatDependsOnTheRows => {
-                "dt.replace refuses a part outside the calendar's range, or that does not convert, when the rows run, so it depends on the values of the rows, where the tables measured the values of one column"
+                "dt.replace, date, datetime and time refuse a part outside the calendar's range, or that does not convert, when the rows run, so it depends on the values of the rows, where the tables measured the values of one column"
             }
             Self::AFormatTheDtypeCannotWrite => {
                 "a format writes the fields a dtype has and Polars refuses one it has none for, where the tables measured the format iso, which every dtype takes"
@@ -2039,7 +2039,8 @@ fn refused_for_nanoseconds_with_milliseconds(case: &Case) -> Option<bool> {
     })
 }
 
-/// The parts `dt.replace` is given, which it converts to the whole numbers of the calendar.
+/// The parts `dt.replace` and the functions that make a date, a moment or a time are given, which
+/// they convert to the whole numbers of the calendar.
 const PARTS_OF_A_DATE: [&str; 7] = [
     "year",
     "month",
@@ -2062,15 +2063,19 @@ fn is_a_refusal_of_a_part_of_a_date(reason: &str) -> bool {
     is_a_refusal_of_the_components_of_a_date(reason) || is_a_failed_conversion(reason)
 }
 
-/// Whether the call is a `dt.replace` that is given a part.
-fn is_a_replacement_given_a_part(call: &Call) -> bool {
-    is(call, "Expr.dt.replace")
+/// Whether the call is given a part of a date or a time to convert: a `dt.replace`, or one of the
+/// functions that make a date, a moment or a time of parts, which convert each as it does.
+fn is_given_a_part_of_a_date(call: &Call) -> bool {
+    (is(call, "Expr.dt.replace")
+        || is(call, "polars.date")
+        || is(call, "polars.datetime")
+        || is(call, "polars.time"))
         && PARTS_OF_A_DATE
             .iter()
             .any(|part| call.argument(part).is_some())
 }
 
-/// The case with each part that a `dt.replace` is given made the number 1.
+/// The case with each part that a call is given made the number 1.
 fn case_with_ones_as_the_parts(case: &Case) -> Option<Case> {
     let one = Expression::new(
         Start::Call(
@@ -2084,7 +2089,7 @@ fn case_with_ones_as_the_parts(case: &Case) -> Option<Case> {
     )
     .ok()?;
     case_changed(case, &|call| {
-        if !is_a_replacement_given_a_part(call) {
+        if !is_given_a_part_of_a_date(call) {
             return None;
         }
         let given: Vec<(&str, Value)> = call
@@ -2104,7 +2109,7 @@ fn case_with_ones_as_the_parts(case: &Case) -> Option<Case> {
 }
 
 /// Whether Polars refuses the case for a part of a date still when each part is the number 1: the
-/// values of the part are then no cause. `None` where no `dt.replace` is given a part.
+/// values of the part are then no cause. `None` where no call is given a part.
 fn refused_for_a_part_of_a_date_with_ones(case: &Case) -> Option<bool> {
     changed(case_with_ones_as_the_parts(case), case).map(|control| {
         (0..RUNS).any(|_| {
@@ -2133,7 +2138,7 @@ fn is_given_only_literals_of_text(call: &Call) -> bool {
                     && (matches!(start.argument("value"), Some(Value::String(_)))
                         || matches!(start.argument("dtype"), Some(Value::Dtype(dtype)) if dtype.to_string() == "String")))
     };
-    is_a_replacement_given_a_part(call)
+    is_given_a_part_of_a_date(call)
         && PARTS_OF_A_DATE
             .iter()
             .all(|part| match call.argument(part) {
@@ -2143,7 +2148,7 @@ fn is_given_only_literals_of_text(call: &Call) -> bool {
             })
 }
 
-/// The case with each part that a `dt.replace` is given made the literal `value`.
+/// The case with each part that a call is given made the literal `value`.
 fn case_with_the_parts_as(case: &Case, value: Value) -> Option<Case> {
     let literal = Expression::new(
         Start::Call(Call::new(catalog::entry("polars.lit")?, vec![("value", value)]).ok()?),
@@ -2151,7 +2156,7 @@ fn case_with_the_parts_as(case: &Case, value: Value) -> Option<Case> {
     )
     .ok()?;
     case_changed(case, &|call| {
-        if !is_a_replacement_given_a_part(call) {
+        if !is_given_a_part_of_a_date(call) {
             return None;
         }
         let given: Vec<(&str, Value)> = call
@@ -2172,7 +2177,7 @@ fn case_with_the_parts_as(case: &Case, value: Value) -> Option<Case> {
 
 /// Whether Polars refuses the case for what `reason` says with each part the literal `value`: it
 /// then evaluates the part, and what it refuses is a cause. Polars that never evaluates a part
-/// allows the case. `None` where no `dt.replace` is given a part.
+/// allows the case. `None` where no call is given a part.
 fn refused_for_a_part_with(case: &Case, value: Value, reason: fn(&str) -> bool) -> Option<bool> {
     changed(case_with_the_parts_as(case, value), case).map(|control| {
         (0..RUNS).any(|_| {
@@ -3527,7 +3532,7 @@ fn applies(
                 && is_a_refusal_of_a_part_of_a_date(&refusal.reason)
                 && held
                     .iter()
-                    .any(|(_, held)| any_call(held, &is_a_replacement_given_a_part))
+                    .any(|(_, held)| any_call(held, &is_given_a_part_of_a_date))
                 && refused_for_a_part_of_a_date_with_ones(case) == Some(false)
         }
         (Limit::APartOfADateThatDependsOnTheRows, Disagreement::PolarsAllows(refused)) => {
@@ -3539,7 +3544,7 @@ fn applies(
             refused.stage == Some(TableStage::Rows)
                 && locate(case, &refused.place)
                     .call
-                    .is_some_and(is_a_replacement_given_a_part)
+                    .is_some_and(is_given_a_part_of_a_date)
                 && if is_a_refusal_of_the_components_of_a_date(&refused.reason) {
                     the_tables_stop_refusing_the_parts_as_ones(
                         case,
