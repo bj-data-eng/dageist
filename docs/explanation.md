@@ -760,7 +760,8 @@ meant, which is not about the text.
   condition, `then` and `otherwise` and each `then` of a chain of them, and to give a replacement new values
   and a default of two zones. A shift filled with a moment of another zone it cannot place either: Polars
   accepts it eagerly and panics when the rows run. It refuses a moment in a zone and one in none too, which
-  the tables, measured on `UTC` and on no zone, say. The tables cannot say the rest, so the walk follows the
+  the tables, measured on `UTC` and on no zone, say for the methods they measure. They measure no
+  condition, so the values of a condition with one of each are not refused yet (#121). The tables cannot say the rest, so the walk follows the
   zone of a moment along its chain, from the column or the literal to each call that gives one or keeps it,
   and of each value of a condition, and refuses an operand that is in another zone than what it is met with,
   by the named rule `moments-share-a-zone`, with the two zones. What an operand is met with is the value
