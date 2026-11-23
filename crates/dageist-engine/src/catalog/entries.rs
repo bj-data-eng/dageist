@@ -2244,7 +2244,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         family: Family::Aggregate,
         accepts: CUM_MAX,
         parameters: &[
-            required("quantile", EXPRESSION, Shape::One).with_role(Role::Share),
+            required("quantile", Kind::Expression(NUMERIC), Shape::One).with_role(Role::Share),
             optional(
                 "method",
                 Kind::Choice(APPROX_QUANTILE_METHOD),
@@ -3269,7 +3269,7 @@ pub(super) const ENTRIES: &[Entry] = &[
         family: Family::Aggregate,
         accepts: QUANTILE,
         parameters: &[
-            required("quantile", EXPRESSION, Shape::One)
+            required("quantile", Kind::Expression(NUMERIC), Shape::One)
                 .with_role(Role::Share)
                 .not_broadcasting(),
             optional(

@@ -300,7 +300,10 @@ fn literal_classes() -> Vec<Representative> {
         .collect()
 }
 
-/// The classes the whole number 1 is cast to as a literal.
+/// How many of the first of the [`NUMBERED`] classes are numbers.
+const NUMERIC_CLASSES: usize = 10;
+
+/// The classes the whole number 1 is cast to as a literal, the numbers first.
 const NUMBERED: [Representative; 17] = [
     Representative::Int8,
     Representative::Int16,
@@ -1003,7 +1006,12 @@ impl Gen<'_> {
     /// back: the tables measured the dtype, which the sign does not change, and
     /// a negative number of an unsigned dtype is not one.
     fn scalar(&mut self, back: bool) -> Built {
-        let class = self.draw.pick(&NUMBERED);
+        self.scalar_among(&NUMBERED, back)
+    }
+
+    /// The same, of one of the `classes`.
+    fn scalar_among(&mut self, classes: &[Representative], back: bool) -> Built {
+        let class = self.draw.pick(classes);
         let signed = [
             Representative::Int8,
             Representative::Int16,
@@ -1033,11 +1041,14 @@ impl Gen<'_> {
         }
     }
 
-    /// A share a quantile reads: the number 1 of a dtype, which is the share of the largest value,
-    /// or a number from 0 to 1 typed without a dtype, which Polars reads as the number it is.
+    /// A share a quantile reads: the number 1 of a numeric dtype, which is the share of the largest
+    /// value, or a number from 0 to 1 typed without a dtype, which Polars reads as the number it is.
+    /// A share is a number, which is all the editor offers: Polars reads text and moments as
+    /// numbers in a select and refuses them where a window or a pivot's aggregate evaluates the
+    /// values of a group.
     fn share(&mut self) -> Built {
         if self.draw.chance(35) {
-            return self.scalar(false);
+            return self.scalar_among(&NUMBERED[..NUMERIC_CLASSES], false);
         }
         let number = self.draw.pick(&[0.0_f64, 0.25, 0.5, 0.9, 1.0]);
         Built {
