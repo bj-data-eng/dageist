@@ -28,8 +28,8 @@ pub enum Rule {
     FilterPredicateIsBoolean,
     /// `polars.element` stands only in a pivot's aggregate.
     ElementOnlyInPivotAggregate,
-    /// A moment or a length of time made of numbers typed in is no join's key: Polars makes a
-    /// literal of the call and names it by an alias, which a key may not hold.
+    /// A moment or a length of time made of numbers typed in is no part of a join's key: Polars
+    /// makes a literal of the call and names it by an alias, which a key may not hold anywhere.
     FoldedFunctionIsNoJoinKey,
     /// A join pairs no two output column names twice: the keys of each side
     /// are named by the column they read, and a key that repeats the name of
@@ -149,7 +149,8 @@ impl Rule {
             Self::PivotAggregateGivesOneValue => context == Context::step(Outer::PivotAggregate),
             Self::JoinKeyNamesAreNotRepeated | Self::KeyIsElementwise => context.is_join_key(),
             Self::FoldedFunctionIsNoJoinKey => {
-                context.is_join_key() && matches!(entry, "polars.datetime" | "polars.duration")
+                matches!(context.outer(), Outer::JoinLeft | Outer::JoinRight)
+                    && matches!(entry, "polars.datetime" | "polars.duration")
             }
             // A matter of the values a call is given, whatever context it stands in.
             Self::DurationIsValid
@@ -192,12 +193,11 @@ impl Rule {
     }
 
     /// The rule that forbids a moment or a length of time made of numbers typed in, where
-    /// `context` is a join's own key, if it does. Whether the call is made of nothing else is a
+    /// `context` is a join's key or inside one, if it does. Whether the call is made of nothing else is a
     /// matter of its arguments, which the caller found.
     #[must_use]
     pub(super) fn forbids_a_folded_function_in_a_key(context: Context) -> Option<Self> {
-        context
-            .is_join_key()
+        matches!(context.outer(), Outer::JoinLeft | Outer::JoinRight)
             .then_some(Self::FoldedFunctionIsNoJoinKey)
     }
 

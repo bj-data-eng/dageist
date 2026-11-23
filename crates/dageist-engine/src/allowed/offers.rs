@@ -1233,8 +1233,8 @@ pub fn rule_forbids_replacement_values_of_other_numbers() -> Result<(), Refusal>
 }
 
 /// The refusal of a moment or a length of time made of numbers typed in, which the caller has found,
-/// where `context` holds one of a join's own keys, if the rule refuses it there. Polars makes a
-/// literal of such a call and names it by an alias, which a key may not hold.
+/// where `context` is a join's key or inside one, if the rule refuses it there. Polars makes a
+/// literal of such a call and names it by an alias, which a key may not hold anywhere.
 ///
 /// # Errors
 ///
