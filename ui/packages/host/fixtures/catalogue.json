@@ -308,6 +308,42 @@
       ]
     },
     {
+      "id": "Expr.all",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "all",
+      "hint": "true if every value is true",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "ignore_nulls",
+          "shown": "ignore_nulls",
+          "label": "skip empty values",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": true
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": true
+          },
+          "start": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "Expr.and_",
       "applies": "expression",
       "family": "logic",
@@ -337,6 +373,191 @@
                 "kind": "unset"
               }
             ]
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.any",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "any",
+      "hint": "true if some value is true",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "ignore_nulls",
+          "shown": "ignore_nulls",
+          "label": "skip empty values",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": true
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": true
+          },
+          "start": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.approx_n_unique",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "approx_n_unique",
+      "hint": "number of different values, found quickly and nearly",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.approx_quantile",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "approx_quantile",
+      "hint": "the value a share of the values fall below, found quickly and nearly",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "quantile",
+          "shown": "quantile",
+          "label": "share, from 0 to 1",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "method",
+          "shown": "method",
+          "label": "way of finding it",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "auto",
+                "shown": "auto"
+              },
+              {
+                "word": "kll",
+                "shown": "kll"
+              },
+              {
+                "word": "req_lo",
+                "shown": "req_lo"
+              },
+              {
+                "word": "req_hi",
+                "shown": "req_hi"
+              },
+              {
+                "word": "req_both",
+                "shown": "req_both"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "auto"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "auto"
+          },
+          "start": {
+            "kind": "word",
+            "value": "kll"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "error",
+          "shown": "error",
+          "label": "share of the rows it may be off by",
+          "kind": {
+            "kind": "value",
+            "type": "float"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "float",
+            "value": 0.001
+          },
+          "defaultSetting": {
+            "kind": "float",
+            "value": 0.001,
+            "shown": "0.001"
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "error_tightness",
+          "shown": "error_tightness",
+          "label": "how sure the error is",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "empirical",
+                "shown": "empirical"
+              },
+              {
+                "word": "formal",
+                "shown": "formal"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "empirical"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "empirical"
+          },
+          "start": {
+            "kind": "word",
+            "value": "formal"
           },
           "position": null,
           "offered": true
@@ -399,6 +620,26 @@
       "family": "trigonometry",
       "name": "arctanh",
       "hint": "inverse hyperbolic tangent",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.arg_max",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "arg_max",
+      "hint": "row of the highest value",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.arg_min",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "arg_min",
+      "hint": "row of the lowest value",
       "head": null,
       "lazy": true,
       "parameters": []
@@ -495,6 +736,96 @@
           "offered": true
         }
       ]
+    },
+    {
+      "id": "Expr.bitwise_and",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "bitwise_and",
+      "hint": "the bits that are set in every value",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.bitwise_count_ones",
+      "applies": "expression",
+      "family": "logic",
+      "name": "bitwise_count_ones",
+      "hint": "number of bits that are set",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.bitwise_count_zeros",
+      "applies": "expression",
+      "family": "logic",
+      "name": "bitwise_count_zeros",
+      "hint": "number of bits that are not set",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.bitwise_leading_ones",
+      "applies": "expression",
+      "family": "logic",
+      "name": "bitwise_leading_ones",
+      "hint": "number of set bits before the first one that is not",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.bitwise_leading_zeros",
+      "applies": "expression",
+      "family": "logic",
+      "name": "bitwise_leading_zeros",
+      "hint": "number of unset bits before the first one that is set",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.bitwise_or",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "bitwise_or",
+      "hint": "the bits that are set in some value",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.bitwise_trailing_ones",
+      "applies": "expression",
+      "family": "logic",
+      "name": "bitwise_trailing_ones",
+      "hint": "number of set bits after the last one that is not",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.bitwise_trailing_zeros",
+      "applies": "expression",
+      "family": "logic",
+      "name": "bitwise_trailing_zeros",
+      "hint": "number of unset bits after the last one that is set",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.bitwise_xor",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "bitwise_xor",
+      "hint": "the bits that are set in an odd number of values",
+      "head": null,
+      "lazy": true,
+      "parameters": []
     },
     {
       "id": "Expr.cast",
@@ -730,6 +1061,78 @@
       "family": "cumulative",
       "name": "cum_max",
       "hint": "running maximum",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "reverse",
+          "shown": "reverse",
+          "label": "from the end",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.cum_min",
+      "applies": "expression",
+      "family": "cumulative",
+      "name": "cum_min",
+      "hint": "running minimum",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "reverse",
+          "shown": "reverse",
+          "label": "from the end",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.cum_prod",
+      "applies": "expression",
+      "family": "cumulative",
+      "name": "cum_prod",
+      "hint": "running product",
       "head": null,
       "lazy": true,
       "parameters": [
@@ -2131,6 +2534,68 @@
       "parameters": []
     },
     {
+      "id": "Expr.entropy",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "entropy",
+      "hint": "how evenly the values share their total",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "base",
+          "shown": "base",
+          "label": "to the base",
+          "kind": {
+            "kind": "value",
+            "type": "float"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "float",
+            "value": 2.718281828459045
+          },
+          "defaultSetting": {
+            "kind": "float",
+            "value": 2.718281828459045,
+            "shown": "2.718281828459045"
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "normalize",
+          "shown": "normalize",
+          "label": "as shares of their total",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": true
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": true
+          },
+          "start": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "Expr.eq",
       "applies": "expression",
       "family": "compare",
@@ -2840,6 +3305,67 @@
       "parameters": []
     },
     {
+      "id": "Expr.kurtosis",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "kurtosis",
+      "hint": "how heavy the tails of the values are",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "fisher",
+          "shown": "fisher",
+          "label": "less 3, as for a bell curve",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": true
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": true
+          },
+          "start": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "bias",
+          "shown": "bias",
+          "label": "not corrected for few values",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": true
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": true
+          },
+          "start": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "Expr.last",
       "applies": "expression",
       "family": "rows",
@@ -3004,6 +3530,26 @@
       "parameters": []
     },
     {
+      "id": "Expr.mean",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "mean",
+      "hint": "average",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.median",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "median",
+      "hint": "middle value",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
       "id": "Expr.min",
       "applies": "expression",
       "family": "aggregate",
@@ -3081,6 +3627,26 @@
       "family": "aggregate",
       "name": "n_unique",
       "hint": "number of different values",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.nan_max",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "nan_max",
+      "hint": "highest value, not a number if one is",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.nan_min",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "nan_min",
+      "hint": "lowest value, not a number if one is",
       "head": null,
       "lazy": true,
       "parameters": []
@@ -3458,6 +4024,98 @@
           "defaultSetting": null,
           "start": {
             "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.product",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "product",
+      "hint": "the values multiplied",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.quantile",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "quantile",
+      "hint": "the value a share of the values fall below",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "quantile",
+          "shown": "quantile",
+          "label": "share, from 0 to 1",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "interpolation",
+          "shown": "interpolation",
+          "label": "between two values",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "nearest",
+                "shown": "nearest"
+              },
+              {
+                "word": "higher",
+                "shown": "higher"
+              },
+              {
+                "word": "lower",
+                "shown": "lower"
+              },
+              {
+                "word": "midpoint",
+                "shown": "midpoint"
+              },
+              {
+                "word": "linear",
+                "shown": "linear"
+              },
+              {
+                "word": "equiprobable",
+                "shown": "equiprobable"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "nearest"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "nearest"
+          },
+          "start": {
+            "kind": "word",
+            "value": "higher"
           },
           "position": null,
           "offered": true
@@ -3935,6 +4593,42 @@
       "parameters": []
     },
     {
+      "id": "Expr.skew",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "skew",
+      "hint": "how lopsided the values are",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "bias",
+          "shown": "bias",
+          "label": "not corrected for few values",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": true
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": true
+          },
+          "start": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "Expr.sort",
       "applies": "expression",
       "family": "order",
@@ -4167,6 +4861,43 @@
       "head": null,
       "lazy": true,
       "parameters": []
+    },
+    {
+      "id": "Expr.std",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "std",
+      "hint": "how far the values spread from their average",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "ddof",
+          "shown": "ddof",
+          "label": "count less",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 1
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 1,
+            "shown": "1"
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
     },
     {
       "id": "Expr.str.contains",
@@ -5524,6 +6255,43 @@
             "kind": "integer",
             "value": 0,
             "shown": "0"
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.var",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "var",
+      "hint": "square of how far the values spread from their average",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "ddof",
+          "shown": "ddof",
+          "label": "count less",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 1
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 1,
+            "shown": "1"
           },
           "start": {
             "kind": "unset"

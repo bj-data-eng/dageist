@@ -86,7 +86,67 @@
       "slots": []
     },
     {
+      "entry": "Expr.all",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.and_",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.any",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.approx_n_unique",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.approx_quantile",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -191,6 +251,36 @@
       "slots": []
     },
     {
+      "entry": "Expr.arg_max",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.arg_min",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.arg_sort",
       "verdict": {
         "kind": "refused",
@@ -207,6 +297,141 @@
     },
     {
       "entry": "Expr.backward_fill",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.bitwise_and",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.bitwise_count_ones",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.bitwise_count_zeros",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.bitwise_leading_ones",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.bitwise_leading_zeros",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.bitwise_or",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.bitwise_trailing_ones",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.bitwise_trailing_zeros",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.bitwise_xor",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -357,6 +582,36 @@
     },
     {
       "entry": "Expr.cum_max",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.cum_min",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.cum_prod",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -1091,6 +1346,21 @@
       "slots": []
     },
     {
+      "entry": "Expr.entropy",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.eq",
       "verdict": {
         "kind": "refused",
@@ -1481,6 +1751,21 @@
       "slots": []
     },
     {
+      "entry": "Expr.kurtosis",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.last",
       "verdict": {
         "kind": "refused",
@@ -1586,6 +1871,36 @@
       "slots": []
     },
     {
+      "entry": "Expr.mean",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.median",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.min",
       "verdict": {
         "kind": "refused",
@@ -1632,6 +1947,36 @@
     },
     {
       "entry": "Expr.n_unique",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.nan_max",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.nan_min",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -1767,6 +2112,36 @@
     },
     {
       "entry": "Expr.pow",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.product",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.quantile",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -1961,6 +2336,21 @@
       "slots": []
     },
     {
+      "entry": "Expr.skew",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.sort",
       "verdict": {
         "kind": "refused",
@@ -1992,6 +2382,21 @@
     },
     {
       "entry": "Expr.sqrt",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.std",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -2532,6 +2937,21 @@
     },
     {
       "entry": "Expr.truncate",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method cannot follow a condition that is at its then; continue or end the condition first"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.var",
       "verdict": {
         "kind": "refused",
         "refusal": {
