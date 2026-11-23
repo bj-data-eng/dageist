@@ -90,7 +90,7 @@ pub enum Family {
     /// The values in another order, and their places in it: `sort`, `sort_by`, `reverse`,
     /// `arg_sort` and `rank`.
     Order,
-    /// Running values: `cum_sum`, `cum_count`, `cum_max`.
+    /// Running values: `cum_sum`, `cum_count`, `cum_max`, `cum_min`, `cum_prod`.
     Cumulative,
     /// Arithmetic on values: `add`, `sub`, `mul`, `neg`, `abs`, `sign`, `clip`, and the like.
     Arithmetic,
@@ -102,7 +102,8 @@ pub enum Family {
     /// Rounding a number: `round`, `ceil`, `floor`, `truncate` and `round_sig_figs`, which give
     /// the dtype they are given.
     Rounding,
-    /// One value for a whole group: `sum`, `min`, `max`, `len`.
+    /// One value for a whole group: `sum`, `min`, `max`, `len`, `mean`, `median`, `std`, `quantile`,
+    /// `arg_max`, `any`, `bitwise_and`.
     Aggregate,
     /// Dates and times: the `dt` namespace.
     Temporal,
@@ -125,7 +126,7 @@ pub enum Family {
     /// `is_unique`, `is_first_distinct`, and the like, which give a Boolean.
     Checks,
     /// Combining and negating truth: `and`, `or`, `xor` and `not`, which work bit
-    /// by bit on whole numbers.
+    /// by bit on whole numbers, and the counts of bits: `bitwise_count_ones` and its kin.
     Logic,
     /// Nulls and NaNs: `fill_null`, `forward_fill`, `drop_nulls`, `null_count`, and the like.
     Nulls,
