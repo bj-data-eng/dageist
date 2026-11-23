@@ -895,15 +895,18 @@ pub fn settle_on_a_value(
 }
 
 /// Asks Polars about a function that starts a chain, which the tables refused for what it is
-/// given, with each literal it is given made a column of its dtype, which Polars cannot fold as it
-/// can a literal: the part as written may be allowed because Polars folds the literal, or never
-/// meets it, as under the length of what the call is part of, and a column of the dtype is refused
-/// as the tables say. `None` for a refusal of a rule or of a link, for a pivot's aggregate, which
-/// reads no column to stand in, when the call is given no literal whose dtype Polars gave, and when
-/// Polars allows the probe, refuses it for another reason or not at the call.
+/// given, with a column of the dtype of each argument that Polars cannot fold, skip or leave null as
+/// it can the argument: first with each literal it is given a column of its dtype, which Polars
+/// folds when the call is asked alone, and then with every argument a column of the dtype that
+/// reaches it, which a condition that no row takes and a part that a length hides are not. The part
+/// as written may be allowed because of what an argument is, and a column of the dtype is refused as
+/// the tables say. `None` for a refusal of a rule or of a link, for a pivot's aggregate, which reads
+/// no column to stand in, when no argument has a dtype Polars gave, and when Polars allows the
+/// probe, refuses it for another reason or not at the call.
 pub fn settle_a_start_given_columns(
     case: &Case,
     refused: &Refused,
+    predicted: &Prediction,
     observed: &Observed,
 ) -> Option<Settled> {
     if !matches!(refused.source, Source::Polars) {
@@ -917,26 +920,38 @@ pub fn settle_a_start_given_columns(
         return None;
     };
     let literals = operand_causes(start, &refused.place, false);
-    let classes = literals
+    let literal_classes = literals
         .iter()
         .map(|cause| class_of(cause, observed))
         .collect::<Option<Vec<_>>>()
-        .filter(|classes| !classes.is_empty())?;
-    let standing: Vec<&Expression> = literals.iter().map(|cause| cause.expression).collect();
-    let columns = call_with_columns(start, &standing, 0)?;
-    let part = Expression::new(Start::Call(columns), Vec::new()).ok()?;
-    let probed = Case {
-        receiver: case.receiver,
-        argument: case.argument,
-        document: document_of(case, &found, part, false)?,
-    };
-    let at = place_of_the_part(&found, false).then(Segment::Start);
-    let tables = Tables::standing(found.on_the_other_table, &classes)?;
-    let refusal = refused_as(&probed, tables, refused, &[at])?;
-    Some(Settled {
-        probe: probed.document.write(),
-        reason: refusal.reason,
-        showing: Showing::TheSameReason,
+        .filter(|classes| !classes.is_empty());
+    let mut attempts: Vec<(Call, Vec<Representative>)> = Vec::new();
+    if let Some(classes) = literal_classes {
+        let standing: Vec<&Expression> = literals.iter().map(|cause| cause.expression).collect();
+        if let Some(columns) = call_with_columns(start, &standing, 0) {
+            attempts.push((columns, classes));
+        }
+    }
+    // The columns of the arguments are the second and after, as a call that follows a value has
+    // that value for the first.
+    if let Some((columns, classes)) = call_on_columns(start, &refused.place, predicted, observed) {
+        attempts.push((columns, [vec![Representative::Int64], classes].concat()));
+    }
+    attempts.into_iter().find_map(|(columns, classes)| {
+        let part = Expression::new(Start::Call(columns), Vec::new()).ok()?;
+        let probed = Case {
+            receiver: case.receiver,
+            argument: case.argument,
+            document: document_of(case, &found, part, false)?,
+        };
+        let at = place_of_the_part(&found, false).then(Segment::Start);
+        let tables = Tables::standing(found.on_the_other_table, &classes)?;
+        let refusal = refused_as(&probed, tables, refused, &[at])?;
+        Some(Settled {
+            probe: probed.document.write(),
+            reason: refusal.reason,
+            showing: Showing::TheSameReason,
+        })
     })
 }
 
@@ -1672,7 +1687,7 @@ pub fn settle_apart(
     observed: &Observed,
 ) -> Option<Settled> {
     settle_on_a_value(case, refused, predicted, observed)
-        .or_else(|| settle_a_start_given_columns(case, refused, observed))
+        .or_else(|| settle_a_start_given_columns(case, refused, predicted, observed))
         .or_else(|| settle_as_a_key(case, refused))
         .or_else(|| settle_on_a_value_as_a_key(case, refused, predicted, observed))
         .or_else(|| settle_in_the_position(case, refused, predicted, observed))
