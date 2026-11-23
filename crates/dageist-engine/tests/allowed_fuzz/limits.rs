@@ -136,7 +136,8 @@ pub enum Limit {
     /// an aggregate leaves to each of the sample's rows; any other call leaves
     /// nothing known. A function that makes a date, a time or a moment of parts gives a null in each
     /// row where a part that is a column is null, and in each row of one that is a column of text,
-    /// which is no number, and a count since 1970 keeps the nulls of what it counts. The first and
+    /// which is no number, and a count since 1970 keeps the nulls of what it counts. A drop of the
+    /// nulls of rows that are all null leaves none, which meets nothing as a null does. The first and
     /// the last take a row (the first or last that
     /// is not null, where they skip nulls), the minimum and the maximum are null
     /// of rows that are all null and a value of any that holds one, and a sum is
@@ -1427,6 +1428,20 @@ fn rows_after(
                 vec![one]
             }
             "Expr.len" => vec![Cell::Value],
+            // A drop of the nulls leaves the rows that hold a value, which are none where they are
+            // all null: a column of no rows meets nothing, as a null does not, so it stands for one
+            // null here.
+            "Expr.drop_nulls" if !rows.contains(&Cell::Unknown) => {
+                let kept: Vec<Cell> = rows
+                    .into_iter()
+                    .filter(|cell| *cell != Cell::Null)
+                    .collect();
+                if kept.is_empty() {
+                    vec![Cell::Null]
+                } else {
+                    kept
+                }
+            }
             // A fill of NaN keeps the null of a row that is one, and gives the value or the row
             // itself to the others; a cast keeps a null too, and gives a null or a value to the
             // others.
