@@ -2579,6 +2579,22 @@ mod tests {
     }
 
     #[test]
+    fn moments_in_two_zones_are_settled_by_polars_refusing_the_part_where_a_sort_key_skips_it() {
+        // `sort(by=[datetime(.., time_zone=Europe/Berlin).first() > lit(null, Datetime(UTC))])`:
+        // the rule refuses a comparison of moments in two zones, and Polars drops a sort key that
+        // is one value; asked as written, it refuses the comparison for the two zones.
+        let case = kept("stricter-moments-in-two-zones-in-a-sort-key-of-one-value.case");
+        let refused = refusal(&case);
+        assert!(matches!(
+            refused.source,
+            Source::Rule("moments-share-a-zone")
+        ));
+        let found = settle(&case, &refused).expect("a comparison that Polars refuses alone");
+        assert!(found.probe.contains("Expr.gt"), "{}", found.probe);
+        assert_eq!(found.showing, Showing::TheSameReason);
+    }
+
+    #[test]
     fn a_comparison_given_no_known_dtype_is_settled_by_polars_refusing_it() {
         // `sort(by=when(b <= b - 1).then(b).last())` of `List(Int64)`: the tables
         // do not know what `b - 1` gives, and refuse the comparison for every
