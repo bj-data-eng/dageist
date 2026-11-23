@@ -2469,6 +2469,48 @@
       "slots": []
     },
     {
+      "entry": "polars.date",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Date",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "polars.datetime",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "polars.duration",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Duration(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": "weeks",
+      "slots": []
+    },
+    {
       "entry": "polars.element",
       "verdict": {
         "kind": "refused",
@@ -2478,6 +2520,20 @@
             "rule": "element-only-in-pivot-aggregate"
           },
           "reason": "`polars.element` stands only in a pivot's aggregate"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "polars.from_epoch",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
         }
       },
       "argument": null,
@@ -2496,6 +2552,20 @@
       },
       "argument": null,
       "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "polars.time",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Time",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": "hour",
       "slots": []
     },
     {

@@ -459,6 +459,7 @@ export const RULE_NAMES = [
   'duration-is-valid',
   'element-only-in-pivot-aggregate',
   'filter-predicate-is-boolean',
+  'folded-function-is-no-join-key',
   'join-key-names-are-not-repeated',
   'key-is-elementwise',
   'moments-share-a-zone',

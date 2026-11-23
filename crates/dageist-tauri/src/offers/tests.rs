@@ -280,14 +280,33 @@ fn what_may_start_an_expression_depends_on_where_it_stands() {
         offered(&select, "polars.element")["verdict"]["refusal"]["source"],
         json!({ "by": "rule", "rule": "element-only-in-pivot-aggregate" })
     );
+    // A function that makes a date, a moment or a length of time starts a chain beside them.
     assert_eq!(
         allowed(&select),
-        ["polars.col", "polars.lit", "polars.when"]
+        [
+            "polars.col",
+            "polars.date",
+            "polars.datetime",
+            "polars.duration",
+            "polars.from_epoch",
+            "polars.lit",
+            "polars.time",
+            "polars.when"
+        ]
     );
     let pivot = at("pivot_aggregate");
     assert_eq!(
         allowed(&pivot),
-        ["polars.element", "polars.lit", "polars.when"]
+        [
+            "polars.date",
+            "polars.datetime",
+            "polars.duration",
+            "polars.element",
+            "polars.from_epoch",
+            "polars.lit",
+            "polars.time",
+            "polars.when"
+        ]
     );
     assert_eq!(
         offered(&pivot, "polars.col")["verdict"]["refusal"]["source"],
@@ -1068,7 +1087,8 @@ fn the_grid_holds_a_cell_for_every_place_and_sets_a_bit_for_every_entry_that_may
         rows.iter()
             .all(|row| row.as_array().expect("a row").len() == afters)
     );
-    // A select start is `col`, `lit` and `when`, and nothing else.
+    // A select start is `col`, `lit` and `when`, and the functions that make a moment, and nothing
+    // else.
     let entries = grid["entries"].as_array().expect("entries");
     let at = |id: &str| {
         entries
@@ -1076,7 +1096,16 @@ fn the_grid_holds_a_cell_for_every_place_and_sets_a_bit_for_every_entry_that_may
             .position(|entry| entry == id)
             .expect("an entry")
     };
-    let starts = [at("polars.col"), at("polars.lit"), at("polars.when")];
+    let starts = [
+        at("polars.col"),
+        at("polars.date"),
+        at("polars.datetime"),
+        at("polars.duration"),
+        at("polars.from_epoch"),
+        at("polars.lit"),
+        at("polars.time"),
+        at("polars.when"),
+    ];
     let select_start = rows[0][0].as_array().expect("words of a mask");
     assert_eq!(select_start.len(), entries.len().div_ceil(32));
     for (word, held) in select_start.iter().enumerate() {
