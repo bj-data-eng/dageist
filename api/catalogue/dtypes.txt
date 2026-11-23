@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 46854 combinations: 15623 allowed; 7626 refused when Polars resolved the schema, 23605 when it ran the rows, 0 when it ran the empty table.
+# 46854 combinations: 15627 allowed; 7626 refused when Polars resolved the schema, 23601 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.abs | - | Array(Int64, 2) | - | refused rows: `abs` operation not supported for dtype `array[i64, 2]`
 Expr.abs | - | Boolean | - | refused rows: `abs` operation not supported for dtype `bool`
@@ -46289,7 +46289,7 @@ Expr.xor | other | UInt8 | UInt32 | allowed UInt32 many
 Expr.xor | other | UInt8 | UInt64 | allowed UInt64 many
 Expr.xor | other | UInt8 | UInt8 | allowed UInt8 many
 polars.date | day | - | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int8')
-polars.date | day | - | Boolean | refused rows: Invalid date components (2026, 1, 0) supplied
+polars.date | day | - | Boolean | allowed Date many
 polars.date | day | - | Date | allowed Date many
 polars.date | day | - | Datetime(us) | allowed Date many
 polars.date | day | - | Datetime(us, UTC) | allowed Date many
@@ -46315,7 +46315,7 @@ polars.date | day | - | UInt32 | allowed Date many
 polars.date | day | - | UInt64 | allowed Date many
 polars.date | day | - | UInt8 | allowed Date many
 polars.date | month | - | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int8')
-polars.date | month | - | Boolean | refused rows: Invalid date components (2026, 0, 1) supplied
+polars.date | month | - | Boolean | allowed Date many
 polars.date | month | - | Date | allowed Date many
 polars.date | month | - | Datetime(us) | allowed Date many
 polars.date | month | - | Datetime(us, UTC) | allowed Date many
@@ -46367,7 +46367,7 @@ polars.date | year | - | UInt32 | allowed Date many
 polars.date | year | - | UInt64 | allowed Date many
 polars.date | year | - | UInt8 | allowed Date many
 polars.datetime | day | - | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int8')
-polars.datetime | day | - | Boolean | refused rows: Invalid date components (2026, 1, 0) supplied
+polars.datetime | day | - | Boolean | allowed Datetime(us) many
 polars.datetime | day | - | Date | allowed Datetime(us) many
 polars.datetime | day | - | Datetime(us) | allowed Datetime(us) many
 polars.datetime | day | - | Datetime(us, UTC) | allowed Datetime(us) many
@@ -46471,7 +46471,7 @@ polars.datetime | minute | - | UInt32 | allowed Datetime(us) many
 polars.datetime | minute | - | UInt64 | allowed Datetime(us) many
 polars.datetime | minute | - | UInt8 | allowed Datetime(us) many
 polars.datetime | month | - | Array(Int64, 2) | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int8')
-polars.datetime | month | - | Boolean | refused rows: Invalid date components (2026, 0, 1) supplied
+polars.datetime | month | - | Boolean | allowed Datetime(us) many
 polars.datetime | month | - | Date | allowed Datetime(us) many
 polars.datetime | month | - | Datetime(us) | allowed Datetime(us) many
 polars.datetime | month | - | Datetime(us, UTC) | allowed Datetime(us) many

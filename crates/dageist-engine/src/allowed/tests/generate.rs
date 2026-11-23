@@ -110,6 +110,15 @@ fn argument_for(entry: &Entry, parameter: &str, value: Expr) -> Argument {
 /// The parameters Polars takes only as a single value, not as a column.
 const SCALAR_ONLY: [(&str, &str); 2] = [("Expr.shift", "n"), ("Expr.shift", "fill_value")];
 
+/// The parts of a date that the functions which make one take, whose calendar has no month and no
+/// day of 0, which a Boolean column holds as false.
+const PARTS_OF_A_DATE: [(&str, &str); 4] = [
+    ("polars.date", "month"),
+    ("polars.date", "day"),
+    ("polars.datetime", "month"),
+    ("polars.datetime", "day"),
+];
+
 /// The parameters whose values a context is measured with as literals: Polars calls a replacement
 /// elementwise, as a join's key must be, only where what it replaces and replaces by, and the
 /// default of a strict one, are literals, which is how a replacement is written, and refuses one
@@ -143,6 +152,15 @@ fn argument_expression(
         } else {
             null_of(&dtype.dtype())
         }
+    } else if PARTS_OF_A_DATE.contains(&(entry, parameter)) && dtype == Representative::Boolean {
+        // A column of true: the month 1 and the day 1, which Polars makes a date of. The sample's
+        // column holds a false, which is no month and no day, and whether a row holds one is for
+        // the rows to say.
+        method(
+            super::build::entry("Expr.or_"),
+            column(scope.argument),
+            vec![("others", expressions(vec![flag(true)]))],
+        )
     } else if SCALAR_ONLY.contains(&(entry, parameter))
         || (scope.literals && LITERAL_IN_CONTEXTS.contains(&(entry, parameter)))
     {
