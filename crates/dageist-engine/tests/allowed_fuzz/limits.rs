@@ -302,7 +302,8 @@ pub enum Limit {
     /// each fill a fill forward, each count the whole number 1 and each replacement not asked for
     /// a dtype is not refused for a failed conversion. A literal is one value that Polars converts
     /// when it works out the schema, so the refusal may be the schema's, and then it names the
-    /// scalar the literal is.
+    /// scalar the literal is, and the strict cast it is given to where it says where. A date made of
+    /// numbers typed in is such a value, the first of January of the year 1 for 1, 1 and 1.
     ACastOfAValueTheDtypeCannotHold,
     /// `drop_nulls` and `drop_nans` leave the values that are not null or not NaN, so a column
     /// that holds one has fewer values than the table has rows, which Polars refuses to meet the
@@ -4131,9 +4132,15 @@ fn applies(
             // converted when the schema is worked out, so the refusal is the schema's, naming the
             // scalar. The cast is the cause where Polars stops refusing for a failed conversion
             // once no cast is strict.
-            unplaced(refusal)
+            // The schema names the call that casts the literal where it works the literal out, so a
+            // refusal of that kind at a strict cast is the cast's as one with no place is.
+            (unplaced(refusal)
                 && (matches!(refusal.stage, Stage::Rows | Stage::Empty)
                     || is_a_literal_that_failed_to_convert(refusal))
+                || (is_a_literal_that_failed_to_convert(refusal)
+                    && refusal.place.as_ref().is_some_and(|place| {
+                        locate(case, place).call.is_some_and(is_a_strict_cast)
+                    })))
                 && is_a_failed_conversion(&refusal.reason)
                 && held
                     .iter()
