@@ -144,8 +144,13 @@ const LITERAL_IN_CONTEXTS: [(&str, &str); 5] = [
 
 /// The parameters whose value is not a null where the expression is built for a group, which has
 /// no other column to give: Polars reads the value of a replacement of every match as the one value
-/// every match is replaced by where it is a literal, and refuses a null.
-const NOT_NULL_FOR_A_GROUP: [(&str, &str); 1] = [("Expr.str.replace_all", "value")];
+/// every match is replaced by where it is a literal, and refuses a null, as it refuses a null
+/// share of a quantile.
+const NOT_NULL_FOR_A_GROUP: [(&str, &str); 3] = [
+    ("Expr.str.replace_all", "value"),
+    ("Expr.quantile", "quantile"),
+    ("Expr.approx_quantile", "quantile"),
+];
 
 /// The expression that stands for an argument of `dtype` for `parameter` of
 /// the entry `entry`: a column of that dtype; the number 1 of that dtype where

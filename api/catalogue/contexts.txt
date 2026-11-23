@@ -67,7 +67,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 13020 combinations: 8876 allowed; 2420 refused when Polars resolved the schema, 1724 when it ran the rows, 0 when it ran the empty table.
+# 13020 combinations: 8887 allowed; 2420 refused when Polars resolved the schema, 1713 when it ran the rows, 0 when it ran the empty table.
 #
 ChainedThen.otherwise | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 ChainedThen.otherwise | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
@@ -639,16 +639,16 @@ Expr.approx_quantile | join_right > over.partition_by | continues | Int64 | Int6
 Expr.approx_quantile | join_right > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.approx_quantile | join_right | continues | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 one
 Expr.approx_quantile | join_right | ends | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | allowed Int64 one
-Expr.approx_quantile | pivot_aggregate > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | refused rows: `quantile` should not contain null values
-Expr.approx_quantile | pivot_aggregate > condition.predicate | ends | Boolean | Boolean | condition-predicate-is-boolean | refused rows: `quantile` should not contain null values
-Expr.approx_quantile | pivot_aggregate > condition.value | continues | Int64 | Int64 | - | refused rows: `quantile` should not contain null values
-Expr.approx_quantile | pivot_aggregate > condition.value | ends | Int64 | Int64 | - | refused rows: `quantile` should not contain null values
+Expr.approx_quantile | pivot_aggregate > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Int64 one
+Expr.approx_quantile | pivot_aggregate > condition.predicate | ends | Boolean | Boolean | condition-predicate-is-boolean | allowed Boolean one
+Expr.approx_quantile | pivot_aggregate > condition.value | continues | Int64 | Int64 | - | allowed Int64 one
+Expr.approx_quantile | pivot_aggregate > condition.value | ends | Int64 | Int64 | - | allowed Int64 one
 Expr.approx_quantile | pivot_aggregate > over.order_by | continues | Int64 | Int64 | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
 Expr.approx_quantile | pivot_aggregate > over.order_by | ends | Int64 | Int64 | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
 Expr.approx_quantile | pivot_aggregate > over.partition_by | continues | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
 Expr.approx_quantile | pivot_aggregate > over.partition_by | ends | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
-Expr.approx_quantile | pivot_aggregate | continues | Int64 | Int64 | pivot-aggregate-gives-one-value | refused rows: `quantile` should not contain null values
-Expr.approx_quantile | pivot_aggregate | ends | Int64 | Int64 | pivot-aggregate-gives-one-value | refused rows: `quantile` should not contain null values
+Expr.approx_quantile | pivot_aggregate | continues | Int64 | Int64 | pivot-aggregate-gives-one-value | allowed Int64 one
+Expr.approx_quantile | pivot_aggregate | ends | Int64 | Int64 | pivot-aggregate-gives-one-value | allowed Int64 one
 Expr.approx_quantile | select > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Int64 one
 Expr.approx_quantile | select > condition.predicate | ends | Boolean | Boolean | condition-predicate-is-boolean | allowed Boolean one
 Expr.approx_quantile | select > condition.value | continues | Int64 | Int64 | - | allowed Int64 one
@@ -9039,16 +9039,16 @@ Expr.quantile | join_right > over.partition_by | continues | Int64 | Int64 | - |
 Expr.quantile | join_right > over.partition_by | ends | Int64 | Int64 | - | refused schema: all join key expressions must be elementwise.
 Expr.quantile | join_right | continues | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | allowed Float64 one
 Expr.quantile | join_right | ends | Int64 | Int64 | join-key-names-are-not-repeated,key-is-elementwise | allowed Float64 one
-Expr.quantile | pivot_aggregate > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | refused rows: could not extract number from any-value of dtype: 'Null'
-Expr.quantile | pivot_aggregate > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | refused rows: could not extract number from any-value of dtype: 'Null'
-Expr.quantile | pivot_aggregate > condition.value | continues | Int64 | Int64 | - | refused rows: could not extract number from any-value of dtype: 'Null'
-Expr.quantile | pivot_aggregate > condition.value | ends | Int64 | Int64 | - | refused rows: could not extract number from any-value of dtype: 'Null'
+Expr.quantile | pivot_aggregate > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Float64 one
+Expr.quantile | pivot_aggregate > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `f64` for series with name `a`
+Expr.quantile | pivot_aggregate > condition.value | continues | Int64 | Int64 | - | allowed Float64 one
+Expr.quantile | pivot_aggregate > condition.value | ends | Int64 | Int64 | - | allowed Float64 one
 Expr.quantile | pivot_aggregate > over.order_by | continues | Int64 | Int64 | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
 Expr.quantile | pivot_aggregate > over.order_by | ends | Int64 | Int64 | - | refused rows: lengths don't match: the length of the window expression did not match that of the group
 Expr.quantile | pivot_aggregate > over.partition_by | continues | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
 Expr.quantile | pivot_aggregate > over.partition_by | ends | Int64 | Int64 | - | refused rows: window expression with non-elementwise `partition_by` or `order_by` not allowed in aggregation context
-Expr.quantile | pivot_aggregate | continues | Int64 | Int64 | pivot-aggregate-gives-one-value | refused rows: could not extract number from any-value of dtype: 'Null'
-Expr.quantile | pivot_aggregate | ends | Int64 | Int64 | pivot-aggregate-gives-one-value | refused rows: could not extract number from any-value of dtype: 'Null'
+Expr.quantile | pivot_aggregate | continues | Int64 | Int64 | pivot-aggregate-gives-one-value | allowed Float64 one
+Expr.quantile | pivot_aggregate | ends | Int64 | Int64 | pivot-aggregate-gives-one-value | allowed Float64 one
 Expr.quantile | select > condition.predicate | continues | Int64 | Int64 | condition-predicate-is-boolean | allowed Float64 one
 Expr.quantile | select > condition.predicate | ends | Int64 | Int64 | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `f64` for series with name `_POLARS_TMP_PHYS_`
 Expr.quantile | select > condition.value | continues | Int64 | Int64 | - | allowed Float64 one
