@@ -300,7 +300,10 @@ fn literal_classes() -> Vec<Representative> {
         .collect()
 }
 
-/// The classes the whole number 1 is cast to as a literal.
+/// How many of the first of the [`NUMBERED`] classes are numbers.
+const NUMERIC_CLASSES: usize = 10;
+
+/// The classes the whole number 1 is cast to as a literal, the numbers first.
 const NUMBERED: [Representative; 17] = [
     Representative::Int8,
     Representative::Int16,
@@ -1003,7 +1006,12 @@ impl Gen<'_> {
     /// back: the tables measured the dtype, which the sign does not change, and
     /// a negative number of an unsigned dtype is not one.
     fn scalar(&mut self, back: bool) -> Built {
-        let class = self.draw.pick(&NUMBERED);
+        self.scalar_among(&NUMBERED, back)
+    }
+
+    /// The same, of one of the `classes`.
+    fn scalar_among(&mut self, classes: &[Representative], back: bool) -> Built {
+        let class = self.draw.pick(classes);
         let signed = [
             Representative::Int8,
             Representative::Int16,
@@ -1030,6 +1038,26 @@ impl Gen<'_> {
             } else {
                 Representative::Boolean
             }),
+        }
+    }
+
+    /// A share a quantile reads: the number 1 of a numeric dtype, which is the share of the largest
+    /// value, or a number from 0 to 1 typed without a dtype, which Polars reads as the number it is.
+    /// A share is a number, which is all the editor offers: Polars reads text and moments as
+    /// numbers in a select and refuses them where a window or a pivot's aggregate evaluates the
+    /// values of a group.
+    fn share(&mut self) -> Built {
+        if self.draw.chance(35) {
+            return self.scalar_among(&NUMBERED[..NUMERIC_CLASSES], false);
+        }
+        let number = self.draw.pick(&[0.0_f64, 0.25, 0.5, 0.9, 1.0]);
+        Built {
+            expression: Expression::new(
+                Start::Call(call("polars.lit", vec![("value", Value::Float(number))])),
+                Vec::new(),
+            )
+            .expect("a start"),
+            class: Some(Representative::Float64),
         }
     }
 
@@ -1517,6 +1545,10 @@ impl Gen<'_> {
                 ("Expr.shift" | "Expr.diff" | "Expr.pct_change", _) => {
                     vec![self.scalar(name == "n")]
                 }
+                // A quantile is one share from 0 to 1, which Polars refuses a column of for the
+                // exact quantile, and a column of numbers outside the range or holding a null for
+                // the approximate one: it is a number, and the tables measure it as one.
+                ("Expr.quantile" | "Expr.approx_quantile", "quantile") => vec![self.share()],
                 // Polars builds a text of as many characters as the length converts to, which for
                 // a timestamp is the microseconds since the epoch: a length that is a chain of
                 // any dtype can fill the memory, so it is the number 1 of a dtype, as a shift's.
@@ -1754,6 +1786,14 @@ impl Gen<'_> {
                 // The seed of a random rank: Polars takes any unsigned number.
                 "seed" => Value::Integer(self.draw.pick(&[0, 1, 7, 12345])),
                 "abs_tol" | "rel_tol" => Value::Float(self.draw.pick(&[0.0, 0.5, 1e-9, 1.0])),
+                // The delta degrees of freedom of a variance: none, the default, and counts that
+                // leave no value to divide by, up to the largest an unsigned byte holds.
+                "ddof" => Value::Integer(self.draw.pick(&[0, 1, 1, 2, 3, 255])),
+                // The base of an entropy's logarithm.
+                "base" => Value::Float(self.draw.pick(&[2.0, 10.0, std::f64::consts::E, 0.5])),
+                // The rank error of an approximate quantile, as a share of the rows: Polars takes
+                // one from 2^-32 up to but not including 1.
+                "error" => Value::Float(self.draw.pick(&[0.001, 0.01, 0.1, 0.5])),
                 other => panic!("the generator does not know what to give {other}"),
             };
             numbers.push((name, value));
@@ -2498,6 +2538,64 @@ mod tests {
             );
         }
         assert!(found > 5, "the cases pad text only {found} times");
+    }
+
+    /// Whether every share a quantile is given in the JSON `value` is a literal alone of a numeric
+    /// dtype, or of none, which is a number typed in.
+    fn shares_are_numbers(value: &serde_json::Value, found: &mut usize) -> bool {
+        const NUMERIC: [&str; 10] = [
+            "Int8", "Int16", "Int32", "Int64", "UInt8", "UInt16", "UInt32", "UInt64", "Float32",
+            "Float64",
+        ];
+        match value {
+            serde_json::Value::Object(map) => {
+                let mut fine = true;
+                if map
+                    .get("entry")
+                    .and_then(|entry| entry.as_str())
+                    .is_some_and(|entry| {
+                        entry == "Expr.quantile" || entry == "Expr.approx_quantile"
+                    })
+                    && let Some(share) =
+                        map.get("arguments").and_then(|given| given.get("quantile"))
+                {
+                    *found += 1;
+                    let expression = &share["expression"];
+                    let literal = &expression["start"];
+                    fine = expression["then"].as_array().is_some_and(Vec::is_empty)
+                        && literal["entry"] == "polars.lit"
+                        && literal["arguments"]["dtype"]["dtype"]
+                            .as_str()
+                            .is_none_or(|dtype| NUMERIC.contains(&dtype));
+                }
+                fine && map.values().all(|inside| shares_are_numbers(inside, found))
+            }
+            serde_json::Value::Array(items) => {
+                items.iter().all(|inside| shares_are_numbers(inside, found))
+            }
+            _ => true,
+        }
+    }
+
+    #[test]
+    fn the_share_of_a_quantile_is_a_number_as_the_editor_offers_it() {
+        // Polars reads a text or a moment as the share it writes in a select and refuses it where a
+        // window or a pivot's aggregate evaluates the values of a group, so the generator gives the
+        // share the editor offers: a number, typed in or the number 1 of a numeric dtype.
+        let mut found = 0;
+        for offset in 0..8000_u64 {
+            let Some(case) = generate(&entropy(offset), None) else {
+                continue;
+            };
+            let document: serde_json::Value =
+                serde_json::from_str(case.document.write().as_str()).expect("a document");
+            assert!(
+                shares_are_numbers(&document, &mut found),
+                "{}",
+                case.document.write()
+            );
+        }
+        assert!(found > 5, "the cases take a quantile only {found} times");
     }
 
     #[test]

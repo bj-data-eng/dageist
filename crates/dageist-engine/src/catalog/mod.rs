@@ -90,7 +90,7 @@ pub enum Family {
     /// The values in another order, and their places in it: `sort`, `sort_by`, `reverse`,
     /// `arg_sort` and `rank`.
     Order,
-    /// Running values: `cum_sum`, `cum_count`, `cum_max`.
+    /// Running values: `cum_sum`, `cum_count`, `cum_max`, `cum_min`, `cum_prod`.
     Cumulative,
     /// Arithmetic on values: `add`, `sub`, `mul`, `neg`, `abs`, `sign`, `clip`, and the like.
     Arithmetic,
@@ -102,7 +102,8 @@ pub enum Family {
     /// Rounding a number: `round`, `ceil`, `floor`, `truncate` and `round_sig_figs`, which give
     /// the dtype they are given.
     Rounding,
-    /// One value for a whole group: `sum`, `min`, `max`, `len`.
+    /// One value for a whole group: `sum`, `min`, `max`, `len`, `mean`, `median`, `std`, `quantile`,
+    /// `arg_max`, `any`, `bitwise_and`.
     Aggregate,
     /// Dates and times: the `dt` namespace.
     Temporal,
@@ -125,7 +126,7 @@ pub enum Family {
     /// `is_unique`, `is_first_distinct`, and the like, which give a Boolean.
     Checks,
     /// Combining and negating truth: `and`, `or`, `xor` and `not`, which work bit
-    /// by bit on whole numbers.
+    /// by bit on whole numbers, and the counts of bits: `bitwise_count_ones` and its kin.
     Logic,
     /// Nulls and NaNs: `fill_null`, `forward_fill`, `drop_nulls`, `null_count`, and the like.
     Nulls,
@@ -373,6 +374,11 @@ pub enum Role {
     /// the number is, which a select resolves to a `Float64` where it ends and a sort key or a
     /// join's key does not.
     Base,
+    /// A share from 0 to 1 that a statistic reads, as `quantile`'s is. A number typed without a dtype
+    /// is the number it is, whatever the value the method follows is, and adapts to nothing: an
+    /// `Int32` where it is whole and a `Float64` where it has a fraction. Polars reads the number
+    /// and not its dtype, so the call gives the same whichever it is.
+    Share,
     /// A limit a value is held to, as `clip`'s bounds are. A number typed without a dtype is cast
     /// to the dtype of the value the method follows, as strictly as Polars can: it refuses a
     /// number that dtype cannot hold, where an operand's would widen the dtype, and cuts a number

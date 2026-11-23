@@ -1,12 +1,12 @@
 //! The parameters that meet the value their method follows in a way of their own,
 //! as Polars' documentation describes the methods: the other side of arithmetic
-//! and of a comparison, the value `shift` fills with, and the rows it counts and the characters a
-//! method of text counts.
+//! and of a comparison, the value `shift` fills with, the rows it counts and the characters a
+//! method of text counts, and the share a quantile reads.
 
 use crate::catalog::{self, Role};
 
 #[test]
-fn only_the_operands_the_fill_the_row_count_the_power_and_the_divisors_have_a_role() {
+fn only_the_operands_the_fill_the_row_count_the_power_the_divisors_and_the_share_have_a_role() {
     let mut found: Vec<(&str, &str, Role)> = catalog::entries()
         .iter()
         .flat_map(|entry| {
@@ -23,6 +23,7 @@ fn only_the_operands_the_fill_the_row_count_the_power_and_the_divisors_have_a_ro
         [
             ("Expr.add", "other", Role::Operand),
             ("Expr.and_", "others", Role::Operand),
+            ("Expr.approx_quantile", "quantile", Role::Share),
             ("Expr.clip", "lower_bound", Role::Bound),
             ("Expr.clip", "upper_bound", Role::Bound),
             ("Expr.diff", "n", Role::Count),
@@ -46,6 +47,7 @@ fn only_the_operands_the_fill_the_row_count_the_power_and_the_divisors_have_a_ro
             ("Expr.or_", "others", Role::Operand),
             ("Expr.pct_change", "n", Role::Count),
             ("Expr.pow", "exponent", Role::Exponent),
+            ("Expr.quantile", "quantile", Role::Share),
             ("Expr.replace", "new", Role::Bound),
             ("Expr.replace", "old", Role::Bound),
             ("Expr.replace_strict", "old", Role::Bound),
@@ -130,4 +132,23 @@ fn a_parameter_that_is_needed_without_being_required_is_one_of_which_a_step_give
             ("Expr.replace_strict", "new")
         ]
     );
+}
+
+#[test]
+fn the_share_of_a_quantile_takes_numbers_only() {
+    // Polars reads a text or a moment as the share it writes in a select and refuses it where a
+    // window or a pivot's aggregate evaluates the values of a group, so the editor offers numbers.
+    for id in ["Expr.quantile", "Expr.approx_quantile"] {
+        let entry = catalog::entry(id).expect("an entry");
+        let share = entry
+            .parameters()
+            .iter()
+            .find(|parameter| parameter.name() == "quantile")
+            .expect("the share");
+        assert_eq!(
+            share.kind(),
+            catalog::Kind::Expression(&[catalog::Dtypes::Numeric]),
+            "{id}"
+        );
+    }
 }

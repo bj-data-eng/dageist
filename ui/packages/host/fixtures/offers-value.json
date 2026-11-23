@@ -87,6 +87,22 @@
       "slots": []
     },
     {
+      "entry": "Expr.all",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "expected boolean input for 'all_ignore_nulls()' (got datetime[μs])"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.and_",
       "verdict": {
         "kind": "refused",
@@ -96,6 +112,50 @@
             "stage": "schema"
           },
           "reason": "& not allowed on datetime[μs] and i8"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.any",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "expected boolean input for 'any_ignore_nulls()' (got datetime[μs])"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.approx_n_unique",
+      "verdict": {
+        "kind": "allowed",
+        "result": "UInt32",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.approx_quantile",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
         }
       },
       "argument": null,
@@ -199,6 +259,34 @@
       "slots": []
     },
     {
+      "entry": "Expr.arg_max",
+      "verdict": {
+        "kind": "allowed",
+        "result": "UInt32",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.arg_min",
+      "verdict": {
+        "kind": "allowed",
+        "result": "UInt32",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.arg_sort",
       "verdict": {
         "kind": "allowed",
@@ -220,6 +308,150 @@
         "shape": "many",
         "ending": {
           "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.bitwise_and",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "dtype datetime[μs] not supported in 'and' operation"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.bitwise_count_ones",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "dtype datetime[μs] not supported in 'count_ones' operation"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.bitwise_count_zeros",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "dtype datetime[μs] not supported in 'count_zeros' operation"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.bitwise_leading_ones",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "dtype datetime[μs] not supported in 'leading_ones' operation"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.bitwise_leading_zeros",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "dtype datetime[μs] not supported in 'leading_zeros' operation"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.bitwise_or",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "dtype datetime[μs] not supported in 'or' operation"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.bitwise_trailing_ones",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "dtype datetime[μs] not supported in 'trailing_ones' operation"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.bitwise_trailing_zeros",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "dtype datetime[μs] not supported in 'trailing_zeros' operation"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.bitwise_xor",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "dtype datetime[μs] not supported in 'xor' operation"
         }
       },
       "argument": null,
@@ -370,6 +602,36 @@
         "shape": "many",
         "ending": {
           "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.cum_min",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.cum_prod",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "`cum_prod` operation not supported for dtype `datetime[μs]`"
         }
       },
       "argument": null,
@@ -1078,6 +1340,22 @@
       "slots": []
     },
     {
+      "entry": "Expr.entropy",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "`entropy` operation not supported for dtype `datetime[μs]` as argument 0"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.eq",
       "verdict": {
         "kind": "allowed",
@@ -1462,6 +1740,20 @@
       "slots": []
     },
     {
+      "entry": "Expr.kurtosis",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Float64",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.last",
       "verdict": {
         "kind": "allowed",
@@ -1564,6 +1856,34 @@
       "slots": []
     },
     {
+      "entry": "Expr.mean",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.median",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.min",
       "verdict": {
         "kind": "allowed",
@@ -1614,6 +1934,34 @@
       "verdict": {
         "kind": "allowed",
         "result": "UInt32",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.nan_max",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.nan_min",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
         "shape": "one",
         "ending": {
           "kind": "allowed"
@@ -1758,6 +2106,36 @@
             "stage": "rows"
           },
           "reason": "`pow` operation not supported for dtype `datetime[μs]` as base"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.product",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "`product` operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.quantile",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
         }
       },
       "argument": null,
@@ -1952,6 +2330,20 @@
       "slots": []
     },
     {
+      "entry": "Expr.skew",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Float64",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.sort",
       "verdict": {
         "kind": "allowed",
@@ -1989,6 +2381,22 @@
             "stage": "rows"
           },
           "reason": "the schema says Datetime(us) and the rows give Float64"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.std",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "`std` operation not supported for dtype `datetime[μs]`"
         }
       },
       "argument": null,
@@ -2561,6 +2969,22 @@
             "stage": "rows"
           },
           "reason": "truncation ('to_zero') operation not supported for dtype `datetime[μs]` (expected: numeric)"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.var",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "schema"
+          },
+          "reason": "`var` operation not supported for dtype `datetime[μs]`"
         }
       },
       "argument": null,

@@ -1,0 +1,2 @@
+{"a":"Int8","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.pivot","arguments":{"on":{"columns":["h"]},"on_columns":{"table":"on_h"},"values":{"columns":["a"]},"aggregate_function":{"expression":{"start":{"entry":"polars.element","arguments":{}},"then":[{"entry":"Expr.quantile","arguments":{"quantile":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"float":0.25}}},"then":[]}}}}]}}}}}]}

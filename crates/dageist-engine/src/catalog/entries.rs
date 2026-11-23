@@ -13,11 +13,12 @@ use std::sync::Arc;
 use polars::chunked_array::cast::CastOptions;
 use polars::frame::PivotColumnNaming;
 use polars::prelude::{
-    AnyValue, ClosedInterval, DataType, DatetimeArgs, DurationArgs, Expr, FillNullStrategy,
-    JoinBuildSide, JoinCoalesce, JoinType, JoinValidation, LazyFrame, MaintainOrderJoin, NULL,
-    NamedFrom, NonExistent, Operator, PolarsError, RankMethod, RankOptions, RoundMode, Scalar,
-    Selector, Series, SortMultipleOptions, SortOptions, TimeUnit, TimeZone, WindowMapping, all,
-    all_horizontal, binary_expr, by_name, col, cols, datetime, duration, element, lit, when,
+    AnyValue, ApproxQuantileMethod, ClosedInterval, DataType, DatetimeArgs, DurationArgs, Expr,
+    FillNullStrategy, JoinBuildSide, JoinCoalesce, JoinType, JoinValidation, LazyFrame,
+    MaintainOrderJoin, NULL, NamedFrom, NonExistent, Operator, PolarsError, QuantileMethod,
+    RankMethod, RankOptions, RoundMode, Scalar, Selector, Series, SortMultipleOptions, SortOptions,
+    TimeUnit, TimeZone, WindowMapping, all, all_horizontal, binary_expr, by_name, col, cols,
+    datetime, duration, element, lit, when,
 };
 use polars::series::ops::NullBehavior;
 
@@ -91,6 +92,16 @@ const NUMERIC_OR_DURATION: &[Dtypes] = &[Dtypes::Numeric, Dtypes::Duration];
 // numbers.
 const BITWISE: &[Dtypes] = &[Dtypes::Integer, Dtypes::Boolean];
 
+// What Polars accepts on the receiver of the statistics, from the functions that run them: `mean`
+// and `median` take numbers, booleans (the share of the true), and the moments, times of day and
+// lengths of time, whose mean is another of the same; `skew` and `kurtosis` convert what they
+// follow to a float, so they take the same; `std`, `var`, `product`, `entropy` and `cum_prod` take
+// numbers and booleans, and a quantile takes numbers and the temporal dtypes but no boolean. The
+// tables of allowed combinations say which members of a group, such as a `Decimal`, Polars refuses.
+const MEANABLE: &[Dtypes] = &[Dtypes::Numeric, Dtypes::Boolean, Dtypes::Temporal];
+const MOMENTS: &[Dtypes] = &[Dtypes::Numeric, Dtypes::Boolean, Dtypes::Temporal];
+const QUANTILE: &[Dtypes] = &[Dtypes::Numeric, Dtypes::Temporal];
+
 // What Polars accepts on the receiver of the nulls, checks and conversions, from the functions
 // that run them: `is_nan`, `is_finite` and the like take numbers, as does `fill_nan`, which is
 // a condition on `is_not_nan`; `is_close` takes numbers, and a date, a time or a duration, a
@@ -162,6 +173,21 @@ const CLOSED: &[&str] = &["both", "left", "right", "none"];
 const FILL_STRATEGY: &[&str] = &["forward", "backward", "min", "max", "mean", "zero", "one"];
 // The words Python's `rank` takes for `method`, which the binding reads.
 const RANK_METHOD: &[&str] = &["average", "min", "max", "dense", "ordinal", "random"];
+// The words Python's `quantile` takes for `interpolation`, which the binding reads, in the order
+// Python's `QuantileMethod` lists them.
+const QUANTILE_METHOD: &[&str] = &[
+    "nearest",
+    "higher",
+    "lower",
+    "midpoint",
+    "linear",
+    "equiprobable",
+];
+// The words Python's `approx_quantile` takes for `method`, which Python checks and Polars reads.
+const APPROX_QUANTILE_METHOD: &[&str] = &["auto", "kll", "req_lo", "req_hi", "req_both"];
+// The words Python's `approx_quantile` takes for `error_tightness`: `formal` is Polars'
+// `use_formal_bound`.
+const ERROR_TIGHTNESS: &[&str] = &["empirical", "formal"];
 // Python's `diff` takes `ignore` and `drop` for `null_behavior`. `drop` leaves out the values that
 // have none before them, as many as `n` says, so it gives fewer values than the table has rows, a
 // number of values the tables cannot state, and it is left out until a shape for it exists. The
@@ -233,6 +259,10 @@ const fn bound(name: &'static str) -> Parameter {
 /// `decimals`: how many places after the point a value is rounded or truncated to, which
 /// Python passes on as an unsigned 32-bit number.
 const DECIMALS: Parameter = optional("decimals", Kind::Value(ValueType::Integer), Shape::One, "0");
+
+/// `ddof`: the delta degrees of freedom of a variance and a standard deviation, which Python
+/// passes on as an unsigned 8-bit number. The values are divided by their count less it.
+const DDOF: Parameter = optional("ddof", Kind::Value(ValueType::Integer), Shape::One, "1");
 
 /// `limit`: how many consecutive nulls a forward or backward fill fills, which Python passes on
 /// as an unsigned 32-bit number. Unset, it fills them all.
@@ -700,6 +730,89 @@ fn cum_max(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
     Ok(expr.cum_max(arguments.flag("reverse", false)?))
 }
 
+fn cum_min(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.cum_min(arguments.flag("reverse", false)?))
+}
+
+fn cum_prod(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.cum_prod(arguments.flag("reverse", false)?))
+}
+
+/// The delta degrees of freedom, which Python's binding takes as an unsigned 8-bit number.
+fn ddof(arguments: &Arguments) -> Result<u8, BuildError> {
+    match arguments.get("ddof") {
+        None => Ok(1),
+        Some(Argument::Integer(value)) => {
+            u8::try_from(*value).map_err(|_| BuildError::OutOfRange {
+                parameter: "ddof",
+                expected: "a whole number from 0 to 255",
+            })
+        }
+        Some(other) => Err(Arguments::wrong("ddof", "a whole number", other)),
+    }
+}
+
+fn std_deviation(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.std(ddof(arguments)?))
+}
+
+fn variance(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.var(ddof(arguments)?))
+}
+
+fn quantile(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let quantile = arguments.required_expression("quantile")?;
+    let method = match arguments.choice("interpolation", QUANTILE_METHOD, "nearest")? {
+        "higher" => QuantileMethod::Higher,
+        "lower" => QuantileMethod::Lower,
+        "midpoint" => QuantileMethod::Midpoint,
+        "linear" => QuantileMethod::Linear,
+        "equiprobable" => QuantileMethod::Equiprobable,
+        _ => QuantileMethod::Nearest,
+    };
+    Ok(expr.quantile(quantile, method))
+}
+
+fn approx_quantile(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let quantile = arguments.required_expression("quantile")?;
+    let method = match arguments.choice("method", APPROX_QUANTILE_METHOD, "auto")? {
+        "kll" => ApproxQuantileMethod::KLL,
+        "req_lo" => ApproxQuantileMethod::ReqSketch { hra: false },
+        "req_hi" => ApproxQuantileMethod::ReqSketch { hra: true },
+        "req_both" => ApproxQuantileMethod::DoubleReqSketch,
+        _ => ApproxQuantileMethod::Auto,
+    };
+    let formal = arguments.choice("error_tightness", ERROR_TIGHTNESS, "empirical")? == "formal";
+    let error = float(arguments, "error", 0.001)?;
+    Ok(expr.approx_quantile(quantile, error, formal, method))
+}
+
+fn skew(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.skew(arguments.flag("bias", true)?))
+}
+
+fn kurtosis(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.kurtosis(
+        arguments.flag("fisher", true)?,
+        arguments.flag("bias", true)?,
+    ))
+}
+
+fn entropy(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.entropy(
+        float(arguments, "base", std::f64::consts::E)?,
+        arguments.flag("normalize", true)?,
+    ))
+}
+
+fn all_values(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.all(arguments.flag("ignore_nulls", true)?))
+}
+
+fn any_value(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.any(arguments.flag("ignore_nulls", true)?))
+}
+
 fn add(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
     let other = arguments.required_expression("other")?;
     Ok(binary_expr(expr, Operator::Plus, other))
@@ -820,6 +933,23 @@ unary!(
     rle_id,
     n_unique,
     count,
+    mean,
+    median,
+    product,
+    arg_max,
+    arg_min,
+    nan_max,
+    nan_min,
+    approx_n_unique,
+    bitwise_and,
+    bitwise_or,
+    bitwise_xor,
+    bitwise_count_ones,
+    bitwise_count_zeros,
+    bitwise_leading_ones,
+    bitwise_leading_zeros,
+    bitwise_trailing_ones,
+    bitwise_trailing_zeros,
 );
 
 /// The methods of the `str` namespace that take nothing, each the method of the same name that
@@ -2076,6 +2206,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(add),
     },
     Entry {
+        id: EntryId("Expr.all"),
+        family: Family::Aggregate,
+        accepts: NUMERIC_OR_BOOLEAN,
+        parameters: &[flag("ignore_nulls", "True").keyword_only()],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(all_values),
+    },
+    Entry {
         id: EntryId("Expr.and_"),
         family: Family::Logic,
         accepts: BITWISE,
@@ -2084,6 +2222,47 @@ pub(super) const ENTRIES: &[Entry] = &[
             .with_at_least_one()],
         laziness: Laziness::Lazy,
         build: Build::Expression(and_),
+    },
+    Entry {
+        id: EntryId("Expr.any"),
+        family: Family::Aggregate,
+        accepts: NUMERIC_OR_BOOLEAN,
+        parameters: &[flag("ignore_nulls", "True").keyword_only()],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(any_value),
+    },
+    Entry {
+        id: EntryId("Expr.approx_n_unique"),
+        family: Family::Aggregate,
+        accepts: CUM_MAX,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(approx_n_unique),
+    },
+    Entry {
+        id: EntryId("Expr.approx_quantile"),
+        family: Family::Aggregate,
+        accepts: CUM_MAX,
+        parameters: &[
+            required("quantile", Kind::Expression(NUMERIC), Shape::One).with_role(Role::Share),
+            optional(
+                "method",
+                Kind::Choice(APPROX_QUANTILE_METHOD),
+                Shape::One,
+                "'auto'",
+            )
+            .keyword_only(),
+            optional("error", Kind::Value(ValueType::Float), Shape::One, "0.001").keyword_only(),
+            optional(
+                "error_tightness",
+                Kind::Choice(ERROR_TIGHTNESS),
+                Shape::One,
+                "'empirical'",
+            )
+            .keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(approx_quantile),
     },
     Entry {
         id: EntryId("Expr.arccos"),
@@ -2134,6 +2313,22 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(arctanh),
     },
     Entry {
+        id: EntryId("Expr.arg_max"),
+        family: Family::Aggregate,
+        accepts: ANY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(arg_max),
+    },
+    Entry {
+        id: EntryId("Expr.arg_min"),
+        family: Family::Aggregate,
+        accepts: ANY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(arg_min),
+    },
+    Entry {
         id: EntryId("Expr.arg_sort"),
         family: Family::Order,
         accepts: ANY,
@@ -2151,6 +2346,78 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[LIMIT],
         laziness: Laziness::Lazy,
         build: Build::Expression(backward_fill),
+    },
+    Entry {
+        id: EntryId("Expr.bitwise_and"),
+        family: Family::Aggregate,
+        accepts: BITWISE,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(bitwise_and),
+    },
+    Entry {
+        id: EntryId("Expr.bitwise_count_ones"),
+        family: Family::Logic,
+        accepts: BITWISE,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(bitwise_count_ones),
+    },
+    Entry {
+        id: EntryId("Expr.bitwise_count_zeros"),
+        family: Family::Logic,
+        accepts: BITWISE,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(bitwise_count_zeros),
+    },
+    Entry {
+        id: EntryId("Expr.bitwise_leading_ones"),
+        family: Family::Logic,
+        accepts: BITWISE,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(bitwise_leading_ones),
+    },
+    Entry {
+        id: EntryId("Expr.bitwise_leading_zeros"),
+        family: Family::Logic,
+        accepts: BITWISE,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(bitwise_leading_zeros),
+    },
+    Entry {
+        id: EntryId("Expr.bitwise_or"),
+        family: Family::Aggregate,
+        accepts: BITWISE,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(bitwise_or),
+    },
+    Entry {
+        id: EntryId("Expr.bitwise_trailing_ones"),
+        family: Family::Logic,
+        accepts: BITWISE,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(bitwise_trailing_ones),
+    },
+    Entry {
+        id: EntryId("Expr.bitwise_trailing_zeros"),
+        family: Family::Logic,
+        accepts: BITWISE,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(bitwise_trailing_zeros),
+    },
+    Entry {
+        id: EntryId("Expr.bitwise_xor"),
+        family: Family::Aggregate,
+        accepts: BITWISE,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(bitwise_xor),
     },
     Entry {
         id: EntryId("Expr.cast"),
@@ -2235,6 +2502,22 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[flag("reverse", "False").keyword_only()],
         laziness: Laziness::Lazy,
         build: Build::Expression(cum_max),
+    },
+    Entry {
+        id: EntryId("Expr.cum_min"),
+        family: Family::Cumulative,
+        accepts: CUM_MAX,
+        parameters: &[flag("reverse", "False").keyword_only()],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(cum_min),
+    },
+    Entry {
+        id: EntryId("Expr.cum_prod"),
+        family: Family::Cumulative,
+        accepts: NUMERIC_OR_BOOLEAN,
+        parameters: &[flag("reverse", "False").keyword_only()],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(cum_prod),
     },
     Entry {
         id: EntryId("Expr.cum_sum"),
@@ -2517,6 +2800,17 @@ pub(super) const ENTRIES: &[Entry] = &[
     temporal("Expr.dt.weekday", DATE_PART, &[], dt_weekday),
     temporal("Expr.dt.year", DATE_PART, &[], dt_year),
     Entry {
+        id: EntryId("Expr.entropy"),
+        family: Family::Aggregate,
+        accepts: NUMERIC_OR_BOOLEAN,
+        parameters: &[
+            optional("base", Kind::Value(ValueType::Float), Shape::One, "math.e"),
+            flag("normalize", "True").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(entropy),
+    },
+    Entry {
         id: EntryId("Expr.eq"),
         family: Family::Compare,
         accepts: ANY,
@@ -2743,6 +3037,17 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(is_unique),
     },
     Entry {
+        id: EntryId("Expr.kurtosis"),
+        family: Family::Aggregate,
+        accepts: MOMENTS,
+        parameters: &[
+            flag("fisher", "True").keyword_only(),
+            flag("bias", "True").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(kurtosis),
+    },
+    Entry {
         id: EntryId("Expr.last"),
         family: Family::Rows,
         accepts: ANY,
@@ -2799,6 +3104,22 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(max),
     },
     Entry {
+        id: EntryId("Expr.mean"),
+        family: Family::Aggregate,
+        accepts: MEANABLE,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(mean),
+    },
+    Entry {
+        id: EntryId("Expr.median"),
+        family: Family::Aggregate,
+        accepts: MEANABLE,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(median),
+    },
+    Entry {
         id: EntryId("Expr.min"),
         family: Family::Aggregate,
         accepts: CUM_MAX,
@@ -2829,6 +3150,22 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[],
         laziness: Laziness::Lazy,
         build: Build::Expression(n_unique),
+    },
+    Entry {
+        id: EntryId("Expr.nan_max"),
+        family: Family::Aggregate,
+        accepts: CUM_MAX,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nan_max),
+    },
+    Entry {
+        id: EntryId("Expr.nan_min"),
+        family: Family::Aggregate,
+        accepts: CUM_MAX,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(nan_min),
     },
     Entry {
         id: EntryId("Expr.ne"),
@@ -2918,6 +3255,32 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[required("exponent", EXPRESSION, Shape::One).with_role(Role::Exponent)],
         laziness: Laziness::Lazy,
         build: Build::Expression(pow),
+    },
+    Entry {
+        id: EntryId("Expr.product"),
+        family: Family::Aggregate,
+        accepts: NUMERIC_OR_BOOLEAN,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(product),
+    },
+    Entry {
+        id: EntryId("Expr.quantile"),
+        family: Family::Aggregate,
+        accepts: QUANTILE,
+        parameters: &[
+            required("quantile", Kind::Expression(NUMERIC), Shape::One)
+                .with_role(Role::Share)
+                .not_broadcasting(),
+            optional(
+                "interpolation",
+                Kind::Choice(QUANTILE_METHOD),
+                Shape::One,
+                "'nearest'",
+            ),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(quantile),
     },
     Entry {
         id: EntryId("Expr.radians"),
@@ -3066,6 +3429,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(sinh),
     },
     Entry {
+        id: EntryId("Expr.skew"),
+        family: Family::Aggregate,
+        accepts: MOMENTS,
+        parameters: &[flag("bias", "True").keyword_only()],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(skew),
+    },
+    Entry {
         id: EntryId("Expr.sort"),
         family: Family::Order,
         accepts: ANY,
@@ -3098,6 +3469,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[],
         laziness: Laziness::Lazy,
         build: Build::Expression(sqrt),
+    },
+    Entry {
+        id: EntryId("Expr.std"),
+        family: Family::Aggregate,
+        accepts: NUMERIC_OR_BOOLEAN,
+        parameters: &[DDOF],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(std_deviation),
     },
     Entry {
         id: EntryId("Expr.str.contains"),
@@ -3417,6 +3796,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[DECIMALS],
         laziness: Laziness::Lazy,
         build: Build::Expression(truncate),
+    },
+    Entry {
+        id: EntryId("Expr.var"),
+        family: Family::Aggregate,
+        accepts: NUMERIC_OR_BOOLEAN,
+        parameters: &[DDOF],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(variance),
     },
     Entry {
         id: EntryId("Expr.xor"),

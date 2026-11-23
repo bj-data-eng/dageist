@@ -2049,3 +2049,202 @@ hint = "number of different values"
 [entries."Expr.count"]
 name = "count"
 hint = "number of values that are not empty"
+
+[entries."Expr.mean"]
+name = "mean"
+hint = "average"
+
+[entries."Expr.median"]
+name = "median"
+hint = "middle value"
+
+[entries."Expr.std"]
+name = "std"
+hint = "how far the values spread from their average"
+
+[entries."Expr.std".parameters.ddof]
+name = "ddof"
+label = "count less"
+
+[entries."Expr.var"]
+name = "var"
+hint = "square of how far the values spread from their average"
+
+[entries."Expr.var".parameters.ddof]
+name = "ddof"
+label = "count less"
+
+[entries."Expr.quantile"]
+name = "quantile"
+hint = "the value a share of the values fall below"
+
+[entries."Expr.quantile".parameters.quantile]
+name = "quantile"
+label = "share, from 0 to 1"
+
+[entries."Expr.quantile".parameters.interpolation]
+name = "interpolation"
+label = "between two values"
+
+[entries."Expr.quantile".parameters.interpolation.choices]
+nearest = "nearest"
+higher = "higher"
+lower = "lower"
+midpoint = "midpoint"
+linear = "linear"
+equiprobable = "equiprobable"
+
+[entries."Expr.approx_quantile"]
+name = "approx_quantile"
+hint = "the value a share of the values fall below, found quickly and nearly"
+
+[entries."Expr.approx_quantile".parameters.quantile]
+name = "quantile"
+label = "share, from 0 to 1"
+
+[entries."Expr.approx_quantile".parameters.method]
+name = "method"
+label = "way of finding it"
+
+[entries."Expr.approx_quantile".parameters.method.choices]
+auto = "auto"
+kll = "kll"
+req_lo = "req_lo"
+req_hi = "req_hi"
+req_both = "req_both"
+
+[entries."Expr.approx_quantile".parameters.error]
+name = "error"
+label = "share of the rows it may be off by"
+
+[entries."Expr.approx_quantile".parameters.error_tightness]
+name = "error_tightness"
+label = "how sure the error is"
+
+[entries."Expr.approx_quantile".parameters.error_tightness.choices]
+empirical = "empirical"
+formal = "formal"
+
+[entries."Expr.product"]
+name = "product"
+hint = "the values multiplied"
+
+[entries."Expr.skew"]
+name = "skew"
+hint = "how lopsided the values are"
+
+[entries."Expr.skew".parameters.bias]
+name = "bias"
+label = "not corrected for few values"
+
+[entries."Expr.kurtosis"]
+name = "kurtosis"
+hint = "how heavy the tails of the values are"
+
+[entries."Expr.kurtosis".parameters.fisher]
+name = "fisher"
+label = "less 3, as for a bell curve"
+
+[entries."Expr.kurtosis".parameters.bias]
+name = "bias"
+label = "not corrected for few values"
+
+[entries."Expr.entropy"]
+name = "entropy"
+hint = "how evenly the values share their total"
+
+[entries."Expr.entropy".parameters.base]
+name = "base"
+label = "to the base"
+
+[entries."Expr.entropy".parameters.normalize]
+name = "normalize"
+label = "as shares of their total"
+
+[entries."Expr.arg_max"]
+name = "arg_max"
+hint = "row of the highest value"
+
+[entries."Expr.arg_min"]
+name = "arg_min"
+hint = "row of the lowest value"
+
+[entries."Expr.nan_max"]
+name = "nan_max"
+hint = "highest value, not a number if one is"
+
+[entries."Expr.nan_min"]
+name = "nan_min"
+hint = "lowest value, not a number if one is"
+
+[entries."Expr.all"]
+name = "all"
+hint = "true if every value is true"
+
+[entries."Expr.all".parameters.ignore_nulls]
+name = "ignore_nulls"
+label = "skip empty values"
+
+[entries."Expr.any"]
+name = "any"
+hint = "true if some value is true"
+
+[entries."Expr.any".parameters.ignore_nulls]
+name = "ignore_nulls"
+label = "skip empty values"
+
+[entries."Expr.approx_n_unique"]
+name = "approx_n_unique"
+hint = "number of different values, found quickly and nearly"
+
+[entries."Expr.cum_min"]
+name = "cum_min"
+hint = "running minimum"
+
+[entries."Expr.cum_min".parameters.reverse]
+name = "reverse"
+label = "from the end"
+
+[entries."Expr.cum_prod"]
+name = "cum_prod"
+hint = "running product"
+
+[entries."Expr.cum_prod".parameters.reverse]
+name = "reverse"
+label = "from the end"
+
+[entries."Expr.bitwise_and"]
+name = "bitwise_and"
+hint = "the bits that are set in every value"
+
+[entries."Expr.bitwise_or"]
+name = "bitwise_or"
+hint = "the bits that are set in some value"
+
+[entries."Expr.bitwise_xor"]
+name = "bitwise_xor"
+hint = "the bits that are set in an odd number of values"
+
+[entries."Expr.bitwise_count_ones"]
+name = "bitwise_count_ones"
+hint = "number of bits that are set"
+
+[entries."Expr.bitwise_count_zeros"]
+name = "bitwise_count_zeros"
+hint = "number of bits that are not set"
+
+[entries."Expr.bitwise_leading_ones"]
+name = "bitwise_leading_ones"
+hint = "number of set bits before the first one that is not"
+
+[entries."Expr.bitwise_leading_zeros"]
+name = "bitwise_leading_zeros"
+hint = "number of unset bits before the first one that is set"
+
+[entries."Expr.bitwise_trailing_ones"]
+name = "bitwise_trailing_ones"
+hint = "number of set bits after the last one that is not"
+
+[entries."Expr.bitwise_trailing_zeros"]
+name = "bitwise_trailing_zeros"
+hint = "number of unset bits after the last one that is set"

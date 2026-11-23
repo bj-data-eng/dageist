@@ -171,6 +171,12 @@ pub(crate) fn is_count(entry: &Entry, name: &str) -> bool {
     role(entry, name).is_some_and(Role::is_a_count)
 }
 
+/// Whether a number typed without a dtype that is the parameter `name` of `entry` keeps the dtype
+/// it has alone, whatever the method follows: a share is read as the number it is.
+pub(crate) fn keeps_its_dtype(entry: &Entry, name: &str) -> bool {
+    role(entry, name) == Some(Role::Share)
+}
+
 /// Whether the whole number typed without a dtype `number`, given as the parameter `name` of
 /// `entry`, is a count that Polars refuses: a length is converted to an unsigned whole number, so
 /// a number below zero is refused when the schema is worked out, which the tables, measured with
@@ -264,7 +270,7 @@ pub(crate) fn receiver_beside(entry: &Entry, name: &str, number: Loose) -> Optio
         Role::Exponent | Role::Base | Role::Bound => Some(Receiver::Keeps),
         Role::Divisor if number.is_whole() => Some(Receiver::Adapts),
         Role::Divisor => Some(Receiver::Keeps),
-        Role::Plain | Role::Filler | Role::Count | Role::Length => None,
+        Role::Plain | Role::Filler | Role::Count | Role::Length | Role::Share => None,
     }
 }
 

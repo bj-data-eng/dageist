@@ -93,9 +93,13 @@ pub enum Limit {
     ///   the plan saying another dtype than the rows give;
     /// - the tables refusing a failed conversion, which Polars allows, of the values a
     ///   replacement lists, of a cast of a literal, or of a cast that follows a comparison or an
-    ///   arithmetic with a null;
+    ///   arithmetic with a null, and of a skew or a kurtosis in the same places, which convert
+    ///   what they follow to a float as a cast does;
     /// - Polars refusing the empty table, with no place, for an operation not supported, a null
-    ///   dtype, or a conversion to `null`.
+    ///   dtype, or a conversion to `null`;
+    /// - Polars refusing the rows, with no place, of an aggregate that holds a quantile, for a
+    ///   share that is no number: a select reads the text the share is written as, and the
+    ///   kernel that takes the values of a group does not.
     ///
     /// A cast of a value that literals alone make, by a function that makes a date, a moment or a
     /// length of time of them, is one too where the same chain through the cast, run in a select on
@@ -441,11 +445,21 @@ pub enum Limit {
     /// `dt.cast_time_unit` given nanoseconds: the case run again with each unit made milliseconds,
     /// which a moment cannot overflow, is not refused for it.
     AMomentBeyondTheRangeOfAUnit,
+    /// Polars' streaming engine refuses the approximate quantile of a literal, which is one value,
+    /// where it stands in a value of a branch of a condition, or in the predicate of a `when` after
+    /// the first, with the reason that the quantile holds a null. It meets it in a select, a
+    /// filter, a sort key, a join key, a window, the predicate of the first `when`, and on a column
+    /// in the condition. The tables measured the call in a condition on columns. Polars refusing
+    /// the rows or the empty table with that refusal, which has no place, in a case with a
+    /// condition that holds in a value or in a later predicate a chain that starts from a literal
+    /// and takes an approximate quantile: the case run again with each such literal a column is not
+    /// refused for it.
+    AnApproximateQuantileOfALiteralInACondition,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 36] = [
+    pub const ALL: [Self; 37] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -482,6 +496,7 @@ impl Limit {
         Self::AFormatTheDtypeCannotWrite,
         Self::APartOfADateThatDependsOnTheRows,
         Self::AMomentBeyondTheRangeOfAUnit,
+        Self::AnApproximateQuantileOfALiteralInACondition,
     ];
 
     /// The name a kept case is filed under.
@@ -533,6 +548,9 @@ impl Limit {
             Self::AFormatTheDtypeCannotWrite => "a-format-the-dtype-cannot-write",
             Self::APartOfADateThatDependsOnTheRows => "a-part-of-a-date-that-depends-on-the-rows",
             Self::AMomentBeyondTheRangeOfAUnit => "a-moment-beyond-the-range-of-a-unit",
+            Self::AnApproximateQuantileOfALiteralInACondition => {
+                "an-approximate-quantile-of-a-literal-in-a-condition"
+            }
         }
     }
 
@@ -617,6 +635,9 @@ impl Limit {
             Self::AMomentBeyondTheRangeOfAUnit => {
                 "a cast of a moment to nanoseconds refuses one outside the years nanoseconds hold, when the rows run, where the tables measured moments of 1970 and after"
             }
+            Self::AnApproximateQuantileOfALiteralInACondition => {
+                "Polars reads the quantile of an approximate quantile of a literal as null in a value or a later predicate of a condition, which it does not in a select or on a column, where the tables measured the call"
+            }
             Self::APartOfADateThatDependsOnTheRows => {
                 "dt.replace, date, datetime and time refuse a part outside the calendar's range, or that does not convert, when the rows run, so it depends on the values of the rows, where the tables measured the values of one column"
             }
@@ -657,7 +678,7 @@ fn is(call: &Call, id: &str) -> bool {
     call.entry().id().as_str() == id
 }
 
-const ONE_VALUE: [&str; 11] = [
+const ONE_VALUE: [&str; 31] = [
     "Expr.has_nulls",
     "Expr.null_count",
     "Expr.n_unique",
@@ -669,6 +690,26 @@ const ONE_VALUE: [&str; 11] = [
     "Expr.len",
     "Expr.first",
     "Expr.last",
+    "Expr.mean",
+    "Expr.median",
+    "Expr.std",
+    "Expr.var",
+    "Expr.quantile",
+    "Expr.product",
+    "Expr.skew",
+    "Expr.kurtosis",
+    "Expr.entropy",
+    "Expr.arg_max",
+    "Expr.arg_min",
+    "Expr.nan_max",
+    "Expr.nan_min",
+    "Expr.all",
+    "Expr.any",
+    "Expr.approx_n_unique",
+    "Expr.approx_quantile",
+    "Expr.bitwise_and",
+    "Expr.bitwise_or",
+    "Expr.bitwise_xor",
 ];
 
 fn is_one_value(call: &Call) -> bool {
@@ -2565,47 +2606,129 @@ fn holds_a_replacement_of_a_literal(expression: &Expression) -> bool {
 /// `call` with the start of each chain that is a literal and holds a replacement made the column
 /// `g`, which holds text in every row.
 fn call_with_text_columns(call: &Call) -> Option<Call> {
-    fn value(held: &Value) -> Option<Value> {
+    call_with_columns_for(call, &holds_a_replacement_of_a_literal_alone, "g")
+}
+
+/// `call` with the start of each chain that `is_it` accepts made the column `column`.
+fn call_with_columns_for(
+    call: &Call,
+    is_it: &dyn Fn(&Expression) -> bool,
+    column: &str,
+) -> Option<Call> {
+    fn value(held: &Value, is_it: &dyn Fn(&Expression) -> bool, column: &str) -> Option<Value> {
         Some(match held {
-            Value::Expression(expression) => Value::Expression(expression_of_columns(expression)?),
-            Value::Many(items) => Value::Many(items.iter().map(value).collect::<Option<Vec<_>>>()?),
+            Value::Expression(expression) => {
+                Value::Expression(expression_of_columns(expression, is_it, column)?)
+            }
+            Value::Many(items) => Value::Many(
+                items
+                    .iter()
+                    .map(|item| value(item, is_it, column))
+                    .collect::<Option<Vec<_>>>()?,
+            ),
             Value::Pairs(pairs) => Value::Pairs(
                 pairs
                     .iter()
-                    .map(|(key, entry)| Some((value(key)?, value(entry)?)))
+                    .map(|(key, entry)| {
+                        Some((value(key, is_it, column)?, value(entry, is_it, column)?))
+                    })
                     .collect::<Option<Vec<_>>>()?,
             ),
             other => other.clone(),
         })
     }
-    fn expression_of_columns(expression: &Expression) -> Option<Expression> {
-        let start = if holds_a_replacement_of_a_literal_alone(expression) {
+    fn expression_of_columns(
+        expression: &Expression,
+        is_it: &dyn Fn(&Expression) -> bool,
+        column: &str,
+    ) -> Option<Expression> {
+        let start = if is_it(expression) {
             Start::Call(
                 Call::new(
                     catalog::entry("polars.col")?,
-                    vec![("name", Value::Columns(vec!["g".to_owned()]))],
+                    vec![("name", Value::Columns(vec![column.to_owned()]))],
                 )
                 .ok()?,
             )
         } else {
             match expression.start() {
-                Start::Call(start) => Start::Call(call_with_text_columns(start)?),
+                Start::Call(start) => Start::Call(call_with_columns_for(start, is_it, column)?),
                 other => other.clone(),
             }
         };
         let links = expression
             .links()
             .iter()
-            .map(call_with_text_columns)
+            .map(|link| call_with_columns_for(link, is_it, column))
             .collect::<Option<Vec<_>>>()?;
         Expression::new(start, links).ok()
     }
     let given = call
         .arguments()
         .iter()
-        .map(|given| Some((given.parameter(), value(given.value())?)))
+        .map(|given| Some((given.parameter(), value(given.value(), is_it, column)?)))
         .collect::<Option<Vec<_>>>()?;
     Call::new(catalog::entry(call.entry().id().as_str())?, given).ok()
+}
+
+/// What Polars says of a quantile that holds a null.
+const A_NULL_QUANTILE: &str = "`quantile` should not contain null values";
+
+/// Whether the chain starts from a literal and takes an approximate quantile.
+fn is_a_literal_approximate_quantile(expression: &Expression) -> bool {
+    matches!(expression.start(), Start::Call(start) if is(start, "polars.lit"))
+        && expression
+            .links()
+            .iter()
+            .any(|link| is(link, "Expr.approx_quantile"))
+}
+
+/// Whether the call is where a condition's values and later predicates are evaluated together: a
+/// value of a branch, or the predicate of a `when` that follows another. The predicate of the
+/// first `when` is not.
+fn is_a_branch_part(call: &Call) -> bool {
+    is_a_branch_value(call) || is(call, "Then.when") || is(call, "ChainedThen.when")
+}
+
+/// Whether an expression holds, at any depth, a part of a condition (a value, or the predicate of
+/// a `when` after the first) that is a chain `found` accepts or holds one.
+fn holds_in_a_branch(expression: &Expression, found: &dyn Fn(&Expression) -> bool) -> bool {
+    let calls = std::iter::once(expression.start())
+        .filter_map(|start| match start {
+            Start::Call(call) => Some(call),
+            Start::Input(_) | Start::Hole => None,
+        })
+        .chain(expression.links());
+    calls.into_iter().any(|call| {
+        operands(call).into_iter().any(|(_, inside)| {
+            (is_a_branch_part(call) && holds_a_chain(inside, found))
+                || holds_in_a_branch(inside, found)
+        })
+    })
+}
+
+/// Whether Polars refuses the case for a null quantile still when the receiver of each
+/// approximate quantile that starts from a literal is the column `k`: the literal is then no
+/// cause.
+fn refused_for_a_null_quantile_with_columns(case: &Case) -> Option<bool> {
+    let step = &case.document.steps()[0];
+    let rebuilt = Step::new(
+        step.id().clone(),
+        call_with_columns_for(step.call(), &is_a_literal_approximate_quantile, "k")?,
+    )
+    .ok()?;
+    let control = Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        document: Document::new(vec![rebuilt]).ok()?,
+    };
+    changed(Some(control), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| refusal.reason.contains(A_NULL_QUANTILE))
+        })
+    })
 }
 
 /// Whether the chain itself, and not an expression it holds, starts from a literal and replaces.
@@ -3769,6 +3892,20 @@ fn applies(
                 && refused_for_another_length_with_text_values(case) == Some(false)
                 && refused_for_another_length_without_windows(case) == Some(false)
         }
+        (
+            Limit::AnApproximateQuantileOfALiteralInACondition,
+            Disagreement::PolarsRefuses(refusal),
+        ) => {
+            // The literal is the cause where Polars stops refusing the quantile as null once the
+            // receiver of each such approximate quantile is a column.
+            unplaced(refusal)
+                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                && refusal.reason.contains(A_NULL_QUANTILE)
+                && held
+                    .iter()
+                    .any(|(_, held)| holds_in_a_branch(held, &is_a_literal_approximate_quantile))
+                && refused_for_a_null_quantile_with_columns(case) == Some(false)
+        }
         (Limit::AMomentBeyondTheRangeOfAUnit, Disagreement::PolarsRefuses(refusal)) => {
             // The unit is the cause where Polars stops refusing the conversion once each cast is to
             // milliseconds.
@@ -3979,12 +4116,22 @@ fn applies(
         (Limit::AGroupAggregate, Disagreement::PolarsRefuses(refusal)) => {
             // A table with no rows has no groups, and the values of an
             // aggregate over none have no dtype.
-            pivot
-                && refusal.stage == Stage::Empty
+            let of_nothing = refusal.stage == Stage::Empty
                 && (refusal.reason.contains("not supported")
                     || refusal.reason.contains("got `null`")
                     || refusal.reason.contains("got null")
-                    || refusal.reason.contains("` to `null` failed"))
+                    || refusal.reason.contains("` to `null` failed"));
+            // A select reads the text a share is written as, and the kernel that takes the values
+            // of a group refuses it as no number.
+            let a_text_share = unplaced(refusal)
+                && refusal.stage == Stage::Rows
+                && refusal
+                    .reason
+                    .contains("expected expression of dtype 'numeric' for quantile")
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &|call| is(call, "Expr.quantile")));
+            pivot && (of_nothing || a_text_share)
         }
         (Limit::AGroupAggregate, Disagreement::PolarsAllows(refused)) => {
             let frames = Frames::with_key(case.receiver, case.argument, None);
@@ -4025,7 +4172,11 @@ fn applies(
                             matches!(
                                 call.entry().id().as_str(),
                                 "Expr.replace" | "Expr.replace_strict"
-                            ) || (is(call, "Expr.cast")
+                            ) || ((is(call, "Expr.cast")
+                                // A skew and a kurtosis convert what they follow to a float, as
+                                // a cast does.
+                                || is(call, "Expr.skew")
+                                || is(call, "Expr.kurtosis"))
                                 && locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
                                     starts_from_a_literal(chain)
                                         || chain.links()[..at].iter().any(compares_with_a_null)
@@ -4791,6 +4942,70 @@ mod tests {
                 at_the_cast(),
                 "conversion from `date` to `u8` failed in column 'scalar' for 1 out of 1 values: [0001-01-01]"
             ),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_pivot_aggregate_is_excused_for_a_skew_of_a_literal_text_and_not_for_the_values_of_a_group()
+    {
+        // The text literal 1 converts to the float a skew reads, where the tables measured the
+        // sample's text, whose values no float reads.
+        assert_eq!(
+            excused_by_kept("uncovered-a-group-aggregate--a-skew-of-a-literal-text.case"),
+            vec![Limit::AGroupAggregate]
+        );
+        let text = "conversion from `str` to `f64` failed in column 'a' for 2 out of 3 values: [\"1d\", \"2d\"]";
+        let at_the_call = || at(&[parameter("aggregate_function"), Segment::Link(0)]);
+        let one = || call("polars.lit", vec![("value", Value::String("1".to_owned()))]);
+        for entry in ["Expr.skew", "Expr.kurtosis"] {
+            let case = pivot(chain_of(one(), vec![call(entry, Vec::new())]));
+            assert_eq!(
+                refused_by_the_tables_at(&case, at_the_call(), text),
+                vec![Limit::AGroupAggregate],
+                "{entry}"
+            );
+            // The values of a group are no literal: they are what the tables measured.
+            let group = pivot(chain_of(
+                call("polars.element", Vec::new()),
+                vec![call(entry, Vec::new())],
+            ));
+            assert_eq!(
+                refused_by_the_tables_at(&group, at_the_call(), text),
+                vec![],
+                "{entry}"
+            );
+        }
+        // The values of a group that a null text is added to are nulls, which convert: the same
+        // reading as a cast's, so the chain the skew follows need not start from a literal.
+        let text_dtype = Dtype::new(Representative::String.dtype()).expect("a dtype");
+        let null_text = call(
+            "polars.lit",
+            vec![
+                ("value", Value::Flag(None)),
+                ("dtype", Value::Dtype(text_dtype)),
+            ],
+        );
+        let summed = pivot(chain_of(
+            call("polars.element", Vec::new()),
+            vec![
+                compared_with("Expr.add", chain(null_text, &[])),
+                call("Expr.skew", Vec::new()),
+            ],
+        ));
+        let at_the_skew = at(&[parameter("aggregate_function"), Segment::Link(1)]);
+        assert_eq!(
+            excused_by_kept("uncovered-a-group-aggregate--a-skew-of-a-sum-with-a-null-text.case"),
+            vec![Limit::AGroupAggregate]
+        );
+        assert_eq!(
+            refused_by_the_tables_at(&summed, at_the_skew, text),
+            vec![Limit::AGroupAggregate]
+        );
+        // A call that does not convert what it follows is refused for it by no kernel of a group.
+        let running = pivot(chain_of(one(), vec![call("Expr.cum_sum", Vec::new())]));
+        assert_eq!(
+            refused_by_the_tables_at(&running, at_the_call(), text),
             vec![]
         );
     }
@@ -7726,6 +7941,49 @@ mod tests {
     }
 
     #[test]
+    fn a_text_share_of_a_quantile_is_excused_in_a_pivots_aggregate_and_nowhere_else() {
+        // A select reads the text "1" as the share it writes, and the aggregate of a pivot, which
+        // runs the values of each group, refuses it as no number.
+        let reason = "expected expression of dtype 'numeric' for quantile, got 'str'";
+        let quantile = chain(column("a"), &["Expr.quantile"]);
+        let case = pivot(quantile.clone());
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Rows, reason, Vec::new()),
+            vec![Limit::AGroupAggregate]
+        );
+        // The same reason is no excuse in a select, in a pivot whose aggregate holds no quantile,
+        // at the empty table, for a refusal Polars placed, or in other words.
+        assert_eq!(
+            polars_refuses(
+                &select(vec![quantile]),
+                None,
+                Stage::Rows,
+                reason,
+                Vec::new()
+            ),
+            vec![]
+        );
+        let without = pivot(chain(column("a"), &["Expr.cum_sum"]));
+        assert_eq!(
+            polars_refuses(&without, None, Stage::Rows, reason, Vec::new()),
+            vec![]
+        );
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Empty, reason, Vec::new()),
+            vec![]
+        );
+        let placed = at(&[parameter("aggregate_function"), Segment::Link(0)]);
+        assert_eq!(
+            polars_refuses(&case, Some(placed), Stage::Rows, reason, Vec::new()),
+            vec![]
+        );
+        assert_eq!(
+            polars_refuses(&case, None, Stage::Rows, "no", Vec::new()),
+            vec![]
+        );
+    }
+
+    #[test]
     fn a_pivot_aggregate_is_excused_by_the_kernel_reason_and_by_the_empty_table_with_one() {
         let case = pivot(chain(column("a"), &["Expr.cum_sum"]));
         let at_the_call = at(&[parameter("aggregate_function"), Segment::Link(0)]);
@@ -8446,6 +8704,243 @@ mod tests {
         );
         assert_eq!(
             refused_for_a_bound(&case, None, Stage::Schema, DYNAMIC),
+            vec![]
+        );
+    }
+
+    // ----- An approximate quantile of a literal in a condition
+
+    const NULL_QUANTILE: &str = "`quantile` should not contain null values";
+
+    /// `when(true).then(start.approx_quantile(share)).otherwise(k)`, or the approximate quantile as
+    /// a plain chain in a select, `start` being the chain's own start and `share` the share it is
+    /// given.
+    fn branch_with_a_quantile(start: Call, share: Expression, in_a_branch: bool) -> Case {
+        let quantile = call(
+            "Expr.approx_quantile",
+            vec![("quantile", Value::Expression(share))],
+        );
+        let quantiled = chain_of(start, vec![quantile]);
+        if !in_a_branch {
+            return select(vec![quantiled]);
+        }
+        let then = call(
+            "When.then",
+            vec![("statement", Value::Expression(quantiled))],
+        );
+        let otherwise = call(
+            "Then.otherwise",
+            vec![("statement", Value::Expression(chain(column("k"), &[])))],
+        );
+        let when = call(
+            "polars.when",
+            vec![(
+                "predicates",
+                many(vec![chain_of(
+                    call("polars.lit", vec![("value", Value::Flag(Some(true)))]),
+                    Vec::new(),
+                )]),
+            )],
+        );
+        select(vec![chain_of(when, vec![then, otherwise])])
+    }
+
+    fn a_share_of_one() -> Expression {
+        chain(call("polars.lit", vec![("value", Value::Float(1.0))]), &[])
+    }
+
+    fn a_literal_true() -> Call {
+        call("polars.lit", vec![("value", Value::Flag(Some(true)))])
+    }
+
+    #[test]
+    fn a_null_quantile_is_excused_for_an_approximate_quantile_of_a_literal_in_a_branch() {
+        assert_eq!(
+            excused_by_kept("uncovered-an-approximate-quantile-of-a-literal-in-a-condition.case"),
+            vec![Limit::AnApproximateQuantileOfALiteralInACondition]
+        );
+        // Either stage, and a number typed without a dtype as the receiver as well as a flag.
+        for stage in [Stage::Rows, Stage::Empty] {
+            for start in [
+                a_literal_true(),
+                call("polars.lit", vec![("value", Value::Integer(2))]),
+            ] {
+                assert_eq!(
+                    refused_for_a_bound(
+                        &branch_with_a_quantile(start, a_share_of_one(), true),
+                        None,
+                        stage.clone(),
+                        NULL_QUANTILE
+                    ),
+                    vec![Limit::AnApproximateQuantileOfALiteralInACondition]
+                );
+            }
+        }
+    }
+
+    /// `when(f).then(k)` and further links, with `predicate` the predicate of the first `when`
+    /// (`first`), of the second (`second`) or of the third (`third`), the others being the column
+    /// `f`, and every value the column `k`.
+    fn conditioned_by(predicate: Expression, place: &str) -> Case {
+        let value = |id: &str| {
+            call(
+                id,
+                vec![("statement", Value::Expression(chain(column("k"), &[])))],
+            )
+        };
+        let when = |id: &str, given: Expression| call(id, vec![("predicates", many(vec![given]))]);
+        let truth = || chain(column("f"), &[]);
+        let start = call(
+            "polars.when",
+            vec![(
+                "predicates",
+                many(vec![if place == "first" {
+                    predicate.clone()
+                } else {
+                    truth()
+                }]),
+            )],
+        );
+        let mut links = vec![value("When.then")];
+        if place != "first" {
+            links.push(when(
+                "Then.when",
+                if place == "second" {
+                    predicate.clone()
+                } else {
+                    truth()
+                },
+            ));
+            links.push(value("ChainedWhen.then"));
+        }
+        if place == "third" {
+            links.push(when("ChainedThen.when", predicate));
+            links.push(value("ChainedWhen.then"));
+        }
+        links.push(value(if place == "first" {
+            "Then.otherwise"
+        } else {
+            "ChainedThen.otherwise"
+        }));
+        select(vec![chain_of(start, links)])
+    }
+
+    /// `lit(2.0).approx_quantile(1.0) != k.n_unique()`, or the same from the column `k`.
+    fn a_quantile_compared(start: Call) -> Expression {
+        chain_of(
+            start,
+            vec![
+                call(
+                    "Expr.approx_quantile",
+                    vec![("quantile", Value::Expression(a_share_of_one()))],
+                ),
+                compared_with("Expr.ne", chain(column("k"), &["Expr.n_unique"])),
+            ],
+        )
+    }
+
+    #[test]
+    fn a_null_quantile_is_excused_for_a_literal_in_a_predicate_after_the_first_and_in_no_other() {
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--in-a-chained-predicate.case"
+            ),
+            vec![Limit::AnApproximateQuantileOfALiteralInACondition]
+        );
+        let literal = || {
+            let dtype = Dtype::new(Representative::Float64.dtype()).expect("a dtype");
+            call(
+                "polars.lit",
+                vec![("value", Value::Float(2.0)), ("dtype", Value::Dtype(dtype))],
+            )
+        };
+        // The predicates of the second and the third `when` are evaluated with the branches.
+        for place in ["second", "third"] {
+            assert_eq!(
+                refused_for_a_bound(
+                    &conditioned_by(a_quantile_compared(literal()), place),
+                    None,
+                    Stage::Rows,
+                    NULL_QUANTILE
+                ),
+                vec![Limit::AnApproximateQuantileOfALiteralInACondition],
+                "{place}"
+            );
+        }
+        // The predicate of the first `when` is a position Polars does not refuse it in.
+        assert_eq!(
+            refused_for_a_bound(
+                &conditioned_by(a_quantile_compared(literal()), "first"),
+                None,
+                Stage::Rows,
+                NULL_QUANTILE
+            ),
+            vec![]
+        );
+        // A column receiver is no literal, in any of them.
+        for place in ["second", "third"] {
+            assert_eq!(
+                refused_for_a_bound(
+                    &conditioned_by(a_quantile_compared(column("k")), place),
+                    None,
+                    Stage::Rows,
+                    NULL_QUANTILE
+                ),
+                vec![],
+                "{place}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_null_quantile_is_not_excused_outside_a_branch_nor_for_a_column_nor_at_a_place() {
+        // The approximate quantile stands in a select, where Polars meets it: no branch holds it.
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_with_a_quantile(a_literal_true(), a_share_of_one(), false),
+                None,
+                Stage::Rows,
+                NULL_QUANTILE
+            ),
+            vec![]
+        );
+        // A column starts the chain: the control is the case itself.
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_with_a_quantile(column("f"), a_share_of_one(), true),
+                None,
+                Stage::Rows,
+                NULL_QUANTILE
+            ),
+            vec![]
+        );
+        // A share that is a null is refused for a column as well: the literal is no cause.
+        assert_eq!(
+            refused_for_a_bound(
+                &branch_with_a_quantile(a_literal_true(), chain(null(), &[]), true),
+                None,
+                Stage::Rows,
+                NULL_QUANTILE
+            ),
+            vec![]
+        );
+        // Another reason, a place and the schema are not this one.
+        let case = branch_with_a_quantile(a_literal_true(), a_share_of_one(), true);
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, "invalid series dtype"),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(
+                &case,
+                Some(link_of("exprs", 0, 0)),
+                Stage::Rows,
+                NULL_QUANTILE
+            ),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Schema, NULL_QUANTILE),
             vec![]
         );
     }

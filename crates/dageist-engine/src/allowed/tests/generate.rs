@@ -108,11 +108,17 @@ fn argument_for(entry: &Entry, parameter: &str, value: Expr) -> Argument {
 }
 
 /// The parameters Polars takes only as a single value, not as a column.
-const SCALAR_ONLY: [(&str, &str); 4] = [
+///
+/// A quantile is in the list too, though the approximate one meets a column of shares: the sample's
+/// columns hold the numbers 1 and 3, which are no share, so what Polars does with a column of them
+/// says nothing of the dtype, and the number 1 is the share that is the largest value.
+const SCALAR_ONLY: [(&str, &str); 6] = [
     ("Expr.shift", "n"),
     ("Expr.shift", "fill_value"),
     ("Expr.diff", "n"),
     ("Expr.pct_change", "n"),
+    ("Expr.quantile", "quantile"),
+    ("Expr.approx_quantile", "quantile"),
 ];
 
 /// The parts of a date that the functions which make one take, whose calendar has no month and no
@@ -138,8 +144,13 @@ const LITERAL_IN_CONTEXTS: [(&str, &str); 5] = [
 
 /// The parameters whose value is not a null where the expression is built for a group, which has
 /// no other column to give: Polars reads the value of a replacement of every match as the one value
-/// every match is replaced by where it is a literal, and refuses a null.
-const NOT_NULL_FOR_A_GROUP: [(&str, &str); 1] = [("Expr.str.replace_all", "value")];
+/// every match is replaced by where it is a literal, and refuses a null, as it refuses a null
+/// share of a quantile.
+const NOT_NULL_FOR_A_GROUP: [(&str, &str); 3] = [
+    ("Expr.str.replace_all", "value"),
+    ("Expr.quantile", "quantile"),
+    ("Expr.approx_quantile", "quantile"),
+];
 
 /// The expression that stands for an argument of `dtype` for `parameter` of
 /// the entry `entry`: a column of that dtype; the number 1 of that dtype where
