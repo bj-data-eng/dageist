@@ -171,6 +171,11 @@ fn made_by(function: &str, arguments: Value) -> Value {
 /// The walk of `LazyFrame.join(other, left_on=[key], right_on=[rk])`, which a table `other` of
 /// whole numbers `rk` is joined to.
 fn join_walk(key: Value) -> Walk {
+    join_keys_walk(vec![key], vec![field("rk")])
+}
+
+/// The walk of `LazyFrame.join(other, left_on=left, right_on=right)`.
+fn join_keys_walk(left: Vec<Value>, right: Vec<Value>) -> Walk {
     let mut inputs = Inputs::new();
     inputs
         .add_table(
@@ -184,8 +189,8 @@ fn join_walk(key: Value) -> Walk {
         "LazyFrame.join",
         json!({
             "other": { "table": "other" },
-            "left_on": many(vec![key]),
-            "right_on": many(vec![field("rk")]),
+            "left_on": many(left),
+            "right_on": many(right),
         }),
     )]);
     Document::read(&written).expect("a document").steps()[0].walk(0, source().schema(), &inputs)
@@ -226,4 +231,31 @@ fn a_boolean_is_a_part_of_a_date_because_true_is_one_and_what_the_rows_hold_is_t
             assert_eq!(walk.refusal(), None, "{function} {part}");
         }
     }
+}
+
+#[test]
+fn a_moment_and_a_length_of_time_are_named_as_their_first_part_for_the_keys_of_a_join() {
+    // Polars names a function that is made of parts by the first of them, so two keys made of
+    // `rk` are both named `rk`, and a join that pairs `a` with it twice repeats a pair of names.
+    let moment = || {
+        made_by(
+            "polars.datetime",
+            json!({ "year": field("rk"), "month": whole(1), "day": whole(1) }),
+        )
+    };
+    let walk = join_keys_walk(vec![field("a"), field("a")], vec![moment(), moment()]);
+    let refusal = walk.refusal().expect("the pair of names comes twice");
+    assert_eq!(
+        refusal.refusal().source(),
+        RefusalSource::Rule(Rule::JoinKeyNamesAreNotRepeated)
+    );
+    // A length of time is named by its weeks, which are the number 0 and so `literal` where none
+    // are given, whatever else is.
+    let length = || made_by("polars.duration", json!({ "days": field("rk") }));
+    let walk = join_keys_walk(vec![field("a"), field("a")], vec![length(), length()]);
+    let refusal = walk.refusal().expect("the pair of names comes twice");
+    assert_eq!(
+        refusal.refusal().source(),
+        RefusalSource::Rule(Rule::JoinKeyNamesAreNotRepeated)
+    );
 }
