@@ -3,13 +3,14 @@
 //! gives. The expected dtypes are what Python Polars documents, and the reasons are Polars'.
 
 use dageist_engine::allowed::{
-    After, Context, Ending, Outer, Place as OfferPlace, RefusalSource, Representative, Shape, Stage,
+    After, Context, Ending, Outer, Place as OfferPlace, RefusalSource, Representative, Rule, Shape,
+    Stage,
 };
 use dageist_engine::document::{Document, Inputs, Segment, Walk, WalkedExpression};
-use polars::prelude::{DataFrame, df};
+use polars::prelude::{DataFrame, IntoLazy, df};
 use serde_json::{Value, json};
 
-use crate::support::{call, chain, document, field, many, step, whole};
+use crate::support::{call, chain, document, field, field_then, many, step, whole};
 
 fn source() -> DataFrame {
     df!(
@@ -159,5 +160,56 @@ fn a_moment_made_with_a_zone_is_in_it_and_a_count_of_days_is_a_date() {
     assert_eq!(
         gives(&seconds),
         select_after(Representative::Datetime, Shape::Many)
+    );
+}
+
+/// The start `function` given `arguments`, as an expression.
+fn made_by(function: &str, arguments: Value) -> Value {
+    chain(call(function, arguments), vec![])
+}
+
+/// The walk of `LazyFrame.join(other, left_on=[key], right_on=[rk])`, which a table `other` of
+/// whole numbers `rk` is joined to.
+fn join_walk(key: Value) -> Walk {
+    let mut inputs = Inputs::new();
+    inputs
+        .add_table(
+            "other",
+            "Other",
+            df!("rk" => [1_i64, 2, 3]).expect("the other table").lazy(),
+        )
+        .expect("a first input");
+    let written = document(vec![step(
+        "s",
+        "LazyFrame.join",
+        json!({
+            "other": { "table": "other" },
+            "left_on": many(vec![key]),
+            "right_on": many(vec![field("rk")]),
+        }),
+    )]);
+    Document::read(&written).expect("a document").steps()[0].walk(0, source().schema(), &inputs)
+}
+
+#[test]
+fn a_key_of_a_function_given_an_aggregate_alone_is_elementwise_and_beside_a_column_is_not() {
+    // Polars joins on a length of time of a sum: the sum is one value and no column is beside it.
+    let alone = join_walk(made_by(
+        "polars.duration",
+        json!({ "days": field_then("a", vec![call("Expr.sum", json!({}))]) }),
+    ));
+    assert_eq!(alone.refusal(), None);
+    // And refuses one that has a column beside the sum: the key is not elementwise.
+    let beside = join_walk(made_by(
+        "polars.duration",
+        json!({
+            "days": field_then("a", vec![call("Expr.sum", json!({}))]),
+            "hours": field("k"),
+        }),
+    ));
+    let refusal = beside.refusal().expect("a sum beside a column");
+    assert_eq!(
+        refusal.refusal().source(),
+        RefusalSource::Rule(Rule::KeyIsElementwise)
     );
 }
