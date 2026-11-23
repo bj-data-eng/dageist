@@ -454,7 +454,7 @@ pub enum Limit {
     /// condition that holds in a value or in a later predicate a chain that starts from a literal
     /// and takes an approximate quantile: the case run again with each such literal a column is not
     /// refused for it.
-    AnApproximateQuantileOfALiteralInABranch,
+    AnApproximateQuantileOfALiteralInACondition,
 }
 
 impl Limit {
@@ -496,7 +496,7 @@ impl Limit {
         Self::AFormatTheDtypeCannotWrite,
         Self::APartOfADateThatDependsOnTheRows,
         Self::AMomentBeyondTheRangeOfAUnit,
-        Self::AnApproximateQuantileOfALiteralInABranch,
+        Self::AnApproximateQuantileOfALiteralInACondition,
     ];
 
     /// The name a kept case is filed under.
@@ -548,8 +548,8 @@ impl Limit {
             Self::AFormatTheDtypeCannotWrite => "a-format-the-dtype-cannot-write",
             Self::APartOfADateThatDependsOnTheRows => "a-part-of-a-date-that-depends-on-the-rows",
             Self::AMomentBeyondTheRangeOfAUnit => "a-moment-beyond-the-range-of-a-unit",
-            Self::AnApproximateQuantileOfALiteralInABranch => {
-                "an-approximate-quantile-of-a-literal-in-a-branch"
+            Self::AnApproximateQuantileOfALiteralInACondition => {
+                "an-approximate-quantile-of-a-literal-in-a-condition"
             }
         }
     }
@@ -635,7 +635,7 @@ impl Limit {
             Self::AMomentBeyondTheRangeOfAUnit => {
                 "a cast of a moment to nanoseconds refuses one outside the years nanoseconds hold, when the rows run, where the tables measured moments of 1970 and after"
             }
-            Self::AnApproximateQuantileOfALiteralInABranch => {
+            Self::AnApproximateQuantileOfALiteralInACondition => {
                 "Polars reads the quantile of an approximate quantile of a literal as null in a value or a later predicate of a condition, which it does not in a select or on a column, where the tables measured the call"
             }
             Self::APartOfADateThatDependsOnTheRows => {
@@ -3892,7 +3892,10 @@ fn applies(
                 && refused_for_another_length_with_text_values(case) == Some(false)
                 && refused_for_another_length_without_windows(case) == Some(false)
         }
-        (Limit::AnApproximateQuantileOfALiteralInABranch, Disagreement::PolarsRefuses(refusal)) => {
+        (
+            Limit::AnApproximateQuantileOfALiteralInACondition,
+            Disagreement::PolarsRefuses(refusal),
+        ) => {
             // The literal is the cause where Polars stops refusing the quantile as null once the
             // receiver of each such approximate quantile is a column.
             unplaced(refusal)
@@ -8705,7 +8708,7 @@ mod tests {
         );
     }
 
-    // ----- An approximate quantile of a literal in a branch
+    // ----- An approximate quantile of a literal in a condition
 
     const NULL_QUANTILE: &str = "`quantile` should not contain null values";
 
@@ -8753,8 +8756,8 @@ mod tests {
     #[test]
     fn a_null_quantile_is_excused_for_an_approximate_quantile_of_a_literal_in_a_branch() {
         assert_eq!(
-            excused_by_kept("uncovered-an-approximate-quantile-of-a-literal-in-a-branch.case"),
-            vec![Limit::AnApproximateQuantileOfALiteralInABranch]
+            excused_by_kept("uncovered-an-approximate-quantile-of-a-literal-in-a-condition.case"),
+            vec![Limit::AnApproximateQuantileOfALiteralInACondition]
         );
         // Either stage, and a number typed without a dtype as the receiver as well as a flag.
         for stage in [Stage::Rows, Stage::Empty] {
@@ -8769,7 +8772,7 @@ mod tests {
                         stage.clone(),
                         NULL_QUANTILE
                     ),
-                    vec![Limit::AnApproximateQuantileOfALiteralInABranch]
+                    vec![Limit::AnApproximateQuantileOfALiteralInACondition]
                 );
             }
         }
@@ -8840,9 +8843,9 @@ mod tests {
     fn a_null_quantile_is_excused_for_a_literal_in_a_predicate_after_the_first_and_in_no_other() {
         assert_eq!(
             excused_by_kept(
-                "uncovered-an-approximate-quantile-of-a-literal-in-a-branch--in-a-chained-predicate.case"
+                "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--in-a-chained-predicate.case"
             ),
-            vec![Limit::AnApproximateQuantileOfALiteralInABranch]
+            vec![Limit::AnApproximateQuantileOfALiteralInACondition]
         );
         let literal = || {
             let dtype = Dtype::new(Representative::Float64.dtype()).expect("a dtype");
@@ -8860,7 +8863,7 @@ mod tests {
                     Stage::Rows,
                     NULL_QUANTILE
                 ),
-                vec![Limit::AnApproximateQuantileOfALiteralInABranch],
+                vec![Limit::AnApproximateQuantileOfALiteralInACondition],
                 "{place}"
             );
         }
