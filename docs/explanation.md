@@ -1533,14 +1533,14 @@ an expected rejection that names both reasons.
 The tally ends with the totals of the cases that agreed, that both refused for another
 reason, that a limit excused, that were refused where Polars does not evaluate the
 part, that a rule stricter by design refused, and that disagreed. The fixed seed's
-1000 cases give none disagreeing; 16 of those that agree are refused by the rule against a
-repeated pair of key names, and the tables could not be asked past a point in 26 more. These
-counts are the same at one thread, at two and at the machine's own, and so are the 66 cases
-refused by the rule that is stricter by design, of 157 pivot cases, and the 7 that a limit excused
-and the 7 refused where Polars does not evaluate the part. The others are not: Polars' thread
+1000 cases give none disagreeing; 12 of those that agree are refused by the rule against a
+repeated pair of key names, and the tables could not be asked past a point in 39 more. These
+counts are the same at one thread, at two and at the machine's own, and so are the 57 cases
+refused by the rule that is stricter by design, of 175 pivot cases, and the 8 that a limit excused
+and the 14 refused where Polars does not evaluate the part. The others are not: Polars' thread
 count changes which reason it gives where the tables and Polars both refuse, and a case in which
 Polars panics at some counts and not at others moves a case between them, so the cases that agree
-are 787 or 788 and those refused by both for another reason 120 or 121, at the three counts
+are 769 or 770 and those refused by both for another reason 134 or 135, at the three counts
 measured. The test
 asserts none of those.
 

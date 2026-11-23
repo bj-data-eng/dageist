@@ -30,8 +30,8 @@ use super::frames::{ON_COLUMNS, OTHER, key_column};
 /// for what it lacks would be read as zeros, the same choice every time.
 pub const LEAST_ENTROPY: usize = 96;
 
-/// Draws small numbers from entropy, one byte for each. Past its end it gives
-/// zeros, the first choice of everything.
+/// Draws numbers from entropy, each below a count that may be of any size. Past its end, or
+/// too near it to hold the bytes a draw needs, it gives zeros, the first choice of everything.
 struct Draw<'a> {
     entropy: Entropy<'a>,
 }
@@ -43,14 +43,30 @@ impl<'a> Draw<'a> {
         }
     }
 
-    /// A number below `count`, which is at most 256.
+    /// A number below `count`, each as likely as any other. It reads as many bytes as `count`
+    /// needs, as one number, and reads again where that number is at or above the largest
+    /// multiple of `count` that the bytes can hold, since reducing it would give the numbers
+    /// below the remainder once more than the rest. A count of one or of a power of two that a
+    /// byte holds reads one byte and keeps its low bits.
     fn below(&mut self, count: usize) -> usize {
-        debug_assert!((1..=256).contains(&count));
-        let byte = self
-            .entropy
-            .take(1)
-            .map_or(0, |bytes| usize::from(bytes[0]));
-        byte % count
+        debug_assert!(count > 0);
+        let width = (usize::BITS - (count - 1).leading_zeros())
+            .div_ceil(8)
+            .max(1) as usize;
+        let span = 1_u128 << (8 * width);
+        let count = count as u128;
+        let limit = span - span % count;
+        loop {
+            let Ok(bytes) = self.entropy.take(width) else {
+                return 0;
+            };
+            let value = bytes
+                .iter()
+                .fold(0_u128, |number, byte| number << 8 | u128::from(*byte));
+            if value < limit {
+                return (value % count) as usize;
+            }
+        }
     }
 
     fn chance(&mut self, percent: usize) -> bool {
@@ -64,7 +80,7 @@ impl<'a> Draw<'a> {
     /// One of `items`, the first more often: the weights say how often.
     fn weighted<T: Copy>(&mut self, items: &[(usize, T)]) -> T {
         let total: usize = items.iter().map(|(weight, _)| weight).sum();
-        let mut left = self.below(total.min(256));
+        let mut left = self.below(total);
         for (weight, item) in items {
             if left < *weight {
                 return *item;
@@ -1781,6 +1797,166 @@ mod tests {
                 (mixed ^ (mixed >> 31)) as u8
             })
             .collect()
+    }
+
+    /// `length` bytes from a mixing function of the position, so that no pattern the size of a
+    /// count can hide in them.
+    fn stream(length: usize) -> Vec<u8> {
+        (0..length as u64)
+            .map(|at| {
+                let mut mixed = at.wrapping_add(0x9e37_79b9_7f4a_7c15);
+                mixed = (mixed ^ (mixed >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+                mixed = (mixed ^ (mixed >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+                (mixed ^ (mixed >> 31)) as u8
+            })
+            .collect()
+    }
+
+    /// How many of `draws` numbers below `count`, drawn from a long stream, fall in each of `bins`
+    /// equal ranges of `0..count`, which `bins` divides. Sixteen bytes of stream for each draw is
+    /// more than a draw that rejects some of what it reads comes to, so a stream that ran out
+    /// would show as the zeros it is read as.
+    fn tally(count: usize, bins: usize, draws: usize) -> Vec<usize> {
+        assert_eq!(count % bins, 0, "{bins} bins do not divide {count}");
+        let bytes = stream(draws * 16);
+        let mut draw = Draw::new(&bytes);
+        let mut tally = vec![0; bins];
+        for _ in 0..draws {
+            let number = draw.below(count);
+            assert!(number < count, "{number} is not below {count}");
+            tally[number / (count / bins)] += 1;
+        }
+        tally
+    }
+
+    /// Asserts that `tally` of `draws` draws is even: the chance of each bin is one over the
+    /// number of bins, so a bin holds `draws / bins` on average with the standard deviation of a
+    /// binomial count, and five of them is how far a bin of a fair draw is allowed to stray.
+    fn assert_even(tally: &[usize], draws: usize) {
+        let bins = tally.len() as f64;
+        let chance = 1.0 / bins;
+        let mean = draws as f64 * chance;
+        let deviation = (draws as f64 * chance * (1.0 - chance)).sqrt();
+        for (bin, &found) in tally.iter().enumerate() {
+            assert!(
+                (found as f64 - mean).abs() <= 5.0 * deviation,
+                "bin {bin} of {} holds {found} of {draws} draws, where {mean:.0} +- {:.0} is even",
+                tally.len(),
+                5.0 * deviation
+            );
+        }
+    }
+
+    #[test]
+    fn a_draw_below_a_count_that_does_not_divide_256_gives_every_number_as_often() {
+        // 157 is a count of methods the catalogue has held; 256 mod 157 is 99, so a draw that
+        // reduces a byte gives each of the first 99 numbers twice as often as the others.
+        let draws = 157 * 2000;
+        assert_even(&tally(157, 157, draws), draws);
+    }
+
+    #[test]
+    fn a_draw_reads_again_where_its_bytes_are_at_or_above_the_largest_multiple_of_the_count() {
+        // One byte holds 256 numbers and one copy of 157, so 157 to 255 are read again.
+        assert_eq!(Draw::new(&[156]).below(157), 156);
+        assert_eq!(Draw::new(&[157, 3]).below(157), 3);
+        assert_eq!(Draw::new(&[255, 200, 0]).below(157), 0);
+        // Two bytes hold 65536 numbers and 218 copies of 300, which end at 65400.
+        assert_eq!(Draw::new(&[0xff, 0x77]).below(300), 299);
+        assert_eq!(Draw::new(&[0xff, 0x78, 0x01, 0x2c]).below(300), 0);
+    }
+
+    #[test]
+    fn a_draw_below_a_count_above_256_reaches_every_number_and_gives_each_as_often() {
+        for count in [257, 300, 600] {
+            let draws = count * 1000;
+            let tally = tally(count, count, draws);
+            assert!(tally[0] > 0, "0 is never drawn below {count}");
+            assert!(
+                tally[count - 1] > 0,
+                "{} is never drawn below {count}",
+                count - 1
+            );
+            assert_even(&tally, draws);
+        }
+    }
+
+    #[test]
+    fn a_draw_below_a_count_of_many_bytes_is_even_across_the_whole_range() {
+        // 1_000_000 takes three bytes and 4_000_000_000 four, the size of a count of a `u32`.
+        for count in [1_000_000, 4_000_000_000] {
+            let draws = 100 * 2000;
+            assert_even(&tally(count, 100, draws), draws);
+        }
+    }
+
+    #[test]
+    fn a_pick_from_a_list_of_more_than_256_items_draws_the_first_and_the_last_as_often_as_any() {
+        let items: Vec<usize> = (0..300).collect();
+        let draws = 300 * 1000;
+        let bytes = stream(draws * 16);
+        let mut draw = Draw::new(&bytes);
+        let mut tally = vec![0; items.len()];
+        for _ in 0..draws {
+            tally[draw.pick(&items)] += 1;
+        }
+        assert!(
+            tally[0] > 0 && tally[299] > 0,
+            "{} and {}",
+            tally[0],
+            tally[299]
+        );
+        assert_even(&tally, draws);
+    }
+
+    #[test]
+    fn a_weighted_pick_keeps_its_weights_for_a_total_above_256() {
+        // Weights of 1000 and 3000 give the first a quarter of the draws, of which there are
+        // 40_000: the count of a binomial with that chance, which has a standard deviation of
+        // the square root of 40_000 * 1/4 * 3/4.
+        let draws = 40_000;
+        let bytes = stream(draws * 16);
+        let mut draw = Draw::new(&bytes);
+        let first = (0..draws)
+            .filter(|_| draw.weighted(&[(1000, 'a'), (3000, 'b')]) == 'a')
+            .count();
+        let deviation = (40_000.0_f64 * 0.25 * 0.75).sqrt();
+        assert!(
+            (first as f64 - 10_000.0).abs() <= 5.0 * deviation,
+            "{first} of {draws} draws are the first, where 10000 +- {:.0} is a quarter",
+            5.0 * deviation
+        );
+        // Every one of 300 weights of one is drawn, the last among them.
+        let items: Vec<(usize, usize)> = (0..300).map(|at| (1, at)).collect();
+        let draws = 300 * 1000;
+        let bytes = stream(draws * 16);
+        let mut draw = Draw::new(&bytes);
+        let mut tally = vec![0; items.len()];
+        for _ in 0..draws {
+            tally[draw.weighted(&items)] += 1;
+        }
+        assert!(
+            tally[0] > 0 && tally[299] > 0,
+            "{} and {}",
+            tally[0],
+            tally[299]
+        );
+        assert_even(&tally, draws);
+    }
+
+    #[test]
+    fn the_same_entropy_gives_the_same_numbers_and_past_its_end_a_draw_gives_zero() {
+        let bytes = stream(400);
+        let (mut one, mut other) = (Draw::new(&bytes), Draw::new(&bytes));
+        for count in (1..200).cycle().take(300) {
+            assert_eq!(one.below(count), other.below(count));
+        }
+        // Too few bytes for a draw below a count of three bytes, or none at all, is zero, the
+        // first choice of everything, whatever the count.
+        for count in [1, 7, 157, 300, 1_000_000] {
+            assert_eq!(Draw::new(&[]).below(count), 0, "{count}");
+        }
+        assert_eq!(Draw::new(&[200]).below(1_000_000), 0);
     }
 
     /// The identifiers of the methods `focus` holds, in the catalogue's order.
