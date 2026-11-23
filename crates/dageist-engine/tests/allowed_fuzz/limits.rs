@@ -8221,6 +8221,45 @@ mod tests {
         );
     }
 
+    /// `sort(by=[polars.date(year=u, month=month, day=day)])`, the sample's `u` holding the years
+    /// 1, 2 and 3.
+    fn sorting_by_a_date(month: Expression, day: Expression) -> Case {
+        let date = call(
+            "polars.date",
+            vec![
+                ("year", Value::Expression(chain(column("u"), &[]))),
+                ("month", Value::Expression(month)),
+                ("day", Value::Expression(day)),
+            ],
+        );
+        let sort = call(
+            "LazyFrame.sort",
+            vec![("by", many(vec![chain_of(date, Vec::new())]))],
+        );
+        case_of(sort)
+    }
+
+    #[test]
+    fn a_null_in_another_part_is_the_cause_where_the_tables_refuse_a_month_polars_never_checks() {
+        // The month is false in the second row, where `b` holds a null, so that row is a null date
+        // whose month Polars never checks.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-part-of-a-date-that-depends-on-the-rows--a-null-in-another-part.case"
+            ),
+            vec![Limit::APartOfADateThatDependsOnTheRows]
+        );
+    }
+
+    #[test]
+    fn a_month_of_a_sort_key_of_one_value_is_no_part_a_null_hides() {
+        // Polars never evaluates a sort key of one value, so the month of false is not checked
+        // whatever the other parts hold: no row has a null that hides it, and it is no limit.
+        let skipped = call("polars.lit", vec![("value", Value::Flag(Some(false)))]);
+        let case = sorting_by_a_date(chain_of(skipped, Vec::new()), whole(1));
+        assert_eq!(excused_by(&case), vec![]);
+    }
+
     /// `sort(by=[when(a.is_null()).then(a.dt.replace(day = lit(false))), len()])` over dates: a sort key
     /// of one value, whose part Polars never evaluates.
     fn a_part_that_a_sort_key_of_one_value_skips() -> Case {
