@@ -97,7 +97,7 @@ describe('the host that calls the bridge', () => {
     const chosen = [{ parameter: 'how', word: 'cross' }];
     const found = await bridgeHost().optionOffers('LazyFrame.join', chosen);
 
-    expect(offers.entries).toHaveLength(172);
+    expect(offers.entries).toHaveLength(182);
     expect(fits.fits).toHaveLength(3);
     expect(found.options.length).toBeGreaterThan(0);
     expect(fitsSent[0]).toMatchObject({

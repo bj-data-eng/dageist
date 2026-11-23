@@ -51,19 +51,20 @@ describe('the methods the engine offers after a timestamp', () => {
     families.flatMap((family) => family.offers).find((offer) => offer.name === name);
 
   it('are grouped by family, the shortest group first, and those of a length in the catalogue order', () => {
-    // The methods of each family: window one, rows, cumulative and conversion three, aggregate and
-    // logic four, rounding and the search of text five, maths and pieces of text seven, checks and
-    // nulls eight, arithmetic eleven, trigonometry, text and compare fifteen, and temporal
+    // The methods of each family: window one, cumulative and conversion three, logic four, order,
+    // rounding and the search of text five, rows and aggregate six, maths and pieces of text seven,
+    // checks and nulls eight, arithmetic eleven, trigonometry, text and compare fifteen, and temporal
     // forty-three.
     expect(families.map((family) => [family.key, family.offers.length])).toEqual([
       ['window', 1],
-      ['rows', 3],
       ['cumulative', 3],
       ['conversion', 3],
-      ['aggregate', 4],
       ['logic', 4],
+      ['order', 5],
       ['rounding', 5],
       ['search', 5],
+      ['rows', 6],
+      ['aggregate', 6],
       ['maths', 7],
       ['pieces', 7],
       ['checks', 8],
@@ -80,7 +81,7 @@ describe('the methods the engine offers after a timestamp', () => {
   it('carry the hint of the catalogue and are offered in the engine’s order', () => {
     expect(
       families.find((family) => family.key === 'rows')?.offers.map((offer) => offer.name),
-    ).toEqual(['first', 'last', 'shift']);
+    ).toEqual(['diff', 'first', 'last', 'pct_change', 'rle_id', 'shift']);
     expect(offerNamed('shift')?.hint).toBe('value n rows earlier');
   });
 

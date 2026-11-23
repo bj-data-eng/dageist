@@ -53,6 +53,7 @@ describe('the catalogue the host sends', () => {
     expect(decoded.families.map((family) => family.key)).toEqual([
       'steps',
       'rows',
+      'order',
       'cumulative',
       'arithmetic',
       'maths',

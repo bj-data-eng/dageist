@@ -199,6 +199,20 @@
       "slots": []
     },
     {
+      "entry": "Expr.arg_sort",
+      "verdict": {
+        "kind": "allowed",
+        "result": "UInt32",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.backward_fill",
       "verdict": {
         "kind": "allowed",
@@ -321,6 +335,20 @@
       "slots": []
     },
     {
+      "entry": "Expr.count",
+      "verdict": {
+        "kind": "allowed",
+        "result": "UInt32",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.cum_count",
       "verdict": {
         "kind": "allowed",
@@ -377,6 +405,27 @@
         }
       },
       "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.diff",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Duration(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": {
+        "parameter": "n",
+        "literal": {
+          "kind": "integer",
+          "value": 1,
+          "shown": "1"
+        }
+      },
       "leftOut": null,
       "slots": []
     },
@@ -1561,6 +1610,20 @@
       "slots": []
     },
     {
+      "entry": "Expr.n_unique",
+      "verdict": {
+        "kind": "allowed",
+        "result": "UInt32",
+        "shape": "one",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.ne",
       "verdict": {
         "kind": "allowed",
@@ -1665,6 +1728,27 @@
       "slots": []
     },
     {
+      "entry": "Expr.pct_change",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Float64",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": {
+        "parameter": "n",
+        "literal": {
+          "kind": "integer",
+          "value": 1,
+          "shown": "1"
+        }
+      },
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.pow",
       "verdict": {
         "kind": "refused",
@@ -1697,6 +1781,20 @@
       "slots": []
     },
     {
+      "entry": "Expr.rank",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Float64",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.replace",
       "verdict": {
         "kind": "allowed",
@@ -1715,6 +1813,34 @@
       "verdict": {
         "kind": "allowed",
         "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.reverse",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.rle_id",
+      "verdict": {
+        "kind": "allowed",
+        "result": "UInt32",
         "shape": "many",
         "ending": {
           "kind": "allowed"
@@ -1819,6 +1945,34 @@
             "stage": "rows"
           },
           "reason": "trigonometry operation not supported for dtype `datetime[μs]`"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.sort",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.sort_by",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
         }
       },
       "argument": null,
