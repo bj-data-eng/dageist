@@ -2469,6 +2469,51 @@
       "slots": []
     },
     {
+      "entry": "polars.date",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "an expression starts here only once: a start cannot follow a value"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "polars.datetime",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "an expression starts here only once: a start cannot follow a value"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "polars.duration",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "an expression starts here only once: a start cannot follow a value"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "polars.element",
       "verdict": {
         "kind": "refused",
@@ -2484,7 +2529,37 @@
       "slots": []
     },
     {
+      "entry": "polars.from_epoch",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "an expression starts here only once: a start cannot follow a value"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "polars.lit",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "an expression starts here only once: a start cannot follow a value"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "polars.time",
       "verdict": {
         "kind": "refused",
         "refusal": {

@@ -11,7 +11,10 @@ use super::adapt::could_be_taken_by_a_number;
 use super::context::Context;
 use super::dtype::{Representative, ResultDtype, dtype_name, unit_name};
 use super::rules::Rule;
-use super::table::{OptionValue, Outcome, Produces, Reason, Shape, Stage, Tables, is_method};
+use super::table::{
+    OptionValue, Outcome, Produces, Reason, Shape, Stage, Tables, has_a_subject, is_method,
+    subject_of,
+};
 use crate::catalog::DefaultValue;
 
 /// What an expression has so far, where an entry would follow it.
@@ -86,9 +89,10 @@ pub struct Chosen<'a> {
     durations: &'a [(&'a str, &'a str, DurationUse)],
     time_zones: &'a [(&'a str, Option<&'a str>)],
     unit: Option<TimeUnit>,
+    zone: Option<&'a str>,
     zone_clash: Option<(&'a str, &'a str)>,
     gives: Option<Representative>,
-    many: bool,
+    shape: Option<Shape>,
 }
 
 impl<'a> Chosen<'a> {
@@ -169,6 +173,15 @@ impl<'a> Chosen<'a> {
         self
     }
 
+    /// The time zone of the moment the method follows, where the chain knows it by name: a length
+    /// of time given to the method is read in it, and Polars reads days and hours together only in
+    /// UTC, where a day is always 24 hours.
+    #[must_use]
+    pub const fn in_zone(mut self, zone: Option<&'a str>) -> Self {
+        self.zone = zone;
+        self
+    }
+
     /// The dtype the entry gives, where the call decides it and the tables
     /// cannot: the column `polars.col` reads, the literal `polars.lit` makes
     /// when it is given a dtype, the values of a condition that `otherwise`
@@ -184,7 +197,17 @@ impl<'a> Chosen<'a> {
     /// one unless told so; a method's shape is the table's.
     #[must_use]
     pub const fn giving_many(mut self) -> Self {
-        self.many = true;
+        self.shape = Some(Shape::Many);
+        self
+    }
+
+    /// That the values the entry gives are one, as those of a function are that is given nothing
+    /// but one value each: a function that makes a moment of literals. A start that takes
+    /// expressions gives as many values as its widest argument, which the tables, measured with
+    /// columns, do not say.
+    #[must_use]
+    pub const fn giving_one(mut self) -> Self {
+        self.shape = Some(Shape::One);
         self
     }
 }
@@ -485,14 +508,19 @@ impl Fit {
 /// be given and is not needs only some dtype of argument that fits.
 fn on_receiver(
     entry: &'static Entry,
-    receiver: Representative,
+    receiver: Option<Representative>,
     arguments: &[(&str, Representative)],
     options: &[(&str, &str)],
 ) -> Result<Fit, Refusal> {
     let tables = Tables::committed();
     let id = entry.id().as_str();
     let stood_in_for = stood_in_for(entry, options);
-    let missing = || Refusal::structure(format!("the tables hold nothing for {id} on {receiver}"));
+    let missing = || match receiver {
+        Some(receiver) => {
+            Refusal::structure(format!("the tables hold nothing for {id} on {receiver}"))
+        }
+        None => Refusal::structure(format!("the tables hold nothing for {id}")),
+    };
     let line = |parameter: Option<&'static str>, argument: Option<Representative>| match tables
         .dtypes
         .get(&(id, parameter, receiver, argument))
@@ -835,7 +863,15 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         After::Value {
             dtype: Representative::DatetimeZoned,
             ..
-        } => DataType::Datetime(unit, Some(TimeZone::UTC)),
+        } => DataType::Datetime(
+            unit,
+            Some(
+                chosen
+                    .zone
+                    .and_then(|name| catalog::check_time_zone(name).ok().flatten())
+                    .unwrap_or(TimeZone::UTC),
+            ),
+        ),
         After::Value { .. } => DataType::Datetime(unit, None),
         _ => catalog::any_moment(),
     };
@@ -870,13 +906,67 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         if let Some(dtype) = receiver
             && !chosen.arguments.is_empty()
         {
-            on_receiver(entry, dtype, chosen.arguments, chosen.options)?;
+            on_receiver(entry, Some(dtype), chosen.arguments, chosen.options)?;
         }
         check_options(entry, receiver, chosen.options)?;
         check_conversions(entry, chosen)?;
     }
+    // What the tables say of a function that starts an expression and takes expressions: it has no
+    // receiver, so each argument is judged by its own line, and its options by the lines of the
+    // dtype of its first expression. An option decides what the first accepts where one is set, as
+    // a count of days is read of a date that a count of seconds refuses, so the line of the dtype
+    // table, measured with the options at their defaults, is not asked of that argument then.
+    let mut function_gives: Option<(Option<ResultDtype>, Shape)> = None;
+    if let Some(subject) = subject_of(entry) {
+        let subject_class = chosen
+            .arguments
+            .iter()
+            .find(|(name, _)| *name == subject)
+            .map(|(_, class)| *class);
+        let lines_of: Vec<(&str, Representative)> = chosen
+            .arguments
+            .iter()
+            .filter(|(name, _)| chosen.options.is_empty() || *name != subject)
+            .copied()
+            .collect();
+        let fit = on_receiver(entry, None, &lines_of, chosen.options)?;
+        match subject_class {
+            Some(class) => check_options(entry, Some(class), chosen.options)?,
+            None => options(entry, chosen.options)?,
+        }
+        let (mut result, mut shape) = (fit.result.clone(), fit.shape);
+        match read_options(entry, subject_class, chosen.options) {
+            OptionsGive::Nothing => {}
+            OptionsGive::Unknown => result = None,
+            OptionsGive::Gives(produces) => {
+                result = Some(produces.result.clone());
+                shape = produces.shape;
+            }
+        }
+        // A moment is in the zone it is given, and in none where it is given none.
+        if entry
+            .parameters()
+            .iter()
+            .any(|parameter| parameter.kind() == Kind::TimeZone)
+            && result
+                .as_ref()
+                .is_some_and(|result| result.name().starts_with("Datetime("))
+        {
+            let unit = unit_name(chosen.unit.unwrap_or(TimeUnit::Microseconds));
+            let zone = chosen
+                .time_zones
+                .iter()
+                .find_map(|(_, zone)| *zone)
+                .and_then(|text| catalog::check_time_zone(text).ok().flatten());
+            result = Some(ResultDtype::from_name(&match zone {
+                Some(zone) => format!("Datetime({unit}, {zone})"),
+                None => format!("Datetime({unit})"),
+            }));
+        }
+        function_gives = Some((result, shape));
+    }
     // What the dtype table says of a method on the value it follows.
-    let (mut result, mut shape) = (None, Shape::Many);
+    let (mut result, mut shape) = function_gives.unwrap_or((None, Shape::Many));
     if let (
         After::Value {
             dtype,
@@ -885,7 +975,7 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         true,
     ) = (place.after, is_method(entry))
     {
-        let fit = on_receiver(entry, dtype, chosen.arguments, chosen.options)?;
+        let fit = on_receiver(entry, Some(dtype), chosen.arguments, chosen.options)?;
         (result, shape) = (fit.result.clone(), fit.shape);
         // And of the options chosen, which the option table says what they give
         // on the dtype of the value the method follows.
@@ -1038,8 +1128,10 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         }
         ends = cell.ends.clone();
     }
-    if chosen.many && !is_method(entry) {
-        shape = Shape::Many;
+    if let Some(given) = chosen.shape
+        && !is_method(entry)
+    {
+        shape = given;
     }
     if let After::Value {
         shape: Shape::One, ..
@@ -1140,6 +1232,18 @@ pub fn rule_forbids_replacement_values_of_other_numbers() -> Result<(), Refusal>
     Err(Refusal::rule(Rule::ReplacementValuesMatchInNumber))
 }
 
+/// The refusal of a moment or a length of time made of numbers typed in, which the caller has found,
+/// where `context` is a join's key or inside one, if the rule refuses it there. Polars makes a
+/// literal of such a call and names it by an alias, which a key may not hold anywhere.
+///
+/// # Errors
+///
+/// The rule, as a refusal that says it in its words.
+pub fn rule_forbids_a_folded_function_in_a_join_key(context: Context) -> Result<(), Refusal> {
+    Rule::forbids_a_folded_function_in_a_key(context)
+        .map_or(Ok(()), |rule| Err(Refusal::rule(rule)))
+}
+
 /// The refusal of a window given a value of one row that a part widens, which the caller has found.
 ///
 /// # Errors
@@ -1204,7 +1308,7 @@ pub fn argument_dtypes(
         .filter_map(|argument| {
             tables
                 .dtypes
-                .get(&(id, Some(parameter), receiver, Some(argument)))
+                .get(&(id, Some(parameter), Some(receiver), Some(argument)))
                 .map(|outcome| (argument, outcome.clone()))
         })
         .collect()
@@ -1222,7 +1326,7 @@ pub fn argument_dtypes(
 ///
 /// The first pair, or single option, Polars refused, with its reason.
 pub fn options(entry: &Entry, chosen: &[(&str, &str)]) -> Result<(), Refusal> {
-    if !is_method(entry) {
+    if !has_a_subject(entry) {
         return check_options(entry, None, chosen);
     }
     let mut refusal = None;
@@ -1381,7 +1485,9 @@ fn check_options(
             // arguments the harness gives it, which a pair of its options is refused for as well,
             // as a cross join is given keys, so its lines say nothing of one option alone.
             None => match key.as_slice() {
-                [(name, word)] if is_method(entry) => alone_in_a_pair(entry, receiver, name, word),
+                [(name, word)] if has_a_subject(entry) => {
+                    alone_in_a_pair(entry, receiver, name, word)
+                }
                 _ => Ok(()),
             },
         };

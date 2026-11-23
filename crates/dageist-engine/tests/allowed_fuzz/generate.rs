@@ -173,6 +173,9 @@ struct Gen<'a> {
     /// condition: alone there Polars cannot resolve it where it runs, in a sort key, for one,
     /// which the tables cannot say.
     untyped_numbers: bool,
+    /// What the tables said of the function that makes a moment that a chain was just started
+    /// from: how many values it gives, or `None` where they refused it.
+    started: Option<Option<Shape>>,
 }
 
 fn entry(id: &str) -> &'static Entry {
@@ -233,6 +236,29 @@ fn methods() -> Vec<&'static Entry> {
         .collect()
 }
 
+/// The functions that start a chain and take expressions, which a chain may start from besides a
+/// column, a literal, `element` and a condition: the ones that make a date, a time, a moment, a
+/// length of time or a range of them.
+fn function_starts() -> Vec<&'static Entry> {
+    catalog::entries()
+        .iter()
+        .filter(|entry| {
+            entry.applies() == Applies::Function
+                && entry
+                    .parameters()
+                    .iter()
+                    .any(|parameter| matches!(parameter.kind(), Kind::Expression(_)))
+        })
+        .collect()
+}
+
+/// The name of a function that starts a chain as Polars gives it, which is its identifier without
+/// `polars.`: `date_range`.
+fn start_name(entry: &Entry) -> &str {
+    let id = entry.id().as_str();
+    id.strip_prefix("polars.").unwrap_or(id)
+}
+
 /// The name of a method as Polars gives it, which is its identifier without `Expr.`:
 /// `dt.replace`.
 fn method_name(entry: &Entry) -> &str {
@@ -243,26 +269,31 @@ fn method_name(entry: &Entry) -> &str {
 /// How often, in a hundred, a focused campaign puts back a method out of its focus for one in it.
 const FOCUS_PERCENT: usize = 25;
 
-/// The methods of an expression a campaign focuses on. Where a chain draws a method that is not
-/// one of them, it draws one that is, one time in four, and the rest of the case is drawn as
-/// without a focus. A focus on every method changes nothing. The target draws again a case that
-/// holds none of them.
+/// The methods of an expression and the functions that start a chain a campaign focuses on. Where
+/// a chain draws a method that is not one of them, it draws one that is, one time in four, as it
+/// does where it draws a start, and the rest of the case is drawn as without a focus. A focus on
+/// every method changes nothing. The target draws again a case that holds none of them.
 #[derive(Debug)]
 pub struct Focus {
     /// In the catalogue's order, each once.
     methods: Vec<&'static Entry>,
+    /// The functions that start a chain, in the catalogue's order, each once.
+    starts: Vec<&'static Entry>,
 }
 
 impl Focus {
-    /// The focus that `text` names: methods, separated by commas, each by its name, `dt.replace`, or
-    /// by the catalogue's identifier, `Expr.dt.replace`; a name that ends in a dot, `dt.`, names
-    /// every method whose name it begins. Text that names nothing is no focus.
+    /// The focus that `text` names: methods and functions that start a chain, separated by
+    /// commas, each by its name, `dt.replace` or `date_range`, or by the catalogue's identifier,
+    /// `Expr.dt.replace` or `polars.date_range`; a name that ends in a dot, `dt.`, names every
+    /// method whose name it begins. Text that names nothing is no focus.
     ///
     /// # Errors
     ///
-    /// Where a name is of no method of an expression in the catalogue, it says which.
+    /// Where a name is of no method of an expression and of no function that makes a moment in the
+    /// catalogue, it says which.
     pub fn parse(text: &str) -> Result<Option<Self>, String> {
         let methods = methods();
+        let starts = function_starts();
         let mut chosen: Vec<&'static Entry> = Vec::new();
         for name in text
             .split(',')
@@ -270,7 +301,7 @@ impl Focus {
             .filter(|name| !name.is_empty())
         {
             let short = name.strip_prefix("Expr.").unwrap_or(name);
-            let named: Vec<&'static Entry> = methods
+            let mut named: Vec<&'static Entry> = methods
                 .iter()
                 .copied()
                 .filter(|entry| {
@@ -281,10 +312,18 @@ impl Focus {
                     }
                 })
                 .collect();
+            let function = name.strip_prefix("polars.").unwrap_or(name);
+            named.extend(
+                starts
+                    .iter()
+                    .copied()
+                    .filter(|entry| !function.ends_with('.') && start_name(entry) == function),
+            );
             if named.is_empty() {
                 return Err(format!(
-                    "DAGEIST_FUZZ_FOCUS names `{name}`, which is no method of an expression in the \
-                     catalogue: name a method as `dt.replace` and the methods of a namespace as `dt.`"
+                    "DAGEIST_FUZZ_FOCUS names `{name}`, which is no method of an expression and no \
+                     function that makes a moment in the catalogue: name a method as `dt.replace`, \
+                     the methods of a namespace as `dt.` and a function as `date_range`"
                 ));
             }
             chosen.extend(named);
@@ -297,20 +336,28 @@ impl Focus {
                 .into_iter()
                 .filter(|entry| chosen.iter().any(|named| named.id() == entry.id()))
                 .collect(),
+            starts: starts
+                .into_iter()
+                .filter(|entry| chosen.iter().any(|named| named.id() == entry.id()))
+                .collect(),
         }))
     }
 
-    /// The names of the methods in focus, separated by commas.
+    /// The names of the methods and the functions in focus, separated by commas.
     pub fn names(&self) -> String {
         self.methods
             .iter()
             .map(|entry| method_name(entry))
+            .chain(self.starts.iter().map(|entry| start_name(entry)))
             .collect::<Vec<_>>()
             .join(", ")
     }
 
     fn holds(&self, entry: &Entry) -> bool {
-        self.methods.iter().any(|method| method.id() == entry.id())
+        self.methods
+            .iter()
+            .chain(&self.starts)
+            .any(|held| held.id() == entry.id())
     }
 
     /// Whether `document` calls a method in focus anywhere: in a step, a chain or what a call is
@@ -361,6 +408,7 @@ pub fn generate(bytes: &[u8], focus: Option<&Focus>) -> Option<Case> {
         host,
         budget: 18,
         untyped_numbers: true,
+        started: None,
     };
     let document = generator.document();
     Some(Case {
@@ -534,7 +582,11 @@ impl Gen<'_> {
             // A fill takes a strategy in place of a value, which `method_call` decides.
             .filter(|parameter| parameter.in_place_of().is_none())
             .collect();
-        if !matches!(entry.applies(), Applies::Expression | Applies::Frame) {
+        if !matches!(entry.applies(), Applies::Expression | Applies::Frame)
+            && !function_starts()
+                .iter()
+                .any(|start| start.id() == entry.id())
+        {
             return Vec::new();
         }
         // An option that a call must be given, as `cast_time_unit` its unit, is always given.
@@ -742,14 +794,26 @@ impl Gen<'_> {
     // -----------------------------------------------------------------------
     // Chains
 
-    fn start(&mut self, host_is_group: bool, depth: usize) -> (Call, Option<Representative>, bool) {
+    fn start(
+        &mut self,
+        slots: &mut Vec<Slot>,
+        host_is_group: bool,
+        depth: usize,
+    ) -> (Call, Option<Representative>, bool) {
+        // A focused campaign draws a function in focus that starts a chain, one time in four.
+        let focused = self
+            .focus
+            .filter(|focus| !focus.starts.is_empty())
+            .is_some_and(|_| self.draw.chance(FOCUS_PERCENT));
         // The start of a condition is the third element: whether it is one.
-        let choice = if host_is_group {
+        let choice = if focused {
+            5
+        } else if host_is_group {
             self.draw
-                .weighted(&[(70, 0_usize), (8, 1), (12, 2), (10, 3)])
+                .weighted(&[(70, 0_usize), (8, 1), (12, 2), (10, 3), (6, 5)])
         } else {
             self.draw
-                .weighted(&[(56, 1_usize), (20, 2), (18, 3), (3, 0), (3, 4)])
+                .weighted(&[(52, 1_usize), (20, 2), (18, 3), (3, 0), (3, 4), (6, 5)])
         };
         // A condition inside a condition inside a condition is deeper than the
         // tables go, and than a test thread's stack takes in a debug build.
@@ -769,12 +833,88 @@ impl Gen<'_> {
                 (call, class, false)
             }
             3 => (call("polars.when", Vec::new()), None, true),
+            5 => {
+                let starts = match self.focus {
+                    Some(focus) if !focus.starts.is_empty() => focus.starts.clone(),
+                    _ => function_starts(),
+                };
+                let entry = self.draw.pick(&starts);
+                match self.function_start(entry, slots, depth) {
+                    Some((start, class)) => (start, class, false),
+                    None => {
+                        let (call, class) = self.column();
+                        (call, class, false)
+                    }
+                }
+            }
             _ => (
                 call("polars.element", Vec::new()),
                 Some(self.receiver),
                 false,
             ),
         }
+    }
+
+    /// A function that makes a moment, given what it needs, with the class of what it gives where
+    /// the tables say it. What it gives is for the chain to carry on from, and whether the tables
+    /// allowed the call and how many values it gives are left in `started`.
+    fn function_start(
+        &mut self,
+        entry: &'static Entry,
+        slots: &mut Vec<Slot>,
+        depth: usize,
+    ) -> Option<(Call, Option<Representative>)> {
+        let (call, operands) = self.method_call(entry, slots, depth)?;
+        let context = Context::from_positions(slots).expect("a position of a step comes first");
+        let given: Vec<(&str, Representative)> = operands
+            .iter()
+            .filter_map(|(name, class)| class.map(|class| (name.as_str(), class)))
+            .collect();
+        let words = option_words(&call);
+        let words: Vec<(&str, &str)> = words
+            .iter()
+            .map(|(name, word)| (name.as_str(), word.as_str()))
+            .collect();
+        let zones: Vec<(&str, Option<&str>)> = entry
+            .parameters()
+            .iter()
+            .filter(|parameter| parameter.kind() == Kind::TimeZone)
+            .filter_map(|parameter| match call.argument(parameter.name())? {
+                Value::TimeZone(zone) => Some((parameter.name(), zone.as_deref())),
+                _ => None,
+            })
+            .collect();
+        // One value where every argument is a literal, which is one, and one for each row where
+        // another is a chain, which may or may not be one value.
+        let one = call.arguments().iter().all(|given| match given.value() {
+            Value::Expression(expression) => {
+                expression.links().is_empty()
+                    && matches!(expression.start(), Start::Call(start)
+                        if start.entry().id().as_str() == "polars.lit")
+            }
+            _ => true,
+        });
+        let chosen = Chosen::default()
+            .with_arguments(&given)
+            .with_options(&words)
+            .with_time_zones(&zones);
+        let chosen = if one {
+            chosen.giving_one()
+        } else {
+            chosen.giving_many()
+        };
+        let verdict = allowed::offer(entry, &OfferPlace::new(context, After::Start), &chosen);
+        self.started = Some(match &verdict {
+            OfferVerdict::Allowed(allowance) => Some(allowance.shape()),
+            OfferVerdict::Refused(_) => None,
+        });
+        let class = match verdict {
+            OfferVerdict::Allowed(allowance) => {
+                allowance.result().and_then(allowed::ResultDtype::class)
+            }
+            OfferVerdict::Refused(_) => None,
+        };
+        Some((call, class))
     }
 
     /// A chain in the position `slots` end in, `depth` levels inside others.
@@ -790,7 +930,8 @@ impl Gen<'_> {
             };
             (call, class, false)
         } else {
-            self.start(group, depth)
+            self.started = None;
+            self.start(slots, group, depth)
         };
         let mut links: Vec<Call> = Vec::new();
         let mut cur_class = class;
@@ -805,6 +946,12 @@ impl Gen<'_> {
             start = condition.remove(0);
             links = condition;
             cur_class = unify(&values);
+        } else if let Some(started) = self.started.take() {
+            // A function that makes a moment was judged for what it was given.
+            match started {
+                Some(given) => shape = given,
+                None => alive = false,
+            }
         } else {
             match allowed::offer(
                 start.entry(),
@@ -973,6 +1120,7 @@ impl Gen<'_> {
             // Without a focus, or with the method drawn in it, nothing more is drawn: the case is
             // the one drawn without a focus.
             if let Some(focus) = self.focus
+                && !focus.methods.is_empty()
                 && !focus.holds(chosen)
                 && self.draw.chance(FOCUS_PERCENT)
             {
@@ -1698,6 +1846,68 @@ mod tests {
                 "{name}: {refusal}"
             );
         }
+    }
+
+    #[test]
+    fn a_focus_names_a_function_that_starts_a_chain_by_name_or_identifier() {
+        for name in ["date", "polars.date", "from_epoch"] {
+            let focus = Focus::parse(name)
+                .unwrap_or_else(|refusal| panic!("{name}: {refusal}"))
+                .unwrap_or_else(|| panic!("{name} names a function"));
+            assert_eq!(focus.names(), name.strip_prefix("polars.").unwrap_or(name));
+        }
+        // Methods and functions are named together, each once.
+        let both = Focus::parse("dt.replace, datetime, polars.datetime")
+            .unwrap()
+            .unwrap();
+        assert_eq!(both.names(), "dt.replace, datetime");
+        // A function that takes no expression stays no focus: a column and a literal are drawn
+        // evenly as they were, and a function is not named as a namespace.
+        for name in ["col", "polars.lit", "date."] {
+            assert!(Focus::parse(name).is_err(), "{name}");
+        }
+    }
+
+    #[test]
+    fn a_focus_on_a_function_draws_it_as_the_start_of_a_chain_more_often() {
+        let focus = Focus::parse("duration").unwrap().unwrap();
+        let holding = |focus: Option<&Focus>| {
+            (0..2000_u64)
+                .filter_map(|offset| generate(&entropy(offset), focus))
+                .filter(|case| {
+                    case.document
+                        .write()
+                        .contains("\"entry\":\"polars.duration\"")
+                })
+                .count()
+        };
+        let (without, with) = (holding(None), holding(Some(&focus)));
+        assert!(without > 0, "no case starts a chain from a function");
+        assert!(
+            with > 4 * without.max(10),
+            "{with} focused cases against {without}"
+        );
+    }
+
+    #[test]
+    fn every_function_that_starts_a_chain_and_takes_expressions_is_drawn_without_a_focus() {
+        let mut drawn = std::collections::BTreeSet::new();
+        for offset in 0..6000_u64 {
+            let Some(case) = generate(&entropy(offset), None) else {
+                continue;
+            };
+            let written = case.document.write();
+            for name in ["date", "time", "datetime", "duration", "from_epoch"] {
+                if written.contains(&format!("\"entry\":\"polars.{name}\"")) {
+                    drawn.insert(name);
+                }
+            }
+        }
+        assert_eq!(
+            drawn.len(),
+            5,
+            "the cases start a chain from {drawn:?} and not from every function"
+        );
     }
 
     #[test]

@@ -370,6 +370,23 @@ fn key_name(key: &Expression) -> Option<String> {
             (!(name.starts_with('^') && name.ends_with('$'))).then(|| name.clone())
         }
         "polars.lit" => Some("literal".to_owned()),
+        // Python names what these make by an alias.
+        "polars.date" => Some("date".to_owned()),
+        "polars.time" => Some("time".to_owned()),
+        // A count since 1970 is named as the column it counts is.
+        "polars.from_epoch" => match start.argument("column") {
+            Some(Value::Expression(column)) => key_name(column),
+            _ => None,
+        },
+        // A moment and a length of time are named as the first of the parts they are made of,
+        // which is `literal` for one that is a number typed in, unless every part is one: Polars
+        // then folds the call into a literal where it can, and names it `datetime` or `duration`,
+        // or leaves it as a call where it cannot, which depends on the values.
+        "polars.datetime" => {
+            let zoned = matches!(start.argument("time_zone"), Some(Value::TimeZone(Some(_))));
+            first_part_name(start, "year", &PARTS_OF_A_MOMENT, !zoned)
+        }
+        "polars.duration" => first_part_name(start, "weeks", &PARTS_OF_A_LENGTH, true),
         "polars.when" => key
             .links()
             .iter()
@@ -380,6 +397,133 @@ fn key_name(key: &Expression) -> Option<String> {
             }),
         _ => None,
     }
+}
+
+/// The unit a call is given for the parameter `parameter`, one of the three a time unit has, if it
+/// is given one.
+fn time_unit_word(call: &Call, parameter: &str) -> Option<String> {
+    match call.argument(parameter) {
+        Some(Value::Choice(word)) => Some(word.clone()),
+        _ => None,
+    }
+}
+
+/// The dtype a function that makes a date, a time, a moment or a length of time gives, where its
+/// arguments decide it: the unit and the zone it is given, which Python reads as it builds it,
+/// and the unit a count since 1970 is read in.
+fn made_dtype(start: &Call) -> Option<DataType> {
+    let unit = |word: &str| match word {
+        "ns" => TimeUnit::Nanoseconds,
+        "ms" => TimeUnit::Milliseconds,
+        _ => TimeUnit::Microseconds,
+    };
+    match start.entry().id().as_str() {
+        "polars.date" => Some(DataType::Date),
+        "polars.time" => Some(DataType::Time),
+        "polars.datetime" => {
+            let unit = unit(&time_unit_word(start, "time_unit").unwrap_or_else(|| "us".to_owned()));
+            let zone = match start.argument("time_zone") {
+                Some(Value::TimeZone(Some(text))) => crate::catalog::check_time_zone(text).ok()?,
+                _ => None,
+            };
+            Some(DataType::Datetime(unit, zone))
+        }
+        "polars.duration" => Some(DataType::Duration(
+            match time_unit_word(start, "time_unit") {
+                Some(word) => unit(&word),
+                None if start.argument("nanoseconds").is_some() => TimeUnit::Nanoseconds,
+                None => TimeUnit::Microseconds,
+            },
+        )),
+        "polars.from_epoch" => Some(match time_unit_word(start, "time_unit").as_deref() {
+            Some("d") => DataType::Date,
+            Some("ns") => DataType::Datetime(TimeUnit::Nanoseconds, None),
+            _ => DataType::Datetime(TimeUnit::Microseconds, None),
+        }),
+        _ => None,
+    }
+}
+
+/// The parts a moment is made of, which `polars.datetime` folds into a literal where all are.
+const PARTS_OF_A_MOMENT: [&str; 7] = [
+    "year",
+    "month",
+    "day",
+    "hour",
+    "minute",
+    "second",
+    "microsecond",
+];
+
+/// The parts a length of time is made of, which `polars.duration` folds into a literal where all
+/// are.
+const PARTS_OF_A_LENGTH: [&str; 8] = [
+    "weeks",
+    "days",
+    "hours",
+    "minutes",
+    "seconds",
+    "milliseconds",
+    "microseconds",
+    "nanoseconds",
+];
+
+/// The output name of a function that makes a moment or a length of time of `parts`, which is the
+/// name of the first part it is given, `literal` for one that is a number typed in or is not given.
+/// Where `may_fold` and every part is a number typed in and nothing more, Polars makes a literal
+/// of the call where the values fit, which it names otherwise, so the name is not known.
+fn first_part_name(start: &Call, first: &str, parts: &[&str], may_fold: bool) -> Option<String> {
+    // A part that Polars may fold: a number, or a flag that it reads as one, typed in. A null and
+    // text are no number, so a call that holds one stays a call. A flag is taken for foldable here
+    // and not by `is_folded_into_a_literal`, on purpose: the name is then not known, which only
+    // leaves the rule for repeated names silent, where taking a flag for folded there would refuse
+    // a key that Polars may allow. The two disagree only on the side of saying less.
+    let bare_literal = |value: Option<&Value>| match value {
+        None => true,
+        Some(Value::Expression(part)) => {
+            part.links().is_empty()
+                && matches!(part.start(), Start::Call(call)
+                if call.entry().id().as_str() == "polars.lit"
+                    && matches!(
+                        call.argument("value"),
+                        Some(Value::Integer(_) | Value::Float(_) | Value::Flag(Some(_)))
+                    ))
+        }
+        Some(_) => false,
+    };
+    if may_fold && parts.iter().all(|part| bare_literal(start.argument(part))) {
+        return None;
+    }
+    match start.argument(first) {
+        Some(Value::Expression(part)) => key_name(part),
+        _ => Some("literal".to_owned()),
+    }
+}
+
+/// Whether Polars folds the call into a literal, which it names by an alias: a moment, with no
+/// zone, or a length of time whose every part is a number typed in, given or left to the number 0.
+/// The values may stop it, which the document does not decide: a month of 13 is no moment, and
+/// Polars then keeps the call and refuses it when the rows run.
+fn is_folded_into_a_literal(start: &Call) -> bool {
+    let (parts, zoned): (&[&str], bool) = match start.entry().id().as_str() {
+        "polars.datetime" => (
+            &PARTS_OF_A_MOMENT,
+            matches!(start.argument("time_zone"), Some(Value::TimeZone(Some(_)))),
+        ),
+        "polars.duration" => (&PARTS_OF_A_LENGTH, false),
+        _ => return false,
+    };
+    let a_number = |value: Option<&Value>| match value {
+        None => true,
+        Some(Value::Expression(part)) => {
+            part.links().is_empty()
+                && matches!(part.start(), Start::Call(call)
+                    if call.entry().id().as_str() == "polars.lit"
+                        && matches!(call.argument("value"), Some(Value::Integer(_) | Value::Float(_))))
+        }
+        Some(_) => false,
+    };
+    !zoned && parts.iter().all(|part| a_number(start.argument(part)))
 }
 
 /// The word of a flag or a choice, as the option table writes it.
@@ -848,7 +992,7 @@ impl Walker<'_> {
                 };
                 self.source.get(name).cloned()
             }
-            _ => None,
+            _ => made_dtype(start),
         }
     }
 
@@ -987,7 +1131,7 @@ impl Walker<'_> {
             "polars.col" => self.column_of(start),
             "polars.lit" => literal_class(start),
             "polars.element" => self.group_of(),
-            _ => None,
+            _ => Representative::of(&made_dtype(start)?),
         }
     }
 
@@ -1038,22 +1182,78 @@ impl Walker<'_> {
         match expression.start() {
             Start::Call(start) => {
                 self.path.push(Segment::Start);
-                let class = self.start_class(start);
+                let takes_expressions = takes_expressions(start);
+                // What a function that takes expressions gives is said only where each argument's
+                // dtype is known, as for a method: the tables are not asked of one that is not, and
+                // Polars may refuse it for its dtype.
+                let class = self.start_class(start).filter(|_| {
+                    !takes_expressions
+                        || start_arguments
+                            .iter()
+                            .all(|(_, operand)| operand.dtype.is_some())
+                });
                 self.blind_to_a_missing_column(start);
+                // A function that takes expressions is judged for what it is given, and gives as
+                // many values as its widest argument.
+                let given: Vec<(&str, Representative)> = start_arguments
+                    .iter()
+                    .filter_map(|(name, operand)| operand.dtype.map(|dtype| (name.as_str(), dtype)))
+                    .collect();
+                let unclassed: Vec<&str> = start_arguments
+                    .iter()
+                    .filter(|(_, operand)| operand.dtype.is_none())
+                    .map(|(name, _)| name.as_str())
+                    .collect();
+                let (words, _) = option_words(start);
+                let words: Vec<(&str, &str)> = words
+                    .iter()
+                    .map(|(name, word)| (name.as_str(), word.as_str()))
+                    .collect();
+                let time_zones = start.time_zones();
                 let chosen = Chosen::default();
                 let chosen = match class {
                     Some(dtype) => chosen.giving(dtype),
                     None => chosen,
                 };
-                let verdict = allowed::offer(
-                    start.entry(),
-                    &OfferPlace::new(context, After::Start),
-                    &chosen,
-                );
+                let chosen = if takes_expressions {
+                    let chosen = chosen
+                        .with_arguments(&given)
+                        .with_unclassed(&unclassed)
+                        .with_options(&words)
+                        .with_time_zones(&time_zones)
+                        .following(self.start_unit(start));
+                    if start_arguments
+                        .iter()
+                        .all(|(_, operand)| operand.shape == Shape::One)
+                    {
+                        chosen.giving_one()
+                    } else {
+                        chosen.giving_many()
+                    }
+                } else {
+                    chosen
+                };
+                let verdict = match allowed::rule_forbids_a_folded_function_in_a_join_key(context) {
+                    Err(refusal) if is_folded_into_a_literal(start) => Verdict::Refused(refusal),
+                    _ => allowed::offer(
+                        start.entry(),
+                        &OfferPlace::new(context, After::Start),
+                        &chosen,
+                    ),
+                };
                 match &verdict {
                     Verdict::Refused(refusal) => self.refuse(refusal, false),
                     Verdict::Allowed(allowance) => {
                         last_end = Some(allowance.can_end().clone());
+                        // What the tables are not told is not guessed: an argument whose dtype is
+                        // not known leaves whether it may end, and fits, not known.
+                        if takes_expressions && !unclassed.is_empty() {
+                            self.blind(format!(
+                                "the dtype of an argument of {} is not known",
+                                start.entry().id().as_str()
+                            ));
+                            last_end = None;
+                        }
                         // An expansion has a dtype for each column, so whether it
                         // may end is not known, whatever the table measured.
                         if Self::names_several(start) && last_end == Some(Ending::Allowed) {
@@ -1352,6 +1552,11 @@ impl Walker<'_> {
         let clash_of_zones = clash
             .as_ref()
             .map(|(first, second)| (first.as_str(), second.as_str()));
+        // The zone of the moment the call follows, which a length of time given to it is read in.
+        let zone_name = match zone {
+            Some(Zone::Named(at)) => Some(self.zones[at].clone()),
+            _ => None,
+        };
         // A number typed without a dtype that a method takes another operand beside adapts to
         // it, as the dtype of that operand where it fits it, or keeps the dtype it has alone, as
         // the base of a power does. Where there is no such operand the tables, measured with typed
@@ -1554,6 +1759,7 @@ impl Walker<'_> {
                     .with_durations(&durations)
                     .with_time_zones(&time_zones)
                     .following(unit)
+                    .in_zone(zone_name.as_deref())
                     .with_zone_clash(clash_of_zones),
             );
             let standing = Standing {
@@ -1626,6 +1832,7 @@ impl Walker<'_> {
             .with_durations(&durations)
             .with_time_zones(&time_zones)
             .following(unit)
+            .in_zone(zone_name.as_deref())
             .with_zone_clash(clash_of_zones);
         let chosen = match gives {
             Some(dtype) => chosen.giving(dtype),
@@ -1870,8 +2077,22 @@ fn wholly_single(expression: &Expression, upto: usize, literals: bool) -> bool {
         Start::Call(start) if start.entry().id().as_str() == "polars.when" => {
             single(start) && links.iter().all(single)
         }
+        // A function that makes a moment of what it is given is one value where each of them is.
+        Start::Call(start) if takes_expressions(start) => single(start) && links.iter().all(single),
         _ => false,
     }
+}
+
+/// Whether `start` is a function that starts an expression and takes expressions, as the ones
+/// that make a date, a moment or a length of time do: it gives as many values as its widest
+/// argument.
+fn takes_expressions(start: &Call) -> bool {
+    start.entry().applies() == Applies::Function
+        && start
+            .entry()
+            .parameters()
+            .iter()
+            .any(|parameter| matches!(parameter.kind(), Kind::Expression(_)))
 }
 
 /// Whether `link` is a comparison, which with a null literal gives a null. `is_between` is two: the

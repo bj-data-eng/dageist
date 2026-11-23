@@ -146,10 +146,16 @@ fn only_a_joins_own_keys_are_contexts_that_hold_a_key() {
 #[test]
 fn the_dtype_table_has_a_line_for_every_method_receiver_and_argument() {
     let mut expected = 0;
-    for entry in catalog::entries()
-        .iter()
-        .filter(|entry| entry.applies() == Applies::Expression)
-    {
+    // A function that starts an expression has no receiver, so its lines are one set where a
+    // method has one for each dtype.
+    for entry in catalog::entries().iter().filter(|entry| {
+        entry.applies() == Applies::Expression
+            || (entry.applies() == Applies::Function
+                && entry
+                    .parameters()
+                    .iter()
+                    .any(|parameter| matches!(parameter.kind(), Kind::Expression(_))))
+    }) {
         let expressions = entry
             .parameters()
             .iter()
@@ -160,7 +166,12 @@ fn the_dtype_table_has_a_line_for_every_method_receiver_and_argument() {
             .iter()
             .any(|p| p.is_needed() && matches!(p.kind(), Kind::Expression(_)));
         let n = Representative::ALL.len();
-        expected += if must_be_given { 0 } else { n } + expressions * n * n;
+        let receivers = if entry.applies() == Applies::Expression {
+            n
+        } else {
+            1
+        };
+        expected += receivers * (if must_be_given { 0 } else { 1 } + expressions * n);
     }
     assert_eq!(Tables::committed().dtypes.len(), expected);
 }
@@ -237,10 +248,14 @@ fn option_values(entry: &catalog::Entry) -> Vec<(usize, bool, bool)> {
 #[test]
 fn the_option_table_covers_each_option_of_one_and_each_pair_of_values_of_more_on_each_dtype() {
     let mut expected = 0;
-    for entry in catalog::entries()
-        .iter()
-        .filter(|entry| matches!(entry.applies(), Applies::Expression | Applies::Frame))
-    {
+    for entry in catalog::entries().iter().filter(|entry| {
+        matches!(entry.applies(), Applies::Expression | Applies::Frame)
+            || (entry.applies() == Applies::Function
+                && entry
+                    .parameters()
+                    .iter()
+                    .any(|parameter| matches!(parameter.kind(), Kind::Expression(_))))
+    }) {
         let values = option_values(entry);
         let sets = match values.as_slice() {
             [] => 0,
@@ -261,12 +276,14 @@ fn the_option_table_covers_each_option_of_one_and_each_pair_of_values_of_more_on
                 (sum * sum - squares) / 2
             }
         };
-        // A method is measured on each dtype, a step on none.
-        let receivers = if entry.applies() == Applies::Expression {
-            Representative::ALL.len()
-        } else {
-            1
-        };
+        // A method is measured on each dtype, and so is a function on the dtype of its subject; a
+        // step on none.
+        let receivers =
+            if entry.applies() == Applies::Expression || entry.applies() == Applies::Function {
+                Representative::ALL.len()
+            } else {
+                1
+            };
         expected += sets * receivers;
     }
     assert_eq!(Tables::committed().options.len(), expected);
@@ -276,12 +293,14 @@ fn the_option_table_covers_each_option_of_one_and_each_pair_of_values_of_more_on
 fn the_mistakes_the_schema_does_not_show_are_refused_when_the_rows_ran() {
     // Issue 44 reported that Polars gives these a schema and fails only on rows.
     let tables = Tables::committed();
-    let stage = |entry: &'static str, parameter, receiver, argument| match tables
-        .dtypes
-        .get(&(entry, parameter, receiver, argument))
-    {
+    let stage = |entry: &'static str, parameter, receiver, argument| match tables.dtypes.get(&(
+        entry,
+        parameter,
+        Some(receiver),
+        argument,
+    )) {
         Some(Outcome::Refused(reason)) => Some(reason.stage),
-        other => panic!("{entry} on {receiver}: {other:?}"),
+        other => panic!("{entry} on {receiver:?}: {other:?}"),
     };
     let text = Representative::String;
     assert_eq!(stage("Expr.dt.date", None, text, None), Some(Stage::Rows));
@@ -308,14 +327,15 @@ fn the_mistakes_the_schema_does_not_show_are_refused_when_the_rows_ran() {
 #[test]
 fn a_method_that_reduces_gives_one_value_and_one_that_runs_gives_many() {
     let tables = Tables::committed();
-    let shape =
-        |entry: &'static str| match tables
-            .dtypes
-            .get(&(entry, None, Representative::Int64, None))
-        {
-            Some(Outcome::Allowed(Some(produces))) => produces.shape,
-            other => panic!("{entry}: {other:?}"),
-        };
+    let shape = |entry: &'static str| match tables.dtypes.get(&(
+        entry,
+        None,
+        Some(Representative::Int64),
+        None,
+    )) {
+        Some(Outcome::Allowed(Some(produces))) => produces.shape,
+        other => panic!("{entry}: {other:?}"),
+    };
     for reduces in [
         "Expr.sum",
         "Expr.min",

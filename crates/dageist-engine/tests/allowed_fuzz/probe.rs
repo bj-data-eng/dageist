@@ -493,6 +493,11 @@ pub fn same_reason(source: &Source, tables: &str, probe: &str) -> bool {
             probe.contains("boolean") && (probe.contains("expected") || probe.contains("must be"))
         }
         Source::Rule(rule) if *rule == COUNT_RULE => probe.contains("must have the same length as"),
+        // Polars finds no dtype that two zones have in common, and says it of a comparison as it
+        // does of a difference or a fill.
+        Source::Rule(rule) if *rule == ZONE_RULE => {
+            ZONE_WORDS.iter().any(|said| probe.contains(said))
+        }
         _ => false,
     }
 }
@@ -560,13 +565,24 @@ fn predicate_probe(found: &Found, rule: &str, predicate: Expression) -> Option<P
 fn probe_of_the_part(found: &Found, source: &Source) -> Option<Probe> {
     match source {
         Source::Polars => chain_probe(found),
-        Source::Rule(rule) if *rule == COUNT_RULE => chain_probe(found),
+        Source::Rule(rule) if *rule == COUNT_RULE || *rule == ZONE_RULE => chain_probe(found),
         Source::Rule(rule) if PREDICATE_RULES.contains(rule) => {
             predicate_probe(found, rule, found_predicate(found)?)
         }
         _ => None,
     }
 }
+
+/// The rule that moments compared, subtracted, filled or bound by one another be in one time zone,
+/// whose refusal Polars shows by the dtype that two zones have in common, which is none.
+const ZONE_RULE: &str = "moments-share-a-zone";
+
+/// What Polars says of two zones that have no dtype in common.
+const ZONE_WORDS: [&str; 3] = [
+    "could not evaluate",
+    "failed to determine supertype",
+    "is incompatible with expected type",
+];
 
 /// The rule that a replacement take as many values as it is given the number of, whose refusal
 /// Polars shows by the lengths it refuses the call for.
@@ -868,6 +884,67 @@ pub fn settle_on_a_value(
         } else {
             classes
         };
+        let tables = Tables::standing(found.on_the_other_table, &classes)?;
+        let refusal = refused_as(&probed, tables, refused, &[at])?;
+        Some(Settled {
+            probe: probed.document.write(),
+            reason: refusal.reason,
+            showing: Showing::TheSameReason,
+        })
+    })
+}
+
+/// Asks Polars about a function that starts a chain, which the tables refused for what it is
+/// given, with a column of the dtype of each argument that Polars cannot fold, skip or leave null as
+/// it can the argument: first with each literal it is given a column of its dtype, which Polars
+/// folds when the call is asked alone, and then with every argument a column of the dtype that
+/// reaches it, which a condition that no row takes and a part that a length hides are not. The part
+/// as written may be allowed because of what an argument is, and a column of the dtype is refused as
+/// the tables say. `None` for a refusal of a rule or of a link, for a pivot's aggregate, which reads
+/// no column to stand in, when no argument has a dtype Polars gave, and when Polars allows the
+/// probe, refuses it for another reason or not at the call.
+pub fn settle_a_start_given_columns(
+    case: &Case,
+    refused: &Refused,
+    predicted: &Prediction,
+    observed: &Observed,
+) -> Option<Settled> {
+    if !matches!(refused.source, Source::Polars) {
+        return None;
+    }
+    let found = find(case, &refused.place)?;
+    if found.in_the_aggregate || !matches!(found.rest, [Segment::Start]) {
+        return None;
+    }
+    let Start::Call(start) = found.expression.start() else {
+        return None;
+    };
+    let literals = operand_causes(start, &refused.place, false);
+    let literal_classes = literals
+        .iter()
+        .map(|cause| class_of(cause, observed))
+        .collect::<Option<Vec<_>>>()
+        .filter(|classes| !classes.is_empty());
+    let mut attempts: Vec<(Call, Vec<Representative>)> = Vec::new();
+    if let Some(classes) = literal_classes {
+        let standing: Vec<&Expression> = literals.iter().map(|cause| cause.expression).collect();
+        if let Some(columns) = call_with_columns(start, &standing, 0) {
+            attempts.push((columns, classes));
+        }
+    }
+    // The columns of the arguments are the second and after, as a call that follows a value has
+    // that value for the first.
+    if let Some((columns, classes)) = call_on_columns(start, &refused.place, predicted, observed) {
+        attempts.push((columns, [vec![Representative::Int64], classes].concat()));
+    }
+    attempts.into_iter().find_map(|(columns, classes)| {
+        let part = Expression::new(Start::Call(columns), Vec::new()).ok()?;
+        let probed = Case {
+            receiver: case.receiver,
+            argument: case.argument,
+            document: document_of(case, &found, part, false)?,
+        };
+        let at = place_of_the_part(&found, false).then(Segment::Start);
         let tables = Tables::standing(found.on_the_other_table, &classes)?;
         let refusal = refused_as(&probed, tables, refused, &[at])?;
         Some(Settled {
@@ -1610,6 +1687,7 @@ pub fn settle_apart(
     observed: &Observed,
 ) -> Option<Settled> {
     settle_on_a_value(case, refused, predicted, observed)
+        .or_else(|| settle_a_start_given_columns(case, refused, predicted, observed))
         .or_else(|| settle_as_a_key(case, refused))
         .or_else(|| settle_on_a_value_as_a_key(case, refused, predicted, observed))
         .or_else(|| settle_in_the_position(case, refused, predicted, observed))
@@ -2481,6 +2559,90 @@ mod tests {
         );
         assert!(found.reason.contains("panicked"), "{}", found.reason);
         assert_eq!(found.showing, Showing::TheSchemaMismatch);
+    }
+
+    #[test]
+    fn a_start_given_a_literal_is_settled_by_polars_refusing_it_given_a_column() {
+        // `join(right_on=[datetime(1, from_epoch(lit(null, List(Int64))), rk).len()])`: the tables
+        // refuse the count of a null list for the dtype of the list, Polars never evaluates what
+        // the length of a call is the length of, and allows the literal where the call is asked
+        // alone, which it folds. Given a column of the dtype of the literal, it refuses the count
+        // for the tables' reason.
+        let case = kept("stricter-a-start-given-a-null-list-polars-folds-under-a-length.case");
+        let refused = refusal(&case);
+        assert_eq!(settle(&case, &refused), None);
+        let found = settle_apart(&case, &refused, &predict(&case), &observe(&case))
+            .expect("a count that Polars refuses of a column");
+        assert!(found.probe.contains("polars.from_epoch"), "{}", found.probe);
+        assert!(
+            found.reason.contains("cannot cast List"),
+            "{}",
+            found.reason
+        );
+        assert_eq!(found.showing, Showing::TheSameReason);
+    }
+
+    #[test]
+    fn a_start_given_a_condition_that_no_row_takes_is_settled_by_polars_refusing_a_column() {
+        // `with_columns(from_epoch(when(h <= a).then(time()), "ns"))` of a column `a` that is all
+        // null: no row takes the condition, which has no `otherwise`, so the count meets only nulls
+        // and Polars allows what the tables refuse for the dtype of a time of day. Given a column of
+        // that dtype, Polars refuses the count as the tables do.
+        let case = kept("stricter-a-start-given-a-condition-that-no-row-takes.case");
+        let refused = refusal(&case);
+        assert_eq!(settle(&case, &refused), None);
+        let found = settle_apart(&case, &refused, &predict(&case), &observe(&case))
+            .expect("a count that Polars refuses of a column");
+        assert!(found.probe.contains("polars.from_epoch"), "{}", found.probe);
+        assert!(
+            found.reason.contains("Time to Datetime"),
+            "{}",
+            found.reason
+        );
+        assert_eq!(found.showing, Showing::TheSameReason);
+    }
+
+    #[test]
+    fn a_start_is_not_settled_where_polars_allows_it_given_a_column_too() {
+        // The tables refused a count of a whole number that Polars allows for a column of whole
+        // numbers as well, so the literal is no reason, and the part is evaluated and accepted.
+        let case = Case::decode(
+            br#"{"a":"Int64","b":"Int64","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.select","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.from_epoch","arguments":{"column":{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":1}}},"then":[]}}}},"then":[]}}]}}}}]}"#,
+        )
+        .expect("a case");
+        let place = Place::of_step(0, StepId::new("s").ok())
+            .then(Segment::Parameter("exprs".to_owned()))
+            .then(Segment::Item(0))
+            .then(Segment::Start);
+        let refused = Refused {
+            source: Source::Polars,
+            at: place.to_string(),
+            place,
+            stage: Some(dageist_engine::allowed::Stage::Rows),
+            reason: "cannot cast List type (inner: 'Int64', to: 'Datetime(\'μs\')')".to_owned(),
+            argument_unknown: false,
+        };
+        assert_eq!(
+            settle_apart(&case, &refused, &predict(&case), &observe(&case)),
+            None
+        );
+    }
+
+    #[test]
+    fn moments_in_two_zones_are_settled_by_polars_refusing_the_part_where_a_sort_key_skips_it() {
+        // `sort(by=[datetime(.., time_zone=Europe/Berlin).first() > lit(null, Datetime(UTC))])`:
+        // the rule refuses a comparison of moments in two zones, and Polars drops a sort key that
+        // is one value; asked as written, it refuses the comparison for the two zones.
+        let case = kept("stricter-moments-in-two-zones-in-a-sort-key-of-one-value.case");
+        let refused = refusal(&case);
+        assert!(matches!(
+            refused.source,
+            Source::Rule("moments-share-a-zone")
+        ));
+        let found = settle(&case, &refused).expect("a comparison that Polars refuses alone");
+        assert!(found.probe.contains("Expr.gt"), "{}", found.probe);
+        assert_eq!(found.showing, Showing::TheSameReason);
     }
 
     #[test]

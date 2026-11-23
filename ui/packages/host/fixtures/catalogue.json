@@ -6278,6 +6278,540 @@
       ]
     },
     {
+      "id": "polars.date",
+      "applies": "function",
+      "family": "start",
+      "name": "date",
+      "hint": "a date made of a year, a month and a day",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "year",
+          "shown": "year",
+          "label": "year",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "month",
+          "shown": "month",
+          "label": "month",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "day",
+          "shown": "day",
+          "label": "day",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "polars.datetime",
+      "applies": "function",
+      "family": "start",
+      "name": "datetime",
+      "hint": "a moment made of a date and a time of day",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "year",
+          "shown": "year",
+          "label": "year",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "month",
+          "shown": "month",
+          "label": "month",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "day",
+          "shown": "day",
+          "label": "day",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "hour",
+          "shown": "hour",
+          "label": "hour",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "minute",
+          "shown": "minute",
+          "label": "minute",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "second",
+          "shown": "second",
+          "label": "second",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "microsecond",
+          "shown": "microsecond",
+          "label": "microsecond",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "time_unit",
+          "shown": "time_unit",
+          "label": "unit",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "ns",
+                "shown": "ns"
+              },
+              {
+                "word": "us",
+                "shown": "us"
+              },
+              {
+                "word": "ms",
+                "shown": "ms"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "us"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "us"
+          },
+          "start": {
+            "kind": "word",
+            "value": "ns"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "time_zone",
+          "shown": "time_zone",
+          "label": "in",
+          "kind": {
+            "kind": "timeZone",
+            "none": {
+              "shown": "None",
+              "hint": "a moment of no time zone"
+            }
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "ambiguous",
+          "shown": "ambiguous",
+          "label": "a clock read twice is",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "earliest",
+                "shown": "earliest"
+              },
+              {
+                "word": "latest",
+                "shown": "latest"
+              },
+              {
+                "word": "raise",
+                "shown": "raise"
+              },
+              {
+                "word": "null",
+                "shown": "null"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "raise"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "raise"
+          },
+          "start": {
+            "kind": "word",
+            "value": "earliest"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "polars.duration",
+      "applies": "function",
+      "family": "start",
+      "name": "duration",
+      "hint": "a length of time made of weeks, days, hours and the like",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "weeks",
+          "shown": "weeks",
+          "label": "weeks",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "days",
+          "shown": "days",
+          "label": "days",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "hours",
+          "shown": "hours",
+          "label": "hours",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "minutes",
+          "shown": "minutes",
+          "label": "minutes",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "seconds",
+          "shown": "seconds",
+          "label": "seconds",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "milliseconds",
+          "shown": "milliseconds",
+          "label": "milliseconds",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "microseconds",
+          "shown": "microseconds",
+          "label": "microseconds",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "nanoseconds",
+          "shown": "nanoseconds",
+          "label": "nanoseconds",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "time_unit",
+          "shown": "time_unit",
+          "label": "unit",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "ns",
+                "shown": "ns"
+              },
+              {
+                "word": "us",
+                "shown": "us"
+              },
+              {
+                "word": "ms",
+                "shown": "ms"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "word",
+            "value": "ns"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "polars.element",
       "applies": "function",
       "family": "start",
@@ -6286,6 +6820,84 @@
       "head": null,
       "lazy": true,
       "parameters": []
+    },
+    {
+      "id": "polars.from_epoch",
+      "applies": "function",
+      "family": "start",
+      "name": "from_epoch",
+      "hint": "a date or a moment from a count since 1970",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "column",
+          "shown": "column",
+          "label": "count",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "time_unit",
+          "shown": "time_unit",
+          "label": "unit",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "ns",
+                "shown": "ns"
+              },
+              {
+                "word": "us",
+                "shown": "us"
+              },
+              {
+                "word": "ms",
+                "shown": "ms"
+              },
+              {
+                "word": "s",
+                "shown": "s"
+              },
+              {
+                "word": "d",
+                "shown": "d"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "s"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "s"
+          },
+          "start": {
+            "kind": "word",
+            "value": "ns"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
     },
     {
       "id": "polars.lit",
@@ -6358,6 +6970,97 @@
           "start": {
             "kind": "flag",
             "value": true
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "polars.time",
+      "applies": "function",
+      "family": "start",
+      "name": "time",
+      "hint": "a time of day made of an hour, a minute and the like",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "hour",
+          "shown": "hour",
+          "label": "hour",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "minute",
+          "shown": "minute",
+          "label": "minute",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "second",
+          "shown": "second",
+          "label": "second",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "microsecond",
+          "shown": "microsecond",
+          "label": "microsecond",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
           },
           "position": null,
           "offered": true

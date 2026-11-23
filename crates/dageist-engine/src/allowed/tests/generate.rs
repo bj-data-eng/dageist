@@ -15,7 +15,7 @@ use crate::allowed::offers::default_word;
 use crate::allowed::rules::Rule;
 use crate::allowed::table::{
     Chain, ContextLine, DtypeKey, DtypeLine, OptionLine, OptionValue, Outcome, Produces, Reason,
-    Stage,
+    Stage, subject_of,
 };
 use crate::catalog::{
     self, Applies, Argument, BuildError, Entry, Kind, Parameter, ParameterDefault,
@@ -23,8 +23,8 @@ use crate::catalog::{
 };
 
 use super::build::{
-    column, condition_with, element, entry, expression, expressions, flag, integer, method,
-    null_of, one_of, patterns, required_choices, step,
+    column, condition_with, element, entry, expression, expressions, flag, function, integer,
+    method, null_of, one_of, patterns, required_choices, step,
 };
 use super::probe::{Plan, measure, outcome};
 use super::sample::Frames;
@@ -110,6 +110,15 @@ fn argument_for(entry: &Entry, parameter: &str, value: Expr) -> Argument {
 /// The parameters Polars takes only as a single value, not as a column.
 const SCALAR_ONLY: [(&str, &str); 2] = [("Expr.shift", "n"), ("Expr.shift", "fill_value")];
 
+/// The parts of a date that the functions which make one take, whose calendar has no month and no
+/// day of 0, which a Boolean column holds as false.
+const PARTS_OF_A_DATE: [(&str, &str); 4] = [
+    ("polars.date", "month"),
+    ("polars.date", "day"),
+    ("polars.datetime", "month"),
+    ("polars.datetime", "day"),
+];
+
 /// The parameters whose values a context is measured with as literals: Polars calls a replacement
 /// elementwise, as a join's key must be, only where what it replaces and replaces by, and the
 /// default of a strict one, are literals, which is how a replacement is written, and refuses one
@@ -143,6 +152,15 @@ fn argument_expression(
         } else {
             null_of(&dtype.dtype())
         }
+    } else if PARTS_OF_A_DATE.contains(&(entry, parameter)) && dtype == Representative::Boolean {
+        // A column of true: the month 1 and the day 1, which Polars makes a date of. The sample's
+        // column holds a false, which is no month and no day, and whether a row holds one is for
+        // the rows to say.
+        method(
+            super::build::entry("Expr.or_"),
+            column(scope.argument),
+            vec![("others", expressions(vec![flag(true)]))],
+        )
     } else if SCALAR_ONLY.contains(&(entry, parameter))
         || (scope.literals && LITERAL_IN_CONTEXTS.contains(&(entry, parameter)))
     {
@@ -192,6 +210,18 @@ fn companions(
         }
     };
     let mut given: Vec<(&'static str, Argument)> = match (entry, parameter) {
+        // A date or a moment needs the three parts that a calendar has, the one that is not tested
+        // being a day that every year has.
+        ("polars.date" | "polars.datetime", tested) => ["year", "month", "day"]
+            .into_iter()
+            .filter(|part| Some(*part) != tested)
+            .map(|part| {
+                (
+                    part,
+                    expression(integer(if part == "year" { 2026 } else { 1 })),
+                )
+            })
+            .collect(),
         ("Expr.over", Some("partition_by" | "order_by")) => Vec::new(),
         ("Expr.over", _) => vec![("partition_by", expressions(vec![scope.partition()]))],
         ("Expr.round_sig_figs", _) => vec![("digits", Argument::Integer(2))],
@@ -240,16 +270,33 @@ fn companions(
 struct DtypeJob {
     entry: &'static Entry,
     parameter: Option<&'static str>,
-    receiver: Representative,
+    /// The dtype of the value a method follows; none for a function that starts an expression.
+    receiver: Option<Representative>,
     argument: Option<Representative>,
+}
+
+/// Whether the entry is one the dtype table has lines for: a method, and a function that starts
+/// an expression and takes expressions.
+fn has_dtype_lines(entry: &'static Entry) -> bool {
+    match entry.applies() {
+        Applies::Expression => true,
+        Applies::Function => !expression_parameters(entry).is_empty(),
+        Applies::Frame | Applies::Condition => false,
+    }
 }
 
 fn dtype_jobs() -> Vec<DtypeJob> {
     let mut jobs = Vec::new();
     for entry in catalog::entries()
         .iter()
-        .filter(|entry| entry.applies() == Applies::Expression)
+        .filter(|entry| has_dtype_lines(entry))
     {
+        // A function has no receiver, and so one set of lines where a method has one for each.
+        let receivers: Vec<Option<Representative>> = if entry.applies() == Applies::Expression {
+            Representative::ALL.into_iter().map(Some).collect()
+        } else {
+            vec![None]
+        };
         let parameters = expression_parameters(entry);
         let required: Vec<_> = parameters
             .iter()
@@ -257,11 +304,11 @@ fn dtype_jobs() -> Vec<DtypeJob> {
             .map(|parameter| parameter.name())
             .collect();
         if required.is_empty() {
-            for receiver in Representative::ALL {
+            for receiver in &receivers {
                 jobs.push(DtypeJob {
                     entry,
                     parameter: None,
-                    receiver,
+                    receiver: *receiver,
                     argument: None,
                 });
             }
@@ -294,12 +341,12 @@ fn dtype_jobs() -> Vec<DtypeJob> {
                  for the one it does not vary",
                 entry.id().as_str()
             );
-            for receiver in Representative::ALL {
+            for receiver in &receivers {
                 for argument in Representative::ALL {
                     jobs.push(DtypeJob {
                         entry,
                         parameter: Some(parameter.name()),
-                        receiver,
+                        receiver: *receiver,
                         argument: Some(argument),
                     });
                 }
@@ -310,21 +357,28 @@ fn dtype_jobs() -> Vec<DtypeJob> {
 }
 
 fn dtype_line(job: &DtypeJob) -> DtypeLine {
-    let argument = job.argument.unwrap_or(job.receiver);
-    let frames = Frames::new(job.receiver, argument, &DataType::Int64);
+    // A function that starts an expression is measured on columns of the dtype of its argument,
+    // beside a column of whole numbers.
+    let receiver = job.receiver.unwrap_or(Representative::Int64);
+    let argument = job.argument.unwrap_or(receiver);
+    let frames = Frames::new(receiver, argument, &DataType::Int64);
     let plan = |frames: &Frames, empty: bool| -> Result<LazyFrame, BuildError> {
         let mut given = companions(
             job.entry.id().as_str(),
             job.parameter,
             LEFT,
-            job.receiver,
+            receiver,
             argument,
         );
         if let (Some(parameter), Some(dtype)) = (job.parameter, job.argument) {
             let value = argument_expression(job.entry.id().as_str(), parameter, dtype, LEFT)?;
             given.push((parameter, argument_for(job.entry, parameter, value)));
         }
-        let call = method(job.entry, column("a"), given)?;
+        let call = if job.entry.applies() == Applies::Function {
+            function(job.entry.id().as_str(), given)?
+        } else {
+            method(job.entry, column("a"), given)?
+        };
         step(
             "LazyFrame.select",
             frames.left(empty),
@@ -392,7 +446,7 @@ impl DtypeIndex {
         'receivers: for receiver in order {
             let mut produces = None;
             if required.is_empty() {
-                match self.lines.get(&(id, None, receiver, None)) {
+                match self.lines.get(&(id, None, Some(receiver), None)) {
                     Some(Outcome::Allowed(allowed)) => produces = allowed.clone(),
                     _ => continue,
                 }
@@ -407,7 +461,7 @@ impl DtypeIndex {
                 let fitting = tried.into_iter().find_map(|argument| {
                     match self
                         .lines
-                        .get(&(id, Some(*parameter), receiver, Some(argument)))
+                        .get(&(id, Some(*parameter), Some(receiver), Some(argument)))
                     {
                         Some(Outcome::Allowed(allowed)) => Some((argument, allowed.clone())),
                         _ => None,
@@ -442,7 +496,7 @@ impl DtypeIndex {
                 .filter_map(|(receiver, argument)| {
                     match self
                         .lines
-                        .get(&(id, Some(*parameter), receiver, Some(argument)))
+                        .get(&(id, Some(*parameter), Some(receiver), Some(argument)))
                     {
                         Some(Outcome::Allowed(Some(allowed)))
                             if allowed.result.class() == Some(Representative::Boolean)
@@ -548,6 +602,22 @@ fn method_on(
         given.push((parameter, argument_for(entry, parameter, value)));
     }
     method(entry, scope.start(), given)
+}
+
+/// The function `entry` with its subject a column of the dtype of the receiver, and `extra`.
+fn function_on(
+    entry: &'static Entry,
+    receiver: Representative,
+    scope: Scope,
+    extra: Vec<(&'static str, Argument)>,
+) -> Result<Expr, BuildError> {
+    let id = entry.id().as_str();
+    let subject = subject_of(entry).expect("a function with a subject");
+    let mut given = companions(id, Some(subject), scope, receiver, receiver);
+    given.retain(|(name, _)| !extra.iter().any(|(given, _)| given == name));
+    given.extend(extra);
+    given.push((subject, expression(scope.start())));
+    function(id, given)
 }
 
 /// Whether the expression under test must be `Boolean` where it stands, as
@@ -992,6 +1062,19 @@ fn context_line(
                 "polars.lit" if chain == Chain::Ends && needs_boolean(context) => Ok(flag(true)),
                 "polars.lit" => Ok(integer(1)),
                 "polars.element" => Ok(element()),
+                // A function that makes a moment is measured on the column, or the values of a
+                // group, that its subject is given, beside the parts that complete it.
+                "polars.date" | "polars.datetime" => function(
+                    id,
+                    vec![
+                        ("year", expression(integer(2026))),
+                        ("month", expression(integer(1))),
+                        ("day", expression(scope.start())),
+                    ],
+                ),
+                "polars.time" => function(id, vec![("hour", expression(scope.start()))]),
+                "polars.duration" => function(id, vec![("days", expression(scope.start()))]),
+                "polars.from_epoch" => function(id, vec![("column", expression(scope.start()))]),
                 other => panic!("the generator does not know the function {other}"),
             }),
         ),
@@ -1273,7 +1356,11 @@ fn option_line(
             if id == "Expr.over" {
                 extra.push(("order_by", expressions(vec![column("k")])));
             }
-            let call = method_on(entry, candidate, LEFT, extra)?;
+            let call = if entry.applies() == Applies::Function {
+                function_on(entry, candidate.receiver, LEFT, extra)?
+            } else {
+                method_on(entry, candidate, LEFT, extra)?
+            };
             step(
                 "LazyFrame.select",
                 frames.left(empty),
@@ -1301,21 +1388,33 @@ fn option_line(
 
 fn option_lines(index: &DtypeIndex) -> Vec<OptionLine> {
     let mut jobs = Vec::new();
-    for entry in catalog::entries()
-        .iter()
-        .filter(|entry| matches!(entry.applies(), Applies::Expression | Applies::Frame))
-    {
+    for entry in catalog::entries().iter().filter(|entry| {
+        matches!(entry.applies(), Applies::Expression | Applies::Frame) || has_dtype_lines(entry)
+    }) {
         let parameters = option_parameters(entry);
         if parameters.is_empty() {
             continue;
         }
         let sets = option_sets(&parameters);
         // A method is measured on each dtype, for what an option allows depends on it, as the
-        // strategy of a fill and the dtype of a cast do; a step follows none.
+        // strategy of a fill and the dtype of a cast do; a step follows none. A function that
+        // takes expressions is measured on each dtype of its subject, as a count since 1970 is
+        // read as a date for days and refused for a date in seconds.
         let candidates: Vec<Option<Candidate>> = if entry.applies() == Applies::Expression {
             Representative::ALL
                 .into_iter()
                 .map(|receiver| Some(option_candidate(entry, receiver, index)))
+                .collect()
+        } else if entry.applies() == Applies::Function {
+            Representative::ALL
+                .into_iter()
+                .map(|receiver| {
+                    Some(Candidate {
+                        receiver,
+                        arguments: Vec::new(),
+                        produces: None,
+                    })
+                })
                 .collect()
         } else {
             vec![None]

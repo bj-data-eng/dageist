@@ -1394,6 +1394,163 @@ label = "as dtype"
 name = "allow_object"
 label = "allow any object"
 
+[entries."polars.date"]
+name = "date"
+hint = "a date made of a year, a month and a day"
+
+[entries."polars.date".parameters.year]
+name = "year"
+label = "year"
+
+[entries."polars.date".parameters.month]
+name = "month"
+label = "month"
+
+[entries."polars.date".parameters.day]
+name = "day"
+label = "day"
+
+[entries."polars.datetime"]
+name = "datetime"
+hint = "a moment made of a date and a time of day"
+
+[entries."polars.datetime".parameters.year]
+name = "year"
+label = "year"
+
+[entries."polars.datetime".parameters.month]
+name = "month"
+label = "month"
+
+[entries."polars.datetime".parameters.day]
+name = "day"
+label = "day"
+
+[entries."polars.datetime".parameters.hour]
+name = "hour"
+label = "hour"
+
+[entries."polars.datetime".parameters.minute]
+name = "minute"
+label = "minute"
+
+[entries."polars.datetime".parameters.second]
+name = "second"
+label = "second"
+
+[entries."polars.datetime".parameters.microsecond]
+name = "microsecond"
+label = "microsecond"
+
+[entries."polars.datetime".parameters.time_unit]
+name = "time_unit"
+label = "unit"
+
+[entries."polars.datetime".parameters.time_unit.choices]
+ns = "ns"
+us = "us"
+ms = "ms"
+
+[entries."polars.datetime".parameters.time_zone]
+name = "time_zone"
+label = "in"
+none = "None"
+none_hint = "a moment of no time zone"
+
+[entries."polars.datetime".parameters.ambiguous]
+name = "ambiguous"
+label = "a clock read twice is"
+
+[entries."polars.datetime".parameters.ambiguous.choices]
+earliest = "earliest"
+latest = "latest"
+raise = "raise"
+null = "null"
+
+[entries."polars.duration"]
+name = "duration"
+hint = "a length of time made of weeks, days, hours and the like"
+
+[entries."polars.duration".parameters.weeks]
+name = "weeks"
+label = "weeks"
+
+[entries."polars.duration".parameters.days]
+name = "days"
+label = "days"
+
+[entries."polars.duration".parameters.hours]
+name = "hours"
+label = "hours"
+
+[entries."polars.duration".parameters.minutes]
+name = "minutes"
+label = "minutes"
+
+[entries."polars.duration".parameters.seconds]
+name = "seconds"
+label = "seconds"
+
+[entries."polars.duration".parameters.milliseconds]
+name = "milliseconds"
+label = "milliseconds"
+
+[entries."polars.duration".parameters.microseconds]
+name = "microseconds"
+label = "microseconds"
+
+[entries."polars.duration".parameters.nanoseconds]
+name = "nanoseconds"
+label = "nanoseconds"
+
+[entries."polars.duration".parameters.time_unit]
+name = "time_unit"
+label = "unit"
+
+[entries."polars.duration".parameters.time_unit.choices]
+ns = "ns"
+us = "us"
+ms = "ms"
+
+[entries."polars.from_epoch"]
+name = "from_epoch"
+hint = "a date or a moment from a count since 1970"
+
+[entries."polars.from_epoch".parameters.column]
+name = "column"
+label = "count"
+
+[entries."polars.from_epoch".parameters.time_unit]
+name = "time_unit"
+label = "unit"
+
+[entries."polars.from_epoch".parameters.time_unit.choices]
+ns = "ns"
+us = "us"
+ms = "ms"
+s = "s"
+d = "d"
+
+[entries."polars.time"]
+name = "time"
+hint = "a time of day made of an hour, a minute and the like"
+
+[entries."polars.time".parameters.hour]
+name = "hour"
+label = "hour"
+
+[entries."polars.time".parameters.minute]
+name = "minute"
+label = "minute"
+
+[entries."polars.time".parameters.second]
+name = "second"
+label = "second"
+
+[entries."polars.time".parameters.microsecond]
+name = "microsecond"
+label = "microsecond"
+
 [entries."polars.element"]
 name = "element"
 hint = "each value of the cell being combined"

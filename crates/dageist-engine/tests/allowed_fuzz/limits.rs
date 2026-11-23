@@ -37,7 +37,9 @@
 use dageist_engine::allowed::Representative;
 use dageist_engine::allowed::Stage as TableStage;
 use dageist_engine::catalog;
-use dageist_engine::document::{Call, Document, Expression, Place, Segment, Start, Step, Value};
+use dageist_engine::document::{
+    Call, Document, Expression, Place, Segment, Start, Step, StepId, Value,
+};
 
 use super::case::Case;
 use super::frames::Frames;
@@ -84,7 +86,8 @@ pub enum Limit {
     ///
     /// The reasons the gate accepts, each at a call of the aggregate of a pivot:
     /// - the tables refusing, which Polars allows, with a reason that says a dtype an operation
-    ///   does not support, a comparison, an operation, an evaluation, a cast, a struct field, the
+    ///   does not support or a function that makes a length of time expects numbers, a comparison,
+    ///   an operation, an evaluation, a cast, a struct field, the
     ///   lengths of a window over a group, a replacement pattern per row, duplicates in what a
     ///   replacement replaces, no supertype of two dtypes, a fill by a strategy for a dtype, or
     ///   the plan saying another dtype than the rows give;
@@ -94,7 +97,12 @@ pub enum Limit {
     /// - Polars refusing the empty table, with no place, for an operation not supported, a null
     ///   dtype, or a conversion to `null`.
     ///
-    /// None has a control that a rerun of Polars could give: the cause is that the group's
+    /// A cast of a value that literals alone make, by a function that makes a date, a moment or a
+    /// length of time of them, is one too where the same chain through the cast, run in a select on
+    /// the sample, is converted without a failure: it converts a null or a number that no group's
+    /// text is.
+    ///
+    /// None of the others has a control that a rerun of Polars could give: the cause is that the group's
     /// kernels run what `select` refuses or converts otherwise, which no case in `select` shows,
     /// so the gate is the pivot and the reason, and the kept cases and tests state each.
     AGroupAggregate,
@@ -133,7 +141,11 @@ pub enum Limit {
     /// `offset_by`, a condition and a window that is not an `explode` keep the
     /// rows in place and leave what they hold unknown, and give the one value that
     /// an aggregate leaves to each of the sample's rows; any other call leaves
-    /// nothing known. The first and the last take a row (the first or last that
+    /// nothing known. A function that makes a date, a time or a moment of parts gives a null in each
+    /// row where a part that is a column is null, and in each row of one that is a column of text,
+    /// which is no number, and a count since 1970 keeps the nulls of what it counts. A drop of the
+    /// nulls of rows that are all null leaves none, which meets nothing as a null does. The first and
+    /// the last take a row (the first or last that
     /// is not null, where they skip nulls), the minimum and the maximum are null
     /// of rows that are all null and a value of any that holds one, and a sum is
     /// not known of rows that are all null. The tables refusing, when they run
@@ -295,7 +307,8 @@ pub enum Limit {
     /// each fill a fill forward, each count the whole number 1 and each replacement not asked for
     /// a dtype is not refused for a failed conversion. A literal is one value that Polars converts
     /// when it works out the schema, so the refusal may be the schema's, and then it names the
-    /// scalar the literal is.
+    /// scalar the literal is, and the strict cast it is given to where it says where. A date made of
+    /// numbers typed in is such a value, the first of January of the year 1 for 1, 1 and 1.
     ACastOfAValueTheDtypeCannotHold,
     /// `drop_nulls` and `drop_nans` leave the values that are not null or not NaN, so a column
     /// that holds one has fewer values than the table has rows, which Polars refuses to meet the
@@ -407,15 +420,15 @@ pub enum Limit {
     /// is not a valid one, which has no place, in a case that holds a method that writes a moment as
     /// text, given a format: the case run again with each format made `iso` is not refused for it.
     AFormatTheDtypeCannotWrite,
-    /// `dt.replace` converts each part it is given to a whole number of the width of the part and
-    /// refuses a value outside the calendar's range, and one that does not convert, when the rows
-    /// run, so what it does with a part that is no number written in depends on the values of the
-    /// rows. The tables measured the column that stands for an argument, whose values are 1 and 3, or
+    /// `dt.replace`, and the functions that make a date, a moment or a time of parts, convert each
+    /// part they are given to a whole number of the width of the part and refuse a value outside
+    /// the calendar's range, and one that does not convert, when the rows run, so what they do
+    /// with a part that is no number written in depends on the values of the rows. The tables measured the column that stands for an argument, whose values are 1 and 3, or
     /// true and false, of which false is a day of 0 that no date has. Polars refusing the rows or the
     /// empty table with the refusal that the components of a date or a time are invalid, or that a
-    /// value does not convert, which has no place, in a case with a `dt.replace` given a part: the
+    /// value does not convert, which has no place, in a case with a call given a part: the
     /// case run again with each part made the number 1 is not refused for it. The tables refusing
-    /// a call at the rows for invalid components that Polars allows, in a case with a `dt.replace`
+    /// a call at the rows for invalid components that Polars allows, in a case with a call
     /// given a part: the tables then no longer refuse it for them with each part made the number 1,
     /// and Polars refuses it for them with each part made `false`, which shows that it evaluates the
     /// part and does not skip it.
@@ -605,7 +618,7 @@ impl Limit {
                 "a cast of a moment to nanoseconds refuses one outside the years nanoseconds hold, when the rows run, where the tables measured moments of 1970 and after"
             }
             Self::APartOfADateThatDependsOnTheRows => {
-                "dt.replace refuses a part outside the calendar's range, or that does not convert, when the rows run, so it depends on the values of the rows, where the tables measured the values of one column"
+                "dt.replace, date, datetime and time refuse a part outside the calendar's range, or that does not convert, when the rows run, so it depends on the values of the rows, where the tables measured the values of one column"
             }
             Self::AFormatTheDtypeCannotWrite => {
                 "a format writes the fields a dtype has and Polars refuses one it has none for, where the tables measured the format iso, which every dtype takes"
@@ -1385,6 +1398,8 @@ fn rows_after(
     // nothing known.
     let mut rows: Vec<Cell> = if receiver && starts_from_a_null_literal(expression) {
         vec![Cell::Null]
+    } else if let Some(made) = rows_made(frames, expression) {
+        made
     } else {
         (0..SAMPLE_ROWS)
             .map(|row| {
@@ -1421,6 +1436,20 @@ fn rows_after(
                 vec![one]
             }
             "Expr.len" => vec![Cell::Value],
+            // A drop of the nulls leaves the rows that hold a value, which are none where they are
+            // all null: a column of no rows meets nothing, as a null does not, so it stands for one
+            // null here.
+            "Expr.drop_nulls" if !rows.contains(&Cell::Unknown) => {
+                let kept: Vec<Cell> = rows
+                    .into_iter()
+                    .filter(|cell| *cell != Cell::Null)
+                    .collect();
+                if kept.is_empty() {
+                    vec![Cell::Null]
+                } else {
+                    kept
+                }
+            }
             // A fill of NaN keeps the null of a row that is one, and gives the value or the row
             // itself to the others; a cast keeps a null too, and gives a null or a value to the
             // others.
@@ -1532,6 +1561,69 @@ fn receiver_nulls_stay(frames: &Frames, rows: &[Cell], link: &Call) -> Vec<Cell>
         .collect()
 }
 
+/// The rows of a chain that starts from a function that makes a date, a time or a moment of parts,
+/// or a moment of a count, where the rows are known: a row is null where a part is, and the text of
+/// a column is no number, so a part that is a column of text is null in each row. A count since
+/// 1970 keeps the nulls of the rows it counts. `None` for any other start, or where a part is not a
+/// column or a number typed in.
+fn rows_made(frames: &Frames, expression: &Expression) -> Option<Vec<Cell>> {
+    let Start::Call(start) = expression.start() else {
+        return None;
+    };
+    if is(start, "polars.from_epoch") {
+        return match start.argument("column") {
+            Some(Value::Expression(counted)) => {
+                rows_after(frames, counted, counted.links().len(), false)
+            }
+            _ => None,
+        };
+    }
+    if !(is(start, "polars.date") || is(start, "polars.time") || is(start, "polars.datetime")) {
+        return None;
+    }
+    let mut rows = vec![Cell::Value; SAMPLE_ROWS];
+    for part in PARTS_OF_A_DATE {
+        let Some(given) = start.argument(part) else {
+            continue;
+        };
+        let Value::Expression(part) = given else {
+            return None;
+        };
+        let cells: Vec<Cell> = if part.links().is_empty()
+            && matches!(part.start(), Start::Call(call)
+                if is(call, "polars.lit")
+                    && matches!(call.argument("value"), Some(Value::Integer(_) | Value::Float(_))))
+        {
+            vec![Cell::Value; SAMPLE_ROWS]
+        } else if let Some(name) = starting_column(part).filter(|_| part.links().is_empty()) {
+            if matches!(
+                frames.dtype_of(name),
+                Some(polars::prelude::DataType::String)
+            ) {
+                vec![Cell::Null; SAMPLE_ROWS]
+            } else {
+                (0..SAMPLE_ROWS)
+                    .map(|row| match frames.holds_a_null_at(name, row) {
+                        Some(true) => Cell::Null,
+                        Some(false) => Cell::Value,
+                        None => Cell::Unknown,
+                    })
+                    .collect()
+            }
+        } else {
+            vec![Cell::Unknown; SAMPLE_ROWS]
+        };
+        for (row, cell) in rows.iter_mut().zip(cells) {
+            *row = match (*row, cell) {
+                (Cell::Null, _) | (_, Cell::Null) => Cell::Null,
+                (Cell::Unknown, _) | (_, Cell::Unknown) => Cell::Unknown,
+                (Cell::Value, Cell::Value) => Cell::Value,
+            };
+        }
+    }
+    Some(rows)
+}
+
 /// The name of the one column `expression` starts from, when it starts from one.
 fn starting_column(expression: &Expression) -> Option<&str> {
     match expression.start() {
@@ -1561,6 +1653,105 @@ fn leaves_only_nulls(
 ) -> bool {
     rows_after(frames, expression, upto, receiver)
         .is_some_and(|rows| !rows.is_empty() && rows.iter().all(|cell| *cell == Cell::Null))
+}
+
+/// Whether `expression` starts from a function that makes a value of what it is given, as the
+/// ones that make a date, a moment or a length of time do, and what it is given reads no column and
+/// no group's values: the value is made of literals alone.
+fn starts_from_a_function_of_literals(expression: &Expression) -> bool {
+    matches!(expression.start(), Start::Call(start)
+    if start.entry().applies() == catalog::Applies::Function
+        && !is(start, "polars.col")
+        && !is(start, "polars.lit")
+        && !is(start, "polars.element")
+        && !operands(start).is_empty()
+        && !operands(start).into_iter().any(|(_, operand)| {
+            any_call(operand, &|call| is(call, "polars.col") || is(call, "polars.element"))
+        }))
+}
+
+/// Whether the first `upto` links of `expression`, run alone in a select on the sample, are
+/// converted without a failure: Polars then makes the value and the conversion where no group
+/// is, so a group's kernels are no cause. A select that Polars refuses is no proof.
+fn converts_when_selected(frames: &Frames, expression: &Expression, upto: usize) -> bool {
+    let Ok(part) = Expression::new(
+        expression.start().clone(),
+        expression.links()[..upto.min(expression.links().len())].to_vec(),
+    ) else {
+        return false;
+    };
+    let (Some(select), Ok(id)) = (catalog::entry("LazyFrame.select"), StepId::new("s")) else {
+        return false;
+    };
+    let Ok(call) = Call::new(
+        select,
+        vec![(
+            "named_exprs",
+            Value::Pairs(vec![(
+                Value::Columns(vec!["out".to_owned()]),
+                Value::Expression(part),
+            )]),
+        )],
+    ) else {
+        return false;
+    };
+    let Ok(step) = Step::new(id.clone(), call) else {
+        return false;
+    };
+    let Ok(document) = Document::new(vec![step]) else {
+        return false;
+    };
+    document
+        .preview(&frames.inputs(false), &frames.rows, &id, 100)
+        .is_ok()
+}
+
+/// Whether Polars gives a null in each row of the left table for the first `upto` links of
+/// `expression`, which is run alone in a select on the sample: a call that the rows the target
+/// follows know nothing of, as a slice by an offset that is no number, may give only nulls.
+fn gives_only_nulls(frames: &Frames, expression: &Expression, upto: usize) -> bool {
+    // A null literal is one that Polars folds, whatever the rows hold, which a probe settles: the
+    // nulls here are those of the sample's rows.
+    // A condition that no row takes gives a null that is no value of the rows: what is in its
+    // branches is not met, which is a part that Polars skips and a probe settles.
+    if any_call(expression, &|call| {
+        (is(call, "polars.lit") && matches!(call.argument("value"), Some(Value::Flag(None))))
+            || call.entry().applies() == catalog::Applies::Condition
+    }) {
+        return false;
+    }
+    let Ok(part) = Expression::new(
+        expression.start().clone(),
+        expression.links()[..upto.min(expression.links().len())].to_vec(),
+    ) else {
+        return false;
+    };
+    let (Some(select), Ok(id)) = (catalog::entry("LazyFrame.select"), StepId::new("s")) else {
+        return false;
+    };
+    let Ok(call) = Call::new(
+        select,
+        vec![(
+            "named_exprs",
+            Value::Pairs(vec![(
+                Value::Columns(vec!["out".to_owned()]),
+                Value::Expression(part),
+            )]),
+        )],
+    ) else {
+        return false;
+    };
+    let Ok(step) = Step::new(id.clone(), call) else {
+        return false;
+    };
+    let Ok(document) = Document::new(vec![step]) else {
+        return false;
+    };
+    document
+        .preview(&frames.inputs(false), &frames.rows, &id, 100)
+        .is_ok_and(|preview| {
+            !preview.rows().is_empty() && preview.rows().iter().all(|row| row[0].is_none())
+        })
 }
 
 /// Whether a call undoes the argument `parameter` of the call `call`.
@@ -2039,7 +2230,8 @@ fn refused_for_nanoseconds_with_milliseconds(case: &Case) -> Option<bool> {
     })
 }
 
-/// The parts `dt.replace` is given, which it converts to the whole numbers of the calendar.
+/// The parts `dt.replace` and the functions that make a date, a moment or a time are given, which
+/// they convert to the whole numbers of the calendar.
 const PARTS_OF_A_DATE: [&str; 7] = [
     "year",
     "month",
@@ -2062,15 +2254,19 @@ fn is_a_refusal_of_a_part_of_a_date(reason: &str) -> bool {
     is_a_refusal_of_the_components_of_a_date(reason) || is_a_failed_conversion(reason)
 }
 
-/// Whether the call is a `dt.replace` that is given a part.
-fn is_a_replacement_given_a_part(call: &Call) -> bool {
-    is(call, "Expr.dt.replace")
+/// Whether the call is given a part of a date or a time to convert: a `dt.replace`, or one of the
+/// functions that make a date, a moment or a time of parts, which convert each as it does.
+fn is_given_a_part_of_a_date(call: &Call) -> bool {
+    (is(call, "Expr.dt.replace")
+        || is(call, "polars.date")
+        || is(call, "polars.datetime")
+        || is(call, "polars.time"))
         && PARTS_OF_A_DATE
             .iter()
             .any(|part| call.argument(part).is_some())
 }
 
-/// The case with each part that a `dt.replace` is given made the number 1.
+/// The case with each part that a call is given made the number 1.
 fn case_with_ones_as_the_parts(case: &Case) -> Option<Case> {
     let one = Expression::new(
         Start::Call(
@@ -2084,7 +2280,7 @@ fn case_with_ones_as_the_parts(case: &Case) -> Option<Case> {
     )
     .ok()?;
     case_changed(case, &|call| {
-        if !is_a_replacement_given_a_part(call) {
+        if !is_given_a_part_of_a_date(call) {
             return None;
         }
         let given: Vec<(&str, Value)> = call
@@ -2103,14 +2299,16 @@ fn case_with_ones_as_the_parts(case: &Case) -> Option<Case> {
     })
 }
 
-/// Whether Polars refuses the case for a part of a date still when each part is the number 1: the
-/// values of the part are then no cause. `None` where no `dt.replace` is given a part.
-fn refused_for_a_part_of_a_date_with_ones(case: &Case) -> Option<bool> {
+/// Whether Polars refuses the case for what `reason` says still when each part is the number 1: the
+/// values of the part are then no cause. The reason is the case's own kind, for a case refused for
+/// the components of a date is not shown to be refused for a part by being refused for the cast
+/// of the date that the ones make. `None` where no call is given a part.
+fn refused_for_a_part_of_a_date_with_ones(case: &Case, reason: fn(&str) -> bool) -> Option<bool> {
     changed(case_with_ones_as_the_parts(case), case).map(|control| {
         (0..RUNS).any(|_| {
             observe(&control)
                 .refusal
-                .is_some_and(|refusal| is_a_refusal_of_a_part_of_a_date(&refusal.reason))
+                .is_some_and(|refusal| reason(&refusal.reason))
         })
     })
 }
@@ -2121,29 +2319,90 @@ fn is_a_failed_conversion_of_text(reason: &str) -> bool {
     is_a_failed_conversion(reason) && reason.starts_with("conversion from `str` to `")
 }
 
-/// Whether the call is a `dt.replace` whose parts are each a literal of text, as `"1"` is, which
+/// Whether the expression is a literal of text, as `"1"` is, and nothing more.
+fn is_a_literal_of_text(expression: &Expression) -> bool {
+    expression.links().is_empty()
+        && matches!(expression.start(), Start::Call(start)
+            if is(start, "polars.lit")
+                && (matches!(start.argument("value"), Some(Value::String(_)))
+                    || matches!(start.argument("dtype"), Some(Value::Dtype(dtype)) if dtype.to_string() == "String")))
+}
+
+/// Whether the call is given parts that are each a literal, one of them of text, as `"1"` is, which
 /// Polars converts to the number where the plan is made, whether or not it evaluates the part,
 /// where the tables, which measured a column of text that is none, refuse it. A part that is a
-/// column of text is not one: Polars converts it when it evaluates the part, which it may not.
-fn is_given_only_literals_of_text(call: &Call) -> bool {
-    let literal_of_text = |expression: &Expression| {
-        expression.links().is_empty()
-            && matches!(expression.start(), Start::Call(start)
-                if is(start, "polars.lit")
-                    && (matches!(start.argument("value"), Some(Value::String(_)))
-                        || matches!(start.argument("dtype"), Some(Value::Dtype(dtype)) if dtype.to_string() == "String")))
+/// column or a chain is not one: Polars converts it when it evaluates the part, which it may not.
+fn is_given_only_literals_one_of_text(call: &Call) -> bool {
+    let literal = |expression: &Expression| {
+        is_a_literal_of_text(expression)
+            || (expression.links().is_empty()
+                && matches!(expression.start(), Start::Call(start) if is(start, "polars.lit")))
     };
-    is_a_replacement_given_a_part(call)
+    let mut text = false;
+    is_given_a_part_of_a_date(call)
         && PARTS_OF_A_DATE
             .iter()
             .all(|part| match call.argument(part) {
-                Some(Value::Expression(expression)) => literal_of_text(expression),
+                Some(Value::Expression(expression)) => {
+                    text |= is_a_literal_of_text(expression);
+                    literal(expression)
+                }
                 Some(_) => false,
                 None => true,
             })
+        && text
 }
 
-/// The case with each part that a `dt.replace` is given made the literal `value`.
+/// The case with each part that a call is given that is a literal of text made the literal
+/// `value`, and the other parts as they are.
+fn case_with_the_text_parts_as(case: &Case, value: Value) -> Option<Case> {
+    let literal = Expression::new(
+        Start::Call(Call::new(catalog::entry("polars.lit")?, vec![("value", value)]).ok()?),
+        Vec::new(),
+    )
+    .ok()?;
+    case_changed(case, &|call| {
+        if !is_given_a_part_of_a_date(call) {
+            return None;
+        }
+        let given: Vec<(&str, Value)> = call
+            .arguments()
+            .iter()
+            .map(|given| {
+                let value = match given.value() {
+                    Value::Expression(part)
+                        if PARTS_OF_A_DATE.contains(&given.parameter())
+                            && is_a_literal_of_text(part) =>
+                    {
+                        Value::Expression(literal.clone())
+                    }
+                    other => other.clone(),
+                };
+                (given.parameter(), value)
+            })
+            .collect();
+        Call::new(call.entry(), given).ok()
+    })
+}
+
+/// Whether Polars refuses the case for what `reason` says with each literal of text that a part is
+/// made the text `x`, which no part reads as a number: it then evaluates the part, and what it
+/// refuses is a cause. `None` where no call is given a part.
+fn refused_for_a_text_part_as_x(case: &Case, reason: fn(&str) -> bool) -> Option<bool> {
+    changed(
+        case_with_the_text_parts_as(case, Value::String("x".to_owned())),
+        case,
+    )
+    .map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| reason(&refusal.reason))
+        })
+    })
+}
+
+/// The case with each part that a call is given made the literal `value`.
 fn case_with_the_parts_as(case: &Case, value: Value) -> Option<Case> {
     let literal = Expression::new(
         Start::Call(Call::new(catalog::entry("polars.lit")?, vec![("value", value)]).ok()?),
@@ -2151,7 +2410,7 @@ fn case_with_the_parts_as(case: &Case, value: Value) -> Option<Case> {
     )
     .ok()?;
     case_changed(case, &|call| {
-        if !is_a_replacement_given_a_part(call) {
+        if !is_given_a_part_of_a_date(call) {
             return None;
         }
         let given: Vec<(&str, Value)> = call
@@ -2172,7 +2431,7 @@ fn case_with_the_parts_as(case: &Case, value: Value) -> Option<Case> {
 
 /// Whether Polars refuses the case for what `reason` says with each part the literal `value`: it
 /// then evaluates the part, and what it refuses is a cause. Polars that never evaluates a part
-/// allows the case. `None` where no `dt.replace` is given a part.
+/// allows the case. `None` where no call is given a part.
 fn refused_for_a_part_with(case: &Case, value: Value, reason: fn(&str) -> bool) -> Option<bool> {
     changed(case_with_the_parts_as(case, value), case).map(|control| {
         (0..RUNS).any(|_| {
@@ -3527,8 +3786,15 @@ fn applies(
                 && is_a_refusal_of_a_part_of_a_date(&refusal.reason)
                 && held
                     .iter()
-                    .any(|(_, held)| any_call(held, &is_a_replacement_given_a_part))
-                && refused_for_a_part_of_a_date_with_ones(case) == Some(false)
+                    .any(|(_, held)| any_call(held, &is_given_a_part_of_a_date))
+                && refused_for_a_part_of_a_date_with_ones(
+                    case,
+                    if is_a_refusal_of_the_components_of_a_date(&refusal.reason) {
+                        is_a_refusal_of_the_components_of_a_date
+                    } else {
+                        is_a_failed_conversion
+                    },
+                ) == Some(false)
         }
         (Limit::APartOfADateThatDependsOnTheRows, Disagreement::PolarsAllows(refused)) => {
             // The values of the column the tables measured are the cause where the tables stop
@@ -3539,7 +3805,7 @@ fn applies(
             refused.stage == Some(TableStage::Rows)
                 && locate(case, &refused.place)
                     .call
-                    .is_some_and(is_a_replacement_given_a_part)
+                    .is_some_and(is_given_a_part_of_a_date)
                 && if is_a_refusal_of_the_components_of_a_date(&refused.reason) {
                     the_tables_stop_refusing_the_parts_as_ones(
                         case,
@@ -3552,14 +3818,11 @@ fn applies(
                 } else if is_a_failed_conversion_of_text(&refused.reason)
                     && locate(case, &refused.place)
                         .call
-                        .is_some_and(is_given_only_literals_of_text)
+                        .is_some_and(is_given_only_literals_one_of_text)
                 {
                     the_tables_stop_refusing_the_parts_as_ones(case, is_a_failed_conversion_of_text)
-                        && refused_for_a_part_with(
-                            case,
-                            Value::String("x".to_owned()),
-                            is_a_failed_conversion_of_text,
-                        ) == Some(true)
+                        && refused_for_a_text_part_as_x(case, is_a_failed_conversion_of_text)
+                            == Some(true)
                 } else {
                     false
                 }
@@ -3722,6 +3985,7 @@ fn applies(
                     || refusal.reason.contains("` to `null` failed"))
         }
         (Limit::AGroupAggregate, Disagreement::PolarsAllows(refused)) => {
+            let frames = Frames::with_key(case.receiver, case.argument, None);
             // The kernels that take the values of a group accept what the ones of
             // `select` refuse: a dtype of an aggregate, a comparison, a cast, a
             // struct, or a window over a group.
@@ -3732,6 +3996,9 @@ fn applies(
                     "cannot perform",
                     "could not evaluate",
                     "casting from",
+                    // A function that makes a length of time reads the dtype of each part where a
+                    // select works out its schema.
+                    "expected integer or float dtype",
                     "lengths don't match",
                     "must specify one field",
                     "cannot cast",
@@ -3760,6 +4027,8 @@ fn applies(
                                 && locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
                                     starts_from_a_literal(chain)
                                         || chain.links()[..at].iter().any(compares_with_a_null)
+                                        || (starts_from_a_function_of_literals(chain)
+                                            && converts_when_selected(&frames, chain, at + 1))
                                 }))
                         })
                     })
@@ -3797,17 +4066,24 @@ fn applies(
         (Limit::AShiftThatLeavesNulls, Disagreement::PolarsAllows(refused)) => {
             let locus = locate(case, &refused.place);
             let frames = Frames::with_key(case.receiver, case.argument, None);
-            // What the call follows, or is given, is only nulls.
+            // What the call follows, or is given, is only nulls: as the rows of the sample, followed
+            // through the calls that are known, say, or as Polars gives them where what the call
+            // follows or is given is run alone on the left table.
+            let on_the_left = !matches!(
+                refused.place.path().first(),
+                Some(Segment::Parameter(name)) if name == "right_on" || name == "aggregate_function"
+            );
             refused.stage == Some(TableStage::Rows)
-                && (locus
-                    .chain
-                    .zip(locus.index)
-                    .is_some_and(|(chain, at)| leaves_only_nulls(&frames, chain, at, true))
-                    || locus.call.is_some_and(|call| {
-                        operands(call).into_iter().any(|(_, operand)| {
-                            leaves_only_nulls(&frames, operand, operand.links().len(), false)
-                        })
-                    }))
+                && (locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
+                    leaves_only_nulls(&frames, chain, at, true)
+                        || (on_the_left && gives_only_nulls(&frames, chain, at))
+                }) || locus.call.is_some_and(|call| {
+                    operands(call).into_iter().any(|(_, operand)| {
+                        leaves_only_nulls(&frames, operand, operand.links().len(), false)
+                            || (on_the_left
+                                && gives_only_nulls(&frames, operand, operand.links().len()))
+                    })
+                }))
         }
         (Limit::ASingleValueInAKey, Disagreement::PolarsAllows(refused)) => {
             // The key the tables refused is wholly one value.
@@ -3982,9 +4258,15 @@ fn applies(
             // converted when the schema is worked out, so the refusal is the schema's, naming the
             // scalar. The cast is the cause where Polars stops refusing for a failed conversion
             // once no cast is strict.
-            unplaced(refusal)
+            // The schema names the call that casts the literal where it works the literal out, so a
+            // refusal of that kind at a strict cast is the cast's as one with no place is.
+            (unplaced(refusal)
                 && (matches!(refusal.stage, Stage::Rows | Stage::Empty)
                     || is_a_literal_that_failed_to_convert(refusal))
+                || (is_a_literal_that_failed_to_convert(refusal)
+                    && refusal.place.as_ref().is_some_and(|place| {
+                        locate(case, place).call.is_some_and(is_a_strict_cast)
+                    })))
                 && is_a_failed_conversion(&refusal.reason)
                 && held
                     .iter()
@@ -4430,6 +4712,154 @@ mod tests {
         ]);
         assert_eq!(
             tables_refuse(&select(vec![plain]), inside, ROWS, "no"),
+            vec![]
+        );
+    }
+
+    /// What the limits make of the tables refusing `case` at `place`, at the rows, for `reason`,
+    /// asked on a stack that Polars' plans fit on: the limit runs Polars again.
+    fn refused_by_the_tables_at(case: &Case, place: Place, reason: &str) -> Vec<Limit> {
+        std::thread::scope(|scope| {
+            std::thread::Builder::new()
+                .stack_size(256 << 20)
+                .spawn_scoped(scope, || tables_refuse(case, place, ROWS, reason))
+                .expect("a thread")
+                .join()
+                .expect("the limits are asked")
+        })
+    }
+
+    #[test]
+    fn a_pivot_aggregate_is_excused_for_a_cast_of_what_literals_alone_make_where_a_select_converts_it()
+     {
+        // `from_epoch(null).str.join(ignore_nulls=false).cast(Int32)`: the value is made of a
+        // literal alone, a null that the cast meets as a null, where the tables measured the text
+        // of the sample. The same value is cast without a failure in a select.
+        assert_eq!(
+            excused_by_kept("uncovered-a-group-aggregate--a-cast-of-a-function-of-literals.case"),
+            vec![Limit::AGroupAggregate]
+        );
+        let text = "conversion from `str` to `i32` failed in column 'a' for 2 out of 3 values: [\"1d\", \"2d\"]";
+        let at_the_cast = || at(&[parameter("aggregate_function"), Segment::Link(0)]);
+        let made_of = |part: Expression| {
+            pivot(chain_of(
+                call(
+                    "polars.from_epoch",
+                    vec![("column", Value::Expression(part))],
+                ),
+                vec![cast_to(Representative::Int32, Vec::new())],
+            ))
+        };
+        // A null alone is converted as a null.
+        assert_eq!(
+            refused_by_the_tables_at(&made_of(chain(null(), &[])), at_the_cast(), text),
+            vec![Limit::AGroupAggregate]
+        );
+        // The values of a group are no literal: the group's own values are what the tables
+        // measured.
+        let group = pivot(chain_of(
+            call(
+                "polars.from_epoch",
+                vec![(
+                    "column",
+                    Value::Expression(chain(call("polars.element", Vec::new()), &[])),
+                )],
+            ),
+            vec![cast_to(Representative::Int32, Vec::new())],
+        ));
+        assert_eq!(
+            refused_by_the_tables_at(&group, at_the_cast(), text),
+            vec![]
+        );
+        // A value that a select refuses to cast too is no group's: the control fails closed.
+        let date = pivot(chain_of(
+            call(
+                "polars.date",
+                vec![
+                    ("year", Value::Expression(whole(1))),
+                    ("month", Value::Expression(whole(1))),
+                    ("day", Value::Expression(whole(1))),
+                ],
+            ),
+            vec![cast_to(Representative::UInt8, Vec::new())],
+        ));
+        assert_eq!(
+            refused_by_the_tables_at(
+                &date,
+                at_the_cast(),
+                "conversion from `date` to `u8` failed in column 'scalar' for 1 out of 1 values: [0001-01-01]"
+            ),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_text_literal_beside_another_literal_is_a_part_polars_converts_and_a_column_beside_it_is_not()
+     {
+        // `datetime(..).dt.replace(month=lit("1"), minute=lit(true))` in a pivot's aggregate: Polars
+        // converts the text of the literal where it makes the plan, and the tables refused the text
+        // of the sample's column. With each part made `x` it refuses the text, so it evaluates it.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-part-of-a-date-that-depends-on-the-rows--a-text-literal-beside-another-literal-in-a-pivot.case"
+            ),
+            vec![Limit::APartOfADateThatDependsOnTheRows]
+        );
+        let text = "conversion from `str` to `i8` failed in column 'b' for 2 out of 3 values: [\"1d\", \"2d\"]";
+        let at_the_replace = || at(&[parameter("aggregate_function"), Segment::Link(0)]);
+        let replacing = |minute: Expression| {
+            let text_literal = call("polars.lit", vec![("value", Value::String("1".to_owned()))]);
+            pivot(chain_of(
+                call("polars.element", Vec::new()),
+                vec![call(
+                    "Expr.dt.replace",
+                    vec![
+                        (
+                            "month",
+                            Value::Expression(chain_of(text_literal, Vec::new())),
+                        ),
+                        ("minute", Value::Expression(minute)),
+                    ],
+                )],
+            ))
+        };
+        assert_eq!(
+            refused_by_the_tables_at(&replacing(whole(1)), at_the_replace(), text),
+            vec![Limit::APartOfADateThatDependsOnTheRows]
+        );
+        // A part that is a column is converted where Polars evaluates it, which the control for
+        // the text of a literal does not show.
+        assert_eq!(
+            refused_by_the_tables_at(&replacing(chain(column("b"), &[])), at_the_replace(), text),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_pivot_aggregate_is_excused_for_a_length_of_time_of_text_and_a_select_is_not() {
+        // The kernels of a group make a length of time of the text of a literal, where a select
+        // refuses it for the dtype of the seconds.
+        assert_eq!(
+            excused_by_kept("uncovered-a-group-aggregate--a-function-given-text.case"),
+            vec![Limit::AGroupAggregate]
+        );
+        let seconds = chain_of(
+            call("polars.lit", vec![("value", Value::String("1".to_owned()))]),
+            Vec::new(),
+        );
+        let duration = call(
+            "polars.duration",
+            vec![("seconds", Value::Expression(seconds))],
+        );
+        let reason = "expected integer or float dtype, (got str) in input 4 of duration";
+        let selected = select(vec![chain_of(duration.clone(), Vec::new())]);
+        assert_eq!(
+            tables_refuse(
+                &selected,
+                at(&[parameter("exprs"), Segment::Item(0), Segment::Start]),
+                Some(TableStage::Schema),
+                reason
+            ),
             vec![]
         );
     }
@@ -6465,6 +6895,127 @@ mod tests {
         assert_eq!(excused(vec![shift(), call("Expr.max", Vec::new())]), vec![]);
     }
 
+    /// `select(polars.from_epoch(polars.time(microsecond=part)).<link>)`, which meets a moment that
+    /// Polars makes null in each row where a part is.
+    fn counting_a_time_of(part: Expression) -> Case {
+        let time = call(
+            "polars.time",
+            vec![("microsecond", Value::Expression(part))],
+        );
+        counting(chain_of(time, Vec::new()))
+    }
+
+    /// `select(polars.from_epoch(counted))`.
+    fn counting(counted: Expression) -> Case {
+        let epoch = call(
+            "polars.from_epoch",
+            vec![("column", Value::Expression(counted))],
+        );
+        select(vec![chain_of(epoch, Vec::new())])
+    }
+
+    #[test]
+    fn a_moment_made_of_text_is_only_nulls_and_one_made_of_numbers_is_not() {
+        // The text of a column is no number, so Polars makes a null of it in each row, and a null
+        // meets a cast that the tables refused for the dtype of a time of day.
+        assert_eq!(
+            excused_by_kept("uncovered-a-shift-that-leaves-nulls--a-moment-made-of-text.case"),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        let at_the_start = || at(&[parameter("exprs"), Segment::Item(0), Segment::Start]);
+        let said = "casting from Time to Datetime('μs') not supported; consider using `dt.combine`";
+        // A column of numbers holds a time of day in each row that has no null: nothing excused.
+        assert_eq!(
+            tables_refuse(
+                &counting_a_time_of(chain(column("u"), &[])),
+                at_the_start(),
+                ROWS,
+                said
+            ),
+            vec![]
+        );
+        // The sample's null is in the middle row of `a` and `b` only, and the other rows hold one.
+        assert_eq!(
+            tables_refuse(
+                &counting_a_time_of(chain(column("a"), &[])),
+                at_the_start(),
+                ROWS,
+                said
+            ),
+            vec![]
+        );
+        assert_eq!(
+            tables_refuse(
+                &counting_a_time_of(chain(column("g"), &[])),
+                at_the_start(),
+                ROWS,
+                said
+            ),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+    }
+
+    #[test]
+    fn a_drop_of_only_nulls_leaves_nothing_to_meet_and_a_drop_of_numbers_does_not() {
+        assert_eq!(
+            excused_by_kept("uncovered-a-shift-that-leaves-nulls--a-drop-of-only-nulls.case"),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        let at_the_start = || at(&[parameter("exprs"), Segment::Item(0), Segment::Start]);
+        let said = "casting from Time to Datetime('μs') not supported; consider using `dt.combine`";
+        let dropped = |part: &str| {
+            counting(chain_of(
+                call(
+                    "polars.time",
+                    vec![("microsecond", Value::Expression(chain(column(part), &[])))],
+                ),
+                vec![call("Expr.drop_nulls", Vec::new())],
+            ))
+        };
+        assert_eq!(
+            tables_refuse(&dropped("g"), at_the_start(), ROWS, said),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        assert_eq!(
+            tables_refuse(&dropped("u"), at_the_start(), ROWS, said),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn what_polars_gives_all_null_is_only_nulls_to_meet_and_what_it_gives_values_is_not() {
+        // `g.str.slice(offset=g)` has the text of a column for an offset, which is no whole
+        // number, so Polars gives a null in each row, and a count since 1970 of it meets only
+        // nulls where the tables refused the dtype of text.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-shift-that-leaves-nulls--a-slice-by-text-that-gives-only-nulls.case"
+            ),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+        let at_the_start = || at(&[parameter("exprs"), Segment::Item(0), Segment::Start]);
+        let said =
+            "casting from string to datetime is not supported. It was removed in Polars 2.0.";
+        let sliced = |offset: Expression| {
+            counting(chain_of(
+                column("g"),
+                vec![call(
+                    "Expr.str.slice",
+                    vec![("offset", Value::Expression(offset))],
+                )],
+            ))
+        };
+        // A whole number for the offset keeps the text, which is what the tables refused.
+        assert_eq!(
+            tables_refuse(&sliced(whole(1)), at_the_start(), ROWS, said),
+            vec![]
+        );
+        assert_eq!(
+            tables_refuse(&sliced(chain(column("g"), &[])), at_the_start(), ROWS, said),
+            vec![Limit::AShiftThatLeavesNulls]
+        );
+    }
+
     #[test]
     fn the_last_of_a_shift_is_null_only_in_a_column_that_has_the_sample_null() {
         // `a` and `b` hold a null in the middle row, which one shift puts last. The
@@ -6731,11 +7282,9 @@ mod tests {
                 "{gives_values}"
             );
         }
-        // A call whose effect on the rows is not known leaves nothing known of them.
-        assert_eq!(
-            excused_after("b", vec![over("k", None), shift_by(1), last()]),
-            vec![]
-        );
+        // A call whose effect on the rows is not known leaves nothing known of them, and Polars,
+        // asked of the part alone, gives the last of them as a value and not as a null.
+        assert_eq!(excused_after("b", vec![over("k", None), last()]), vec![]);
         // Shifts that empty the rows leave only nulls whatever came before them, as
         // long as the rows are the sample's.
         assert_eq!(
@@ -7239,6 +7788,67 @@ mod tests {
         let mut given = vec![("dtype", Value::Dtype(dtype))];
         given.extend(extra);
         call("Expr.cast", given)
+    }
+
+    #[test]
+    fn a_date_made_of_literals_is_a_value_a_strict_cast_cannot_hold_and_the_cast_is_why() {
+        // A date made of the numbers 1, 1 and 1.5 is the first of January of the year 1, which a
+        // cast to a whole number of eight bits cannot hold, and Polars converts the literal when it
+        // works out the schema, naming it the scalar and the call that casts it. The tables measured
+        // the dates of 1970.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-cast-of-a-value-the-dtype-cannot-hold--a-date-made-of-literals.case"
+            ),
+            vec![Limit::ACastOfAValueTheDtypeCannotHold]
+        );
+        let scalar = "conversion from `date` to `u8` failed in column 'scalar' for 1 out of 1 values: [0001-01-01]";
+        let date = || {
+            call(
+                "polars.date",
+                vec![
+                    ("year", Value::Expression(whole(1))),
+                    ("month", Value::Expression(whole(1))),
+                    ("day", Value::Expression(whole(1))),
+                ],
+            )
+        };
+        let strict = select(vec![chain_of(
+            date(),
+            vec![cast_to(Representative::UInt8, Vec::new())],
+        )]);
+        let at_the_cast = || link_of("exprs", 0, 0);
+        // A refusal at the cast that the case holds is the cast's.
+        assert_eq!(
+            refused_for_a_bound(&strict, Some(at_the_cast()), Stage::Schema, scalar,),
+            vec![Limit::ACastOfAValueTheDtypeCannotHold]
+        );
+        // A refusal at another call, or of a column and not of a scalar, is not.
+        let elsewhere = select(vec![chain_of(
+            date(),
+            vec![
+                cast_to(Representative::UInt8, Vec::new()),
+                call("Expr.cum_sum", Vec::new()),
+            ],
+        )]);
+        assert_eq!(
+            refused_for_a_bound(
+                &elsewhere,
+                Some(link_of("exprs", 0, 1)),
+                Stage::Schema,
+                scalar,
+            ),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(
+                &strict,
+                Some(at_the_cast()),
+                Stage::Schema,
+                "conversion from `date` to `u8` failed in column 'a' for 1 out of 3 values: [0001-01-01]",
+            ),
+            vec![]
+        );
     }
 
     #[test]
@@ -8134,13 +8744,104 @@ mod tests {
             &ones,
             is_a_refusal_of_the_components_of_a_date
         ));
-        assert_eq!(refused_for_a_part_of_a_date_with_ones(&ones), None);
+        assert_eq!(
+            refused_for_a_part_of_a_date_with_ones(&ones, is_a_refusal_of_a_part_of_a_date),
+            None
+        );
         let none = select(vec![chain(column("a"), &["Expr.cum_sum"])]);
         assert!(!the_tables_stop_refusing_the_parts_as_ones(
             &none,
             is_a_refusal_of_the_components_of_a_date
         ));
-        assert_eq!(refused_for_a_part_of_a_date_with_ones(&none), None);
+        assert_eq!(
+            refused_for_a_part_of_a_date_with_ones(&none, is_a_refusal_of_a_part_of_a_date),
+            None
+        );
+    }
+
+    const INVALID_DATE: &str = "Invalid date components (1, 1, 0) supplied";
+
+    /// `select(polars.date(year=1, month=1, day=day))`, the parts of a date that a function makes
+    /// of them.
+    fn making_a_date(day: Expression) -> Case {
+        let date = call(
+            "polars.date",
+            vec![
+                ("year", Value::Expression(whole(1))),
+                ("month", Value::Expression(whole(1))),
+                ("day", Value::Expression(day)),
+            ],
+        );
+        select(vec![chain_of(date, Vec::new())])
+    }
+
+    /// `select(polars.time(hour=hour))`.
+    fn making_a_time(hour: Expression) -> Case {
+        let time = call("polars.time", vec![("hour", Value::Expression(hour))]);
+        select(vec![chain_of(time, Vec::new())])
+    }
+
+    #[test]
+    fn a_part_a_function_makes_a_date_of_is_excused_where_polars_refuses_it() {
+        let day = chain(column("k"), &["Expr.not_"]);
+        for (case, said) in [
+            (making_a_date(day.clone()), INVALID_DATE),
+            (making_a_time(day), INVALID_TIME),
+        ] {
+            assert_eq!(
+                refused_for_a_bound(&case, None, Stage::Rows, said),
+                vec![Limit::APartOfADateThatDependsOnTheRows],
+                "{said}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_date_given_numbers_no_calendar_has_is_excused_though_the_dates_with_ones_are_refused_for_a_cast()
+     {
+        // `pivot(aggregate=date(300, 1, -1).cast(UInt8))`: a day of -1 is no day, which Polars
+        // refuses when the rows run, and the tables measured days that are. With each part made the
+        // number 1 the date is the first of January of the year 1, which the cast to eight bits
+        // cannot hold: that is another refusal, and not the components', so the parts are why.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-part-of-a-date-that-depends-on-the-rows--a-date-given-numbers-no-calendar-has.case"
+            ),
+            vec![Limit::APartOfADateThatDependsOnTheRows]
+        );
+    }
+
+    #[test]
+    fn a_part_a_function_makes_a_date_of_is_not_excused_where_the_number_1_is_refused_too() {
+        // Each part is already the number 1: the control is the case itself, which shows nothing.
+        let ones = making_a_date(whole(1));
+        assert_eq!(
+            refused_for_a_bound(&ones, None, Stage::Rows, INVALID_DATE),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_part_of_a_date_with_ones(&ones, is_a_refusal_of_a_part_of_a_date),
+            None
+        );
+        // A refusal at a place, in the schema or for another reason is not this one.
+        let case = making_a_date(chain(column("k"), &["Expr.not_"]));
+        assert_eq!(
+            refused_for_a_bound(
+                &case,
+                Some(link_of("exprs", 0, 1)),
+                Stage::Rows,
+                INVALID_DATE
+            ),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Schema, INVALID_DATE),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, "invalid series dtype"),
+            vec![]
+        );
     }
 
     /// `sort(by=[when(a.is_null()).then(a.dt.replace(day = lit(false))), len()])` over dates: a sort key
@@ -8280,7 +8981,7 @@ mod tests {
         let column_part = replacing("day", chain(column("b"), &[]));
         assert!(!any_call_in_step(
             column_part.document.steps()[0].call(),
-            &is_given_only_literals_of_text
+            &is_given_only_literals_one_of_text
         ));
         for text in ["1", "x"] {
             let literal = replacing(
@@ -8295,7 +8996,7 @@ mod tests {
             );
             assert!(any_call_in_step(
                 literal.document.steps()[0].call(),
-                &is_given_only_literals_of_text
+                &is_given_only_literals_one_of_text
             ));
         }
         let none = select(vec![chain(column("a"), &["Expr.cum_sum"])]);

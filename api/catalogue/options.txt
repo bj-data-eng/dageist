@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 5092 combinations: 2907 allowed; 662 refused when Polars resolved the schema, 1523 when it ran the rows, 0 when it ran the empty table.
+# 5612 combinations: 3214 allowed; 713 refused when Polars resolved the schema, 1685 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.cast | Array(Int64, 2) | dtype=Boolean | refused rows: cannot cast Array type (inner: 'Int64', to: 'Boolean')
 Expr.cast | Array(Int64, 2) | dtype=Boolean, strict=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Boolean')
@@ -5126,3 +5126,523 @@ LazyFrame.sort | - | nulls_last=true, maintain_order=false | allowed -
 LazyFrame.sort | - | nulls_last=true, maintain_order=true | allowed -
 LazyFrame.sort | - | nulls_last=true, multithreaded=false | allowed -
 LazyFrame.sort | - | nulls_last=true, multithreaded=true | allowed -
+polars.datetime | Array(Int64, 2) | time_unit=ms, ambiguous=earliest | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int32')
+polars.datetime | Array(Int64, 2) | time_unit=ms, ambiguous=latest | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int32')
+polars.datetime | Array(Int64, 2) | time_unit=ms, ambiguous=null | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int32')
+polars.datetime | Array(Int64, 2) | time_unit=ms, ambiguous=raise | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int32')
+polars.datetime | Array(Int64, 2) | time_unit=ns, ambiguous=earliest | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int32')
+polars.datetime | Array(Int64, 2) | time_unit=ns, ambiguous=latest | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int32')
+polars.datetime | Array(Int64, 2) | time_unit=ns, ambiguous=null | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int32')
+polars.datetime | Array(Int64, 2) | time_unit=ns, ambiguous=raise | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int32')
+polars.datetime | Array(Int64, 2) | time_unit=us, ambiguous=earliest | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int32')
+polars.datetime | Array(Int64, 2) | time_unit=us, ambiguous=latest | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int32')
+polars.datetime | Array(Int64, 2) | time_unit=us, ambiguous=null | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int32')
+polars.datetime | Array(Int64, 2) | time_unit=us, ambiguous=raise | refused rows: cannot cast Array type (inner: 'Int64', to: 'Int32')
+polars.datetime | Boolean | time_unit=ms, ambiguous=earliest | allowed Datetime(ms) many
+polars.datetime | Boolean | time_unit=ms, ambiguous=latest | allowed Datetime(ms) many
+polars.datetime | Boolean | time_unit=ms, ambiguous=null | allowed Datetime(ms) many
+polars.datetime | Boolean | time_unit=ms, ambiguous=raise | allowed Datetime(ms) many
+polars.datetime | Boolean | time_unit=ns, ambiguous=earliest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Boolean | time_unit=ns, ambiguous=latest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Boolean | time_unit=ns, ambiguous=null | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Boolean | time_unit=ns, ambiguous=raise | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Boolean | time_unit=us, ambiguous=earliest | allowed Datetime(us) many
+polars.datetime | Boolean | time_unit=us, ambiguous=latest | allowed Datetime(us) many
+polars.datetime | Boolean | time_unit=us, ambiguous=null | allowed Datetime(us) many
+polars.datetime | Boolean | time_unit=us, ambiguous=raise | allowed Datetime(us) many
+polars.datetime | Date | time_unit=ms, ambiguous=earliest | allowed Datetime(ms) many
+polars.datetime | Date | time_unit=ms, ambiguous=latest | allowed Datetime(ms) many
+polars.datetime | Date | time_unit=ms, ambiguous=null | allowed Datetime(ms) many
+polars.datetime | Date | time_unit=ms, ambiguous=raise | allowed Datetime(ms) many
+polars.datetime | Date | time_unit=ns, ambiguous=earliest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Date | time_unit=ns, ambiguous=latest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Date | time_unit=ns, ambiguous=null | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Date | time_unit=ns, ambiguous=raise | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Date | time_unit=us, ambiguous=earliest | allowed Datetime(us) many
+polars.datetime | Date | time_unit=us, ambiguous=latest | allowed Datetime(us) many
+polars.datetime | Date | time_unit=us, ambiguous=null | allowed Datetime(us) many
+polars.datetime | Date | time_unit=us, ambiguous=raise | allowed Datetime(us) many
+polars.datetime | Datetime(us) | time_unit=ms, ambiguous=earliest | allowed Datetime(ms) many
+polars.datetime | Datetime(us) | time_unit=ms, ambiguous=latest | allowed Datetime(ms) many
+polars.datetime | Datetime(us) | time_unit=ms, ambiguous=null | allowed Datetime(ms) many
+polars.datetime | Datetime(us) | time_unit=ms, ambiguous=raise | allowed Datetime(ms) many
+polars.datetime | Datetime(us) | time_unit=ns, ambiguous=earliest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Datetime(us) | time_unit=ns, ambiguous=latest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Datetime(us) | time_unit=ns, ambiguous=null | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Datetime(us) | time_unit=ns, ambiguous=raise | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Datetime(us) | time_unit=us, ambiguous=earliest | allowed Datetime(us) many
+polars.datetime | Datetime(us) | time_unit=us, ambiguous=latest | allowed Datetime(us) many
+polars.datetime | Datetime(us) | time_unit=us, ambiguous=null | allowed Datetime(us) many
+polars.datetime | Datetime(us) | time_unit=us, ambiguous=raise | allowed Datetime(us) many
+polars.datetime | Datetime(us, UTC) | time_unit=ms, ambiguous=earliest | allowed Datetime(ms) many
+polars.datetime | Datetime(us, UTC) | time_unit=ms, ambiguous=latest | allowed Datetime(ms) many
+polars.datetime | Datetime(us, UTC) | time_unit=ms, ambiguous=null | allowed Datetime(ms) many
+polars.datetime | Datetime(us, UTC) | time_unit=ms, ambiguous=raise | allowed Datetime(ms) many
+polars.datetime | Datetime(us, UTC) | time_unit=ns, ambiguous=earliest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Datetime(us, UTC) | time_unit=ns, ambiguous=latest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Datetime(us, UTC) | time_unit=ns, ambiguous=null | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Datetime(us, UTC) | time_unit=ns, ambiguous=raise | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Datetime(us, UTC) | time_unit=us, ambiguous=earliest | allowed Datetime(us) many
+polars.datetime | Datetime(us, UTC) | time_unit=us, ambiguous=latest | allowed Datetime(us) many
+polars.datetime | Datetime(us, UTC) | time_unit=us, ambiguous=null | allowed Datetime(us) many
+polars.datetime | Datetime(us, UTC) | time_unit=us, ambiguous=raise | allowed Datetime(us) many
+polars.datetime | Decimal(10, 2) | time_unit=ms, ambiguous=earliest | allowed Datetime(ms) many
+polars.datetime | Decimal(10, 2) | time_unit=ms, ambiguous=latest | allowed Datetime(ms) many
+polars.datetime | Decimal(10, 2) | time_unit=ms, ambiguous=null | allowed Datetime(ms) many
+polars.datetime | Decimal(10, 2) | time_unit=ms, ambiguous=raise | allowed Datetime(ms) many
+polars.datetime | Decimal(10, 2) | time_unit=ns, ambiguous=earliest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Decimal(10, 2) | time_unit=ns, ambiguous=latest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Decimal(10, 2) | time_unit=ns, ambiguous=null | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Decimal(10, 2) | time_unit=ns, ambiguous=raise | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Decimal(10, 2) | time_unit=us, ambiguous=earliest | allowed Datetime(us) many
+polars.datetime | Decimal(10, 2) | time_unit=us, ambiguous=latest | allowed Datetime(us) many
+polars.datetime | Decimal(10, 2) | time_unit=us, ambiguous=null | allowed Datetime(us) many
+polars.datetime | Decimal(10, 2) | time_unit=us, ambiguous=raise | allowed Datetime(us) many
+polars.datetime | Duration(us) | time_unit=ms, ambiguous=earliest | allowed Datetime(ms) many
+polars.datetime | Duration(us) | time_unit=ms, ambiguous=latest | allowed Datetime(ms) many
+polars.datetime | Duration(us) | time_unit=ms, ambiguous=null | allowed Datetime(ms) many
+polars.datetime | Duration(us) | time_unit=ms, ambiguous=raise | allowed Datetime(ms) many
+polars.datetime | Duration(us) | time_unit=ns, ambiguous=earliest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Duration(us) | time_unit=ns, ambiguous=latest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Duration(us) | time_unit=ns, ambiguous=null | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Duration(us) | time_unit=ns, ambiguous=raise | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Duration(us) | time_unit=us, ambiguous=earliest | allowed Datetime(us) many
+polars.datetime | Duration(us) | time_unit=us, ambiguous=latest | allowed Datetime(us) many
+polars.datetime | Duration(us) | time_unit=us, ambiguous=null | allowed Datetime(us) many
+polars.datetime | Duration(us) | time_unit=us, ambiguous=raise | allowed Datetime(us) many
+polars.datetime | Float16 | time_unit=ms, ambiguous=earliest | allowed Datetime(ms) many
+polars.datetime | Float16 | time_unit=ms, ambiguous=latest | allowed Datetime(ms) many
+polars.datetime | Float16 | time_unit=ms, ambiguous=null | allowed Datetime(ms) many
+polars.datetime | Float16 | time_unit=ms, ambiguous=raise | allowed Datetime(ms) many
+polars.datetime | Float16 | time_unit=ns, ambiguous=earliest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Float16 | time_unit=ns, ambiguous=latest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Float16 | time_unit=ns, ambiguous=null | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Float16 | time_unit=ns, ambiguous=raise | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Float16 | time_unit=us, ambiguous=earliest | allowed Datetime(us) many
+polars.datetime | Float16 | time_unit=us, ambiguous=latest | allowed Datetime(us) many
+polars.datetime | Float16 | time_unit=us, ambiguous=null | allowed Datetime(us) many
+polars.datetime | Float16 | time_unit=us, ambiguous=raise | allowed Datetime(us) many
+polars.datetime | Float32 | time_unit=ms, ambiguous=earliest | allowed Datetime(ms) many
+polars.datetime | Float32 | time_unit=ms, ambiguous=latest | allowed Datetime(ms) many
+polars.datetime | Float32 | time_unit=ms, ambiguous=null | allowed Datetime(ms) many
+polars.datetime | Float32 | time_unit=ms, ambiguous=raise | allowed Datetime(ms) many
+polars.datetime | Float32 | time_unit=ns, ambiguous=earliest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Float32 | time_unit=ns, ambiguous=latest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Float32 | time_unit=ns, ambiguous=null | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Float32 | time_unit=ns, ambiguous=raise | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Float32 | time_unit=us, ambiguous=earliest | allowed Datetime(us) many
+polars.datetime | Float32 | time_unit=us, ambiguous=latest | allowed Datetime(us) many
+polars.datetime | Float32 | time_unit=us, ambiguous=null | allowed Datetime(us) many
+polars.datetime | Float32 | time_unit=us, ambiguous=raise | allowed Datetime(us) many
+polars.datetime | Float64 | time_unit=ms, ambiguous=earliest | allowed Datetime(ms) many
+polars.datetime | Float64 | time_unit=ms, ambiguous=latest | allowed Datetime(ms) many
+polars.datetime | Float64 | time_unit=ms, ambiguous=null | allowed Datetime(ms) many
+polars.datetime | Float64 | time_unit=ms, ambiguous=raise | allowed Datetime(ms) many
+polars.datetime | Float64 | time_unit=ns, ambiguous=earliest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Float64 | time_unit=ns, ambiguous=latest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Float64 | time_unit=ns, ambiguous=null | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Float64 | time_unit=ns, ambiguous=raise | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Float64 | time_unit=us, ambiguous=earliest | allowed Datetime(us) many
+polars.datetime | Float64 | time_unit=us, ambiguous=latest | allowed Datetime(us) many
+polars.datetime | Float64 | time_unit=us, ambiguous=null | allowed Datetime(us) many
+polars.datetime | Float64 | time_unit=us, ambiguous=raise | allowed Datetime(us) many
+polars.datetime | Int128 | time_unit=ms, ambiguous=earliest | allowed Datetime(ms) many
+polars.datetime | Int128 | time_unit=ms, ambiguous=latest | allowed Datetime(ms) many
+polars.datetime | Int128 | time_unit=ms, ambiguous=null | allowed Datetime(ms) many
+polars.datetime | Int128 | time_unit=ms, ambiguous=raise | allowed Datetime(ms) many
+polars.datetime | Int128 | time_unit=ns, ambiguous=earliest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Int128 | time_unit=ns, ambiguous=latest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Int128 | time_unit=ns, ambiguous=null | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Int128 | time_unit=ns, ambiguous=raise | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Int128 | time_unit=us, ambiguous=earliest | allowed Datetime(us) many
+polars.datetime | Int128 | time_unit=us, ambiguous=latest | allowed Datetime(us) many
+polars.datetime | Int128 | time_unit=us, ambiguous=null | allowed Datetime(us) many
+polars.datetime | Int128 | time_unit=us, ambiguous=raise | allowed Datetime(us) many
+polars.datetime | Int16 | time_unit=ms, ambiguous=earliest | allowed Datetime(ms) many
+polars.datetime | Int16 | time_unit=ms, ambiguous=latest | allowed Datetime(ms) many
+polars.datetime | Int16 | time_unit=ms, ambiguous=null | allowed Datetime(ms) many
+polars.datetime | Int16 | time_unit=ms, ambiguous=raise | allowed Datetime(ms) many
+polars.datetime | Int16 | time_unit=ns, ambiguous=earliest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Int16 | time_unit=ns, ambiguous=latest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Int16 | time_unit=ns, ambiguous=null | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Int16 | time_unit=ns, ambiguous=raise | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Int16 | time_unit=us, ambiguous=earliest | allowed Datetime(us) many
+polars.datetime | Int16 | time_unit=us, ambiguous=latest | allowed Datetime(us) many
+polars.datetime | Int16 | time_unit=us, ambiguous=null | allowed Datetime(us) many
+polars.datetime | Int16 | time_unit=us, ambiguous=raise | allowed Datetime(us) many
+polars.datetime | Int32 | time_unit=ms, ambiguous=earliest | allowed Datetime(ms) many
+polars.datetime | Int32 | time_unit=ms, ambiguous=latest | allowed Datetime(ms) many
+polars.datetime | Int32 | time_unit=ms, ambiguous=null | allowed Datetime(ms) many
+polars.datetime | Int32 | time_unit=ms, ambiguous=raise | allowed Datetime(ms) many
+polars.datetime | Int32 | time_unit=ns, ambiguous=earliest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Int32 | time_unit=ns, ambiguous=latest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Int32 | time_unit=ns, ambiguous=null | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Int32 | time_unit=ns, ambiguous=raise | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Int32 | time_unit=us, ambiguous=earliest | allowed Datetime(us) many
+polars.datetime | Int32 | time_unit=us, ambiguous=latest | allowed Datetime(us) many
+polars.datetime | Int32 | time_unit=us, ambiguous=null | allowed Datetime(us) many
+polars.datetime | Int32 | time_unit=us, ambiguous=raise | allowed Datetime(us) many
+polars.datetime | Int64 | time_unit=ms, ambiguous=earliest | allowed Datetime(ms) many
+polars.datetime | Int64 | time_unit=ms, ambiguous=latest | allowed Datetime(ms) many
+polars.datetime | Int64 | time_unit=ms, ambiguous=null | allowed Datetime(ms) many
+polars.datetime | Int64 | time_unit=ms, ambiguous=raise | allowed Datetime(ms) many
+polars.datetime | Int64 | time_unit=ns, ambiguous=earliest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Int64 | time_unit=ns, ambiguous=latest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Int64 | time_unit=ns, ambiguous=null | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Int64 | time_unit=ns, ambiguous=raise | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Int64 | time_unit=us, ambiguous=earliest | allowed Datetime(us) many
+polars.datetime | Int64 | time_unit=us, ambiguous=latest | allowed Datetime(us) many
+polars.datetime | Int64 | time_unit=us, ambiguous=null | allowed Datetime(us) many
+polars.datetime | Int64 | time_unit=us, ambiguous=raise | allowed Datetime(us) many
+polars.datetime | Int8 | time_unit=ms, ambiguous=earliest | allowed Datetime(ms) many
+polars.datetime | Int8 | time_unit=ms, ambiguous=latest | allowed Datetime(ms) many
+polars.datetime | Int8 | time_unit=ms, ambiguous=null | allowed Datetime(ms) many
+polars.datetime | Int8 | time_unit=ms, ambiguous=raise | allowed Datetime(ms) many
+polars.datetime | Int8 | time_unit=ns, ambiguous=earliest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Int8 | time_unit=ns, ambiguous=latest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Int8 | time_unit=ns, ambiguous=null | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Int8 | time_unit=ns, ambiguous=raise | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Int8 | time_unit=us, ambiguous=earliest | allowed Datetime(us) many
+polars.datetime | Int8 | time_unit=us, ambiguous=latest | allowed Datetime(us) many
+polars.datetime | Int8 | time_unit=us, ambiguous=null | allowed Datetime(us) many
+polars.datetime | Int8 | time_unit=us, ambiguous=raise | allowed Datetime(us) many
+polars.datetime | List(Int64) | time_unit=ms, ambiguous=earliest | refused rows: cannot cast List type (inner: 'Int64', to: 'Int32')
+polars.datetime | List(Int64) | time_unit=ms, ambiguous=latest | refused rows: cannot cast List type (inner: 'Int64', to: 'Int32')
+polars.datetime | List(Int64) | time_unit=ms, ambiguous=null | refused rows: cannot cast List type (inner: 'Int64', to: 'Int32')
+polars.datetime | List(Int64) | time_unit=ms, ambiguous=raise | refused rows: cannot cast List type (inner: 'Int64', to: 'Int32')
+polars.datetime | List(Int64) | time_unit=ns, ambiguous=earliest | refused rows: cannot cast List type (inner: 'Int64', to: 'Int32')
+polars.datetime | List(Int64) | time_unit=ns, ambiguous=latest | refused rows: cannot cast List type (inner: 'Int64', to: 'Int32')
+polars.datetime | List(Int64) | time_unit=ns, ambiguous=null | refused rows: cannot cast List type (inner: 'Int64', to: 'Int32')
+polars.datetime | List(Int64) | time_unit=ns, ambiguous=raise | refused rows: cannot cast List type (inner: 'Int64', to: 'Int32')
+polars.datetime | List(Int64) | time_unit=us, ambiguous=earliest | refused rows: cannot cast List type (inner: 'Int64', to: 'Int32')
+polars.datetime | List(Int64) | time_unit=us, ambiguous=latest | refused rows: cannot cast List type (inner: 'Int64', to: 'Int32')
+polars.datetime | List(Int64) | time_unit=us, ambiguous=null | refused rows: cannot cast List type (inner: 'Int64', to: 'Int32')
+polars.datetime | List(Int64) | time_unit=us, ambiguous=raise | refused rows: cannot cast List type (inner: 'Int64', to: 'Int32')
+polars.datetime | List(String) | time_unit=ms, ambiguous=earliest | refused rows: cannot cast List type (inner: 'String', to: 'Int32')
+polars.datetime | List(String) | time_unit=ms, ambiguous=latest | refused rows: cannot cast List type (inner: 'String', to: 'Int32')
+polars.datetime | List(String) | time_unit=ms, ambiguous=null | refused rows: cannot cast List type (inner: 'String', to: 'Int32')
+polars.datetime | List(String) | time_unit=ms, ambiguous=raise | refused rows: cannot cast List type (inner: 'String', to: 'Int32')
+polars.datetime | List(String) | time_unit=ns, ambiguous=earliest | refused rows: cannot cast List type (inner: 'String', to: 'Int32')
+polars.datetime | List(String) | time_unit=ns, ambiguous=latest | refused rows: cannot cast List type (inner: 'String', to: 'Int32')
+polars.datetime | List(String) | time_unit=ns, ambiguous=null | refused rows: cannot cast List type (inner: 'String', to: 'Int32')
+polars.datetime | List(String) | time_unit=ns, ambiguous=raise | refused rows: cannot cast List type (inner: 'String', to: 'Int32')
+polars.datetime | List(String) | time_unit=us, ambiguous=earliest | refused rows: cannot cast List type (inner: 'String', to: 'Int32')
+polars.datetime | List(String) | time_unit=us, ambiguous=latest | refused rows: cannot cast List type (inner: 'String', to: 'Int32')
+polars.datetime | List(String) | time_unit=us, ambiguous=null | refused rows: cannot cast List type (inner: 'String', to: 'Int32')
+polars.datetime | List(String) | time_unit=us, ambiguous=raise | refused rows: cannot cast List type (inner: 'String', to: 'Int32')
+polars.datetime | Null | time_unit=ms, ambiguous=earliest | allowed Datetime(ms) many
+polars.datetime | Null | time_unit=ms, ambiguous=latest | allowed Datetime(ms) many
+polars.datetime | Null | time_unit=ms, ambiguous=null | allowed Datetime(ms) many
+polars.datetime | Null | time_unit=ms, ambiguous=raise | allowed Datetime(ms) many
+polars.datetime | Null | time_unit=ns, ambiguous=earliest | allowed Datetime(ns) many
+polars.datetime | Null | time_unit=ns, ambiguous=latest | allowed Datetime(ns) many
+polars.datetime | Null | time_unit=ns, ambiguous=null | allowed Datetime(ns) many
+polars.datetime | Null | time_unit=ns, ambiguous=raise | allowed Datetime(ns) many
+polars.datetime | Null | time_unit=us, ambiguous=earliest | allowed Datetime(us) many
+polars.datetime | Null | time_unit=us, ambiguous=latest | allowed Datetime(us) many
+polars.datetime | Null | time_unit=us, ambiguous=null | allowed Datetime(us) many
+polars.datetime | Null | time_unit=us, ambiguous=raise | allowed Datetime(us) many
+polars.datetime | String | time_unit=ms, ambiguous=earliest | allowed Datetime(ms) many
+polars.datetime | String | time_unit=ms, ambiguous=latest | allowed Datetime(ms) many
+polars.datetime | String | time_unit=ms, ambiguous=null | allowed Datetime(ms) many
+polars.datetime | String | time_unit=ms, ambiguous=raise | allowed Datetime(ms) many
+polars.datetime | String | time_unit=ns, ambiguous=earliest | allowed Datetime(ns) many
+polars.datetime | String | time_unit=ns, ambiguous=latest | allowed Datetime(ns) many
+polars.datetime | String | time_unit=ns, ambiguous=null | allowed Datetime(ns) many
+polars.datetime | String | time_unit=ns, ambiguous=raise | allowed Datetime(ns) many
+polars.datetime | String | time_unit=us, ambiguous=earliest | allowed Datetime(us) many
+polars.datetime | String | time_unit=us, ambiguous=latest | allowed Datetime(us) many
+polars.datetime | String | time_unit=us, ambiguous=null | allowed Datetime(us) many
+polars.datetime | String | time_unit=us, ambiguous=raise | allowed Datetime(us) many
+polars.datetime | Struct(x: Int64, y: String) | time_unit=ms, ambiguous=earliest | refused rows: invalid series dtype: expected `Int32`, got `struct[2]` for series with name `a`
+polars.datetime | Struct(x: Int64, y: String) | time_unit=ms, ambiguous=latest | refused rows: invalid series dtype: expected `Int32`, got `struct[2]` for series with name `a`
+polars.datetime | Struct(x: Int64, y: String) | time_unit=ms, ambiguous=null | refused rows: invalid series dtype: expected `Int32`, got `struct[2]` for series with name `a`
+polars.datetime | Struct(x: Int64, y: String) | time_unit=ms, ambiguous=raise | refused rows: invalid series dtype: expected `Int32`, got `struct[2]` for series with name `a`
+polars.datetime | Struct(x: Int64, y: String) | time_unit=ns, ambiguous=earliest | refused rows: invalid series dtype: expected `Int32`, got `struct[2]` for series with name `a`
+polars.datetime | Struct(x: Int64, y: String) | time_unit=ns, ambiguous=latest | refused rows: invalid series dtype: expected `Int32`, got `struct[2]` for series with name `a`
+polars.datetime | Struct(x: Int64, y: String) | time_unit=ns, ambiguous=null | refused rows: invalid series dtype: expected `Int32`, got `struct[2]` for series with name `a`
+polars.datetime | Struct(x: Int64, y: String) | time_unit=ns, ambiguous=raise | refused rows: invalid series dtype: expected `Int32`, got `struct[2]` for series with name `a`
+polars.datetime | Struct(x: Int64, y: String) | time_unit=us, ambiguous=earliest | refused rows: invalid series dtype: expected `Int32`, got `struct[2]` for series with name `a`
+polars.datetime | Struct(x: Int64, y: String) | time_unit=us, ambiguous=latest | refused rows: invalid series dtype: expected `Int32`, got `struct[2]` for series with name `a`
+polars.datetime | Struct(x: Int64, y: String) | time_unit=us, ambiguous=null | refused rows: invalid series dtype: expected `Int32`, got `struct[2]` for series with name `a`
+polars.datetime | Struct(x: Int64, y: String) | time_unit=us, ambiguous=raise | refused rows: invalid series dtype: expected `Int32`, got `struct[2]` for series with name `a`
+polars.datetime | Time | time_unit=ms, ambiguous=earliest | allowed Datetime(ms) many
+polars.datetime | Time | time_unit=ms, ambiguous=latest | allowed Datetime(ms) many
+polars.datetime | Time | time_unit=ms, ambiguous=null | allowed Datetime(ms) many
+polars.datetime | Time | time_unit=ms, ambiguous=raise | allowed Datetime(ms) many
+polars.datetime | Time | time_unit=ns, ambiguous=earliest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Time | time_unit=ns, ambiguous=latest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Time | time_unit=ns, ambiguous=null | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Time | time_unit=ns, ambiguous=raise | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | Time | time_unit=us, ambiguous=earliest | allowed Datetime(us) many
+polars.datetime | Time | time_unit=us, ambiguous=latest | allowed Datetime(us) many
+polars.datetime | Time | time_unit=us, ambiguous=null | allowed Datetime(us) many
+polars.datetime | Time | time_unit=us, ambiguous=raise | allowed Datetime(us) many
+polars.datetime | UInt128 | time_unit=ms, ambiguous=earliest | allowed Datetime(ms) many
+polars.datetime | UInt128 | time_unit=ms, ambiguous=latest | allowed Datetime(ms) many
+polars.datetime | UInt128 | time_unit=ms, ambiguous=null | allowed Datetime(ms) many
+polars.datetime | UInt128 | time_unit=ms, ambiguous=raise | allowed Datetime(ms) many
+polars.datetime | UInt128 | time_unit=ns, ambiguous=earliest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | UInt128 | time_unit=ns, ambiguous=latest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | UInt128 | time_unit=ns, ambiguous=null | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | UInt128 | time_unit=ns, ambiguous=raise | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | UInt128 | time_unit=us, ambiguous=earliest | allowed Datetime(us) many
+polars.datetime | UInt128 | time_unit=us, ambiguous=latest | allowed Datetime(us) many
+polars.datetime | UInt128 | time_unit=us, ambiguous=null | allowed Datetime(us) many
+polars.datetime | UInt128 | time_unit=us, ambiguous=raise | allowed Datetime(us) many
+polars.datetime | UInt16 | time_unit=ms, ambiguous=earliest | allowed Datetime(ms) many
+polars.datetime | UInt16 | time_unit=ms, ambiguous=latest | allowed Datetime(ms) many
+polars.datetime | UInt16 | time_unit=ms, ambiguous=null | allowed Datetime(ms) many
+polars.datetime | UInt16 | time_unit=ms, ambiguous=raise | allowed Datetime(ms) many
+polars.datetime | UInt16 | time_unit=ns, ambiguous=earliest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | UInt16 | time_unit=ns, ambiguous=latest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | UInt16 | time_unit=ns, ambiguous=null | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | UInt16 | time_unit=ns, ambiguous=raise | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | UInt16 | time_unit=us, ambiguous=earliest | allowed Datetime(us) many
+polars.datetime | UInt16 | time_unit=us, ambiguous=latest | allowed Datetime(us) many
+polars.datetime | UInt16 | time_unit=us, ambiguous=null | allowed Datetime(us) many
+polars.datetime | UInt16 | time_unit=us, ambiguous=raise | allowed Datetime(us) many
+polars.datetime | UInt32 | time_unit=ms, ambiguous=earliest | allowed Datetime(ms) many
+polars.datetime | UInt32 | time_unit=ms, ambiguous=latest | allowed Datetime(ms) many
+polars.datetime | UInt32 | time_unit=ms, ambiguous=null | allowed Datetime(ms) many
+polars.datetime | UInt32 | time_unit=ms, ambiguous=raise | allowed Datetime(ms) many
+polars.datetime | UInt32 | time_unit=ns, ambiguous=earliest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | UInt32 | time_unit=ns, ambiguous=latest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | UInt32 | time_unit=ns, ambiguous=null | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | UInt32 | time_unit=ns, ambiguous=raise | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | UInt32 | time_unit=us, ambiguous=earliest | allowed Datetime(us) many
+polars.datetime | UInt32 | time_unit=us, ambiguous=latest | allowed Datetime(us) many
+polars.datetime | UInt32 | time_unit=us, ambiguous=null | allowed Datetime(us) many
+polars.datetime | UInt32 | time_unit=us, ambiguous=raise | allowed Datetime(us) many
+polars.datetime | UInt64 | time_unit=ms, ambiguous=earliest | allowed Datetime(ms) many
+polars.datetime | UInt64 | time_unit=ms, ambiguous=latest | allowed Datetime(ms) many
+polars.datetime | UInt64 | time_unit=ms, ambiguous=null | allowed Datetime(ms) many
+polars.datetime | UInt64 | time_unit=ms, ambiguous=raise | allowed Datetime(ms) many
+polars.datetime | UInt64 | time_unit=ns, ambiguous=earliest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | UInt64 | time_unit=ns, ambiguous=latest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | UInt64 | time_unit=ns, ambiguous=null | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | UInt64 | time_unit=ns, ambiguous=raise | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | UInt64 | time_unit=us, ambiguous=earliest | allowed Datetime(us) many
+polars.datetime | UInt64 | time_unit=us, ambiguous=latest | allowed Datetime(us) many
+polars.datetime | UInt64 | time_unit=us, ambiguous=null | allowed Datetime(us) many
+polars.datetime | UInt64 | time_unit=us, ambiguous=raise | allowed Datetime(us) many
+polars.datetime | UInt8 | time_unit=ms, ambiguous=earliest | allowed Datetime(ms) many
+polars.datetime | UInt8 | time_unit=ms, ambiguous=latest | allowed Datetime(ms) many
+polars.datetime | UInt8 | time_unit=ms, ambiguous=null | allowed Datetime(ms) many
+polars.datetime | UInt8 | time_unit=ms, ambiguous=raise | allowed Datetime(ms) many
+polars.datetime | UInt8 | time_unit=ns, ambiguous=earliest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | UInt8 | time_unit=ns, ambiguous=latest | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | UInt8 | time_unit=ns, ambiguous=null | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | UInt8 | time_unit=ns, ambiguous=raise | refused rows: Polars panicked: called `Option::unwrap()` on a `None` value
+polars.datetime | UInt8 | time_unit=us, ambiguous=earliest | allowed Datetime(us) many
+polars.datetime | UInt8 | time_unit=us, ambiguous=latest | allowed Datetime(us) many
+polars.datetime | UInt8 | time_unit=us, ambiguous=null | allowed Datetime(us) many
+polars.datetime | UInt8 | time_unit=us, ambiguous=raise | allowed Datetime(us) many
+polars.duration | Array(Int64, 2) | time_unit=ms | refused schema: expected integer or float dtype, (got array[i64, 2]) in input 0 of duration
+polars.duration | Array(Int64, 2) | time_unit=ns | refused schema: expected integer or float dtype, (got array[i64, 2]) in input 0 of duration
+polars.duration | Array(Int64, 2) | time_unit=us | refused schema: expected integer or float dtype, (got array[i64, 2]) in input 0 of duration
+polars.duration | Boolean | time_unit=ms | refused schema: expected integer or float dtype, (got bool) in input 0 of duration
+polars.duration | Boolean | time_unit=ns | refused schema: expected integer or float dtype, (got bool) in input 0 of duration
+polars.duration | Boolean | time_unit=us | refused schema: expected integer or float dtype, (got bool) in input 0 of duration
+polars.duration | Date | time_unit=ms | refused schema: expected integer or float dtype, (got date) in input 0 of duration
+polars.duration | Date | time_unit=ns | refused schema: expected integer or float dtype, (got date) in input 0 of duration
+polars.duration | Date | time_unit=us | refused schema: expected integer or float dtype, (got date) in input 0 of duration
+polars.duration | Datetime(us) | time_unit=ms | refused schema: expected integer or float dtype, (got datetime[μs]) in input 0 of duration
+polars.duration | Datetime(us) | time_unit=ns | refused schema: expected integer or float dtype, (got datetime[μs]) in input 0 of duration
+polars.duration | Datetime(us) | time_unit=us | refused schema: expected integer or float dtype, (got datetime[μs]) in input 0 of duration
+polars.duration | Datetime(us, UTC) | time_unit=ms | refused schema: expected integer or float dtype, (got datetime[μs, UTC]) in input 0 of duration
+polars.duration | Datetime(us, UTC) | time_unit=ns | refused schema: expected integer or float dtype, (got datetime[μs, UTC]) in input 0 of duration
+polars.duration | Datetime(us, UTC) | time_unit=us | refused schema: expected integer or float dtype, (got datetime[μs, UTC]) in input 0 of duration
+polars.duration | Decimal(10, 2) | time_unit=ms | refused schema: expected integer or float dtype, (got decimal[10,2]) in input 0 of duration
+polars.duration | Decimal(10, 2) | time_unit=ns | refused schema: expected integer or float dtype, (got decimal[10,2]) in input 0 of duration
+polars.duration | Decimal(10, 2) | time_unit=us | refused schema: expected integer or float dtype, (got decimal[10,2]) in input 0 of duration
+polars.duration | Duration(us) | time_unit=ms | refused schema: expected integer or float dtype, (got duration[μs]) in input 0 of duration
+polars.duration | Duration(us) | time_unit=ns | refused schema: expected integer or float dtype, (got duration[μs]) in input 0 of duration
+polars.duration | Duration(us) | time_unit=us | refused schema: expected integer or float dtype, (got duration[μs]) in input 0 of duration
+polars.duration | Float16 | time_unit=ms | allowed Duration(ms) many
+polars.duration | Float16 | time_unit=ns | allowed Duration(ns) many
+polars.duration | Float16 | time_unit=us | allowed Duration(us) many
+polars.duration | Float32 | time_unit=ms | allowed Duration(ms) many
+polars.duration | Float32 | time_unit=ns | allowed Duration(ns) many
+polars.duration | Float32 | time_unit=us | allowed Duration(us) many
+polars.duration | Float64 | time_unit=ms | allowed Duration(ms) many
+polars.duration | Float64 | time_unit=ns | allowed Duration(ns) many
+polars.duration | Float64 | time_unit=us | allowed Duration(us) many
+polars.duration | Int128 | time_unit=ms | allowed Duration(ms) many
+polars.duration | Int128 | time_unit=ns | allowed Duration(ns) many
+polars.duration | Int128 | time_unit=us | allowed Duration(us) many
+polars.duration | Int16 | time_unit=ms | allowed Duration(ms) many
+polars.duration | Int16 | time_unit=ns | allowed Duration(ns) many
+polars.duration | Int16 | time_unit=us | allowed Duration(us) many
+polars.duration | Int32 | time_unit=ms | allowed Duration(ms) many
+polars.duration | Int32 | time_unit=ns | allowed Duration(ns) many
+polars.duration | Int32 | time_unit=us | allowed Duration(us) many
+polars.duration | Int64 | time_unit=ms | allowed Duration(ms) many
+polars.duration | Int64 | time_unit=ns | allowed Duration(ns) many
+polars.duration | Int64 | time_unit=us | allowed Duration(us) many
+polars.duration | Int8 | time_unit=ms | allowed Duration(ms) many
+polars.duration | Int8 | time_unit=ns | allowed Duration(ns) many
+polars.duration | Int8 | time_unit=us | allowed Duration(us) many
+polars.duration | List(Int64) | time_unit=ms | refused schema: expected integer or float dtype, (got list[i64]) in input 0 of duration
+polars.duration | List(Int64) | time_unit=ns | refused schema: expected integer or float dtype, (got list[i64]) in input 0 of duration
+polars.duration | List(Int64) | time_unit=us | refused schema: expected integer or float dtype, (got list[i64]) in input 0 of duration
+polars.duration | List(String) | time_unit=ms | refused schema: expected integer or float dtype, (got list[str]) in input 0 of duration
+polars.duration | List(String) | time_unit=ns | refused schema: expected integer or float dtype, (got list[str]) in input 0 of duration
+polars.duration | List(String) | time_unit=us | refused schema: expected integer or float dtype, (got list[str]) in input 0 of duration
+polars.duration | Null | time_unit=ms | refused schema: expected integer or float dtype, (got null) in input 0 of duration
+polars.duration | Null | time_unit=ns | refused schema: expected integer or float dtype, (got null) in input 0 of duration
+polars.duration | Null | time_unit=us | refused schema: expected integer or float dtype, (got null) in input 0 of duration
+polars.duration | String | time_unit=ms | refused schema: expected integer or float dtype, (got str) in input 0 of duration
+polars.duration | String | time_unit=ns | refused schema: expected integer or float dtype, (got str) in input 0 of duration
+polars.duration | String | time_unit=us | refused schema: expected integer or float dtype, (got str) in input 0 of duration
+polars.duration | Struct(x: Int64, y: String) | time_unit=ms | refused schema: expected integer or float dtype, (got struct[2]) in input 0 of duration
+polars.duration | Struct(x: Int64, y: String) | time_unit=ns | refused schema: expected integer or float dtype, (got struct[2]) in input 0 of duration
+polars.duration | Struct(x: Int64, y: String) | time_unit=us | refused schema: expected integer or float dtype, (got struct[2]) in input 0 of duration
+polars.duration | Time | time_unit=ms | refused schema: expected integer or float dtype, (got time) in input 0 of duration
+polars.duration | Time | time_unit=ns | refused schema: expected integer or float dtype, (got time) in input 0 of duration
+polars.duration | Time | time_unit=us | refused schema: expected integer or float dtype, (got time) in input 0 of duration
+polars.duration | UInt128 | time_unit=ms | allowed Duration(ms) many
+polars.duration | UInt128 | time_unit=ns | allowed Duration(ns) many
+polars.duration | UInt128 | time_unit=us | allowed Duration(us) many
+polars.duration | UInt16 | time_unit=ms | allowed Duration(ms) many
+polars.duration | UInt16 | time_unit=ns | allowed Duration(ns) many
+polars.duration | UInt16 | time_unit=us | allowed Duration(us) many
+polars.duration | UInt32 | time_unit=ms | allowed Duration(ms) many
+polars.duration | UInt32 | time_unit=ns | allowed Duration(ns) many
+polars.duration | UInt32 | time_unit=us | allowed Duration(us) many
+polars.duration | UInt64 | time_unit=ms | allowed Duration(ms) many
+polars.duration | UInt64 | time_unit=ns | allowed Duration(ns) many
+polars.duration | UInt64 | time_unit=us | allowed Duration(us) many
+polars.duration | UInt8 | time_unit=ms | allowed Duration(ms) many
+polars.duration | UInt8 | time_unit=ns | allowed Duration(ns) many
+polars.duration | UInt8 | time_unit=us | allowed Duration(us) many
+polars.from_epoch | Array(Int64, 2) | time_unit=d | refused rows: cannot cast Array type (inner: 'Int64', to: 'Date')
+polars.from_epoch | Array(Int64, 2) | time_unit=ms | refused rows: cannot cast Array type (inner: 'Int64', to: 'Datetime('μs')')
+polars.from_epoch | Array(Int64, 2) | time_unit=ns | refused rows: cannot cast Array type (inner: 'Int64', to: 'Datetime('ns')')
+polars.from_epoch | Array(Int64, 2) | time_unit=s | refused rows: cannot cast Array type (inner: 'Int64', to: 'Datetime('μs')')
+polars.from_epoch | Array(Int64, 2) | time_unit=us | refused rows: cannot cast Array type (inner: 'Int64', to: 'Datetime('μs')')
+polars.from_epoch | Boolean | time_unit=d | allowed Date many
+polars.from_epoch | Boolean | time_unit=ms | allowed Datetime(us) many
+polars.from_epoch | Boolean | time_unit=ns | allowed Datetime(ns) many
+polars.from_epoch | Boolean | time_unit=s | allowed Datetime(us) many
+polars.from_epoch | Boolean | time_unit=us | allowed Datetime(us) many
+polars.from_epoch | Date | time_unit=d | allowed Date many
+polars.from_epoch | Date | time_unit=ms | refused schema: * not allowed on date and i64
+polars.from_epoch | Date | time_unit=ns | allowed Datetime(ns) many
+polars.from_epoch | Date | time_unit=s | refused schema: * not allowed on date and i64
+polars.from_epoch | Date | time_unit=us | allowed Datetime(us) many
+polars.from_epoch | Datetime(us) | time_unit=d | allowed Date many
+polars.from_epoch | Datetime(us) | time_unit=ms | refused schema: * not allowed on datetime[μs] and i64
+polars.from_epoch | Datetime(us) | time_unit=ns | allowed Datetime(ns) many
+polars.from_epoch | Datetime(us) | time_unit=s | refused schema: * not allowed on datetime[μs] and i64
+polars.from_epoch | Datetime(us) | time_unit=us | allowed Datetime(us) many
+polars.from_epoch | Datetime(us, UTC) | time_unit=d | allowed Date many
+polars.from_epoch | Datetime(us, UTC) | time_unit=ms | refused schema: * not allowed on datetime[μs, UTC] and i64
+polars.from_epoch | Datetime(us, UTC) | time_unit=ns | allowed Datetime(ns) many
+polars.from_epoch | Datetime(us, UTC) | time_unit=s | refused schema: * not allowed on datetime[μs, UTC] and i64
+polars.from_epoch | Datetime(us, UTC) | time_unit=us | allowed Datetime(us) many
+polars.from_epoch | Decimal(10, 2) | time_unit=d | refused rows: casting from Decimal(10, 2) to Date not supported
+polars.from_epoch | Decimal(10, 2) | time_unit=ms | refused rows: casting from Decimal(38, 2) to Datetime('μs') not supported
+polars.from_epoch | Decimal(10, 2) | time_unit=ns | refused rows: casting from Decimal(10, 2) to Datetime('ns') not supported
+polars.from_epoch | Decimal(10, 2) | time_unit=s | refused rows: casting from Decimal(38, 2) to Datetime('μs') not supported
+polars.from_epoch | Decimal(10, 2) | time_unit=us | refused rows: casting from Decimal(10, 2) to Datetime('μs') not supported
+polars.from_epoch | Duration(us) | time_unit=d | refused rows: casting from Duration('μs') to Date not supported
+polars.from_epoch | Duration(us) | time_unit=ms | refused rows: casting from Duration('μs') to Datetime('μs') not supported
+polars.from_epoch | Duration(us) | time_unit=ns | refused rows: casting from Duration('μs') to Datetime('ns') not supported
+polars.from_epoch | Duration(us) | time_unit=s | refused rows: casting from Duration('μs') to Datetime('μs') not supported
+polars.from_epoch | Duration(us) | time_unit=us | refused rows: casting from Duration('μs') to Datetime('μs') not supported
+polars.from_epoch | Float16 | time_unit=d | allowed Date many
+polars.from_epoch | Float16 | time_unit=ms | allowed Datetime(us) many
+polars.from_epoch | Float16 | time_unit=ns | allowed Datetime(ns) many
+polars.from_epoch | Float16 | time_unit=s | allowed Datetime(us) many
+polars.from_epoch | Float16 | time_unit=us | allowed Datetime(us) many
+polars.from_epoch | Float32 | time_unit=d | allowed Date many
+polars.from_epoch | Float32 | time_unit=ms | allowed Datetime(us) many
+polars.from_epoch | Float32 | time_unit=ns | allowed Datetime(ns) many
+polars.from_epoch | Float32 | time_unit=s | allowed Datetime(us) many
+polars.from_epoch | Float32 | time_unit=us | allowed Datetime(us) many
+polars.from_epoch | Float64 | time_unit=d | allowed Date many
+polars.from_epoch | Float64 | time_unit=ms | allowed Datetime(us) many
+polars.from_epoch | Float64 | time_unit=ns | allowed Datetime(ns) many
+polars.from_epoch | Float64 | time_unit=s | allowed Datetime(us) many
+polars.from_epoch | Float64 | time_unit=us | allowed Datetime(us) many
+polars.from_epoch | Int128 | time_unit=d | allowed Date many
+polars.from_epoch | Int128 | time_unit=ms | allowed Datetime(us) many
+polars.from_epoch | Int128 | time_unit=ns | allowed Datetime(ns) many
+polars.from_epoch | Int128 | time_unit=s | allowed Datetime(us) many
+polars.from_epoch | Int128 | time_unit=us | allowed Datetime(us) many
+polars.from_epoch | Int16 | time_unit=d | allowed Date many
+polars.from_epoch | Int16 | time_unit=ms | allowed Datetime(us) many
+polars.from_epoch | Int16 | time_unit=ns | allowed Datetime(ns) many
+polars.from_epoch | Int16 | time_unit=s | allowed Datetime(us) many
+polars.from_epoch | Int16 | time_unit=us | allowed Datetime(us) many
+polars.from_epoch | Int32 | time_unit=d | allowed Date many
+polars.from_epoch | Int32 | time_unit=ms | allowed Datetime(us) many
+polars.from_epoch | Int32 | time_unit=ns | allowed Datetime(ns) many
+polars.from_epoch | Int32 | time_unit=s | allowed Datetime(us) many
+polars.from_epoch | Int32 | time_unit=us | allowed Datetime(us) many
+polars.from_epoch | Int64 | time_unit=d | allowed Date many
+polars.from_epoch | Int64 | time_unit=ms | allowed Datetime(us) many
+polars.from_epoch | Int64 | time_unit=ns | allowed Datetime(ns) many
+polars.from_epoch | Int64 | time_unit=s | allowed Datetime(us) many
+polars.from_epoch | Int64 | time_unit=us | allowed Datetime(us) many
+polars.from_epoch | Int8 | time_unit=d | allowed Date many
+polars.from_epoch | Int8 | time_unit=ms | allowed Datetime(us) many
+polars.from_epoch | Int8 | time_unit=ns | allowed Datetime(ns) many
+polars.from_epoch | Int8 | time_unit=s | allowed Datetime(us) many
+polars.from_epoch | Int8 | time_unit=us | allowed Datetime(us) many
+polars.from_epoch | List(Int64) | time_unit=d | refused rows: cannot cast List type (inner: 'Int64', to: 'Date')
+polars.from_epoch | List(Int64) | time_unit=ms | refused rows: cannot cast List type (inner: 'Int64', to: 'Datetime('μs')')
+polars.from_epoch | List(Int64) | time_unit=ns | refused rows: cannot cast List type (inner: 'Int64', to: 'Datetime('ns')')
+polars.from_epoch | List(Int64) | time_unit=s | refused rows: cannot cast List type (inner: 'Int64', to: 'Datetime('μs')')
+polars.from_epoch | List(Int64) | time_unit=us | refused rows: cannot cast List type (inner: 'Int64', to: 'Datetime('μs')')
+polars.from_epoch | List(String) | time_unit=d | refused rows: cannot cast List type (inner: 'String', to: 'Date')
+polars.from_epoch | List(String) | time_unit=ms | refused rows: cannot mul columns: dtype was not list on all nesting levels: (left: list[str], right: i64)
+polars.from_epoch | List(String) | time_unit=ns | refused rows: cannot cast List type (inner: 'String', to: 'Datetime('ns')')
+polars.from_epoch | List(String) | time_unit=s | refused rows: cannot mul columns: dtype was not list on all nesting levels: (left: list[str], right: i64)
+polars.from_epoch | List(String) | time_unit=us | refused rows: cannot cast List type (inner: 'String', to: 'Datetime('μs')')
+polars.from_epoch | Null | time_unit=d | allowed Date many
+polars.from_epoch | Null | time_unit=ms | allowed Datetime(us) many
+polars.from_epoch | Null | time_unit=ns | allowed Datetime(ns) many
+polars.from_epoch | Null | time_unit=s | allowed Datetime(us) many
+polars.from_epoch | Null | time_unit=us | allowed Datetime(us) many
+polars.from_epoch | String | time_unit=d | refused rows: casting from string to date is not supported. It was removed in Polars 2.0. Use `str.to_date()` instead.
+polars.from_epoch | String | time_unit=ms | refused schema: arithmetic on dtypes str and i64 is not allowed (lhs: column 'a', rhs: expression `1000`); try an explicit cast first
+polars.from_epoch | String | time_unit=ns | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+polars.from_epoch | String | time_unit=s | refused schema: arithmetic on dtypes str and i64 is not allowed (lhs: column 'a', rhs: expression `1000000`); try an explicit cast first
+polars.from_epoch | String | time_unit=us | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+polars.from_epoch | Struct(x: Int64, y: String) | time_unit=d | refused rows: casting from string to date is not supported. It was removed in Polars 2.0. Use `str.to_date()` instead.
+polars.from_epoch | Struct(x: Int64, y: String) | time_unit=ms | refused schema: cannot * a struct with non-numeric field: (field: y, dtype: str)
+polars.from_epoch | Struct(x: Int64, y: String) | time_unit=ns | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+polars.from_epoch | Struct(x: Int64, y: String) | time_unit=s | refused schema: cannot * a struct with non-numeric field: (field: y, dtype: str)
+polars.from_epoch | Struct(x: Int64, y: String) | time_unit=us | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+polars.from_epoch | Time | time_unit=d | refused rows: casting from Time to Date not supported
+polars.from_epoch | Time | time_unit=ms | refused schema: * not allowed on time and i64
+polars.from_epoch | Time | time_unit=ns | refused rows: casting from Time to Datetime('ns') not supported; consider using `dt.combine`
+polars.from_epoch | Time | time_unit=s | refused schema: * not allowed on time and i64
+polars.from_epoch | Time | time_unit=us | refused rows: casting from Time to Datetime('μs') not supported; consider using `dt.combine`
+polars.from_epoch | UInt128 | time_unit=d | allowed Date many
+polars.from_epoch | UInt128 | time_unit=ms | allowed Datetime(us) many
+polars.from_epoch | UInt128 | time_unit=ns | allowed Datetime(ns) many
+polars.from_epoch | UInt128 | time_unit=s | allowed Datetime(us) many
+polars.from_epoch | UInt128 | time_unit=us | allowed Datetime(us) many
+polars.from_epoch | UInt16 | time_unit=d | allowed Date many
+polars.from_epoch | UInt16 | time_unit=ms | allowed Datetime(us) many
+polars.from_epoch | UInt16 | time_unit=ns | allowed Datetime(ns) many
+polars.from_epoch | UInt16 | time_unit=s | allowed Datetime(us) many
+polars.from_epoch | UInt16 | time_unit=us | allowed Datetime(us) many
+polars.from_epoch | UInt32 | time_unit=d | allowed Date many
+polars.from_epoch | UInt32 | time_unit=ms | allowed Datetime(us) many
+polars.from_epoch | UInt32 | time_unit=ns | allowed Datetime(ns) many
+polars.from_epoch | UInt32 | time_unit=s | allowed Datetime(us) many
+polars.from_epoch | UInt32 | time_unit=us | allowed Datetime(us) many
+polars.from_epoch | UInt64 | time_unit=d | allowed Date many
+polars.from_epoch | UInt64 | time_unit=ms | allowed Datetime(us) many
+polars.from_epoch | UInt64 | time_unit=ns | allowed Datetime(ns) many
+polars.from_epoch | UInt64 | time_unit=s | allowed Datetime(us) many
+polars.from_epoch | UInt64 | time_unit=us | allowed Datetime(us) many
+polars.from_epoch | UInt8 | time_unit=d | allowed Date many
+polars.from_epoch | UInt8 | time_unit=ms | allowed Datetime(us) many
+polars.from_epoch | UInt8 | time_unit=ns | allowed Datetime(ns) many
+polars.from_epoch | UInt8 | time_unit=s | allowed Datetime(us) many
+polars.from_epoch | UInt8 | time_unit=us | allowed Datetime(us) many

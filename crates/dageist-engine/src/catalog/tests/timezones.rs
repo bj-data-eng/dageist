@@ -4,7 +4,7 @@
 use crate::catalog::{Kind, check_time_zone, entries};
 
 #[test]
-fn only_the_zone_of_a_method_that_localizes_or_converts_a_moment_is_a_time_zone() {
+fn only_the_zone_of_a_call_that_localizes_converts_or_makes_a_moment_is_a_time_zone() {
     let mut named: Vec<(&str, &str, bool)> = entries()
         .iter()
         .flat_map(|entry| {
@@ -23,12 +23,14 @@ fn only_the_zone_of_a_method_that_localizes_or_converts_a_moment_is_a_time_zone(
         .collect();
     named.sort_unstable();
     // The signatures of `api/polars/python.txt`: `time_zone: str | None` of `replace_time_zone`, which
-    // takes the zone off with `None`, and `time_zone: str` of `convert_time_zone`, which does not.
+    // takes the zone off with `None`, `time_zone: str` of `convert_time_zone`, which does not, and
+    // `time_zone: str | None` of `polars.datetime`, a moment of none where it is not given.
     assert_eq!(
         named,
         [
             ("Expr.dt.convert_time_zone", "time_zone", false),
             ("Expr.dt.replace_time_zone", "time_zone", true),
+            ("polars.datetime", "time_zone", true),
         ]
     );
 }

@@ -266,12 +266,13 @@ fn fields(line: &str, count: usize) -> Result<Vec<&str>, String> {
 
 /// One line of the dtype table: an expression entry with an expression
 /// parameter given an argument of one dtype (or none), on a receiver of one
-/// dtype.
+/// dtype. A function that starts an expression has no receiver, and the line
+/// writes none.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct DtypeLine {
     pub entry: &'static str,
     pub parameter: Option<&'static str>,
-    pub receiver: Representative,
+    pub receiver: Option<Representative>,
     pub argument: Option<Representative>,
     pub outcome: Outcome,
 }
@@ -283,7 +284,8 @@ impl DtypeLine {
             "{} | {} | {} | {} | {}",
             self.entry,
             self.parameter.unwrap_or("-"),
-            self.receiver,
+            self.receiver
+                .map_or_else(|| "-".to_owned(), |dtype| dtype.to_string()),
             self.argument
                 .map_or_else(|| "-".to_owned(), |dtype| dtype.to_string()),
             self.outcome
@@ -296,7 +298,7 @@ impl DtypeLine {
         Ok(Self {
             entry: entry.id().as_str(),
             parameter: optional(fields[1], |name| parameter_named(entry, name))?,
-            receiver: dtype_named(fields[2])?,
+            receiver: optional(fields[2], dtype_named)?,
             argument: optional(fields[3], dtype_named)?,
             outcome: Outcome::parse(fields[4])?,
         })
@@ -503,7 +505,7 @@ impl std::error::Error for TableError {}
 pub(super) type DtypeKey = (
     &'static str,
     Option<&'static str>,
-    Representative,
+    Option<Representative>,
     Option<Representative>,
 );
 
@@ -646,4 +648,25 @@ impl Tables {
 /// an expression.
 pub(super) fn is_method(entry: &catalog::Entry) -> bool {
     entry.applies() == Applies::Expression
+}
+
+/// Whether the entry is measured on a dtype that its call is given: a method, on the value it
+/// follows, and a function that starts an expression and takes expressions, on the first of
+/// them, which is its subject. The options of such an entry are measured on each dtype.
+pub(super) fn has_a_subject(entry: &catalog::Entry) -> bool {
+    is_method(entry) || subject_of(entry).is_some()
+}
+
+/// The first expression parameter of a function that starts an expression, which what the
+/// options of the function are measured on, if it has one.
+pub(super) fn subject_of(entry: &catalog::Entry) -> Option<&'static str> {
+    (entry.applies() == Applies::Function)
+        .then(|| {
+            entry
+                .parameters()
+                .iter()
+                .find(|parameter| matches!(parameter.kind(), catalog::Kind::Expression(_)))
+                .map(catalog::Parameter::name)
+        })
+        .flatten()
 }

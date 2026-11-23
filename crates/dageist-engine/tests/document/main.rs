@@ -10,6 +10,8 @@ mod floats;
 mod holes;
 mod inputs;
 mod join_keys;
+mod moments;
+mod moments_walked;
 mod nesting;
 mod nulls;
 mod patterns;

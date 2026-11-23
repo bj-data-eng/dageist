@@ -257,6 +257,25 @@ fn one_line(text: &str) -> String {
     line.chars().take(3000).collect()
 }
 
+/// Whether Polars refused at a call that comes after the one the tables could not be asked of, in
+/// the same chain: `why` names the place of that call before its colon, and `refused` is the place
+/// of Polars' refusal, which differ only by the number of the link. The dtype before the call that
+/// the tables were not told is not known, so what follows it is not asked either, and Polars may
+/// refuse one of those calls where the tables say nothing.
+fn is_a_later_call_of_the_chain(why: &str, refused: &str) -> bool {
+    let link_of = |place: &str| -> Option<(String, usize)> {
+        let (base, number) = place.rsplit_once(", link ")?;
+        Some((base.to_owned(), number.parse().ok()?))
+    };
+    let Some((place, _)) = why.split_once(": ") else {
+        return false;
+    };
+    match (link_of(place), link_of(refused)) {
+        (Some((base, blind)), Some((other, refused))) => base == other && refused >= blind,
+        _ => false,
+    }
+}
+
 /// What the tables predict of the dtypes, compared with what Polars says: the
 /// first difference, if there is one.
 fn dtype_difference(case: &Case, prediction: &Prediction, observed: &Observed) -> Option<String> {
@@ -274,7 +293,8 @@ fn dtype_difference(case: &Case, prediction: &Prediction, observed: &Observed) -
         Verdict::Refuses(_) => true,
         Verdict::Undetermined(why) => observed.refusal.as_ref().is_some_and(|refusal| {
             refusal.stage == Stage::Schema
-                && why.starts_with(&format!("{}: ", refusal.at))
+                && (why.starts_with(&format!("{}: ", refusal.at))
+                    || is_a_later_call_of_the_chain(why, &refusal.at))
                 && refusal
                     .place
                     .as_ref()
@@ -355,6 +375,8 @@ fn polars_words(rule: &str) -> &'static [&'static str] {
             "is not allowed in this context",
         ],
         "join-key-names-are-not-repeated" => &["repeated key names"],
+        // Polars makes a literal of a moment of numbers typed in and names it by an alias.
+        "folded-function-is-no-join-key" => &["'alias' is not allowed in a join key"],
         // The engine words a pattern it refuses with Polars' own words after its own, and
         // Polars words every refusal of a regular expression, which a size limit is one of,
         // as a regex error.
@@ -766,6 +788,26 @@ mod tests {
     }
 
     #[test]
+    fn a_refusal_is_taken_for_the_calls_after_the_one_the_tables_cannot_be_asked_of_in_its_chain() {
+        let blind = "step \"s\", exprs item 1, the start, predicates item 1, link 1: the dtype of an argument is not known";
+        // The call itself and the ones after it in the chain that holds it.
+        for refused in [
+            "step \"s\", exprs item 1, the start, predicates item 1, link 1",
+            "step \"s\", exprs item 1, the start, predicates item 1, link 2",
+        ] {
+            assert!(is_a_later_call_of_the_chain(blind, refused), "{refused}");
+        }
+        // One before it, one of another chain, and a start have none to be taken for.
+        for refused in [
+            "step \"s\", exprs item 1, the start, predicates item 1, link 0",
+            "step \"s\", exprs item 2, the start, predicates item 1, link 2",
+            "step \"s\", exprs item 1, the start, predicates item 1, the start",
+        ] {
+            assert!(!is_a_later_call_of_the_chain(blind, refused), "{refused}");
+        }
+    }
+
+    #[test]
     fn what_polars_says_of_the_element_rule_is_either_of_its_two_refusals() {
         // The engine says where `element` stands only, and Polars says it of an
         // `element` that has no pivot to be in (polars-error: "`element` is not
@@ -793,6 +835,10 @@ mod tests {
             (
                 "join-key-names-are-not-repeated",
                 "joining with repeated key names; already joined on u and u",
+            ),
+            (
+                "folded-function-is-no-join-key",
+                "'alias' is not allowed in a join key, use 'with_columns' first",
             ),
             (
                 "filter-predicate-is-boolean",
