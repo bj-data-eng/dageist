@@ -213,3 +213,17 @@ fn a_key_of_a_function_given_an_aggregate_alone_is_elementwise_and_beside_a_colu
         RefusalSource::Rule(Rule::KeyIsElementwise)
     );
 }
+
+#[test]
+fn a_boolean_is_a_part_of_a_date_because_true_is_one_and_what_the_rows_hold_is_the_rows() {
+    // A Boolean column of true is the month and the day 1, which Polars makes a date of: that a
+    // row of false is no day is the rows' to say, so the walk does not refuse the dtype.
+    for part in ["month", "day"] {
+        let mut arguments = json!({ "year": whole(2026), "month": whole(1), "day": whole(1) });
+        arguments[part] = field("f");
+        for function in ["polars.date", "polars.datetime"] {
+            let walk = walk_of(function, arguments.clone());
+            assert_eq!(walk.refusal(), None, "{function} {part}");
+        }
+    }
+}
