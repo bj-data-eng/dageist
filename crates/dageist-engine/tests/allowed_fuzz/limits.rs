@@ -2243,14 +2243,16 @@ fn case_with_ones_as_the_parts(case: &Case) -> Option<Case> {
     })
 }
 
-/// Whether Polars refuses the case for a part of a date still when each part is the number 1: the
-/// values of the part are then no cause. `None` where no call is given a part.
-fn refused_for_a_part_of_a_date_with_ones(case: &Case) -> Option<bool> {
+/// Whether Polars refuses the case for what `reason` says still when each part is the number 1: the
+/// values of the part are then no cause. The reason is the case's own kind, for a case refused for
+/// the components of a date is not shown to be refused for a part by being refused for the cast
+/// of the date that the ones make. `None` where no call is given a part.
+fn refused_for_a_part_of_a_date_with_ones(case: &Case, reason: fn(&str) -> bool) -> Option<bool> {
     changed(case_with_ones_as_the_parts(case), case).map(|control| {
         (0..RUNS).any(|_| {
             observe(&control)
                 .refusal
-                .is_some_and(|refusal| is_a_refusal_of_a_part_of_a_date(&refusal.reason))
+                .is_some_and(|refusal| reason(&refusal.reason))
         })
     })
 }
@@ -3668,7 +3670,14 @@ fn applies(
                 && held
                     .iter()
                     .any(|(_, held)| any_call(held, &is_given_a_part_of_a_date))
-                && refused_for_a_part_of_a_date_with_ones(case) == Some(false)
+                && refused_for_a_part_of_a_date_with_ones(
+                    case,
+                    if is_a_refusal_of_the_components_of_a_date(&refusal.reason) {
+                        is_a_refusal_of_the_components_of_a_date
+                    } else {
+                        is_a_failed_conversion
+                    },
+                ) == Some(false)
         }
         (Limit::APartOfADateThatDependsOnTheRows, Disagreement::PolarsAllows(refused)) => {
             // The values of the column the tables measured are the cause where the tables stop
@@ -8499,13 +8508,19 @@ mod tests {
             &ones,
             is_a_refusal_of_the_components_of_a_date
         ));
-        assert_eq!(refused_for_a_part_of_a_date_with_ones(&ones), None);
+        assert_eq!(
+            refused_for_a_part_of_a_date_with_ones(&ones, is_a_refusal_of_a_part_of_a_date),
+            None
+        );
         let none = select(vec![chain(column("a"), &["Expr.cum_sum"])]);
         assert!(!the_tables_stop_refusing_the_parts_as_ones(
             &none,
             is_a_refusal_of_the_components_of_a_date
         ));
-        assert_eq!(refused_for_a_part_of_a_date_with_ones(&none), None);
+        assert_eq!(
+            refused_for_a_part_of_a_date_with_ones(&none, is_a_refusal_of_a_part_of_a_date),
+            None
+        );
     }
 
     const INVALID_DATE: &str = "Invalid date components (1, 1, 0) supplied";
@@ -8568,7 +8583,10 @@ mod tests {
             refused_for_a_bound(&ones, None, Stage::Rows, INVALID_DATE),
             vec![]
         );
-        assert_eq!(refused_for_a_part_of_a_date_with_ones(&ones), None);
+        assert_eq!(
+            refused_for_a_part_of_a_date_with_ones(&ones, is_a_refusal_of_a_part_of_a_date),
+            None
+        );
         // A refusal at a place, in the schema or for another reason is not this one.
         let case = making_a_date(chain(column("k"), &["Expr.not_"]));
         assert_eq!(
