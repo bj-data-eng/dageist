@@ -420,11 +420,19 @@ pub enum Limit {
     /// and Polars refuses it for them with each part made `false`, which shows that it evaluates the
     /// part and does not skip it.
     APartOfADateThatDependsOnTheRows,
+    /// `dt.cast_time_unit` to nanoseconds multiplies the count of a moment, and Polars refuses one
+    /// outside the years that nanoseconds hold, such as the first of January of the year 1, when the
+    /// rows run, so it depends on the values of the rows, which the tables measured as moments of
+    /// 1970 and after. Polars refusing the rows or the empty table with the refusal that a conversion
+    /// from a moment in one unit to one in nanoseconds failed, which has no place, in a case with a
+    /// `dt.cast_time_unit` given nanoseconds: the case run again with each unit made milliseconds,
+    /// which a moment cannot overflow, is not refused for it.
+    AMomentBeyondTheRangeOfAUnit,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 35] = [
+    pub const ALL: [Self; 36] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -460,6 +468,7 @@ impl Limit {
         Self::AReplacementOfALiteralAggregateInABranch,
         Self::AFormatTheDtypeCannotWrite,
         Self::APartOfADateThatDependsOnTheRows,
+        Self::AMomentBeyondTheRangeOfAUnit,
     ];
 
     /// The name a kept case is filed under.
@@ -510,6 +519,7 @@ impl Limit {
             }
             Self::AFormatTheDtypeCannotWrite => "a-format-the-dtype-cannot-write",
             Self::APartOfADateThatDependsOnTheRows => "a-part-of-a-date-that-depends-on-the-rows",
+            Self::AMomentBeyondTheRangeOfAUnit => "a-moment-beyond-the-range-of-a-unit",
         }
     }
 
@@ -590,6 +600,9 @@ impl Limit {
             }
             Self::AReplacementOfALiteralAggregateInABranch => {
                 "Polars' streaming engine reads the pattern of a replacement of the aggregate of a literal text in a branch of a condition as many values, which it does not where it stands in a select, where the tables measured it"
+            }
+            Self::AMomentBeyondTheRangeOfAUnit => {
+                "a cast of a moment to nanoseconds refuses one outside the years nanoseconds hold, when the rows run, where the tables measured moments of 1970 and after"
             }
             Self::APartOfADateThatDependsOnTheRows => {
                 "dt.replace refuses a part outside the calendar's range, or that does not convert, when the rows run, so it depends on the values of the rows, where the tables measured the values of one column"
@@ -1985,6 +1998,43 @@ fn refused_for_a_pattern_read_as_many_with_columns(case: &Case) -> Option<bool> 
                     .iter()
                     .any(|said| refusal.reason.contains(said))
             })
+        })
+    })
+}
+
+/// Whether the reason is that a moment could not be converted to one counted in nanoseconds.
+fn is_a_failed_conversion_to_nanoseconds(reason: &str) -> bool {
+    is_a_failed_conversion(reason) && reason.contains("` to `datetime[ns")
+}
+
+/// Whether the call changes the unit of a moment to nanoseconds.
+fn is_a_cast_to_nanoseconds(call: &Call) -> bool {
+    is(call, "Expr.dt.cast_time_unit")
+        && matches!(call.argument("time_unit"), Some(Value::Choice(word)) if word == "ns")
+}
+
+/// The case with each cast to nanoseconds made a cast to milliseconds.
+fn case_with_milliseconds(case: &Case) -> Option<Case> {
+    case_changed(case, &|call| {
+        if !is_a_cast_to_nanoseconds(call) {
+            return None;
+        }
+        Call::new(
+            call.entry(),
+            vec![("time_unit", Value::Choice("ms".to_owned()))],
+        )
+        .ok()
+    })
+}
+
+/// Whether Polars refuses the case for a conversion to nanoseconds still when each cast is to
+/// milliseconds: the unit is then no cause. `None` where no cast is to nanoseconds.
+fn refused_for_nanoseconds_with_milliseconds(case: &Case) -> Option<bool> {
+    changed(case_with_milliseconds(case), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| is_a_failed_conversion_to_nanoseconds(&refusal.reason))
         })
     })
 }
@@ -3436,6 +3486,17 @@ fn applies(
                 })
                 && refused_for_another_length_with_text_values(case) == Some(false)
                 && refused_for_another_length_without_windows(case) == Some(false)
+        }
+        (Limit::AMomentBeyondTheRangeOfAUnit, Disagreement::PolarsRefuses(refusal)) => {
+            // The unit is the cause where Polars stops refusing the conversion once each cast is to
+            // milliseconds.
+            unplaced(refusal)
+                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                && is_a_failed_conversion_to_nanoseconds(&refusal.reason)
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &is_a_cast_to_nanoseconds))
+                && refused_for_nanoseconds_with_milliseconds(case) == Some(false)
         }
         (Limit::APartOfADateThatDependsOnTheRows, Disagreement::PolarsRefuses(refusal)) => {
             // The part is the cause where Polars stops refusing the components once each part is
@@ -8083,6 +8144,75 @@ mod tests {
         );
         assert!(observe(&case).refusal.is_none());
         assert_eq!(excused_by(&case), vec![]);
+    }
+
+    // ----- A moment beyond the range of a unit
+
+    const BEYOND_NANOSECONDS: &str = "conversion from `datetime[μs, UTC]` to `datetime[ns, UTC]` failed in column 'a' for 1 out of 1 values: [0001-01-01 00:00:00.000001 UTC]";
+
+    fn cast_the_unit_to(unit: &str) -> Case {
+        let cast = call(
+            "Expr.dt.cast_time_unit",
+            vec![("time_unit", Value::Choice(unit.to_owned()))],
+        );
+        select(vec![chain_of(column("a"), vec![cast])])
+    }
+
+    #[test]
+    fn a_moment_beyond_nanoseconds_is_excused_at_the_rows_and_the_empty_table() {
+        assert_eq!(
+            excused_by_kept("uncovered-a-moment-beyond-the-range-of-a-unit.case"),
+            vec![Limit::AMomentBeyondTheRangeOfAUnit]
+        );
+        for stage in [Stage::Rows, Stage::Empty] {
+            assert_eq!(
+                refused_for_a_bound(&cast_the_unit_to("ns"), None, stage, BEYOND_NANOSECONDS),
+                vec![Limit::AMomentBeyondTheRangeOfAUnit]
+            );
+        }
+    }
+
+    #[test]
+    fn a_conversion_is_not_excused_for_milliseconds_nor_at_a_place_nor_for_another_reason() {
+        // The control is the case itself where the cast is to milliseconds already.
+        assert_eq!(
+            refused_for_a_bound(
+                &cast_the_unit_to("ms"),
+                None,
+                Stage::Rows,
+                BEYOND_NANOSECONDS
+            ),
+            vec![]
+        );
+        let case = cast_the_unit_to("ns");
+        assert_eq!(
+            refused_for_a_bound(
+                &case,
+                Some(link_of("exprs", 0, 1)),
+                Stage::Rows,
+                BEYOND_NANOSECONDS
+            ),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Schema, BEYOND_NANOSECONDS),
+            vec![]
+        );
+        // A conversion to another dtype is not the unit's.
+        assert_eq!(
+            refused_for_a_bound(
+                &case,
+                None,
+                Stage::Rows,
+                "conversion from `str` to `i8` failed in column 'a' for 1 out of 1 values: [x]"
+            ),
+            vec![]
+        );
+        let other = select(vec![chain(column("a"), &["Expr.cum_sum"])]);
+        assert_eq!(
+            refused_for_a_bound(&other, None, Stage::Rows, BEYOND_NANOSECONDS),
+            vec![]
+        );
     }
 
     // ----- A struct with no fields
