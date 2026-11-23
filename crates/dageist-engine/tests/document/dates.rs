@@ -488,3 +488,66 @@ fn the_unit_a_moment_is_held_in_is_the_one_the_walk_says_it_gives_and_asks_polar
         walked.refusal().source()
     );
 }
+
+/// The date 1970-01-02, a value of one row, with `then` after it.
+fn a_date_then(then: Vec<Value>) -> Value {
+    chain(
+        call(
+            "polars.lit",
+            json!({
+                "value": { "integer": 1 },
+                "dtype": { "dtype": "Date" },
+            }),
+        ),
+        then,
+    )
+}
+
+fn replaced_by_the_days_open() -> Value {
+    call(
+        "Expr.dt.replace",
+        json!({ "month": crate::support::field("row_days") }),
+    )
+}
+
+fn over_the_owners() -> Value {
+    call(
+        "Expr.over",
+        json!({ "partition_by": crate::support::many(vec![crate::support::field("owner")]) }),
+    )
+}
+
+#[test]
+fn a_date_of_one_row_that_a_part_widens_is_no_input_of_a_window() {
+    // Polars meets the one date with each of the parts where it is selected, and refuses it when a
+    // window must map it to as many values as the table has rows.
+    let widened = selecting(a_date_then(vec![
+        replaced_by_the_days_open(),
+        over_the_owners(),
+    ]));
+    let report = report_of(&widened);
+    let walked = report.steps()[0]
+        .walk()
+        .refusal()
+        .expect("the walk refuses it");
+    assert!(
+        matches!(walked.refusal().source(), RefusalSource::Rule(rule)
+            if rule.name() == "window-input-is-not-widened"),
+        "{:?}",
+        walked.refusal().source()
+    );
+    assert!(
+        walked.refusal().reason().contains("window"),
+        "{}",
+        walked.refusal().reason()
+    );
+    // Selected alone it is met with each part, and a value of many rows is no value that a part
+    // widens, so a window takes it.
+    let alone = selecting(a_date_then(vec![replaced_by_the_days_open()]));
+    assert_eq!(report_of(&alone).steps()[0].walk().refusal(), None);
+    let many = selecting(moments_then_all(vec![
+        replaced_by_the_days_open(),
+        over_the_owners(),
+    ]));
+    assert_eq!(report_of(&many).steps()[0].walk().refusal(), None);
+}
