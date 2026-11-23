@@ -4516,6 +4516,35 @@ mod tests {
     }
 
     #[test]
+    fn a_pivot_aggregate_is_excused_for_a_length_of_time_of_text_and_a_select_is_not() {
+        // The kernels of a group make a length of time of the text of a literal, where a select
+        // refuses it for the dtype of the seconds.
+        assert_eq!(
+            excused_by_kept("uncovered-a-group-aggregate--a-function-given-text.case"),
+            vec![Limit::AGroupAggregate]
+        );
+        let seconds = chain_of(
+            call("polars.lit", vec![("value", Value::String("1".to_owned()))]),
+            Vec::new(),
+        );
+        let duration = call(
+            "polars.duration",
+            vec![("seconds", Value::Expression(seconds))],
+        );
+        let reason = "expected integer or float dtype, (got str) in input 4 of duration";
+        let selected = select(vec![chain_of(duration.clone(), Vec::new())]);
+        assert_eq!(
+            tables_refuse(
+                &selected,
+                at(&[parameter("exprs"), Segment::Item(0), Segment::Start]),
+                Some(TableStage::Schema),
+                reason
+            ),
+            vec![]
+        );
+    }
+
+    #[test]
     fn a_pivot_aggregate_is_excused_for_a_fill_by_a_strategy_and_for_a_replacement_of_nothing() {
         let case = pivot(chain(column("a"), &["Expr.forward_fill"]));
         let at_the_call = at(&[parameter("aggregate_function"), Segment::Link(0)]);
