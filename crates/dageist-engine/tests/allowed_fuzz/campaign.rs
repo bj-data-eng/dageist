@@ -4,7 +4,7 @@
 //! Where a case is evaluated is the evaluator's: [`InProcess`] runs it on the
 //! thread that asks, which is what the fixed seed of the engine's tests does.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::time::Duration;
@@ -131,11 +131,17 @@ pub fn detail_of(outcome: &CaseOutcome) -> String {
 }
 
 /// The target a campaign hands to the property runner: it makes cases as the
-/// target does and evaluates them through the evaluator.
+/// target does and evaluates them through the evaluator. A case that fails is
+/// reduced and kept here, and the runner is told it was checked, since the runner
+/// ends the run at a failure and the next case is to be run whatever this one did.
 struct Observing<'a, E> {
     target: &'a AllowedTarget,
     evaluator: &'a E,
+    settings: &'a Settings,
+    /// How many cases were evaluated.
+    cases: Cell<u64>,
     tally: RefCell<Tally>,
+    findings: RefCell<Vec<Finding>>,
 }
 
 impl<E: Evaluator> CaseTarget for Observing<'_, E> {
@@ -163,7 +169,20 @@ impl<E: Evaluator> CaseTarget for Observing<'_, E> {
         for (what, count) in observation.tally {
             *self.tally.borrow_mut().entry(what).or_default() += count;
         }
-        Ok(observation.outcome)
+        self.cases.set(self.cases.get() + 1);
+        let Some(key) = observation.outcome.failure_key() else {
+            return Ok(observation.outcome);
+        };
+        let finding = keep(
+            self.target,
+            self.evaluator,
+            self.settings,
+            self.cases.get(),
+            &canonical,
+            &observation.outcome,
+        )?;
+        self.findings.borrow_mut().push(finding);
+        CaseOutcome::evaluated(vec![key.property().clone()])
     }
 }
 
@@ -187,12 +206,14 @@ fn reduced_of(
     (reduced, detail_of(outcome))
 }
 
-/// Reduces the case written as `canonical`, which `evaluator` found to end as
-/// `first` did, and keeps what it came to under `settings.keep`.
+/// Reduces the case written as `canonical`, the `ordinal`th of the campaign, which
+/// `evaluator` found to end as `first` did, and keeps what it came to under
+/// `settings.keep`.
 fn keep<E: Evaluator>(
     target: &AllowedTarget,
     evaluator: &E,
     settings: &Settings,
+    ordinal: u64,
     canonical: &[u8],
     first: &CaseOutcome,
 ) -> Result<Finding> {
@@ -212,9 +233,11 @@ fn keep<E: Evaluator>(
         },
     )?;
     let (reduced, detail) = reduced_of(&report, key, first);
-    let kept = settings
-        .keep
-        .join(format!("{:016x}-{}.case", settings.seed, reduced.len()));
+    let kept = settings.keep.join(format!(
+        "{:016x}-{ordinal}-{}.case",
+        settings.seed,
+        reduced.len()
+    ));
     std::fs::write(&kept, &reduced).map_err(|error| {
         FuzzError::with_source(
             dageist_fuzz::FuzzErrorKind::Io,
@@ -232,8 +255,9 @@ fn keep<E: Evaluator>(
     })
 }
 
-/// Runs the cases `settings` names through `evaluator`. When one disagrees,
-/// reduces it and keeps the result. Panics where the run itself cannot be made.
+/// Runs the cases `settings` names through `evaluator`, every one whatever the
+/// ones before it did. A case that fails is reduced and kept, and the next is run.
+/// Panics where the run itself cannot be made.
 pub fn run<E: Evaluator>(settings: &Settings, evaluator: &E) -> Report {
     let target = AllowedTarget::new().with_focus(settings.focus.clone());
     // A draw reads more than a byte where a count needs more, and again where it rejects what it
@@ -264,7 +288,10 @@ pub fn run<E: Evaluator>(settings: &Settings, evaluator: &E) -> Report {
     let observing = Observing {
         target: &target,
         evaluator,
+        settings,
+        cases: Cell::new(0),
         tally: RefCell::new(Tally::new()),
+        findings: RefCell::new(Vec::new()),
     };
     let report = run_property(&observing, &strategy, config, &mut capture)
         .unwrap_or_else(|error| panic!("the property could not be run: {error:?}"));
@@ -274,23 +301,9 @@ pub fn run<E: Evaluator>(settings: &Settings, evaluator: &E) -> Report {
     for (what, count) in take_counts() {
         *tally.entry(what).or_default() += count;
     }
-    let findings = report
-        .failure
-        .map(|found| {
-            keep(
-                &target,
-                evaluator,
-                settings,
-                &found.canonical,
-                &found.outcome,
-            )
-            .unwrap_or_else(|error| panic!("the finding could not be kept: {error:?}"))
-        })
-        .into_iter()
-        .collect();
     Report {
         evaluated: report.counts.evaluated(),
-        findings,
+        findings: observing.findings.into_inner(),
         tally: tally_lines(&tally),
     }
 }
@@ -302,9 +315,10 @@ mod tests {
     use super::super::target::ALLOWANCE;
     use super::*;
 
-    /// Evaluates as the target does, except that a case whose text holds `needle` ends as
-    /// one that missed its deadline: a failure of the class that a process stopped for
-    /// taking too long has, which no in-process evaluation can have.
+    /// Evaluates as the target does, except that a case that checked something and whose
+    /// text holds `needle` ends as one that missed its deadline: a failure of the class
+    /// that a process stopped for taking too long has, which no in-process evaluation can
+    /// have.
     struct Misses<'a> {
         evaluation: InProcess<'a>,
         needle: &'a str,
@@ -313,7 +327,11 @@ mod tests {
     impl Evaluator for Misses<'_> {
         fn observe(&self, canonical: &[u8], within: Duration) -> Result<Observation> {
             let mut observation = self.evaluation.observe(canonical, within)?;
-            if String::from_utf8_lossy(canonical).contains(self.needle) {
+            // Only a case that checked something can end as a failure, as a property that is
+            // violated is, so that the cases a run draws are the same with and without it.
+            if observation.outcome.is_evaluated()
+                && String::from_utf8_lossy(canonical).contains(self.needle)
+            {
                 observation.outcome = CaseOutcome::failure(
                     FailureKey::new(
                         PropertyId::new(ALLOWANCE)?,
