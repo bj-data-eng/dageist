@@ -407,11 +407,22 @@ pub enum Limit {
     /// is not a valid one, which has no place, in a case that holds a method that writes a moment as
     /// text, given a format: the case run again with each format made `iso` is not refused for it.
     AFormatTheDtypeCannotWrite,
+    /// `dt.replace` converts each part it is given to a whole number of the width of the part and
+    /// refuses a value outside the calendar's range, and one that does not convert, when the rows
+    /// run, so what it does with a part that is no number written in depends on the values of the
+    /// rows. The tables measured the column that stands for an argument, whose values are 1 and 3, or
+    /// true and false, of which false is a day of 0 that no date has. Polars refusing the rows or the
+    /// empty table with the refusal that the components of a date or a time are invalid, or that a
+    /// value does not convert, which has no place, in a case with a `dt.replace` given a part: the
+    /// case run again with each part made the number 1 is not refused for it. The tables refusing
+    /// a call at the rows for invalid components that Polars allows, in a case with a `dt.replace`
+    /// given a part: the tables then no longer refuse it for them with each part made the number 1.
+    APartOfADateThatDependsOnTheRows,
 }
 
 impl Limit {
     /// Every limit, which the kept cases cover each by one.
-    pub const ALL: [Self; 34] = [
+    pub const ALL: [Self; 35] = [
         Self::AnExplodeChangesTheLengths,
         Self::ALiteral,
         Self::AGroupAggregate,
@@ -446,6 +457,7 @@ impl Limit {
         Self::AReplacementOfAnAggregateInAWindowKey,
         Self::AReplacementOfALiteralAggregateInABranch,
         Self::AFormatTheDtypeCannotWrite,
+        Self::APartOfADateThatDependsOnTheRows,
     ];
 
     /// The name a kept case is filed under.
@@ -495,6 +507,7 @@ impl Limit {
                 "a-replacement-of-a-literal-aggregate-in-a-branch"
             }
             Self::AFormatTheDtypeCannotWrite => "a-format-the-dtype-cannot-write",
+            Self::APartOfADateThatDependsOnTheRows => "a-part-of-a-date-that-depends-on-the-rows",
         }
     }
 
@@ -575,6 +588,9 @@ impl Limit {
             }
             Self::AReplacementOfALiteralAggregateInABranch => {
                 "Polars' streaming engine reads the pattern of a replacement of the aggregate of a literal text in a branch of a condition as many values, which it does not where it stands in a select, where the tables measured it"
+            }
+            Self::APartOfADateThatDependsOnTheRows => {
+                "dt.replace refuses a part outside the calendar's range, or that does not convert, when the rows run, so it depends on the values of the rows, where the tables measured the values of one column"
             }
             Self::AFormatTheDtypeCannotWrite => {
                 "a format writes the fields a dtype has and Polars refuses one it has none for, where the tables measured the format iso, which every dtype takes"
@@ -1971,6 +1987,94 @@ fn refused_for_a_pattern_read_as_many_with_columns(case: &Case) -> Option<bool> 
     })
 }
 
+/// The parts `dt.replace` is given, which it converts to the whole numbers of the calendar.
+const PARTS_OF_A_DATE: [&str; 7] = [
+    "year",
+    "month",
+    "day",
+    "hour",
+    "minute",
+    "second",
+    "microsecond",
+];
+
+/// Whether the reason is that the components of a date or of a time are invalid, as a day of 0 or
+/// a minute below zero are.
+fn is_a_refusal_of_the_components_of_a_date(reason: &str) -> bool {
+    reason.contains("Invalid date components") || reason.contains("Invalid time components")
+}
+
+/// Whether the reason is one that Polars refuses a part of a date with: invalid components, or a
+/// value that does not convert to the whole number of the part, as the NaN of an arc is not.
+fn is_a_refusal_of_a_part_of_a_date(reason: &str) -> bool {
+    is_a_refusal_of_the_components_of_a_date(reason) || is_a_failed_conversion(reason)
+}
+
+/// Whether the call is a `dt.replace` that is given a part.
+fn is_a_replacement_given_a_part(call: &Call) -> bool {
+    is(call, "Expr.dt.replace")
+        && PARTS_OF_A_DATE
+            .iter()
+            .any(|part| call.argument(part).is_some())
+}
+
+/// The case with each part that a `dt.replace` is given made the number 1.
+fn case_with_ones_as_the_parts(case: &Case) -> Option<Case> {
+    let one = Expression::new(
+        Start::Call(
+            Call::new(
+                catalog::entry("polars.lit")?,
+                vec![("value", Value::Integer(1))],
+            )
+            .ok()?,
+        ),
+        Vec::new(),
+    )
+    .ok()?;
+    case_changed(case, &|call| {
+        if !is_a_replacement_given_a_part(call) {
+            return None;
+        }
+        let given: Vec<(&str, Value)> = call
+            .arguments()
+            .iter()
+            .map(|given| {
+                let value = if PARTS_OF_A_DATE.contains(&given.parameter()) {
+                    Value::Expression(one.clone())
+                } else {
+                    given.value().clone()
+                };
+                (given.parameter(), value)
+            })
+            .collect();
+        Call::new(call.entry(), given).ok()
+    })
+}
+
+/// Whether Polars refuses the case for a part of a date still when each part is the number 1: the
+/// values of the part are then no cause. `None` where no `dt.replace` is given a part.
+fn refused_for_a_part_of_a_date_with_ones(case: &Case) -> Option<bool> {
+    changed(case_with_ones_as_the_parts(case), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| is_a_refusal_of_a_part_of_a_date(&refusal.reason))
+        })
+    })
+}
+
+/// Whether the tables stop refusing the case for invalid components once each part of a date is the
+/// number 1, which they then judge as the column of whole numbers they measured. The case may be
+/// refused for another reason still, as a pivot's aggregate is by its rule.
+fn the_tables_allow_the_parts_as_ones(case: &Case) -> bool {
+    changed(case_with_ones_as_the_parts(case), case).is_some_and(|control| {
+        !matches!(
+            predict(&control).verdict,
+            Verdict::Refuses(refused) if is_a_refusal_of_the_components_of_a_date(&refused.reason)
+        )
+    })
+}
+
 /// Whether the reason is one that Polars refuses a format with: that it cannot format the dtype
 /// with it, that a duration has no such format, or that it is not a format of a method that
 /// writes text.
@@ -3283,6 +3387,27 @@ fn applies(
                 })
                 && refused_for_another_length_with_text_values(case) == Some(false)
                 && refused_for_another_length_without_windows(case) == Some(false)
+        }
+        (Limit::APartOfADateThatDependsOnTheRows, Disagreement::PolarsRefuses(refusal)) => {
+            // The part is the cause where Polars stops refusing the components once each part is
+            // the number 1, which every part takes.
+            unplaced(refusal)
+                && matches!(refusal.stage, Stage::Rows | Stage::Empty)
+                && is_a_refusal_of_a_part_of_a_date(&refusal.reason)
+                && held
+                    .iter()
+                    .any(|(_, held)| any_call(held, &is_a_replacement_given_a_part))
+                && refused_for_a_part_of_a_date_with_ones(case) == Some(false)
+        }
+        (Limit::APartOfADateThatDependsOnTheRows, Disagreement::PolarsAllows(refused)) => {
+            // The values of the column the tables measured are the cause where the tables allow the
+            // case once each part is the number 1.
+            refused.stage == Some(TableStage::Rows)
+                && is_a_refusal_of_the_components_of_a_date(&refused.reason)
+                && locate(case, &refused.place)
+                    .call
+                    .is_some_and(is_a_replacement_given_a_part)
+                && the_tables_allow_the_parts_as_ones(case)
         }
         (Limit::AFormatTheDtypeCannotWrite, Disagreement::PolarsRefuses(refusal)) => {
             // The format is the cause where Polars stops refusing the dtype once each format is
@@ -7743,6 +7868,115 @@ mod tests {
             refused_for_a_bound(&other, None, Stage::Rows, A_YEAR_OF_A_TIME),
             vec![]
         );
+    }
+
+    // ----- A part of a date that depends on the rows
+
+    const INVALID_TIME: &str = "Invalid time components (0, -2, 0, 1000) supplied";
+    const NOT_A_NUMBER: &str =
+        "conversion from `f64` to `i8` failed in column 'k' for 1 out of 1 values: [NaN]";
+
+    fn replacing(part: &str, value: Expression) -> Case {
+        let replace = call(
+            "Expr.dt.replace",
+            vec![(part_name(part), Value::Expression(value))],
+        );
+        select(vec![chain_of(column("a"), vec![replace])])
+    }
+
+    /// The parts of a date by name, as the call is given them.
+    fn part_name(part: &str) -> &'static str {
+        PARTS_OF_A_DATE
+            .into_iter()
+            .find(|known| *known == part)
+            .expect("a part of a date")
+    }
+
+    #[test]
+    fn a_part_that_the_rows_decide_is_excused_whether_polars_refuses_it_or_the_tables_do() {
+        for name in [
+            "uncovered-a-part-of-a-date-that-depends-on-the-rows.case",
+            "uncovered-a-part-of-a-date-that-depends-on-the-rows--a-value-that-does-not-convert.case",
+            "uncovered-a-part-of-a-date-that-depends-on-the-rows--the-tables-refuse-a-part-polars-runs.case",
+        ] {
+            assert_eq!(
+                excused_by_kept(name),
+                vec![Limit::APartOfADateThatDependsOnTheRows],
+                "{name}"
+            );
+        }
+        let case = replacing("minute", chain(column("k"), &["Expr.not_"]));
+        for (said, stage) in [
+            (INVALID_TIME, Stage::Rows),
+            (INVALID_TIME, Stage::Empty),
+            (NOT_A_NUMBER, Stage::Rows),
+        ] {
+            assert_eq!(
+                refused_for_a_bound(&case, None, stage, said),
+                vec![Limit::APartOfADateThatDependsOnTheRows],
+                "{said}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_part_is_not_excused_where_the_number_1_is_refused_too_nor_at_a_place_nor_for_another_reason()
+     {
+        // Each part is already the number 1: the control is the case itself, which shows nothing.
+        let case = replacing("minute", whole(1));
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, INVALID_TIME),
+            vec![]
+        );
+        let case = replacing("minute", chain(column("k"), &["Expr.not_"]));
+        // A refusal at a place, in the schema, or for another reason is not this one.
+        assert_eq!(
+            refused_for_a_bound(
+                &case,
+                Some(link_of("exprs", 0, 1)),
+                Stage::Rows,
+                INVALID_TIME
+            ),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Schema, INVALID_TIME),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, "invalid series dtype"),
+            vec![]
+        );
+        // A case with no `dt.replace` given a part has no part to blame.
+        let other = select(vec![chain(column("a"), &["Expr.cum_sum"])]);
+        assert_eq!(
+            refused_for_a_bound(&other, None, Stage::Rows, INVALID_TIME),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn the_tables_are_blamed_for_a_part_only_where_the_number_1_is_not_refused_by_them() {
+        let kept = |name: &str| {
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/allowed_fuzz/regressions")
+                .join(name);
+            Case::decode(&std::fs::read(path).expect("a kept case")).expect("a case")
+        };
+        // The pivot's day is `true`, which the tables meet as a column of true and false: with the
+        // number 1 they stop refusing it for the components.
+        let pivot = kept(
+            "uncovered-a-part-of-a-date-that-depends-on-the-rows--the-tables-refuse-a-part-polars-runs.case",
+        );
+        assert!(the_tables_allow_the_parts_as_ones(&pivot));
+        // Where each part is the number 1 already, the control is the case itself, which shows
+        // nothing, and where no call is given a part there is no control.
+        let ones = replacing("day", whole(1));
+        assert!(!the_tables_allow_the_parts_as_ones(&ones));
+        assert_eq!(refused_for_a_part_of_a_date_with_ones(&ones), None);
+        let none = select(vec![chain(column("a"), &["Expr.cum_sum"])]);
+        assert!(!the_tables_allow_the_parts_as_ones(&none));
+        assert_eq!(refused_for_a_part_of_a_date_with_ones(&none), None);
     }
 
     // ----- A struct with no fields
