@@ -409,3 +409,27 @@ fn a_folded_length_of_time_is_no_part_of_a_join_key_either() {
     };
     assert_eq!(rule.name(), "folded-function-is-no-join-key");
 }
+
+#[test]
+fn a_length_of_time_of_a_null_is_named_by_its_first_part_as_polars_does_not_fold_it() {
+    // A null is no number to make a literal of, so the call stays a call and is named by its first
+    // part, which is `literal` where the weeks are not given: two such keys repeat the name.
+    let length = || {
+        made_by(
+            "polars.duration",
+            json!({ "milliseconds": chain(
+                call(
+                    "polars.lit",
+                    json!({ "value": { "flag": null }, "dtype": { "dtype": "UInt8" } })
+                ),
+                vec![]
+            ) }),
+        )
+    };
+    let walk = join_keys_walk(vec![field("a"), field("a")], vec![length(), length()]);
+    let refusal = walk.refusal().expect("the pair of names comes twice");
+    assert_eq!(
+        refusal.refusal().source(),
+        RefusalSource::Rule(Rule::JoinKeyNamesAreNotRepeated)
+    );
+}
