@@ -21,6 +21,7 @@ mod preview;
 mod reading;
 mod refusals;
 mod shown;
+mod statistics;
 mod summary;
 mod support;
 mod syntax;

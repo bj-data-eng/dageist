@@ -16,7 +16,7 @@ use crate::claims::{claims, inputs};
 use crate::support::{call, chain, document, field, field_then, many, named, step, whole};
 
 /// The one-step document that selects `expression` as the column `out`.
-fn selecting(expression: Value) -> String {
+pub(crate) fn selecting(expression: Value) -> String {
     document(vec![step(
         "s",
         "LazyFrame.select",
@@ -24,7 +24,7 @@ fn selecting(expression: Value) -> String {
     )])
 }
 
-fn report_of(text: &str) -> Report {
+pub(crate) fn report_of(text: &str) -> Report {
     Document::read(text)
         .expect("a document")
         .run_on(&inputs(), &claims())
@@ -32,7 +32,7 @@ fn report_of(text: &str) -> Report {
 }
 
 /// The dtype of the column `out` that the step gives, which it must give.
-fn dtype_of(written: &str) -> DataType {
+pub(crate) fn dtype_of(written: &str) -> DataType {
     let report = report_of(written);
     match report.steps()[0].outcome() {
         Outcome::Valid { schema, .. } => schema
@@ -43,7 +43,7 @@ fn dtype_of(written: &str) -> DataType {
     }
 }
 
-fn cells(written: &str) -> Vec<Option<String>> {
+pub(crate) fn cells(written: &str) -> Vec<Option<String>> {
     Document::read(written)
         .expect("a document")
         .preview(&inputs(), &claims(), &StepId::new("s").expect("an id"), 100)
@@ -54,25 +54,25 @@ fn cells(written: &str) -> Vec<Option<String>> {
         .collect()
 }
 
-fn texts(cells: &[&str]) -> Vec<Option<String>> {
+pub(crate) fn texts(cells: &[&str]) -> Vec<Option<String>> {
     cells.iter().map(|cell| Some((*cell).to_owned())).collect()
 }
 
 /// The column `name` followed by the one method `entry` given `arguments`.
-fn method(name: &str, entry: &str, arguments: Value) -> Value {
+pub(crate) fn method(name: &str, entry: &str, arguments: Value) -> Value {
     field_then(name, vec![call(entry, arguments)])
 }
 
-fn flag(on: bool) -> Value {
+pub(crate) fn flag(on: bool) -> Value {
     json!({ "flag": on })
 }
 
-fn word(choice: &str) -> Value {
+pub(crate) fn word(choice: &str) -> Value {
     json!({ "choice": choice })
 }
 
 /// `row_days`, with a null where it is 2: `0, null, null, 0, null, null, 1`.
-fn with_gaps() -> Value {
+pub(crate) fn with_gaps() -> Value {
     let gap = chain(
         call(
             "polars.lit",
@@ -96,7 +96,7 @@ fn with_gaps() -> Value {
 }
 
 /// Chains `then` after the expression `start` gives.
-fn after(start: &Value, then: Vec<Value>) -> Value {
+pub(crate) fn after(start: &Value, then: Vec<Value>) -> Value {
     let mut chained = start.clone();
     chained["expression"]["then"]
         .as_array_mut()
@@ -334,7 +334,7 @@ fn a_count_of_distinct_values_counts_a_null_and_a_count_does_not() {
 // ---------------------------------------------------------------------------
 // The walk
 
-fn source() -> DataFrame {
+pub(crate) fn source() -> DataFrame {
     df!(
         "a" => [1_i64, 2, 3],
         "b" => ["x", "y", "z"],
@@ -344,7 +344,7 @@ fn source() -> DataFrame {
     .expect("the table")
 }
 
-fn select_walk(expression: Value) -> Walk {
+pub(crate) fn select_walk(expression: Value) -> Walk {
     let written = document(vec![step(
         "s",
         "LazyFrame.select",
@@ -358,7 +358,7 @@ fn select_walk(expression: Value) -> Walk {
 }
 
 /// Where a link added after the select item would stand: what the item gives.
-fn gives(walk: &Walk) -> Option<OfferPlace> {
+pub(crate) fn gives(walk: &Walk) -> Option<OfferPlace> {
     walk.expressions()
         .iter()
         .find(|expression| {
@@ -367,7 +367,7 @@ fn gives(walk: &Walk) -> Option<OfferPlace> {
         .and_then(|expression| expression.places().last().copied().flatten())
 }
 
-fn select_after(dtype: Representative, shape: Shape) -> Option<OfferPlace> {
+pub(crate) fn select_after(dtype: Representative, shape: Shape) -> Option<OfferPlace> {
     Some(OfferPlace::new(
         Context::step(Outer::Select),
         After::Value { dtype, shape },
@@ -450,7 +450,7 @@ fn a_sort_by_of_one_value_by_a_column_is_a_value_for_each_row_as_polars_gives() 
 }
 
 /// The walk of a join of the table on `ra` with the key `key` on the left.
-fn join_walk(key: Value) -> Walk {
+pub(crate) fn join_walk(key: Value) -> Walk {
     let mut inputs = Inputs::new();
     inputs
         .add_table(
