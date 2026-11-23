@@ -37,7 +37,9 @@
 use dageist_engine::allowed::Representative;
 use dageist_engine::allowed::Stage as TableStage;
 use dageist_engine::catalog;
-use dageist_engine::document::{Call, Document, Expression, Place, Segment, Start, Step, Value};
+use dageist_engine::document::{
+    Call, Document, Expression, Place, Segment, Start, Step, StepId, Value,
+};
 
 use super::case::Case;
 use super::frames::Frames;
@@ -1645,6 +1647,54 @@ fn leaves_only_nulls(
 ) -> bool {
     rows_after(frames, expression, upto, receiver)
         .is_some_and(|rows| !rows.is_empty() && rows.iter().all(|cell| *cell == Cell::Null))
+}
+
+/// Whether Polars gives a null in each row of the left table for the first `upto` links of
+/// `expression`, which is run alone in a select on the sample: a call that the rows the target
+/// follows know nothing of, as a slice by an offset that is no number, may give only nulls.
+fn gives_only_nulls(frames: &Frames, expression: &Expression, upto: usize) -> bool {
+    // A null literal is one that Polars folds, whatever the rows hold, which a probe settles: the
+    // nulls here are those of the sample's rows.
+    // A condition that no row takes gives a null that is no value of the rows: what is in its
+    // branches is not met, which is a part that Polars skips and a probe settles.
+    if any_call(expression, &|call| {
+        (is(call, "polars.lit") && matches!(call.argument("value"), Some(Value::Flag(None))))
+            || call.entry().applies() == catalog::Applies::Condition
+    }) {
+        return false;
+    }
+    let Ok(part) = Expression::new(
+        expression.start().clone(),
+        expression.links()[..upto.min(expression.links().len())].to_vec(),
+    ) else {
+        return false;
+    };
+    let (Some(select), Ok(id)) = (catalog::entry("LazyFrame.select"), StepId::new("s")) else {
+        return false;
+    };
+    let Ok(call) = Call::new(
+        select,
+        vec![(
+            "named_exprs",
+            Value::Pairs(vec![(
+                Value::Columns(vec!["out".to_owned()]),
+                Value::Expression(part),
+            )]),
+        )],
+    ) else {
+        return false;
+    };
+    let Ok(step) = Step::new(id.clone(), call) else {
+        return false;
+    };
+    let Ok(document) = Document::new(vec![step]) else {
+        return false;
+    };
+    document
+        .preview(&frames.inputs(false), &frames.rows, &id, 100)
+        .is_ok_and(|preview| {
+            !preview.rows().is_empty() && preview.rows().iter().all(|row| row[0].is_none())
+        })
 }
 
 /// Whether a call undoes the argument `parameter` of the call `call`.
@@ -3889,17 +3939,24 @@ fn applies(
         (Limit::AShiftThatLeavesNulls, Disagreement::PolarsAllows(refused)) => {
             let locus = locate(case, &refused.place);
             let frames = Frames::with_key(case.receiver, case.argument, None);
-            // What the call follows, or is given, is only nulls.
+            // What the call follows, or is given, is only nulls: as the rows of the sample, followed
+            // through the calls that are known, say, or as Polars gives them where what the call
+            // follows or is given is run alone on the left table.
+            let on_the_left = !matches!(
+                refused.place.path().first(),
+                Some(Segment::Parameter(name)) if name == "right_on" || name == "aggregate_function"
+            );
             refused.stage == Some(TableStage::Rows)
-                && (locus
-                    .chain
-                    .zip(locus.index)
-                    .is_some_and(|(chain, at)| leaves_only_nulls(&frames, chain, at, true))
-                    || locus.call.is_some_and(|call| {
-                        operands(call).into_iter().any(|(_, operand)| {
-                            leaves_only_nulls(&frames, operand, operand.links().len(), false)
-                        })
-                    }))
+                && (locus.chain.zip(locus.index).is_some_and(|(chain, at)| {
+                    leaves_only_nulls(&frames, chain, at, true)
+                        || (on_the_left && gives_only_nulls(&frames, chain, at))
+                }) || locus.call.is_some_and(|call| {
+                    operands(call).into_iter().any(|(_, operand)| {
+                        leaves_only_nulls(&frames, operand, operand.links().len(), false)
+                            || (on_the_left
+                                && gives_only_nulls(&frames, operand, operand.links().len()))
+                    })
+                }))
         }
         (Limit::ASingleValueInAKey, Disagreement::PolarsAllows(refused)) => {
             // The key the tables refused is wholly one value.
@@ -6973,11 +7030,9 @@ mod tests {
                 "{gives_values}"
             );
         }
-        // A call whose effect on the rows is not known leaves nothing known of them.
-        assert_eq!(
-            excused_after("b", vec![over("k", None), shift_by(1), last()]),
-            vec![]
-        );
+        // A call whose effect on the rows is not known leaves nothing known of them, and Polars,
+        // asked of the part alone, gives the last of them as a value and not as a null.
+        assert_eq!(excused_after("b", vec![over("k", None), last()]), vec![]);
         // Shifts that empty the rows leave only nulls whatever came before them, as
         // long as the rows are the sample's.
         assert_eq!(
