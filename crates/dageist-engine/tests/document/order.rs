@@ -492,3 +492,34 @@ fn a_count_beside_a_column_is_refused_in_a_join_key_as_any_aggregate_is() {
         );
     }
 }
+
+#[test]
+fn a_difference_that_drops_the_values_it_has_none_before_is_not_one_the_catalogue_has() {
+    // Python's `null_behavior='drop'` leaves out the first `n` values, so it gives fewer values than
+    // the table has rows, which no shape of the walk says. The catalogue has the word `ignore` only,
+    // so the step is refused and no row is dropped.
+    let dropping = selecting(method(
+        "row_days",
+        "Expr.diff",
+        json!({ "null_behavior": word("drop") }),
+    ));
+    let refused = match Document::read(&dropping) {
+        Err(_) => true,
+        Ok(document) => matches!(
+            document
+                .run_on(&inputs(), &claims())
+                .map(|report| { matches!(report.steps()[0].outcome(), Outcome::Valid { .. }) }),
+            Ok(false) | Err(_)
+        ),
+    };
+    assert!(
+        refused,
+        "a drop of the first values is no word of the catalogue"
+    );
+    let ignoring = selecting(method(
+        "row_days",
+        "Expr.diff",
+        json!({ "null_behavior": word("ignore") }),
+    ));
+    assert_eq!(cells(&ignoring).len(), 7);
+}
