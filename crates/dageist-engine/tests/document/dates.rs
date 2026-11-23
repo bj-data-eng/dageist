@@ -387,3 +387,34 @@ fn no_time_zone_takes_the_zone_off_and_only_replace_takes_it() {
         report.steps()[0].outcome()
     );
 }
+
+#[test]
+fn an_empty_zone_converts_to_utc_and_replaces_by_no_zone_as_polars_reads_it() {
+    // Polars reads the empty text as no zone, and `convert_time_zone` gives a moment that has none
+    // the zone UTC, so a moment converted to it has a zone whose offsets Polars reads.
+    let written = selecting(moments_then_all(vec![
+        in_zone("Expr.dt.replace_time_zone", Some("UTC")),
+        in_zone("Expr.dt.convert_time_zone", Some("")),
+        call("Expr.dt.base_utc_offset", json!({})),
+        call("Expr.dt.total_hours", json!({})),
+    ]));
+    let report = report_of(&written);
+    assert_eq!(report.steps()[0].walk().refusal(), None);
+    assert!(
+        matches!(report.steps()[0].outcome(), Outcome::Valid { .. }),
+        "{:?}",
+        report.steps()[0].outcome()
+    );
+    assert_eq!(cells(&written), vec![Some("0".to_owned()); 7]);
+    // Replacing the zone by the empty text takes it off, as it does by none.
+    let written = selecting(moments_then_all(vec![
+        in_zone("Expr.dt.replace_time_zone", Some("UTC")),
+        in_zone("Expr.dt.replace_time_zone", Some("")),
+        call("Expr.dt.base_utc_offset", json!({})),
+    ]));
+    let report = report_of(&written);
+    assert!(
+        report.steps()[0].walk().refusal().is_some(),
+        "a moment with no zone has no offsets"
+    );
+}
