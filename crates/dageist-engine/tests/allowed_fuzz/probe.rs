@@ -878,6 +878,52 @@ pub fn settle_on_a_value(
     })
 }
 
+/// Asks Polars about a function that starts a chain, which the tables refused for what it is
+/// given, with each literal it is given made a column of its dtype, which Polars cannot fold as it
+/// can a literal: the part as written may be allowed because Polars folds the literal, or never
+/// meets it, as under the length of what the call is part of, and a column of the dtype is refused
+/// as the tables say. `None` for a refusal of a rule or of a link, for a pivot's aggregate, which
+/// reads no column to stand in, when the call is given no literal whose dtype Polars gave, and when
+/// Polars allows the probe, refuses it for another reason or not at the call.
+pub fn settle_a_start_given_columns(
+    case: &Case,
+    refused: &Refused,
+    observed: &Observed,
+) -> Option<Settled> {
+    if !matches!(refused.source, Source::Polars) {
+        return None;
+    }
+    let found = find(case, &refused.place)?;
+    if found.in_the_aggregate || !matches!(found.rest, [Segment::Start]) {
+        return None;
+    }
+    let Start::Call(start) = found.expression.start() else {
+        return None;
+    };
+    let literals = operand_causes(start, &refused.place, false);
+    let classes = literals
+        .iter()
+        .map(|cause| class_of(cause, observed))
+        .collect::<Option<Vec<_>>>()
+        .filter(|classes| !classes.is_empty())?;
+    let standing: Vec<&Expression> = literals.iter().map(|cause| cause.expression).collect();
+    let columns = call_with_columns(start, &standing, 0)?;
+    let part = Expression::new(Start::Call(columns), Vec::new()).ok()?;
+    let probed = Case {
+        receiver: case.receiver,
+        argument: case.argument,
+        document: document_of(case, &found, part, false)?,
+    };
+    let at = place_of_the_part(&found, false).then(Segment::Start);
+    let tables = Tables::standing(found.on_the_other_table, &classes)?;
+    let refusal = refused_as(&probed, tables, refused, &[at])?;
+    Some(Settled {
+        probe: probed.document.write(),
+        reason: refusal.reason,
+        showing: Showing::TheSameReason,
+    })
+}
+
 /// Asks Polars about a predicate that a rule refused, apart from what the predicate holds: a
 /// column of the dtype that reaches its end, as the predicate of a condition or of a filter. The
 /// predicate as written may be refused first for a call inside it that the tables allow, as a
@@ -1610,6 +1656,7 @@ pub fn settle_apart(
     observed: &Observed,
 ) -> Option<Settled> {
     settle_on_a_value(case, refused, predicted, observed)
+        .or_else(|| settle_a_start_given_columns(case, refused, observed))
         .or_else(|| settle_as_a_key(case, refused))
         .or_else(|| settle_on_a_value_as_a_key(case, refused, predicted, observed))
         .or_else(|| settle_in_the_position(case, refused, predicted, observed))
