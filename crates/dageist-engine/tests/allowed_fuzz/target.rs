@@ -12,7 +12,7 @@ use dageist_fuzz::{
 };
 
 use super::case::Case;
-use super::generate::generate;
+use super::generate::{Focus, generate};
 use super::limits::{excuses, strict};
 use super::observe::{Observed, Refusal, Seen, Stage, is_the_targets_own, observe};
 use super::predict::{Prediction, Refused, Source, Verdict, predict};
@@ -41,6 +41,8 @@ pub const DTYPES: &str = "dageist-engine::tables-predict-dtypes";
 
 pub struct AllowedTarget {
     descriptor: TargetDescriptor,
+    /// The methods the cases it makes are focused on, if any.
+    focus: Option<Focus>,
 }
 
 impl Default for AllowedTarget {
@@ -58,7 +60,15 @@ impl AllowedTarget {
             .into_iter()
             .find(|target| target.id().as_str() == TARGET)
             .expect("the descriptor declares the target");
-        Self { descriptor }
+        Self {
+            descriptor,
+            focus: None,
+        }
+    }
+
+    /// The target that makes cases focused on `focus`, if it is one.
+    pub fn with_focus(self, focus: Option<Focus>) -> Self {
+        Self { focus, ..self }
     }
 
     fn property(name: &str) -> PropertyId {
@@ -419,7 +429,7 @@ impl CaseTarget for AllowedTarget {
     }
 
     fn generate(&self, input: &[u8]) -> Result<Generation<Case>> {
-        match generate(input) {
+        match generate(input, self.focus.as_ref()) {
             Some(case) => Ok(Generation::Generated(case)),
             None => Ok(Generation::Rejected(GenerationRejection::new(
                 "too little entropy to make a case from",
