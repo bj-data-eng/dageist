@@ -473,12 +473,21 @@ const PARTS_OF_A_LENGTH: [&str; 8] = [
 /// Where `may_fold` and every part is a number typed in and nothing more, Polars makes a literal
 /// of the call where the values fit, which it names otherwise, so the name is not known.
 fn first_part_name(start: &Call, first: &str, parts: &[&str], may_fold: bool) -> Option<String> {
+    // A part that Polars may fold: a number, or a flag that it reads as one, typed in. A null and
+    // text are no number, so a call that holds one stays a call. A flag is taken for foldable here
+    // and not by `is_folded_into_a_literal`, on purpose: the name is then not known, which only
+    // leaves the rule for repeated names silent, where taking a flag for folded there would refuse
+    // a key that Polars may allow. The two disagree only on the side of saying less.
     let bare_literal = |value: Option<&Value>| match value {
         None => true,
         Some(Value::Expression(part)) => {
             part.links().is_empty()
                 && matches!(part.start(), Start::Call(call)
-                    if call.entry().id().as_str() == "polars.lit")
+                if call.entry().id().as_str() == "polars.lit"
+                    && matches!(
+                        call.argument("value"),
+                        Some(Value::Integer(_) | Value::Float(_) | Value::Flag(Some(_)))
+                    ))
         }
         Some(_) => false,
     };
