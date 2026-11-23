@@ -1274,9 +1274,11 @@ It then runs the case through the step document, as the editor does, on three ro
 with a null and on a table with no rows, and compares: a case is allowed only
 when the schema and both runs succeed, as the tables count it, and the dtype
 after every link that the tables gave is the class Polars gives. The case is the
-document's own text, so a kept case replays exactly. The
-[how-to](how-to.md#check-the-tables-against-polars) says how to run it for longer
-and to replay a case.
+document's own text, so a kept case replays exactly. A campaign draws its methods
+evenly, or focused on chosen methods so that every case holds one of them, which keeps
+a batch of new methods checked against the rest as deeply however many the catalogue
+holds. The [how-to](how-to.md#check-the-tables-against-polars) says how to run it for
+longer, to focus it and to replay a case.
 
 A disagreement is either a defect of dageist, a combination the tables were not
 measured on, or a part of an expression that Polars does not evaluate. The first

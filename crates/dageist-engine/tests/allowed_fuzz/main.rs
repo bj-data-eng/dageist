@@ -13,8 +13,8 @@
 //! be replayed.
 //!
 //! The fixed seed below runs with the engine's tests. [`a_campaign`] runs more
-//! on request, and [`replay_a_case`] replays one kept case; the how-to guide
-//! says how.
+//! on request, focused on chosen methods where it is asked to be, and
+//! [`replay_a_case`] replays one kept case; the how-to guide says how.
 
 mod case;
 mod frames;
@@ -38,6 +38,7 @@ use dageist_fuzz::reduction::{ReductionLimits, reduce_direct};
 use dageist_fuzz::{CaseOutcome, CaseTarget, OutcomeKind};
 
 use case::Case;
+use generate::Focus;
 use limits::Limit;
 use target::{AllowedTarget, take_tally};
 
@@ -103,10 +104,10 @@ fn on_a_large_stack<T: Send>(work: impl FnOnce() -> T + Send) -> T {
     })
 }
 
-/// Runs `cases` cases made from `seed`. When one disagrees, reduces it and
-/// keeps the result under the directory for kept evidence.
-fn campaign(seed: u64, cases: u32) -> (Result<u64, Finding>, Vec<String>) {
-    let target = AllowedTarget::new();
+/// Runs `cases` cases made from `seed`, focused on `focus` if it is one. When one
+/// disagrees, reduces it and keeps the result under the directory for kept evidence.
+fn campaign(seed: u64, cases: u32, focus: Option<Focus>) -> (Result<u64, Finding>, Vec<String>) {
+    let target = AllowedTarget::new().with_focus(focus);
     let strategy = property::bytes(512, target.descriptor().limits());
     let config = PropertyConfig {
         cases,
@@ -169,6 +170,17 @@ fn campaign(seed: u64, cases: u32) -> (Result<u64, Finding>, Vec<String>) {
     (Err(finding), tally)
 }
 
+/// The methods `DAGEIST_FUZZ_FOCUS` names, which a campaign focuses on. Unset or
+/// empty, it names none.
+fn env_focus() -> Option<Focus> {
+    let text = match std::env::var("DAGEIST_FUZZ_FOCUS") {
+        Ok(text) => text,
+        Err(std::env::VarError::NotPresent) => return None,
+        Err(std::env::VarError::NotUnicode(_)) => panic!("DAGEIST_FUZZ_FOCUS is not text"),
+    };
+    Focus::parse(&text).unwrap_or_else(|refusal| panic!("{refusal}"))
+}
+
 fn env_number<T: std::str::FromStr>(name: &str, default: T) -> T {
     std::env::var(name)
         .ok()
@@ -179,7 +191,7 @@ fn env_number<T: std::str::FromStr>(name: &str, default: T) -> T {
 #[test]
 fn the_tables_predict_what_polars_does_for_the_fixed_seed() {
     let started = Instant::now();
-    let (result, tally) = on_a_large_stack(|| campaign(SEED, CASES));
+    let (result, tally) = on_a_large_stack(|| campaign(SEED, CASES, None));
     eprintln!(
         "{CASES} cases of seed {SEED:#x} took {:.1?}\n{}",
         started.elapsed(),
@@ -194,16 +206,22 @@ fn the_tables_predict_what_polars_does_for_the_fixed_seed() {
     }
 }
 
-/// A longer run: `DAGEIST_FUZZ_CASES` cases from `DAGEIST_FUZZ_SEED`.
+/// A longer run: `DAGEIST_FUZZ_CASES` cases from `DAGEIST_FUZZ_SEED`, focused on the
+/// methods `DAGEIST_FUZZ_FOCUS` names, if it names any.
 #[test]
-#[ignore = "a campaign, run on request with DAGEIST_FUZZ_CASES and DAGEIST_FUZZ_SEED"]
+#[ignore = "a campaign, run on request with DAGEIST_FUZZ_CASES, DAGEIST_FUZZ_SEED and DAGEIST_FUZZ_FOCUS"]
 fn a_campaign() {
     let seed: u64 = env_number("DAGEIST_FUZZ_SEED", SEED);
     let cases: u32 = env_number("DAGEIST_FUZZ_CASES", 5_000);
+    let focus = env_focus();
+    let focused = focus
+        .as_ref()
+        .map(|focus| format!(" focused on {}", focus.names()))
+        .unwrap_or_default();
     let started = Instant::now();
-    let (result, tally) = on_a_large_stack(|| campaign(seed, cases));
+    let (result, tally) = on_a_large_stack(|| campaign(seed, cases, focus));
     eprintln!(
-        "{cases} cases of seed {seed:#x} took {:.1?}\n{}",
+        "{cases} cases of seed {seed:#x}{focused} took {:.1?}\n{}",
         started.elapsed(),
         tally.join("\n")
     );
@@ -363,6 +381,53 @@ fn a_case_reads_back_as_the_bytes_it_was_written_as() {
         checked += 1;
     }
     assert!(checked > 0);
+}
+
+#[test]
+fn every_case_a_focused_campaign_makes_holds_a_method_in_focus() {
+    // What each focus names, from the catalogue: a method, a namespace and two methods.
+    let methods = |chosen: &dyn Fn(&str) -> bool| -> Vec<String> {
+        dageist_engine::catalog::entries()
+            .iter()
+            .filter(|entry| entry.applies() == dageist_engine::catalog::Applies::Expression)
+            .map(|entry| entry.id().as_str().to_owned())
+            .filter(|id| chosen(id))
+            .collect()
+    };
+    let focuses = [
+        ("dt.replace", methods(&|id| id == "Expr.dt.replace")),
+        ("dt.", methods(&|id| id.starts_with("Expr.dt."))),
+        (
+            "replace_strict, over",
+            methods(&|id| id == "Expr.replace_strict" || id == "Expr.over"),
+        ),
+    ];
+    for (text, ids) in focuses {
+        let target = AllowedTarget::new().with_focus(Focus::parse(text).unwrap());
+        let mut made = 0;
+        for offset in 0..600_u64 {
+            let entropy: Vec<u8> = (0..512_u64)
+                .map(|at| {
+                    let mut mixed = (offset << 16 | at).wrapping_add(0x9e37_79b9_7f4a_7c15);
+                    mixed = (mixed ^ (mixed >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+                    mixed = (mixed ^ (mixed >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+                    (mixed ^ (mixed >> 31)) as u8
+                })
+                .collect();
+            let dageist_fuzz::Generation::Generated(case) = target.generate(&entropy).unwrap()
+            else {
+                continue;
+            };
+            let written = case.document.write();
+            assert!(
+                ids.iter()
+                    .any(|id| written.contains(&format!("\"entry\":\"{id}\""))),
+                "a case focused on {text} holds none of {ids:?}:\n{written}"
+            );
+            made += 1;
+        }
+        assert!(made >= 100, "only {made} cases focused on {text} were made");
+    }
 }
 
 #[test]

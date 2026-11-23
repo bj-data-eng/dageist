@@ -162,6 +162,8 @@ struct Built {
 
 struct Gen<'a> {
     draw: Draw<'a>,
+    /// The methods a focused campaign draws more often.
+    focus: Option<&'a Focus>,
     receiver: Representative,
     argument: Representative,
     host: Host,
@@ -223,7 +225,127 @@ const NUMBERED: [Representative; 17] = [
     Representative::Time,
 ];
 
-pub fn generate(bytes: &[u8]) -> Option<Case> {
+/// The methods of an expression, which a chain draws its links from.
+fn methods() -> Vec<&'static Entry> {
+    catalog::entries()
+        .iter()
+        .filter(|entry| entry.applies() == Applies::Expression)
+        .collect()
+}
+
+/// The name of a method as Polars gives it, which is its identifier without `Expr.`:
+/// `dt.replace`.
+fn method_name(entry: &Entry) -> &str {
+    let id = entry.id().as_str();
+    id.strip_prefix("Expr.").unwrap_or(id)
+}
+
+/// How often, in a hundred, a focused campaign puts back a method out of its focus for one in it.
+const FOCUS_PERCENT: usize = 25;
+
+/// The methods of an expression a campaign focuses on. Where a chain draws a method that is not
+/// one of them, it draws one that is, one time in four, and the rest of the case is drawn as
+/// without a focus. A focus on every method changes nothing. The target draws again a case that
+/// holds none of them.
+#[derive(Debug)]
+pub struct Focus {
+    /// In the catalogue's order, each once.
+    methods: Vec<&'static Entry>,
+}
+
+impl Focus {
+    /// The focus that `text` names: methods, separated by commas, each by its name, `dt.replace`, or
+    /// by the catalogue's identifier, `Expr.dt.replace`; a name that ends in a dot, `dt.`, names
+    /// every method whose name it begins. Text that names nothing is no focus.
+    ///
+    /// # Errors
+    ///
+    /// Where a name is of no method of an expression in the catalogue, it says which.
+    pub fn parse(text: &str) -> Result<Option<Self>, String> {
+        let methods = methods();
+        let mut chosen: Vec<&'static Entry> = Vec::new();
+        for name in text
+            .split(',')
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+        {
+            let short = name.strip_prefix("Expr.").unwrap_or(name);
+            let named: Vec<&'static Entry> = methods
+                .iter()
+                .copied()
+                .filter(|entry| {
+                    if short.ends_with('.') {
+                        method_name(entry).starts_with(short)
+                    } else {
+                        method_name(entry) == short
+                    }
+                })
+                .collect();
+            if named.is_empty() {
+                return Err(format!(
+                    "DAGEIST_FUZZ_FOCUS names `{name}`, which is no method of an expression in the \
+                     catalogue: name a method as `dt.replace` and the methods of a namespace as `dt.`"
+                ));
+            }
+            chosen.extend(named);
+        }
+        if chosen.is_empty() {
+            return Ok(None);
+        }
+        Ok(Some(Self {
+            methods: methods
+                .into_iter()
+                .filter(|entry| chosen.iter().any(|named| named.id() == entry.id()))
+                .collect(),
+        }))
+    }
+
+    /// The names of the methods in focus, separated by commas.
+    pub fn names(&self) -> String {
+        self.methods
+            .iter()
+            .map(|entry| method_name(entry))
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+
+    fn holds(&self, entry: &Entry) -> bool {
+        self.methods.iter().any(|method| method.id() == entry.id())
+    }
+
+    /// Whether `document` calls a method in focus anywhere: in a step, a chain or what a call is
+    /// given.
+    pub fn is_held_by(&self, document: &Document) -> bool {
+        document
+            .steps()
+            .iter()
+            .any(|step| self.is_in_call(step.call()))
+    }
+
+    fn is_in_call(&self, call: &Call) -> bool {
+        self.holds(call.entry())
+            || call
+                .arguments()
+                .iter()
+                .any(|given| self.is_in_value(given.value()))
+    }
+
+    fn is_in_value(&self, value: &Value) -> bool {
+        match value {
+            Value::Expression(expression) => {
+                matches!(expression.start(), Start::Call(start) if self.is_in_call(start))
+                    || expression.links().iter().any(|link| self.is_in_call(link))
+            }
+            Value::Many(items) => items.iter().any(|item| self.is_in_value(item)),
+            Value::Pairs(pairs) => pairs
+                .iter()
+                .any(|(key, value)| self.is_in_value(key) || self.is_in_value(value)),
+            _ => false,
+        }
+    }
+}
+
+pub fn generate(bytes: &[u8], focus: Option<&Focus>) -> Option<Case> {
     if bytes.len() < LEAST_ENTROPY {
         return None;
     }
@@ -233,6 +355,7 @@ pub fn generate(bytes: &[u8]) -> Option<Case> {
     let host = draw.weighted(&Host::ALL);
     let mut generator = Gen {
         draw,
+        focus,
         receiver,
         argument,
         host,
@@ -844,12 +967,17 @@ impl Gen<'_> {
         class: Representative,
         shape: Shape,
     ) -> Option<(Call, Next)> {
-        let methods: Vec<&'static Entry> = catalog::entries()
-            .iter()
-            .filter(|entry| entry.applies() == Applies::Expression)
-            .collect();
+        let methods = methods();
         for attempt in 0..6 {
-            let chosen = methods[self.draw.below(methods.len())];
+            let mut chosen = methods[self.draw.below(methods.len())];
+            // Without a focus, or with the method drawn in it, nothing more is drawn: the case is
+            // the one drawn without a focus.
+            if let Some(focus) = self.focus
+                && !focus.holds(chosen)
+                && self.draw.chance(FOCUS_PERCENT)
+            {
+                chosen = self.draw.pick(&focus.methods);
+            }
             let (call, arguments) = self.method_call(chosen, slots, depth)?;
             let given: Vec<(&str, Representative)> = arguments
                 .iter()
@@ -1507,6 +1635,110 @@ mod tests {
             .collect()
     }
 
+    /// The identifiers of the methods `focus` holds, in the catalogue's order.
+    fn focused_ids(focus: &Focus) -> Vec<&'static str> {
+        focus
+            .methods
+            .iter()
+            .map(|entry| entry.id().as_str())
+            .collect()
+    }
+
+    /// The identifiers of the catalogue's methods of an expression that begin with `prefix`.
+    fn ids_beginning(prefix: &str) -> Vec<&'static str> {
+        catalog::entries()
+            .iter()
+            .filter(|entry| entry.applies() == Applies::Expression)
+            .map(|entry| entry.id().as_str())
+            .filter(|id| id.starts_with(prefix))
+            .collect()
+    }
+
+    #[test]
+    fn a_focus_names_methods_by_name_or_identifier_and_namespaces_by_a_name_that_ends_in_a_dot() {
+        let one = Focus::parse("dt.replace").unwrap().unwrap();
+        assert_eq!(focused_ids(&one), ["Expr.dt.replace"]);
+        let by_id = Focus::parse("Expr.dt.replace").unwrap().unwrap();
+        assert_eq!(focused_ids(&by_id), ["Expr.dt.replace"]);
+        let namespace = Focus::parse("dt.").unwrap().unwrap();
+        let dates = ids_beginning("Expr.dt.");
+        assert!(dates.len() > 1, "the catalogue has methods of `dt`");
+        assert_eq!(focused_ids(&namespace), dates);
+        // Names are separated by commas, and a method named twice is in focus once.
+        let several = Focus::parse(" over , replace_strict,over ")
+            .unwrap()
+            .unwrap();
+        assert_eq!(focused_ids(&several), ["Expr.over", "Expr.replace_strict"]);
+        assert_eq!(several.names(), "over, replace_strict");
+    }
+
+    #[test]
+    fn text_that_names_nothing_is_no_focus() {
+        for text in ["", "   ", " , "] {
+            assert!(Focus::parse(text).unwrap().is_none(), "{text:?}");
+        }
+    }
+
+    #[test]
+    fn a_focus_refuses_a_name_that_is_of_no_method_of_an_expression() {
+        // A method the catalogue lacks, a namespace named without its dot, a namespace it lacks,
+        // a function that starts a chain, a link of a condition and a step are no methods.
+        for name in [
+            "dt.no_such_method",
+            "dt",
+            "nowhere.",
+            "col",
+            "polars.when",
+            "Then.otherwise",
+            "LazyFrame.join",
+        ] {
+            let refusal = Focus::parse(&format!("over, {name}")).unwrap_err();
+            assert!(
+                refusal.contains("DAGEIST_FUZZ_FOCUS") && refusal.contains(&format!("`{name}`")),
+                "{name}: {refusal}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_focus_on_every_method_leaves_each_case_as_it_is_drawn_without_one() {
+        let every = ids_beginning("")
+            .iter()
+            .map(|id| id.strip_prefix("Expr.").unwrap_or(id))
+            .collect::<Vec<_>>()
+            .join(",");
+        let every = Focus::parse(&every).unwrap().unwrap();
+        assert_eq!(focused_ids(&every), ids_beginning(""));
+        let mut compared = 0;
+        for offset in 0..2000_u64 {
+            let bytes = entropy(offset);
+            let unfocused = generate(&bytes, None);
+            assert_eq!(generate(&bytes, Some(&every)), unfocused, "offset {offset}");
+            compared += usize::from(unfocused.is_some());
+        }
+        assert_eq!(compared, 2000);
+    }
+
+    #[test]
+    fn a_focus_draws_its_methods_more_often() {
+        let focus = Focus::parse("dt.replace").unwrap().unwrap();
+        let holding = |focus: Option<&Focus>| {
+            (0..2000_u64)
+                .filter_map(|offset| generate(&entropy(offset), focus))
+                .filter(|case| {
+                    case.document
+                        .write()
+                        .contains("\"entry\":\"Expr.dt.replace\"")
+                })
+                .count()
+        };
+        let (without, with) = (holding(None), holding(Some(&focus)));
+        assert!(
+            with > 4 * without.max(10),
+            "{with} focused cases against {without}"
+        );
+    }
+
     /// Whether the document of `case` holds a `shift` by a whole number below
     /// zero, which is written as a literal of the number.
     fn shifts_back(case: &Case) -> bool {
@@ -1549,7 +1781,7 @@ mod tests {
         // The generator gives a length as a literal of the number 1, as it gives the shift of `shift`.
         let mut found = 0;
         for offset in 0..8000_u64 {
-            let Some(case) = generate(&entropy(offset)) else {
+            let Some(case) = generate(&entropy(offset), None) else {
                 continue;
             };
             let document: serde_json::Value =
@@ -1572,7 +1804,7 @@ mod tests {
         // The limit for what a shift leaves null follows the direction of the
         // shift, so the target must reach both for a campaign to check it.
         let cases: Vec<Case> = (0..6000_u64)
-            .filter_map(|offset| generate(&entropy(offset)))
+            .filter_map(|offset| generate(&entropy(offset), None))
             .collect();
         let back = cases.iter().filter(|case| shifts_back(case)).count();
         let forward = cases
@@ -1612,7 +1844,7 @@ mod tests {
         // dtype, with options or without, and refuses a window given neither, so a
         // campaign checks the first and never draws the second.
         let mut all = Vec::new();
-        for case in (0..6000_u64).filter_map(|offset| generate(&entropy(offset))) {
+        for case in (0..6000_u64).filter_map(|offset| generate(&entropy(offset), None)) {
             let document: serde_json::Value =
                 serde_json::from_str(case.document.write().lines().last().expect("a document"))
                     .expect("a document is JSON");
