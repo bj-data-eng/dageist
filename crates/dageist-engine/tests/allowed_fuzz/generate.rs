@@ -1701,6 +1701,68 @@ mod tests {
     }
 
     #[test]
+    fn a_focus_names_a_function_that_starts_a_chain_by_name_or_identifier() {
+        for name in ["date", "polars.date", "from_epoch"] {
+            let focus = Focus::parse(name)
+                .unwrap_or_else(|refusal| panic!("{name}: {refusal}"))
+                .unwrap_or_else(|| panic!("{name} names a function"));
+            assert_eq!(focus.names(), name.strip_prefix("polars.").unwrap_or(name));
+        }
+        // Methods and functions are named together, each once.
+        let both = Focus::parse("dt.replace, datetime, polars.datetime")
+            .unwrap()
+            .unwrap();
+        assert_eq!(both.names(), "dt.replace, datetime");
+        // A function that takes no expression stays no focus: a column and a literal are drawn
+        // evenly as they were, and a function is not named as a namespace.
+        for name in ["col", "polars.lit", "date."] {
+            assert!(Focus::parse(name).is_err(), "{name}");
+        }
+    }
+
+    #[test]
+    fn a_focus_on_a_function_draws_it_as_the_start_of_a_chain_more_often() {
+        let focus = Focus::parse("duration").unwrap().unwrap();
+        let holding = |focus: Option<&Focus>| {
+            (0..2000_u64)
+                .filter_map(|offset| generate(&entropy(offset), focus))
+                .filter(|case| {
+                    case.document
+                        .write()
+                        .contains("\"entry\":\"polars.duration\"")
+                })
+                .count()
+        };
+        let (without, with) = (holding(None), holding(Some(&focus)));
+        assert!(without > 0, "no case starts a chain from a function");
+        assert!(
+            with > 4 * without.max(10),
+            "{with} focused cases against {without}"
+        );
+    }
+
+    #[test]
+    fn every_function_that_starts_a_chain_and_takes_expressions_is_drawn_without_a_focus() {
+        let mut drawn = std::collections::BTreeSet::new();
+        for offset in 0..6000_u64 {
+            let Some(case) = generate(&entropy(offset), None) else {
+                continue;
+            };
+            let written = case.document.write();
+            for name in ["date", "time", "datetime", "duration", "from_epoch"] {
+                if written.contains(&format!("\"entry\":\"polars.{name}\"")) {
+                    drawn.insert(name);
+                }
+            }
+        }
+        assert_eq!(
+            drawn.len(),
+            5,
+            "the cases start a chain from {drawn:?} and not from every function"
+        );
+    }
+
+    #[test]
     fn a_focus_on_every_method_leaves_each_case_as_it_is_drawn_without_one() {
         let every = ids_beginning("")
             .iter()
