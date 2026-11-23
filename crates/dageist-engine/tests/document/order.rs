@@ -262,13 +262,37 @@ fn a_rank_is_the_place_in_order_and_the_method_says_how_ties_share_it() {
         cells(&descending),
         texts(&["3", "1", "1", "3", "1", "1", "2"])
     );
-    // A random rank of a seed is the same each time, and a place of the seven.
-    let seeded = ranks(json!({
-        "method": word("random"),
-        "seed": { "integer": 7 },
-    }));
-    assert_eq!(dtype_of(&seeded), DataType::UInt32);
-    assert_eq!(cells(&seeded), cells(&seeded));
+    // A random rank of a seed is the same each time it runs. It breaks each tie at random, so every
+    // place is one of those its value shares, and no two rows share a place.
+    let seeded = || {
+        ranks(json!({
+            "method": word("random"),
+            "seed": { "integer": 7 },
+        }))
+    };
+    let first = seeded();
+    assert_eq!(dtype_of(&first), DataType::UInt32);
+    let places = cells(&first);
+    assert_eq!(places, cells(&seeded()));
+    let shared: [&[&str]; 7] = [
+        &["1", "2"],
+        &["4", "5", "6", "7"],
+        &["4", "5", "6", "7"],
+        &["1", "2"],
+        &["4", "5", "6", "7"],
+        &["4", "5", "6", "7"],
+        &["3"],
+    ];
+    for (place, allowed) in places.iter().zip(shared) {
+        let place = place.as_deref().expect("a place");
+        assert!(
+            allowed.contains(&place),
+            "{place} is not one of {allowed:?}"
+        );
+    }
+    let mut sorted = places.clone();
+    sorted.sort();
+    assert_eq!(sorted, texts(&["1", "2", "3", "4", "5", "6", "7"]));
 }
 
 #[test]
