@@ -370,6 +370,14 @@ fn key_name(key: &Expression) -> Option<String> {
             (!(name.starts_with('^') && name.ends_with('$'))).then(|| name.clone())
         }
         "polars.lit" => Some("literal".to_owned()),
+        // Python names what these make by an alias.
+        "polars.date" => Some("date".to_owned()),
+        "polars.time" => Some("time".to_owned()),
+        // A count since 1970 is named as the column it counts is.
+        "polars.from_epoch" => match start.argument("column") {
+            Some(Value::Expression(column)) => key_name(column),
+            _ => None,
+        },
         "polars.when" => key
             .links()
             .iter()
@@ -378,6 +386,51 @@ fn key_name(key: &Expression) -> Option<String> {
                 Some(Value::Expression(value)) => key_name(value),
                 _ => None,
             }),
+        _ => None,
+    }
+}
+
+/// The unit a call is given for the parameter `parameter`, one of the three a time unit has, if it
+/// is given one.
+fn time_unit_word(call: &Call, parameter: &str) -> Option<String> {
+    match call.argument(parameter) {
+        Some(Value::Choice(word)) => Some(word.clone()),
+        _ => None,
+    }
+}
+
+/// The dtype a function that makes a date, a time, a moment or a length of time gives, where its
+/// arguments decide it: the unit and the zone it is given, which Python reads as it builds it,
+/// and the unit a count since 1970 is read in.
+fn made_dtype(start: &Call) -> Option<DataType> {
+    let unit = |word: &str| match word {
+        "ns" => TimeUnit::Nanoseconds,
+        "ms" => TimeUnit::Milliseconds,
+        _ => TimeUnit::Microseconds,
+    };
+    match start.entry().id().as_str() {
+        "polars.date" => Some(DataType::Date),
+        "polars.time" => Some(DataType::Time),
+        "polars.datetime" => {
+            let unit = unit(&time_unit_word(start, "time_unit").unwrap_or_else(|| "us".to_owned()));
+            let zone = match start.argument("time_zone") {
+                Some(Value::TimeZone(Some(text))) => crate::catalog::check_time_zone(text).ok()?,
+                _ => None,
+            };
+            Some(DataType::Datetime(unit, zone))
+        }
+        "polars.duration" => Some(DataType::Duration(
+            match time_unit_word(start, "time_unit") {
+                Some(word) => unit(&word),
+                None if start.argument("nanoseconds").is_some() => TimeUnit::Nanoseconds,
+                None => TimeUnit::Microseconds,
+            },
+        )),
+        "polars.from_epoch" => Some(match time_unit_word(start, "time_unit").as_deref() {
+            Some("d") => DataType::Date,
+            Some("ns") => DataType::Datetime(TimeUnit::Nanoseconds, None),
+            _ => DataType::Datetime(TimeUnit::Microseconds, None),
+        }),
         _ => None,
     }
 }
@@ -848,7 +901,7 @@ impl Walker<'_> {
                 };
                 self.source.get(name).cloned()
             }
-            _ => None,
+            _ => made_dtype(start),
         }
     }
 
@@ -987,7 +1040,7 @@ impl Walker<'_> {
             "polars.col" => self.column_of(start),
             "polars.lit" => literal_class(start),
             "polars.element" => self.group_of(),
-            _ => None,
+            _ => Representative::of(&made_dtype(start)?),
         }
     }
 
@@ -1040,10 +1093,51 @@ impl Walker<'_> {
                 self.path.push(Segment::Start);
                 let class = self.start_class(start);
                 self.blind_to_a_missing_column(start);
+                // A function that takes expressions is judged for what it is given, and gives as
+                // many values as its widest argument.
+                let takes_expressions = start.entry().applies() == Applies::Function
+                    && start
+                        .entry()
+                        .parameters()
+                        .iter()
+                        .any(|parameter| matches!(parameter.kind(), Kind::Expression(_)));
+                let given: Vec<(&str, Representative)> = start_arguments
+                    .iter()
+                    .filter_map(|(name, operand)| operand.dtype.map(|dtype| (name.as_str(), dtype)))
+                    .collect();
+                let unclassed: Vec<&str> = start_arguments
+                    .iter()
+                    .filter(|(_, operand)| operand.dtype.is_none())
+                    .map(|(name, _)| name.as_str())
+                    .collect();
+                let (words, _) = option_words(start);
+                let words: Vec<(&str, &str)> = words
+                    .iter()
+                    .map(|(name, word)| (name.as_str(), word.as_str()))
+                    .collect();
+                let time_zones = start.time_zones();
                 let chosen = Chosen::default();
                 let chosen = match class {
                     Some(dtype) => chosen.giving(dtype),
                     None => chosen,
+                };
+                let chosen = if takes_expressions {
+                    let chosen = chosen
+                        .with_arguments(&given)
+                        .with_unclassed(&unclassed)
+                        .with_options(&words)
+                        .with_time_zones(&time_zones)
+                        .following(self.start_unit(start));
+                    if start_arguments
+                        .iter()
+                        .all(|(_, operand)| operand.shape == Shape::One)
+                    {
+                        chosen.giving_one()
+                    } else {
+                        chosen.giving_many()
+                    }
+                } else {
+                    chosen
                 };
                 let verdict = allowed::offer(
                     start.entry(),
@@ -1054,6 +1148,15 @@ impl Walker<'_> {
                     Verdict::Refused(refusal) => self.refuse(refusal, false),
                     Verdict::Allowed(allowance) => {
                         last_end = Some(allowance.can_end().clone());
+                        // What the tables are not told is not guessed: an argument whose dtype is
+                        // not known leaves whether it may end, and fits, not known.
+                        if takes_expressions && !unclassed.is_empty() {
+                            self.blind(format!(
+                                "the dtype of an argument of {} is not known",
+                                start.entry().id().as_str()
+                            ));
+                            last_end = None;
+                        }
                         // An expansion has a dtype for each column, so whether it
                         // may end is not known, whatever the table measured.
                         if Self::names_several(start) && last_end == Some(Ending::Allowed) {

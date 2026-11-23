@@ -58,7 +58,7 @@ fn select_after(dtype: Representative, shape: Shape) -> Option<OfferPlace> {
 }
 
 #[test]
-fn what_a_function_is_given_in_text_is_refused_where_polars_refuses_it() {
+fn what_a_function_is_given_in_text_is_refused_where_and_at_the_stage_polars_refuses_it() {
     // `duration` takes numbers: Polars refuses the text when it works out the schema.
     let text = walk_of("polars.duration", json!({ "days": field("b") }));
     let refusal = text.refusal().expect("text is no number of days");
@@ -77,8 +77,9 @@ fn what_a_function_is_given_in_text_is_refused_where_polars_refuses_it() {
     let number = walk_of("polars.duration", json!({ "days": field("a") }));
     assert_eq!(number.refusal(), None);
     assert_eq!(selected(&number).ending(), Some(&Ending::Allowed));
-    // `from_epoch` of text multiplies it for seconds, and casts it to a date for days.
-    for unit in [None, Some("d")] {
+    // `from_epoch` of text multiplies it for seconds, which Polars refuses when it works out the
+    // schema, and casts it to a date for days, which it refuses only when it runs the rows.
+    for (unit, stage) in [(None, Stage::Schema), (Some("d"), Stage::Rows)] {
         let mut arguments = json!({ "column": field("b") });
         if let Some(unit) = unit {
             arguments["time_unit"] = json!({ "choice": unit });
@@ -87,7 +88,7 @@ fn what_a_function_is_given_in_text_is_refused_where_polars_refuses_it() {
         let refusal = counted.refusal().unwrap_or_else(|| panic!("{unit:?}"));
         assert_eq!(
             refusal.refusal().source(),
-            RefusalSource::Polars(Stage::Schema),
+            RefusalSource::Polars(stage),
             "{unit:?}"
         );
     }
