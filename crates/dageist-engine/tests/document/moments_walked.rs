@@ -336,3 +336,53 @@ fn what_a_function_gives_is_not_said_where_the_dtype_of_an_argument_is_not_known
         select_after(Representative::Date, Shape::Many)
     );
 }
+
+/// The walk of `select(polars.datetime(2026, 3, 5, time_zone=zone).dt.truncate(every))`.
+fn truncated_in(zone: &str, every: &str) -> Walk {
+    let moment = call(
+        "polars.datetime",
+        json!({
+            "year": whole(2026),
+            "month": whole(3),
+            "day": whole(5),
+            "time_zone": { "time_zone": zone },
+        }),
+    );
+    let truncate = call(
+        "Expr.dt.truncate",
+        json!({ "every": crate::support::text(every) }),
+    );
+    let written = document(vec![step(
+        "s",
+        "LazyFrame.select",
+        json!({ "exprs": many(vec![chain(moment, vec![truncate])]) }),
+    )]);
+    Document::read(&written).expect("a document").steps()[0].walk(
+        0,
+        source().schema(),
+        &Inputs::new(),
+    )
+}
+
+#[test]
+fn a_length_of_days_and_hours_is_refused_for_a_moment_in_a_zone_that_is_not_utc() {
+    // Polars cuts a moment in UTC by two days and a half, and refuses a moment in any other zone,
+    // for a day there is not always 24 hours, so a length of days cannot be mixed with hours.
+    for zone in ["Europe/Berlin", "Australia/Lord_Howe", "Asia/Kolkata"] {
+        let walk = truncated_in(zone, "2d12h");
+        let refusal = walk.refusal().unwrap_or_else(|| panic!("{zone}"));
+        assert_eq!(
+            refusal.refusal().source(),
+            RefusalSource::Rule(Rule::DurationIsValid),
+            "{zone}"
+        );
+        assert!(
+            refusal.refusal().reason().contains("cannot mix"),
+            "{}",
+            refusal.refusal().reason()
+        );
+        // A length of hours alone has no day to vary, in any zone.
+        assert_eq!(truncated_in(zone, "36h").refusal(), None, "{zone}");
+    }
+    assert_eq!(truncated_in("UTC", "2d12h").refusal(), None);
+}
