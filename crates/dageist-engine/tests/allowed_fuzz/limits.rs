@@ -4599,6 +4599,125 @@ mod tests {
         );
     }
 
+    /// What the limits make of the tables refusing `case` at `place`, at the rows, for `reason`,
+    /// asked on a stack that Polars' plans fit on: the limit runs Polars again.
+    fn refused_by_the_tables_at(case: &Case, place: Place, reason: &str) -> Vec<Limit> {
+        std::thread::scope(|scope| {
+            std::thread::Builder::new()
+                .stack_size(256 << 20)
+                .spawn_scoped(scope, || tables_refuse(case, place, ROWS, reason))
+                .expect("a thread")
+                .join()
+                .expect("the limits are asked")
+        })
+    }
+
+    #[test]
+    fn a_pivot_aggregate_is_excused_for_a_cast_of_what_literals_alone_make_where_a_select_converts_it()
+     {
+        // `from_epoch(null).str.join(ignore_nulls=false).cast(Int32)`: the value is made of a
+        // literal alone, a null that the cast meets as a null, where the tables measured the text
+        // of the sample. The same value is cast without a failure in a select.
+        assert_eq!(
+            excused_by_kept("uncovered-a-group-aggregate--a-cast-of-a-function-of-literals.case"),
+            vec![Limit::AGroupAggregate]
+        );
+        let text = "conversion from `str` to `i32` failed in column 'a' for 2 out of 3 values: [\"1d\", \"2d\"]";
+        let at_the_cast = || at(&[parameter("aggregate_function"), Segment::Link(0)]);
+        let made_of = |part: Expression| {
+            pivot(chain_of(
+                call(
+                    "polars.from_epoch",
+                    vec![("column", Value::Expression(part))],
+                ),
+                vec![cast_to(Representative::Int32, Vec::new())],
+            ))
+        };
+        // A null alone is converted as a null.
+        assert_eq!(
+            refused_by_the_tables_at(&made_of(chain(null(), &[])), at_the_cast(), text),
+            vec![Limit::AGroupAggregate]
+        );
+        // The values of a group are no literal: the group's own values are what the tables
+        // measured.
+        let group = pivot(chain_of(
+            call(
+                "polars.from_epoch",
+                vec![(
+                    "column",
+                    Value::Expression(chain(call("polars.element", Vec::new()), &[])),
+                )],
+            ),
+            vec![cast_to(Representative::Int32, Vec::new())],
+        ));
+        assert_eq!(
+            refused_by_the_tables_at(&group, at_the_cast(), text),
+            vec![]
+        );
+        // A value that a select refuses to cast too is no group's: the control fails closed.
+        let date = pivot(chain_of(
+            call(
+                "polars.date",
+                vec![
+                    ("year", Value::Expression(whole(1))),
+                    ("month", Value::Expression(whole(1))),
+                    ("day", Value::Expression(whole(1))),
+                ],
+            ),
+            vec![cast_to(Representative::UInt8, Vec::new())],
+        ));
+        assert_eq!(
+            refused_by_the_tables_at(
+                &date,
+                at_the_cast(),
+                "conversion from `date` to `u8` failed in column 'scalar' for 1 out of 1 values: [0001-01-01]"
+            ),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn a_text_literal_beside_another_literal_is_a_part_polars_converts_and_a_column_beside_it_is_not()
+     {
+        // `datetime(..).dt.replace(month=lit("1"), minute=lit(true))` in a pivot's aggregate: Polars
+        // converts the text of the literal where it makes the plan, and the tables refused the text
+        // of the sample's column. With each part made `x` it refuses the text, so it evaluates it.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-part-of-a-date-that-depends-on-the-rows--a-text-literal-beside-another-literal-in-a-pivot.case"
+            ),
+            vec![Limit::APartOfADateThatDependsOnTheRows]
+        );
+        let text = "conversion from `str` to `i8` failed in column 'b' for 2 out of 3 values: [\"1d\", \"2d\"]";
+        let at_the_replace = || at(&[parameter("aggregate_function"), Segment::Link(0)]);
+        let replacing = |minute: Expression| {
+            let text_literal = call("polars.lit", vec![("value", Value::String("1".to_owned()))]);
+            pivot(chain_of(
+                call("polars.element", Vec::new()),
+                vec![call(
+                    "Expr.dt.replace",
+                    vec![
+                        (
+                            "month",
+                            Value::Expression(chain_of(text_literal, Vec::new())),
+                        ),
+                        ("minute", Value::Expression(minute)),
+                    ],
+                )],
+            ))
+        };
+        assert_eq!(
+            refused_by_the_tables_at(&replacing(whole(1)), at_the_replace(), text),
+            vec![Limit::APartOfADateThatDependsOnTheRows]
+        );
+        // A part that is a column is converted where Polars evaluates it, which the control for
+        // the text of a literal does not show.
+        assert_eq!(
+            refused_by_the_tables_at(&replacing(chain(column("b"), &[])), at_the_replace(), text),
+            vec![]
+        );
+    }
+
     #[test]
     fn a_pivot_aggregate_is_excused_for_a_length_of_time_of_text_and_a_select_is_not() {
         // The kernels of a group make a length of time of the text of a literal, where a select
