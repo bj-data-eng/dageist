@@ -8546,6 +8546,21 @@ mod tests {
     }
 
     #[test]
+    fn a_date_given_numbers_no_calendar_has_is_excused_though_the_dates_with_ones_are_refused_for_a_cast()
+     {
+        // `pivot(aggregate=date(300, 1, -1).cast(UInt8))`: a day of -1 is no day, which Polars
+        // refuses when the rows run, and the tables measured days that are. With each part made the
+        // number 1 the date is the first of January of the year 1, which the cast to eight bits
+        // cannot hold: that is another refusal, and not the components', so the parts are why.
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-part-of-a-date-that-depends-on-the-rows--a-date-given-numbers-no-calendar-has.case"
+            ),
+            vec![Limit::APartOfADateThatDependsOnTheRows]
+        );
+    }
+
+    #[test]
     fn a_part_a_function_makes_a_date_of_is_not_excused_where_the_number_1_is_refused_too() {
         // Each part is already the number 1: the control is the case itself, which shows nothing.
         let ones = making_a_date(whole(1));
