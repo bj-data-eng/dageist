@@ -534,8 +534,9 @@ What Polars does with each is what the tables say, and some of it is not what a 
 - `rank` gives a `Float64` for `average` and a `UInt32` for every other `method`, and `arg_sort` and `rle_id`
   a `UInt32`. A `rank` of `random` takes a `seed`, a whole number from zero that Python passes as an unsigned
   64-bit number, and is another order each time it runs without one. `diff` of dates and moments is a length
-  of time, `diff` takes the numbers and the dates, times and lengths of time that a subtraction takes and
-  refuses text and a `Boolean`, and `pct_change` is the quotient of a value and the one `n` rows before it,
+  of time, in nanoseconds for a time of day, and of an unsigned whole number the signed one that holds every
+  difference (`UInt8` gives `Int16`); it takes the numbers and the dates, times and lengths of time that a
+  subtraction takes and refuses text and a `Boolean`, and `pct_change` is the quotient of a value and the one `n` rows before it,
   less one, a float.
 - `n` of `diff` and `pct_change` is a count of rows as `shift`'s is: one value, which Polars refuses many
   values of with `'n' must be a scalar value` or `n must be a single value`, and a whole number typed
