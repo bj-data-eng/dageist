@@ -1095,12 +1095,7 @@ impl Walker<'_> {
                 self.blind_to_a_missing_column(start);
                 // A function that takes expressions is judged for what it is given, and gives as
                 // many values as its widest argument.
-                let takes_expressions = start.entry().applies() == Applies::Function
-                    && start
-                        .entry()
-                        .parameters()
-                        .iter()
-                        .any(|parameter| matches!(parameter.kind(), Kind::Expression(_)));
+                let takes_expressions = takes_expressions(start);
                 let given: Vec<(&str, Representative)> = start_arguments
                     .iter()
                     .filter_map(|(name, operand)| operand.dtype.map(|dtype| (name.as_str(), dtype)))
@@ -1973,8 +1968,22 @@ fn wholly_single(expression: &Expression, upto: usize, literals: bool) -> bool {
         Start::Call(start) if start.entry().id().as_str() == "polars.when" => {
             single(start) && links.iter().all(single)
         }
+        // A function that makes a moment of what it is given is one value where each of them is.
+        Start::Call(start) if takes_expressions(start) => single(start) && links.iter().all(single),
         _ => false,
     }
+}
+
+/// Whether `start` is a function that starts an expression and takes expressions, as the ones
+/// that make a date, a moment or a length of time do: it gives as many values as its widest
+/// argument.
+fn takes_expressions(start: &Call) -> bool {
+    start.entry().applies() == Applies::Function
+        && start
+            .entry()
+            .parameters()
+            .iter()
+            .any(|parameter| matches!(parameter.kind(), Kind::Expression(_)))
 }
 
 /// Whether `link` is a comparison, which with a null literal gives a null. `is_between` is two: the
