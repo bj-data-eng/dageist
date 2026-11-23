@@ -4,6 +4,7 @@
 //! worked out by hand and checked against `python -I` with that release, not read from a run of
 //! the engine.
 
+use dageist_engine::allowed::{RefusalSource, Stage};
 use dageist_engine::document::{Document, Inputs, Outcome, Report, RowsError, StepId, StepRows};
 use polars::prelude::{DataFrame, DataType, NamedFrom, Series};
 use serde_json::{Value, json};
@@ -383,4 +384,49 @@ fn the_step_after_one_that_changes_the_rows_is_given_the_rows_it_kept() {
         })
         .collect();
     assert_eq!(counted, [(4, 3), (3, 2), (2, 2)]);
+}
+
+/// What the tables say of the one step of `text` on the table, before any row is read.
+fn walked(text: &str) -> dageist_engine::document::Walk {
+    let document = Document::read(text).expect("a document");
+    document.steps()[0].walk(0, table().schema(), &Inputs::new())
+}
+
+#[test]
+fn the_walk_refuses_a_column_drop_nans_looks_at_where_a_test_for_a_nan_is_refused() {
+    let looking_at = |names: &[&str]| {
+        walked(&one(
+            "LazyFrame.drop_nans",
+            json!({ "subset": columns(names) }),
+        ))
+    };
+    // `is_nan` of text is refused when the rows run, which the tables say of it as Python Polars
+    // does of the step: `is_nan operation not supported for dtype str`.
+    let walk = looking_at(&["a", "s"]);
+    let refusal = walk.refusal().expect("a text column is refused");
+    assert_eq!(refusal.place().to_string(), "step \"s\", subset");
+    assert_eq!(
+        refusal.refusal().source(),
+        RefusalSource::Polars(Stage::Rows)
+    );
+    assert_eq!(
+        refusal.refusal().reason(),
+        "`is_nan` operation not supported for dtype `str`"
+    );
+    // A whole number and a float hold no NaN, or may, and are accepted, as is a table of no name.
+    assert!(looking_at(&["a", "f"]).refusal().is_none());
+    assert!(
+        walked(&one("LazyFrame.drop_nans", json!({})))
+            .refusal()
+            .is_none()
+    );
+    // The other steps that look at columns refuse none by their dtype.
+    assert!(
+        walked(&one(
+            "LazyFrame.drop_nulls",
+            json!({ "subset": columns(&["s"]) })
+        ))
+        .refusal()
+        .is_none()
+    );
 }
