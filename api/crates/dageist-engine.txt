@@ -468,6 +468,7 @@ pub dageist_engine::catalog::Role::FloorDivisor
 pub dageist_engine::catalog::Role::Length
 pub dageist_engine::catalog::Role::Operand
 pub dageist_engine::catalog::Role::Plain
+pub dageist_engine::catalog::Role::Share
 impl dageist_engine::catalog::Role
 pub const fn dageist_engine::catalog::Role::is_a_count(self) -> bool
 pub enum dageist_engine::catalog::Setting
