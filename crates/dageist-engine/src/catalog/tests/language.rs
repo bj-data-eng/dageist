@@ -498,3 +498,20 @@ fn every_name_listed_as_changed_is_shown_differently_from_polars() {
         }
     }
 }
+
+#[test]
+fn only_a_parameter_that_may_be_given_none_has_the_words_for_it() {
+    let words = english();
+    for entry in entries() {
+        for parameter in entry.parameters() {
+            let has = words.parameter_none(entry.id(), parameter.name()).is_some();
+            assert_eq!(
+                has,
+                parameter.takes_no_time_zone(),
+                "{}#{}",
+                entry.id().as_str(),
+                parameter.name()
+            );
+        }
+    }
+}

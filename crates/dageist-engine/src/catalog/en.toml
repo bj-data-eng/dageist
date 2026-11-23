@@ -423,6 +423,8 @@ hint = "the same clock, in another time zone"
 [entries."Expr.dt.replace_time_zone".parameters.time_zone]
 name = "time_zone"
 label = "in"
+none = "None"
+none_hint = "takes the zone off"
 
 [entries."Expr.dt.replace_time_zone".parameters.ambiguous]
 name = "ambiguous"

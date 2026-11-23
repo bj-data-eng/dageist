@@ -16,6 +16,7 @@ export type {
   CauseView,
   ChangeView,
   ChoiceView,
+  NoneView,
   ColumnChangeView,
   ColumnValuesView,
   ColumnView,

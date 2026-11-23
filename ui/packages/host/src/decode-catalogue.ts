@@ -6,6 +6,7 @@
 import type {
   CatalogueView,
   ChoiceView,
+  NoneView,
   ComparisonView,
   DefaultView,
   EntryView,
@@ -32,6 +33,11 @@ import {
   readTagged,
   readWord,
 } from './decode';
+
+const readNone: Decode<NoneView> = readRecord(['shown', 'hint'], (fields, path) => ({
+  shown: readField(fields, path, 'shown', readString),
+  hint: readField(fields, path, 'hint', readString),
+}));
 
 const readChoice: Decode<ChoiceView> = readRecord(['word', 'shown'], (fields, path) => ({
   word: readField(fields, path, 'word', readString),
@@ -66,10 +72,10 @@ const readKind: Decode<KindView> = readTagged<KindView>('kind', {
     }),
   },
   timeZone: {
-    fields: ['takesNone'],
+    fields: ['none'],
     read: (fields, path) => ({
       kind: 'timeZone',
-      takesNone: readField(fields, path, 'takesNone', readBoolean),
+      none: readField(fields, path, 'none', readNullable(readNone)),
     }),
   },
   table: { fields: [], read: () => ({ kind: 'table' }) },

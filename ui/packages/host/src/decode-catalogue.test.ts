@@ -161,11 +161,11 @@ describe('the catalogue the host sends', () => {
     // Python's `replace_time_zone` takes `None` to take the zone off, and `convert_time_zone` a zone.
     expect(kindOf('Expr.dt.replace_time_zone', 'time_zone')).toEqual({
       kind: 'timeZone',
-      takesNone: true,
+      none: { shown: 'None', hint: 'takes the zone off' },
     });
     expect(kindOf('Expr.dt.convert_time_zone', 'time_zone')).toEqual({
       kind: 'timeZone',
-      takesNone: false,
+      none: null,
     });
     // How a clock that is read twice is resolved is a choice of Polars' words.
     expect(kindOf('Expr.dt.replace_time_zone', 'ambiguous')).toMatchObject({ kind: 'choice' });

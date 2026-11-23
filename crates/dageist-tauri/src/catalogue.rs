@@ -52,6 +52,13 @@ struct ChoiceView {
     shown: String,
 }
 
+/// The word for none and what it does, as the language file gives them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct NoneView {
+    shown: String,
+    hint: String,
+}
+
 /// What a parameter holds, which decides how the view draws it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
@@ -77,8 +84,7 @@ enum KindView {
     /// A time zone, as Polars reads one. A parameter that may also be given none, as
     /// `replace_time_zone`'s is, says so.
     TimeZone {
-        #[serde(rename = "takesNone")]
-        takes_none: bool,
+        none: Option<NoneView>,
     },
     Table,
     Path,
@@ -432,7 +438,22 @@ fn kind_of(
             plain_text_flag: parameter.plain_text_flag(),
         },
         Kind::TimeZone => KindView::TimeZone {
-            takes_none: parameter.takes_no_time_zone(),
+            none: if parameter.takes_no_time_zone() {
+                let missing = || {
+                    MissingWord(format!(
+                        "word for none of {}#{}",
+                        entry.id().as_str(),
+                        parameter.name()
+                    ))
+                };
+                let (shown, hint) = words
+                    .parameter_none(entry.id(), parameter.name())
+                    .ok_or_else(missing)?;
+                let (shown, hint) = (shown.to_owned(), hint.to_owned());
+                Some(NoneView { shown, hint })
+            } else {
+                None
+            },
         },
         Kind::Table => KindView::Table,
         Kind::Path => KindView::Path,

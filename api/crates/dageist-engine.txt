@@ -179,6 +179,7 @@ impl<'a> dageist_engine::allowed::ArgumentSlot<'a>
 pub const fn dageist_engine::allowed::ArgumentSlot<'a>::new(entry: &'static dageist_engine::catalog::Entry, parameter: &'a str, method_place: dageist_engine::allowed::Place) -> Self
 pub struct dageist_engine::allowed::Chosen<'a>
 impl<'a> dageist_engine::allowed::Chosen<'a>
+pub const fn dageist_engine::allowed::Chosen<'a>::following(self, unit: core::option::Option<polars_core::datatypes::temporal::time_unit::TimeUnit>) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::giving(self, dtype: dageist_engine::allowed::Representative) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::giving_many(self) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_arguments(self, arguments: &'a [(&'a str, dageist_engine::allowed::Representative)]) -> Self
@@ -665,6 +666,7 @@ pub fn dageist_engine::catalog::Words::entry_name(&self, id: dageist_engine::cat
 pub fn dageist_engine::catalog::Words::family_title(&self, family: dageist_engine::catalog::Family) -> core::option::Option<&str>
 pub fn dageist_engine::catalog::Words::parameter_label(&self, id: dageist_engine::catalog::EntryId, parameter: &str) -> core::option::Option<&str>
 pub fn dageist_engine::catalog::Words::parameter_name(&self, id: dageist_engine::catalog::EntryId, parameter: &str) -> core::option::Option<&str>
+pub fn dageist_engine::catalog::Words::parameter_none(&self, id: dageist_engine::catalog::EntryId, parameter: &str) -> core::option::Option<(&str, &str)>
 pub fn dageist_engine::catalog::Words::parse(source: &str) -> core::result::Result<Self, dageist_engine::catalog::WordsError>
 pub fn dageist_engine::catalog::Words::say(&self, phrase: dageist_engine::catalog::SummaryPhrase<'_>) -> alloc::string::String
 pub fn dageist_engine::catalog::Words::sign(&self, comparison: dageist_engine::catalog::Comparison) -> core::option::Option<&str>

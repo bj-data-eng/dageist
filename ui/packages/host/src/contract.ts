@@ -77,10 +77,10 @@ export type KindView =
    */
   | { readonly kind: 'pattern'; readonly plainTextFlag: string | null }
   /**
-   * A time zone, as Polars reads one. `takesNone` is set where the parameter may also be given no
-   * zone at all, which is Python's `None`.
+   * A time zone, as Polars reads one. `none` is set where the parameter may also be given no zone at
+   * all, which is Python's `None`: the word for it and what it does, as the language file gives them.
    */
-  | { readonly kind: 'timeZone'; readonly takesNone: boolean }
+  | { readonly kind: 'timeZone'; readonly none: NoneView | null }
   | { readonly kind: 'table' }
   | { readonly kind: 'path' }
   | { readonly kind: 'pairs'; readonly key: KindView; readonly value: KindView };
@@ -90,6 +90,12 @@ export const VALUE_TYPES = ['integer', 'float', 'string', 'date', 'any'] as cons
 
 /** The type of a literal typed in. */
 export type ValueTypeView = (typeof VALUE_TYPES)[number];
+
+/** The word for none and what it does, for a parameter that may be given none. */
+export interface NoneView {
+  readonly shown: string;
+  readonly hint: string;
+}
 
 /** One word of a choice: as Polars spells it, and as it is shown. */
 export interface ChoiceView {

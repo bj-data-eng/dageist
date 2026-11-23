@@ -902,7 +902,7 @@
           "label": "to",
           "kind": {
             "kind": "timeZone",
-            "takesNone": false
+            "none": null
           },
           "shape": {
             "shape": "one"
@@ -1387,7 +1387,10 @@
           "label": "in",
           "kind": {
             "kind": "timeZone",
-            "takesNone": true
+            "none": {
+              "shown": "None",
+              "hint": "takes the zone off"
+            }
           },
           "shape": {
             "shape": "one"

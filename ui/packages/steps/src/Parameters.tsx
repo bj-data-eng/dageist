@@ -19,6 +19,7 @@ import type {
   ChoiceView,
   EntryView,
   KindView,
+  NoneView,
   OfferPlaceView,
   ParameterView,
   TypedKind,
@@ -417,9 +418,6 @@ const LITERAL_PLACEHOLDERS: Readonly<Record<LiteralType, string>> = {
   path: 'Type a path',
 };
 
-/** The word that stands for no time zone, as Python writes it. */
-const NO_TIME_ZONE = 'None';
-
 /** What is waiting to be typed, for each type of literal. */
 const LITERAL_WAITING: Readonly<Record<LiteralType, string>> = {
   integer: 'whole number',
@@ -504,14 +502,14 @@ function TimeZoneDrawing({
   names,
   openId,
   setting,
-  takesNone,
+  none,
   onChange,
 }: {
   readonly describedAs: string;
   readonly names?: boolean | undefined;
   readonly openId?: string | undefined;
   readonly setting: Setting;
-  readonly takesNone: boolean;
+  readonly none: NoneView | null;
   readonly onChange: (setting: Setting) => void;
 }): React.JSX.Element {
   const list = useListState();
@@ -520,9 +518,9 @@ function TimeZoneDrawing({
     list.open ? { text: list.typed, typed: typedInto('timeZone'), slot: null } : null,
   );
   const value = literalOf(setting);
-  const none = setting.kind === 'word' && setting.value === NO_TIME_ZONE;
+  const isNone = none !== null && setting.kind === 'word' && setting.value === none.shown;
   let shown: { label: string; look: 'plain' | 'quoted' | 'none' };
-  if (none) shown = { label: NO_TIME_ZONE, look: 'plain' };
+  if (isNone) shown = { label: none.shown, look: 'plain' };
   else if (value === null) shown = { label: LITERAL_WAITING.timeZone, look: 'none' };
   else shown = { label: value.shown, look: 'quoted' };
   return (
@@ -530,22 +528,22 @@ function TimeZoneDrawing({
       label={shown.label}
       tone="value"
       look={shown.look}
-      wrong={value === null && !none}
+      wrong={value === null && !isNone}
       names={names ?? false}
       openNow={useIsFresh(openId)}
       describedAs={describedAs}
       placeholder={LITERAL_PLACEHOLDERS.timeZone}
       offers={(typed) => [
         titled('Value', literalOffers('timeZone', typed, readings, onChange)),
-        ...(takesNone
-          ? [
+        ...(none === null
+          ? []
+          : [
               titled('No time zone', [
-                offer(NO_TIME_ZONE, 'value', 'takes the zone off', () => {
-                  onChange({ kind: 'word', value: NO_TIME_ZONE });
+                offer(none.shown, 'value', none.hint, () => {
+                  onChange({ kind: 'word', value: none.shown });
                 }),
               ]),
-            ]
-          : []),
+            ]),
       ]}
       onOpenChange={list.onOpenChange}
       onType={list.onType}
@@ -677,14 +675,7 @@ function OneDrawing({
         />
       );
     case 'timeZone':
-      return (
-        <TimeZoneDrawing
-          {...common}
-          setting={setting}
-          takesNone={kind.takesNone}
-          onChange={onChange}
-        />
-      );
+      return <TimeZoneDrawing {...common} setting={setting} none={kind.none} onChange={onChange} />;
     case 'table':
       return <TableDrawing {...common} value={nameOf(setting)} onChange={word} />;
     case 'path':
