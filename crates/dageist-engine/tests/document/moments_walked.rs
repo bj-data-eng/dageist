@@ -259,3 +259,59 @@ fn a_moment_and_a_length_of_time_are_named_as_their_first_part_for_the_keys_of_a
         RefusalSource::Rule(Rule::JoinKeyNamesAreNotRepeated)
     );
 }
+
+#[test]
+fn a_moment_or_a_length_of_time_of_numbers_typed_in_is_no_join_key_because_polars_aliases_it() {
+    // Polars makes a literal of the call and names it by an alias, which a join's key may not hold.
+    let folded = [
+        ("polars.duration", json!({})),
+        (
+            "polars.duration",
+            json!({ "days": whole(1), "hours": whole(2) }),
+        ),
+        (
+            "polars.datetime",
+            json!({ "year": whole(2026), "month": whole(3), "day": whole(5) }),
+        ),
+    ];
+    for (function, arguments) in folded {
+        let walk = join_walk(made_by(function, arguments.clone()));
+        let refusal = walk
+            .refusal()
+            .unwrap_or_else(|| panic!("{function} {arguments}"));
+        let RefusalSource::Rule(rule) = refusal.refusal().source() else {
+            panic!("{function}: {refusal:?}");
+        };
+        assert_eq!(
+            rule.name(),
+            "folded-function-is-no-join-key",
+            "{function} {arguments}"
+        );
+        assert!(
+            refusal.refusal().reason().contains("alias"),
+            "{}",
+            refusal.refusal().reason()
+        );
+    }
+    // A column among the parts, or a zone, leaves the call a call, which has no alias.
+    let kept = [
+        ("polars.duration", json!({ "days": field("a") })),
+        (
+            "polars.datetime",
+            json!({
+                "year": whole(2026),
+                "month": whole(3),
+                "day": whole(5),
+                "time_zone": { "time_zone": "UTC" },
+            }),
+        ),
+        (
+            "polars.datetime",
+            json!({ "year": field("a"), "month": whole(3), "day": whole(5) }),
+        ),
+    ];
+    for (function, arguments) in kept {
+        let walk = join_walk(made_by(function, arguments.clone()));
+        assert_eq!(walk.refusal(), None, "{function} {arguments}");
+    }
+}
