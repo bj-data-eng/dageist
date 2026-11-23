@@ -566,6 +566,24 @@ mod tests {
     }
 
     #[test]
+    fn a_time_zone_that_may_be_none_carries_the_words_for_none_from_the_language_file() {
+        let view = view();
+        // Python's `replace_time_zone` takes `None` to take the zone off, and the editor shows the
+        // word and its hint as the language file gives them; `convert_time_zone` takes a zone only.
+        assert_eq!(
+            parameter(&view, "Expr.dt.replace_time_zone", "time_zone")["kind"],
+            json!({
+                "kind": "timeZone",
+                "none": { "shown": "None", "hint": "takes the zone off" }
+            })
+        );
+        assert_eq!(
+            parameter(&view, "Expr.dt.convert_time_zone", "time_zone")["kind"],
+            json!({ "kind": "timeZone", "none": null })
+        );
+    }
+
+    #[test]
     fn a_parameter_that_does_nothing_for_the_editor_is_not_offered_and_the_others_are() {
         let view = view();
         // A typed pattern is always refused when it is none, so `strict` changes nothing for
