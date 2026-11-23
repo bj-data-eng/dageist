@@ -16,6 +16,7 @@
 //! on request, focused on chosen methods where it is asked to be, and
 //! [`replay_a_case`] replays one kept case; the how-to guide says how.
 
+mod campaign;
 mod case;
 mod frames;
 mod generate;
@@ -29,18 +30,16 @@ mod reduce;
 mod target;
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::AtomicBool;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
-use dageist_fuzz::engine::{PropertyConfig, replay, run_property};
-use dageist_fuzz::generation::property;
-use dageist_fuzz::reduction::{ReductionLimits, reduce_direct};
-use dageist_fuzz::{CaseOutcome, CaseTarget, OutcomeKind};
+use dageist_fuzz::engine::replay;
+use dageist_fuzz::{CaseTarget, OutcomeKind};
 
+use campaign::{InProcess, Report, Settings, detail_of};
 use case::Case;
 use generate::Focus;
 use limits::Limit;
-use target::{AllowedTarget, take_tally};
+use target::AllowedTarget;
 
 /// The seed and size of the run that goes with the engine's tests.
 const SEED: u64 = 0x00d4_6e15_7a11_0001;
@@ -59,36 +58,6 @@ fn regressions() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/allowed_fuzz/regressions")
 }
 
-/// What a disagreement came to: the case, reduced, and what disagreed.
-struct Finding {
-    kept: PathBuf,
-    reduced: Vec<u8>,
-    detail: String,
-}
-
-impl std::fmt::Display for Finding {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            formatter,
-            "the tables and Polars disagree: {}\nthe smallest case found, kept as {}:\n{}",
-            self.detail,
-            self.kept.display(),
-            String::from_utf8_lossy(&self.reduced)
-        )
-    }
-}
-
-fn detail_of(outcome: &CaseOutcome) -> String {
-    format!(
-        "{}: {}",
-        outcome
-            .failure_key()
-            .and_then(|key| key.discriminator())
-            .unwrap_or("?"),
-        outcome.detail().unwrap_or_default()
-    )
-}
-
 /// Runs `work` on a thread with a stack large enough for Polars to build and
 /// resolve the deepest expression a case makes in a debug build, which the
 /// two megabytes of a test thread are not.
@@ -102,75 +71,6 @@ fn on_a_large_stack<T: Send>(work: impl FnOnce() -> T + Send) -> T {
             .join()
             .unwrap_or_else(|payload| std::panic::resume_unwind(payload))
     })
-}
-
-/// Runs `cases` cases made from `seed`, focused on `focus` if it is one. When one
-/// disagrees, reduces it and keeps the result under the directory for kept evidence.
-fn campaign(seed: u64, cases: u32, focus: Option<Focus>) -> (Result<u64, Finding>, Vec<String>) {
-    let target = AllowedTarget::new().with_focus(focus);
-    // A draw reads more than a byte where a count needs more, and again where it rejects what it
-    // read, so a case that is made from entropy of up to this many bytes runs out of it about as
-    // seldom as one did of 512 when each draw was one byte.
-    let strategy = property::bytes(1024, target.descriptor().limits());
-    let config = PropertyConfig {
-        cases,
-        max_rejections: 1_000_000,
-        // Entropy is not the case: the owner's reduction works on the case.
-        max_shrink_iterations: 0,
-        seed,
-    };
-    // The case is written down before it is run, so that one that does not
-    // return is still found: it is the file `current.case`.
-    let directory = keep_directory();
-    std::fs::create_dir_all(&directory).expect("a directory for kept evidence");
-    let current = directory.join("current.case");
-    let mut capture = |bytes: &[u8]| {
-        std::fs::write(&current, bytes).map_err(|error| {
-            dageist_fuzz::FuzzError::with_source(
-                dageist_fuzz::FuzzErrorKind::Io,
-                "capture the case",
-                "write the case about to run",
-                error,
-            )
-        })
-    };
-    let report = run_property(&target, &strategy, config, &mut capture)
-        .unwrap_or_else(|error| panic!("the property could not be run: {error:?}"));
-    // The tally is of the run, not of the reduction of what it found.
-    let tally = take_tally();
-    let Some(found) = report.failure else {
-        return (Ok(report.counts.evaluated()), tally);
-    };
-    let key = found
-        .outcome
-        .failure_key()
-        .expect("a failure has its key")
-        .clone();
-    let limits = ReductionLimits::new(400, Duration::from_secs(600), 1 << 24, 2)
-        .expect("limits of a reduction");
-    let reduction = reduce_direct(
-        &target,
-        &found.canonical,
-        &key,
-        limits,
-        &AtomicBool::new(false),
-    )
-    .unwrap_or_else(|error| panic!("the reduction could not be run: {error:?}"));
-    let reduced = reduction
-        .canonical_input()
-        .unwrap_or_else(|| reduction.best_input())
-        .to_vec();
-    let outcome = target
-        .evaluate(&target.decode(&reduced).expect("a reduced case is a case"))
-        .expect("a reduced case is evaluated");
-    let kept = directory.join(format!("{seed:016x}-{}.case", reduced.len()));
-    std::fs::write(&kept, &reduced).expect("evidence is kept");
-    let finding = Finding {
-        kept,
-        reduced,
-        detail: detail_of(&outcome),
-    };
-    (Err(finding), tally)
 }
 
 /// The methods `DAGEIST_FUZZ_FOCUS` names, which a campaign focuses on. Unset or
@@ -194,18 +94,31 @@ fn env_number<T: std::str::FromStr>(name: &str, default: T) -> T {
 #[test]
 fn the_tables_predict_what_polars_does_for_the_fixed_seed() {
     let started = Instant::now();
-    let (result, tally) = on_a_large_stack(|| campaign(SEED, CASES, None));
+    let report = on_a_large_stack(|| {
+        let target = AllowedTarget::new();
+        campaign::run(
+            &Settings::new(SEED, CASES, None, keep_directory()),
+            &InProcess::new(&target),
+        )
+    });
     eprintln!(
         "{CASES} cases of seed {SEED:#x} took {:.1?}\n{}",
         started.elapsed(),
-        tally.join("\n")
+        report.tally.join("\n")
     );
-    match result {
-        Ok(evaluated) => assert!(
-            evaluated >= u64::from(CASES) / 2,
-            "only {evaluated} of {CASES} cases checked something"
-        ),
-        Err(finding) => panic!("{finding}"),
+    assert_no_findings(&report);
+    assert!(
+        report.evaluated >= u64::from(CASES) / 2,
+        "only {} of {CASES} cases checked something",
+        report.evaluated
+    );
+}
+
+/// Panics with every finding of `report`.
+fn assert_no_findings(report: &Report) {
+    if !report.findings.is_empty() {
+        let findings: Vec<String> = report.findings.iter().map(ToString::to_string).collect();
+        panic!("{}", findings.join("\n\n"));
     }
 }
 
@@ -222,15 +135,19 @@ fn a_campaign() {
         .map(|focus| format!(" focused on {}", focus.names()))
         .unwrap_or_default();
     let started = Instant::now();
-    let (result, tally) = on_a_large_stack(|| campaign(seed, cases, focus));
+    let report = on_a_large_stack(|| {
+        let target = AllowedTarget::new();
+        campaign::run(
+            &Settings::new(seed, cases, focus, keep_directory()),
+            &InProcess::new(&target),
+        )
+    });
     eprintln!(
         "{cases} cases of seed {seed:#x}{focused} took {:.1?}\n{}",
         started.elapsed(),
-        tally.join("\n")
+        report.tally.join("\n")
     );
-    if let Err(finding) = result {
-        panic!("{finding}");
-    }
+    assert_no_findings(&report);
 }
 
 /// Replays the case in the file `DAGEIST_FUZZ_REPLAY` names.
