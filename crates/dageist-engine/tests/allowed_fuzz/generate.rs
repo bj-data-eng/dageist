@@ -1033,6 +1033,23 @@ impl Gen<'_> {
         }
     }
 
+    /// A share a quantile reads: the number 1 of a dtype, which is the share of the largest value,
+    /// or a number from 0 to 1 typed without a dtype, which Polars reads as the number it is.
+    fn share(&mut self) -> Built {
+        if self.draw.chance(35) {
+            return self.scalar(false);
+        }
+        let number = self.draw.pick(&[0.0_f64, 0.25, 0.5, 0.9, 1.0]);
+        Built {
+            expression: Expression::new(
+                Start::Call(call("polars.lit", vec![("value", Value::Float(number))])),
+                Vec::new(),
+            )
+            .expect("a start"),
+            class: Some(Representative::Float64),
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Chains
 
@@ -1517,6 +1534,10 @@ impl Gen<'_> {
                 ("Expr.shift" | "Expr.diff" | "Expr.pct_change", _) => {
                     vec![self.scalar(name == "n")]
                 }
+                // A quantile is one share from 0 to 1, which Polars refuses a column of for the
+                // exact quantile, and a column of numbers outside the range or holding a null for
+                // the approximate one: it is a number, and the tables measure it as one.
+                ("Expr.quantile" | "Expr.approx_quantile", "quantile") => vec![self.share()],
                 // Polars builds a text of as many characters as the length converts to, which for
                 // a timestamp is the microseconds since the epoch: a length that is a chain of
                 // any dtype can fill the memory, so it is the number 1 of a dtype, as a shift's.
@@ -1754,6 +1775,14 @@ impl Gen<'_> {
                 // The seed of a random rank: Polars takes any unsigned number.
                 "seed" => Value::Integer(self.draw.pick(&[0, 1, 7, 12345])),
                 "abs_tol" | "rel_tol" => Value::Float(self.draw.pick(&[0.0, 0.5, 1e-9, 1.0])),
+                // The delta degrees of freedom of a variance: none, the default, and counts that
+                // leave no value to divide by, up to the largest an unsigned byte holds.
+                "ddof" => Value::Integer(self.draw.pick(&[0, 1, 1, 2, 3, 255])),
+                // The base of an entropy's logarithm.
+                "base" => Value::Float(self.draw.pick(&[2.0, 10.0, std::f64::consts::E, 0.5])),
+                // The rank error of an approximate quantile, as a share of the rows: Polars takes
+                // one from 2^-32 up to but not including 1.
+                "error" => Value::Float(self.draw.pick(&[0.001, 0.01, 0.1, 0.5])),
                 other => panic!("the generator does not know what to give {other}"),
             };
             numbers.push((name, value));

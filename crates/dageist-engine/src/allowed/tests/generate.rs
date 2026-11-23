@@ -108,11 +108,17 @@ fn argument_for(entry: &Entry, parameter: &str, value: Expr) -> Argument {
 }
 
 /// The parameters Polars takes only as a single value, not as a column.
-const SCALAR_ONLY: [(&str, &str); 4] = [
+///
+/// A quantile is in the list too, though the approximate one meets a column of shares: the sample's
+/// columns hold the numbers 1 and 3, which are no share, so what Polars does with a column of them
+/// says nothing of the dtype, and the number 1 is the share that is the largest value.
+const SCALAR_ONLY: [(&str, &str); 6] = [
     ("Expr.shift", "n"),
     ("Expr.shift", "fill_value"),
     ("Expr.diff", "n"),
     ("Expr.pct_change", "n"),
+    ("Expr.quantile", "quantile"),
+    ("Expr.approx_quantile", "quantile"),
 ];
 
 /// The parts of a date that the functions which make one take, whose calendar has no month and no

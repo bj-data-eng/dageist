@@ -105,6 +105,9 @@ fn arguments_for(entry: &Entry, column: &str, operand: &str) -> Arguments {
                 Kind::Expression(&[Dtypes::Time]) => expression_arg(col("tm")),
                 // The length or the count of characters of a method of text is a whole number.
                 Kind::Expression(_) if parameter.role().is_a_count() => expression_arg(col("i")),
+                // A quantile is a share from 0 to 1, and a single value, which Polars refuses a
+                // column of for the exact quantile and a column of whole numbers for any.
+                Kind::Expression(_) if parameter.name() == "quantile" => expression_arg(lit(0.5)),
                 Kind::Expression(_) if parameter.role() != Role::Plain => {
                     expression_arg(col(operand))
                 }
