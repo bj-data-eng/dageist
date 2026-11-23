@@ -8814,12 +8814,10 @@ mod tests {
             links.push(when("ChainedThen.when", predicate));
             links.push(value("ChainedWhen.then"));
         }
-        links.push(value(if place == "third" {
-            "ChainedThen.otherwise"
-        } else if place == "second" {
-            "ChainedThen.otherwise"
-        } else {
+        links.push(value(if place == "first" {
             "Then.otherwise"
+        } else {
+            "ChainedThen.otherwise"
         }));
         select(vec![chain_of(start, links)])
     }
