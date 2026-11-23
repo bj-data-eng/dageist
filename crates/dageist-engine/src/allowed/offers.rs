@@ -89,6 +89,7 @@ pub struct Chosen<'a> {
     durations: &'a [(&'a str, &'a str, DurationUse)],
     time_zones: &'a [(&'a str, Option<&'a str>)],
     unit: Option<TimeUnit>,
+    zone: Option<&'a str>,
     zone_clash: Option<(&'a str, &'a str)>,
     gives: Option<Representative>,
     shape: Option<Shape>,
@@ -169,6 +170,15 @@ impl<'a> Chosen<'a> {
     #[must_use]
     pub const fn following(mut self, unit: Option<TimeUnit>) -> Self {
         self.unit = unit;
+        self
+    }
+
+    /// The time zone of the moment the method follows, where the chain knows it by name: a length
+    /// of time given to the method is read in it, and Polars reads days and hours together only in
+    /// UTC, where a day is always 24 hours.
+    #[must_use]
+    pub const fn in_zone(mut self, zone: Option<&'a str>) -> Self {
+        self.zone = zone;
         self
     }
 
@@ -853,7 +863,15 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         After::Value {
             dtype: Representative::DatetimeZoned,
             ..
-        } => DataType::Datetime(unit, Some(TimeZone::UTC)),
+        } => DataType::Datetime(
+            unit,
+            Some(
+                chosen
+                    .zone
+                    .and_then(|name| catalog::check_time_zone(name).ok().flatten())
+                    .unwrap_or(TimeZone::UTC),
+            ),
+        ),
         After::Value { .. } => DataType::Datetime(unit, None),
         _ => catalog::any_moment(),
     };

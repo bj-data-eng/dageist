@@ -1543,6 +1543,11 @@ impl Walker<'_> {
         let clash_of_zones = clash
             .as_ref()
             .map(|(first, second)| (first.as_str(), second.as_str()));
+        // The zone of the moment the call follows, which a length of time given to it is read in.
+        let zone_name = match zone {
+            Some(Zone::Named(at)) => Some(self.zones[at].clone()),
+            _ => None,
+        };
         // A number typed without a dtype that a method takes another operand beside adapts to
         // it, as the dtype of that operand where it fits it, or keeps the dtype it has alone, as
         // the base of a power does. Where there is no such operand the tables, measured with typed
@@ -1745,6 +1750,7 @@ impl Walker<'_> {
                     .with_durations(&durations)
                     .with_time_zones(&time_zones)
                     .following(unit)
+                    .in_zone(zone_name.as_deref())
                     .with_zone_clash(clash_of_zones),
             );
             let standing = Standing {
@@ -1817,6 +1823,7 @@ impl Walker<'_> {
             .with_durations(&durations)
             .with_time_zones(&time_zones)
             .following(unit)
+            .in_zone(zone_name.as_deref())
             .with_zone_clash(clash_of_zones);
         let chosen = match gives {
             Some(dtype) => chosen.giving(dtype),
