@@ -85,8 +85,11 @@ impl Applies {
 pub enum Family {
     /// Steps that change the table.
     Steps,
-    /// Values taken from other rows: `shift`, `first`, `last`.
+    /// Values taken from other rows, and compared with them: `shift`, `first`, `last`, `diff`.
     Rows,
+    /// The values in another order, and their places in it: `sort`, `sort_by`, `reverse`,
+    /// `arg_sort` and `rank`.
+    Order,
     /// Running values: `cum_sum`, `cum_count`, `cum_max`.
     Cumulative,
     /// Arithmetic on values: `add`, `sub`, `mul`, `neg`, `abs`, `sign`, `clip`, and the like.
@@ -136,9 +139,10 @@ pub enum Family {
 
 impl Family {
     /// Every family, in the order they are offered.
-    pub const ALL: [Self; 20] = [
+    pub const ALL: [Self; 21] = [
         Self::Steps,
         Self::Rows,
+        Self::Order,
         Self::Cumulative,
         Self::Arithmetic,
         Self::Maths,
@@ -165,6 +169,7 @@ impl Family {
         match self {
             Self::Steps => "steps",
             Self::Rows => "rows",
+            Self::Order => "order",
             Self::Cumulative => "cumulative",
             Self::Arithmetic => "arithmetic",
             Self::Maths => "maths",

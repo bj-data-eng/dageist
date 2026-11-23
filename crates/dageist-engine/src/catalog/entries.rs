@@ -15,10 +15,11 @@ use polars::frame::PivotColumnNaming;
 use polars::prelude::{
     AnyValue, ClosedInterval, DataType, DatetimeArgs, DurationArgs, Expr, FillNullStrategy,
     JoinBuildSide, JoinCoalesce, JoinType, JoinValidation, LazyFrame, MaintainOrderJoin, NULL,
-    NamedFrom, NonExistent, Operator, PolarsError, RoundMode, Scalar, Series, SortMultipleOptions,
-    SortOptions, TimeUnit, TimeZone, WindowMapping, all, all_horizontal, binary_expr, col, cols,
-    datetime, duration, element, lit, when,
+    NamedFrom, NonExistent, Operator, PolarsError, RankMethod, RankOptions, RoundMode, Scalar,
+    Series, SortMultipleOptions, SortOptions, TimeUnit, TimeZone, WindowMapping, all,
+    all_horizontal, binary_expr, col, cols, datetime, duration, element, lit, when,
 };
+use polars::series::ops::NullBehavior;
 
 use super::{
     Argument, Arguments, AsManyAs, Build, BuildError, Conditional, Dtypes, DurationUse, Entry,
@@ -159,6 +160,13 @@ const CLOSED: &[&str] = &["both", "left", "right", "none"];
 // The words Python's `fill_null` takes for `strategy`, which `parse_fill_null_strategy` in the
 // binding reads. `forward` and `backward` are the strategies `limit` bounds.
 const FILL_STRATEGY: &[&str] = &["forward", "backward", "min", "max", "mean", "zero", "one"];
+// The words Python's `rank` takes for `method`, which the binding reads.
+const RANK_METHOD: &[&str] = &["average", "min", "max", "dense", "ordinal", "random"];
+// Python's `diff` takes `ignore` and `drop` for `null_behavior`. `drop` leaves out the values that
+// have none before them, as many as `n` says, so it gives fewer values than the table has rows, a
+// number of values the tables cannot state, and it is left out until a shape for it exists. The
+// editor does not offer the parameter, so a step always takes `ignore`.
+const NULL_BEHAVIOR: &[&str] = &["ignore"];
 
 /// A method of the `dt` namespace: it takes the dates, times and lengths of time it `accepts` and
 /// is swapped for the others of its family.
@@ -578,6 +586,76 @@ fn shift(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
     })
 }
 
+fn sort_values(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.sort(SortOptions {
+        descending: arguments.flag("descending", false)?,
+        nulls_last: arguments.flag("nulls_last", false)?,
+        multithreaded: true,
+        maintain_order: false,
+        limit: None,
+    }))
+}
+
+fn arg_sort(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.arg_sort(
+        arguments.flag("descending", false)?,
+        arguments.flag("nulls_last", false)?,
+    ))
+}
+
+fn sort_by(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    if arguments.get("by").is_none() {
+        return Err(BuildError::Missing { parameter: "by" });
+    }
+    let mut by = arguments.expressions("by")?;
+    by.extend(arguments.expressions("more_by")?);
+    let options = SortMultipleOptions {
+        descending: per_item_flags(arguments, "descending", by.len(), false)?,
+        nulls_last: per_item_flags(arguments, "nulls_last", by.len(), false)?,
+        maintain_order: arguments.flag("maintain_order", false)?,
+        multithreaded: arguments.flag("multithreaded", true)?,
+        limit: None,
+    };
+    Ok(expr.sort_by(by, options))
+}
+
+fn diff(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let n = arguments.expression("n")?.unwrap_or_else(|| lit(1));
+    arguments.choice("null_behavior", NULL_BEHAVIOR, "ignore")?;
+    Ok(expr.diff(n, NullBehavior::Ignore))
+}
+
+fn pct_change(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let n = arguments.expression("n")?.unwrap_or_else(|| lit(1));
+    Ok(expr.pct_change(n))
+}
+
+fn rank(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let method = match arguments.choice("method", RANK_METHOD, "average")? {
+        "min" => RankMethod::Min,
+        "max" => RankMethod::Max,
+        "dense" => RankMethod::Dense,
+        "ordinal" => RankMethod::Ordinal,
+        "random" => RankMethod::Random,
+        _ => RankMethod::Average,
+    };
+    let seed = match arguments.get("seed") {
+        None | Some(Argument::Flag(None)) => None,
+        Some(Argument::Integer(value)) => {
+            Some(u64::try_from(*value).map_err(|_| BuildError::OutOfRange {
+                parameter: "seed",
+                expected: "a whole number from 0",
+            })?)
+        }
+        Some(other) => return Err(Arguments::wrong("seed", "a whole number", other)),
+    };
+    let options = RankOptions {
+        method,
+        descending: arguments.flag("descending", false)?,
+    };
+    Ok(expr.rank(options, seed))
+}
+
 fn sum(expr: Expr, _arguments: &Arguments) -> Result<Expr, BuildError> {
     Ok(expr.sum())
 }
@@ -738,6 +816,10 @@ unary!(
     is_last_distinct,
     has_nulls,
     null_count,
+    reverse,
+    rle_id,
+    n_unique,
+    count,
 );
 
 /// The methods of the `str` namespace that take nothing, each the method of the same name that
@@ -1930,6 +2012,17 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(arctanh),
     },
     Entry {
+        id: EntryId("Expr.arg_sort"),
+        family: Family::Order,
+        accepts: ANY,
+        parameters: &[
+            flag("descending", "False").keyword_only(),
+            flag("nulls_last", "False").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(arg_sort),
+    },
+    Entry {
         id: EntryId("Expr.backward_fill"),
         family: Family::Nulls,
         accepts: ANY,
@@ -1998,6 +2091,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(cot),
     },
     Entry {
+        id: EntryId("Expr.count"),
+        family: Family::Aggregate,
+        accepts: ANY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(count),
+    },
+    Entry {
         id: EntryId("Expr.cum_count"),
         family: Family::Cumulative,
         accepts: ANY,
@@ -2028,6 +2129,25 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[],
         laziness: Laziness::Lazy,
         build: Build::Expression(degrees),
+    },
+    Entry {
+        id: EntryId("Expr.diff"),
+        family: Family::Rows,
+        accepts: SUBTRACTABLE,
+        parameters: &[
+            optional("n", Kind::Expression(INTEGER), Shape::One, "1")
+                .with_role(Role::Count)
+                .not_broadcasting(),
+            optional(
+                "null_behavior",
+                Kind::Choice(NULL_BEHAVIOR),
+                Shape::One,
+                "'ignore'",
+            )
+            .not_offered(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(diff),
     },
     Entry {
         id: EntryId("Expr.drop_nans"),
@@ -2581,6 +2701,14 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(mul),
     },
     Entry {
+        id: EntryId("Expr.n_unique"),
+        family: Family::Aggregate,
+        accepts: ANY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(n_unique),
+    },
+    Entry {
         id: EntryId("Expr.ne"),
         family: Family::Compare,
         accepts: ANY,
@@ -2652,6 +2780,16 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(over),
     },
     Entry {
+        id: EntryId("Expr.pct_change"),
+        family: Family::Rows,
+        accepts: ANY,
+        parameters: &[optional("n", Kind::Expression(INTEGER), Shape::One, "1")
+            .with_role(Role::Count)
+            .not_broadcasting()],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(pct_change),
+    },
+    Entry {
         id: EntryId("Expr.pow"),
         family: Family::Arithmetic,
         accepts: NUMERIC,
@@ -2666,6 +2804,18 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[],
         laziness: Laziness::Lazy,
         build: Build::Expression(radians),
+    },
+    Entry {
+        id: EntryId("Expr.rank"),
+        family: Family::Order,
+        accepts: ANY,
+        parameters: &[
+            optional("method", Kind::Choice(RANK_METHOD), Shape::One, "'average'"),
+            flag("descending", "False").keyword_only(),
+            optional("seed", Kind::Value(ValueType::Integer), Shape::One, "None").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(rank),
     },
     Entry {
         id: EntryId("Expr.replace"),
@@ -2708,6 +2858,22 @@ pub(super) const ENTRIES: &[Entry] = &[
         ],
         laziness: Laziness::Lazy,
         build: Build::Expression(replace_strict),
+    },
+    Entry {
+        id: EntryId("Expr.reverse"),
+        family: Family::Order,
+        accepts: ANY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(reverse),
+    },
+    Entry {
+        id: EntryId("Expr.rle_id"),
+        family: Family::Rows,
+        accepts: ANY,
+        parameters: &[],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(rle_id),
     },
     Entry {
         id: EntryId("Expr.round"),
@@ -2776,6 +2942,32 @@ pub(super) const ENTRIES: &[Entry] = &[
         parameters: &[],
         laziness: Laziness::Lazy,
         build: Build::Expression(sinh),
+    },
+    Entry {
+        id: EntryId("Expr.sort"),
+        family: Family::Order,
+        accepts: ANY,
+        parameters: &[
+            flag("descending", "False").keyword_only(),
+            flag("nulls_last", "False").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(sort_values),
+    },
+    Entry {
+        id: EntryId("Expr.sort_by"),
+        family: Family::Order,
+        accepts: ANY,
+        parameters: &[
+            required("by", EXPRESSION, Shape::Many),
+            starred("more_by", EXPRESSION),
+            optional("descending", Kind::Flag, Shape::PerItem("by"), "False").keyword_only(),
+            optional("nulls_last", Kind::Flag, Shape::PerItem("by"), "False").keyword_only(),
+            flag("multithreaded", "True").keyword_only(),
+            flag("maintain_order", "False").keyword_only(),
+        ],
+        laziness: Laziness::Lazy,
+        build: Build::Expression(sort_by),
     },
     Entry {
         id: EntryId("Expr.sqrt"),

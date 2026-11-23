@@ -260,7 +260,8 @@ fn every_default_of_the_inventory_that_python_writes_as_a_literal_is_read() {
 }
 
 #[test]
-fn only_the_count_of_shift_and_the_base_of_log_are_expressions_with_a_default_that_is_a_value() {
+fn only_the_rows_a_method_counts_and_the_base_of_log_are_expressions_with_a_default_that_is_a_value()
+ {
     // The document judges an expression to be at its default only for a parameter that counts
     // rows and has a whole number for its default (`Role::Count`), which is `shift(n=1)`. The
     // base of `log` defaults to Euler's number, and an expression of that number is not judged
@@ -293,11 +294,18 @@ fn only_the_count_of_shift_and_the_base_of_log_are_expressions_with_a_default_th
     assert_eq!(
         found,
         [
+            ("Expr.diff", "n", Role::Count, DefaultValue::Integer(1)),
             (
                 "Expr.log",
                 "base",
                 Role::Base,
                 DefaultValue::Float(std::f64::consts::E)
+            ),
+            (
+                "Expr.pct_change",
+                "n",
+                Role::Count,
+                DefaultValue::Integer(1)
             ),
             ("Expr.shift", "n", Role::Count, DefaultValue::Integer(1))
         ]

@@ -1002,6 +1002,7 @@ mod tests {
             [
                 "steps",
                 "rows",
+                "order",
                 "cumulative",
                 "arithmetic",
                 "maths",

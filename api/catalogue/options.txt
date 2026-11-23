@@ -32,8 +32,112 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 5612 combinations: 3214 allowed; 713 refused when Polars resolved the schema, 1685 when it ran the rows, 0 when it ran the empty table.
+# 6782 combinations: 4380 allowed; 713 refused when Polars resolved the schema, 1689 when it ran the rows, 0 when it ran the empty table.
 #
+Expr.arg_sort | Array(Int64, 2) | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Array(Int64, 2) | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Array(Int64, 2) | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Array(Int64, 2) | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Boolean | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Boolean | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Boolean | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Boolean | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Date | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Date | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Date | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Date | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Datetime(us) | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Datetime(us) | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Datetime(us) | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Datetime(us) | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Datetime(us, UTC) | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Datetime(us, UTC) | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Datetime(us, UTC) | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Datetime(us, UTC) | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Decimal(10, 2) | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Decimal(10, 2) | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Decimal(10, 2) | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Decimal(10, 2) | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Duration(us) | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Duration(us) | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Duration(us) | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Duration(us) | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Float16 | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Float16 | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Float16 | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Float16 | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Float32 | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Float32 | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Float32 | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Float32 | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Float64 | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Float64 | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Float64 | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Float64 | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Int128 | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Int128 | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Int128 | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Int128 | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Int16 | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Int16 | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Int16 | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Int16 | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Int32 | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Int32 | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Int32 | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Int32 | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Int64 | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Int64 | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Int64 | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Int64 | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Int8 | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Int8 | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Int8 | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Int8 | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | List(Int64) | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | List(Int64) | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | List(Int64) | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | List(Int64) | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | List(String) | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | List(String) | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | List(String) | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | List(String) | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Null | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Null | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Null | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Null | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | String | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | String | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | String | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | String | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Struct(x: Int64, y: String) | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Struct(x: Int64, y: String) | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Struct(x: Int64, y: String) | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Struct(x: Int64, y: String) | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Time | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Time | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | Time | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | Time | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | UInt128 | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | UInt128 | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | UInt128 | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | UInt128 | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | UInt16 | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | UInt16 | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | UInt16 | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | UInt16 | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | UInt32 | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | UInt32 | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | UInt32 | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | UInt32 | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | UInt64 | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | UInt64 | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | UInt64 | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | UInt64 | descending=true, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | UInt8 | descending=false, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | UInt8 | descending=false, nulls_last=true | allowed UInt32 many
+Expr.arg_sort | UInt8 | descending=true, nulls_last=false | allowed UInt32 many
+Expr.arg_sort | UInt8 | descending=true, nulls_last=true | allowed UInt32 many
 Expr.cast | Array(Int64, 2) | dtype=Boolean | refused rows: cannot cast Array type (inner: 'Int64', to: 'Boolean')
 Expr.cast | Array(Int64, 2) | dtype=Boolean, strict=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Boolean')
 Expr.cast | Array(Int64, 2) | dtype=Boolean, wrap_numerical=true | refused rows: cannot cast Array type (inner: 'Int64', to: 'Boolean')
@@ -1984,6 +2088,32 @@ Expr.cum_sum | UInt64 | reverse=false | allowed UInt64 many
 Expr.cum_sum | UInt64 | reverse=true | allowed UInt64 many
 Expr.cum_sum | UInt8 | reverse=false | allowed Int64 many
 Expr.cum_sum | UInt8 | reverse=true | allowed Int64 many
+Expr.diff | Array(Int64, 2) | null_behavior=ignore | allowed Array(Int64, 2) many
+Expr.diff | Boolean | null_behavior=ignore | refused rows: `subtract` operation not supported for dtype `bool`
+Expr.diff | Date | null_behavior=ignore | allowed Duration(us) many
+Expr.diff | Datetime(us) | null_behavior=ignore | allowed Duration(us) many
+Expr.diff | Datetime(us, UTC) | null_behavior=ignore | allowed Duration(us) many
+Expr.diff | Decimal(10, 2) | null_behavior=ignore | allowed Decimal(38, 2) many
+Expr.diff | Duration(us) | null_behavior=ignore | allowed Duration(us) many
+Expr.diff | Float16 | null_behavior=ignore | allowed Float16 many
+Expr.diff | Float32 | null_behavior=ignore | allowed Float32 many
+Expr.diff | Float64 | null_behavior=ignore | allowed Float64 many
+Expr.diff | Int128 | null_behavior=ignore | allowed Int128 many
+Expr.diff | Int16 | null_behavior=ignore | allowed Int16 many
+Expr.diff | Int32 | null_behavior=ignore | allowed Int32 many
+Expr.diff | Int64 | null_behavior=ignore | allowed Int64 many
+Expr.diff | Int8 | null_behavior=ignore | allowed Int8 many
+Expr.diff | List(Int64) | null_behavior=ignore | allowed List(Int64) many
+Expr.diff | List(String) | null_behavior=ignore | refused rows: cannot sub two list columns with non-numeric inner types: (left: list[str], right: list[str])
+Expr.diff | Null | null_behavior=ignore | allowed Null many
+Expr.diff | String | null_behavior=ignore | refused rows: sub operation not supported for dtypes `str` and `str`
+Expr.diff | Struct(x: Int64, y: String) | null_behavior=ignore | refused rows: sub operation not supported for dtypes `str` and `str`
+Expr.diff | Time | null_behavior=ignore | allowed Duration(ns) many
+Expr.diff | UInt128 | null_behavior=ignore | allowed UInt128 many
+Expr.diff | UInt16 | null_behavior=ignore | allowed Int32 many
+Expr.diff | UInt32 | null_behavior=ignore | allowed Int64 many
+Expr.diff | UInt64 | null_behavior=ignore | allowed Int64 many
+Expr.diff | UInt8 | null_behavior=ignore | allowed Int16 many
 Expr.dt.cast_time_unit | Array(Int64, 2) | time_unit=ms | refused schema: expected duration or datetime, got array[i64, 2]
 Expr.dt.cast_time_unit | Array(Int64, 2) | time_unit=ns | refused schema: expected duration or datetime, got array[i64, 2]
 Expr.dt.cast_time_unit | Array(Int64, 2) | time_unit=us | refused schema: expected duration or datetime, got array[i64, 2]
@@ -3934,6 +4064,318 @@ Expr.over | UInt8 | nulls_last=false, mapping_strategy=join | allowed List(UInt8
 Expr.over | UInt8 | nulls_last=true, mapping_strategy=explode | allowed UInt8 many
 Expr.over | UInt8 | nulls_last=true, mapping_strategy=group_to_rows | allowed UInt8 many
 Expr.over | UInt8 | nulls_last=true, mapping_strategy=join | allowed List(UInt8) many
+Expr.rank | Array(Int64, 2) | method=average, descending=false | allowed Float64 many
+Expr.rank | Array(Int64, 2) | method=average, descending=true | allowed Float64 many
+Expr.rank | Array(Int64, 2) | method=dense, descending=false | allowed UInt32 many
+Expr.rank | Array(Int64, 2) | method=dense, descending=true | allowed UInt32 many
+Expr.rank | Array(Int64, 2) | method=max, descending=false | allowed UInt32 many
+Expr.rank | Array(Int64, 2) | method=max, descending=true | allowed UInt32 many
+Expr.rank | Array(Int64, 2) | method=min, descending=false | allowed UInt32 many
+Expr.rank | Array(Int64, 2) | method=min, descending=true | allowed UInt32 many
+Expr.rank | Array(Int64, 2) | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | Array(Int64, 2) | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | Array(Int64, 2) | method=random, descending=false | allowed UInt32 many
+Expr.rank | Array(Int64, 2) | method=random, descending=true | allowed UInt32 many
+Expr.rank | Boolean | method=average, descending=false | allowed Float64 many
+Expr.rank | Boolean | method=average, descending=true | allowed Float64 many
+Expr.rank | Boolean | method=dense, descending=false | allowed UInt32 many
+Expr.rank | Boolean | method=dense, descending=true | allowed UInt32 many
+Expr.rank | Boolean | method=max, descending=false | allowed UInt32 many
+Expr.rank | Boolean | method=max, descending=true | allowed UInt32 many
+Expr.rank | Boolean | method=min, descending=false | allowed UInt32 many
+Expr.rank | Boolean | method=min, descending=true | allowed UInt32 many
+Expr.rank | Boolean | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | Boolean | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | Boolean | method=random, descending=false | allowed UInt32 many
+Expr.rank | Boolean | method=random, descending=true | allowed UInt32 many
+Expr.rank | Date | method=average, descending=false | allowed Float64 many
+Expr.rank | Date | method=average, descending=true | allowed Float64 many
+Expr.rank | Date | method=dense, descending=false | allowed UInt32 many
+Expr.rank | Date | method=dense, descending=true | allowed UInt32 many
+Expr.rank | Date | method=max, descending=false | allowed UInt32 many
+Expr.rank | Date | method=max, descending=true | allowed UInt32 many
+Expr.rank | Date | method=min, descending=false | allowed UInt32 many
+Expr.rank | Date | method=min, descending=true | allowed UInt32 many
+Expr.rank | Date | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | Date | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | Date | method=random, descending=false | allowed UInt32 many
+Expr.rank | Date | method=random, descending=true | allowed UInt32 many
+Expr.rank | Datetime(us) | method=average, descending=false | allowed Float64 many
+Expr.rank | Datetime(us) | method=average, descending=true | allowed Float64 many
+Expr.rank | Datetime(us) | method=dense, descending=false | allowed UInt32 many
+Expr.rank | Datetime(us) | method=dense, descending=true | allowed UInt32 many
+Expr.rank | Datetime(us) | method=max, descending=false | allowed UInt32 many
+Expr.rank | Datetime(us) | method=max, descending=true | allowed UInt32 many
+Expr.rank | Datetime(us) | method=min, descending=false | allowed UInt32 many
+Expr.rank | Datetime(us) | method=min, descending=true | allowed UInt32 many
+Expr.rank | Datetime(us) | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | Datetime(us) | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | Datetime(us) | method=random, descending=false | allowed UInt32 many
+Expr.rank | Datetime(us) | method=random, descending=true | allowed UInt32 many
+Expr.rank | Datetime(us, UTC) | method=average, descending=false | allowed Float64 many
+Expr.rank | Datetime(us, UTC) | method=average, descending=true | allowed Float64 many
+Expr.rank | Datetime(us, UTC) | method=dense, descending=false | allowed UInt32 many
+Expr.rank | Datetime(us, UTC) | method=dense, descending=true | allowed UInt32 many
+Expr.rank | Datetime(us, UTC) | method=max, descending=false | allowed UInt32 many
+Expr.rank | Datetime(us, UTC) | method=max, descending=true | allowed UInt32 many
+Expr.rank | Datetime(us, UTC) | method=min, descending=false | allowed UInt32 many
+Expr.rank | Datetime(us, UTC) | method=min, descending=true | allowed UInt32 many
+Expr.rank | Datetime(us, UTC) | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | Datetime(us, UTC) | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | Datetime(us, UTC) | method=random, descending=false | allowed UInt32 many
+Expr.rank | Datetime(us, UTC) | method=random, descending=true | allowed UInt32 many
+Expr.rank | Decimal(10, 2) | method=average, descending=false | allowed Float64 many
+Expr.rank | Decimal(10, 2) | method=average, descending=true | allowed Float64 many
+Expr.rank | Decimal(10, 2) | method=dense, descending=false | allowed UInt32 many
+Expr.rank | Decimal(10, 2) | method=dense, descending=true | allowed UInt32 many
+Expr.rank | Decimal(10, 2) | method=max, descending=false | allowed UInt32 many
+Expr.rank | Decimal(10, 2) | method=max, descending=true | allowed UInt32 many
+Expr.rank | Decimal(10, 2) | method=min, descending=false | allowed UInt32 many
+Expr.rank | Decimal(10, 2) | method=min, descending=true | allowed UInt32 many
+Expr.rank | Decimal(10, 2) | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | Decimal(10, 2) | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | Decimal(10, 2) | method=random, descending=false | allowed UInt32 many
+Expr.rank | Decimal(10, 2) | method=random, descending=true | allowed UInt32 many
+Expr.rank | Duration(us) | method=average, descending=false | allowed Float64 many
+Expr.rank | Duration(us) | method=average, descending=true | allowed Float64 many
+Expr.rank | Duration(us) | method=dense, descending=false | allowed UInt32 many
+Expr.rank | Duration(us) | method=dense, descending=true | allowed UInt32 many
+Expr.rank | Duration(us) | method=max, descending=false | allowed UInt32 many
+Expr.rank | Duration(us) | method=max, descending=true | allowed UInt32 many
+Expr.rank | Duration(us) | method=min, descending=false | allowed UInt32 many
+Expr.rank | Duration(us) | method=min, descending=true | allowed UInt32 many
+Expr.rank | Duration(us) | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | Duration(us) | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | Duration(us) | method=random, descending=false | allowed UInt32 many
+Expr.rank | Duration(us) | method=random, descending=true | allowed UInt32 many
+Expr.rank | Float16 | method=average, descending=false | allowed Float64 many
+Expr.rank | Float16 | method=average, descending=true | allowed Float64 many
+Expr.rank | Float16 | method=dense, descending=false | allowed UInt32 many
+Expr.rank | Float16 | method=dense, descending=true | allowed UInt32 many
+Expr.rank | Float16 | method=max, descending=false | allowed UInt32 many
+Expr.rank | Float16 | method=max, descending=true | allowed UInt32 many
+Expr.rank | Float16 | method=min, descending=false | allowed UInt32 many
+Expr.rank | Float16 | method=min, descending=true | allowed UInt32 many
+Expr.rank | Float16 | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | Float16 | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | Float16 | method=random, descending=false | allowed UInt32 many
+Expr.rank | Float16 | method=random, descending=true | allowed UInt32 many
+Expr.rank | Float32 | method=average, descending=false | allowed Float64 many
+Expr.rank | Float32 | method=average, descending=true | allowed Float64 many
+Expr.rank | Float32 | method=dense, descending=false | allowed UInt32 many
+Expr.rank | Float32 | method=dense, descending=true | allowed UInt32 many
+Expr.rank | Float32 | method=max, descending=false | allowed UInt32 many
+Expr.rank | Float32 | method=max, descending=true | allowed UInt32 many
+Expr.rank | Float32 | method=min, descending=false | allowed UInt32 many
+Expr.rank | Float32 | method=min, descending=true | allowed UInt32 many
+Expr.rank | Float32 | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | Float32 | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | Float32 | method=random, descending=false | allowed UInt32 many
+Expr.rank | Float32 | method=random, descending=true | allowed UInt32 many
+Expr.rank | Float64 | method=average, descending=false | allowed Float64 many
+Expr.rank | Float64 | method=average, descending=true | allowed Float64 many
+Expr.rank | Float64 | method=dense, descending=false | allowed UInt32 many
+Expr.rank | Float64 | method=dense, descending=true | allowed UInt32 many
+Expr.rank | Float64 | method=max, descending=false | allowed UInt32 many
+Expr.rank | Float64 | method=max, descending=true | allowed UInt32 many
+Expr.rank | Float64 | method=min, descending=false | allowed UInt32 many
+Expr.rank | Float64 | method=min, descending=true | allowed UInt32 many
+Expr.rank | Float64 | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | Float64 | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | Float64 | method=random, descending=false | allowed UInt32 many
+Expr.rank | Float64 | method=random, descending=true | allowed UInt32 many
+Expr.rank | Int128 | method=average, descending=false | allowed Float64 many
+Expr.rank | Int128 | method=average, descending=true | allowed Float64 many
+Expr.rank | Int128 | method=dense, descending=false | allowed UInt32 many
+Expr.rank | Int128 | method=dense, descending=true | allowed UInt32 many
+Expr.rank | Int128 | method=max, descending=false | allowed UInt32 many
+Expr.rank | Int128 | method=max, descending=true | allowed UInt32 many
+Expr.rank | Int128 | method=min, descending=false | allowed UInt32 many
+Expr.rank | Int128 | method=min, descending=true | allowed UInt32 many
+Expr.rank | Int128 | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | Int128 | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | Int128 | method=random, descending=false | allowed UInt32 many
+Expr.rank | Int128 | method=random, descending=true | allowed UInt32 many
+Expr.rank | Int16 | method=average, descending=false | allowed Float64 many
+Expr.rank | Int16 | method=average, descending=true | allowed Float64 many
+Expr.rank | Int16 | method=dense, descending=false | allowed UInt32 many
+Expr.rank | Int16 | method=dense, descending=true | allowed UInt32 many
+Expr.rank | Int16 | method=max, descending=false | allowed UInt32 many
+Expr.rank | Int16 | method=max, descending=true | allowed UInt32 many
+Expr.rank | Int16 | method=min, descending=false | allowed UInt32 many
+Expr.rank | Int16 | method=min, descending=true | allowed UInt32 many
+Expr.rank | Int16 | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | Int16 | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | Int16 | method=random, descending=false | allowed UInt32 many
+Expr.rank | Int16 | method=random, descending=true | allowed UInt32 many
+Expr.rank | Int32 | method=average, descending=false | allowed Float64 many
+Expr.rank | Int32 | method=average, descending=true | allowed Float64 many
+Expr.rank | Int32 | method=dense, descending=false | allowed UInt32 many
+Expr.rank | Int32 | method=dense, descending=true | allowed UInt32 many
+Expr.rank | Int32 | method=max, descending=false | allowed UInt32 many
+Expr.rank | Int32 | method=max, descending=true | allowed UInt32 many
+Expr.rank | Int32 | method=min, descending=false | allowed UInt32 many
+Expr.rank | Int32 | method=min, descending=true | allowed UInt32 many
+Expr.rank | Int32 | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | Int32 | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | Int32 | method=random, descending=false | allowed UInt32 many
+Expr.rank | Int32 | method=random, descending=true | allowed UInt32 many
+Expr.rank | Int64 | method=average, descending=false | allowed Float64 many
+Expr.rank | Int64 | method=average, descending=true | allowed Float64 many
+Expr.rank | Int64 | method=dense, descending=false | allowed UInt32 many
+Expr.rank | Int64 | method=dense, descending=true | allowed UInt32 many
+Expr.rank | Int64 | method=max, descending=false | allowed UInt32 many
+Expr.rank | Int64 | method=max, descending=true | allowed UInt32 many
+Expr.rank | Int64 | method=min, descending=false | allowed UInt32 many
+Expr.rank | Int64 | method=min, descending=true | allowed UInt32 many
+Expr.rank | Int64 | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | Int64 | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | Int64 | method=random, descending=false | allowed UInt32 many
+Expr.rank | Int64 | method=random, descending=true | allowed UInt32 many
+Expr.rank | Int8 | method=average, descending=false | allowed Float64 many
+Expr.rank | Int8 | method=average, descending=true | allowed Float64 many
+Expr.rank | Int8 | method=dense, descending=false | allowed UInt32 many
+Expr.rank | Int8 | method=dense, descending=true | allowed UInt32 many
+Expr.rank | Int8 | method=max, descending=false | allowed UInt32 many
+Expr.rank | Int8 | method=max, descending=true | allowed UInt32 many
+Expr.rank | Int8 | method=min, descending=false | allowed UInt32 many
+Expr.rank | Int8 | method=min, descending=true | allowed UInt32 many
+Expr.rank | Int8 | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | Int8 | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | Int8 | method=random, descending=false | allowed UInt32 many
+Expr.rank | Int8 | method=random, descending=true | allowed UInt32 many
+Expr.rank | List(Int64) | method=average, descending=false | allowed Float64 many
+Expr.rank | List(Int64) | method=average, descending=true | allowed Float64 many
+Expr.rank | List(Int64) | method=dense, descending=false | allowed UInt32 many
+Expr.rank | List(Int64) | method=dense, descending=true | allowed UInt32 many
+Expr.rank | List(Int64) | method=max, descending=false | allowed UInt32 many
+Expr.rank | List(Int64) | method=max, descending=true | allowed UInt32 many
+Expr.rank | List(Int64) | method=min, descending=false | allowed UInt32 many
+Expr.rank | List(Int64) | method=min, descending=true | allowed UInt32 many
+Expr.rank | List(Int64) | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | List(Int64) | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | List(Int64) | method=random, descending=false | allowed UInt32 many
+Expr.rank | List(Int64) | method=random, descending=true | allowed UInt32 many
+Expr.rank | List(String) | method=average, descending=false | allowed Float64 many
+Expr.rank | List(String) | method=average, descending=true | allowed Float64 many
+Expr.rank | List(String) | method=dense, descending=false | allowed UInt32 many
+Expr.rank | List(String) | method=dense, descending=true | allowed UInt32 many
+Expr.rank | List(String) | method=max, descending=false | allowed UInt32 many
+Expr.rank | List(String) | method=max, descending=true | allowed UInt32 many
+Expr.rank | List(String) | method=min, descending=false | allowed UInt32 many
+Expr.rank | List(String) | method=min, descending=true | allowed UInt32 many
+Expr.rank | List(String) | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | List(String) | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | List(String) | method=random, descending=false | allowed UInt32 many
+Expr.rank | List(String) | method=random, descending=true | allowed UInt32 many
+Expr.rank | Null | method=average, descending=false | allowed Float64 many
+Expr.rank | Null | method=average, descending=true | allowed Float64 many
+Expr.rank | Null | method=dense, descending=false | allowed UInt32 many
+Expr.rank | Null | method=dense, descending=true | allowed UInt32 many
+Expr.rank | Null | method=max, descending=false | allowed UInt32 many
+Expr.rank | Null | method=max, descending=true | allowed UInt32 many
+Expr.rank | Null | method=min, descending=false | allowed UInt32 many
+Expr.rank | Null | method=min, descending=true | allowed UInt32 many
+Expr.rank | Null | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | Null | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | Null | method=random, descending=false | allowed UInt32 many
+Expr.rank | Null | method=random, descending=true | allowed UInt32 many
+Expr.rank | String | method=average, descending=false | allowed Float64 many
+Expr.rank | String | method=average, descending=true | allowed Float64 many
+Expr.rank | String | method=dense, descending=false | allowed UInt32 many
+Expr.rank | String | method=dense, descending=true | allowed UInt32 many
+Expr.rank | String | method=max, descending=false | allowed UInt32 many
+Expr.rank | String | method=max, descending=true | allowed UInt32 many
+Expr.rank | String | method=min, descending=false | allowed UInt32 many
+Expr.rank | String | method=min, descending=true | allowed UInt32 many
+Expr.rank | String | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | String | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | String | method=random, descending=false | allowed UInt32 many
+Expr.rank | String | method=random, descending=true | allowed UInt32 many
+Expr.rank | Struct(x: Int64, y: String) | method=average, descending=false | allowed Float64 many
+Expr.rank | Struct(x: Int64, y: String) | method=average, descending=true | allowed Float64 many
+Expr.rank | Struct(x: Int64, y: String) | method=dense, descending=false | allowed UInt32 many
+Expr.rank | Struct(x: Int64, y: String) | method=dense, descending=true | allowed UInt32 many
+Expr.rank | Struct(x: Int64, y: String) | method=max, descending=false | allowed UInt32 many
+Expr.rank | Struct(x: Int64, y: String) | method=max, descending=true | allowed UInt32 many
+Expr.rank | Struct(x: Int64, y: String) | method=min, descending=false | allowed UInt32 many
+Expr.rank | Struct(x: Int64, y: String) | method=min, descending=true | allowed UInt32 many
+Expr.rank | Struct(x: Int64, y: String) | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | Struct(x: Int64, y: String) | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | Struct(x: Int64, y: String) | method=random, descending=false | allowed UInt32 many
+Expr.rank | Struct(x: Int64, y: String) | method=random, descending=true | allowed UInt32 many
+Expr.rank | Time | method=average, descending=false | allowed Float64 many
+Expr.rank | Time | method=average, descending=true | allowed Float64 many
+Expr.rank | Time | method=dense, descending=false | allowed UInt32 many
+Expr.rank | Time | method=dense, descending=true | allowed UInt32 many
+Expr.rank | Time | method=max, descending=false | allowed UInt32 many
+Expr.rank | Time | method=max, descending=true | allowed UInt32 many
+Expr.rank | Time | method=min, descending=false | allowed UInt32 many
+Expr.rank | Time | method=min, descending=true | allowed UInt32 many
+Expr.rank | Time | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | Time | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | Time | method=random, descending=false | allowed UInt32 many
+Expr.rank | Time | method=random, descending=true | allowed UInt32 many
+Expr.rank | UInt128 | method=average, descending=false | allowed Float64 many
+Expr.rank | UInt128 | method=average, descending=true | allowed Float64 many
+Expr.rank | UInt128 | method=dense, descending=false | allowed UInt32 many
+Expr.rank | UInt128 | method=dense, descending=true | allowed UInt32 many
+Expr.rank | UInt128 | method=max, descending=false | allowed UInt32 many
+Expr.rank | UInt128 | method=max, descending=true | allowed UInt32 many
+Expr.rank | UInt128 | method=min, descending=false | allowed UInt32 many
+Expr.rank | UInt128 | method=min, descending=true | allowed UInt32 many
+Expr.rank | UInt128 | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | UInt128 | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | UInt128 | method=random, descending=false | allowed UInt32 many
+Expr.rank | UInt128 | method=random, descending=true | allowed UInt32 many
+Expr.rank | UInt16 | method=average, descending=false | allowed Float64 many
+Expr.rank | UInt16 | method=average, descending=true | allowed Float64 many
+Expr.rank | UInt16 | method=dense, descending=false | allowed UInt32 many
+Expr.rank | UInt16 | method=dense, descending=true | allowed UInt32 many
+Expr.rank | UInt16 | method=max, descending=false | allowed UInt32 many
+Expr.rank | UInt16 | method=max, descending=true | allowed UInt32 many
+Expr.rank | UInt16 | method=min, descending=false | allowed UInt32 many
+Expr.rank | UInt16 | method=min, descending=true | allowed UInt32 many
+Expr.rank | UInt16 | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | UInt16 | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | UInt16 | method=random, descending=false | allowed UInt32 many
+Expr.rank | UInt16 | method=random, descending=true | allowed UInt32 many
+Expr.rank | UInt32 | method=average, descending=false | allowed Float64 many
+Expr.rank | UInt32 | method=average, descending=true | allowed Float64 many
+Expr.rank | UInt32 | method=dense, descending=false | allowed UInt32 many
+Expr.rank | UInt32 | method=dense, descending=true | allowed UInt32 many
+Expr.rank | UInt32 | method=max, descending=false | allowed UInt32 many
+Expr.rank | UInt32 | method=max, descending=true | allowed UInt32 many
+Expr.rank | UInt32 | method=min, descending=false | allowed UInt32 many
+Expr.rank | UInt32 | method=min, descending=true | allowed UInt32 many
+Expr.rank | UInt32 | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | UInt32 | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | UInt32 | method=random, descending=false | allowed UInt32 many
+Expr.rank | UInt32 | method=random, descending=true | allowed UInt32 many
+Expr.rank | UInt64 | method=average, descending=false | allowed Float64 many
+Expr.rank | UInt64 | method=average, descending=true | allowed Float64 many
+Expr.rank | UInt64 | method=dense, descending=false | allowed UInt32 many
+Expr.rank | UInt64 | method=dense, descending=true | allowed UInt32 many
+Expr.rank | UInt64 | method=max, descending=false | allowed UInt32 many
+Expr.rank | UInt64 | method=max, descending=true | allowed UInt32 many
+Expr.rank | UInt64 | method=min, descending=false | allowed UInt32 many
+Expr.rank | UInt64 | method=min, descending=true | allowed UInt32 many
+Expr.rank | UInt64 | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | UInt64 | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | UInt64 | method=random, descending=false | allowed UInt32 many
+Expr.rank | UInt64 | method=random, descending=true | allowed UInt32 many
+Expr.rank | UInt8 | method=average, descending=false | allowed Float64 many
+Expr.rank | UInt8 | method=average, descending=true | allowed Float64 many
+Expr.rank | UInt8 | method=dense, descending=false | allowed UInt32 many
+Expr.rank | UInt8 | method=dense, descending=true | allowed UInt32 many
+Expr.rank | UInt8 | method=max, descending=false | allowed UInt32 many
+Expr.rank | UInt8 | method=max, descending=true | allowed UInt32 many
+Expr.rank | UInt8 | method=min, descending=false | allowed UInt32 many
+Expr.rank | UInt8 | method=min, descending=true | allowed UInt32 many
+Expr.rank | UInt8 | method=ordinal, descending=false | allowed UInt32 many
+Expr.rank | UInt8 | method=ordinal, descending=true | allowed UInt32 many
+Expr.rank | UInt8 | method=random, descending=false | allowed UInt32 many
+Expr.rank | UInt8 | method=random, descending=true | allowed UInt32 many
 Expr.round | Array(Int64, 2) | mode=half_away_from_zero | refused rows: rounding ('half_away_from_zero') operation not supported for dtype `array[i64, 2]` (expected: numeric)
 Expr.round | Array(Int64, 2) | mode=half_to_even | refused rows: rounding ('half_to_even') operation not supported for dtype `array[i64, 2]` (expected: numeric)
 Expr.round | Boolean | mode=half_away_from_zero | refused rows: rounding ('half_away_from_zero') operation not supported for dtype `bool` (expected: numeric)
@@ -3986,6 +4428,734 @@ Expr.round | UInt64 | mode=half_away_from_zero | allowed UInt64 many
 Expr.round | UInt64 | mode=half_to_even | allowed UInt64 many
 Expr.round | UInt8 | mode=half_away_from_zero | allowed UInt8 many
 Expr.round | UInt8 | mode=half_to_even | allowed UInt8 many
+Expr.sort | Array(Int64, 2) | descending=false, nulls_last=false | allowed Array(Int64, 2) many
+Expr.sort | Array(Int64, 2) | descending=false, nulls_last=true | allowed Array(Int64, 2) many
+Expr.sort | Array(Int64, 2) | descending=true, nulls_last=false | allowed Array(Int64, 2) many
+Expr.sort | Array(Int64, 2) | descending=true, nulls_last=true | allowed Array(Int64, 2) many
+Expr.sort | Boolean | descending=false, nulls_last=false | allowed Boolean many
+Expr.sort | Boolean | descending=false, nulls_last=true | allowed Boolean many
+Expr.sort | Boolean | descending=true, nulls_last=false | allowed Boolean many
+Expr.sort | Boolean | descending=true, nulls_last=true | allowed Boolean many
+Expr.sort | Date | descending=false, nulls_last=false | allowed Date many
+Expr.sort | Date | descending=false, nulls_last=true | allowed Date many
+Expr.sort | Date | descending=true, nulls_last=false | allowed Date many
+Expr.sort | Date | descending=true, nulls_last=true | allowed Date many
+Expr.sort | Datetime(us) | descending=false, nulls_last=false | allowed Datetime(us) many
+Expr.sort | Datetime(us) | descending=false, nulls_last=true | allowed Datetime(us) many
+Expr.sort | Datetime(us) | descending=true, nulls_last=false | allowed Datetime(us) many
+Expr.sort | Datetime(us) | descending=true, nulls_last=true | allowed Datetime(us) many
+Expr.sort | Datetime(us, UTC) | descending=false, nulls_last=false | allowed Datetime(us, UTC) many
+Expr.sort | Datetime(us, UTC) | descending=false, nulls_last=true | allowed Datetime(us, UTC) many
+Expr.sort | Datetime(us, UTC) | descending=true, nulls_last=false | allowed Datetime(us, UTC) many
+Expr.sort | Datetime(us, UTC) | descending=true, nulls_last=true | allowed Datetime(us, UTC) many
+Expr.sort | Decimal(10, 2) | descending=false, nulls_last=false | allowed Decimal(10, 2) many
+Expr.sort | Decimal(10, 2) | descending=false, nulls_last=true | allowed Decimal(10, 2) many
+Expr.sort | Decimal(10, 2) | descending=true, nulls_last=false | allowed Decimal(10, 2) many
+Expr.sort | Decimal(10, 2) | descending=true, nulls_last=true | allowed Decimal(10, 2) many
+Expr.sort | Duration(us) | descending=false, nulls_last=false | allowed Duration(us) many
+Expr.sort | Duration(us) | descending=false, nulls_last=true | allowed Duration(us) many
+Expr.sort | Duration(us) | descending=true, nulls_last=false | allowed Duration(us) many
+Expr.sort | Duration(us) | descending=true, nulls_last=true | allowed Duration(us) many
+Expr.sort | Float16 | descending=false, nulls_last=false | allowed Float16 many
+Expr.sort | Float16 | descending=false, nulls_last=true | allowed Float16 many
+Expr.sort | Float16 | descending=true, nulls_last=false | allowed Float16 many
+Expr.sort | Float16 | descending=true, nulls_last=true | allowed Float16 many
+Expr.sort | Float32 | descending=false, nulls_last=false | allowed Float32 many
+Expr.sort | Float32 | descending=false, nulls_last=true | allowed Float32 many
+Expr.sort | Float32 | descending=true, nulls_last=false | allowed Float32 many
+Expr.sort | Float32 | descending=true, nulls_last=true | allowed Float32 many
+Expr.sort | Float64 | descending=false, nulls_last=false | allowed Float64 many
+Expr.sort | Float64 | descending=false, nulls_last=true | allowed Float64 many
+Expr.sort | Float64 | descending=true, nulls_last=false | allowed Float64 many
+Expr.sort | Float64 | descending=true, nulls_last=true | allowed Float64 many
+Expr.sort | Int128 | descending=false, nulls_last=false | allowed Int128 many
+Expr.sort | Int128 | descending=false, nulls_last=true | allowed Int128 many
+Expr.sort | Int128 | descending=true, nulls_last=false | allowed Int128 many
+Expr.sort | Int128 | descending=true, nulls_last=true | allowed Int128 many
+Expr.sort | Int16 | descending=false, nulls_last=false | allowed Int16 many
+Expr.sort | Int16 | descending=false, nulls_last=true | allowed Int16 many
+Expr.sort | Int16 | descending=true, nulls_last=false | allowed Int16 many
+Expr.sort | Int16 | descending=true, nulls_last=true | allowed Int16 many
+Expr.sort | Int32 | descending=false, nulls_last=false | allowed Int32 many
+Expr.sort | Int32 | descending=false, nulls_last=true | allowed Int32 many
+Expr.sort | Int32 | descending=true, nulls_last=false | allowed Int32 many
+Expr.sort | Int32 | descending=true, nulls_last=true | allowed Int32 many
+Expr.sort | Int64 | descending=false, nulls_last=false | allowed Int64 many
+Expr.sort | Int64 | descending=false, nulls_last=true | allowed Int64 many
+Expr.sort | Int64 | descending=true, nulls_last=false | allowed Int64 many
+Expr.sort | Int64 | descending=true, nulls_last=true | allowed Int64 many
+Expr.sort | Int8 | descending=false, nulls_last=false | allowed Int8 many
+Expr.sort | Int8 | descending=false, nulls_last=true | allowed Int8 many
+Expr.sort | Int8 | descending=true, nulls_last=false | allowed Int8 many
+Expr.sort | Int8 | descending=true, nulls_last=true | allowed Int8 many
+Expr.sort | List(Int64) | descending=false, nulls_last=false | allowed List(Int64) many
+Expr.sort | List(Int64) | descending=false, nulls_last=true | allowed List(Int64) many
+Expr.sort | List(Int64) | descending=true, nulls_last=false | allowed List(Int64) many
+Expr.sort | List(Int64) | descending=true, nulls_last=true | allowed List(Int64) many
+Expr.sort | List(String) | descending=false, nulls_last=false | allowed List(String) many
+Expr.sort | List(String) | descending=false, nulls_last=true | allowed List(String) many
+Expr.sort | List(String) | descending=true, nulls_last=false | allowed List(String) many
+Expr.sort | List(String) | descending=true, nulls_last=true | allowed List(String) many
+Expr.sort | Null | descending=false, nulls_last=false | allowed Null many
+Expr.sort | Null | descending=false, nulls_last=true | allowed Null many
+Expr.sort | Null | descending=true, nulls_last=false | allowed Null many
+Expr.sort | Null | descending=true, nulls_last=true | allowed Null many
+Expr.sort | String | descending=false, nulls_last=false | allowed String many
+Expr.sort | String | descending=false, nulls_last=true | allowed String many
+Expr.sort | String | descending=true, nulls_last=false | allowed String many
+Expr.sort | String | descending=true, nulls_last=true | allowed String many
+Expr.sort | Struct(x: Int64, y: String) | descending=false, nulls_last=false | allowed Struct(x: Int64, y: String) many
+Expr.sort | Struct(x: Int64, y: String) | descending=false, nulls_last=true | allowed Struct(x: Int64, y: String) many
+Expr.sort | Struct(x: Int64, y: String) | descending=true, nulls_last=false | allowed Struct(x: Int64, y: String) many
+Expr.sort | Struct(x: Int64, y: String) | descending=true, nulls_last=true | allowed Struct(x: Int64, y: String) many
+Expr.sort | Time | descending=false, nulls_last=false | allowed Time many
+Expr.sort | Time | descending=false, nulls_last=true | allowed Time many
+Expr.sort | Time | descending=true, nulls_last=false | allowed Time many
+Expr.sort | Time | descending=true, nulls_last=true | allowed Time many
+Expr.sort | UInt128 | descending=false, nulls_last=false | allowed UInt128 many
+Expr.sort | UInt128 | descending=false, nulls_last=true | allowed UInt128 many
+Expr.sort | UInt128 | descending=true, nulls_last=false | allowed UInt128 many
+Expr.sort | UInt128 | descending=true, nulls_last=true | allowed UInt128 many
+Expr.sort | UInt16 | descending=false, nulls_last=false | allowed UInt16 many
+Expr.sort | UInt16 | descending=false, nulls_last=true | allowed UInt16 many
+Expr.sort | UInt16 | descending=true, nulls_last=false | allowed UInt16 many
+Expr.sort | UInt16 | descending=true, nulls_last=true | allowed UInt16 many
+Expr.sort | UInt32 | descending=false, nulls_last=false | allowed UInt32 many
+Expr.sort | UInt32 | descending=false, nulls_last=true | allowed UInt32 many
+Expr.sort | UInt32 | descending=true, nulls_last=false | allowed UInt32 many
+Expr.sort | UInt32 | descending=true, nulls_last=true | allowed UInt32 many
+Expr.sort | UInt64 | descending=false, nulls_last=false | allowed UInt64 many
+Expr.sort | UInt64 | descending=false, nulls_last=true | allowed UInt64 many
+Expr.sort | UInt64 | descending=true, nulls_last=false | allowed UInt64 many
+Expr.sort | UInt64 | descending=true, nulls_last=true | allowed UInt64 many
+Expr.sort | UInt8 | descending=false, nulls_last=false | allowed UInt8 many
+Expr.sort | UInt8 | descending=false, nulls_last=true | allowed UInt8 many
+Expr.sort | UInt8 | descending=true, nulls_last=false | allowed UInt8 many
+Expr.sort | UInt8 | descending=true, nulls_last=true | allowed UInt8 many
+Expr.sort_by | Array(Int64, 2) | descending=false, maintain_order=false | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | descending=false, maintain_order=true | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | descending=false, multithreaded=false | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | descending=false, multithreaded=true | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | descending=false, nulls_last=false | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | descending=false, nulls_last=true | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | descending=true, maintain_order=false | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | descending=true, maintain_order=true | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | descending=true, multithreaded=false | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | descending=true, multithreaded=true | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | descending=true, nulls_last=false | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | descending=true, nulls_last=true | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | multithreaded=false, maintain_order=false | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | multithreaded=false, maintain_order=true | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | multithreaded=true, maintain_order=false | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | multithreaded=true, maintain_order=true | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | nulls_last=false, maintain_order=false | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | nulls_last=false, maintain_order=true | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | nulls_last=false, multithreaded=false | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | nulls_last=false, multithreaded=true | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | nulls_last=true, maintain_order=false | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | nulls_last=true, maintain_order=true | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | nulls_last=true, multithreaded=false | allowed Array(Int64, 2) many
+Expr.sort_by | Array(Int64, 2) | nulls_last=true, multithreaded=true | allowed Array(Int64, 2) many
+Expr.sort_by | Boolean | descending=false, maintain_order=false | allowed Boolean many
+Expr.sort_by | Boolean | descending=false, maintain_order=true | allowed Boolean many
+Expr.sort_by | Boolean | descending=false, multithreaded=false | allowed Boolean many
+Expr.sort_by | Boolean | descending=false, multithreaded=true | allowed Boolean many
+Expr.sort_by | Boolean | descending=false, nulls_last=false | allowed Boolean many
+Expr.sort_by | Boolean | descending=false, nulls_last=true | allowed Boolean many
+Expr.sort_by | Boolean | descending=true, maintain_order=false | allowed Boolean many
+Expr.sort_by | Boolean | descending=true, maintain_order=true | allowed Boolean many
+Expr.sort_by | Boolean | descending=true, multithreaded=false | allowed Boolean many
+Expr.sort_by | Boolean | descending=true, multithreaded=true | allowed Boolean many
+Expr.sort_by | Boolean | descending=true, nulls_last=false | allowed Boolean many
+Expr.sort_by | Boolean | descending=true, nulls_last=true | allowed Boolean many
+Expr.sort_by | Boolean | multithreaded=false, maintain_order=false | allowed Boolean many
+Expr.sort_by | Boolean | multithreaded=false, maintain_order=true | allowed Boolean many
+Expr.sort_by | Boolean | multithreaded=true, maintain_order=false | allowed Boolean many
+Expr.sort_by | Boolean | multithreaded=true, maintain_order=true | allowed Boolean many
+Expr.sort_by | Boolean | nulls_last=false, maintain_order=false | allowed Boolean many
+Expr.sort_by | Boolean | nulls_last=false, maintain_order=true | allowed Boolean many
+Expr.sort_by | Boolean | nulls_last=false, multithreaded=false | allowed Boolean many
+Expr.sort_by | Boolean | nulls_last=false, multithreaded=true | allowed Boolean many
+Expr.sort_by | Boolean | nulls_last=true, maintain_order=false | allowed Boolean many
+Expr.sort_by | Boolean | nulls_last=true, maintain_order=true | allowed Boolean many
+Expr.sort_by | Boolean | nulls_last=true, multithreaded=false | allowed Boolean many
+Expr.sort_by | Boolean | nulls_last=true, multithreaded=true | allowed Boolean many
+Expr.sort_by | Date | descending=false, maintain_order=false | allowed Date many
+Expr.sort_by | Date | descending=false, maintain_order=true | allowed Date many
+Expr.sort_by | Date | descending=false, multithreaded=false | allowed Date many
+Expr.sort_by | Date | descending=false, multithreaded=true | allowed Date many
+Expr.sort_by | Date | descending=false, nulls_last=false | allowed Date many
+Expr.sort_by | Date | descending=false, nulls_last=true | allowed Date many
+Expr.sort_by | Date | descending=true, maintain_order=false | allowed Date many
+Expr.sort_by | Date | descending=true, maintain_order=true | allowed Date many
+Expr.sort_by | Date | descending=true, multithreaded=false | allowed Date many
+Expr.sort_by | Date | descending=true, multithreaded=true | allowed Date many
+Expr.sort_by | Date | descending=true, nulls_last=false | allowed Date many
+Expr.sort_by | Date | descending=true, nulls_last=true | allowed Date many
+Expr.sort_by | Date | multithreaded=false, maintain_order=false | allowed Date many
+Expr.sort_by | Date | multithreaded=false, maintain_order=true | allowed Date many
+Expr.sort_by | Date | multithreaded=true, maintain_order=false | allowed Date many
+Expr.sort_by | Date | multithreaded=true, maintain_order=true | allowed Date many
+Expr.sort_by | Date | nulls_last=false, maintain_order=false | allowed Date many
+Expr.sort_by | Date | nulls_last=false, maintain_order=true | allowed Date many
+Expr.sort_by | Date | nulls_last=false, multithreaded=false | allowed Date many
+Expr.sort_by | Date | nulls_last=false, multithreaded=true | allowed Date many
+Expr.sort_by | Date | nulls_last=true, maintain_order=false | allowed Date many
+Expr.sort_by | Date | nulls_last=true, maintain_order=true | allowed Date many
+Expr.sort_by | Date | nulls_last=true, multithreaded=false | allowed Date many
+Expr.sort_by | Date | nulls_last=true, multithreaded=true | allowed Date many
+Expr.sort_by | Datetime(us) | descending=false, maintain_order=false | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | descending=false, maintain_order=true | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | descending=false, multithreaded=false | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | descending=false, multithreaded=true | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | descending=false, nulls_last=false | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | descending=false, nulls_last=true | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | descending=true, maintain_order=false | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | descending=true, maintain_order=true | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | descending=true, multithreaded=false | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | descending=true, multithreaded=true | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | descending=true, nulls_last=false | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | descending=true, nulls_last=true | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | multithreaded=false, maintain_order=false | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | multithreaded=false, maintain_order=true | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | multithreaded=true, maintain_order=false | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | multithreaded=true, maintain_order=true | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | nulls_last=false, maintain_order=false | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | nulls_last=false, maintain_order=true | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | nulls_last=false, multithreaded=false | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | nulls_last=false, multithreaded=true | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | nulls_last=true, maintain_order=false | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | nulls_last=true, maintain_order=true | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | nulls_last=true, multithreaded=false | allowed Datetime(us) many
+Expr.sort_by | Datetime(us) | nulls_last=true, multithreaded=true | allowed Datetime(us) many
+Expr.sort_by | Datetime(us, UTC) | descending=false, maintain_order=false | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | descending=false, maintain_order=true | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | descending=false, multithreaded=false | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | descending=false, multithreaded=true | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | descending=false, nulls_last=false | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | descending=false, nulls_last=true | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | descending=true, maintain_order=false | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | descending=true, maintain_order=true | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | descending=true, multithreaded=false | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | descending=true, multithreaded=true | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | descending=true, nulls_last=false | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | descending=true, nulls_last=true | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | multithreaded=false, maintain_order=false | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | multithreaded=false, maintain_order=true | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | multithreaded=true, maintain_order=false | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | multithreaded=true, maintain_order=true | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | nulls_last=false, maintain_order=false | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | nulls_last=false, maintain_order=true | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | nulls_last=false, multithreaded=false | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | nulls_last=false, multithreaded=true | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | nulls_last=true, maintain_order=false | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | nulls_last=true, maintain_order=true | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | nulls_last=true, multithreaded=false | allowed Datetime(us, UTC) many
+Expr.sort_by | Datetime(us, UTC) | nulls_last=true, multithreaded=true | allowed Datetime(us, UTC) many
+Expr.sort_by | Decimal(10, 2) | descending=false, maintain_order=false | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | descending=false, maintain_order=true | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | descending=false, multithreaded=false | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | descending=false, multithreaded=true | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | descending=false, nulls_last=false | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | descending=false, nulls_last=true | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | descending=true, maintain_order=false | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | descending=true, maintain_order=true | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | descending=true, multithreaded=false | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | descending=true, multithreaded=true | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | descending=true, nulls_last=false | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | descending=true, nulls_last=true | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | multithreaded=false, maintain_order=false | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | multithreaded=false, maintain_order=true | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | multithreaded=true, maintain_order=false | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | multithreaded=true, maintain_order=true | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | nulls_last=false, maintain_order=false | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | nulls_last=false, maintain_order=true | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | nulls_last=false, multithreaded=false | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | nulls_last=false, multithreaded=true | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | nulls_last=true, maintain_order=false | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | nulls_last=true, maintain_order=true | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | nulls_last=true, multithreaded=false | allowed Decimal(10, 2) many
+Expr.sort_by | Decimal(10, 2) | nulls_last=true, multithreaded=true | allowed Decimal(10, 2) many
+Expr.sort_by | Duration(us) | descending=false, maintain_order=false | allowed Duration(us) many
+Expr.sort_by | Duration(us) | descending=false, maintain_order=true | allowed Duration(us) many
+Expr.sort_by | Duration(us) | descending=false, multithreaded=false | allowed Duration(us) many
+Expr.sort_by | Duration(us) | descending=false, multithreaded=true | allowed Duration(us) many
+Expr.sort_by | Duration(us) | descending=false, nulls_last=false | allowed Duration(us) many
+Expr.sort_by | Duration(us) | descending=false, nulls_last=true | allowed Duration(us) many
+Expr.sort_by | Duration(us) | descending=true, maintain_order=false | allowed Duration(us) many
+Expr.sort_by | Duration(us) | descending=true, maintain_order=true | allowed Duration(us) many
+Expr.sort_by | Duration(us) | descending=true, multithreaded=false | allowed Duration(us) many
+Expr.sort_by | Duration(us) | descending=true, multithreaded=true | allowed Duration(us) many
+Expr.sort_by | Duration(us) | descending=true, nulls_last=false | allowed Duration(us) many
+Expr.sort_by | Duration(us) | descending=true, nulls_last=true | allowed Duration(us) many
+Expr.sort_by | Duration(us) | multithreaded=false, maintain_order=false | allowed Duration(us) many
+Expr.sort_by | Duration(us) | multithreaded=false, maintain_order=true | allowed Duration(us) many
+Expr.sort_by | Duration(us) | multithreaded=true, maintain_order=false | allowed Duration(us) many
+Expr.sort_by | Duration(us) | multithreaded=true, maintain_order=true | allowed Duration(us) many
+Expr.sort_by | Duration(us) | nulls_last=false, maintain_order=false | allowed Duration(us) many
+Expr.sort_by | Duration(us) | nulls_last=false, maintain_order=true | allowed Duration(us) many
+Expr.sort_by | Duration(us) | nulls_last=false, multithreaded=false | allowed Duration(us) many
+Expr.sort_by | Duration(us) | nulls_last=false, multithreaded=true | allowed Duration(us) many
+Expr.sort_by | Duration(us) | nulls_last=true, maintain_order=false | allowed Duration(us) many
+Expr.sort_by | Duration(us) | nulls_last=true, maintain_order=true | allowed Duration(us) many
+Expr.sort_by | Duration(us) | nulls_last=true, multithreaded=false | allowed Duration(us) many
+Expr.sort_by | Duration(us) | nulls_last=true, multithreaded=true | allowed Duration(us) many
+Expr.sort_by | Float16 | descending=false, maintain_order=false | allowed Float16 many
+Expr.sort_by | Float16 | descending=false, maintain_order=true | allowed Float16 many
+Expr.sort_by | Float16 | descending=false, multithreaded=false | allowed Float16 many
+Expr.sort_by | Float16 | descending=false, multithreaded=true | allowed Float16 many
+Expr.sort_by | Float16 | descending=false, nulls_last=false | allowed Float16 many
+Expr.sort_by | Float16 | descending=false, nulls_last=true | allowed Float16 many
+Expr.sort_by | Float16 | descending=true, maintain_order=false | allowed Float16 many
+Expr.sort_by | Float16 | descending=true, maintain_order=true | allowed Float16 many
+Expr.sort_by | Float16 | descending=true, multithreaded=false | allowed Float16 many
+Expr.sort_by | Float16 | descending=true, multithreaded=true | allowed Float16 many
+Expr.sort_by | Float16 | descending=true, nulls_last=false | allowed Float16 many
+Expr.sort_by | Float16 | descending=true, nulls_last=true | allowed Float16 many
+Expr.sort_by | Float16 | multithreaded=false, maintain_order=false | allowed Float16 many
+Expr.sort_by | Float16 | multithreaded=false, maintain_order=true | allowed Float16 many
+Expr.sort_by | Float16 | multithreaded=true, maintain_order=false | allowed Float16 many
+Expr.sort_by | Float16 | multithreaded=true, maintain_order=true | allowed Float16 many
+Expr.sort_by | Float16 | nulls_last=false, maintain_order=false | allowed Float16 many
+Expr.sort_by | Float16 | nulls_last=false, maintain_order=true | allowed Float16 many
+Expr.sort_by | Float16 | nulls_last=false, multithreaded=false | allowed Float16 many
+Expr.sort_by | Float16 | nulls_last=false, multithreaded=true | allowed Float16 many
+Expr.sort_by | Float16 | nulls_last=true, maintain_order=false | allowed Float16 many
+Expr.sort_by | Float16 | nulls_last=true, maintain_order=true | allowed Float16 many
+Expr.sort_by | Float16 | nulls_last=true, multithreaded=false | allowed Float16 many
+Expr.sort_by | Float16 | nulls_last=true, multithreaded=true | allowed Float16 many
+Expr.sort_by | Float32 | descending=false, maintain_order=false | allowed Float32 many
+Expr.sort_by | Float32 | descending=false, maintain_order=true | allowed Float32 many
+Expr.sort_by | Float32 | descending=false, multithreaded=false | allowed Float32 many
+Expr.sort_by | Float32 | descending=false, multithreaded=true | allowed Float32 many
+Expr.sort_by | Float32 | descending=false, nulls_last=false | allowed Float32 many
+Expr.sort_by | Float32 | descending=false, nulls_last=true | allowed Float32 many
+Expr.sort_by | Float32 | descending=true, maintain_order=false | allowed Float32 many
+Expr.sort_by | Float32 | descending=true, maintain_order=true | allowed Float32 many
+Expr.sort_by | Float32 | descending=true, multithreaded=false | allowed Float32 many
+Expr.sort_by | Float32 | descending=true, multithreaded=true | allowed Float32 many
+Expr.sort_by | Float32 | descending=true, nulls_last=false | allowed Float32 many
+Expr.sort_by | Float32 | descending=true, nulls_last=true | allowed Float32 many
+Expr.sort_by | Float32 | multithreaded=false, maintain_order=false | allowed Float32 many
+Expr.sort_by | Float32 | multithreaded=false, maintain_order=true | allowed Float32 many
+Expr.sort_by | Float32 | multithreaded=true, maintain_order=false | allowed Float32 many
+Expr.sort_by | Float32 | multithreaded=true, maintain_order=true | allowed Float32 many
+Expr.sort_by | Float32 | nulls_last=false, maintain_order=false | allowed Float32 many
+Expr.sort_by | Float32 | nulls_last=false, maintain_order=true | allowed Float32 many
+Expr.sort_by | Float32 | nulls_last=false, multithreaded=false | allowed Float32 many
+Expr.sort_by | Float32 | nulls_last=false, multithreaded=true | allowed Float32 many
+Expr.sort_by | Float32 | nulls_last=true, maintain_order=false | allowed Float32 many
+Expr.sort_by | Float32 | nulls_last=true, maintain_order=true | allowed Float32 many
+Expr.sort_by | Float32 | nulls_last=true, multithreaded=false | allowed Float32 many
+Expr.sort_by | Float32 | nulls_last=true, multithreaded=true | allowed Float32 many
+Expr.sort_by | Float64 | descending=false, maintain_order=false | allowed Float64 many
+Expr.sort_by | Float64 | descending=false, maintain_order=true | allowed Float64 many
+Expr.sort_by | Float64 | descending=false, multithreaded=false | allowed Float64 many
+Expr.sort_by | Float64 | descending=false, multithreaded=true | allowed Float64 many
+Expr.sort_by | Float64 | descending=false, nulls_last=false | allowed Float64 many
+Expr.sort_by | Float64 | descending=false, nulls_last=true | allowed Float64 many
+Expr.sort_by | Float64 | descending=true, maintain_order=false | allowed Float64 many
+Expr.sort_by | Float64 | descending=true, maintain_order=true | allowed Float64 many
+Expr.sort_by | Float64 | descending=true, multithreaded=false | allowed Float64 many
+Expr.sort_by | Float64 | descending=true, multithreaded=true | allowed Float64 many
+Expr.sort_by | Float64 | descending=true, nulls_last=false | allowed Float64 many
+Expr.sort_by | Float64 | descending=true, nulls_last=true | allowed Float64 many
+Expr.sort_by | Float64 | multithreaded=false, maintain_order=false | allowed Float64 many
+Expr.sort_by | Float64 | multithreaded=false, maintain_order=true | allowed Float64 many
+Expr.sort_by | Float64 | multithreaded=true, maintain_order=false | allowed Float64 many
+Expr.sort_by | Float64 | multithreaded=true, maintain_order=true | allowed Float64 many
+Expr.sort_by | Float64 | nulls_last=false, maintain_order=false | allowed Float64 many
+Expr.sort_by | Float64 | nulls_last=false, maintain_order=true | allowed Float64 many
+Expr.sort_by | Float64 | nulls_last=false, multithreaded=false | allowed Float64 many
+Expr.sort_by | Float64 | nulls_last=false, multithreaded=true | allowed Float64 many
+Expr.sort_by | Float64 | nulls_last=true, maintain_order=false | allowed Float64 many
+Expr.sort_by | Float64 | nulls_last=true, maintain_order=true | allowed Float64 many
+Expr.sort_by | Float64 | nulls_last=true, multithreaded=false | allowed Float64 many
+Expr.sort_by | Float64 | nulls_last=true, multithreaded=true | allowed Float64 many
+Expr.sort_by | Int128 | descending=false, maintain_order=false | allowed Int128 many
+Expr.sort_by | Int128 | descending=false, maintain_order=true | allowed Int128 many
+Expr.sort_by | Int128 | descending=false, multithreaded=false | allowed Int128 many
+Expr.sort_by | Int128 | descending=false, multithreaded=true | allowed Int128 many
+Expr.sort_by | Int128 | descending=false, nulls_last=false | allowed Int128 many
+Expr.sort_by | Int128 | descending=false, nulls_last=true | allowed Int128 many
+Expr.sort_by | Int128 | descending=true, maintain_order=false | allowed Int128 many
+Expr.sort_by | Int128 | descending=true, maintain_order=true | allowed Int128 many
+Expr.sort_by | Int128 | descending=true, multithreaded=false | allowed Int128 many
+Expr.sort_by | Int128 | descending=true, multithreaded=true | allowed Int128 many
+Expr.sort_by | Int128 | descending=true, nulls_last=false | allowed Int128 many
+Expr.sort_by | Int128 | descending=true, nulls_last=true | allowed Int128 many
+Expr.sort_by | Int128 | multithreaded=false, maintain_order=false | allowed Int128 many
+Expr.sort_by | Int128 | multithreaded=false, maintain_order=true | allowed Int128 many
+Expr.sort_by | Int128 | multithreaded=true, maintain_order=false | allowed Int128 many
+Expr.sort_by | Int128 | multithreaded=true, maintain_order=true | allowed Int128 many
+Expr.sort_by | Int128 | nulls_last=false, maintain_order=false | allowed Int128 many
+Expr.sort_by | Int128 | nulls_last=false, maintain_order=true | allowed Int128 many
+Expr.sort_by | Int128 | nulls_last=false, multithreaded=false | allowed Int128 many
+Expr.sort_by | Int128 | nulls_last=false, multithreaded=true | allowed Int128 many
+Expr.sort_by | Int128 | nulls_last=true, maintain_order=false | allowed Int128 many
+Expr.sort_by | Int128 | nulls_last=true, maintain_order=true | allowed Int128 many
+Expr.sort_by | Int128 | nulls_last=true, multithreaded=false | allowed Int128 many
+Expr.sort_by | Int128 | nulls_last=true, multithreaded=true | allowed Int128 many
+Expr.sort_by | Int16 | descending=false, maintain_order=false | allowed Int16 many
+Expr.sort_by | Int16 | descending=false, maintain_order=true | allowed Int16 many
+Expr.sort_by | Int16 | descending=false, multithreaded=false | allowed Int16 many
+Expr.sort_by | Int16 | descending=false, multithreaded=true | allowed Int16 many
+Expr.sort_by | Int16 | descending=false, nulls_last=false | allowed Int16 many
+Expr.sort_by | Int16 | descending=false, nulls_last=true | allowed Int16 many
+Expr.sort_by | Int16 | descending=true, maintain_order=false | allowed Int16 many
+Expr.sort_by | Int16 | descending=true, maintain_order=true | allowed Int16 many
+Expr.sort_by | Int16 | descending=true, multithreaded=false | allowed Int16 many
+Expr.sort_by | Int16 | descending=true, multithreaded=true | allowed Int16 many
+Expr.sort_by | Int16 | descending=true, nulls_last=false | allowed Int16 many
+Expr.sort_by | Int16 | descending=true, nulls_last=true | allowed Int16 many
+Expr.sort_by | Int16 | multithreaded=false, maintain_order=false | allowed Int16 many
+Expr.sort_by | Int16 | multithreaded=false, maintain_order=true | allowed Int16 many
+Expr.sort_by | Int16 | multithreaded=true, maintain_order=false | allowed Int16 many
+Expr.sort_by | Int16 | multithreaded=true, maintain_order=true | allowed Int16 many
+Expr.sort_by | Int16 | nulls_last=false, maintain_order=false | allowed Int16 many
+Expr.sort_by | Int16 | nulls_last=false, maintain_order=true | allowed Int16 many
+Expr.sort_by | Int16 | nulls_last=false, multithreaded=false | allowed Int16 many
+Expr.sort_by | Int16 | nulls_last=false, multithreaded=true | allowed Int16 many
+Expr.sort_by | Int16 | nulls_last=true, maintain_order=false | allowed Int16 many
+Expr.sort_by | Int16 | nulls_last=true, maintain_order=true | allowed Int16 many
+Expr.sort_by | Int16 | nulls_last=true, multithreaded=false | allowed Int16 many
+Expr.sort_by | Int16 | nulls_last=true, multithreaded=true | allowed Int16 many
+Expr.sort_by | Int32 | descending=false, maintain_order=false | allowed Int32 many
+Expr.sort_by | Int32 | descending=false, maintain_order=true | allowed Int32 many
+Expr.sort_by | Int32 | descending=false, multithreaded=false | allowed Int32 many
+Expr.sort_by | Int32 | descending=false, multithreaded=true | allowed Int32 many
+Expr.sort_by | Int32 | descending=false, nulls_last=false | allowed Int32 many
+Expr.sort_by | Int32 | descending=false, nulls_last=true | allowed Int32 many
+Expr.sort_by | Int32 | descending=true, maintain_order=false | allowed Int32 many
+Expr.sort_by | Int32 | descending=true, maintain_order=true | allowed Int32 many
+Expr.sort_by | Int32 | descending=true, multithreaded=false | allowed Int32 many
+Expr.sort_by | Int32 | descending=true, multithreaded=true | allowed Int32 many
+Expr.sort_by | Int32 | descending=true, nulls_last=false | allowed Int32 many
+Expr.sort_by | Int32 | descending=true, nulls_last=true | allowed Int32 many
+Expr.sort_by | Int32 | multithreaded=false, maintain_order=false | allowed Int32 many
+Expr.sort_by | Int32 | multithreaded=false, maintain_order=true | allowed Int32 many
+Expr.sort_by | Int32 | multithreaded=true, maintain_order=false | allowed Int32 many
+Expr.sort_by | Int32 | multithreaded=true, maintain_order=true | allowed Int32 many
+Expr.sort_by | Int32 | nulls_last=false, maintain_order=false | allowed Int32 many
+Expr.sort_by | Int32 | nulls_last=false, maintain_order=true | allowed Int32 many
+Expr.sort_by | Int32 | nulls_last=false, multithreaded=false | allowed Int32 many
+Expr.sort_by | Int32 | nulls_last=false, multithreaded=true | allowed Int32 many
+Expr.sort_by | Int32 | nulls_last=true, maintain_order=false | allowed Int32 many
+Expr.sort_by | Int32 | nulls_last=true, maintain_order=true | allowed Int32 many
+Expr.sort_by | Int32 | nulls_last=true, multithreaded=false | allowed Int32 many
+Expr.sort_by | Int32 | nulls_last=true, multithreaded=true | allowed Int32 many
+Expr.sort_by | Int64 | descending=false, maintain_order=false | allowed Int64 many
+Expr.sort_by | Int64 | descending=false, maintain_order=true | allowed Int64 many
+Expr.sort_by | Int64 | descending=false, multithreaded=false | allowed Int64 many
+Expr.sort_by | Int64 | descending=false, multithreaded=true | allowed Int64 many
+Expr.sort_by | Int64 | descending=false, nulls_last=false | allowed Int64 many
+Expr.sort_by | Int64 | descending=false, nulls_last=true | allowed Int64 many
+Expr.sort_by | Int64 | descending=true, maintain_order=false | allowed Int64 many
+Expr.sort_by | Int64 | descending=true, maintain_order=true | allowed Int64 many
+Expr.sort_by | Int64 | descending=true, multithreaded=false | allowed Int64 many
+Expr.sort_by | Int64 | descending=true, multithreaded=true | allowed Int64 many
+Expr.sort_by | Int64 | descending=true, nulls_last=false | allowed Int64 many
+Expr.sort_by | Int64 | descending=true, nulls_last=true | allowed Int64 many
+Expr.sort_by | Int64 | multithreaded=false, maintain_order=false | allowed Int64 many
+Expr.sort_by | Int64 | multithreaded=false, maintain_order=true | allowed Int64 many
+Expr.sort_by | Int64 | multithreaded=true, maintain_order=false | allowed Int64 many
+Expr.sort_by | Int64 | multithreaded=true, maintain_order=true | allowed Int64 many
+Expr.sort_by | Int64 | nulls_last=false, maintain_order=false | allowed Int64 many
+Expr.sort_by | Int64 | nulls_last=false, maintain_order=true | allowed Int64 many
+Expr.sort_by | Int64 | nulls_last=false, multithreaded=false | allowed Int64 many
+Expr.sort_by | Int64 | nulls_last=false, multithreaded=true | allowed Int64 many
+Expr.sort_by | Int64 | nulls_last=true, maintain_order=false | allowed Int64 many
+Expr.sort_by | Int64 | nulls_last=true, maintain_order=true | allowed Int64 many
+Expr.sort_by | Int64 | nulls_last=true, multithreaded=false | allowed Int64 many
+Expr.sort_by | Int64 | nulls_last=true, multithreaded=true | allowed Int64 many
+Expr.sort_by | Int8 | descending=false, maintain_order=false | allowed Int8 many
+Expr.sort_by | Int8 | descending=false, maintain_order=true | allowed Int8 many
+Expr.sort_by | Int8 | descending=false, multithreaded=false | allowed Int8 many
+Expr.sort_by | Int8 | descending=false, multithreaded=true | allowed Int8 many
+Expr.sort_by | Int8 | descending=false, nulls_last=false | allowed Int8 many
+Expr.sort_by | Int8 | descending=false, nulls_last=true | allowed Int8 many
+Expr.sort_by | Int8 | descending=true, maintain_order=false | allowed Int8 many
+Expr.sort_by | Int8 | descending=true, maintain_order=true | allowed Int8 many
+Expr.sort_by | Int8 | descending=true, multithreaded=false | allowed Int8 many
+Expr.sort_by | Int8 | descending=true, multithreaded=true | allowed Int8 many
+Expr.sort_by | Int8 | descending=true, nulls_last=false | allowed Int8 many
+Expr.sort_by | Int8 | descending=true, nulls_last=true | allowed Int8 many
+Expr.sort_by | Int8 | multithreaded=false, maintain_order=false | allowed Int8 many
+Expr.sort_by | Int8 | multithreaded=false, maintain_order=true | allowed Int8 many
+Expr.sort_by | Int8 | multithreaded=true, maintain_order=false | allowed Int8 many
+Expr.sort_by | Int8 | multithreaded=true, maintain_order=true | allowed Int8 many
+Expr.sort_by | Int8 | nulls_last=false, maintain_order=false | allowed Int8 many
+Expr.sort_by | Int8 | nulls_last=false, maintain_order=true | allowed Int8 many
+Expr.sort_by | Int8 | nulls_last=false, multithreaded=false | allowed Int8 many
+Expr.sort_by | Int8 | nulls_last=false, multithreaded=true | allowed Int8 many
+Expr.sort_by | Int8 | nulls_last=true, maintain_order=false | allowed Int8 many
+Expr.sort_by | Int8 | nulls_last=true, maintain_order=true | allowed Int8 many
+Expr.sort_by | Int8 | nulls_last=true, multithreaded=false | allowed Int8 many
+Expr.sort_by | Int8 | nulls_last=true, multithreaded=true | allowed Int8 many
+Expr.sort_by | List(Int64) | descending=false, maintain_order=false | allowed List(Int64) many
+Expr.sort_by | List(Int64) | descending=false, maintain_order=true | allowed List(Int64) many
+Expr.sort_by | List(Int64) | descending=false, multithreaded=false | allowed List(Int64) many
+Expr.sort_by | List(Int64) | descending=false, multithreaded=true | allowed List(Int64) many
+Expr.sort_by | List(Int64) | descending=false, nulls_last=false | allowed List(Int64) many
+Expr.sort_by | List(Int64) | descending=false, nulls_last=true | allowed List(Int64) many
+Expr.sort_by | List(Int64) | descending=true, maintain_order=false | allowed List(Int64) many
+Expr.sort_by | List(Int64) | descending=true, maintain_order=true | allowed List(Int64) many
+Expr.sort_by | List(Int64) | descending=true, multithreaded=false | allowed List(Int64) many
+Expr.sort_by | List(Int64) | descending=true, multithreaded=true | allowed List(Int64) many
+Expr.sort_by | List(Int64) | descending=true, nulls_last=false | allowed List(Int64) many
+Expr.sort_by | List(Int64) | descending=true, nulls_last=true | allowed List(Int64) many
+Expr.sort_by | List(Int64) | multithreaded=false, maintain_order=false | allowed List(Int64) many
+Expr.sort_by | List(Int64) | multithreaded=false, maintain_order=true | allowed List(Int64) many
+Expr.sort_by | List(Int64) | multithreaded=true, maintain_order=false | allowed List(Int64) many
+Expr.sort_by | List(Int64) | multithreaded=true, maintain_order=true | allowed List(Int64) many
+Expr.sort_by | List(Int64) | nulls_last=false, maintain_order=false | allowed List(Int64) many
+Expr.sort_by | List(Int64) | nulls_last=false, maintain_order=true | allowed List(Int64) many
+Expr.sort_by | List(Int64) | nulls_last=false, multithreaded=false | allowed List(Int64) many
+Expr.sort_by | List(Int64) | nulls_last=false, multithreaded=true | allowed List(Int64) many
+Expr.sort_by | List(Int64) | nulls_last=true, maintain_order=false | allowed List(Int64) many
+Expr.sort_by | List(Int64) | nulls_last=true, maintain_order=true | allowed List(Int64) many
+Expr.sort_by | List(Int64) | nulls_last=true, multithreaded=false | allowed List(Int64) many
+Expr.sort_by | List(Int64) | nulls_last=true, multithreaded=true | allowed List(Int64) many
+Expr.sort_by | List(String) | descending=false, maintain_order=false | allowed List(String) many
+Expr.sort_by | List(String) | descending=false, maintain_order=true | allowed List(String) many
+Expr.sort_by | List(String) | descending=false, multithreaded=false | allowed List(String) many
+Expr.sort_by | List(String) | descending=false, multithreaded=true | allowed List(String) many
+Expr.sort_by | List(String) | descending=false, nulls_last=false | allowed List(String) many
+Expr.sort_by | List(String) | descending=false, nulls_last=true | allowed List(String) many
+Expr.sort_by | List(String) | descending=true, maintain_order=false | allowed List(String) many
+Expr.sort_by | List(String) | descending=true, maintain_order=true | allowed List(String) many
+Expr.sort_by | List(String) | descending=true, multithreaded=false | allowed List(String) many
+Expr.sort_by | List(String) | descending=true, multithreaded=true | allowed List(String) many
+Expr.sort_by | List(String) | descending=true, nulls_last=false | allowed List(String) many
+Expr.sort_by | List(String) | descending=true, nulls_last=true | allowed List(String) many
+Expr.sort_by | List(String) | multithreaded=false, maintain_order=false | allowed List(String) many
+Expr.sort_by | List(String) | multithreaded=false, maintain_order=true | allowed List(String) many
+Expr.sort_by | List(String) | multithreaded=true, maintain_order=false | allowed List(String) many
+Expr.sort_by | List(String) | multithreaded=true, maintain_order=true | allowed List(String) many
+Expr.sort_by | List(String) | nulls_last=false, maintain_order=false | allowed List(String) many
+Expr.sort_by | List(String) | nulls_last=false, maintain_order=true | allowed List(String) many
+Expr.sort_by | List(String) | nulls_last=false, multithreaded=false | allowed List(String) many
+Expr.sort_by | List(String) | nulls_last=false, multithreaded=true | allowed List(String) many
+Expr.sort_by | List(String) | nulls_last=true, maintain_order=false | allowed List(String) many
+Expr.sort_by | List(String) | nulls_last=true, maintain_order=true | allowed List(String) many
+Expr.sort_by | List(String) | nulls_last=true, multithreaded=false | allowed List(String) many
+Expr.sort_by | List(String) | nulls_last=true, multithreaded=true | allowed List(String) many
+Expr.sort_by | Null | descending=false, maintain_order=false | allowed Null many
+Expr.sort_by | Null | descending=false, maintain_order=true | allowed Null many
+Expr.sort_by | Null | descending=false, multithreaded=false | allowed Null many
+Expr.sort_by | Null | descending=false, multithreaded=true | allowed Null many
+Expr.sort_by | Null | descending=false, nulls_last=false | allowed Null many
+Expr.sort_by | Null | descending=false, nulls_last=true | allowed Null many
+Expr.sort_by | Null | descending=true, maintain_order=false | allowed Null many
+Expr.sort_by | Null | descending=true, maintain_order=true | allowed Null many
+Expr.sort_by | Null | descending=true, multithreaded=false | allowed Null many
+Expr.sort_by | Null | descending=true, multithreaded=true | allowed Null many
+Expr.sort_by | Null | descending=true, nulls_last=false | allowed Null many
+Expr.sort_by | Null | descending=true, nulls_last=true | allowed Null many
+Expr.sort_by | Null | multithreaded=false, maintain_order=false | allowed Null many
+Expr.sort_by | Null | multithreaded=false, maintain_order=true | allowed Null many
+Expr.sort_by | Null | multithreaded=true, maintain_order=false | allowed Null many
+Expr.sort_by | Null | multithreaded=true, maintain_order=true | allowed Null many
+Expr.sort_by | Null | nulls_last=false, maintain_order=false | allowed Null many
+Expr.sort_by | Null | nulls_last=false, maintain_order=true | allowed Null many
+Expr.sort_by | Null | nulls_last=false, multithreaded=false | allowed Null many
+Expr.sort_by | Null | nulls_last=false, multithreaded=true | allowed Null many
+Expr.sort_by | Null | nulls_last=true, maintain_order=false | allowed Null many
+Expr.sort_by | Null | nulls_last=true, maintain_order=true | allowed Null many
+Expr.sort_by | Null | nulls_last=true, multithreaded=false | allowed Null many
+Expr.sort_by | Null | nulls_last=true, multithreaded=true | allowed Null many
+Expr.sort_by | String | descending=false, maintain_order=false | allowed String many
+Expr.sort_by | String | descending=false, maintain_order=true | allowed String many
+Expr.sort_by | String | descending=false, multithreaded=false | allowed String many
+Expr.sort_by | String | descending=false, multithreaded=true | allowed String many
+Expr.sort_by | String | descending=false, nulls_last=false | allowed String many
+Expr.sort_by | String | descending=false, nulls_last=true | allowed String many
+Expr.sort_by | String | descending=true, maintain_order=false | allowed String many
+Expr.sort_by | String | descending=true, maintain_order=true | allowed String many
+Expr.sort_by | String | descending=true, multithreaded=false | allowed String many
+Expr.sort_by | String | descending=true, multithreaded=true | allowed String many
+Expr.sort_by | String | descending=true, nulls_last=false | allowed String many
+Expr.sort_by | String | descending=true, nulls_last=true | allowed String many
+Expr.sort_by | String | multithreaded=false, maintain_order=false | allowed String many
+Expr.sort_by | String | multithreaded=false, maintain_order=true | allowed String many
+Expr.sort_by | String | multithreaded=true, maintain_order=false | allowed String many
+Expr.sort_by | String | multithreaded=true, maintain_order=true | allowed String many
+Expr.sort_by | String | nulls_last=false, maintain_order=false | allowed String many
+Expr.sort_by | String | nulls_last=false, maintain_order=true | allowed String many
+Expr.sort_by | String | nulls_last=false, multithreaded=false | allowed String many
+Expr.sort_by | String | nulls_last=false, multithreaded=true | allowed String many
+Expr.sort_by | String | nulls_last=true, maintain_order=false | allowed String many
+Expr.sort_by | String | nulls_last=true, maintain_order=true | allowed String many
+Expr.sort_by | String | nulls_last=true, multithreaded=false | allowed String many
+Expr.sort_by | String | nulls_last=true, multithreaded=true | allowed String many
+Expr.sort_by | Struct(x: Int64, y: String) | descending=false, maintain_order=false | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | descending=false, maintain_order=true | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | descending=false, multithreaded=false | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | descending=false, multithreaded=true | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | descending=false, nulls_last=false | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | descending=false, nulls_last=true | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | descending=true, maintain_order=false | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | descending=true, maintain_order=true | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | descending=true, multithreaded=false | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | descending=true, multithreaded=true | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | descending=true, nulls_last=false | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | descending=true, nulls_last=true | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | multithreaded=false, maintain_order=false | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | multithreaded=false, maintain_order=true | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | multithreaded=true, maintain_order=false | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | multithreaded=true, maintain_order=true | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | nulls_last=false, maintain_order=false | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | nulls_last=false, maintain_order=true | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | nulls_last=false, multithreaded=false | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | nulls_last=false, multithreaded=true | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | nulls_last=true, maintain_order=false | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | nulls_last=true, maintain_order=true | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | nulls_last=true, multithreaded=false | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Struct(x: Int64, y: String) | nulls_last=true, multithreaded=true | allowed Struct(x: Int64, y: String) many
+Expr.sort_by | Time | descending=false, maintain_order=false | allowed Time many
+Expr.sort_by | Time | descending=false, maintain_order=true | allowed Time many
+Expr.sort_by | Time | descending=false, multithreaded=false | allowed Time many
+Expr.sort_by | Time | descending=false, multithreaded=true | allowed Time many
+Expr.sort_by | Time | descending=false, nulls_last=false | allowed Time many
+Expr.sort_by | Time | descending=false, nulls_last=true | allowed Time many
+Expr.sort_by | Time | descending=true, maintain_order=false | allowed Time many
+Expr.sort_by | Time | descending=true, maintain_order=true | allowed Time many
+Expr.sort_by | Time | descending=true, multithreaded=false | allowed Time many
+Expr.sort_by | Time | descending=true, multithreaded=true | allowed Time many
+Expr.sort_by | Time | descending=true, nulls_last=false | allowed Time many
+Expr.sort_by | Time | descending=true, nulls_last=true | allowed Time many
+Expr.sort_by | Time | multithreaded=false, maintain_order=false | allowed Time many
+Expr.sort_by | Time | multithreaded=false, maintain_order=true | allowed Time many
+Expr.sort_by | Time | multithreaded=true, maintain_order=false | allowed Time many
+Expr.sort_by | Time | multithreaded=true, maintain_order=true | allowed Time many
+Expr.sort_by | Time | nulls_last=false, maintain_order=false | allowed Time many
+Expr.sort_by | Time | nulls_last=false, maintain_order=true | allowed Time many
+Expr.sort_by | Time | nulls_last=false, multithreaded=false | allowed Time many
+Expr.sort_by | Time | nulls_last=false, multithreaded=true | allowed Time many
+Expr.sort_by | Time | nulls_last=true, maintain_order=false | allowed Time many
+Expr.sort_by | Time | nulls_last=true, maintain_order=true | allowed Time many
+Expr.sort_by | Time | nulls_last=true, multithreaded=false | allowed Time many
+Expr.sort_by | Time | nulls_last=true, multithreaded=true | allowed Time many
+Expr.sort_by | UInt128 | descending=false, maintain_order=false | allowed UInt128 many
+Expr.sort_by | UInt128 | descending=false, maintain_order=true | allowed UInt128 many
+Expr.sort_by | UInt128 | descending=false, multithreaded=false | allowed UInt128 many
+Expr.sort_by | UInt128 | descending=false, multithreaded=true | allowed UInt128 many
+Expr.sort_by | UInt128 | descending=false, nulls_last=false | allowed UInt128 many
+Expr.sort_by | UInt128 | descending=false, nulls_last=true | allowed UInt128 many
+Expr.sort_by | UInt128 | descending=true, maintain_order=false | allowed UInt128 many
+Expr.sort_by | UInt128 | descending=true, maintain_order=true | allowed UInt128 many
+Expr.sort_by | UInt128 | descending=true, multithreaded=false | allowed UInt128 many
+Expr.sort_by | UInt128 | descending=true, multithreaded=true | allowed UInt128 many
+Expr.sort_by | UInt128 | descending=true, nulls_last=false | allowed UInt128 many
+Expr.sort_by | UInt128 | descending=true, nulls_last=true | allowed UInt128 many
+Expr.sort_by | UInt128 | multithreaded=false, maintain_order=false | allowed UInt128 many
+Expr.sort_by | UInt128 | multithreaded=false, maintain_order=true | allowed UInt128 many
+Expr.sort_by | UInt128 | multithreaded=true, maintain_order=false | allowed UInt128 many
+Expr.sort_by | UInt128 | multithreaded=true, maintain_order=true | allowed UInt128 many
+Expr.sort_by | UInt128 | nulls_last=false, maintain_order=false | allowed UInt128 many
+Expr.sort_by | UInt128 | nulls_last=false, maintain_order=true | allowed UInt128 many
+Expr.sort_by | UInt128 | nulls_last=false, multithreaded=false | allowed UInt128 many
+Expr.sort_by | UInt128 | nulls_last=false, multithreaded=true | allowed UInt128 many
+Expr.sort_by | UInt128 | nulls_last=true, maintain_order=false | allowed UInt128 many
+Expr.sort_by | UInt128 | nulls_last=true, maintain_order=true | allowed UInt128 many
+Expr.sort_by | UInt128 | nulls_last=true, multithreaded=false | allowed UInt128 many
+Expr.sort_by | UInt128 | nulls_last=true, multithreaded=true | allowed UInt128 many
+Expr.sort_by | UInt16 | descending=false, maintain_order=false | allowed UInt16 many
+Expr.sort_by | UInt16 | descending=false, maintain_order=true | allowed UInt16 many
+Expr.sort_by | UInt16 | descending=false, multithreaded=false | allowed UInt16 many
+Expr.sort_by | UInt16 | descending=false, multithreaded=true | allowed UInt16 many
+Expr.sort_by | UInt16 | descending=false, nulls_last=false | allowed UInt16 many
+Expr.sort_by | UInt16 | descending=false, nulls_last=true | allowed UInt16 many
+Expr.sort_by | UInt16 | descending=true, maintain_order=false | allowed UInt16 many
+Expr.sort_by | UInt16 | descending=true, maintain_order=true | allowed UInt16 many
+Expr.sort_by | UInt16 | descending=true, multithreaded=false | allowed UInt16 many
+Expr.sort_by | UInt16 | descending=true, multithreaded=true | allowed UInt16 many
+Expr.sort_by | UInt16 | descending=true, nulls_last=false | allowed UInt16 many
+Expr.sort_by | UInt16 | descending=true, nulls_last=true | allowed UInt16 many
+Expr.sort_by | UInt16 | multithreaded=false, maintain_order=false | allowed UInt16 many
+Expr.sort_by | UInt16 | multithreaded=false, maintain_order=true | allowed UInt16 many
+Expr.sort_by | UInt16 | multithreaded=true, maintain_order=false | allowed UInt16 many
+Expr.sort_by | UInt16 | multithreaded=true, maintain_order=true | allowed UInt16 many
+Expr.sort_by | UInt16 | nulls_last=false, maintain_order=false | allowed UInt16 many
+Expr.sort_by | UInt16 | nulls_last=false, maintain_order=true | allowed UInt16 many
+Expr.sort_by | UInt16 | nulls_last=false, multithreaded=false | allowed UInt16 many
+Expr.sort_by | UInt16 | nulls_last=false, multithreaded=true | allowed UInt16 many
+Expr.sort_by | UInt16 | nulls_last=true, maintain_order=false | allowed UInt16 many
+Expr.sort_by | UInt16 | nulls_last=true, maintain_order=true | allowed UInt16 many
+Expr.sort_by | UInt16 | nulls_last=true, multithreaded=false | allowed UInt16 many
+Expr.sort_by | UInt16 | nulls_last=true, multithreaded=true | allowed UInt16 many
+Expr.sort_by | UInt32 | descending=false, maintain_order=false | allowed UInt32 many
+Expr.sort_by | UInt32 | descending=false, maintain_order=true | allowed UInt32 many
+Expr.sort_by | UInt32 | descending=false, multithreaded=false | allowed UInt32 many
+Expr.sort_by | UInt32 | descending=false, multithreaded=true | allowed UInt32 many
+Expr.sort_by | UInt32 | descending=false, nulls_last=false | allowed UInt32 many
+Expr.sort_by | UInt32 | descending=false, nulls_last=true | allowed UInt32 many
+Expr.sort_by | UInt32 | descending=true, maintain_order=false | allowed UInt32 many
+Expr.sort_by | UInt32 | descending=true, maintain_order=true | allowed UInt32 many
+Expr.sort_by | UInt32 | descending=true, multithreaded=false | allowed UInt32 many
+Expr.sort_by | UInt32 | descending=true, multithreaded=true | allowed UInt32 many
+Expr.sort_by | UInt32 | descending=true, nulls_last=false | allowed UInt32 many
+Expr.sort_by | UInt32 | descending=true, nulls_last=true | allowed UInt32 many
+Expr.sort_by | UInt32 | multithreaded=false, maintain_order=false | allowed UInt32 many
+Expr.sort_by | UInt32 | multithreaded=false, maintain_order=true | allowed UInt32 many
+Expr.sort_by | UInt32 | multithreaded=true, maintain_order=false | allowed UInt32 many
+Expr.sort_by | UInt32 | multithreaded=true, maintain_order=true | allowed UInt32 many
+Expr.sort_by | UInt32 | nulls_last=false, maintain_order=false | allowed UInt32 many
+Expr.sort_by | UInt32 | nulls_last=false, maintain_order=true | allowed UInt32 many
+Expr.sort_by | UInt32 | nulls_last=false, multithreaded=false | allowed UInt32 many
+Expr.sort_by | UInt32 | nulls_last=false, multithreaded=true | allowed UInt32 many
+Expr.sort_by | UInt32 | nulls_last=true, maintain_order=false | allowed UInt32 many
+Expr.sort_by | UInt32 | nulls_last=true, maintain_order=true | allowed UInt32 many
+Expr.sort_by | UInt32 | nulls_last=true, multithreaded=false | allowed UInt32 many
+Expr.sort_by | UInt32 | nulls_last=true, multithreaded=true | allowed UInt32 many
+Expr.sort_by | UInt64 | descending=false, maintain_order=false | allowed UInt64 many
+Expr.sort_by | UInt64 | descending=false, maintain_order=true | allowed UInt64 many
+Expr.sort_by | UInt64 | descending=false, multithreaded=false | allowed UInt64 many
+Expr.sort_by | UInt64 | descending=false, multithreaded=true | allowed UInt64 many
+Expr.sort_by | UInt64 | descending=false, nulls_last=false | allowed UInt64 many
+Expr.sort_by | UInt64 | descending=false, nulls_last=true | allowed UInt64 many
+Expr.sort_by | UInt64 | descending=true, maintain_order=false | allowed UInt64 many
+Expr.sort_by | UInt64 | descending=true, maintain_order=true | allowed UInt64 many
+Expr.sort_by | UInt64 | descending=true, multithreaded=false | allowed UInt64 many
+Expr.sort_by | UInt64 | descending=true, multithreaded=true | allowed UInt64 many
+Expr.sort_by | UInt64 | descending=true, nulls_last=false | allowed UInt64 many
+Expr.sort_by | UInt64 | descending=true, nulls_last=true | allowed UInt64 many
+Expr.sort_by | UInt64 | multithreaded=false, maintain_order=false | allowed UInt64 many
+Expr.sort_by | UInt64 | multithreaded=false, maintain_order=true | allowed UInt64 many
+Expr.sort_by | UInt64 | multithreaded=true, maintain_order=false | allowed UInt64 many
+Expr.sort_by | UInt64 | multithreaded=true, maintain_order=true | allowed UInt64 many
+Expr.sort_by | UInt64 | nulls_last=false, maintain_order=false | allowed UInt64 many
+Expr.sort_by | UInt64 | nulls_last=false, maintain_order=true | allowed UInt64 many
+Expr.sort_by | UInt64 | nulls_last=false, multithreaded=false | allowed UInt64 many
+Expr.sort_by | UInt64 | nulls_last=false, multithreaded=true | allowed UInt64 many
+Expr.sort_by | UInt64 | nulls_last=true, maintain_order=false | allowed UInt64 many
+Expr.sort_by | UInt64 | nulls_last=true, maintain_order=true | allowed UInt64 many
+Expr.sort_by | UInt64 | nulls_last=true, multithreaded=false | allowed UInt64 many
+Expr.sort_by | UInt64 | nulls_last=true, multithreaded=true | allowed UInt64 many
+Expr.sort_by | UInt8 | descending=false, maintain_order=false | allowed UInt8 many
+Expr.sort_by | UInt8 | descending=false, maintain_order=true | allowed UInt8 many
+Expr.sort_by | UInt8 | descending=false, multithreaded=false | allowed UInt8 many
+Expr.sort_by | UInt8 | descending=false, multithreaded=true | allowed UInt8 many
+Expr.sort_by | UInt8 | descending=false, nulls_last=false | allowed UInt8 many
+Expr.sort_by | UInt8 | descending=false, nulls_last=true | allowed UInt8 many
+Expr.sort_by | UInt8 | descending=true, maintain_order=false | allowed UInt8 many
+Expr.sort_by | UInt8 | descending=true, maintain_order=true | allowed UInt8 many
+Expr.sort_by | UInt8 | descending=true, multithreaded=false | allowed UInt8 many
+Expr.sort_by | UInt8 | descending=true, multithreaded=true | allowed UInt8 many
+Expr.sort_by | UInt8 | descending=true, nulls_last=false | allowed UInt8 many
+Expr.sort_by | UInt8 | descending=true, nulls_last=true | allowed UInt8 many
+Expr.sort_by | UInt8 | multithreaded=false, maintain_order=false | allowed UInt8 many
+Expr.sort_by | UInt8 | multithreaded=false, maintain_order=true | allowed UInt8 many
+Expr.sort_by | UInt8 | multithreaded=true, maintain_order=false | allowed UInt8 many
+Expr.sort_by | UInt8 | multithreaded=true, maintain_order=true | allowed UInt8 many
+Expr.sort_by | UInt8 | nulls_last=false, maintain_order=false | allowed UInt8 many
+Expr.sort_by | UInt8 | nulls_last=false, maintain_order=true | allowed UInt8 many
+Expr.sort_by | UInt8 | nulls_last=false, multithreaded=false | allowed UInt8 many
+Expr.sort_by | UInt8 | nulls_last=false, multithreaded=true | allowed UInt8 many
+Expr.sort_by | UInt8 | nulls_last=true, maintain_order=false | allowed UInt8 many
+Expr.sort_by | UInt8 | nulls_last=true, maintain_order=true | allowed UInt8 many
+Expr.sort_by | UInt8 | nulls_last=true, multithreaded=false | allowed UInt8 many
+Expr.sort_by | UInt8 | nulls_last=true, multithreaded=true | allowed UInt8 many
 Expr.str.contains | Array(Int64, 2) | literal=false, strict=false | refused schema: expected String type, got: array[i64, 2]
 Expr.str.contains | Array(Int64, 2) | literal=false, strict=true | refused schema: expected String type, got: array[i64, 2]
 Expr.str.contains | Array(Int64, 2) | literal=true, strict=false | refused schema: expected String type, got: array[i64, 2]

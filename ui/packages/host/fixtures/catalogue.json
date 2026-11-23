@@ -6,7 +6,11 @@
     },
     {
       "key": "rows",
-      "title": "Rows"
+      "title": "Rows · other rows, differences"
+    },
+    {
+      "key": "order",
+      "title": "Order · sort, reverse, rank"
     },
     {
       "key": "cumulative",
@@ -400,6 +404,67 @@
       "parameters": []
     },
     {
+      "id": "Expr.arg_sort",
+      "applies": "expression",
+      "family": "order",
+      "name": "arg_sort",
+      "hint": "the row each place in order comes from",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "descending",
+          "shown": "descending",
+          "label": "largest first",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "nulls_last",
+          "shown": "nulls_last",
+          "label": "empty values last",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "Expr.backward_fill",
       "applies": "expression",
       "family": "nulls",
@@ -614,6 +679,16 @@
       "parameters": []
     },
     {
+      "id": "Expr.count",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "count",
+      "hint": "number of values that are not empty",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
       "id": "Expr.cum_count",
       "applies": "expression",
       "family": "cumulative",
@@ -730,6 +805,72 @@
       "head": null,
       "lazy": true,
       "parameters": []
+    },
+    {
+      "id": "Expr.diff",
+      "applies": "expression",
+      "family": "rows",
+      "name": "diff",
+      "hint": "value less the one n rows earlier",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "n",
+          "shown": "n",
+          "label": "rows",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 1
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 1,
+            "shown": "1"
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "null_behavior",
+          "shown": "null_behavior",
+          "label": "empty values",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "ignore",
+                "shown": "ignore"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "ignore"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "ignore"
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": false
+        }
+      ]
     },
     {
       "id": "Expr.drop_nans",
@@ -2935,6 +3076,16 @@
       ]
     },
     {
+      "id": "Expr.n_unique",
+      "applies": "expression",
+      "family": "aggregate",
+      "name": "n_unique",
+      "hint": "number of different values",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
       "id": "Expr.ne",
       "applies": "expression",
       "family": "compare",
@@ -3247,6 +3398,42 @@
       ]
     },
     {
+      "id": "Expr.pct_change",
+      "applies": "expression",
+      "family": "rows",
+      "name": "pct_change",
+      "hint": "how much a value grew from the one n rows earlier",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "n",
+          "shown": "n",
+          "label": "rows",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 1
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 1,
+            "shown": "1"
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "Expr.pow",
       "applies": "expression",
       "family": "arithmetic",
@@ -3286,6 +3473,114 @@
       "head": null,
       "lazy": true,
       "parameters": []
+    },
+    {
+      "id": "Expr.rank",
+      "applies": "expression",
+      "family": "order",
+      "name": "rank",
+      "hint": "the place of each value in order",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "method",
+          "shown": "method",
+          "label": "ties",
+          "kind": {
+            "kind": "choice",
+            "words": [
+              {
+                "word": "average",
+                "shown": "average"
+              },
+              {
+                "word": "min",
+                "shown": "min"
+              },
+              {
+                "word": "max",
+                "shown": "max"
+              },
+              {
+                "word": "dense",
+                "shown": "dense"
+              },
+              {
+                "word": "ordinal",
+                "shown": "ordinal"
+              },
+              {
+                "word": "random",
+                "shown": "random"
+              }
+            ]
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "average"
+          },
+          "defaultSetting": {
+            "kind": "word",
+            "value": "average"
+          },
+          "start": {
+            "kind": "word",
+            "value": "min"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "descending",
+          "shown": "descending",
+          "label": "largest first",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "seed",
+          "shown": "seed",
+          "label": "random seed",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
     },
     {
       "id": "Expr.replace",
@@ -3428,6 +3723,26 @@
           "offered": true
         }
       ]
+    },
+    {
+      "id": "Expr.reverse",
+      "applies": "expression",
+      "family": "order",
+      "name": "reverse",
+      "hint": "the values from the last to the first",
+      "head": null,
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "Expr.rle_id",
+      "applies": "expression",
+      "family": "rows",
+      "name": "rle_id",
+      "hint": "counts up each time the value changes",
+      "head": null,
+      "lazy": true,
+      "parameters": []
     },
     {
       "id": "Expr.round",
@@ -3618,6 +3933,230 @@
       "head": null,
       "lazy": true,
       "parameters": []
+    },
+    {
+      "id": "Expr.sort",
+      "applies": "expression",
+      "family": "order",
+      "name": "sort",
+      "hint": "the values in order",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "descending",
+          "shown": "descending",
+          "label": "largest first",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "nulls_last",
+          "shown": "nulls_last",
+          "label": "empty values last",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "Expr.sort_by",
+      "applies": "expression",
+      "family": "order",
+      "name": "sort_by",
+      "hint": "the values in the order of other values",
+      "head": null,
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "by",
+          "shown": "by",
+          "label": "ordered by",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "more_by",
+          "shown": "more_by",
+          "label": "then by",
+          "kind": {
+            "kind": "expression"
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": {
+            "kind": "empty"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "descending",
+          "shown": "descending",
+          "label": "largest first",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "perItem",
+            "of": "by"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "nulls_last",
+          "shown": "nulls_last",
+          "label": "empty values last",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "perItem",
+            "of": "by"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "multithreaded",
+          "shown": "multithreaded",
+          "label": "on several threads",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": true
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": true
+          },
+          "start": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "maintain_order",
+          "shown": "maintain_order",
+          "label": "equal values keep their order",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": false
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": false
+          },
+          "start": {
+            "kind": "flag",
+            "value": true
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
     },
     {
       "id": "Expr.sqrt",

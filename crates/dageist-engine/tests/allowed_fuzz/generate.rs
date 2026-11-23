@@ -1288,7 +1288,9 @@ impl Gen<'_> {
             let position = Slot::of_parameter(id, name);
             slots.extend(position);
             let built: Vec<Built> = match (id, name) {
-                ("Expr.shift", _) => vec![self.scalar(name == "n")],
+                ("Expr.shift" | "Expr.diff" | "Expr.pct_change", _) => {
+                    vec![self.scalar(name == "n")]
+                }
                 // Polars builds a text of as many characters as the length converts to, which for
                 // a timestamp is the microseconds since the epoch: a length that is a chain of
                 // any dtype can fill the memory, so it is the number 1 of a dtype, as a shift's.
@@ -1523,6 +1525,8 @@ impl Gen<'_> {
                 "group_index" => Value::Integer(self.draw.pick(&[0, 1, 2, 5])),
                 // How many matches `replace` replaces: none, some, or all of them below zero.
                 "n" => Value::Integer(self.draw.pick(&[-1, 0, 1, 1, 2, 3])),
+                // The seed of a random rank: Polars takes any unsigned number.
+                "seed" => Value::Integer(self.draw.pick(&[0, 1, 7, 12345])),
                 "abs_tol" | "rel_tol" => Value::Float(self.draw.pick(&[0.0, 0.5, 1e-9, 1.0])),
                 other => panic!("the generator does not know what to give {other}"),
             };

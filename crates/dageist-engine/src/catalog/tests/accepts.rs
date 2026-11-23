@@ -15,7 +15,8 @@ use polars::prelude::{
 };
 
 use crate::catalog::{
-    Applies, Argument, Arguments, Build, Dtypes, Entry, Kind, Role, ValueType, Variadic, entries,
+    Applies, Argument, Arguments, Build, Dtypes, Entry, Kind, Role, Shape, ValueType, Variadic,
+    entries,
 };
 
 use super::build::{expression_arg, many, sample};
@@ -122,7 +123,9 @@ fn arguments_for(entry: &Entry, column: &str, operand: &str) -> Arguments {
                 Kind::Pattern => Argument::Pattern("(a)".to_owned()),
                 other => panic!("{} takes {other:?}", entry.id().as_str()),
             };
-            let value = if parameter.variadic() == Some(Variadic::Args) {
+            let value = if parameter.variadic() == Some(Variadic::Args)
+                || parameter.shape() == Shape::Many
+            {
                 many(vec![value])
             } else {
                 value

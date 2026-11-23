@@ -12,7 +12,10 @@ title = "Steps · change the table"
 title = "Aggregate · one value"
 
 [families.rows]
-title = "Rows"
+title = "Rows · other rows, differences"
+
+[families.order]
+title = "Order · sort, reverse, rank"
 
 [families.cumulative]
 title = "Cumulative"
@@ -1810,3 +1813,118 @@ at_least = "≥"
 less = "<"
 at_most = "≤"
 separator = ", "
+
+[entries."Expr.sort"]
+name = "sort"
+hint = "the values in order"
+
+[entries."Expr.sort".parameters.descending]
+name = "descending"
+label = "largest first"
+
+[entries."Expr.sort".parameters.nulls_last]
+name = "nulls_last"
+label = "empty values last"
+
+[entries."Expr.sort_by"]
+name = "sort_by"
+hint = "the values in the order of other values"
+
+[entries."Expr.sort_by".parameters.by]
+name = "by"
+label = "ordered by"
+
+[entries."Expr.sort_by".parameters.more_by]
+name = "more_by"
+label = "then by"
+
+[entries."Expr.sort_by".parameters.descending]
+name = "descending"
+label = "largest first"
+
+[entries."Expr.sort_by".parameters.nulls_last]
+name = "nulls_last"
+label = "empty values last"
+
+[entries."Expr.sort_by".parameters.multithreaded]
+name = "multithreaded"
+label = "on several threads"
+
+[entries."Expr.sort_by".parameters.maintain_order]
+name = "maintain_order"
+label = "equal values keep their order"
+
+[entries."Expr.reverse"]
+name = "reverse"
+hint = "the values from the last to the first"
+
+[entries."Expr.arg_sort"]
+name = "arg_sort"
+hint = "the row each place in order comes from"
+
+[entries."Expr.arg_sort".parameters.descending]
+name = "descending"
+label = "largest first"
+
+[entries."Expr.arg_sort".parameters.nulls_last]
+name = "nulls_last"
+label = "empty values last"
+
+[entries."Expr.rank"]
+name = "rank"
+hint = "the place of each value in order"
+
+[entries."Expr.rank".parameters.method]
+name = "method"
+label = "ties"
+
+[entries."Expr.rank".parameters.method.choices]
+average = "average"
+min = "min"
+max = "max"
+dense = "dense"
+ordinal = "ordinal"
+random = "random"
+
+[entries."Expr.rank".parameters.descending]
+name = "descending"
+label = "largest first"
+
+[entries."Expr.rank".parameters.seed]
+name = "seed"
+label = "random seed"
+
+[entries."Expr.diff"]
+name = "diff"
+hint = "value less the one n rows earlier"
+
+[entries."Expr.diff".parameters.n]
+name = "n"
+label = "rows"
+
+[entries."Expr.diff".parameters.null_behavior]
+name = "null_behavior"
+label = "empty values"
+
+[entries."Expr.diff".parameters.null_behavior.choices]
+ignore = "ignore"
+
+[entries."Expr.pct_change"]
+name = "pct_change"
+hint = "how much a value grew from the one n rows earlier"
+
+[entries."Expr.pct_change".parameters.n]
+name = "n"
+label = "rows"
+
+[entries."Expr.rle_id"]
+name = "rle_id"
+hint = "counts up each time the value changes"
+
+[entries."Expr.n_unique"]
+name = "n_unique"
+hint = "number of different values"
+
+[entries."Expr.count"]
+name = "count"
+hint = "number of values that are not empty"

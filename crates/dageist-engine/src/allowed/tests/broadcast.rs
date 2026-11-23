@@ -128,7 +128,7 @@ const AGGREGATE_RECEIVER: [(&str, &str); 2] = [
 
 /// The parameters that Polars allows no operand of many for, with why: nothing is measured of them.
 /// `over`'s keys are met by the window, which has a rule of its own.
-const NOT_MEASURED: [(&str, &str, &str); 6] = [
+const NOT_MEASURED: [(&str, &str, &str); 8] = [
     ("Expr.over", "more_exprs", "a key of the window"),
     ("Expr.replace", "new", "the values a replacement lists"),
     (
@@ -141,6 +141,8 @@ const NOT_MEASURED: [(&str, &str, &str); 6] = [
         "default",
         "the values a replacement lists",
     ),
+    ("Expr.diff", "n", "Polars takes one value only"),
+    ("Expr.pct_change", "n", "Polars takes one value only"),
     ("Expr.shift", "n", "Polars takes one value only"),
     ("Expr.shift", "fill_value", "Polars takes one value only"),
 ];

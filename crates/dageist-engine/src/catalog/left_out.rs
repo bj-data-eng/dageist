@@ -112,6 +112,39 @@ pub fn left_out() -> &'static [LeftOut] {
 //   shape that the walk can say: a count of values that its arguments decide, which `int_range`,
 //   `repeat` and `linear_space` need as well, is a shape of its own. The `*_ranges` functions give
 //   a list of each and wait for a list kind too.
+// - `Expr.filter`, `unique`, `head`, `tail`, `slice`, `limit`, `top_k`, `bottom_k`, `gather_every`,
+//   `gather`, `arg_unique`, `mode` and `unique_counts`, and `Expr.diff`'s `null_behavior` of `drop`,
+//   give as many values as the data and their arguments decide: a `filter` the rows that hold, a
+//   `head(2)` two of them or fewer, a `unique` as many as there are different values, a `mode` the
+//   values that occur most often, and a `diff` that drops the first `n`. The tables say `one` or
+//   `many` of a call, and `many` is the table's rows, which none of them gives but by chance of
+//   the three rows or the arguments the harness picks. Polars refuses them beside a column, in a
+//   select, a filter's predicate, a sort key or the key of a window, unless they give one value or
+//   exactly the table's rows, with "zip node received non-equal length inputs", in a window that
+//   does not join with "expressions must have matching group lengths" unless they give as many as
+//   the group has, and as a join's key, which is not elementwise. Which of those a call meets is
+//   for the rows and the arguments to say, so the walk has no shape for it: the count of values
+//   that `date_range` and its kin decide above is the same shape, so these wait for it, as
+//   `Expr.diff`'s `drop` does, which the editor does not offer, so `diff` is catalogued with
+//   `ignore` only. A chain that goes on to an aggregate is one value whatever count its first
+//   method gives, but the method itself stands in a place of its own first.
+// - `Expr.interpolate` gives as many values as it follows, but whether Polars takes a column depends
+//   on its rows: it interpolates a column of `Boolean` that holds no null to a `Float64` and panics
+//   on one that holds a null, and the method `nearest` does the same for text and arrays, where the
+//   tables measured the sample's rows, which hold a null, and refuse them. A column that holds no
+//   null is accepted by Polars and refused by the tables, so it waits for a way to say that a
+//   column holds no null.
+// - `Expr.is_in` takes `other` as a list column, whose row is met by the receiver's, or as a
+//   column of the receiver's own dtype, which Python Polars 2.1 deprecates as ambiguous and Rust
+//   reads as the whole column's set of values. The first gives as many values as the two meet, a
+//   receiver of one value given a list column of many values giving many, and the second gives as
+//   many as the receiver, one value given a column of many giving one, so the number of values
+//   depends on the dtype of `other` where `broadcasts` says it for the parameter alone. A
+//   Python list given as `other` is a list of literals, which waits for a list kind too.
+// - `Expr.search_sorted` gives a place for each value of `element` and not for each value it
+//   follows: a column of many values searched for one value gives one, and one value searched
+//   for a column gives many, so the count of values is the argument's, which the walk, that gives
+//   a method the count of what it follows and lets an operand widen it, does not state.
 // - `Expr.str.split_exact` and `splitn` give a struct, whose fields a step reads with
 //   `Expr.struct.field`, which is not catalogued yet. `Expr.str.extract_groups` gives one too, and
 //   is catalogued, for its fields are named by the pattern and Polars says them.
@@ -154,7 +187,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.approx_quantile", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arg_max", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arg_min", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.arg_sort", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arg_true", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arg_unique", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.agg", Reason::NotYetCatalogued),
@@ -221,13 +253,11 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.cat.slice", Reason::NotYetCatalogued),
     LeftOut::new("Expr.cat.starts_with", Reason::NotYetCatalogued),
     LeftOut::new("Expr.cat.to", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.count", Reason::NotYetCatalogued),
     LeftOut::new("Expr.cum_min", Reason::NotYetCatalogued),
     LeftOut::new("Expr.cum_prod", Reason::NotYetCatalogued),
     LeftOut::new("Expr.cumulative_eval", Reason::NotYetCatalogued),
     LeftOut::new("Expr.cut", Reason::Deprecated),
     LeftOut::new("Expr.deserialize", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.diff", Reason::NotYetCatalogued),
     LeftOut::new("Expr.dot", Reason::NotYetCatalogued),
     LeftOut::new("Expr.dt.add_business_days", Reason::NotYetCatalogued),
     LeftOut::new("Expr.dt.is_business_day", Reason::NotYetCatalogued),
@@ -346,7 +376,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.meta.undo_aliases", Reason::NotYetCatalogued),
     LeftOut::new("Expr.min_by", Reason::NotYetCatalogued),
     LeftOut::new("Expr.mode", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.n_unique", Reason::NotYetCatalogued),
     LeftOut::new("Expr.name.keep", Reason::NotYetCatalogued),
     LeftOut::new("Expr.name.map", Reason::TakesPythonFunction),
     LeftOut::new("Expr.name.map_fields", Reason::TakesPythonFunction),
@@ -361,7 +390,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.name.to_uppercase", Reason::NotYetCatalogued),
     LeftOut::new("Expr.nan_max", Reason::NotYetCatalogued),
     LeftOut::new("Expr.nan_min", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.pct_change", Reason::NotYetCatalogued),
     LeftOut::new("Expr.peak_max", Reason::NotYetCatalogued),
     LeftOut::new("Expr.peak_min", Reason::NotYetCatalogued),
     LeftOut::new("Expr.pipe", Reason::TakesPythonFunction),
@@ -369,13 +397,10 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.product", Reason::NotYetCatalogued),
     LeftOut::new("Expr.qcut", Reason::Deprecated),
     LeftOut::new("Expr.quantile", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.rank", Reason::NotYetCatalogued),
     LeftOut::new("Expr.reinterpret", Reason::NotYetCatalogued),
     LeftOut::new("Expr.repeat_by", Reason::NotYetCatalogued),
     LeftOut::new("Expr.reshape", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.reverse", Reason::NotYetCatalogued),
     LeftOut::new("Expr.rle", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.rle_id", Reason::NotYetCatalogued),
     LeftOut::new("Expr.rolling", Reason::NotYetCatalogued),
     LeftOut::new("Expr.rolling_kurtosis", Reason::NotYetCatalogued),
     LeftOut::new("Expr.rolling_map", Reason::TakesPythonFunction),
@@ -404,8 +429,6 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.shuffle", Reason::NotYetCatalogued),
     LeftOut::new("Expr.skew", Reason::NotYetCatalogued),
     LeftOut::new("Expr.slice", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.sort", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.sort_by", Reason::NotYetCatalogued),
     LeftOut::new("Expr.std", Reason::NotYetCatalogued),
     LeftOut::new("Expr.str.contains_any", Reason::NotYetCatalogued),
     LeftOut::new("Expr.str.decode", Reason::NotYetCatalogued),
