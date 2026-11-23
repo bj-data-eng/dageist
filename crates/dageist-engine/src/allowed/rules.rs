@@ -33,6 +33,8 @@ pub enum Rule {
     /// an earlier one, beside a key on the other side that repeats the name it
     /// was paired with, makes the same pair again.
     JoinKeyNamesAreNotRepeated,
+    /// A duration typed in, where a method reads a text as one, is a duration string Polars reads.
+    DurationIsValid,
     /// A join's own key is elementwise: it holds no aggregate beside a column,
     /// no column compared with a null, and no replacement of values that are not literals.
     KeyIsElementwise,
@@ -42,19 +44,32 @@ pub enum Rule {
     /// A replacement is given as many new values as old ones, or one, and a strict one a
     /// default of as many values as what it follows, or one.
     ReplacementValuesMatchInNumber,
+    /// A time zone is one Polars reads: a name of the time zone database, or a fixed offset.
+    TimeZoneIsValid,
+    /// The operands of a comparison, a difference, a fill and the bounds of an interval, the values of
+    /// a condition, and the new values of a replacement and its default, where they are moments, are in
+    /// one time zone: Polars finds no dtype that two zones have in common.
+    MomentsShareAZone,
+    /// A window is given a value as long as its input, which a value of one row that a part widens is
+    /// not.
+    WindowInputIsNotWidened,
 }
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 12] = [
         Self::ConditionPredicateIsBoolean,
+        Self::DurationIsValid,
         Self::ElementOnlyInPivotAggregate,
         Self::FilterPredicateIsBoolean,
         Self::JoinKeyNamesAreNotRepeated,
         Self::KeyIsElementwise,
+        Self::MomentsShareAZone,
         Self::PatternIsValid,
         Self::PivotAggregateGivesOneValue,
         Self::ReplacementValuesMatchInNumber,
+        Self::TimeZoneIsValid,
+        Self::WindowInputIsNotWidened,
     ];
 
     /// The name the tables give the rule.
@@ -63,12 +78,16 @@ impl Rule {
         match self {
             Self::PivotAggregateGivesOneValue => "pivot-aggregate-gives-one-value",
             Self::ConditionPredicateIsBoolean => "condition-predicate-is-boolean",
+            Self::DurationIsValid => "duration-is-valid",
             Self::ElementOnlyInPivotAggregate => "element-only-in-pivot-aggregate",
             Self::FilterPredicateIsBoolean => "filter-predicate-is-boolean",
             Self::JoinKeyNamesAreNotRepeated => "join-key-names-are-not-repeated",
             Self::KeyIsElementwise => "key-is-elementwise",
+            Self::MomentsShareAZone => "moments-share-a-zone",
             Self::PatternIsValid => "pattern-is-valid",
             Self::ReplacementValuesMatchInNumber => "replacement-values-match-in-number",
+            Self::TimeZoneIsValid => "time-zone-is-valid",
+            Self::WindowInputIsNotWidened => "window-input-is-not-widened",
         }
     }
 
@@ -96,6 +115,14 @@ impl Rule {
             Self::KeyIsElementwise => {
                 "a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a column be compared with a null, nor a replacement take a value that reads a column"
             }
+            Self::DurationIsValid => "a duration typed in must be a duration string Polars reads",
+            Self::TimeZoneIsValid => "a time zone must be one Polars reads",
+            Self::WindowInputIsNotWidened => {
+                "a window takes a value as long as its input, and a value of one row that a part widens, as dt.replace's parts do, is not: Polars refuses the length of its output"
+            }
+            Self::MomentsShareAZone => {
+                "moments that are compared, subtracted, filled, bound by one another, or given as the values of a condition or as a replacement's new values and default, must be in one time zone: Polars finds no dtype that two zones have in common, and fails where a shift is filled with a moment of another zone"
+            }
             Self::PatternIsValid => "a pattern must be a valid regular expression",
             Self::ReplacementValuesMatchInNumber => {
                 "a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one"
@@ -114,7 +141,12 @@ impl Rule {
             Self::PivotAggregateGivesOneValue => context == Context::step(Outer::PivotAggregate),
             Self::JoinKeyNamesAreNotRepeated | Self::KeyIsElementwise => context.is_join_key(),
             // A matter of the values a call is given, whatever context it stands in.
-            Self::PatternIsValid | Self::ReplacementValuesMatchInNumber => false,
+            Self::DurationIsValid
+            | Self::MomentsShareAZone
+            | Self::PatternIsValid
+            | Self::ReplacementValuesMatchInNumber
+            | Self::TimeZoneIsValid
+            | Self::WindowInputIsNotWidened => false,
             Self::ConditionPredicateIsBoolean | Self::FilterPredicateIsBoolean => {
                 self.needs_boolean_end(context)
             }
@@ -209,8 +241,12 @@ impl Rule {
             | Self::ElementOnlyInPivotAggregate
             | Self::JoinKeyNamesAreNotRepeated
             | Self::KeyIsElementwise
+            | Self::DurationIsValid
             | Self::PatternIsValid
-            | Self::ReplacementValuesMatchInNumber => false,
+            | Self::ReplacementValuesMatchInNumber
+            | Self::MomentsShareAZone
+            | Self::TimeZoneIsValid
+            | Self::WindowInputIsNotWidened => false,
         }
     }
 }

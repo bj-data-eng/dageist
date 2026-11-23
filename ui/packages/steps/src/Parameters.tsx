@@ -19,6 +19,7 @@ import type {
   ChoiceView,
   EntryView,
   KindView,
+  NoneView,
   OfferPlaceView,
   ParameterView,
   TypedKind,
@@ -385,6 +386,7 @@ export type LiteralType =
   | 'any'
   | 'duration'
   | 'pattern'
+  | 'timeZone'
   | 'path';
 
 /** Returns what the engine is asked a text is typed into, for a literal of `type`. */
@@ -394,6 +396,8 @@ function typedInto(type: LiteralType): TypedKind {
       return { kind: 'duration' };
     case 'pattern':
       return { kind: 'pattern' };
+    case 'timeZone':
+      return { kind: 'timeZone' };
     case 'path':
       return { kind: 'path' };
     default:
@@ -410,6 +414,7 @@ const LITERAL_PLACEHOLDERS: Readonly<Record<LiteralType, string>> = {
   any: 'Type a number or text',
   duration: 'Type a duration, such as 1mo',
   pattern: 'Type a pattern, such as [aeiou]',
+  timeZone: 'Type a time zone, such as Europe/Berlin',
   path: 'Type a path',
 };
 
@@ -422,6 +427,7 @@ const LITERAL_WAITING: Readonly<Record<LiteralType, string>> = {
   any: 'number or text',
   duration: 'duration',
   pattern: 'pattern',
+  timeZone: 'time zone',
   path: 'path',
 };
 
@@ -481,6 +487,64 @@ export function LiteralDrawing({
       describedAs={describedAs}
       placeholder={placeholder}
       offers={(typed) => [titled('Value', literalOffers(type, typed, readings, onChange))]}
+      onOpenChange={list.onOpenChange}
+      onType={list.onType}
+    />
+  );
+}
+
+/**
+ * Draws a time zone typed into the search box of its list, or, where the parameter may be given
+ * none, the word `None`, which is no zone at all: it takes the zone off a moment.
+ */
+function TimeZoneDrawing({
+  describedAs,
+  names,
+  openId,
+  setting,
+  none,
+  onChange,
+}: {
+  readonly describedAs: string;
+  readonly names?: boolean | undefined;
+  readonly openId?: string | undefined;
+  readonly setting: Setting;
+  readonly none: NoneView | null;
+  readonly onChange: (setting: Setting) => void;
+}): React.JSX.Element {
+  const list = useListState();
+  // The engine reads what is typed, only while the list is open.
+  const readings = useReadTyped(
+    list.open ? { text: list.typed, typed: typedInto('timeZone'), slot: null } : null,
+  );
+  const value = literalOf(setting);
+  const isNone = none !== null && setting.kind === 'word' && setting.value === none.shown;
+  let shown: { label: string; look: 'plain' | 'quoted' | 'none' };
+  if (isNone) shown = { label: none.shown, look: 'plain' };
+  else if (value === null) shown = { label: LITERAL_WAITING.timeZone, look: 'none' };
+  else shown = { label: value.shown, look: 'quoted' };
+  return (
+    <Slot
+      label={shown.label}
+      tone="value"
+      look={shown.look}
+      wrong={value === null && !isNone}
+      names={names ?? false}
+      openNow={useIsFresh(openId)}
+      describedAs={describedAs}
+      placeholder={LITERAL_PLACEHOLDERS.timeZone}
+      offers={(typed) => [
+        titled('Value', literalOffers('timeZone', typed, readings, onChange)),
+        ...(none === null
+          ? []
+          : [
+              titled('No time zone', [
+                offer(none.shown, 'value', none.hint, () => {
+                  onChange({ kind: 'word', value: none.shown });
+                }),
+              ]),
+            ]),
+      ]}
       onOpenChange={list.onOpenChange}
       onType={list.onType}
     />
@@ -610,6 +674,8 @@ function OneDrawing({
           }}
         />
       );
+    case 'timeZone':
+      return <TimeZoneDrawing {...common} setting={setting} none={kind.none} onChange={onChange} />;
     case 'table':
       return <TableDrawing {...common} value={nameOf(setting)} onChange={word} />;
     case 'path':

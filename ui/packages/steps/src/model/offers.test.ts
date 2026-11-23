@@ -52,8 +52,9 @@ describe('the methods the engine offers after a timestamp', () => {
 
   it('are grouped by family, the shortest group first, and those of a length in the catalogue order', () => {
     // The methods of each family: window one, rows, cumulative and conversion three, aggregate and
-    // logic four, rounding, temporal and the search of text five, maths and pieces of text seven,
-    // checks and nulls eight, arithmetic eleven, and trigonometry, text and compare fifteen.
+    // logic four, rounding and the search of text five, maths and pieces of text seven, checks and
+    // nulls eight, arithmetic eleven, trigonometry, text and compare fifteen, and temporal
+    // forty-three.
     expect(families.map((family) => [family.key, family.offers.length])).toEqual([
       ['window', 1],
       ['rows', 3],
@@ -62,7 +63,6 @@ describe('the methods the engine offers after a timestamp', () => {
       ['aggregate', 4],
       ['logic', 4],
       ['rounding', 5],
-      ['temporal', 5],
       ['search', 5],
       ['maths', 7],
       ['pieces', 7],
@@ -72,6 +72,7 @@ describe('the methods the engine offers after a timestamp', () => {
       ['trigonometry', 15],
       ['text', 15],
       ['compare', 15],
+      ['temporal', 43],
     ]);
     expect(families[0]?.title).toBe('Window');
   });

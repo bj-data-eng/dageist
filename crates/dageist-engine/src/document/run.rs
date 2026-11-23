@@ -15,7 +15,8 @@ use polars::prelude::{
 
 use crate::allowed::{self, Context, Position, Refusal};
 use crate::catalog::{
-    Argument, Arguments, Build, BuildError, Conditional, Kind, Laziness, check_pattern, english,
+    Argument, Arguments, Build, BuildError, Conditional, Kind, Laziness, any_moment,
+    check_duration, check_pattern, english,
 };
 
 use super::changes::ColumnChange;
@@ -629,6 +630,8 @@ impl Builder<'_> {
                 | BuildError::UnknownChoice { parameter, .. }
                 | BuildError::OutOfRange { parameter, .. }
                 | BuildError::NotAPattern { parameter, .. }
+                | BuildError::NotADuration { parameter, .. }
+                | BuildError::NotATimeZone { parameter, .. }
                 | BuildError::Repeated { parameter } => Some((*parameter).to_owned()),
                 BuildError::UnknownParameter { parameter } => Some(parameter.clone()),
                 BuildError::OutOfOrder { .. } | BuildError::Polars(_) => None,
@@ -761,6 +764,7 @@ impl Builder<'_> {
             Value::Dtype(dtype) => Argument::Dtype(dtype.as_polars().clone()),
             Value::Duration(text) => Argument::Duration(text.clone()),
             Value::Pattern(text) => Argument::Pattern(text.clone()),
+            Value::TimeZone(zone) => Argument::TimeZone(zone.clone()),
             Value::Path(text) => Argument::Path(text.clone()),
             Value::Table(name) => match self.inputs.table(name) {
                 Some(table) => Argument::Table(table),
@@ -831,6 +835,25 @@ impl Builder<'_> {
         let mut links = Vec::with_capacity(expression.links().len());
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
+            // A duration typed in is a duration string where the call takes it so, and is refused
+            // at its place when Polars reads it as none for the moment it is given to, whose dtype,
+            // unit and zone included, is the one the value before the call has where it is
+            // worked out, and the finest `Datetime` otherwise: Polars would refuse it only when
+            // the rows run, or panic.
+            let durations = link.durations();
+            if !durations.is_empty() {
+                let moment = match self.resolve(&state, from_element) {
+                    Some(Resolution::Dtype(dtype @ (DataType::Datetime(..) | DataType::Date))) => {
+                        dtype
+                    }
+                    _ => any_moment(),
+                };
+                for (parameter, text, using) in durations {
+                    if let Err(error) = check_duration(text, using, &moment) {
+                        return self.built(Err(BuildError::NotADuration { parameter, error }));
+                    }
+                }
+            }
             let arguments = self.arguments(link)?;
             state = match (link.entry().build(), state) {
                 (Build::Expression(build), Built::Expr(receiver)) => {

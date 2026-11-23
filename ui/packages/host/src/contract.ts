@@ -76,6 +76,11 @@ export type KindView =
    * that makes the text plain text where it is true, such as `literal`, or is `null`.
    */
   | { readonly kind: 'pattern'; readonly plainTextFlag: string | null }
+  /**
+   * A time zone, as Polars reads one. `none` is set where the parameter may also be given no zone at
+   * all, which is Python's `None`: the word for it and what it does, as the language file gives them.
+   */
+  | { readonly kind: 'timeZone'; readonly none: NoneView | null }
   | { readonly kind: 'table' }
   | { readonly kind: 'path' }
   | { readonly kind: 'pairs'; readonly key: KindView; readonly value: KindView };
@@ -85,6 +90,12 @@ export const VALUE_TYPES = ['integer', 'float', 'string', 'date', 'any'] as cons
 
 /** The type of a literal typed in. */
 export type ValueTypeView = (typeof VALUE_TYPES)[number];
+
+/** The word for none and what it does, for a parameter that may be given none. */
+export interface NoneView {
+  readonly shown: string;
+  readonly hint: string;
+}
 
 /** One word of a choice: as Polars spells it, and as it is shown. */
 export interface ChoiceView {
@@ -445,12 +456,16 @@ export type StageView = (typeof STAGES)[number];
 export const RULE_NAMES = [
   'pivot-aggregate-gives-one-value',
   'condition-predicate-is-boolean',
+  'duration-is-valid',
   'element-only-in-pivot-aggregate',
   'filter-predicate-is-boolean',
   'join-key-names-are-not-repeated',
   'key-is-elementwise',
+  'moments-share-a-zone',
   'pattern-is-valid',
   'replacement-values-match-in-number',
+  'time-zone-is-valid',
+  'window-input-is-not-widened',
 ] as const;
 
 /** The name of a rule the engine holds that Polars does not. */
@@ -687,7 +702,7 @@ export interface FitsRequest {
 
 /**
  * What a text is typed into, as the catalogue writes the kind of a parameter that takes a typed
- * value: an expression, a literal of a type, a duration, a pattern or a path. The engine reads the text as
+ * value: an expression, a literal of a type, a duration, a pattern, a time zone or a path. The engine reads the text as
  * that slot takes it.
  */
 export type TypedKind =
@@ -695,6 +710,7 @@ export type TypedKind =
   | { readonly kind: 'value'; readonly type: ValueTypeView }
   | { readonly kind: 'duration' }
   | { readonly kind: 'pattern' }
+  | { readonly kind: 'timeZone' }
   | { readonly kind: 'path' };
 
 /**

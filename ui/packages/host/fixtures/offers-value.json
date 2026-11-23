@@ -409,10 +409,266 @@
       "slots": []
     },
     {
+      "entry": "Expr.dt.base_utc_offset",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "`base_utc_offset` operation not supported for dtype `datetime[μs]` (expected: time-zone-aware datetime)"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.cast_time_unit",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(ns)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": ["time_unit"]
+    },
+    {
+      "entry": "Expr.dt.century",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Int32",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.combine",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.convert_time_zone",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us, UTC)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": ["time_zone"]
+    },
+    {
       "entry": "Expr.dt.date",
       "verdict": {
         "kind": "allowed",
         "result": "Date",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.day",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Int8",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.days_in_month",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Int8",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.dst_offset",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "`dst_offset` operation not supported for dtype `datetime[μs]` (expected: time-zone-aware datetime)"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.epoch",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Int64",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.hour",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Int8",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.is_leap_year",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Boolean",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.iso_year",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Int32",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.microsecond",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Int32",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.millennium",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Int32",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.millisecond",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Int32",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.minute",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Int8",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.month",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Int8",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.month_end",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
         "shape": "many",
         "ending": {
           "kind": "allowed"
@@ -437,6 +693,20 @@
       "slots": []
     },
     {
+      "entry": "Expr.dt.nanosecond",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Int32",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.dt.offset_by",
       "verdict": {
         "kind": "allowed",
@@ -451,10 +721,136 @@
       "slots": []
     },
     {
+      "entry": "Expr.dt.ordinal_day",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Int16",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.quarter",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Int8",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.replace",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": "year",
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.replace_time_zone",
+      "verdict": {
+        "kind": "allowed",
+        "result": null,
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": ["time_zone"]
+    },
+    {
+      "entry": "Expr.dt.round",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.second",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Int8",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.strftime",
+      "verdict": {
+        "kind": "allowed",
+        "result": "String",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": ["format"]
+    },
+    {
       "entry": "Expr.dt.time",
       "verdict": {
         "kind": "allowed",
         "result": "Time",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.timestamp",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Int64",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.to_string",
+      "verdict": {
+        "kind": "allowed",
+        "result": "String",
         "shape": "many",
         "ending": {
           "kind": "allowed"
@@ -474,6 +870,158 @@
             "stage": "rows"
           },
           "reason": "invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.total_hours",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.total_microseconds",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.total_milliseconds",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.total_minutes",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.total_nanoseconds",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.total_seconds",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "polars",
+            "stage": "rows"
+          },
+          "reason": "invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.truncate",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Datetime(us)",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.week",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Int8",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.weekday",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Int8",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.year",
+      "verdict": {
+        "kind": "allowed",
+        "result": "Int32",
+        "shape": "many",
+        "ending": {
+          "kind": "allowed"
         }
       },
       "argument": null,

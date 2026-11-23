@@ -52,6 +52,13 @@ struct ChoiceView {
     shown: String,
 }
 
+/// The word for none and what it does, as the language file gives them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct NoneView {
+    shown: String,
+    hint: String,
+}
+
 /// What a parameter holds, which decides how the view draws it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
@@ -73,6 +80,11 @@ enum KindView {
     Pattern {
         #[serde(rename = "plainTextFlag")]
         plain_text_flag: Option<&'static str>,
+    },
+    /// A time zone, as Polars reads one. A parameter that may also be given none, as
+    /// `replace_time_zone`'s is, says so.
+    TimeZone {
+        none: Option<NoneView>,
     },
     Table,
     Path,
@@ -425,6 +437,24 @@ fn kind_of(
         Kind::Pattern => KindView::Pattern {
             plain_text_flag: parameter.plain_text_flag(),
         },
+        Kind::TimeZone => KindView::TimeZone {
+            none: if parameter.takes_no_time_zone() {
+                let missing = || {
+                    MissingWord(format!(
+                        "word for none of {}#{}",
+                        entry.id().as_str(),
+                        parameter.name()
+                    ))
+                };
+                let (shown, hint) = words
+                    .parameter_none(entry.id(), parameter.name())
+                    .ok_or_else(missing)?;
+                let (shown, hint) = (shown.to_owned(), hint.to_owned());
+                Some(NoneView { shown, hint })
+            } else {
+                None
+            },
+        },
         Kind::Table => KindView::Table,
         Kind::Path => KindView::Path,
         Kind::Pairs(key, value) => KindView::Pairs {
@@ -554,6 +584,24 @@ mod tests {
             .find(|parameter| parameter["name"] == name)
             .unwrap_or_else(|| panic!("no parameter {name} of {id}"))
             .clone()
+    }
+
+    #[test]
+    fn a_time_zone_that_may_be_none_carries_the_words_for_none_from_the_language_file() {
+        let view = view();
+        // Python's `replace_time_zone` takes `None` to take the zone off, and the editor shows the
+        // word and its hint as the language file gives them; `convert_time_zone` takes a zone only.
+        assert_eq!(
+            parameter(&view, "Expr.dt.replace_time_zone", "time_zone")["kind"],
+            json!({
+                "kind": "timeZone",
+                "none": { "shown": "None", "hint": "takes the zone off" }
+            })
+        );
+        assert_eq!(
+            parameter(&view, "Expr.dt.convert_time_zone", "time_zone")["kind"],
+            json!({ "kind": "timeZone", "none": null })
+        );
     }
 
     #[test]

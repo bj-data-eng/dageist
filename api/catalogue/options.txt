@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 4052 combinations: 2699 allowed; 332 refused when Polars resolved the schema, 1021 when it ran the rows, 0 when it ran the empty table.
+# 5092 combinations: 2907 allowed; 662 refused when Polars resolved the schema, 1523 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.cast | Array(Int64, 2) | dtype=Boolean | refused rows: cannot cast Array type (inner: 'Int64', to: 'Boolean')
 Expr.cast | Array(Int64, 2) | dtype=Boolean, strict=false | refused rows: cannot cast Array type (inner: 'Int64', to: 'Boolean')
@@ -1984,6 +1984,734 @@ Expr.cum_sum | UInt64 | reverse=false | allowed UInt64 many
 Expr.cum_sum | UInt64 | reverse=true | allowed UInt64 many
 Expr.cum_sum | UInt8 | reverse=false | allowed Int64 many
 Expr.cum_sum | UInt8 | reverse=true | allowed Int64 many
+Expr.dt.cast_time_unit | Array(Int64, 2) | time_unit=ms | refused schema: expected duration or datetime, got array[i64, 2]
+Expr.dt.cast_time_unit | Array(Int64, 2) | time_unit=ns | refused schema: expected duration or datetime, got array[i64, 2]
+Expr.dt.cast_time_unit | Array(Int64, 2) | time_unit=us | refused schema: expected duration or datetime, got array[i64, 2]
+Expr.dt.cast_time_unit | Boolean | time_unit=ms | refused schema: expected duration or datetime, got bool
+Expr.dt.cast_time_unit | Boolean | time_unit=ns | refused schema: expected duration or datetime, got bool
+Expr.dt.cast_time_unit | Boolean | time_unit=us | refused schema: expected duration or datetime, got bool
+Expr.dt.cast_time_unit | Date | time_unit=ms | refused schema: expected duration or datetime, got date
+Expr.dt.cast_time_unit | Date | time_unit=ns | refused schema: expected duration or datetime, got date
+Expr.dt.cast_time_unit | Date | time_unit=us | refused schema: expected duration or datetime, got date
+Expr.dt.cast_time_unit | Datetime(us) | time_unit=ms | allowed Datetime(ms) many
+Expr.dt.cast_time_unit | Datetime(us) | time_unit=ns | allowed Datetime(ns) many
+Expr.dt.cast_time_unit | Datetime(us) | time_unit=us | allowed Datetime(us) many
+Expr.dt.cast_time_unit | Datetime(us, UTC) | time_unit=ms | allowed Datetime(ms, UTC) many
+Expr.dt.cast_time_unit | Datetime(us, UTC) | time_unit=ns | allowed Datetime(ns, UTC) many
+Expr.dt.cast_time_unit | Datetime(us, UTC) | time_unit=us | allowed Datetime(us, UTC) many
+Expr.dt.cast_time_unit | Decimal(10, 2) | time_unit=ms | refused schema: expected duration or datetime, got decimal[10,2]
+Expr.dt.cast_time_unit | Decimal(10, 2) | time_unit=ns | refused schema: expected duration or datetime, got decimal[10,2]
+Expr.dt.cast_time_unit | Decimal(10, 2) | time_unit=us | refused schema: expected duration or datetime, got decimal[10,2]
+Expr.dt.cast_time_unit | Duration(us) | time_unit=ms | allowed Duration(ms) many
+Expr.dt.cast_time_unit | Duration(us) | time_unit=ns | allowed Duration(ns) many
+Expr.dt.cast_time_unit | Duration(us) | time_unit=us | allowed Duration(us) many
+Expr.dt.cast_time_unit | Float16 | time_unit=ms | refused schema: expected duration or datetime, got f16
+Expr.dt.cast_time_unit | Float16 | time_unit=ns | refused schema: expected duration or datetime, got f16
+Expr.dt.cast_time_unit | Float16 | time_unit=us | refused schema: expected duration or datetime, got f16
+Expr.dt.cast_time_unit | Float32 | time_unit=ms | refused schema: expected duration or datetime, got f32
+Expr.dt.cast_time_unit | Float32 | time_unit=ns | refused schema: expected duration or datetime, got f32
+Expr.dt.cast_time_unit | Float32 | time_unit=us | refused schema: expected duration or datetime, got f32
+Expr.dt.cast_time_unit | Float64 | time_unit=ms | refused schema: expected duration or datetime, got f64
+Expr.dt.cast_time_unit | Float64 | time_unit=ns | refused schema: expected duration or datetime, got f64
+Expr.dt.cast_time_unit | Float64 | time_unit=us | refused schema: expected duration or datetime, got f64
+Expr.dt.cast_time_unit | Int128 | time_unit=ms | refused schema: expected duration or datetime, got i128
+Expr.dt.cast_time_unit | Int128 | time_unit=ns | refused schema: expected duration or datetime, got i128
+Expr.dt.cast_time_unit | Int128 | time_unit=us | refused schema: expected duration or datetime, got i128
+Expr.dt.cast_time_unit | Int16 | time_unit=ms | refused schema: expected duration or datetime, got i16
+Expr.dt.cast_time_unit | Int16 | time_unit=ns | refused schema: expected duration or datetime, got i16
+Expr.dt.cast_time_unit | Int16 | time_unit=us | refused schema: expected duration or datetime, got i16
+Expr.dt.cast_time_unit | Int32 | time_unit=ms | refused schema: expected duration or datetime, got i32
+Expr.dt.cast_time_unit | Int32 | time_unit=ns | refused schema: expected duration or datetime, got i32
+Expr.dt.cast_time_unit | Int32 | time_unit=us | refused schema: expected duration or datetime, got i32
+Expr.dt.cast_time_unit | Int64 | time_unit=ms | refused schema: expected duration or datetime, got i64
+Expr.dt.cast_time_unit | Int64 | time_unit=ns | refused schema: expected duration or datetime, got i64
+Expr.dt.cast_time_unit | Int64 | time_unit=us | refused schema: expected duration or datetime, got i64
+Expr.dt.cast_time_unit | Int8 | time_unit=ms | refused schema: expected duration or datetime, got i8
+Expr.dt.cast_time_unit | Int8 | time_unit=ns | refused schema: expected duration or datetime, got i8
+Expr.dt.cast_time_unit | Int8 | time_unit=us | refused schema: expected duration or datetime, got i8
+Expr.dt.cast_time_unit | List(Int64) | time_unit=ms | refused schema: expected duration or datetime, got list[i64]
+Expr.dt.cast_time_unit | List(Int64) | time_unit=ns | refused schema: expected duration or datetime, got list[i64]
+Expr.dt.cast_time_unit | List(Int64) | time_unit=us | refused schema: expected duration or datetime, got list[i64]
+Expr.dt.cast_time_unit | List(String) | time_unit=ms | refused schema: expected duration or datetime, got list[str]
+Expr.dt.cast_time_unit | List(String) | time_unit=ns | refused schema: expected duration or datetime, got list[str]
+Expr.dt.cast_time_unit | List(String) | time_unit=us | refused schema: expected duration or datetime, got list[str]
+Expr.dt.cast_time_unit | Null | time_unit=ms | refused schema: expected duration or datetime, got null
+Expr.dt.cast_time_unit | Null | time_unit=ns | refused schema: expected duration or datetime, got null
+Expr.dt.cast_time_unit | Null | time_unit=us | refused schema: expected duration or datetime, got null
+Expr.dt.cast_time_unit | String | time_unit=ms | refused schema: expected duration or datetime, got str
+Expr.dt.cast_time_unit | String | time_unit=ns | refused schema: expected duration or datetime, got str
+Expr.dt.cast_time_unit | String | time_unit=us | refused schema: expected duration or datetime, got str
+Expr.dt.cast_time_unit | Struct(x: Int64, y: String) | time_unit=ms | refused schema: expected duration or datetime, got struct[2]
+Expr.dt.cast_time_unit | Struct(x: Int64, y: String) | time_unit=ns | refused schema: expected duration or datetime, got struct[2]
+Expr.dt.cast_time_unit | Struct(x: Int64, y: String) | time_unit=us | refused schema: expected duration or datetime, got struct[2]
+Expr.dt.cast_time_unit | Time | time_unit=ms | refused schema: expected duration or datetime, got time
+Expr.dt.cast_time_unit | Time | time_unit=ns | refused schema: expected duration or datetime, got time
+Expr.dt.cast_time_unit | Time | time_unit=us | refused schema: expected duration or datetime, got time
+Expr.dt.cast_time_unit | UInt128 | time_unit=ms | refused schema: expected duration or datetime, got u128
+Expr.dt.cast_time_unit | UInt128 | time_unit=ns | refused schema: expected duration or datetime, got u128
+Expr.dt.cast_time_unit | UInt128 | time_unit=us | refused schema: expected duration or datetime, got u128
+Expr.dt.cast_time_unit | UInt16 | time_unit=ms | refused schema: expected duration or datetime, got u16
+Expr.dt.cast_time_unit | UInt16 | time_unit=ns | refused schema: expected duration or datetime, got u16
+Expr.dt.cast_time_unit | UInt16 | time_unit=us | refused schema: expected duration or datetime, got u16
+Expr.dt.cast_time_unit | UInt32 | time_unit=ms | refused schema: expected duration or datetime, got u32
+Expr.dt.cast_time_unit | UInt32 | time_unit=ns | refused schema: expected duration or datetime, got u32
+Expr.dt.cast_time_unit | UInt32 | time_unit=us | refused schema: expected duration or datetime, got u32
+Expr.dt.cast_time_unit | UInt64 | time_unit=ms | refused schema: expected duration or datetime, got u64
+Expr.dt.cast_time_unit | UInt64 | time_unit=ns | refused schema: expected duration or datetime, got u64
+Expr.dt.cast_time_unit | UInt64 | time_unit=us | refused schema: expected duration or datetime, got u64
+Expr.dt.cast_time_unit | UInt8 | time_unit=ms | refused schema: expected duration or datetime, got u8
+Expr.dt.cast_time_unit | UInt8 | time_unit=ns | refused schema: expected duration or datetime, got u8
+Expr.dt.cast_time_unit | UInt8 | time_unit=us | refused schema: expected duration or datetime, got u8
+Expr.dt.combine | Array(Int64, 2) | time_unit=ms | refused schema: expected Date or Datetime, got array[i64, 2]
+Expr.dt.combine | Array(Int64, 2) | time_unit=ns | refused schema: expected Date or Datetime, got array[i64, 2]
+Expr.dt.combine | Array(Int64, 2) | time_unit=us | refused schema: expected Date or Datetime, got array[i64, 2]
+Expr.dt.combine | Boolean | time_unit=ms | refused schema: expected Date or Datetime, got bool
+Expr.dt.combine | Boolean | time_unit=ns | refused schema: expected Date or Datetime, got bool
+Expr.dt.combine | Boolean | time_unit=us | refused schema: expected Date or Datetime, got bool
+Expr.dt.combine | Date | time_unit=ms | allowed Datetime(ms) many
+Expr.dt.combine | Date | time_unit=ns | allowed Datetime(ns) many
+Expr.dt.combine | Date | time_unit=us | allowed Datetime(us) many
+Expr.dt.combine | Datetime(us) | time_unit=ms | allowed Datetime(ms) many
+Expr.dt.combine | Datetime(us) | time_unit=ns | allowed Datetime(ns) many
+Expr.dt.combine | Datetime(us) | time_unit=us | allowed Datetime(us) many
+Expr.dt.combine | Datetime(us, UTC) | time_unit=ms | allowed Datetime(ms, UTC) many
+Expr.dt.combine | Datetime(us, UTC) | time_unit=ns | allowed Datetime(ns, UTC) many
+Expr.dt.combine | Datetime(us, UTC) | time_unit=us | allowed Datetime(us, UTC) many
+Expr.dt.combine | Decimal(10, 2) | time_unit=ms | refused schema: expected Date or Datetime, got decimal[10,2]
+Expr.dt.combine | Decimal(10, 2) | time_unit=ns | refused schema: expected Date or Datetime, got decimal[10,2]
+Expr.dt.combine | Decimal(10, 2) | time_unit=us | refused schema: expected Date or Datetime, got decimal[10,2]
+Expr.dt.combine | Duration(us) | time_unit=ms | refused schema: expected Date or Datetime, got duration[μs]
+Expr.dt.combine | Duration(us) | time_unit=ns | refused schema: expected Date or Datetime, got duration[μs]
+Expr.dt.combine | Duration(us) | time_unit=us | refused schema: expected Date or Datetime, got duration[μs]
+Expr.dt.combine | Float16 | time_unit=ms | refused schema: expected Date or Datetime, got f16
+Expr.dt.combine | Float16 | time_unit=ns | refused schema: expected Date or Datetime, got f16
+Expr.dt.combine | Float16 | time_unit=us | refused schema: expected Date or Datetime, got f16
+Expr.dt.combine | Float32 | time_unit=ms | refused schema: expected Date or Datetime, got f32
+Expr.dt.combine | Float32 | time_unit=ns | refused schema: expected Date or Datetime, got f32
+Expr.dt.combine | Float32 | time_unit=us | refused schema: expected Date or Datetime, got f32
+Expr.dt.combine | Float64 | time_unit=ms | refused schema: expected Date or Datetime, got f64
+Expr.dt.combine | Float64 | time_unit=ns | refused schema: expected Date or Datetime, got f64
+Expr.dt.combine | Float64 | time_unit=us | refused schema: expected Date or Datetime, got f64
+Expr.dt.combine | Int128 | time_unit=ms | refused schema: expected Date or Datetime, got i128
+Expr.dt.combine | Int128 | time_unit=ns | refused schema: expected Date or Datetime, got i128
+Expr.dt.combine | Int128 | time_unit=us | refused schema: expected Date or Datetime, got i128
+Expr.dt.combine | Int16 | time_unit=ms | refused schema: expected Date or Datetime, got i16
+Expr.dt.combine | Int16 | time_unit=ns | refused schema: expected Date or Datetime, got i16
+Expr.dt.combine | Int16 | time_unit=us | refused schema: expected Date or Datetime, got i16
+Expr.dt.combine | Int32 | time_unit=ms | refused schema: expected Date or Datetime, got i32
+Expr.dt.combine | Int32 | time_unit=ns | refused schema: expected Date or Datetime, got i32
+Expr.dt.combine | Int32 | time_unit=us | refused schema: expected Date or Datetime, got i32
+Expr.dt.combine | Int64 | time_unit=ms | refused schema: expected Date or Datetime, got i64
+Expr.dt.combine | Int64 | time_unit=ns | refused schema: expected Date or Datetime, got i64
+Expr.dt.combine | Int64 | time_unit=us | refused schema: expected Date or Datetime, got i64
+Expr.dt.combine | Int8 | time_unit=ms | refused schema: expected Date or Datetime, got i8
+Expr.dt.combine | Int8 | time_unit=ns | refused schema: expected Date or Datetime, got i8
+Expr.dt.combine | Int8 | time_unit=us | refused schema: expected Date or Datetime, got i8
+Expr.dt.combine | List(Int64) | time_unit=ms | refused schema: expected Date or Datetime, got list[i64]
+Expr.dt.combine | List(Int64) | time_unit=ns | refused schema: expected Date or Datetime, got list[i64]
+Expr.dt.combine | List(Int64) | time_unit=us | refused schema: expected Date or Datetime, got list[i64]
+Expr.dt.combine | List(String) | time_unit=ms | refused schema: expected Date or Datetime, got list[str]
+Expr.dt.combine | List(String) | time_unit=ns | refused schema: expected Date or Datetime, got list[str]
+Expr.dt.combine | List(String) | time_unit=us | refused schema: expected Date or Datetime, got list[str]
+Expr.dt.combine | Null | time_unit=ms | refused schema: expected Date or Datetime, got null
+Expr.dt.combine | Null | time_unit=ns | refused schema: expected Date or Datetime, got null
+Expr.dt.combine | Null | time_unit=us | refused schema: expected Date or Datetime, got null
+Expr.dt.combine | String | time_unit=ms | refused schema: expected Date or Datetime, got str
+Expr.dt.combine | String | time_unit=ns | refused schema: expected Date or Datetime, got str
+Expr.dt.combine | String | time_unit=us | refused schema: expected Date or Datetime, got str
+Expr.dt.combine | Struct(x: Int64, y: String) | time_unit=ms | refused schema: expected Date or Datetime, got struct[2]
+Expr.dt.combine | Struct(x: Int64, y: String) | time_unit=ns | refused schema: expected Date or Datetime, got struct[2]
+Expr.dt.combine | Struct(x: Int64, y: String) | time_unit=us | refused schema: expected Date or Datetime, got struct[2]
+Expr.dt.combine | Time | time_unit=ms | refused schema: expected Date or Datetime, got time
+Expr.dt.combine | Time | time_unit=ns | refused schema: expected Date or Datetime, got time
+Expr.dt.combine | Time | time_unit=us | refused schema: expected Date or Datetime, got time
+Expr.dt.combine | UInt128 | time_unit=ms | refused schema: expected Date or Datetime, got u128
+Expr.dt.combine | UInt128 | time_unit=ns | refused schema: expected Date or Datetime, got u128
+Expr.dt.combine | UInt128 | time_unit=us | refused schema: expected Date or Datetime, got u128
+Expr.dt.combine | UInt16 | time_unit=ms | refused schema: expected Date or Datetime, got u16
+Expr.dt.combine | UInt16 | time_unit=ns | refused schema: expected Date or Datetime, got u16
+Expr.dt.combine | UInt16 | time_unit=us | refused schema: expected Date or Datetime, got u16
+Expr.dt.combine | UInt32 | time_unit=ms | refused schema: expected Date or Datetime, got u32
+Expr.dt.combine | UInt32 | time_unit=ns | refused schema: expected Date or Datetime, got u32
+Expr.dt.combine | UInt32 | time_unit=us | refused schema: expected Date or Datetime, got u32
+Expr.dt.combine | UInt64 | time_unit=ms | refused schema: expected Date or Datetime, got u64
+Expr.dt.combine | UInt64 | time_unit=ns | refused schema: expected Date or Datetime, got u64
+Expr.dt.combine | UInt64 | time_unit=us | refused schema: expected Date or Datetime, got u64
+Expr.dt.combine | UInt8 | time_unit=ms | refused schema: expected Date or Datetime, got u8
+Expr.dt.combine | UInt8 | time_unit=ns | refused schema: expected Date or Datetime, got u8
+Expr.dt.combine | UInt8 | time_unit=us | refused schema: expected Date or Datetime, got u8
+Expr.dt.epoch | Array(Int64, 2) | time_unit=d | refused rows: cannot cast Array type (inner: 'Int64', to: 'Date')
+Expr.dt.epoch | Array(Int64, 2) | time_unit=ms | refused rows: cannot cast Array type (inner: 'Int64', to: 'Datetime('ms')')
+Expr.dt.epoch | Array(Int64, 2) | time_unit=ns | refused rows: cannot cast Array type (inner: 'Int64', to: 'Datetime('ns')')
+Expr.dt.epoch | Array(Int64, 2) | time_unit=s | refused rows: cannot cast Array type (inner: 'Int64', to: 'Datetime('ms')')
+Expr.dt.epoch | Array(Int64, 2) | time_unit=us | refused rows: cannot cast Array type (inner: 'Int64', to: 'Datetime('μs')')
+Expr.dt.epoch | Boolean | time_unit=d | allowed Int32 many
+Expr.dt.epoch | Boolean | time_unit=ms | allowed Int64 many
+Expr.dt.epoch | Boolean | time_unit=ns | allowed Int64 many
+Expr.dt.epoch | Boolean | time_unit=s | allowed Int64 many
+Expr.dt.epoch | Boolean | time_unit=us | allowed Int64 many
+Expr.dt.epoch | Date | time_unit=d | allowed Int32 many
+Expr.dt.epoch | Date | time_unit=ms | allowed Int64 many
+Expr.dt.epoch | Date | time_unit=ns | allowed Int64 many
+Expr.dt.epoch | Date | time_unit=s | allowed Int64 many
+Expr.dt.epoch | Date | time_unit=us | allowed Int64 many
+Expr.dt.epoch | Datetime(us) | time_unit=d | allowed Int32 many
+Expr.dt.epoch | Datetime(us) | time_unit=ms | allowed Int64 many
+Expr.dt.epoch | Datetime(us) | time_unit=ns | allowed Int64 many
+Expr.dt.epoch | Datetime(us) | time_unit=s | allowed Int64 many
+Expr.dt.epoch | Datetime(us) | time_unit=us | allowed Int64 many
+Expr.dt.epoch | Datetime(us, UTC) | time_unit=d | allowed Int32 many
+Expr.dt.epoch | Datetime(us, UTC) | time_unit=ms | allowed Int64 many
+Expr.dt.epoch | Datetime(us, UTC) | time_unit=ns | allowed Int64 many
+Expr.dt.epoch | Datetime(us, UTC) | time_unit=s | allowed Int64 many
+Expr.dt.epoch | Datetime(us, UTC) | time_unit=us | allowed Int64 many
+Expr.dt.epoch | Decimal(10, 2) | time_unit=d | refused rows: casting from Decimal(10, 2) to Date not supported
+Expr.dt.epoch | Decimal(10, 2) | time_unit=ms | refused rows: casting from Decimal(10, 2) to Datetime('ms') not supported
+Expr.dt.epoch | Decimal(10, 2) | time_unit=ns | refused rows: casting from Decimal(10, 2) to Datetime('ns') not supported
+Expr.dt.epoch | Decimal(10, 2) | time_unit=s | refused rows: casting from Decimal(10, 2) to Datetime('ms') not supported
+Expr.dt.epoch | Decimal(10, 2) | time_unit=us | refused rows: casting from Decimal(10, 2) to Datetime('μs') not supported
+Expr.dt.epoch | Duration(us) | time_unit=d | refused rows: casting from Duration('μs') to Date not supported
+Expr.dt.epoch | Duration(us) | time_unit=ms | refused rows: `timestamp` operation not supported for dtype `duration[μs]`
+Expr.dt.epoch | Duration(us) | time_unit=ns | refused rows: `timestamp` operation not supported for dtype `duration[μs]`
+Expr.dt.epoch | Duration(us) | time_unit=s | refused rows: `timestamp` operation not supported for dtype `duration[μs]`
+Expr.dt.epoch | Duration(us) | time_unit=us | refused rows: `timestamp` operation not supported for dtype `duration[μs]`
+Expr.dt.epoch | Float16 | time_unit=d | allowed Int32 many
+Expr.dt.epoch | Float16 | time_unit=ms | allowed Int64 many
+Expr.dt.epoch | Float16 | time_unit=ns | allowed Int64 many
+Expr.dt.epoch | Float16 | time_unit=s | allowed Int64 many
+Expr.dt.epoch | Float16 | time_unit=us | allowed Int64 many
+Expr.dt.epoch | Float32 | time_unit=d | allowed Int32 many
+Expr.dt.epoch | Float32 | time_unit=ms | allowed Int64 many
+Expr.dt.epoch | Float32 | time_unit=ns | allowed Int64 many
+Expr.dt.epoch | Float32 | time_unit=s | allowed Int64 many
+Expr.dt.epoch | Float32 | time_unit=us | allowed Int64 many
+Expr.dt.epoch | Float64 | time_unit=d | allowed Int32 many
+Expr.dt.epoch | Float64 | time_unit=ms | allowed Int64 many
+Expr.dt.epoch | Float64 | time_unit=ns | allowed Int64 many
+Expr.dt.epoch | Float64 | time_unit=s | allowed Int64 many
+Expr.dt.epoch | Float64 | time_unit=us | allowed Int64 many
+Expr.dt.epoch | Int128 | time_unit=d | allowed Int32 many
+Expr.dt.epoch | Int128 | time_unit=ms | allowed Int64 many
+Expr.dt.epoch | Int128 | time_unit=ns | allowed Int64 many
+Expr.dt.epoch | Int128 | time_unit=s | allowed Int64 many
+Expr.dt.epoch | Int128 | time_unit=us | allowed Int64 many
+Expr.dt.epoch | Int16 | time_unit=d | allowed Int32 many
+Expr.dt.epoch | Int16 | time_unit=ms | allowed Int64 many
+Expr.dt.epoch | Int16 | time_unit=ns | allowed Int64 many
+Expr.dt.epoch | Int16 | time_unit=s | allowed Int64 many
+Expr.dt.epoch | Int16 | time_unit=us | allowed Int64 many
+Expr.dt.epoch | Int32 | time_unit=d | allowed Int32 many
+Expr.dt.epoch | Int32 | time_unit=ms | allowed Int64 many
+Expr.dt.epoch | Int32 | time_unit=ns | allowed Int64 many
+Expr.dt.epoch | Int32 | time_unit=s | allowed Int64 many
+Expr.dt.epoch | Int32 | time_unit=us | allowed Int64 many
+Expr.dt.epoch | Int64 | time_unit=d | allowed Int32 many
+Expr.dt.epoch | Int64 | time_unit=ms | allowed Int64 many
+Expr.dt.epoch | Int64 | time_unit=ns | allowed Int64 many
+Expr.dt.epoch | Int64 | time_unit=s | allowed Int64 many
+Expr.dt.epoch | Int64 | time_unit=us | allowed Int64 many
+Expr.dt.epoch | Int8 | time_unit=d | allowed Int32 many
+Expr.dt.epoch | Int8 | time_unit=ms | allowed Int64 many
+Expr.dt.epoch | Int8 | time_unit=ns | allowed Int64 many
+Expr.dt.epoch | Int8 | time_unit=s | allowed Int64 many
+Expr.dt.epoch | Int8 | time_unit=us | allowed Int64 many
+Expr.dt.epoch | List(Int64) | time_unit=d | refused rows: cannot cast List type (inner: 'Int64', to: 'Date')
+Expr.dt.epoch | List(Int64) | time_unit=ms | refused rows: cannot cast List type (inner: 'Int64', to: 'Datetime('ms')')
+Expr.dt.epoch | List(Int64) | time_unit=ns | refused rows: cannot cast List type (inner: 'Int64', to: 'Datetime('ns')')
+Expr.dt.epoch | List(Int64) | time_unit=s | refused rows: cannot cast List type (inner: 'Int64', to: 'Datetime('ms')')
+Expr.dt.epoch | List(Int64) | time_unit=us | refused rows: cannot cast List type (inner: 'Int64', to: 'Datetime('μs')')
+Expr.dt.epoch | List(String) | time_unit=d | refused rows: cannot cast List type (inner: 'String', to: 'Date')
+Expr.dt.epoch | List(String) | time_unit=ms | refused rows: cannot cast List type (inner: 'String', to: 'Datetime('ms')')
+Expr.dt.epoch | List(String) | time_unit=ns | refused rows: cannot cast List type (inner: 'String', to: 'Datetime('ns')')
+Expr.dt.epoch | List(String) | time_unit=s | refused rows: cannot cast List type (inner: 'String', to: 'Datetime('ms')')
+Expr.dt.epoch | List(String) | time_unit=us | refused rows: cannot cast List type (inner: 'String', to: 'Datetime('μs')')
+Expr.dt.epoch | Null | time_unit=d | allowed Int32 many
+Expr.dt.epoch | Null | time_unit=ms | allowed Int64 many
+Expr.dt.epoch | Null | time_unit=ns | allowed Int64 many
+Expr.dt.epoch | Null | time_unit=s | allowed Int64 many
+Expr.dt.epoch | Null | time_unit=us | allowed Int64 many
+Expr.dt.epoch | String | time_unit=d | refused rows: casting from string to date is not supported. It was removed in Polars 2.0. Use `str.to_date()` instead.
+Expr.dt.epoch | String | time_unit=ms | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+Expr.dt.epoch | String | time_unit=ns | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+Expr.dt.epoch | String | time_unit=s | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+Expr.dt.epoch | String | time_unit=us | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+Expr.dt.epoch | Struct(x: Int64, y: String) | time_unit=d | refused rows: casting from string to date is not supported. It was removed in Polars 2.0. Use `str.to_date()` instead.
+Expr.dt.epoch | Struct(x: Int64, y: String) | time_unit=ms | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+Expr.dt.epoch | Struct(x: Int64, y: String) | time_unit=ns | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+Expr.dt.epoch | Struct(x: Int64, y: String) | time_unit=s | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+Expr.dt.epoch | Struct(x: Int64, y: String) | time_unit=us | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+Expr.dt.epoch | Time | time_unit=d | refused rows: casting from Time to Date not supported
+Expr.dt.epoch | Time | time_unit=ms | refused rows: `timestamp` operation not supported for dtype `time`
+Expr.dt.epoch | Time | time_unit=ns | refused rows: `timestamp` operation not supported for dtype `time`
+Expr.dt.epoch | Time | time_unit=s | refused rows: `timestamp` operation not supported for dtype `time`
+Expr.dt.epoch | Time | time_unit=us | refused rows: `timestamp` operation not supported for dtype `time`
+Expr.dt.epoch | UInt128 | time_unit=d | allowed Int32 many
+Expr.dt.epoch | UInt128 | time_unit=ms | allowed Int64 many
+Expr.dt.epoch | UInt128 | time_unit=ns | allowed Int64 many
+Expr.dt.epoch | UInt128 | time_unit=s | allowed Int64 many
+Expr.dt.epoch | UInt128 | time_unit=us | allowed Int64 many
+Expr.dt.epoch | UInt16 | time_unit=d | allowed Int32 many
+Expr.dt.epoch | UInt16 | time_unit=ms | allowed Int64 many
+Expr.dt.epoch | UInt16 | time_unit=ns | allowed Int64 many
+Expr.dt.epoch | UInt16 | time_unit=s | allowed Int64 many
+Expr.dt.epoch | UInt16 | time_unit=us | allowed Int64 many
+Expr.dt.epoch | UInt32 | time_unit=d | allowed Int32 many
+Expr.dt.epoch | UInt32 | time_unit=ms | allowed Int64 many
+Expr.dt.epoch | UInt32 | time_unit=ns | allowed Int64 many
+Expr.dt.epoch | UInt32 | time_unit=s | allowed Int64 many
+Expr.dt.epoch | UInt32 | time_unit=us | allowed Int64 many
+Expr.dt.epoch | UInt64 | time_unit=d | allowed Int32 many
+Expr.dt.epoch | UInt64 | time_unit=ms | allowed Int64 many
+Expr.dt.epoch | UInt64 | time_unit=ns | allowed Int64 many
+Expr.dt.epoch | UInt64 | time_unit=s | allowed Int64 many
+Expr.dt.epoch | UInt64 | time_unit=us | allowed Int64 many
+Expr.dt.epoch | UInt8 | time_unit=d | allowed Int32 many
+Expr.dt.epoch | UInt8 | time_unit=ms | allowed Int64 many
+Expr.dt.epoch | UInt8 | time_unit=ns | allowed Int64 many
+Expr.dt.epoch | UInt8 | time_unit=s | allowed Int64 many
+Expr.dt.epoch | UInt8 | time_unit=us | allowed Int64 many
+Expr.dt.replace | Array(Int64, 2) | ambiguous=earliest | refused rows: `round` operation not supported for dtype `array[i64, 2]` (expected: date/datetime)
+Expr.dt.replace | Array(Int64, 2) | ambiguous=latest | refused rows: `round` operation not supported for dtype `array[i64, 2]` (expected: date/datetime)
+Expr.dt.replace | Array(Int64, 2) | ambiguous=null | refused rows: `round` operation not supported for dtype `array[i64, 2]` (expected: date/datetime)
+Expr.dt.replace | Array(Int64, 2) | ambiguous=raise | refused rows: `round` operation not supported for dtype `array[i64, 2]` (expected: date/datetime)
+Expr.dt.replace | Boolean | ambiguous=earliest | refused rows: `round` operation not supported for dtype `bool` (expected: date/datetime)
+Expr.dt.replace | Boolean | ambiguous=latest | refused rows: `round` operation not supported for dtype `bool` (expected: date/datetime)
+Expr.dt.replace | Boolean | ambiguous=null | refused rows: `round` operation not supported for dtype `bool` (expected: date/datetime)
+Expr.dt.replace | Boolean | ambiguous=raise | refused rows: `round` operation not supported for dtype `bool` (expected: date/datetime)
+Expr.dt.replace | Date | ambiguous=earliest | allowed Date many
+Expr.dt.replace | Date | ambiguous=latest | allowed Date many
+Expr.dt.replace | Date | ambiguous=null | allowed Date many
+Expr.dt.replace | Date | ambiguous=raise | allowed Date many
+Expr.dt.replace | Datetime(us) | ambiguous=earliest | allowed Datetime(us) many
+Expr.dt.replace | Datetime(us) | ambiguous=latest | allowed Datetime(us) many
+Expr.dt.replace | Datetime(us) | ambiguous=null | allowed Datetime(us) many
+Expr.dt.replace | Datetime(us) | ambiguous=raise | allowed Datetime(us) many
+Expr.dt.replace | Datetime(us, UTC) | ambiguous=earliest | allowed Datetime(us, UTC) many
+Expr.dt.replace | Datetime(us, UTC) | ambiguous=latest | allowed Datetime(us, UTC) many
+Expr.dt.replace | Datetime(us, UTC) | ambiguous=null | allowed Datetime(us, UTC) many
+Expr.dt.replace | Datetime(us, UTC) | ambiguous=raise | allowed Datetime(us, UTC) many
+Expr.dt.replace | Decimal(10, 2) | ambiguous=earliest | refused rows: `round` operation not supported for dtype `decimal[10,2]` (expected: date/datetime)
+Expr.dt.replace | Decimal(10, 2) | ambiguous=latest | refused rows: `round` operation not supported for dtype `decimal[10,2]` (expected: date/datetime)
+Expr.dt.replace | Decimal(10, 2) | ambiguous=null | refused rows: `round` operation not supported for dtype `decimal[10,2]` (expected: date/datetime)
+Expr.dt.replace | Decimal(10, 2) | ambiguous=raise | refused rows: `round` operation not supported for dtype `decimal[10,2]` (expected: date/datetime)
+Expr.dt.replace | Duration(us) | ambiguous=earliest | refused rows: `round` operation not supported for dtype `duration[μs]` (expected: date/datetime)
+Expr.dt.replace | Duration(us) | ambiguous=latest | refused rows: `round` operation not supported for dtype `duration[μs]` (expected: date/datetime)
+Expr.dt.replace | Duration(us) | ambiguous=null | refused rows: `round` operation not supported for dtype `duration[μs]` (expected: date/datetime)
+Expr.dt.replace | Duration(us) | ambiguous=raise | refused rows: `round` operation not supported for dtype `duration[μs]` (expected: date/datetime)
+Expr.dt.replace | Float16 | ambiguous=earliest | refused rows: `round` operation not supported for dtype `f16` (expected: date/datetime)
+Expr.dt.replace | Float16 | ambiguous=latest | refused rows: `round` operation not supported for dtype `f16` (expected: date/datetime)
+Expr.dt.replace | Float16 | ambiguous=null | refused rows: `round` operation not supported for dtype `f16` (expected: date/datetime)
+Expr.dt.replace | Float16 | ambiguous=raise | refused rows: `round` operation not supported for dtype `f16` (expected: date/datetime)
+Expr.dt.replace | Float32 | ambiguous=earliest | refused rows: `round` operation not supported for dtype `f32` (expected: date/datetime)
+Expr.dt.replace | Float32 | ambiguous=latest | refused rows: `round` operation not supported for dtype `f32` (expected: date/datetime)
+Expr.dt.replace | Float32 | ambiguous=null | refused rows: `round` operation not supported for dtype `f32` (expected: date/datetime)
+Expr.dt.replace | Float32 | ambiguous=raise | refused rows: `round` operation not supported for dtype `f32` (expected: date/datetime)
+Expr.dt.replace | Float64 | ambiguous=earliest | refused rows: `round` operation not supported for dtype `f64` (expected: date/datetime)
+Expr.dt.replace | Float64 | ambiguous=latest | refused rows: `round` operation not supported for dtype `f64` (expected: date/datetime)
+Expr.dt.replace | Float64 | ambiguous=null | refused rows: `round` operation not supported for dtype `f64` (expected: date/datetime)
+Expr.dt.replace | Float64 | ambiguous=raise | refused rows: `round` operation not supported for dtype `f64` (expected: date/datetime)
+Expr.dt.replace | Int128 | ambiguous=earliest | refused rows: `round` operation not supported for dtype `i128` (expected: date/datetime)
+Expr.dt.replace | Int128 | ambiguous=latest | refused rows: `round` operation not supported for dtype `i128` (expected: date/datetime)
+Expr.dt.replace | Int128 | ambiguous=null | refused rows: `round` operation not supported for dtype `i128` (expected: date/datetime)
+Expr.dt.replace | Int128 | ambiguous=raise | refused rows: `round` operation not supported for dtype `i128` (expected: date/datetime)
+Expr.dt.replace | Int16 | ambiguous=earliest | refused rows: `round` operation not supported for dtype `i16` (expected: date/datetime)
+Expr.dt.replace | Int16 | ambiguous=latest | refused rows: `round` operation not supported for dtype `i16` (expected: date/datetime)
+Expr.dt.replace | Int16 | ambiguous=null | refused rows: `round` operation not supported for dtype `i16` (expected: date/datetime)
+Expr.dt.replace | Int16 | ambiguous=raise | refused rows: `round` operation not supported for dtype `i16` (expected: date/datetime)
+Expr.dt.replace | Int32 | ambiguous=earliest | refused rows: `round` operation not supported for dtype `i32` (expected: date/datetime)
+Expr.dt.replace | Int32 | ambiguous=latest | refused rows: `round` operation not supported for dtype `i32` (expected: date/datetime)
+Expr.dt.replace | Int32 | ambiguous=null | refused rows: `round` operation not supported for dtype `i32` (expected: date/datetime)
+Expr.dt.replace | Int32 | ambiguous=raise | refused rows: `round` operation not supported for dtype `i32` (expected: date/datetime)
+Expr.dt.replace | Int64 | ambiguous=earliest | refused rows: `round` operation not supported for dtype `i64` (expected: date/datetime)
+Expr.dt.replace | Int64 | ambiguous=latest | refused rows: `round` operation not supported for dtype `i64` (expected: date/datetime)
+Expr.dt.replace | Int64 | ambiguous=null | refused rows: `round` operation not supported for dtype `i64` (expected: date/datetime)
+Expr.dt.replace | Int64 | ambiguous=raise | refused rows: `round` operation not supported for dtype `i64` (expected: date/datetime)
+Expr.dt.replace | Int8 | ambiguous=earliest | refused rows: `round` operation not supported for dtype `i8` (expected: date/datetime)
+Expr.dt.replace | Int8 | ambiguous=latest | refused rows: `round` operation not supported for dtype `i8` (expected: date/datetime)
+Expr.dt.replace | Int8 | ambiguous=null | refused rows: `round` operation not supported for dtype `i8` (expected: date/datetime)
+Expr.dt.replace | Int8 | ambiguous=raise | refused rows: `round` operation not supported for dtype `i8` (expected: date/datetime)
+Expr.dt.replace | List(Int64) | ambiguous=earliest | refused rows: `round` operation not supported for dtype `list[i64]` (expected: date/datetime)
+Expr.dt.replace | List(Int64) | ambiguous=latest | refused rows: `round` operation not supported for dtype `list[i64]` (expected: date/datetime)
+Expr.dt.replace | List(Int64) | ambiguous=null | refused rows: `round` operation not supported for dtype `list[i64]` (expected: date/datetime)
+Expr.dt.replace | List(Int64) | ambiguous=raise | refused rows: `round` operation not supported for dtype `list[i64]` (expected: date/datetime)
+Expr.dt.replace | List(String) | ambiguous=earliest | refused rows: `round` operation not supported for dtype `list[str]` (expected: date/datetime)
+Expr.dt.replace | List(String) | ambiguous=latest | refused rows: `round` operation not supported for dtype `list[str]` (expected: date/datetime)
+Expr.dt.replace | List(String) | ambiguous=null | refused rows: `round` operation not supported for dtype `list[str]` (expected: date/datetime)
+Expr.dt.replace | List(String) | ambiguous=raise | refused rows: `round` operation not supported for dtype `list[str]` (expected: date/datetime)
+Expr.dt.replace | Null | ambiguous=earliest | refused rows: `round` operation not supported for dtype `null` (expected: date/datetime)
+Expr.dt.replace | Null | ambiguous=latest | refused rows: `round` operation not supported for dtype `null` (expected: date/datetime)
+Expr.dt.replace | Null | ambiguous=null | refused rows: `round` operation not supported for dtype `null` (expected: date/datetime)
+Expr.dt.replace | Null | ambiguous=raise | refused rows: `round` operation not supported for dtype `null` (expected: date/datetime)
+Expr.dt.replace | String | ambiguous=earliest | refused rows: `round` operation not supported for dtype `str` (expected: date/datetime)
+Expr.dt.replace | String | ambiguous=latest | refused rows: `round` operation not supported for dtype `str` (expected: date/datetime)
+Expr.dt.replace | String | ambiguous=null | refused rows: `round` operation not supported for dtype `str` (expected: date/datetime)
+Expr.dt.replace | String | ambiguous=raise | refused rows: `round` operation not supported for dtype `str` (expected: date/datetime)
+Expr.dt.replace | Struct(x: Int64, y: String) | ambiguous=earliest | refused rows: `round` operation not supported for dtype `struct[2]` (expected: date/datetime)
+Expr.dt.replace | Struct(x: Int64, y: String) | ambiguous=latest | refused rows: `round` operation not supported for dtype `struct[2]` (expected: date/datetime)
+Expr.dt.replace | Struct(x: Int64, y: String) | ambiguous=null | refused rows: `round` operation not supported for dtype `struct[2]` (expected: date/datetime)
+Expr.dt.replace | Struct(x: Int64, y: String) | ambiguous=raise | refused rows: `round` operation not supported for dtype `struct[2]` (expected: date/datetime)
+Expr.dt.replace | Time | ambiguous=earliest | refused rows: `round` operation not supported for dtype `time` (expected: date/datetime)
+Expr.dt.replace | Time | ambiguous=latest | refused rows: `round` operation not supported for dtype `time` (expected: date/datetime)
+Expr.dt.replace | Time | ambiguous=null | refused rows: `round` operation not supported for dtype `time` (expected: date/datetime)
+Expr.dt.replace | Time | ambiguous=raise | refused rows: `round` operation not supported for dtype `time` (expected: date/datetime)
+Expr.dt.replace | UInt128 | ambiguous=earliest | refused rows: `round` operation not supported for dtype `u128` (expected: date/datetime)
+Expr.dt.replace | UInt128 | ambiguous=latest | refused rows: `round` operation not supported for dtype `u128` (expected: date/datetime)
+Expr.dt.replace | UInt128 | ambiguous=null | refused rows: `round` operation not supported for dtype `u128` (expected: date/datetime)
+Expr.dt.replace | UInt128 | ambiguous=raise | refused rows: `round` operation not supported for dtype `u128` (expected: date/datetime)
+Expr.dt.replace | UInt16 | ambiguous=earliest | refused rows: `round` operation not supported for dtype `u16` (expected: date/datetime)
+Expr.dt.replace | UInt16 | ambiguous=latest | refused rows: `round` operation not supported for dtype `u16` (expected: date/datetime)
+Expr.dt.replace | UInt16 | ambiguous=null | refused rows: `round` operation not supported for dtype `u16` (expected: date/datetime)
+Expr.dt.replace | UInt16 | ambiguous=raise | refused rows: `round` operation not supported for dtype `u16` (expected: date/datetime)
+Expr.dt.replace | UInt32 | ambiguous=earliest | refused rows: `round` operation not supported for dtype `u32` (expected: date/datetime)
+Expr.dt.replace | UInt32 | ambiguous=latest | refused rows: `round` operation not supported for dtype `u32` (expected: date/datetime)
+Expr.dt.replace | UInt32 | ambiguous=null | refused rows: `round` operation not supported for dtype `u32` (expected: date/datetime)
+Expr.dt.replace | UInt32 | ambiguous=raise | refused rows: `round` operation not supported for dtype `u32` (expected: date/datetime)
+Expr.dt.replace | UInt64 | ambiguous=earliest | refused rows: `round` operation not supported for dtype `u64` (expected: date/datetime)
+Expr.dt.replace | UInt64 | ambiguous=latest | refused rows: `round` operation not supported for dtype `u64` (expected: date/datetime)
+Expr.dt.replace | UInt64 | ambiguous=null | refused rows: `round` operation not supported for dtype `u64` (expected: date/datetime)
+Expr.dt.replace | UInt64 | ambiguous=raise | refused rows: `round` operation not supported for dtype `u64` (expected: date/datetime)
+Expr.dt.replace | UInt8 | ambiguous=earliest | refused rows: `round` operation not supported for dtype `u8` (expected: date/datetime)
+Expr.dt.replace | UInt8 | ambiguous=latest | refused rows: `round` operation not supported for dtype `u8` (expected: date/datetime)
+Expr.dt.replace | UInt8 | ambiguous=null | refused rows: `round` operation not supported for dtype `u8` (expected: date/datetime)
+Expr.dt.replace | UInt8 | ambiguous=raise | refused rows: `round` operation not supported for dtype `u8` (expected: date/datetime)
+Expr.dt.replace_time_zone | Array(Int64, 2) | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `array[i64, 2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Array(Int64, 2) | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `array[i64, 2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Array(Int64, 2) | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `array[i64, 2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Array(Int64, 2) | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `array[i64, 2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Array(Int64, 2) | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `array[i64, 2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Array(Int64, 2) | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `array[i64, 2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Array(Int64, 2) | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `array[i64, 2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Array(Int64, 2) | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `array[i64, 2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Boolean | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `bool` (expected: Datetime)
+Expr.dt.replace_time_zone | Boolean | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `bool` (expected: Datetime)
+Expr.dt.replace_time_zone | Boolean | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `bool` (expected: Datetime)
+Expr.dt.replace_time_zone | Boolean | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `bool` (expected: Datetime)
+Expr.dt.replace_time_zone | Boolean | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `bool` (expected: Datetime)
+Expr.dt.replace_time_zone | Boolean | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `bool` (expected: Datetime)
+Expr.dt.replace_time_zone | Boolean | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `bool` (expected: Datetime)
+Expr.dt.replace_time_zone | Boolean | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `bool` (expected: Datetime)
+Expr.dt.replace_time_zone | Date | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `date` (expected: Datetime)
+Expr.dt.replace_time_zone | Date | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `date` (expected: Datetime)
+Expr.dt.replace_time_zone | Date | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `date` (expected: Datetime)
+Expr.dt.replace_time_zone | Date | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `date` (expected: Datetime)
+Expr.dt.replace_time_zone | Date | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `date` (expected: Datetime)
+Expr.dt.replace_time_zone | Date | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `date` (expected: Datetime)
+Expr.dt.replace_time_zone | Date | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `date` (expected: Datetime)
+Expr.dt.replace_time_zone | Date | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `date` (expected: Datetime)
+Expr.dt.replace_time_zone | Datetime(us) | ambiguous=earliest, non_existent=null | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | Datetime(us) | ambiguous=earliest, non_existent=raise | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | Datetime(us) | ambiguous=latest, non_existent=null | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | Datetime(us) | ambiguous=latest, non_existent=raise | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | Datetime(us) | ambiguous=null, non_existent=null | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | Datetime(us) | ambiguous=null, non_existent=raise | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | Datetime(us) | ambiguous=raise, non_existent=null | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | Datetime(us) | ambiguous=raise, non_existent=raise | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | Datetime(us, UTC) | ambiguous=earliest, non_existent=null | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | Datetime(us, UTC) | ambiguous=earliest, non_existent=raise | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | Datetime(us, UTC) | ambiguous=latest, non_existent=null | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | Datetime(us, UTC) | ambiguous=latest, non_existent=raise | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | Datetime(us, UTC) | ambiguous=null, non_existent=null | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | Datetime(us, UTC) | ambiguous=null, non_existent=raise | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | Datetime(us, UTC) | ambiguous=raise, non_existent=null | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | Datetime(us, UTC) | ambiguous=raise, non_existent=raise | allowed Datetime(us, UTC) many
+Expr.dt.replace_time_zone | Decimal(10, 2) | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `decimal[10,2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Decimal(10, 2) | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `decimal[10,2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Decimal(10, 2) | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `decimal[10,2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Decimal(10, 2) | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `decimal[10,2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Decimal(10, 2) | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `decimal[10,2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Decimal(10, 2) | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `decimal[10,2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Decimal(10, 2) | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `decimal[10,2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Decimal(10, 2) | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `decimal[10,2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Duration(us) | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `duration[μs]` (expected: Datetime)
+Expr.dt.replace_time_zone | Duration(us) | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `duration[μs]` (expected: Datetime)
+Expr.dt.replace_time_zone | Duration(us) | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `duration[μs]` (expected: Datetime)
+Expr.dt.replace_time_zone | Duration(us) | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `duration[μs]` (expected: Datetime)
+Expr.dt.replace_time_zone | Duration(us) | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `duration[μs]` (expected: Datetime)
+Expr.dt.replace_time_zone | Duration(us) | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `duration[μs]` (expected: Datetime)
+Expr.dt.replace_time_zone | Duration(us) | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `duration[μs]` (expected: Datetime)
+Expr.dt.replace_time_zone | Duration(us) | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `duration[μs]` (expected: Datetime)
+Expr.dt.replace_time_zone | Float16 | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `f16` (expected: Datetime)
+Expr.dt.replace_time_zone | Float16 | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `f16` (expected: Datetime)
+Expr.dt.replace_time_zone | Float16 | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `f16` (expected: Datetime)
+Expr.dt.replace_time_zone | Float16 | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `f16` (expected: Datetime)
+Expr.dt.replace_time_zone | Float16 | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `f16` (expected: Datetime)
+Expr.dt.replace_time_zone | Float16 | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `f16` (expected: Datetime)
+Expr.dt.replace_time_zone | Float16 | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `f16` (expected: Datetime)
+Expr.dt.replace_time_zone | Float16 | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `f16` (expected: Datetime)
+Expr.dt.replace_time_zone | Float32 | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `f32` (expected: Datetime)
+Expr.dt.replace_time_zone | Float32 | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `f32` (expected: Datetime)
+Expr.dt.replace_time_zone | Float32 | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `f32` (expected: Datetime)
+Expr.dt.replace_time_zone | Float32 | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `f32` (expected: Datetime)
+Expr.dt.replace_time_zone | Float32 | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `f32` (expected: Datetime)
+Expr.dt.replace_time_zone | Float32 | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `f32` (expected: Datetime)
+Expr.dt.replace_time_zone | Float32 | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `f32` (expected: Datetime)
+Expr.dt.replace_time_zone | Float32 | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `f32` (expected: Datetime)
+Expr.dt.replace_time_zone | Float64 | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `f64` (expected: Datetime)
+Expr.dt.replace_time_zone | Float64 | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `f64` (expected: Datetime)
+Expr.dt.replace_time_zone | Float64 | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `f64` (expected: Datetime)
+Expr.dt.replace_time_zone | Float64 | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `f64` (expected: Datetime)
+Expr.dt.replace_time_zone | Float64 | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `f64` (expected: Datetime)
+Expr.dt.replace_time_zone | Float64 | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `f64` (expected: Datetime)
+Expr.dt.replace_time_zone | Float64 | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `f64` (expected: Datetime)
+Expr.dt.replace_time_zone | Float64 | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `f64` (expected: Datetime)
+Expr.dt.replace_time_zone | Int128 | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `i128` (expected: Datetime)
+Expr.dt.replace_time_zone | Int128 | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `i128` (expected: Datetime)
+Expr.dt.replace_time_zone | Int128 | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `i128` (expected: Datetime)
+Expr.dt.replace_time_zone | Int128 | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `i128` (expected: Datetime)
+Expr.dt.replace_time_zone | Int128 | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `i128` (expected: Datetime)
+Expr.dt.replace_time_zone | Int128 | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `i128` (expected: Datetime)
+Expr.dt.replace_time_zone | Int128 | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `i128` (expected: Datetime)
+Expr.dt.replace_time_zone | Int128 | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `i128` (expected: Datetime)
+Expr.dt.replace_time_zone | Int16 | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `i16` (expected: Datetime)
+Expr.dt.replace_time_zone | Int16 | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `i16` (expected: Datetime)
+Expr.dt.replace_time_zone | Int16 | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `i16` (expected: Datetime)
+Expr.dt.replace_time_zone | Int16 | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `i16` (expected: Datetime)
+Expr.dt.replace_time_zone | Int16 | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `i16` (expected: Datetime)
+Expr.dt.replace_time_zone | Int16 | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `i16` (expected: Datetime)
+Expr.dt.replace_time_zone | Int16 | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `i16` (expected: Datetime)
+Expr.dt.replace_time_zone | Int16 | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `i16` (expected: Datetime)
+Expr.dt.replace_time_zone | Int32 | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `i32` (expected: Datetime)
+Expr.dt.replace_time_zone | Int32 | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `i32` (expected: Datetime)
+Expr.dt.replace_time_zone | Int32 | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `i32` (expected: Datetime)
+Expr.dt.replace_time_zone | Int32 | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `i32` (expected: Datetime)
+Expr.dt.replace_time_zone | Int32 | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `i32` (expected: Datetime)
+Expr.dt.replace_time_zone | Int32 | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `i32` (expected: Datetime)
+Expr.dt.replace_time_zone | Int32 | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `i32` (expected: Datetime)
+Expr.dt.replace_time_zone | Int32 | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `i32` (expected: Datetime)
+Expr.dt.replace_time_zone | Int64 | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `i64` (expected: Datetime)
+Expr.dt.replace_time_zone | Int64 | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `i64` (expected: Datetime)
+Expr.dt.replace_time_zone | Int64 | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `i64` (expected: Datetime)
+Expr.dt.replace_time_zone | Int64 | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `i64` (expected: Datetime)
+Expr.dt.replace_time_zone | Int64 | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `i64` (expected: Datetime)
+Expr.dt.replace_time_zone | Int64 | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `i64` (expected: Datetime)
+Expr.dt.replace_time_zone | Int64 | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `i64` (expected: Datetime)
+Expr.dt.replace_time_zone | Int64 | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `i64` (expected: Datetime)
+Expr.dt.replace_time_zone | Int8 | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `i8` (expected: Datetime)
+Expr.dt.replace_time_zone | Int8 | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `i8` (expected: Datetime)
+Expr.dt.replace_time_zone | Int8 | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `i8` (expected: Datetime)
+Expr.dt.replace_time_zone | Int8 | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `i8` (expected: Datetime)
+Expr.dt.replace_time_zone | Int8 | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `i8` (expected: Datetime)
+Expr.dt.replace_time_zone | Int8 | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `i8` (expected: Datetime)
+Expr.dt.replace_time_zone | Int8 | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `i8` (expected: Datetime)
+Expr.dt.replace_time_zone | Int8 | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `i8` (expected: Datetime)
+Expr.dt.replace_time_zone | List(Int64) | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `list[i64]` (expected: Datetime)
+Expr.dt.replace_time_zone | List(Int64) | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `list[i64]` (expected: Datetime)
+Expr.dt.replace_time_zone | List(Int64) | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `list[i64]` (expected: Datetime)
+Expr.dt.replace_time_zone | List(Int64) | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `list[i64]` (expected: Datetime)
+Expr.dt.replace_time_zone | List(Int64) | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `list[i64]` (expected: Datetime)
+Expr.dt.replace_time_zone | List(Int64) | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `list[i64]` (expected: Datetime)
+Expr.dt.replace_time_zone | List(Int64) | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `list[i64]` (expected: Datetime)
+Expr.dt.replace_time_zone | List(Int64) | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `list[i64]` (expected: Datetime)
+Expr.dt.replace_time_zone | List(String) | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `list[str]` (expected: Datetime)
+Expr.dt.replace_time_zone | List(String) | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `list[str]` (expected: Datetime)
+Expr.dt.replace_time_zone | List(String) | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `list[str]` (expected: Datetime)
+Expr.dt.replace_time_zone | List(String) | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `list[str]` (expected: Datetime)
+Expr.dt.replace_time_zone | List(String) | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `list[str]` (expected: Datetime)
+Expr.dt.replace_time_zone | List(String) | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `list[str]` (expected: Datetime)
+Expr.dt.replace_time_zone | List(String) | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `list[str]` (expected: Datetime)
+Expr.dt.replace_time_zone | List(String) | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `list[str]` (expected: Datetime)
+Expr.dt.replace_time_zone | Null | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `null` (expected: Datetime)
+Expr.dt.replace_time_zone | Null | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `null` (expected: Datetime)
+Expr.dt.replace_time_zone | Null | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `null` (expected: Datetime)
+Expr.dt.replace_time_zone | Null | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `null` (expected: Datetime)
+Expr.dt.replace_time_zone | Null | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `null` (expected: Datetime)
+Expr.dt.replace_time_zone | Null | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `null` (expected: Datetime)
+Expr.dt.replace_time_zone | Null | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `null` (expected: Datetime)
+Expr.dt.replace_time_zone | Null | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `null` (expected: Datetime)
+Expr.dt.replace_time_zone | String | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `str` (expected: Datetime)
+Expr.dt.replace_time_zone | String | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `str` (expected: Datetime)
+Expr.dt.replace_time_zone | String | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `str` (expected: Datetime)
+Expr.dt.replace_time_zone | String | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `str` (expected: Datetime)
+Expr.dt.replace_time_zone | String | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `str` (expected: Datetime)
+Expr.dt.replace_time_zone | String | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `str` (expected: Datetime)
+Expr.dt.replace_time_zone | String | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `str` (expected: Datetime)
+Expr.dt.replace_time_zone | String | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `str` (expected: Datetime)
+Expr.dt.replace_time_zone | Struct(x: Int64, y: String) | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `struct[2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Struct(x: Int64, y: String) | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `struct[2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Struct(x: Int64, y: String) | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `struct[2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Struct(x: Int64, y: String) | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `struct[2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Struct(x: Int64, y: String) | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `struct[2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Struct(x: Int64, y: String) | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `struct[2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Struct(x: Int64, y: String) | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `struct[2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Struct(x: Int64, y: String) | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `struct[2]` (expected: Datetime)
+Expr.dt.replace_time_zone | Time | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `time` (expected: Datetime)
+Expr.dt.replace_time_zone | Time | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `time` (expected: Datetime)
+Expr.dt.replace_time_zone | Time | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `time` (expected: Datetime)
+Expr.dt.replace_time_zone | Time | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `time` (expected: Datetime)
+Expr.dt.replace_time_zone | Time | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `time` (expected: Datetime)
+Expr.dt.replace_time_zone | Time | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `time` (expected: Datetime)
+Expr.dt.replace_time_zone | Time | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `time` (expected: Datetime)
+Expr.dt.replace_time_zone | Time | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `time` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt128 | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `u128` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt128 | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `u128` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt128 | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `u128` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt128 | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `u128` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt128 | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `u128` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt128 | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `u128` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt128 | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `u128` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt128 | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `u128` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt16 | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `u16` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt16 | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `u16` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt16 | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `u16` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt16 | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `u16` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt16 | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `u16` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt16 | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `u16` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt16 | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `u16` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt16 | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `u16` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt32 | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `u32` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt32 | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `u32` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt32 | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `u32` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt32 | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `u32` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt32 | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `u32` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt32 | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `u32` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt32 | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `u32` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt32 | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `u32` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt64 | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `u64` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt64 | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `u64` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt64 | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `u64` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt64 | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `u64` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt64 | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `u64` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt64 | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `u64` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt64 | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `u64` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt64 | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `u64` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt8 | ambiguous=earliest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `u8` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt8 | ambiguous=earliest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `u8` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt8 | ambiguous=latest, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `u8` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt8 | ambiguous=latest, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `u8` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt8 | ambiguous=null, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `u8` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt8 | ambiguous=null, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `u8` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt8 | ambiguous=raise, non_existent=null | refused schema: replace-time-zone operation not supported for dtype `u8` (expected: Datetime)
+Expr.dt.replace_time_zone | UInt8 | ambiguous=raise, non_existent=raise | refused schema: replace-time-zone operation not supported for dtype `u8` (expected: Datetime)
+Expr.dt.second | Array(Int64, 2) | fractional=false | refused rows: `second` operation not supported for dtype `array[i64, 2]`
+Expr.dt.second | Array(Int64, 2) | fractional=true | refused rows: `second` operation not supported for dtype `array[i64, 2]`
+Expr.dt.second | Boolean | fractional=false | refused rows: `second` operation not supported for dtype `bool`
+Expr.dt.second | Boolean | fractional=true | refused rows: `second` operation not supported for dtype `bool`
+Expr.dt.second | Date | fractional=false | refused rows: `second` operation not supported for dtype `date`
+Expr.dt.second | Date | fractional=true | refused rows: `second` operation not supported for dtype `date`
+Expr.dt.second | Datetime(us) | fractional=false | allowed Int8 many
+Expr.dt.second | Datetime(us) | fractional=true | allowed Float64 many
+Expr.dt.second | Datetime(us, UTC) | fractional=false | allowed Int8 many
+Expr.dt.second | Datetime(us, UTC) | fractional=true | allowed Float64 many
+Expr.dt.second | Decimal(10, 2) | fractional=false | refused rows: `second` operation not supported for dtype `decimal[10,2]`
+Expr.dt.second | Decimal(10, 2) | fractional=true | refused rows: `second` operation not supported for dtype `decimal[10,2]`
+Expr.dt.second | Duration(us) | fractional=false | refused rows: `second` operation not supported for dtype `duration[μs]`
+Expr.dt.second | Duration(us) | fractional=true | refused rows: `second` operation not supported for dtype `duration[μs]`
+Expr.dt.second | Float16 | fractional=false | refused rows: `second` operation not supported for dtype `f16`
+Expr.dt.second | Float16 | fractional=true | refused rows: `second` operation not supported for dtype `f16`
+Expr.dt.second | Float32 | fractional=false | refused rows: `second` operation not supported for dtype `f32`
+Expr.dt.second | Float32 | fractional=true | refused rows: `second` operation not supported for dtype `f32`
+Expr.dt.second | Float64 | fractional=false | refused rows: `second` operation not supported for dtype `f64`
+Expr.dt.second | Float64 | fractional=true | refused rows: `second` operation not supported for dtype `f64`
+Expr.dt.second | Int128 | fractional=false | refused rows: `second` operation not supported for dtype `i128`
+Expr.dt.second | Int128 | fractional=true | refused rows: `second` operation not supported for dtype `i128`
+Expr.dt.second | Int16 | fractional=false | refused rows: `second` operation not supported for dtype `i16`
+Expr.dt.second | Int16 | fractional=true | refused rows: `second` operation not supported for dtype `i16`
+Expr.dt.second | Int32 | fractional=false | refused rows: `second` operation not supported for dtype `i32`
+Expr.dt.second | Int32 | fractional=true | refused rows: `second` operation not supported for dtype `i32`
+Expr.dt.second | Int64 | fractional=false | refused rows: `second` operation not supported for dtype `i64`
+Expr.dt.second | Int64 | fractional=true | refused rows: `second` operation not supported for dtype `i64`
+Expr.dt.second | Int8 | fractional=false | refused rows: `second` operation not supported for dtype `i8`
+Expr.dt.second | Int8 | fractional=true | refused rows: `second` operation not supported for dtype `i8`
+Expr.dt.second | List(Int64) | fractional=false | refused rows: `second` operation not supported for dtype `list[i64]`
+Expr.dt.second | List(Int64) | fractional=true | refused rows: `second` operation not supported for dtype `list[i64]`
+Expr.dt.second | List(String) | fractional=false | refused rows: `second` operation not supported for dtype `list[str]`
+Expr.dt.second | List(String) | fractional=true | refused rows: `second` operation not supported for dtype `list[str]`
+Expr.dt.second | Null | fractional=false | refused rows: `second` operation not supported for dtype `null`
+Expr.dt.second | Null | fractional=true | refused rows: `second` operation not supported for dtype `null`
+Expr.dt.second | String | fractional=false | refused rows: `second` operation not supported for dtype `str`
+Expr.dt.second | String | fractional=true | refused rows: `second` operation not supported for dtype `str`
+Expr.dt.second | Struct(x: Int64, y: String) | fractional=false | refused rows: `second` operation not supported for dtype `struct[2]`
+Expr.dt.second | Struct(x: Int64, y: String) | fractional=true | refused rows: `second` operation not supported for dtype `struct[2]`
+Expr.dt.second | Time | fractional=false | allowed Int8 many
+Expr.dt.second | Time | fractional=true | allowed Float64 many
+Expr.dt.second | UInt128 | fractional=false | refused rows: `second` operation not supported for dtype `u128`
+Expr.dt.second | UInt128 | fractional=true | refused rows: `second` operation not supported for dtype `u128`
+Expr.dt.second | UInt16 | fractional=false | refused rows: `second` operation not supported for dtype `u16`
+Expr.dt.second | UInt16 | fractional=true | refused rows: `second` operation not supported for dtype `u16`
+Expr.dt.second | UInt32 | fractional=false | refused rows: `second` operation not supported for dtype `u32`
+Expr.dt.second | UInt32 | fractional=true | refused rows: `second` operation not supported for dtype `u32`
+Expr.dt.second | UInt64 | fractional=false | refused rows: `second` operation not supported for dtype `u64`
+Expr.dt.second | UInt64 | fractional=true | refused rows: `second` operation not supported for dtype `u64`
+Expr.dt.second | UInt8 | fractional=false | refused rows: `second` operation not supported for dtype `u8`
+Expr.dt.second | UInt8 | fractional=true | refused rows: `second` operation not supported for dtype `u8`
+Expr.dt.timestamp | Array(Int64, 2) | time_unit=ms | refused rows: cannot cast Array type (inner: 'Int64', to: 'Datetime('ms')')
+Expr.dt.timestamp | Array(Int64, 2) | time_unit=ns | refused rows: cannot cast Array type (inner: 'Int64', to: 'Datetime('ns')')
+Expr.dt.timestamp | Array(Int64, 2) | time_unit=us | refused rows: cannot cast Array type (inner: 'Int64', to: 'Datetime('μs')')
+Expr.dt.timestamp | Boolean | time_unit=ms | allowed Int64 many
+Expr.dt.timestamp | Boolean | time_unit=ns | allowed Int64 many
+Expr.dt.timestamp | Boolean | time_unit=us | allowed Int64 many
+Expr.dt.timestamp | Date | time_unit=ms | allowed Int64 many
+Expr.dt.timestamp | Date | time_unit=ns | allowed Int64 many
+Expr.dt.timestamp | Date | time_unit=us | allowed Int64 many
+Expr.dt.timestamp | Datetime(us) | time_unit=ms | allowed Int64 many
+Expr.dt.timestamp | Datetime(us) | time_unit=ns | allowed Int64 many
+Expr.dt.timestamp | Datetime(us) | time_unit=us | allowed Int64 many
+Expr.dt.timestamp | Datetime(us, UTC) | time_unit=ms | allowed Int64 many
+Expr.dt.timestamp | Datetime(us, UTC) | time_unit=ns | allowed Int64 many
+Expr.dt.timestamp | Datetime(us, UTC) | time_unit=us | allowed Int64 many
+Expr.dt.timestamp | Decimal(10, 2) | time_unit=ms | refused rows: casting from Decimal(10, 2) to Datetime('ms') not supported
+Expr.dt.timestamp | Decimal(10, 2) | time_unit=ns | refused rows: casting from Decimal(10, 2) to Datetime('ns') not supported
+Expr.dt.timestamp | Decimal(10, 2) | time_unit=us | refused rows: casting from Decimal(10, 2) to Datetime('μs') not supported
+Expr.dt.timestamp | Duration(us) | time_unit=ms | refused rows: `timestamp` operation not supported for dtype `duration[μs]`
+Expr.dt.timestamp | Duration(us) | time_unit=ns | refused rows: `timestamp` operation not supported for dtype `duration[μs]`
+Expr.dt.timestamp | Duration(us) | time_unit=us | refused rows: `timestamp` operation not supported for dtype `duration[μs]`
+Expr.dt.timestamp | Float16 | time_unit=ms | allowed Int64 many
+Expr.dt.timestamp | Float16 | time_unit=ns | allowed Int64 many
+Expr.dt.timestamp | Float16 | time_unit=us | allowed Int64 many
+Expr.dt.timestamp | Float32 | time_unit=ms | allowed Int64 many
+Expr.dt.timestamp | Float32 | time_unit=ns | allowed Int64 many
+Expr.dt.timestamp | Float32 | time_unit=us | allowed Int64 many
+Expr.dt.timestamp | Float64 | time_unit=ms | allowed Int64 many
+Expr.dt.timestamp | Float64 | time_unit=ns | allowed Int64 many
+Expr.dt.timestamp | Float64 | time_unit=us | allowed Int64 many
+Expr.dt.timestamp | Int128 | time_unit=ms | allowed Int64 many
+Expr.dt.timestamp | Int128 | time_unit=ns | allowed Int64 many
+Expr.dt.timestamp | Int128 | time_unit=us | allowed Int64 many
+Expr.dt.timestamp | Int16 | time_unit=ms | allowed Int64 many
+Expr.dt.timestamp | Int16 | time_unit=ns | allowed Int64 many
+Expr.dt.timestamp | Int16 | time_unit=us | allowed Int64 many
+Expr.dt.timestamp | Int32 | time_unit=ms | allowed Int64 many
+Expr.dt.timestamp | Int32 | time_unit=ns | allowed Int64 many
+Expr.dt.timestamp | Int32 | time_unit=us | allowed Int64 many
+Expr.dt.timestamp | Int64 | time_unit=ms | allowed Int64 many
+Expr.dt.timestamp | Int64 | time_unit=ns | allowed Int64 many
+Expr.dt.timestamp | Int64 | time_unit=us | allowed Int64 many
+Expr.dt.timestamp | Int8 | time_unit=ms | allowed Int64 many
+Expr.dt.timestamp | Int8 | time_unit=ns | allowed Int64 many
+Expr.dt.timestamp | Int8 | time_unit=us | allowed Int64 many
+Expr.dt.timestamp | List(Int64) | time_unit=ms | refused rows: cannot cast List type (inner: 'Int64', to: 'Datetime('ms')')
+Expr.dt.timestamp | List(Int64) | time_unit=ns | refused rows: cannot cast List type (inner: 'Int64', to: 'Datetime('ns')')
+Expr.dt.timestamp | List(Int64) | time_unit=us | refused rows: cannot cast List type (inner: 'Int64', to: 'Datetime('μs')')
+Expr.dt.timestamp | List(String) | time_unit=ms | refused rows: cannot cast List type (inner: 'String', to: 'Datetime('ms')')
+Expr.dt.timestamp | List(String) | time_unit=ns | refused rows: cannot cast List type (inner: 'String', to: 'Datetime('ns')')
+Expr.dt.timestamp | List(String) | time_unit=us | refused rows: cannot cast List type (inner: 'String', to: 'Datetime('μs')')
+Expr.dt.timestamp | Null | time_unit=ms | allowed Int64 many
+Expr.dt.timestamp | Null | time_unit=ns | allowed Int64 many
+Expr.dt.timestamp | Null | time_unit=us | allowed Int64 many
+Expr.dt.timestamp | String | time_unit=ms | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+Expr.dt.timestamp | String | time_unit=ns | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+Expr.dt.timestamp | String | time_unit=us | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+Expr.dt.timestamp | Struct(x: Int64, y: String) | time_unit=ms | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+Expr.dt.timestamp | Struct(x: Int64, y: String) | time_unit=ns | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+Expr.dt.timestamp | Struct(x: Int64, y: String) | time_unit=us | refused rows: casting from string to datetime is not supported. It was removed in Polars 2.0. Use `str.to_datetime()` instead.
+Expr.dt.timestamp | Time | time_unit=ms | refused rows: `timestamp` operation not supported for dtype `time`
+Expr.dt.timestamp | Time | time_unit=ns | refused rows: `timestamp` operation not supported for dtype `time`
+Expr.dt.timestamp | Time | time_unit=us | refused rows: `timestamp` operation not supported for dtype `time`
+Expr.dt.timestamp | UInt128 | time_unit=ms | allowed Int64 many
+Expr.dt.timestamp | UInt128 | time_unit=ns | allowed Int64 many
+Expr.dt.timestamp | UInt128 | time_unit=us | allowed Int64 many
+Expr.dt.timestamp | UInt16 | time_unit=ms | allowed Int64 many
+Expr.dt.timestamp | UInt16 | time_unit=ns | allowed Int64 many
+Expr.dt.timestamp | UInt16 | time_unit=us | allowed Int64 many
+Expr.dt.timestamp | UInt32 | time_unit=ms | allowed Int64 many
+Expr.dt.timestamp | UInt32 | time_unit=ns | allowed Int64 many
+Expr.dt.timestamp | UInt32 | time_unit=us | allowed Int64 many
+Expr.dt.timestamp | UInt64 | time_unit=ms | allowed Int64 many
+Expr.dt.timestamp | UInt64 | time_unit=ns | allowed Int64 many
+Expr.dt.timestamp | UInt64 | time_unit=us | allowed Int64 many
+Expr.dt.timestamp | UInt8 | time_unit=ms | allowed Int64 many
+Expr.dt.timestamp | UInt8 | time_unit=ns | allowed Int64 many
+Expr.dt.timestamp | UInt8 | time_unit=us | allowed Int64 many
 Expr.dt.total_days | Array(Int64, 2) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `array[i64, 2]` for series with name `a`
 Expr.dt.total_days | Array(Int64, 2) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `array[i64, 2]` for series with name `a`
 Expr.dt.total_days | Boolean | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `bool` for series with name `a`
@@ -2036,6 +2764,318 @@ Expr.dt.total_days | UInt64 | fractional=false | refused rows: invalid series dt
 Expr.dt.total_days | UInt64 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u64` for series with name `a`
 Expr.dt.total_days | UInt8 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
 Expr.dt.total_days | UInt8 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
+Expr.dt.total_hours | Array(Int64, 2) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `array[i64, 2]` for series with name `a`
+Expr.dt.total_hours | Array(Int64, 2) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `array[i64, 2]` for series with name `a`
+Expr.dt.total_hours | Boolean | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `bool` for series with name `a`
+Expr.dt.total_hours | Boolean | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `bool` for series with name `a`
+Expr.dt.total_hours | Date | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `date` for series with name `a`
+Expr.dt.total_hours | Date | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `date` for series with name `a`
+Expr.dt.total_hours | Datetime(us) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`
+Expr.dt.total_hours | Datetime(us) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`
+Expr.dt.total_hours | Datetime(us, UTC) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.total_hours | Datetime(us, UTC) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.total_hours | Decimal(10, 2) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `decimal[10,2]` for series with name `a`
+Expr.dt.total_hours | Decimal(10, 2) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `decimal[10,2]` for series with name `a`
+Expr.dt.total_hours | Duration(us) | fractional=false | allowed Int64 many
+Expr.dt.total_hours | Duration(us) | fractional=true | allowed Float64 many
+Expr.dt.total_hours | Float16 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `f16` for series with name `a`
+Expr.dt.total_hours | Float16 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `f16` for series with name `a`
+Expr.dt.total_hours | Float32 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `f32` for series with name `a`
+Expr.dt.total_hours | Float32 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `f32` for series with name `a`
+Expr.dt.total_hours | Float64 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `f64` for series with name `a`
+Expr.dt.total_hours | Float64 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `f64` for series with name `a`
+Expr.dt.total_hours | Int128 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i128` for series with name `a`
+Expr.dt.total_hours | Int128 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i128` for series with name `a`
+Expr.dt.total_hours | Int16 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i16` for series with name `a`
+Expr.dt.total_hours | Int16 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i16` for series with name `a`
+Expr.dt.total_hours | Int32 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i32` for series with name `a`
+Expr.dt.total_hours | Int32 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i32` for series with name `a`
+Expr.dt.total_hours | Int64 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i64` for series with name `a`
+Expr.dt.total_hours | Int64 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i64` for series with name `a`
+Expr.dt.total_hours | Int8 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i8` for series with name `a`
+Expr.dt.total_hours | Int8 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i8` for series with name `a`
+Expr.dt.total_hours | List(Int64) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `list[i64]` for series with name `a`
+Expr.dt.total_hours | List(Int64) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `list[i64]` for series with name `a`
+Expr.dt.total_hours | List(String) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `list[str]` for series with name `a`
+Expr.dt.total_hours | List(String) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `list[str]` for series with name `a`
+Expr.dt.total_hours | Null | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `null` for series with name `a`
+Expr.dt.total_hours | Null | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `null` for series with name `a`
+Expr.dt.total_hours | String | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `str` for series with name `a`
+Expr.dt.total_hours | String | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `str` for series with name `a`
+Expr.dt.total_hours | Struct(x: Int64, y: String) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `struct[2]` for series with name `a`
+Expr.dt.total_hours | Struct(x: Int64, y: String) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `struct[2]` for series with name `a`
+Expr.dt.total_hours | Time | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `time` for series with name `a`
+Expr.dt.total_hours | Time | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `time` for series with name `a`
+Expr.dt.total_hours | UInt128 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u128` for series with name `a`
+Expr.dt.total_hours | UInt128 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u128` for series with name `a`
+Expr.dt.total_hours | UInt16 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u16` for series with name `a`
+Expr.dt.total_hours | UInt16 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u16` for series with name `a`
+Expr.dt.total_hours | UInt32 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u32` for series with name `a`
+Expr.dt.total_hours | UInt32 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u32` for series with name `a`
+Expr.dt.total_hours | UInt64 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u64` for series with name `a`
+Expr.dt.total_hours | UInt64 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u64` for series with name `a`
+Expr.dt.total_hours | UInt8 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
+Expr.dt.total_hours | UInt8 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
+Expr.dt.total_microseconds | Array(Int64, 2) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `array[i64, 2]` for series with name `a`
+Expr.dt.total_microseconds | Array(Int64, 2) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `array[i64, 2]` for series with name `a`
+Expr.dt.total_microseconds | Boolean | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `bool` for series with name `a`
+Expr.dt.total_microseconds | Boolean | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `bool` for series with name `a`
+Expr.dt.total_microseconds | Date | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `date` for series with name `a`
+Expr.dt.total_microseconds | Date | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `date` for series with name `a`
+Expr.dt.total_microseconds | Datetime(us) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`
+Expr.dt.total_microseconds | Datetime(us) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`
+Expr.dt.total_microseconds | Datetime(us, UTC) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.total_microseconds | Datetime(us, UTC) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.total_microseconds | Decimal(10, 2) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `decimal[10,2]` for series with name `a`
+Expr.dt.total_microseconds | Decimal(10, 2) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `decimal[10,2]` for series with name `a`
+Expr.dt.total_microseconds | Duration(us) | fractional=false | allowed Int64 many
+Expr.dt.total_microseconds | Duration(us) | fractional=true | allowed Float64 many
+Expr.dt.total_microseconds | Float16 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `f16` for series with name `a`
+Expr.dt.total_microseconds | Float16 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `f16` for series with name `a`
+Expr.dt.total_microseconds | Float32 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `f32` for series with name `a`
+Expr.dt.total_microseconds | Float32 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `f32` for series with name `a`
+Expr.dt.total_microseconds | Float64 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `f64` for series with name `a`
+Expr.dt.total_microseconds | Float64 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `f64` for series with name `a`
+Expr.dt.total_microseconds | Int128 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i128` for series with name `a`
+Expr.dt.total_microseconds | Int128 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i128` for series with name `a`
+Expr.dt.total_microseconds | Int16 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i16` for series with name `a`
+Expr.dt.total_microseconds | Int16 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i16` for series with name `a`
+Expr.dt.total_microseconds | Int32 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i32` for series with name `a`
+Expr.dt.total_microseconds | Int32 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i32` for series with name `a`
+Expr.dt.total_microseconds | Int64 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i64` for series with name `a`
+Expr.dt.total_microseconds | Int64 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i64` for series with name `a`
+Expr.dt.total_microseconds | Int8 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i8` for series with name `a`
+Expr.dt.total_microseconds | Int8 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i8` for series with name `a`
+Expr.dt.total_microseconds | List(Int64) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `list[i64]` for series with name `a`
+Expr.dt.total_microseconds | List(Int64) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `list[i64]` for series with name `a`
+Expr.dt.total_microseconds | List(String) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `list[str]` for series with name `a`
+Expr.dt.total_microseconds | List(String) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `list[str]` for series with name `a`
+Expr.dt.total_microseconds | Null | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `null` for series with name `a`
+Expr.dt.total_microseconds | Null | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `null` for series with name `a`
+Expr.dt.total_microseconds | String | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `str` for series with name `a`
+Expr.dt.total_microseconds | String | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `str` for series with name `a`
+Expr.dt.total_microseconds | Struct(x: Int64, y: String) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `struct[2]` for series with name `a`
+Expr.dt.total_microseconds | Struct(x: Int64, y: String) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `struct[2]` for series with name `a`
+Expr.dt.total_microseconds | Time | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `time` for series with name `a`
+Expr.dt.total_microseconds | Time | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `time` for series with name `a`
+Expr.dt.total_microseconds | UInt128 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u128` for series with name `a`
+Expr.dt.total_microseconds | UInt128 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u128` for series with name `a`
+Expr.dt.total_microseconds | UInt16 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u16` for series with name `a`
+Expr.dt.total_microseconds | UInt16 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u16` for series with name `a`
+Expr.dt.total_microseconds | UInt32 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u32` for series with name `a`
+Expr.dt.total_microseconds | UInt32 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u32` for series with name `a`
+Expr.dt.total_microseconds | UInt64 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u64` for series with name `a`
+Expr.dt.total_microseconds | UInt64 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u64` for series with name `a`
+Expr.dt.total_microseconds | UInt8 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
+Expr.dt.total_microseconds | UInt8 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
+Expr.dt.total_milliseconds | Array(Int64, 2) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `array[i64, 2]` for series with name `a`
+Expr.dt.total_milliseconds | Array(Int64, 2) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `array[i64, 2]` for series with name `a`
+Expr.dt.total_milliseconds | Boolean | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `bool` for series with name `a`
+Expr.dt.total_milliseconds | Boolean | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `bool` for series with name `a`
+Expr.dt.total_milliseconds | Date | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `date` for series with name `a`
+Expr.dt.total_milliseconds | Date | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `date` for series with name `a`
+Expr.dt.total_milliseconds | Datetime(us) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`
+Expr.dt.total_milliseconds | Datetime(us) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`
+Expr.dt.total_milliseconds | Datetime(us, UTC) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.total_milliseconds | Datetime(us, UTC) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.total_milliseconds | Decimal(10, 2) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `decimal[10,2]` for series with name `a`
+Expr.dt.total_milliseconds | Decimal(10, 2) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `decimal[10,2]` for series with name `a`
+Expr.dt.total_milliseconds | Duration(us) | fractional=false | allowed Int64 many
+Expr.dt.total_milliseconds | Duration(us) | fractional=true | allowed Float64 many
+Expr.dt.total_milliseconds | Float16 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `f16` for series with name `a`
+Expr.dt.total_milliseconds | Float16 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `f16` for series with name `a`
+Expr.dt.total_milliseconds | Float32 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `f32` for series with name `a`
+Expr.dt.total_milliseconds | Float32 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `f32` for series with name `a`
+Expr.dt.total_milliseconds | Float64 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `f64` for series with name `a`
+Expr.dt.total_milliseconds | Float64 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `f64` for series with name `a`
+Expr.dt.total_milliseconds | Int128 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i128` for series with name `a`
+Expr.dt.total_milliseconds | Int128 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i128` for series with name `a`
+Expr.dt.total_milliseconds | Int16 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i16` for series with name `a`
+Expr.dt.total_milliseconds | Int16 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i16` for series with name `a`
+Expr.dt.total_milliseconds | Int32 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i32` for series with name `a`
+Expr.dt.total_milliseconds | Int32 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i32` for series with name `a`
+Expr.dt.total_milliseconds | Int64 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i64` for series with name `a`
+Expr.dt.total_milliseconds | Int64 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i64` for series with name `a`
+Expr.dt.total_milliseconds | Int8 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i8` for series with name `a`
+Expr.dt.total_milliseconds | Int8 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i8` for series with name `a`
+Expr.dt.total_milliseconds | List(Int64) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `list[i64]` for series with name `a`
+Expr.dt.total_milliseconds | List(Int64) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `list[i64]` for series with name `a`
+Expr.dt.total_milliseconds | List(String) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `list[str]` for series with name `a`
+Expr.dt.total_milliseconds | List(String) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `list[str]` for series with name `a`
+Expr.dt.total_milliseconds | Null | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `null` for series with name `a`
+Expr.dt.total_milliseconds | Null | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `null` for series with name `a`
+Expr.dt.total_milliseconds | String | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `str` for series with name `a`
+Expr.dt.total_milliseconds | String | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `str` for series with name `a`
+Expr.dt.total_milliseconds | Struct(x: Int64, y: String) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `struct[2]` for series with name `a`
+Expr.dt.total_milliseconds | Struct(x: Int64, y: String) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `struct[2]` for series with name `a`
+Expr.dt.total_milliseconds | Time | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `time` for series with name `a`
+Expr.dt.total_milliseconds | Time | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `time` for series with name `a`
+Expr.dt.total_milliseconds | UInt128 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u128` for series with name `a`
+Expr.dt.total_milliseconds | UInt128 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u128` for series with name `a`
+Expr.dt.total_milliseconds | UInt16 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u16` for series with name `a`
+Expr.dt.total_milliseconds | UInt16 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u16` for series with name `a`
+Expr.dt.total_milliseconds | UInt32 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u32` for series with name `a`
+Expr.dt.total_milliseconds | UInt32 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u32` for series with name `a`
+Expr.dt.total_milliseconds | UInt64 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u64` for series with name `a`
+Expr.dt.total_milliseconds | UInt64 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u64` for series with name `a`
+Expr.dt.total_milliseconds | UInt8 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
+Expr.dt.total_milliseconds | UInt8 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
+Expr.dt.total_minutes | Array(Int64, 2) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `array[i64, 2]` for series with name `a`
+Expr.dt.total_minutes | Array(Int64, 2) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `array[i64, 2]` for series with name `a`
+Expr.dt.total_minutes | Boolean | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `bool` for series with name `a`
+Expr.dt.total_minutes | Boolean | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `bool` for series with name `a`
+Expr.dt.total_minutes | Date | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `date` for series with name `a`
+Expr.dt.total_minutes | Date | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `date` for series with name `a`
+Expr.dt.total_minutes | Datetime(us) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`
+Expr.dt.total_minutes | Datetime(us) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`
+Expr.dt.total_minutes | Datetime(us, UTC) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.total_minutes | Datetime(us, UTC) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.total_minutes | Decimal(10, 2) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `decimal[10,2]` for series with name `a`
+Expr.dt.total_minutes | Decimal(10, 2) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `decimal[10,2]` for series with name `a`
+Expr.dt.total_minutes | Duration(us) | fractional=false | allowed Int64 many
+Expr.dt.total_minutes | Duration(us) | fractional=true | allowed Float64 many
+Expr.dt.total_minutes | Float16 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `f16` for series with name `a`
+Expr.dt.total_minutes | Float16 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `f16` for series with name `a`
+Expr.dt.total_minutes | Float32 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `f32` for series with name `a`
+Expr.dt.total_minutes | Float32 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `f32` for series with name `a`
+Expr.dt.total_minutes | Float64 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `f64` for series with name `a`
+Expr.dt.total_minutes | Float64 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `f64` for series with name `a`
+Expr.dt.total_minutes | Int128 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i128` for series with name `a`
+Expr.dt.total_minutes | Int128 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i128` for series with name `a`
+Expr.dt.total_minutes | Int16 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i16` for series with name `a`
+Expr.dt.total_minutes | Int16 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i16` for series with name `a`
+Expr.dt.total_minutes | Int32 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i32` for series with name `a`
+Expr.dt.total_minutes | Int32 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i32` for series with name `a`
+Expr.dt.total_minutes | Int64 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i64` for series with name `a`
+Expr.dt.total_minutes | Int64 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i64` for series with name `a`
+Expr.dt.total_minutes | Int8 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i8` for series with name `a`
+Expr.dt.total_minutes | Int8 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i8` for series with name `a`
+Expr.dt.total_minutes | List(Int64) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `list[i64]` for series with name `a`
+Expr.dt.total_minutes | List(Int64) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `list[i64]` for series with name `a`
+Expr.dt.total_minutes | List(String) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `list[str]` for series with name `a`
+Expr.dt.total_minutes | List(String) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `list[str]` for series with name `a`
+Expr.dt.total_minutes | Null | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `null` for series with name `a`
+Expr.dt.total_minutes | Null | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `null` for series with name `a`
+Expr.dt.total_minutes | String | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `str` for series with name `a`
+Expr.dt.total_minutes | String | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `str` for series with name `a`
+Expr.dt.total_minutes | Struct(x: Int64, y: String) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `struct[2]` for series with name `a`
+Expr.dt.total_minutes | Struct(x: Int64, y: String) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `struct[2]` for series with name `a`
+Expr.dt.total_minutes | Time | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `time` for series with name `a`
+Expr.dt.total_minutes | Time | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `time` for series with name `a`
+Expr.dt.total_minutes | UInt128 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u128` for series with name `a`
+Expr.dt.total_minutes | UInt128 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u128` for series with name `a`
+Expr.dt.total_minutes | UInt16 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u16` for series with name `a`
+Expr.dt.total_minutes | UInt16 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u16` for series with name `a`
+Expr.dt.total_minutes | UInt32 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u32` for series with name `a`
+Expr.dt.total_minutes | UInt32 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u32` for series with name `a`
+Expr.dt.total_minutes | UInt64 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u64` for series with name `a`
+Expr.dt.total_minutes | UInt64 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u64` for series with name `a`
+Expr.dt.total_minutes | UInt8 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
+Expr.dt.total_minutes | UInt8 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
+Expr.dt.total_nanoseconds | Array(Int64, 2) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `array[i64, 2]` for series with name `a`
+Expr.dt.total_nanoseconds | Array(Int64, 2) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `array[i64, 2]` for series with name `a`
+Expr.dt.total_nanoseconds | Boolean | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `bool` for series with name `a`
+Expr.dt.total_nanoseconds | Boolean | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `bool` for series with name `a`
+Expr.dt.total_nanoseconds | Date | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `date` for series with name `a`
+Expr.dt.total_nanoseconds | Date | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `date` for series with name `a`
+Expr.dt.total_nanoseconds | Datetime(us) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`
+Expr.dt.total_nanoseconds | Datetime(us) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`
+Expr.dt.total_nanoseconds | Datetime(us, UTC) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.total_nanoseconds | Datetime(us, UTC) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.total_nanoseconds | Decimal(10, 2) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `decimal[10,2]` for series with name `a`
+Expr.dt.total_nanoseconds | Decimal(10, 2) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `decimal[10,2]` for series with name `a`
+Expr.dt.total_nanoseconds | Duration(us) | fractional=false | allowed Int64 many
+Expr.dt.total_nanoseconds | Duration(us) | fractional=true | allowed Float64 many
+Expr.dt.total_nanoseconds | Float16 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `f16` for series with name `a`
+Expr.dt.total_nanoseconds | Float16 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `f16` for series with name `a`
+Expr.dt.total_nanoseconds | Float32 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `f32` for series with name `a`
+Expr.dt.total_nanoseconds | Float32 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `f32` for series with name `a`
+Expr.dt.total_nanoseconds | Float64 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `f64` for series with name `a`
+Expr.dt.total_nanoseconds | Float64 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `f64` for series with name `a`
+Expr.dt.total_nanoseconds | Int128 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i128` for series with name `a`
+Expr.dt.total_nanoseconds | Int128 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i128` for series with name `a`
+Expr.dt.total_nanoseconds | Int16 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i16` for series with name `a`
+Expr.dt.total_nanoseconds | Int16 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i16` for series with name `a`
+Expr.dt.total_nanoseconds | Int32 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i32` for series with name `a`
+Expr.dt.total_nanoseconds | Int32 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i32` for series with name `a`
+Expr.dt.total_nanoseconds | Int64 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i64` for series with name `a`
+Expr.dt.total_nanoseconds | Int64 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i64` for series with name `a`
+Expr.dt.total_nanoseconds | Int8 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i8` for series with name `a`
+Expr.dt.total_nanoseconds | Int8 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i8` for series with name `a`
+Expr.dt.total_nanoseconds | List(Int64) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `list[i64]` for series with name `a`
+Expr.dt.total_nanoseconds | List(Int64) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `list[i64]` for series with name `a`
+Expr.dt.total_nanoseconds | List(String) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `list[str]` for series with name `a`
+Expr.dt.total_nanoseconds | List(String) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `list[str]` for series with name `a`
+Expr.dt.total_nanoseconds | Null | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `null` for series with name `a`
+Expr.dt.total_nanoseconds | Null | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `null` for series with name `a`
+Expr.dt.total_nanoseconds | String | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `str` for series with name `a`
+Expr.dt.total_nanoseconds | String | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `str` for series with name `a`
+Expr.dt.total_nanoseconds | Struct(x: Int64, y: String) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `struct[2]` for series with name `a`
+Expr.dt.total_nanoseconds | Struct(x: Int64, y: String) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `struct[2]` for series with name `a`
+Expr.dt.total_nanoseconds | Time | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `time` for series with name `a`
+Expr.dt.total_nanoseconds | Time | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `time` for series with name `a`
+Expr.dt.total_nanoseconds | UInt128 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u128` for series with name `a`
+Expr.dt.total_nanoseconds | UInt128 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u128` for series with name `a`
+Expr.dt.total_nanoseconds | UInt16 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u16` for series with name `a`
+Expr.dt.total_nanoseconds | UInt16 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u16` for series with name `a`
+Expr.dt.total_nanoseconds | UInt32 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u32` for series with name `a`
+Expr.dt.total_nanoseconds | UInt32 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u32` for series with name `a`
+Expr.dt.total_nanoseconds | UInt64 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u64` for series with name `a`
+Expr.dt.total_nanoseconds | UInt64 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u64` for series with name `a`
+Expr.dt.total_nanoseconds | UInt8 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
+Expr.dt.total_nanoseconds | UInt8 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
+Expr.dt.total_seconds | Array(Int64, 2) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `array[i64, 2]` for series with name `a`
+Expr.dt.total_seconds | Array(Int64, 2) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `array[i64, 2]` for series with name `a`
+Expr.dt.total_seconds | Boolean | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `bool` for series with name `a`
+Expr.dt.total_seconds | Boolean | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `bool` for series with name `a`
+Expr.dt.total_seconds | Date | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `date` for series with name `a`
+Expr.dt.total_seconds | Date | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `date` for series with name `a`
+Expr.dt.total_seconds | Datetime(us) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`
+Expr.dt.total_seconds | Datetime(us) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs]` for series with name `a`
+Expr.dt.total_seconds | Datetime(us, UTC) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.total_seconds | Datetime(us, UTC) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `datetime[μs, UTC]` for series with name `a`
+Expr.dt.total_seconds | Decimal(10, 2) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `decimal[10,2]` for series with name `a`
+Expr.dt.total_seconds | Decimal(10, 2) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `decimal[10,2]` for series with name `a`
+Expr.dt.total_seconds | Duration(us) | fractional=false | allowed Int64 many
+Expr.dt.total_seconds | Duration(us) | fractional=true | allowed Float64 many
+Expr.dt.total_seconds | Float16 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `f16` for series with name `a`
+Expr.dt.total_seconds | Float16 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `f16` for series with name `a`
+Expr.dt.total_seconds | Float32 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `f32` for series with name `a`
+Expr.dt.total_seconds | Float32 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `f32` for series with name `a`
+Expr.dt.total_seconds | Float64 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `f64` for series with name `a`
+Expr.dt.total_seconds | Float64 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `f64` for series with name `a`
+Expr.dt.total_seconds | Int128 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i128` for series with name `a`
+Expr.dt.total_seconds | Int128 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i128` for series with name `a`
+Expr.dt.total_seconds | Int16 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i16` for series with name `a`
+Expr.dt.total_seconds | Int16 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i16` for series with name `a`
+Expr.dt.total_seconds | Int32 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i32` for series with name `a`
+Expr.dt.total_seconds | Int32 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i32` for series with name `a`
+Expr.dt.total_seconds | Int64 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i64` for series with name `a`
+Expr.dt.total_seconds | Int64 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i64` for series with name `a`
+Expr.dt.total_seconds | Int8 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `i8` for series with name `a`
+Expr.dt.total_seconds | Int8 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `i8` for series with name `a`
+Expr.dt.total_seconds | List(Int64) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `list[i64]` for series with name `a`
+Expr.dt.total_seconds | List(Int64) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `list[i64]` for series with name `a`
+Expr.dt.total_seconds | List(String) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `list[str]` for series with name `a`
+Expr.dt.total_seconds | List(String) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `list[str]` for series with name `a`
+Expr.dt.total_seconds | Null | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `null` for series with name `a`
+Expr.dt.total_seconds | Null | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `null` for series with name `a`
+Expr.dt.total_seconds | String | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `str` for series with name `a`
+Expr.dt.total_seconds | String | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `str` for series with name `a`
+Expr.dt.total_seconds | Struct(x: Int64, y: String) | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `struct[2]` for series with name `a`
+Expr.dt.total_seconds | Struct(x: Int64, y: String) | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `struct[2]` for series with name `a`
+Expr.dt.total_seconds | Time | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `time` for series with name `a`
+Expr.dt.total_seconds | Time | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `time` for series with name `a`
+Expr.dt.total_seconds | UInt128 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u128` for series with name `a`
+Expr.dt.total_seconds | UInt128 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u128` for series with name `a`
+Expr.dt.total_seconds | UInt16 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u16` for series with name `a`
+Expr.dt.total_seconds | UInt16 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u16` for series with name `a`
+Expr.dt.total_seconds | UInt32 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u32` for series with name `a`
+Expr.dt.total_seconds | UInt32 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u32` for series with name `a`
+Expr.dt.total_seconds | UInt64 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u64` for series with name `a`
+Expr.dt.total_seconds | UInt64 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u64` for series with name `a`
+Expr.dt.total_seconds | UInt8 | fractional=false | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
+Expr.dt.total_seconds | UInt8 | fractional=true | refused rows: invalid series dtype: expected `Duration`, got `u8` for series with name `a`
 Expr.fill_null | Array(Int64, 2) | strategy=backward | allowed Array(Int64, 2) many
 Expr.fill_null | Array(Int64, 2) | strategy=forward | allowed Array(Int64, 2) many
 Expr.fill_null | Array(Int64, 2) | strategy=max | refused rows: fill null strategy not yet supported for dtype: array[i64, 2]

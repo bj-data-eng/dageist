@@ -1,0 +1,2 @@
+{"a":"Date","b":"Date","revision":1}
+{"version":1,"steps":[{"id":"s","call":{"entry":"LazyFrame.select","arguments":{"exprs":{"many":[{"expression":{"start":{"entry":"polars.lit","arguments":{"value":{"integer":1},"dtype":{"dtype":"Time"}}},"then":[{"entry":"Expr.dt.to_string","arguments":{"format":{"string":"%Y-%m-%d"}}}]}}]}}}}]}

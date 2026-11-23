@@ -400,7 +400,277 @@
       "slots": []
     },
     {
+      "entry": "Expr.dt.base_utc_offset",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.cast_time_unit",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.century",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.combine",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.convert_time_zone",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.dt.date",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.day",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.days_in_month",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.dst_offset",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.epoch",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.hour",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.is_leap_year",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.iso_year",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.microsecond",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.millennium",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.millisecond",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.minute",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.month",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.month_end",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -430,7 +700,127 @@
       "slots": []
     },
     {
+      "entry": "Expr.dt.nanosecond",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.dt.offset_by",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.ordinal_day",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.quarter",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.replace",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.replace_time_zone",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.round",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.second",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.strftime",
       "verdict": {
         "kind": "refused",
         "refusal": {
@@ -460,7 +850,187 @@
       "slots": []
     },
     {
+      "entry": "Expr.dt.timestamp",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.to_string",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
       "entry": "Expr.dt.total_days",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.total_hours",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.total_microseconds",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.total_milliseconds",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.total_minutes",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.total_nanoseconds",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.total_seconds",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.truncate",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.week",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.weekday",
+      "verdict": {
+        "kind": "refused",
+        "refusal": {
+          "source": {
+            "by": "structure"
+          },
+          "reason": "a method needs the value it applies to before it"
+        }
+      },
+      "argument": null,
+      "leftOut": null,
+      "slots": []
+    },
+    {
+      "entry": "Expr.dt.year",
       "verdict": {
         "kind": "refused",
         "refusal": {

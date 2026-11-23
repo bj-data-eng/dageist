@@ -37,6 +37,8 @@ pub(super) fn scalar(value: &Value) -> Option<String> {
         Value::Flag(Some(true)) => "True".to_owned(),
         Value::Flag(Some(false)) => "False".to_owned(),
         Value::Flag(None) => "None".to_owned(),
+        Value::TimeZone(Some(zone)) => string(zone),
+        Value::TimeZone(None) => "None".to_owned(),
         // A dtype of a document is one `dtype_python` writes.
         Value::Dtype(dtype) => dtype_python(dtype.as_polars()).unwrap_or_default(),
         Value::Table(name) => name.clone(),

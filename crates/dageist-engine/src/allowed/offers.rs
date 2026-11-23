@@ -3,11 +3,13 @@
 
 use std::fmt;
 
-use crate::catalog::{self, Applies, Entry, Kind, PatternError};
+use polars::prelude::{DataType, TimeUnit, TimeZone};
+
+use crate::catalog::{self, Applies, DurationUse, Entry, Kind};
 
 use super::adapt::could_be_taken_by_a_number;
 use super::context::Context;
-use super::dtype::{Representative, ResultDtype, dtype_name};
+use super::dtype::{Representative, ResultDtype, dtype_name, unit_name};
 use super::rules::Rule;
 use super::table::{OptionValue, Outcome, Produces, Reason, Shape, Stage, Tables, is_method};
 use crate::catalog::DefaultValue;
@@ -81,6 +83,10 @@ pub struct Chosen<'a> {
     options: &'a [(&'a str, &'a str)],
     unclassed: &'a [&'a str],
     patterns: &'a [(&'a str, &'a str)],
+    durations: &'a [(&'a str, &'a str, DurationUse)],
+    time_zones: &'a [(&'a str, Option<&'a str>)],
+    unit: Option<TimeUnit>,
+    zone_clash: Option<(&'a str, &'a str)>,
     gives: Option<Representative>,
     many: bool,
 }
@@ -120,6 +126,46 @@ impl<'a> Chosen<'a> {
     #[must_use]
     pub const fn with_patterns(mut self, patterns: &'a [(&'a str, &'a str)]) -> Self {
         self.patterns = patterns;
+        self
+    }
+
+    /// The durations given to parameters that hold a duration string, each by the parameter's name
+    /// and the text as typed. A text Polars does not read as a duration is refused in Polars' words,
+    /// whatever follows it.
+    #[must_use]
+    pub const fn with_durations(
+        mut self,
+        durations: &'a [(&'a str, &'a str, DurationUse)],
+    ) -> Self {
+        self.durations = durations;
+        self
+    }
+
+    /// The time zones given to parameters that take one, each by the parameter's name and the text
+    /// as typed, or none for a call given no zone. A text Polars does not read as a time zone is
+    /// refused in Polars' words, whatever follows it, and a call gives a moment in the zone, or in
+    /// none where it is given none.
+    #[must_use]
+    pub const fn with_time_zones(mut self, time_zones: &'a [(&'a str, Option<&'a str>)]) -> Self {
+        self.time_zones = time_zones;
+        self
+    }
+
+    /// The two zones of the moments a method is given, where they differ: the one it follows and the
+    /// one of an operand it is compared with, subtracted by, filled with or bound by. Polars finds
+    /// no dtype that they have in common, which is refused whatever follows.
+    #[must_use]
+    pub const fn with_zone_clash(mut self, clash: Option<(&'a str, &'a str)>) -> Self {
+        self.zone_clash = clash;
+        self
+    }
+
+    /// The unit the moment or the length of time the method follows is counted in, where the chain
+    /// knows it. The tables were measured on microseconds, so a method that keeps the unit gives
+    /// the one it follows, and a duration is asked of Polars on a moment counted in it.
+    #[must_use]
+    pub const fn following(mut self, unit: Option<TimeUnit>) -> Self {
+        self.unit = unit;
         self
     }
 
@@ -212,7 +258,7 @@ impl Refusal {
     }
 
     /// A refusal by `rule` that adds what Polars says of the case, in its words.
-    fn rule_because(rule: Rule, said: &PatternError) -> Self {
+    fn rule_because(rule: Rule, said: &impl fmt::Display) -> Self {
         Self {
             source: RefusalSource::Rule(rule),
             reason: format!("{}: {said}", rule.statement()),
@@ -461,9 +507,11 @@ fn on_receiver(
     let required: Vec<&'static str> = required_expressions(entry)
         .filter(|parameter| !stood_in_for.contains(parameter))
         .collect();
-    if required.is_empty() && stood_in_for.is_empty() {
-        fit = Some(line(None, None)?);
-    }
+    // What the method is refused for with none of its arguments, which it is measured with where
+    // it needs none. Where arguments are given, the lines of the calls that have them say what
+    // Polars does of the call, and which of two failures it meets first, as it converts a part it
+    // is given before it meets the value it follows, so the refusal of an argument is the one told.
+    let alone = (required.is_empty() && stood_in_for.is_empty()).then(|| line(None, None));
     // What the arguments given decide: each is measured on its own, so what
     // the method gives is what they agree on, and not known where they do not.
     let mut given_fits: Vec<Fit> = Vec::new();
@@ -475,6 +523,9 @@ fn on_receiver(
             .find(|parameter| parameter == name)
             .ok_or_else(|| Refusal::structure(format!("{id} has no parameter {name}")))?;
         given_fits.push(line(Some(parameter), Some(*dtype))?);
+    }
+    if let Some(alone) = alone {
+        fit = Some(alone?);
     }
     if let Some(first) = given_fits.first() {
         let same_result = given_fits.iter().all(|found| found.result == first.result);
@@ -774,12 +825,53 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
             return Err(Refusal::rule_because(Rule::PatternIsValid, &said));
         }
     }
+    // A duration Polars does not read is refused in Polars' words, whatever follows it.
+    let unit = chosen.unit.unwrap_or(TimeUnit::Microseconds);
+    let moment = match place.after {
+        After::Value {
+            dtype: Representative::Date,
+            ..
+        } => DataType::Date,
+        After::Value {
+            dtype: Representative::DatetimeZoned,
+            ..
+        } => DataType::Datetime(unit, Some(TimeZone::UTC)),
+        After::Value { .. } => DataType::Datetime(unit, None),
+        _ => catalog::any_moment(),
+    };
+    for (_, text, using) in chosen.durations {
+        if let Err(said) = catalog::check_duration(text, *using, &moment) {
+            return Err(Refusal::rule_because(Rule::DurationIsValid, &said));
+        }
+    }
+    // A time zone Polars does not read is refused in Polars' words, whatever follows it.
+    for (_, zone) in chosen.time_zones {
+        if let Some(text) = zone
+            && let Err(said) = catalog::check_time_zone(text)
+        {
+            return Err(Refusal::rule_because(Rule::TimeZoneIsValid, &said));
+        }
+    }
+    // Moments in two zones are no operands of one another, whatever follows.
+    if let Some((first, second)) = chosen.zone_clash {
+        return Err(Refusal::rule_because(
+            Rule::MomentsShareAZone,
+            &format!("{first} and {second}"),
+        ));
+    }
     // What the options set are refused for, on the dtype of the value the method follows.
     if is_method(entry) {
         let receiver = match place.after {
             After::Value { dtype, .. } => Some(dtype),
             _ => None,
         };
+        // An argument given is refused before an option is: the line of the call that has it says
+        // what Polars does of the call, where the option is measured with none.
+        if let Some(dtype) = receiver
+            && !chosen.arguments.is_empty()
+        {
+            on_receiver(entry, dtype, chosen.arguments, chosen.options)?;
+        }
         check_options(entry, receiver, chosen.options)?;
         check_conversions(entry, chosen)?;
     }
@@ -849,6 +941,61 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
                 .find(|(name, _)| *name == parameter.name())
                 .and_then(|(_, text)| catalog::groups_dtype(text).ok())
                 .map(|dtype| ResultDtype::from_name(&dtype_name(&dtype)));
+        }
+        // A call that is given a time zone gives a moment in it, and one given none a moment of no
+        // zone, where the tables, measured with the zone UTC, say only that a moment is given: it
+        // gives nothing until it is told the zone, where a call may be given none.
+        if let Some(parameter) = entry
+            .parameters()
+            .iter()
+            .find(|parameter| parameter.kind() == Kind::TimeZone)
+            && result
+                .as_ref()
+                .is_some_and(|result| result.name().starts_with("Datetime("))
+        {
+            let unit = unit_name(chosen.unit.unwrap_or(TimeUnit::Microseconds));
+            // Polars reads the empty text as no zone: a moment given it has none where the call
+            // takes a zone off, and the zone UTC where the call converts, which takes none.
+            let zoned = |zone: String| ResultDtype::from_name(&format!("Datetime({unit}, {zone})"));
+            let unzoned = || ResultDtype::from_name(&format!("Datetime({unit})"));
+            result = match chosen
+                .time_zones
+                .iter()
+                .find(|(name, _)| *name == parameter.name())
+            {
+                Some((_, Some(text))) => match catalog::check_time_zone(text).ok() {
+                    Some(Some(zone)) => Some(zoned(zone.to_string())),
+                    Some(None) if parameter.takes_no_time_zone() => Some(unzoned()),
+                    Some(None) => Some(zoned(TimeZone::UTC.to_string())),
+                    None => Some(unzoned()),
+                },
+                Some((_, None)) => Some(unzoned()),
+                None if parameter.takes_no_time_zone() => None,
+                None => result,
+            };
+        } else if let Some(known) = chosen.unit
+            && known != TimeUnit::Microseconds
+            && entry.family() == catalog::Family::Temporal
+            && !entry
+                .parameters()
+                .iter()
+                .any(|parameter| parameter.name() == "time_unit")
+            && let Some(kept) = result
+                .as_ref()
+                .filter(|result| {
+                    matches!(
+                        result.class(),
+                        Some(Representative::Datetime | Representative::DatetimeZoned)
+                    )
+                })
+                .and_then(|result| result.name().strip_prefix("Datetime(us"))
+        {
+            // A method of the `dt` namespace keeps the unit of the moment it follows, which the
+            // tables, measured on microseconds, name as they were measured.
+            result = Some(ResultDtype::from_name(&format!(
+                "Datetime({}{kept}",
+                unit_name(known)
+            )));
         }
         // A call that was not given what Polars needs to run it gives nothing
         // whatever its options: Polars refuses a window given neither key.
@@ -991,6 +1138,15 @@ pub fn rule_forbids_a_key_known_not_elementwise(context: Context) -> Result<(), 
 /// The rule, as a refusal that says it in its words.
 pub fn rule_forbids_replacement_values_of_other_numbers() -> Result<(), Refusal> {
     Err(Refusal::rule(Rule::ReplacementValuesMatchInNumber))
+}
+
+/// The refusal of a window given a value of one row that a part widens, which the caller has found.
+///
+/// # Errors
+///
+/// The rule, as a refusal that says it in its words.
+pub fn rule_forbids_a_window_over_a_widened_value() -> Result<(), Refusal> {
+    Err(Refusal::rule(Rule::WindowInputIsNotWidened))
 }
 
 /// The refusal of a key that the caller has already found repeats a pair of

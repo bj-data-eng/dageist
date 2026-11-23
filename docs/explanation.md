@@ -264,7 +264,7 @@ dtypes are not stored, because Polars works them out from a schema without
 reading data; which combinations Polars allows is kept in
 [tables](#which-combinations-polars-allows) beside it.
 
-Every parameter is one of eleven kinds, and the view has one way of drawing
+Every parameter is one of twelve kinds, and the view has one way of drawing
 each, so a new operation needs data rather than a new look:
 
 | Kind | Holds |
@@ -277,6 +277,7 @@ each, so a new operation needs data rather than a new look:
 | dtype | A Polars dtype. |
 | duration | A Polars duration such as `1mo`. |
 | pattern | A regular expression, in the syntax of Rust's `regex` crate that Polars uses, typed in; see [the pattern kind](#the-pattern-kind). |
+| time zone | A name of the time zone database such as `Europe/Berlin`, or a fixed offset, typed in, and for a method that takes a zone off, none; see [the time zone kind](#the-time-zone-kind). |
 | table | A frame from the graph. |
 | path | A file, folder or cloud location. |
 | pairs | Key and value entries, each side of its own kind. |
@@ -730,6 +731,118 @@ as a refusal when the steps run, not in its list; only the list that adds an
 option asks. The values of `is_in` are connected lists the engine has no entry
 to judge yet, so that list offers them unjudged.
 
+### The Time Zone Kind
+
+`dt.replace_time_zone` and `dt.convert_time_zone` take a time zone, which is a parameter of a kind
+of its own: a name of the time zone database, such as `Europe/Berlin` or `UTC`, or a fixed offset
+such as `+01:00`, which Polars reads as the zone of the database that has it. It is typed in, and
+the engine does not know the database: it asks Polars, which reads a zone before it builds a
+method of a moment, and `check_time_zone` gives the zone or Polars' reason, up to the first blank
+line, where the text is none: the name, how to look the names up, and nothing of the hint at what was
+meant, which is not about the text.
+
+- A text that is no time zone is refused where the step is built, at the parameter, with Polars'
+  reason, and where the walk asks, by the named rule `time-zone-is-valid`, whatever follows it.
+- Python's `replace_time_zone` takes `None` for the zone, which takes the zone off a moment and keeps
+  its clock. The parameter says so, `takes_no_time_zone`, and the document writes it as a time
+  zone that is null, which the editor draws as the word `None` below the typed zones. `convert_time_zone`
+  takes a zone only, and a document that gives it none is refused at the parameter. Polars reads the
+  empty text as no zone, so `replace_time_zone` given it takes the zone off, and `convert_time_zone` given it
+  gives the zone UTC, which the walk says.
+- A moment is held in a zone or in none, so what the method gives depends on the zone it is given:
+  a moment in the zone, and in none where it is given none. The tables, which were measured with the
+  zone `UTC`, say only that a moment is given, so the walk says the rest: the dtype of the call is
+  not known until the zone is, for a method that takes none, and is then a `Datetime` with the
+  zone as Polars reads it, or without one.
+- Polars finds no dtype that a moment in one zone and a moment in another have in common, so it refuses to
+  compare them (`eq`, `ne`, `lt`, `le`, `gt`, `ge`, `eq_missing`, `ne_missing`), to subtract them, to fill one
+  with the other (`fill_null`), to bound one by the other (`is_between`), to give both as the values of a
+  condition, `then` and `otherwise` and each `then` of a chain of them, and to give a replacement new values
+  and a default of two zones. A shift filled with a moment of another zone it cannot place either: Polars
+  accepts it eagerly and panics when the rows run. It refuses a moment in a zone and one in none too, which
+  the tables, measured on `UTC` and on no zone, say for the methods they measure. They measure no
+  condition, so the values of a condition with one of each are not refused yet (#121). The tables cannot say the rest, so the walk follows the
+  zone of a moment along its chain, from the column or the literal to each call that gives one or keeps it,
+  and of each value of a condition, and refuses an operand that is in another zone than what it is met with,
+  by the named rule `moments-share-a-zone`, with the two zones. What an operand is met with is the value
+  the method follows for a comparison, a difference, a fill and the bounds of an interval, and the new values
+  for the default of a replacement, whose own receiver is no matter: its zone is the new values'. `clip`,
+  `replace`, `is_in` and a fill by a strategy are not refused it: Polars keeps the zone of what they follow.
+- `base_utc_offset` and `dst_offset` read the offsets of the zone a moment has, so Polars refuses
+  a moment that has none, when the rows run.
+- `ambiguous` of `replace_time_zone` says which of the two times a clock that is read twice stands
+  for, where the clocks go back, or that it is refused or none, and `non_existent` what a clock that
+  is never read, where they go forward, gives. Both are choices of Polars' words. The tables
+  measured them with a zone that has neither gap nor repeat, so what they say of the words is that
+  Polars takes them; a step that meets a clock Polars refuses is refused when the rows run.
+
+### The Parts Of A Moment
+
+The `dt` namespace is a family of its own, Temporal, under Polars' own names, which the tables say
+what each takes and gives.
+
+- **Taking a moment apart.** `year`, `iso_year`, `quarter`, `month`, `week`, `weekday`, `day`,
+  `ordinal_day`, `century`, `millennium`, `days_in_month`, `is_leap_year` and `month_end` take a date or
+  a moment, and `hour`, `minute`, `second`, `millisecond`, `microsecond` and `nanosecond` a moment or a
+  time of day. `weekday` is Monday 1, `week` the ISO week, and `second` has the fraction of the second
+  where `fractional` is set, as Python writes it, which is the nanoseconds over a billion added to the
+  second.
+- **Counting a length of time.** `total_days`, `total_hours`, `total_minutes`, `total_seconds`,
+  `total_milliseconds`, `total_microseconds` and `total_nanoseconds` take a duration and give whole
+  numbers, or with a fraction where `fractional` is set.
+- **Counting a moment.** `timestamp` gives the count since the start of 1970 in a unit and `epoch` also
+  in seconds and in days, which Python works out of the others, so the catalogue does. Polars counts a
+  number or a `Boolean` as the moment it stands for, so the tables allow `timestamp` of them; a time of
+  day, a duration and text it refuses. `cast_time_unit` holds a moment or a duration in another unit.
+- **Combining, cutting and moving.** `combine` puts a time of day on a date or a moment, `truncate`
+  and `round` cut and round to a period, `offset_by` moves, and `replace` sets the parts it is given
+  and keeps the rest. A part not given is left as it was, so the method starts with all of them left
+  out. Polars meets a value of one row, a literal, with each of the many values of a part where it is
+  selected, but not where a window follows: the window maps what it is given to as many values as it has
+  rows, and the value a part widened is refused for the length of its output. The catalogue says so of each
+  part, `broadcasts_in_a_window`, and the walk follows whether the value a chain has was widened by one,
+  through the calls that keep it many, and refuses a window that is given it, by the named rule
+  `window-input-is-not-widened`.
+- **Writing.** `strftime` and `to_string` write a moment as text by a format, or, for `to_string` given
+  none, by ISO, which separates the date and the time of day by a space and by `T` where the format is
+  `iso:strict`. A format is text typed in, and Polars says when it can write it: a year of a time of
+  day, an hour of a date, a field that does not exist and anything but `iso` and `polars` for a
+  duration are refused when the rows run, and the tables, which measured `iso`, do not say so, so a
+  limit holds it. `strftime` takes a format, which Python's `to_string` takes optionally.
+
+### The Duration String
+
+The methods of the `dt` namespace that move, cut and round a moment by a length of time, `dt.offset_by`,
+`dt.truncate` and `dt.round`, take it as an expression that holds a duration string such as `1mo`,
+`2d12h` or `-3h`, which may be a column of them, so it is not a parameter of a kind of its own. The
+catalogue names the parameter as one that holds a duration string, and the method that reads it: the
+move, the cut or the round.
+
+Where the expression is text typed in and nothing more, the engine asks Polars whether it reads it,
+and does not parse one itself. `check_duration` runs the method on one moment with the text and
+gives Polars' reason where it refuses, in Polars' words, up to the first blank line: a text with no
+amount or no unit, a unit that does not exist, a second sign, or, of the cut and the round, a length
+below zero. Polars refuses some of them only for the dtype of what it is given to, so the moment is
+of the dtype that the value before the method has: a `Date` cannot be cut by a length of days and
+hours together, nor by a length of nothing, where a `Datetime` can, and a length of a nanosecond is
+none to a moment counted in microseconds, which Polars' rounding divides by and panics, in the words it
+panics with. The build works the dtype out from the schema, unit and zone included, where it traces the
+dtypes, and asks on a `Datetime` counted in nanoseconds otherwise; the walk follows the unit of a moment
+along its chain, from the column or the literal to each call that keeps it or gives it, so that what
+the tables, which were measured on microseconds, name `Datetime(us)` is named by the unit the chain has
+after a method of the `dt` namespace that keeps it. A unit that no such method gives is not followed
+past the method that does not keep it, and a method outside the namespace is named as the tables name
+it. An amount whose units add up to more than an `i64` of
+nanoseconds is refused before Polars is asked, in every build, as [a typed duration is](#how-a-typed-text-is-read).
+
+- A duration typed in that Polars refuses is refused where the step is built, at the parameter that
+  holds it, and where the walk asks, by the named rule `duration-is-valid`, whatever follows it.
+- A duration that is a column is Polars' to read, row by row, when the rows run, and the tables
+  measured the text of the sample's rows, which is `1d` and `2d`. The target gives a duration that is
+  a column only that column, for the text of the others is no duration, which is the person's to
+  give and not a mistake of the tables.
+- The parameter of the move is `by`; that of the cut and the round is `every`.
+
 ### How A Typed Text Is Read
 
 The view sends the text it was given with what it is typed into, which is the
@@ -754,7 +867,8 @@ or, for a text the slot does not take, why not. Nothing typed reads as nothing.
 - **A duration** is read as Polars reads a duration string, such as `1mo` or
   `2d12h`, by the parser that `dt.offset_by` uses. Given to an expression, as
   `dt.offset_by`'s `by`, `"1d"` is a `String` literal like any other, which the
-  tables allow there and Polars reads when it runs rows; only a parameter that
+  tables allow there and Polars reads when it runs rows, and which the step holds to a
+  duration Polars reads, [as below](#the-duration-string); only a parameter that
   takes a duration itself reads the text as one, and the reading has no dtype.
   An amount whose units add up to more than an `i64` of nanoseconds (a day is 24
   hours and a week 7 days) or of months is refused, in every build: Polars adds
@@ -1130,6 +1244,12 @@ a `fill_value` of text makes a `shift` give text, and where two arguments give
 different results the result is not known. A `Struct` is two fields, an `Array`
 of two, and a `Decimal` of ten digits: the tables say nothing of other sizes.
 
+Where a method is given an argument, the line of the call that has it says what Polars does of the call, and
+that is the refusal told when the argument is refused, before the line of the method with none of its
+arguments, which is told when none is given. The two can refuse for different reasons: `dt.replace`
+converts a part it is given before it meets the value it follows, so text given text as the month is
+refused for the failed conversion, and the call with no part is refused for the text being no moment.
+
 ### What The Tables Are Checked Against
 
 The tables are measured one combination at a time, so whether they predict what
@@ -1374,15 +1494,15 @@ an expected rejection that names both reasons.
 The tally ends with the totals of the cases that agreed, that both refused for another
 reason, that a limit excused, that were refused where Polars does not evaluate the
 part, that a rule stricter by design refused, and that disagreed. The fixed seed's
-1000 cases give none disagreeing; 16 of those that agree are refused by the rule against a
-repeated pair of key names, and the tables could not be asked past a point in 22 more. These
-counts are the same at one thread, at two and at the machine's own, and so are the 10 cases
-refused where Polars does not evaluate the part. The others are not: Polars' thread count
-changes which reason it gives where the tables and Polars both refuse, and a case in which
-Polars panics at some counts and not at others moves a case between them, so the cases that
-agree are 806 to 808, those refused by both for another reason are 98 or 99, those a limit
-excused are 6 or 7 and those refused by the rule that is stricter by design are 72 or 73
-of 157 or 158 pivot cases. The test asserts none of those.
+1000 cases give none disagreeing; 19 of those that agree are refused by the rule against a
+repeated pair of key names, and the tables could not be asked past a point in 27 more. These
+counts are the same at one thread, at two and at the machine's own, and so are the 69 cases
+refused by the rule that is stricter by design, of 157 pivot cases. The others are not: Polars' thread
+count changes which reason it gives where the tables and Polars both refuse, and a case in which
+Polars panics at some counts and not at others moves a case between them, so the cases refused where
+Polars does not evaluate the part are 5 or 6, while the cases that agree are 784, those refused by
+both for another reason 120 and those a limit excused 6, at the three counts measured. The test
+asserts none of those.
 
 | Limit | Excuses |
 | --- | --- |
@@ -1416,6 +1536,9 @@ of 157 or 158 pivot cases. The test asserts none of those.
 | A replacement of more than the first match | Polars replaces more than the first match only of plain text and of one value, and refuses a pattern that has an ASCII punctuation mark, which it takes for a regular expression, or a value that is many, with a count above one. The tables measured the first match, which is `n`'s default. Polars refusing the rows or the empty table with the refusal that a replacement of a pattern or of many values with a count above one is not yet supported, which has no place, in a case with a `str.replace` given a count above one: the case run again with each count left out is not refused for it. |
 | A literal text beside many replacement values | A literal text is one value, which Polars' streaming engine broadcasts over the rows of a table only where each piece it runs them in is no longer than that one value, and never over a table with no rows, so a replacement of it given many values is refused where the column of text the tables measured it with is not. How long a piece is depends on how the rows are shared among the threads: the rows of the target's three-row tables are one piece of three at one thread, pieces of two and one at two, and pieces of one at three or more, so the rows are refused at the first two and pass at the others, and the empty table is refused at every count. Polars refusing the rows or the empty table with the refusal that the length of the value does not match that of the text, which has no place, in a case with a replacement in a chain that starts from a literal: the case run again with each such literal a column of text is not refused for it. |
 | A struct with no fields | A struct with no fields, which `str.extract_groups` gives of a pattern that has no group, cannot be grouped by: Polars refuses a test for a value that is unique or duplicated of it, with the refusal that at least one key is required. The tables measured a struct on two fields. Polars refusing the rows or the empty table with that refusal, which has no place, in a case with an `str.extract_groups` of a pattern with no group: the case run again with each such pattern given a group is not refused for it. |
+| A format the dtype cannot write | A format writes the fields of the calendar and of the clock that a dtype has, and Polars refuses one it has no field for: a year for a time of day, an hour for a date, a field that does not exist, and any but `iso` and `polars` for a duration. The tables measured the format `iso`, which every dtype takes. Polars refusing the rows or the empty table with the refusal that it cannot format the dtype with the format, that a duration has no such format or that the format is not a valid one, which has no place, in a case with a method that writes a moment as text, given a format: the case run again with each format made `iso` is not refused for it. |
+| A part of a date that depends on the rows | `dt.replace` converts each part it is given to a whole number of the width of the part and refuses a value outside the calendar's range, and one that does not convert, when the rows run, so what it does with a part that is no number written in depends on the values of the rows. The tables measured the column that stands for an argument, whose values are 1 and 3, or true and false, of which false is a day of 0 that no date has. Polars refusing the rows or the empty table with the refusal that the components of a date or a time are invalid, or that a value does not convert, which has no place, in a case with a `dt.replace` given a part: the case run again with each part made the number 1 is not refused for it. The tables refusing the rows for invalid components that Polars allows, in such a case: the tables then no longer refuse it for them with each part made the number 1, and Polars refuses it for them with each part made `false`, which shows that it evaluates the part and does not skip it, as it skips one in a sort key of one value. The tables refusing the rows with a failed conversion of text to the whole number of a part, as of the text of a column of durations, that Polars allows, in such a case given only literals of text for its parts: the tables then no longer refuse it with each part made the number 1, and Polars refuses it with each part made the literal `x`, which shows that it converts a literal where it makes the plan, so that a literal is converted whether or not the rows evaluate it; a part that is a column is not excused, for Polars converts it only where it evaluates it. |
+| A moment beyond the range of a unit | `dt.cast_time_unit` to nanoseconds multiplies the count of a moment, and Polars refuses one outside the years that nanoseconds hold, such as the first of January of the year 1, when the rows run. The tables measured moments of 1970 and after. Polars refusing the rows or the empty table with the refusal that a conversion to a moment counted in nanoseconds failed, which has no place, in a case with a `dt.cast_time_unit` given nanoseconds: the case run again with each unit made milliseconds, which a moment cannot overflow, is not refused for it. |
 | A replacement of an aggregate in a window key | Polars' streaming engine does not meet a text of one value, a literal or an aggregate, with each of the many values of a replacement in the order key of a window, or in a key inside it, which it does in a select, where the tables measured the replacement. It refuses the lengths at every thread count. Polars refusing the rows or the empty table with the refusal that the length of the value does not match that of the text, which has no place, in a case with a window and a replacement: the case run again with the value of each replacement made a text literal is not refused for it, and nor is the case run again with each window made a fill. |
 | A replacement of a literal aggregate in a branch | Polars' streaming engine refuses a replacement of the aggregate of a literal text, which is one value, where it stands in a branch of a condition, and meets it where it stands in a select, in a sum, in a window or in memory. It reads the pattern of the replacement as many values, and what it says depends on how it splits the rows of the table: that the length of the pattern is dynamic where a piece of them is longer than one row, and that the pattern is null where it is not. The tables measured the replacement in select, on columns. Polars refusing the rows or the empty table with either refusal, which has no place, in a case with a branch of a condition that holds a chain that starts from a literal and replaces after an aggregate: the case run again with each such literal a column of text is not refused for it. |
 | A bitwise call in a join's key | Polars refuses some dtypes of `and_`, `or_` and `xor` when it works out the schema of a select, a filter or a sort key, and accepts them in a join's key, on either side: it checks the dtypes of a bitwise call there less than anywhere else (the pairs it accepts are listed below the table). The tables measured a bitwise call in select, and refuse it for the dtypes it is given; for an argument whose dtype they do not know, for one it might have. The tables refusing, with a reason that names the two dtypes of a bitwise call (`^ not allowed on date and i8`, `\| on Boolean and Int64 is not supported`), at an `and_`, `or_` or `xor` in one of a join's own keys, which Polars allows; the key is why only where Polars, asked to select the refused call on a column of each of the two dtypes the reason names, refuses it at that call for the tables' reason, which a call whose dtypes select accepts, a refusal about another call, a step that is no join and the key of a window do not meet. |
@@ -1447,7 +1570,14 @@ cannot, an unclosed group or class, a repetition that ends before it begins, a g
 none or is named twice, a flag or a property that does not exist, an escape with nothing after it, a repetition of nothing and
 an unopened group, so that the refusal of a pattern is checked as the pattern is, with the rule that
 asks Polars, a replacement's value is often text with a reference to a group, and a split's separator is often text drawn from the same two sets, and the groups of a pattern are often tested for unique values. `n` and a group
-number are drawn from a few values, and a limit holds the count that Polars refuses.
+number are drawn from a few values, and a limit holds the count that Polars refuses. A duration that
+a method reads as a duration string is text typed in, drawn from twelve that Polars reads, which include
+a sign and two units, and nine that it does not, with no amount, no unit, a fraction, a unit that does not
+exist, one in the wrong case, a second sign, a space and an amount too large to hold, and otherwise
+the column of the table that stands for an argument, whose text is the durations the tables were measured
+with. A time zone is drawn from eight names and offsets that Polars reads, four texts that it does not,
+and, for a method that takes a zone off, none, and a method that must be given a time zone or a unit
+is always given one.
 
 ## What The Step Editor Storyboard Has Settled
 

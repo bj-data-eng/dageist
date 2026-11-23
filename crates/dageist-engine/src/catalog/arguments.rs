@@ -2,9 +2,12 @@
 
 use std::collections::BTreeMap;
 
-use polars::prelude::{DataType, Expr, LazyFrame, PolarsError};
+use polars::prelude::{DataType, Expr, LazyFrame, PolarsError, TimeZone};
 
-use super::{Entry, Kind, Parameter, PatternError, Shape, ValueType, check_pattern};
+use super::{
+    DurationError, Entry, Kind, Parameter, PatternError, Shape, TimeZoneError, ValueType,
+    check_pattern, check_time_zone,
+};
 
 /// What the text of a pattern stands for: a regular expression, or, where a flag such as `literal`
 /// says so, plain text that matches itself.
@@ -40,6 +43,8 @@ pub enum Argument {
     Duration(String),
     /// A regular expression, as typed: whether it is one is asked when the entry is built.
     Pattern(String),
+    /// A time zone as typed, or none: whether it is one is asked when the entry is built.
+    TimeZone(Option<String>),
     /// A frame from the graph.
     Table(LazyFrame),
     /// A file, folder or cloud location.
@@ -63,6 +68,7 @@ impl Argument {
             Self::Dtype(_) => "a dtype",
             Self::Duration(_) => "a duration",
             Self::Pattern(_) => "a pattern",
+            Self::TimeZone(_) => "a time zone",
             Self::Table(_) => "a table",
             Self::Path(_) => "a path",
             Self::Pairs(_) => "pairs",
@@ -127,6 +133,20 @@ pub enum BuildError {
         /// What Polars said of it.
         error: PatternError,
     },
+    /// A time zone that Polars does not read.
+    NotATimeZone {
+        /// The parameter's name.
+        parameter: &'static str,
+        /// What Polars said of it.
+        error: TimeZoneError,
+    },
+    /// A duration string that Polars does not read, or cannot hold.
+    NotADuration {
+        /// The parameter's name.
+        parameter: &'static str,
+        /// What Polars said of it.
+        error: DurationError,
+    },
     /// Polars refused the arguments.
     Polars(PolarsError),
 }
@@ -165,6 +185,12 @@ impl std::fmt::Display for BuildError {
                     "{parameter} is not a valid regular expression: {error}"
                 )
             }
+            Self::NotATimeZone { parameter, error } => {
+                write!(formatter, "{parameter} is not a time zone: {error}")
+            }
+            Self::NotADuration { parameter, error } => {
+                write!(formatter, "{parameter} is not a duration: {error}")
+            }
             Self::Polars(error) => write!(formatter, "{error}"),
         }
     }
@@ -174,6 +200,8 @@ impl std::error::Error for BuildError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::NotAPattern { error, .. } => Some(error),
+            Self::NotADuration { error, .. } => Some(error),
+            Self::NotATimeZone { error, .. } => Some(error),
             Self::Polars(error) => Some(error),
             _ => None,
         }
@@ -361,6 +389,32 @@ impl Arguments {
         }
     }
 
+    /// The time zone given for the required `parameter`, as Polars reads it: the zone, or none for a
+    /// parameter that takes none and was given none.
+    ///
+    /// # Errors
+    ///
+    /// When none was given, another kind of argument was, the text is no time zone, or none was
+    /// given to a parameter that needs a zone.
+    pub fn time_zone(
+        &self,
+        parameter: &'static str,
+        takes_none: bool,
+    ) -> Result<Option<TimeZone>, BuildError> {
+        match self.get(parameter) {
+            None => Err(BuildError::Missing { parameter }),
+            Some(Argument::TimeZone(Some(text))) => {
+                check_time_zone(text).map_err(|error| BuildError::NotATimeZone { parameter, error })
+            }
+            Some(Argument::TimeZone(None)) if takes_none => Ok(None),
+            Some(Argument::TimeZone(None)) => Err(BuildError::OutOfRange {
+                parameter,
+                expected: "a time zone, not none",
+            }),
+            Some(other) => Err(Self::wrong(parameter, "a time zone", other)),
+        }
+    }
+
     /// The word given for `parameter`, checked against `words`, or `default`.
     ///
     /// # Errors
@@ -432,6 +486,7 @@ const fn expects(kind: Kind) -> &'static str {
         Kind::Dtype => "a dtype",
         Kind::Duration => "a duration",
         Kind::Pattern => "a pattern",
+        Kind::TimeZone => "a time zone",
         Kind::Table => "a table",
         Kind::Path => "a path",
         Kind::Pairs(..) => "pairs",
@@ -454,6 +509,7 @@ fn check_kind(parameter: &'static str, kind: Kind, argument: &Argument) -> Resul
         | (Kind::Dtype, Argument::Dtype(_))
         | (Kind::Duration, Argument::Duration(_))
         | (Kind::Pattern, Argument::Pattern(_))
+        | (Kind::TimeZone, Argument::TimeZone(_))
         | (Kind::Table, Argument::Table(_))
         | (Kind::Path, Argument::Path(_)) => Ok(()),
         (Kind::Choice(words), Argument::Choice(word)) => {

@@ -18,7 +18,7 @@
 //! whose dtype is not known where a method follows it is not asked from there
 //! on, and the walk says it cannot tell.
 
-use polars::prelude::{Schema, SchemaRef};
+use polars::prelude::{DataType, Schema, SchemaRef, TimeUnit};
 
 use crate::allowed::{
     self, After, Chosen, ConditionState, Context, Ending, Literal, Nested, Outer,
@@ -29,7 +29,7 @@ use crate::allowed::{
     is_count, is_left_unresolved, is_refused_as_a_count, is_required, operand_adapts,
     receiver_beside,
 };
-use crate::catalog::{Applies, AsManyAs, Comparison, Entry, Kind};
+use crate::catalog::{Applies, AsManyAs, Comparison, Entry, Kind, Role};
 
 use super::error::{Place, Segment};
 use super::inputs::Inputs;
@@ -207,6 +207,7 @@ impl Step {
             })
             .and_then(|mut table| table.collect_schema().ok());
         let mut walker = Walker {
+            zones: Vec::new(),
             step: self.call(),
             source,
             inputs,
@@ -245,6 +246,17 @@ struct Operand {
     /// expression for all its values, whose predicate Polars drops where it optimizes the plan
     /// and not where a call that is no elementwise one follows it.
     counted: bool,
+    /// The time zone it is a moment in, where the chain knows it.
+    zone: Option<Zone>,
+}
+
+/// The time zone of a moment: none, or a name that the walk holds once, by its place in the list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Zone {
+    /// A moment that has none.
+    Naive,
+    /// A moment in the zone the walker named at that place.
+    Named(usize),
 }
 
 /// The class of one value of a condition, and whether it is a number typed
@@ -259,6 +271,13 @@ struct Around {
     /// What the chain starts from, when that is a number typed without a dtype and the
     /// link follows it.
     receiver_loose: Option<Loose>,
+    /// The unit the moment or the length of time the link follows is counted in, where it is known.
+    unit: Option<TimeUnit>,
+    /// Whether the value the link follows is one that a part widened: a value of one row that a method
+    /// met with each of the many values of a part, which a window refuses.
+    widened: bool,
+    /// The zone of the moment the link follows, where it is known.
+    zone: Option<Zone>,
 }
 
 /// What a chain has so far.
@@ -271,6 +290,8 @@ enum Cur {
     Condition {
         state: ConditionState,
         values: Vec<Valued>,
+        /// The zone of each value, where it is a moment whose zone is known, in the order of `values`.
+        zones: Vec<Option<Zone>>,
         /// Whether every predicate and value so far gives one value, which a
         /// condition of them gives too.
         single: bool,
@@ -296,6 +317,8 @@ struct Walker<'a> {
     walked: Vec<WalkedExpression>,
     refusal: Option<WalkRefusal>,
     not_known: Option<String>,
+    /// The names of the zones the walk has met, which a [`Zone::Named`] points into.
+    zones: Vec<String>,
 }
 
 /// The output names of a join's keys before the first whose name is not known, in
@@ -398,6 +421,76 @@ fn option_words(call: &Call) -> (Vec<(String, String)>, bool) {
         words.extend(word.map(|word| (given.parameter().to_owned(), word)));
     }
     (words, unknown)
+}
+
+/// Whether the chain has a value that a part widened after `link`: the link met a receiver of one
+/// value with each of the many values a part gives, where the part is not met so in a window, or the
+/// value was widened before and is still many.
+fn widens(
+    link: &Call,
+    arguments: &[(String, Operand)],
+    receiver: Option<Shape>,
+    next: &Cur,
+    before: bool,
+) -> bool {
+    let widens_here = receiver == Some(Shape::One)
+        && arguments.iter().any(|(name, operand)| {
+            operand.shape == Shape::Many
+                && link.entry().parameters().iter().any(|parameter| {
+                    parameter.name() == name && !parameter.broadcasts_in_a_window()
+                })
+        });
+    let many = matches!(
+        next,
+        Cur::Value {
+            shape: Shape::Many,
+            ..
+        }
+    );
+    widens_here || (before && many)
+}
+
+/// The unit a moment or a length of time of the dtype is counted in.
+const fn unit_of(dtype: &DataType) -> Option<TimeUnit> {
+    match dtype {
+        DataType::Datetime(unit, _) | DataType::Duration(unit) => Some(*unit),
+        _ => None,
+    }
+}
+
+/// The unit the word the tables write for a dtype, such as `Datetime(ns, UTC)`, counts in.
+fn unit_in_name(name: &str) -> Option<TimeUnit> {
+    let inside = name
+        .strip_prefix("Datetime(")
+        .or_else(|| name.strip_prefix("Duration("))?;
+    match inside.split([',', ')']).next()? {
+        "ns" => Some(TimeUnit::Nanoseconds),
+        "us" => Some(TimeUnit::Microseconds),
+        "ms" => Some(TimeUnit::Milliseconds),
+        _ => None,
+    }
+}
+
+/// The unit the chain is counted in after `link`, which follows a value counted in `before`: what a
+/// method that is given a unit says it gives, as the table writes it, and the unit it follows for
+/// the others, where they give a moment or a length of time.
+fn unit_after(link: &Call, before: Option<TimeUnit>, standing: &Standing) -> Option<TimeUnit> {
+    let result = standing.verdict()?.allowance()?.result()?;
+    if !matches!(
+        result.class(),
+        Some(Representative::Datetime | Representative::DatetimeZoned | Representative::Duration)
+    ) {
+        return None;
+    }
+    if link
+        .entry()
+        .parameters()
+        .iter()
+        .any(|parameter| parameter.name() == "time_unit")
+    {
+        return unit_in_name(result.name());
+    }
+    before
 }
 
 /// The class a literal has, when its dtype is known without another operand:
@@ -729,6 +822,165 @@ impl Walker<'_> {
         Representative::of(self.source.get(name)?)
     }
 
+    /// The dtype a start gives, where its arguments decide it: that of the column it reads, or of
+    /// the dtype a literal is given.
+    fn start_dtype(&self, start: &Call) -> Option<DataType> {
+        match start.entry().id().as_str() {
+            "polars.col" => {
+                let Some(Value::Columns(names)) = start.argument("name") else {
+                    return None;
+                };
+                if Self::names_several(start) {
+                    return None;
+                }
+                self.read_against()?.get(names.first()?).cloned()
+            }
+            "polars.lit" => match start.argument("dtype") {
+                Some(Value::Dtype(dtype)) => Some(dtype.as_polars().clone()),
+                _ => None,
+            },
+            "polars.element" => {
+                let Some(Value::Columns(names)) = self.step.argument("values") else {
+                    return None;
+                };
+                let [name] = names.as_slice() else {
+                    return None;
+                };
+                self.source.get(name).cloned()
+            }
+            _ => None,
+        }
+    }
+
+    /// The zone of the moment a start gives, where its arguments decide it.
+    fn start_zone(&mut self, start: &Call) -> Option<Zone> {
+        match self.start_dtype(start)? {
+            DataType::Datetime(_, None) => Some(Zone::Naive),
+            DataType::Datetime(_, Some(zone)) => Some(self.zone_named(zone.as_str())),
+            _ => None,
+        }
+    }
+
+    /// The names of the two zones of a moment a method follows and an operand it is given as one the
+    /// moment is compared with, subtracted by, filled with or bound by, where both are known and
+    /// they differ.
+    fn zone_clash(
+        &self,
+        entry: &Entry,
+        arguments: &[(String, Operand)],
+        receiver: Option<Zone>,
+    ) -> Option<(String, String)> {
+        let zone_of = |name: &str| {
+            arguments
+                .iter()
+                .find(|(given, _)| given == name)
+                .and_then(|(_, operand)| operand.zone)
+        };
+        let differ = |first: Option<Zone>, second: Option<Zone>| match (first, second) {
+            (Some(Zone::Named(first)), Some(Zone::Named(second))) if first != second => {
+                Some((self.zones[first].clone(), self.zones[second].clone()))
+            }
+            _ => None,
+        };
+        entry.parameters().iter().find_map(|parameter| {
+            let own = zone_of(parameter.name())?;
+            // An operand is met with the value it follows, as a comparison, a difference, a fill and
+            // the bounds of an interval are; a parameter that shares a dtype with another is met with
+            // that one, as the default of a replacement is with its new values, and the value it
+            // follows is no matter.
+            if matches!(parameter.role(), Role::Operand | Role::Filler)
+                && let Some(clash) = differ(receiver, Some(own))
+            {
+                return Some(clash);
+            }
+            let partner = parameter.shares_a_dtype_with()?;
+            differ(zone_of(partner), Some(own))
+        })
+    }
+
+    /// The names of two zones of the values a condition has when this link ends it, where both are
+    /// known and they differ: Polars finds no dtype that the moments of two zones have in common.
+    fn condition_zone_clash(
+        &self,
+        entry: &Entry,
+        cur: &Cur,
+        arguments: &[(String, Operand)],
+    ) -> Option<(String, String)> {
+        if !matches!(
+            entry.id().as_str(),
+            "Then.otherwise" | "ChainedThen.otherwise"
+        ) {
+            return None;
+        }
+        let Cur::Condition { zones, .. } = cur else {
+            return None;
+        };
+        let last = arguments
+            .iter()
+            .find(|(name, _)| name == "statement")
+            .and_then(|(_, operand)| operand.zone);
+        let known: Vec<usize> = zones
+            .iter()
+            .copied()
+            .chain(std::iter::once(last))
+            .filter_map(|zone| match zone {
+                Some(Zone::Named(at)) => Some(at),
+                _ => None,
+            })
+            .collect();
+        let first = *known.first()?;
+        let other = known.iter().find(|at| **at != first)?;
+        Some((self.zones[first].clone(), self.zones[*other].clone()))
+    }
+
+    /// The zone the walk holds under `name`.
+    fn zone_named(&mut self, name: &str) -> Zone {
+        let at = self
+            .zones
+            .iter()
+            .position(|known| known == name)
+            .unwrap_or_else(|| {
+                self.zones.push(name.to_owned());
+                self.zones.len() - 1
+            });
+        Zone::Named(at)
+    }
+
+    /// The zone of the chain after `link`, which follows a moment in `before`: the zone a method that
+    /// is given one gives, as the call says it, and the zone it follows for the others, where they
+    /// give a moment.
+    fn zone_after(
+        &mut self,
+        link: &Call,
+        before: Option<Zone>,
+        standing: &Standing,
+    ) -> Option<Zone> {
+        let result = standing.verdict()?.allowance()?.result()?;
+        match result.class() {
+            Some(Representative::Datetime) => Some(Zone::Naive),
+            Some(Representative::DatetimeZoned) => {
+                if link
+                    .entry()
+                    .parameters()
+                    .iter()
+                    .any(|parameter| parameter.kind() == Kind::TimeZone)
+                {
+                    let (_, zone) = result.name().split_once(", ")?;
+                    Some(self.zone_named(zone.strip_suffix(')')?))
+                } else {
+                    before.filter(|zone| matches!(zone, Zone::Named(_)))
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// The unit the moment or the length of time a start gives is counted in, where its arguments
+    /// decide it.
+    fn start_unit(&self, start: &Call) -> Option<TimeUnit> {
+        unit_of(&self.start_dtype(start)?)
+    }
+
     /// The class a start gives, where its arguments decide it.
     fn start_class(&self, start: &Call) -> Option<Representative> {
         match start.entry().id().as_str() {
@@ -758,6 +1010,7 @@ impl Walker<'_> {
             shape: Shape::Many,
             known: false,
             counted: false,
+            zone: None,
         };
         let mut calls: Vec<Standing> = Vec::new();
         let mut last_end: Option<Ending> = None;
@@ -810,6 +1063,7 @@ impl Walker<'_> {
                             Cur::Condition {
                                 state: ConditionState::When,
                                 values: Vec::new(),
+                                zones: Vec::new(),
                                 single: start_arguments
                                     .iter()
                                     .all(|(_, operand)| operand.shape == Shape::One),
@@ -859,6 +1113,15 @@ impl Walker<'_> {
             .collect();
         let mut branches_are_one =
             statements.len() > 1 && statements.windows(2).all(|pair| pair[0] == pair[1]);
+        let mut widened = false;
+        let mut unit = match expression.start() {
+            Start::Call(start) => self.start_unit(start),
+            _ => None,
+        };
+        let mut zone = match expression.start() {
+            Start::Call(start) => self.start_zone(start),
+            _ => None,
+        };
         for (at, link) in expression.links().iter().enumerate() {
             self.path.push(Segment::Link(at));
             let arguments = self.arguments(link, values_end);
@@ -879,6 +1142,10 @@ impl Walker<'_> {
                         ..
                     }
             );
+            let receiver_shape = match &cur {
+                Cur::Value { shape, .. } => Some(*shape),
+                _ => None,
+            };
             let (next, standing) = self.link(
                 link,
                 &arguments,
@@ -888,8 +1155,14 @@ impl Walker<'_> {
                 Around {
                     branches_are_one,
                     receiver_loose,
+                    unit,
+                    widened,
+                    zone,
                 },
             );
+            unit = unit_after(link, unit, &standing);
+            zone = self.zone_after(link, zone, &standing);
+            widened = widens(link, &arguments, receiver_shape, &next, widened);
             if branches_are_one
                 && all_single
                 && matches!(
@@ -977,6 +1250,7 @@ impl Walker<'_> {
                 // What was not asked has no shape that can be counted on.
                 known: dtype.is_some(),
                 counted: dtype.is_some() && !branches_are_one,
+                zone,
             },
             Cur::Condition { values, .. } => Operand {
                 dtype: unify(&values),
@@ -984,6 +1258,7 @@ impl Walker<'_> {
                 shape: Shape::Many,
                 known: true,
                 counted: !branches_are_one,
+                zone: None,
             },
             Cur::Dead => unsaid,
         }
@@ -1049,8 +1324,34 @@ impl Walker<'_> {
         let Around {
             branches_are_one,
             receiver_loose,
+            unit,
+            widened,
+            zone,
         } = around;
         let entry = link.entry();
+        // A window is refused a value of one row that a part widened, whose output is longer than
+        // its input.
+        if widened
+            && entry.id().as_str() == "Expr.over"
+            && let Err(refusal) = allowed::rule_forbids_a_window_over_a_widened_value()
+        {
+            self.refuse(&refusal, false);
+            return (
+                Cur::Dead,
+                Standing {
+                    follows: None,
+                    verdict: Some(Verdict::Refused(refusal)),
+                },
+            );
+        }
+        // Moments in two zones that a method is given to compare, subtract, fill or bind by one
+        // another have no dtype in common.
+        let clash = self
+            .zone_clash(entry, arguments, zone)
+            .or_else(|| self.condition_zone_clash(entry, &cur, arguments));
+        let clash_of_zones = clash
+            .as_ref()
+            .map(|(first, second)| (first.as_str(), second.as_str()));
         // A number typed without a dtype that a method takes another operand beside adapts to
         // it, as the dtype of that operand where it fits it, or keeps the dtype it has alone, as
         // the base of a power does. Where there is no such operand the tables, measured with typed
@@ -1179,6 +1480,8 @@ impl Walker<'_> {
             .map(|(name, word)| (name.as_str(), word.as_str()))
             .collect();
         let patterns = link.patterns();
+        let durations = link.durations();
+        let time_zones = link.time_zones();
         let place = OfferPlace::new(context, after);
         // Two arguments that meet in the supertype of their dtypes are judged each apart, so
         // where their dtypes differ, whether Polars finds a supertype is not known, and what
@@ -1247,7 +1550,11 @@ impl Walker<'_> {
                     .with_arguments(&judged)
                     .with_unclassed(&unjudged)
                     .with_options(&words)
-                    .with_patterns(&patterns),
+                    .with_patterns(&patterns)
+                    .with_durations(&durations)
+                    .with_time_zones(&time_zones)
+                    .following(unit)
+                    .with_zone_clash(clash_of_zones),
             );
             let standing = Standing {
                 follows: Some(after),
@@ -1315,7 +1622,11 @@ impl Walker<'_> {
             .with_arguments(&given)
             .with_unclassed(&unclassed)
             .with_options(&words)
-            .with_patterns(&patterns);
+            .with_patterns(&patterns)
+            .with_durations(&durations)
+            .with_time_zones(&time_zones)
+            .following(unit)
+            .with_zone_clash(clash_of_zones);
         let chosen = match gives {
             Some(dtype) => chosen.giving(dtype),
             None => chosen,
@@ -1358,6 +1669,7 @@ impl Walker<'_> {
                 Applies::Condition,
                 Cur::Condition {
                     mut values,
+                    mut zones,
                     single,
                     values_single,
                     known,
@@ -1370,10 +1682,12 @@ impl Walker<'_> {
                 let state = match entry.id().as_str() {
                     "When.then" => {
                         values.push(statement_class);
+                        zones.push(statement.and_then(|operand| operand.zone));
                         ConditionState::Then
                     }
                     "ChainedWhen.then" => {
                         values.push(statement_class);
+                        zones.push(statement.and_then(|operand| operand.zone));
                         ConditionState::ChainedThen
                     }
                     "Then.when" | "ChainedThen.when" => ConditionState::ChainedWhen,
@@ -1406,6 +1720,7 @@ impl Walker<'_> {
                 Cur::Condition {
                     state,
                     values,
+                    zones,
                     single,
                     values_single,
                     known,

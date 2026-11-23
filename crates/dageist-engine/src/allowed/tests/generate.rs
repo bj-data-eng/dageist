@@ -24,7 +24,7 @@ use crate::catalog::{
 
 use super::build::{
     column, condition_with, element, entry, expression, expressions, flag, integer, method,
-    null_of, one_of, patterns, step,
+    null_of, one_of, patterns, required_choices, step,
 };
 use super::probe::{Plan, measure, outcome};
 use super::sample::Frames;
@@ -203,6 +203,12 @@ fn companions(
         ("Expr.replace_strict", Some("default")) => vec![("old", own())],
         // A slice that is tested for its length starts at a place: the second character.
         ("Expr.str.slice", Some("length")) => vec![("offset", expression(integer(1)))],
+        // A time zone every moment is given, or converted to: one that has no gap or repeat.
+        ("Expr.dt.replace_time_zone" | "Expr.dt.convert_time_zone", _) => {
+            vec![("time_zone", Argument::TimeZone(Some("UTC".to_owned())))]
+        }
+        // The format that every dtype of a date or a time takes.
+        ("Expr.dt.strftime", _) => vec![("format", Argument::String("iso".to_owned()))],
         ("Expr.is_between", Some("lower_bound")) => vec![("upper_bound", own())],
         ("Expr.is_between", Some("upper_bound")) => vec![("lower_bound", own())],
         _ => Vec::new(),
@@ -223,6 +229,7 @@ fn companions(
     // A pattern that a method must be given is the harness's, which every one of them accepts.
     if let Some(entry) = catalog::entry(entry) {
         given.extend(patterns(entry));
+        given.extend(required_choices(entry));
     }
     given
 }

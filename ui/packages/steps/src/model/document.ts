@@ -534,6 +534,7 @@ function settingArgument(
     case 'text':
       if (kind.kind === 'duration') return { duration: setting.value };
       if (kind.kind === 'pattern') return { pattern: setting.value };
+      if (kind.kind === 'timeZone') return { time_zone: setting.value };
       if (kind.kind === 'path') return { path: setting.value };
       return { string: setting.value };
     case 'word':
@@ -542,6 +543,9 @@ function settingArgument(
           return { choice: setting.value };
         case 'dtype':
           return { dtype: setting.value };
+        // The word `None` is no zone, which Python's `replace_time_zone` takes a zone off with.
+        case 'timeZone':
+          return { time_zone: null };
         case 'column':
           return columnsOf(setting.value);
         case 'table':

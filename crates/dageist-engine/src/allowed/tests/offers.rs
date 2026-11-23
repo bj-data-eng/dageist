@@ -1285,3 +1285,59 @@ fn two_arguments_that_give_different_results_leave_the_result_unknown() {
         assert_eq!(result_of(&alone), Some(expected), "{parameter}: {alone:?}");
     }
 }
+
+#[test]
+fn a_part_given_to_replace_is_refused_for_what_polars_says_of_the_call_that_has_it() {
+    // Polars converts a part that `dt.replace` is given before it meets the value it follows, so
+    // text given text as the month is refused for the conversion, at the rows, where the call with
+    // no part is refused for the text, as no moment.
+    let refused = verdict(
+        "Expr.dt.replace",
+        &select_after(Representative::String),
+        &[("month", Representative::String)],
+    );
+    let refusal = refused.refusal().expect("refused after text");
+    assert_eq!(refusal.source(), RefusalSource::Polars(Stage::Rows));
+    assert!(
+        refusal
+            .reason()
+            .contains("conversion from `str` to `i8` failed"),
+        "{}",
+        refusal.reason()
+    );
+    let refused = verdict(
+        "Expr.dt.replace",
+        &select_after(Representative::String),
+        &[],
+    );
+    let refusal = refused.refusal().expect("refused after text");
+    assert!(
+        refusal
+            .reason()
+            .contains("`round` operation not supported for dtype `str`"),
+        "{}",
+        refusal.reason()
+    );
+}
+
+#[test]
+fn a_part_given_to_replace_beside_an_option_is_refused_as_converted_too() {
+    // The option is measured with the value it follows alone, which is refused as no moment; the
+    // part it is given beside is converted first, which is what Polars says of the call.
+    let chosen = Chosen::default()
+        .with_arguments(&[("month", Representative::String)])
+        .with_options(&[("ambiguous", "raise")]);
+    let refused = offer(
+        entry("Expr.dt.replace"),
+        &select_after(Representative::String),
+        &chosen,
+    );
+    let refusal = refused.refusal().expect("refused after text");
+    assert!(
+        refusal
+            .reason()
+            .contains("conversion from `str` to `i8` failed"),
+        "{}",
+        refusal.reason()
+    );
+}

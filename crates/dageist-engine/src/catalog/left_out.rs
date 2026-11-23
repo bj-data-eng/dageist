@@ -100,6 +100,9 @@ pub fn left_out() -> &'static [LeftOut] {
 //   patterns, which Polars matches all at once with Aho-Corasick. A pattern here is one regular
 //   expression typed in; a list of texts, typed or connected from another node, is a kind of its
 //   own, and the many-pattern methods wait for it.
+// - `Expr.dt.add_business_days` and `is_business_day` take `week_mask` and `holidays`, a week of seven
+//   flags and a list of dates, which are lists of literals, and a list of literals typed in, of
+//   flags or of dates, is a kind of its own that does not exist yet.
 // - `Expr.str.split_exact` and `splitn` give a struct, whose fields a step reads with
 //   `Expr.struct.field`, which is not catalogued yet. `Expr.str.extract_groups` gives one too, and
 //   is catalogued, for its fields are named by the pattern and Polars says them.
@@ -218,45 +221,7 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.diff", Reason::NotYetCatalogued),
     LeftOut::new("Expr.dot", Reason::NotYetCatalogued),
     LeftOut::new("Expr.dt.add_business_days", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.base_utc_offset", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.cast_time_unit", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.century", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.combine", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.convert_time_zone", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.day", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.days_in_month", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.dst_offset", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.epoch", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.hour", Reason::NotYetCatalogued),
     LeftOut::new("Expr.dt.is_business_day", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.is_leap_year", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.iso_year", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.microsecond", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.millennium", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.millisecond", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.minute", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.month", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.month_end", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.nanosecond", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.ordinal_day", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.quarter", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.replace", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.replace_time_zone", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.round", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.second", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.strftime", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.timestamp", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.to_string", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.total_hours", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.total_microseconds", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.total_milliseconds", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.total_minutes", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.total_nanoseconds", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.total_seconds", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.truncate", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.week", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.weekday", Reason::NotYetCatalogued),
-    LeftOut::new("Expr.dt.year", Reason::NotYetCatalogued),
     LeftOut::new("Expr.entropy", Reason::NotYetCatalogued),
     LeftOut::new("Expr.ewm_mean", Reason::NotYetCatalogued),
     LeftOut::new("Expr.ewm_mean_by", Reason::NotYetCatalogued),

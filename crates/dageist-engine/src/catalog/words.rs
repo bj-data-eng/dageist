@@ -100,6 +100,8 @@ struct ParameterWords {
     name: String,
     label: String,
     choices: BTreeMap<String, String>,
+    /// The word for none and its hint, for a parameter that may be given none.
+    none: Option<(String, String)>,
 }
 
 #[derive(Debug, Clone)]
@@ -532,6 +534,16 @@ impl Words {
             .map(|parameter| parameter.label.as_str())
     }
 
+    /// The word for none and its hint, for an entry's parameter that may be given none, as the
+    /// time zone of `replace_time_zone` may: the zone is then taken off.
+    #[must_use]
+    pub fn parameter_none(&self, id: EntryId, parameter: &str) -> Option<(&str, &str)> {
+        self.parameter(id, parameter)?
+            .none
+            .as_ref()
+            .map(|(word, hint)| (word.as_str(), hint.as_str()))
+    }
+
     /// The shown word for one choice word of an entry's parameter.
     #[must_use]
     pub fn choice_word(&self, id: EntryId, parameter: &str, word: &str) -> Option<&str> {
@@ -745,7 +757,28 @@ fn entry_words(path: &str, table: &Table) -> Result<EntryWords, WordsError> {
         hint: text(table, "hint", path)?,
         head,
         parameters: section(table, path, "parameters", |parameter_path, table| {
-            only(table, &["name", "label", "choices"], parameter_path)?;
+            only(
+                table,
+                &["name", "label", "choices", "none", "none_hint"],
+                parameter_path,
+            )?;
+            let none = match (table.get("none"), table.get("none_hint")) {
+                (None, None) => None,
+                (Some(word), Some(hint)) => Some((
+                    as_text(word, &join(parameter_path, "none"))?,
+                    as_text(hint, &join(parameter_path, "none_hint"))?,
+                )),
+                (Some(_), None) => {
+                    return Err(WordsError::Missing {
+                        path: join(parameter_path, "none_hint"),
+                    });
+                }
+                (None, Some(_)) => {
+                    return Err(WordsError::Missing {
+                        path: join(parameter_path, "none"),
+                    });
+                }
+            };
             let choices = match table.get("choices") {
                 None => BTreeMap::new(),
                 Some(value) => {
@@ -762,6 +795,7 @@ fn entry_words(path: &str, table: &Table) -> Result<EntryWords, WordsError> {
                 name: text(table, "name", parameter_path)?,
                 label: text(table, "label", parameter_path)?,
                 choices,
+                none,
             })
         })?,
     })

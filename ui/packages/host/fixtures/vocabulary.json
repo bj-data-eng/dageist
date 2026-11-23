@@ -3,13 +3,17 @@
   "nested": ["over.partition_by", "over.order_by", "condition.predicate", "condition.value"],
   "rules": [
     "condition-predicate-is-boolean",
+    "duration-is-valid",
     "element-only-in-pivot-aggregate",
     "filter-predicate-is-boolean",
     "join-key-names-are-not-repeated",
     "key-is-elementwise",
+    "moments-share-a-zone",
     "pattern-is-valid",
     "pivot-aggregate-gives-one-value",
-    "replacement-values-match-in-number"
+    "replacement-values-match-in-number",
+    "time-zone-is-valid",
+    "window-input-is-not-widened"
   ],
   "stages": ["schema", "rows", "empty"],
   "conditionStates": ["when", "then", "chainedWhen", "chainedThen"],

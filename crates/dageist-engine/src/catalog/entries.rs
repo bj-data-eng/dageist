@@ -14,15 +14,15 @@ use polars::chunked_array::cast::CastOptions;
 use polars::frame::PivotColumnNaming;
 use polars::prelude::{
     AnyValue, ClosedInterval, DataType, Expr, FillNullStrategy, JoinBuildSide, JoinCoalesce,
-    JoinType, JoinValidation, LazyFrame, MaintainOrderJoin, NULL, NamedFrom, Operator, PolarsError,
-    RoundMode, Scalar, Series, SortMultipleOptions, SortOptions, WindowMapping, all,
-    all_horizontal, binary_expr, col, cols, element, lit, when,
+    JoinType, JoinValidation, LazyFrame, MaintainOrderJoin, NULL, NamedFrom, NonExistent, Operator,
+    PolarsError, RoundMode, Scalar, Series, SortMultipleOptions, SortOptions, TimeUnit, TimeZone,
+    WindowMapping, all, all_horizontal, binary_expr, col, cols, element, lit, when,
 };
 
 use super::{
-    Argument, Arguments, AsManyAs, Build, BuildError, Conditional, Dtypes, Entry, EntryId, Family,
-    Kind, Laziness, Parameter, ParameterDefault, PatternMeans, Role, Shape, ValueType, Variadic,
-    Writes,
+    Argument, Arguments, AsManyAs, Build, BuildError, Conditional, Dtypes, DurationUse, Entry,
+    EntryId, Family, Kind, Laziness, Parameter, ParameterDefault, PatternMeans, Role, Shape,
+    ValueType, Variadic, Writes,
 };
 
 const ANY: &[Dtypes] = &[Dtypes::Any];
@@ -45,6 +45,24 @@ const SUBTRACTABLE: &[Dtypes] = &[Dtypes::Numeric, Dtypes::Temporal];
 const DATE_PART: &[Dtypes] = &[Dtypes::Datetime, Dtypes::Date];
 const TIME_PART: &[Dtypes] = &[Dtypes::Datetime, Dtypes::Time];
 const DURATION: &[Dtypes] = &[Dtypes::Duration];
+// What Polars takes a time unit of: a `Datetime` and a `Duration` are held in one, and changed to
+// another by `cast_time_unit`.
+// What Polars takes a time zone of: a `Datetime`, which it gives one it has none, converts to another
+// and, where it has one, reads the offsets of. A `Datetime` with none is refused the offsets.
+const ZONED: &[Dtypes] = &[Dtypes::Datetime];
+// The time of day `combine` puts on a date or a moment.
+const TIME_OF_DAY: &[Dtypes] = &[Dtypes::Time];
+// What Polars writes as text with a format: a moment, a date, a time of day and a duration.
+const WRITABLE: &[Dtypes] = &[Dtypes::Temporal];
+const HAS_A_UNIT: &[Dtypes] = &[Dtypes::Datetime, Dtypes::Duration];
+// What Polars counts since the start of 1970: a moment, and a number or a `Boolean`, which it
+// reads as the count of microseconds a moment is. A time of day, a duration and text it refuses.
+const COUNTED_SINCE_1970: &[Dtypes] = &[
+    Dtypes::Numeric,
+    Dtypes::Boolean,
+    Dtypes::Datetime,
+    Dtypes::Date,
+];
 
 // What Polars accepts on the receiver of arithmetic and logic, from the functions that run
 // them: a coarse group is claimed when Polars accepts it with some dtype of operand, and the
@@ -119,6 +137,17 @@ const BUILD_SIDE: &[&str] = &[
     "force_left",
     "force_right",
 ];
+// The words Python's `TimeUnit` takes: the unit a `Datetime` or a `Duration` counts in.
+const TIME_UNIT: &[&str] = &["ns", "us", "ms"];
+// The words Python's `epoch` takes for `time_unit`: the three units of a `TimeUnit`, and seconds
+// and days, which `epoch` works out of them.
+const EPOCH_UNIT: &[&str] = &["ns", "us", "ms", "s", "d"];
+// The words Python's `Ambiguous` takes: which of the two times a clock that is read twice, as it is
+// where the clocks go back, stands for, and what to do where no word is given.
+const AMBIGUOUS: &[&str] = &["earliest", "latest", "raise", "null"];
+// The words Python's `replace_time_zone` takes for `non_existent`: what a clock that is never read,
+// as where the clocks go forward, gives.
+const NON_EXISTENT: &[&str] = &["raise", "null"];
 const COLUMN_NAMING: &[&str] = &["auto", "combine"];
 const MAPPING_STRATEGY: &[&str] = &["group_to_rows", "join", "explode"];
 // The words Python's binding takes for `mode`. Polars' enum also has `to_zero`, which the
@@ -129,6 +158,24 @@ const CLOSED: &[&str] = &["both", "left", "right", "none"];
 // The words Python's `fill_null` takes for `strategy`, which `parse_fill_null_strategy` in the
 // binding reads. `forward` and `backward` are the strategies `limit` bounds.
 const FILL_STRATEGY: &[&str] = &["forward", "backward", "min", "max", "mean", "zero", "one"];
+
+/// A method of the `dt` namespace: it takes the dates, times and lengths of time it `accepts` and
+/// is swapped for the others of its family.
+const fn temporal(
+    id: &'static str,
+    accepts: &'static [Dtypes],
+    parameters: &'static [Parameter],
+    build: fn(Expr, &Arguments) -> Result<Expr, BuildError>,
+) -> Entry {
+    Entry {
+        id: EntryId(id),
+        family: Family::Temporal,
+        accepts,
+        parameters,
+        laziness: Laziness::Lazy,
+        build: Build::Expression(build),
+    }
+}
 
 const fn required(name: &'static str, kind: Kind, shape: Shape) -> Parameter {
     Parameter::new(name, kind, shape, ParameterDefault::Required)
@@ -1067,12 +1114,253 @@ fn dt_offset_by(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
     Ok(expr.dt().offset_by(arguments.required_expression("by")?))
 }
 
+fn dt_truncate(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().truncate(arguments.required_expression("every")?))
+}
+
+fn dt_round(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().round(arguments.required_expression("every")?))
+}
+
 fn dt_month_start(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
     Ok(expr.dt().month_start())
 }
 
 fn dt_total_days(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
     Ok(expr.dt().total_days(arguments.flag("fractional", false)?))
+}
+
+fn dt_century(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().century())
+}
+
+fn dt_day(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().day())
+}
+
+fn dt_days_in_month(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().days_in_month())
+}
+
+fn dt_iso_year(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().iso_year())
+}
+
+fn dt_millennium(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().millennium())
+}
+
+fn dt_month(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().month())
+}
+
+fn dt_month_end(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().month_end())
+}
+
+fn dt_ordinal_day(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().ordinal_day())
+}
+
+fn dt_quarter(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().quarter())
+}
+
+fn dt_week(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().week())
+}
+
+fn dt_weekday(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().weekday())
+}
+
+fn dt_year(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().year())
+}
+
+fn dt_is_leap_year(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().is_leap_year())
+}
+
+fn dt_hour(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().hour())
+}
+
+fn dt_minute(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().minute())
+}
+
+fn dt_millisecond(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().millisecond())
+}
+
+fn dt_microsecond(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().microsecond())
+}
+
+fn dt_nanosecond(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().nanosecond())
+}
+
+/// The second of the minute, with the fraction of it as Python writes it: the whole second and
+/// the nanoseconds of it over a billion.
+fn dt_second(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(if arguments.flag("fractional", false)? {
+        expr.clone().dt().second() + expr.dt().nanosecond() / lit(1_000_000_000.0)
+    } else {
+        expr.dt().second()
+    })
+}
+
+fn dt_total_hours(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().total_hours(arguments.flag("fractional", false)?))
+}
+
+fn dt_total_minutes(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr
+        .dt()
+        .total_minutes(arguments.flag("fractional", false)?))
+}
+
+fn dt_total_seconds(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr
+        .dt()
+        .total_seconds(arguments.flag("fractional", false)?))
+}
+
+fn dt_total_milliseconds(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr
+        .dt()
+        .total_milliseconds(arguments.flag("fractional", false)?))
+}
+
+fn dt_total_microseconds(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr
+        .dt()
+        .total_microseconds(arguments.flag("fractional", false)?))
+}
+
+fn dt_total_nanoseconds(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr
+        .dt()
+        .total_nanoseconds(arguments.flag("fractional", false)?))
+}
+
+/// The time unit given for `parameter`, which is one of `words`.
+fn time_unit(
+    arguments: &Arguments,
+    parameter: &'static str,
+    words: &[&'static str],
+    default: Option<&'static str>,
+) -> Result<TimeUnit, BuildError> {
+    let word = match (arguments.get(parameter), default) {
+        (None, None) => return Err(BuildError::Missing { parameter }),
+        (_, default) => arguments.choice(parameter, words, default.unwrap_or(words[0]))?,
+    };
+    Ok(match word {
+        "ns" => TimeUnit::Nanoseconds,
+        "ms" => TimeUnit::Milliseconds,
+        _ => TimeUnit::Microseconds,
+    })
+}
+
+fn dt_base_utc_offset(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().base_utc_offset())
+}
+
+fn dt_dst_offset(expr: Expr, _: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().dst_offset())
+}
+
+/// A moment in the zone, which keeps its instant and changes the clock it is read by. Python takes
+/// a zone only, so none is refused.
+fn dt_convert_time_zone(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let zone = arguments
+        .time_zone("time_zone", false)?
+        .unwrap_or(TimeZone::UTC);
+    Ok(expr.dt().convert_time_zone(zone))
+}
+
+/// A moment in the zone that keeps its clock and changes its instant, or in none where the zone is
+/// none. A clock that is read twice or never is resolved by the words given.
+fn dt_replace_time_zone(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let zone = arguments.time_zone("time_zone", true)?;
+    let ambiguous = arguments.choice("ambiguous", AMBIGUOUS, "raise")?;
+    let non_existent = match arguments.choice("non_existent", NON_EXISTENT, "raise")? {
+        "null" => NonExistent::Null,
+        _ => NonExistent::Raise,
+    };
+    Ok(expr
+        .dt()
+        .replace_time_zone(zone, lit(ambiguous), non_existent))
+}
+
+fn dt_combine(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr.dt().combine(
+        arguments.required_expression("time")?,
+        time_unit(arguments, "time_unit", TIME_UNIT, Some("us"))?,
+    ))
+}
+
+/// A part of a moment that is left as it is where it is not given: Python gives each a null.
+fn dt_replace(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let part = |name: &'static str| -> Result<Expr, BuildError> {
+        Ok(arguments.expression(name)?.unwrap_or_else(|| lit(NULL)))
+    };
+    let ambiguous = arguments.choice("ambiguous", AMBIGUOUS, "raise")?;
+    Ok(expr.dt().replace(
+        part("year")?,
+        part("month")?,
+        part("day")?,
+        part("hour")?,
+        part("minute")?,
+        part("second")?,
+        part("microsecond")?,
+        lit(ambiguous),
+    ))
+}
+
+fn dt_strftime(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let format = arguments.string("format")?.ok_or(BuildError::Missing {
+        parameter: "format",
+    })?;
+    Ok(expr.dt().strftime(&format))
+}
+
+/// A moment as text, in ISO form where Python's `to_string` is given no format.
+fn dt_to_string(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    let format = arguments
+        .string("format")?
+        .unwrap_or_else(|| "iso".to_owned());
+    Ok(expr.dt().to_string(&format))
+}
+
+fn dt_cast_time_unit(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr
+        .dt()
+        .cast_time_unit(time_unit(arguments, "time_unit", TIME_UNIT, None)?))
+}
+
+fn dt_timestamp(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(expr
+        .dt()
+        .timestamp(time_unit(arguments, "time_unit", TIME_UNIT, Some("us"))?))
+}
+
+/// The time since the start of 1970 in the unit asked for, as Python works it out: a time stamp
+/// in the three units of a time unit, a whole number of seconds from one in milliseconds, and a
+/// whole number of days from the date.
+fn dt_epoch(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
+    Ok(match arguments.choice("time_unit", EPOCH_UNIT, "us")? {
+        "s" => expr
+            .dt()
+            .timestamp(TimeUnit::Milliseconds)
+            .floor_div(lit(1000_i64)),
+        "d" => expr.cast(DataType::Date).cast(DataType::Int32),
+        _ => expr
+            .dt()
+            .timestamp(time_unit(arguments, "time_unit", TIME_UNIT, Some("us"))?),
+    })
 }
 
 fn over(expr: Expr, arguments: &Arguments) -> Result<Expr, BuildError> {
@@ -1660,6 +1948,29 @@ pub(super) const ENTRIES: &[Entry] = &[
         laziness: Laziness::Lazy,
         build: Build::Expression(drop_nulls),
     },
+    temporal("Expr.dt.base_utc_offset", ZONED, &[], dt_base_utc_offset),
+    temporal(
+        "Expr.dt.cast_time_unit",
+        HAS_A_UNIT,
+        &[required("time_unit", Kind::Choice(TIME_UNIT), Shape::One)],
+        dt_cast_time_unit,
+    ),
+    temporal("Expr.dt.century", DATE_PART, &[], dt_century),
+    temporal(
+        "Expr.dt.combine",
+        DATE_PART,
+        &[
+            required("time", Kind::Expression(TIME_OF_DAY), Shape::One),
+            optional("time_unit", Kind::Choice(TIME_UNIT), Shape::One, "'us'"),
+        ],
+        dt_combine,
+    ),
+    temporal(
+        "Expr.dt.convert_time_zone",
+        ZONED,
+        &[required("time_zone", Kind::TimeZone, Shape::One)],
+        dt_convert_time_zone,
+    ),
     Entry {
         id: EntryId("Expr.dt.date"),
         family: Family::Temporal,
@@ -1668,6 +1979,29 @@ pub(super) const ENTRIES: &[Entry] = &[
         laziness: Laziness::Lazy,
         build: Build::Expression(dt_date),
     },
+    temporal("Expr.dt.day", DATE_PART, &[], dt_day),
+    temporal("Expr.dt.days_in_month", DATE_PART, &[], dt_days_in_month),
+    temporal("Expr.dt.dst_offset", ZONED, &[], dt_dst_offset),
+    temporal(
+        "Expr.dt.epoch",
+        COUNTED_SINCE_1970,
+        &[optional(
+            "time_unit",
+            Kind::Choice(EPOCH_UNIT),
+            Shape::One,
+            "'us'",
+        )],
+        dt_epoch,
+    ),
+    temporal("Expr.dt.hour", TIME_PART, &[], dt_hour),
+    temporal("Expr.dt.is_leap_year", DATE_PART, &[], dt_is_leap_year),
+    temporal("Expr.dt.iso_year", DATE_PART, &[], dt_iso_year),
+    temporal("Expr.dt.microsecond", TIME_PART, &[], dt_microsecond),
+    temporal("Expr.dt.millennium", DATE_PART, &[], dt_millennium),
+    temporal("Expr.dt.millisecond", TIME_PART, &[], dt_millisecond),
+    temporal("Expr.dt.minute", TIME_PART, &[], dt_minute),
+    temporal("Expr.dt.month", DATE_PART, &[], dt_month),
+    temporal("Expr.dt.month_end", DATE_PART, &[], dt_month_end),
     Entry {
         id: EntryId("Expr.dt.month_start"),
         family: Family::Temporal,
@@ -1676,15 +2010,88 @@ pub(super) const ENTRIES: &[Entry] = &[
         laziness: Laziness::Lazy,
         build: Build::Expression(dt_month_start),
     },
+    temporal("Expr.dt.nanosecond", TIME_PART, &[], dt_nanosecond),
     Entry {
         id: EntryId("Expr.dt.offset_by"),
         family: Family::Temporal,
         accepts: DATE_PART,
         // `str | Expr`: a duration string is the expression that holds it.
-        parameters: &[required("by", Kind::Expression(STRING), Shape::One)],
+        parameters: &[required("by", Kind::Expression(STRING), Shape::One)
+            .holding_a_duration_string(DurationUse::Offset)],
         laziness: Laziness::Lazy,
         build: Build::Expression(dt_offset_by),
     },
+    temporal("Expr.dt.ordinal_day", DATE_PART, &[], dt_ordinal_day),
+    temporal("Expr.dt.quarter", DATE_PART, &[], dt_quarter),
+    temporal(
+        "Expr.dt.replace",
+        DATE_PART,
+        &[
+            optional("year", EXPRESSION, Shape::One, "None")
+                .keyword_only()
+                .not_broadcasting_in_a_window(),
+            optional("month", EXPRESSION, Shape::One, "None")
+                .keyword_only()
+                .not_broadcasting_in_a_window(),
+            optional("day", EXPRESSION, Shape::One, "None")
+                .keyword_only()
+                .not_broadcasting_in_a_window(),
+            optional("hour", EXPRESSION, Shape::One, "None")
+                .keyword_only()
+                .not_broadcasting_in_a_window(),
+            optional("minute", EXPRESSION, Shape::One, "None")
+                .keyword_only()
+                .not_broadcasting_in_a_window(),
+            optional("second", EXPRESSION, Shape::One, "None")
+                .keyword_only()
+                .not_broadcasting_in_a_window(),
+            optional("microsecond", EXPRESSION, Shape::One, "None")
+                .keyword_only()
+                .not_broadcasting_in_a_window(),
+            optional("ambiguous", Kind::Choice(AMBIGUOUS), Shape::One, "'raise'").keyword_only(),
+        ],
+        dt_replace,
+    ),
+    temporal(
+        "Expr.dt.replace_time_zone",
+        ZONED,
+        &[
+            required("time_zone", Kind::TimeZone, Shape::One).or_no_time_zone(),
+            optional("ambiguous", Kind::Choice(AMBIGUOUS), Shape::One, "'raise'").keyword_only(),
+            optional(
+                "non_existent",
+                Kind::Choice(NON_EXISTENT),
+                Shape::One,
+                "'raise'",
+            )
+            .keyword_only(),
+        ],
+        dt_replace_time_zone,
+    ),
+    temporal(
+        "Expr.dt.round",
+        DATE_PART,
+        // `str | timedelta | Expr`: a duration string is the expression that holds it.
+        &[required("every", Kind::Expression(STRING), Shape::One)
+            .holding_a_duration_string(DurationUse::Round)],
+        dt_round,
+    ),
+    temporal(
+        "Expr.dt.second",
+        TIME_PART,
+        &[flag("fractional", "False").keyword_only()],
+        dt_second,
+    ),
+    temporal(
+        "Expr.dt.strftime",
+        WRITABLE,
+        &[required(
+            "format",
+            Kind::Value(ValueType::String),
+            Shape::One,
+        )],
+        dt_strftime,
+    ),
     Entry {
         id: EntryId("Expr.dt.time"),
         family: Family::Temporal,
@@ -1693,6 +2100,28 @@ pub(super) const ENTRIES: &[Entry] = &[
         laziness: Laziness::Lazy,
         build: Build::Expression(dt_time),
     },
+    temporal(
+        "Expr.dt.timestamp",
+        COUNTED_SINCE_1970,
+        &[optional(
+            "time_unit",
+            Kind::Choice(TIME_UNIT),
+            Shape::One,
+            "'us'",
+        )],
+        dt_timestamp,
+    ),
+    temporal(
+        "Expr.dt.to_string",
+        WRITABLE,
+        &[optional(
+            "format",
+            Kind::Value(ValueType::String),
+            Shape::One,
+            "None",
+        )],
+        dt_to_string,
+    ),
     Entry {
         id: EntryId("Expr.dt.total_days"),
         family: Family::Temporal,
@@ -1701,6 +2130,53 @@ pub(super) const ENTRIES: &[Entry] = &[
         laziness: Laziness::Lazy,
         build: Build::Expression(dt_total_days),
     },
+    temporal(
+        "Expr.dt.total_hours",
+        DURATION,
+        &[flag("fractional", "False").keyword_only()],
+        dt_total_hours,
+    ),
+    temporal(
+        "Expr.dt.total_microseconds",
+        DURATION,
+        &[flag("fractional", "False").keyword_only()],
+        dt_total_microseconds,
+    ),
+    temporal(
+        "Expr.dt.total_milliseconds",
+        DURATION,
+        &[flag("fractional", "False").keyword_only()],
+        dt_total_milliseconds,
+    ),
+    temporal(
+        "Expr.dt.total_minutes",
+        DURATION,
+        &[flag("fractional", "False").keyword_only()],
+        dt_total_minutes,
+    ),
+    temporal(
+        "Expr.dt.total_nanoseconds",
+        DURATION,
+        &[flag("fractional", "False").keyword_only()],
+        dt_total_nanoseconds,
+    ),
+    temporal(
+        "Expr.dt.total_seconds",
+        DURATION,
+        &[flag("fractional", "False").keyword_only()],
+        dt_total_seconds,
+    ),
+    temporal(
+        "Expr.dt.truncate",
+        DATE_PART,
+        // `str | timedelta | Expr`: a duration string is the expression that holds it.
+        &[required("every", Kind::Expression(STRING), Shape::One)
+            .holding_a_duration_string(DurationUse::Cut)],
+        dt_truncate,
+    ),
+    temporal("Expr.dt.week", DATE_PART, &[], dt_week),
+    temporal("Expr.dt.weekday", DATE_PART, &[], dt_weekday),
+    temporal("Expr.dt.year", DATE_PART, &[], dt_year),
     Entry {
         id: EntryId("Expr.eq"),
         family: Family::Compare,

@@ -395,8 +395,9 @@ impl Gen<'_> {
     // -----------------------------------------------------------------------
     // Options
 
-    /// The options an entry is given: none, or, as the option table reads
-    /// them, one when the entry has only one, and two or more otherwise.
+    /// The options an entry is given: those it must be given, and none or, as the option table
+    /// reads them, one when the entry has only one that it need not be given, and two or more
+    /// otherwise.
     fn options(&mut self, entry: &'static Entry) -> Vec<(&'static str, Value)> {
         let parameters: Vec<_> = entry
             .parameters()
@@ -410,11 +411,19 @@ impl Gen<'_> {
             // A fill takes a strategy in place of a value, which `method_call` decides.
             .filter(|parameter| parameter.in_place_of().is_none())
             .collect();
-        if !matches!(entry.applies(), Applies::Expression | Applies::Frame)
-            || parameters.is_empty()
-            || !self.draw.chance(45)
-        {
+        if !matches!(entry.applies(), Applies::Expression | Applies::Frame) {
             return Vec::new();
+        }
+        // An option that a call must be given, as `cast_time_unit` its unit, is always given.
+        let (needed, parameters): (Vec<&catalog::Parameter>, Vec<&catalog::Parameter>) = parameters
+            .into_iter()
+            .partition(|parameter| parameter.is_needed());
+        let mut given: Vec<(&'static str, Value)> = needed
+            .into_iter()
+            .map(|parameter| (parameter.name(), self.option_value(parameter)))
+            .collect();
+        if parameters.is_empty() || !self.draw.chance(45) {
+            return given;
         }
         let mut chosen: Vec<usize> = Vec::new();
         if parameters.len() == 1 {
@@ -432,24 +441,26 @@ impl Gen<'_> {
             }
         }
         chosen.sort_unstable();
-        chosen
-            .into_iter()
-            .map(|at| {
-                let parameter = parameters[at];
-                let value = match parameter.kind() {
-                    Kind::Choice(words) => Value::Choice((*self.draw.pick(words)).to_owned()),
-                    _ => {
-                        let unsettable = parameter.default() == ParameterDefault::Python("None");
-                        match self.draw.below(if unsettable { 3 } else { 2 }) {
-                            0 => Value::Flag(Some(true)),
-                            1 => Value::Flag(Some(false)),
-                            _ => Value::Flag(None),
-                        }
-                    }
-                };
-                (parameter.name(), value)
-            })
-            .collect()
+        for at in chosen {
+            let parameter = parameters[at];
+            given.push((parameter.name(), self.option_value(parameter)));
+        }
+        given
+    }
+
+    /// A word of a choice, or a setting of a flag, drawn for the option `parameter`.
+    fn option_value(&mut self, parameter: &catalog::Parameter) -> Value {
+        match parameter.kind() {
+            Kind::Choice(words) => Value::Choice((*self.draw.pick(words)).to_owned()),
+            _ => {
+                let unsettable = parameter.default() == ParameterDefault::Python("None");
+                match self.draw.below(if unsettable { 3 } else { 2 }) {
+                    0 => Value::Flag(Some(true)),
+                    1 => Value::Flag(Some(false)),
+                    _ => Value::Flag(None),
+                }
+            }
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -1046,6 +1057,44 @@ impl Gen<'_> {
                         class: Some(Representative::String),
                     }]
                 }
+                // A duration is often text typed in, which Polars reads as a duration string: one it
+                // reads for the period of a cut or the amount of a move, or one it does not. Where
+                // it is a column it is the one that stands for an argument, whose text is the
+                // durations the tables were measured with: the text of the other columns is no
+                // duration, which Polars refuses when the rows run, and is no mistake of the
+                // tables but of what a duration is given.
+                _ if parameter.duration_string().is_some() => {
+                    let argument = match self.host {
+                        Host::JoinRight => Some("rb"),
+                        Host::Pivot | Host::JoinOn => None,
+                        _ => Some("b"),
+                    };
+                    match argument {
+                        Some(name) if !self.draw.chance(55) => {
+                            vec![Built {
+                                expression: Expression::new(Start::Call(column(name)), Vec::new())
+                                    .expect("a start"),
+                                class: self.class_of(name),
+                            }]
+                        }
+                        _ => {
+                            let text = if self.draw.chance(25) {
+                                self.draw.pick(&INVALID_DURATIONS)
+                            } else {
+                                self.draw.pick(&VALID_DURATIONS)
+                            };
+                            let literal = call(
+                                "polars.lit",
+                                vec![("value", Value::String(text.to_owned()))],
+                            );
+                            vec![Built {
+                                expression: Expression::new(Start::Call(literal), Vec::new())
+                                    .expect("a start"),
+                                class: Some(Representative::String),
+                            }]
+                        }
+                    }
+                }
                 // What a replacement puts in place of a match is often text, with the references to
                 // a group of the match that a pattern gives it meaning for.
                 ("Expr.str.replace" | "Expr.str.replace_all", "value") if self.draw.chance(50) => {
@@ -1106,6 +1155,7 @@ impl Gen<'_> {
         given.extend(self.numbers(entry, &given));
         given.extend(self.texts(entry));
         given.extend(self.patterns(entry));
+        given.extend(self.time_zones(entry));
         if id == "Expr.over" {
             let ordered = given.iter().any(|(name, _)| *name == "order_by");
             let optioned = given
@@ -1196,13 +1246,18 @@ impl Gen<'_> {
     fn texts(&mut self, entry: &'static Entry) -> Vec<(&'static str, Value)> {
         let mut texts = Vec::new();
         for parameter in entry.parameters() {
-            if parameter.kind() != Kind::Value(ValueType::String) || !self.draw.chance(50) {
+            if parameter.kind() != Kind::Value(ValueType::String)
+                || (!parameter.is_needed() && !self.draw.chance(50))
+            {
                 continue;
             }
             let name = parameter.name();
             let value = match name {
                 "delimiter" => self.draw.pick(&["", "-", ", ", "é", "ab"]),
                 "fill_char" => self.draw.pick(&["*", "0", " ", "é", "-"]),
+                // How a moment is written: ISO in its two forms, and the formats of the calendar
+                // and of the clock, some of which a date or a time of day has no part for.
+                "format" => self.draw.pick(&FORMATS),
                 other => panic!("the generator does not know what to give {other}"),
             };
             texts.push((name, Value::String(value.to_owned())));
@@ -1227,6 +1282,27 @@ impl Gen<'_> {
                     self.draw.pick(&VALID_PATTERNS)
                 };
                 (parameter.name(), Value::Pattern(text.to_owned()))
+            })
+            .collect()
+    }
+
+    /// The time zones a method is given for the parameters that take one, which it must be given:
+    /// names of the database and fixed offsets that Polars reads, text that it does not, and none,
+    /// for a method that takes it off.
+    fn time_zones(&mut self, entry: &'static Entry) -> Vec<(&'static str, Value)> {
+        entry
+            .parameters()
+            .iter()
+            .filter(|parameter| parameter.kind() == Kind::TimeZone)
+            .map(|parameter| {
+                let value = if parameter.takes_no_time_zone() && self.draw.chance(15) {
+                    Value::TimeZone(None)
+                } else if self.draw.chance(18) {
+                    Value::TimeZone(Some(self.draw.pick(&INVALID_TIME_ZONES).to_owned()))
+                } else {
+                    Value::TimeZone(Some(self.draw.pick(&VALID_TIME_ZONES).to_owned()))
+                };
+                (parameter.name(), value)
             })
             .collect()
     }
@@ -1320,6 +1396,61 @@ const INVALID_PATTERNS: [&str; 10] = [
     "\\",
     "*a",
     "a)",
+];
+
+/// Durations Polars reads: a single unit of each kind, two units, a sign and a zero. A method
+/// that cuts or rounds meets some of them with a reason of its own, which a limit holds.
+const VALID_DURATIONS: [&str; 12] = [
+    "1d", "1h", "30m", "1mo", "1w", "1y", "1q", "500ms", "1s", "2d12h", "+1d", "-1d",
+];
+
+/// Durations Polars does not read, each for a reason of its own: no amount, no unit, an amount
+/// with a fraction, a unit that does not exist and one in the wrong case, a second sign, a space,
+/// and an amount too large to hold.
+const INVALID_DURATIONS: [&str; 9] = [
+    "d",
+    "1",
+    "1.5d",
+    "1x",
+    "1D",
+    "1d-1h",
+    "1 d",
+    "1d ",
+    "99999999999y",
+];
+
+/// Time zones Polars reads: with and without daylight saving, with a half hour, as a fixed offset
+/// and as the zone of the database that has it.
+const VALID_TIME_ZONES: [&str; 8] = [
+    "UTC",
+    "Europe/Berlin",
+    "America/New_York",
+    "Asia/Kolkata",
+    "Australia/Lord_Howe",
+    "Etc/GMT+5",
+    "+01:00",
+    "EST",
+];
+
+/// Time zones Polars does not read: a name that is none, one in the wrong case, one with a space
+/// and one that is the letter of an offset.
+const INVALID_TIME_ZONES: [&str; 4] = ["Not/AZone", "europe/berlin", "America/New_York ", "Z"];
+
+/// Formats a moment is written by: the two ISO forms, the date, the clock, the names of the day and
+/// of the month, the day of the year, text with no field in it, and two that Polars reads no field
+/// in: a percent sign with nothing after it and a field that does not exist.
+const FORMATS: [&str; 11] = [
+    "iso",
+    "iso:strict",
+    "%Y-%m-%d",
+    "%H:%M:%S",
+    "%A %d %B %Y",
+    "%j",
+    "%F %T%.f",
+    "text",
+    "%Y",
+    "%",
+    "%Q",
 ];
 
 /// The class every value of a condition has, when they have the same one.
