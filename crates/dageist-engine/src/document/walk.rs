@@ -1173,11 +1173,19 @@ impl Walker<'_> {
         match expression.start() {
             Start::Call(start) => {
                 self.path.push(Segment::Start);
-                let class = self.start_class(start);
+                let takes_expressions = takes_expressions(start);
+                // What a function that takes expressions gives is said only where each argument's
+                // dtype is known, as for a method: the tables are not asked of one that is not, and
+                // Polars may refuse it for its dtype.
+                let class = self.start_class(start).filter(|_| {
+                    !takes_expressions
+                        || start_arguments
+                            .iter()
+                            .all(|(_, operand)| operand.dtype.is_some())
+                });
                 self.blind_to_a_missing_column(start);
                 // A function that takes expressions is judged for what it is given, and gives as
                 // many values as its widest argument.
-                let takes_expressions = takes_expressions(start);
                 let given: Vec<(&str, Representative)> = start_arguments
                     .iter()
                     .filter_map(|(name, operand)| operand.dtype.map(|dtype| (name.as_str(), dtype)))
