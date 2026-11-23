@@ -261,6 +261,9 @@ struct Around {
     receiver_loose: Option<Loose>,
     /// The unit the moment or the length of time the link follows is counted in, where it is known.
     unit: Option<TimeUnit>,
+    /// Whether the value the link follows is one that a part widened: a value of one row that a method
+    /// met with each of the many values of a part, which a window refuses.
+    widened: bool,
 }
 
 /// What a chain has so far.
@@ -400,6 +403,33 @@ fn option_words(call: &Call) -> (Vec<(String, String)>, bool) {
         words.extend(word.map(|word| (given.parameter().to_owned(), word)));
     }
     (words, unknown)
+}
+
+/// Whether the chain has a value that a part widened after `link`: the link met a receiver of one
+/// value with each of the many values a part gives, where the part is not met so in a window, or the
+/// value was widened before and is still many.
+fn widens(
+    link: &Call,
+    arguments: &[(String, Operand)],
+    receiver: Option<Shape>,
+    next: &Cur,
+    before: bool,
+) -> bool {
+    let widens_here = receiver == Some(Shape::One)
+        && arguments.iter().any(|(name, operand)| {
+            operand.shape == Shape::Many
+                && link.entry().parameters().iter().any(|parameter| {
+                    parameter.name() == name && !parameter.broadcasts_in_a_window()
+                })
+        });
+    let many = matches!(
+        next,
+        Cur::Value {
+            shape: Shape::Many,
+            ..
+        }
+    );
+    widens_here || (before && many)
 }
 
 /// The unit a moment or a length of time of the dtype is counted in.
@@ -934,6 +964,7 @@ impl Walker<'_> {
             .collect();
         let mut branches_are_one =
             statements.len() > 1 && statements.windows(2).all(|pair| pair[0] == pair[1]);
+        let mut widened = false;
         let mut unit = match expression.start() {
             Start::Call(start) => self.start_unit(start),
             _ => None,
@@ -958,6 +989,10 @@ impl Walker<'_> {
                         ..
                     }
             );
+            let receiver_shape = match &cur {
+                Cur::Value { shape, .. } => Some(*shape),
+                _ => None,
+            };
             let (next, standing) = self.link(
                 link,
                 &arguments,
@@ -968,9 +1003,11 @@ impl Walker<'_> {
                     branches_are_one,
                     receiver_loose,
                     unit,
+                    widened,
                 },
             );
             unit = unit_after(link, unit, &standing);
+            widened = widens(link, &arguments, receiver_shape, &next, widened);
             if branches_are_one
                 && all_single
                 && matches!(
@@ -1131,8 +1168,24 @@ impl Walker<'_> {
             branches_are_one,
             receiver_loose,
             unit,
+            widened,
         } = around;
         let entry = link.entry();
+        // A window is refused a value of one row that a part widened, whose output is longer than
+        // its input.
+        if widened
+            && entry.id().as_str() == "Expr.over"
+            && let Err(refusal) = allowed::rule_forbids_a_window_over_a_widened_value()
+        {
+            self.refuse(&refusal, false);
+            return (
+                Cur::Dead,
+                Standing {
+                    follows: None,
+                    verdict: Some(Verdict::Refused(refusal)),
+                },
+            );
+        }
         // A number typed without a dtype that a method takes another operand beside adapts to
         // it, as the dtype of that operand where it fits it, or keeps the dtype it has alone, as
         // the base of a power does. Where there is no such operand the tables, measured with typed

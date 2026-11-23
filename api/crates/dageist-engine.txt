@@ -120,8 +120,9 @@ pub dageist_engine::allowed::Rule::PatternIsValid
 pub dageist_engine::allowed::Rule::PivotAggregateGivesOneValue
 pub dageist_engine::allowed::Rule::ReplacementValuesMatchInNumber
 pub dageist_engine::allowed::Rule::TimeZoneIsValid
+pub dageist_engine::allowed::Rule::WindowInputIsNotWidened
 impl dageist_engine::allowed::Rule
-pub const dageist_engine::allowed::Rule::ALL: [Self; 10]
+pub const dageist_engine::allowed::Rule::ALL: [Self; 11]
 pub fn dageist_engine::allowed::Rule::from_name(name: &str) -> core::option::Option<Self>
 pub const fn dageist_engine::allowed::Rule::name(self) -> &'static str
 pub const fn dageist_engine::allowed::Rule::statement(self) -> &'static str
@@ -270,6 +271,7 @@ pub fn dageist_engine::allowed::read_typed(text: &str, typed: dageist_engine::al
 pub fn dageist_engine::allowed::rule_forbids(entry: &dageist_engine::catalog::Entry, context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_key_known_not_elementwise(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_a_repeated_pair_of_key_names(context: dageist_engine::allowed::Context) -> core::result::Result<(), dageist_engine::allowed::Refusal>
+pub fn dageist_engine::allowed::rule_forbids_a_window_over_a_widened_value() -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::rule_forbids_replacement_values_of_other_numbers() -> core::result::Result<(), dageist_engine::allowed::Refusal>
 pub fn dageist_engine::allowed::slots_at_start(entry: &'static dageist_engine::catalog::Entry) -> alloc::vec::Vec<&'static str>
 pub mod dageist_engine::catalog
@@ -613,6 +615,7 @@ impl dageist_engine::catalog::Parameter
 pub const fn dageist_engine::catalog::Parameter::adapts_numbers_only(&self) -> bool
 pub const fn dageist_engine::catalog::Parameter::as_many_as(&self) -> core::option::Option<dageist_engine::catalog::AsManyAs>
 pub const fn dageist_engine::catalog::Parameter::broadcasts(&self) -> bool
+pub const fn dageist_engine::catalog::Parameter::broadcasts_in_a_window(&self) -> bool
 pub const fn dageist_engine::catalog::Parameter::converts(&self) -> &'static [&'static str]
 pub const fn dageist_engine::catalog::Parameter::default(&self) -> dageist_engine::catalog::ParameterDefault
 pub const fn dageist_engine::catalog::Parameter::duration_string(&self) -> core::option::Option<dageist_engine::catalog::DurationUse>

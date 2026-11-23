@@ -55,6 +55,7 @@
 #   pivot-aggregate-gives-one-value: a pivot's aggregate must give one value for each group.
 #   replacement-values-match-in-number: a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one.
 #   time-zone-is-valid: a time zone must be one Polars reads.
+#   window-input-is-not-widened: a window takes a value as long as its input, and a value of one row that a part widens, as dt.replace's parts do, is not: Polars refuses the length of its output.
 #
 # An outcome is `allowed <dtype of the result> <one|many>` (`-` for a step), or
 # `refused <stage>: <Polars' reason>`. A combination is allowed only when Polars resolved

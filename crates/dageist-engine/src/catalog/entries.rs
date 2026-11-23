@@ -2027,13 +2027,27 @@ pub(super) const ENTRIES: &[Entry] = &[
         "Expr.dt.replace",
         DATE_PART,
         &[
-            optional("year", EXPRESSION, Shape::One, "None").keyword_only(),
-            optional("month", EXPRESSION, Shape::One, "None").keyword_only(),
-            optional("day", EXPRESSION, Shape::One, "None").keyword_only(),
-            optional("hour", EXPRESSION, Shape::One, "None").keyword_only(),
-            optional("minute", EXPRESSION, Shape::One, "None").keyword_only(),
-            optional("second", EXPRESSION, Shape::One, "None").keyword_only(),
-            optional("microsecond", EXPRESSION, Shape::One, "None").keyword_only(),
+            optional("year", EXPRESSION, Shape::One, "None")
+                .keyword_only()
+                .not_broadcasting_in_a_window(),
+            optional("month", EXPRESSION, Shape::One, "None")
+                .keyword_only()
+                .not_broadcasting_in_a_window(),
+            optional("day", EXPRESSION, Shape::One, "None")
+                .keyword_only()
+                .not_broadcasting_in_a_window(),
+            optional("hour", EXPRESSION, Shape::One, "None")
+                .keyword_only()
+                .not_broadcasting_in_a_window(),
+            optional("minute", EXPRESSION, Shape::One, "None")
+                .keyword_only()
+                .not_broadcasting_in_a_window(),
+            optional("second", EXPRESSION, Shape::One, "None")
+                .keyword_only()
+                .not_broadcasting_in_a_window(),
+            optional("microsecond", EXPRESSION, Shape::One, "None")
+                .keyword_only()
+                .not_broadcasting_in_a_window(),
             optional("ambiguous", Kind::Choice(AMBIGUOUS), Shape::One, "'raise'").keyword_only(),
         ],
         dt_replace,

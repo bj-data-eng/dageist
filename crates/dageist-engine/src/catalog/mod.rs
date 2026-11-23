@@ -443,6 +443,7 @@ pub struct Parameter {
     offered: bool,
     duration_string: Option<DurationUse>,
     takes_no_time_zone: bool,
+    broadcasts_in_a_window: bool,
 }
 
 impl Parameter {
@@ -469,6 +470,7 @@ impl Parameter {
             offered: true,
             duration_string: None,
             takes_no_time_zone: false,
+            broadcasts_in_a_window: true,
         }
     }
 
@@ -583,6 +585,15 @@ impl Parameter {
             "only an expression may hold a duration string typed in"
         );
         self.duration_string = Some(using);
+        self
+    }
+
+    /// The same parameter, of which Polars meets a receiver of one value with each of many values where
+    /// the expression is selected, as it does every other, but not where a window follows: a window
+    /// maps what it is given to as many values as it has, and the one value a part widens is refused
+    /// with the length of its output. `dt.replace`'s parts are so.
+    const fn not_broadcasting_in_a_window(mut self) -> Self {
+        self.broadcasts_in_a_window = false;
         self
     }
 
@@ -739,6 +750,14 @@ impl Parameter {
     #[must_use]
     pub const fn names_the_fields_of_the_result(&self) -> bool {
         self.names_the_fields_of_the_result
+    }
+
+    /// Whether a receiver of one value is met with each of the many values the parameter is given
+    /// where a window follows too, as it is where the expression is selected: false for the parts
+    /// of `dt.replace`, whose widened value a window refuses.
+    #[must_use]
+    pub const fn broadcasts_in_a_window(&self) -> bool {
+        self.broadcasts_in_a_window
     }
 
     /// Whether the time zone the parameter holds may be none: no zone at all, which a moment of no

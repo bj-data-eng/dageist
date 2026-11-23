@@ -783,7 +783,12 @@ what each takes and gives.
 - **Combining, cutting and moving.** `combine` puts a time of day on a date or a moment, `truncate`
   and `round` cut and round to a period, `offset_by` moves, and `replace` sets the parts it is given
   and keeps the rest. A part not given is left as it was, so the method starts with all of them left
-  out.
+  out. Polars meets a value of one row, a literal, with each of the many values of a part where it is
+  selected, but not where a window follows: the window maps what it is given to as many values as it has
+  rows, and the value a part widened is refused for the length of its output. The catalogue says so of each
+  part, `broadcasts_in_a_window`, and the walk follows whether the value a chain has was widened by one,
+  through the calls that keep it many, and refuses a window that is given it, by the named rule
+  `window-input-is-not-widened`.
 - **Writing.** `strftime` and `to_string` write a moment as text by a format, or, for `to_string` given
   none, by ISO, which separates the date and the time of day by a space and by `T` where the format is
   `iso:strict`. A format is text typed in, and Polars says when it can write it: a year of a time of

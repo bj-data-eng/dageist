@@ -464,6 +464,7 @@ export const RULE_NAMES = [
   'pattern-is-valid',
   'replacement-values-match-in-number',
   'time-zone-is-valid',
+  'window-input-is-not-widened',
 ] as const;
 
 /** The name of a rule the engine holds that Polars does not. */

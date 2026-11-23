@@ -11,7 +11,8 @@
     "pattern-is-valid",
     "pivot-aggregate-gives-one-value",
     "replacement-values-match-in-number",
-    "time-zone-is-valid"
+    "time-zone-is-valid",
+    "window-input-is-not-widened"
   ],
   "stages": ["schema", "rows", "empty"],
   "conditionStates": ["when", "then", "chainedWhen", "chainedThen"],

@@ -1123,6 +1123,15 @@ pub fn rule_forbids_replacement_values_of_other_numbers() -> Result<(), Refusal>
     Err(Refusal::rule(Rule::ReplacementValuesMatchInNumber))
 }
 
+/// The refusal of a window given a value of one row that a part widens, which the caller has found.
+///
+/// # Errors
+///
+/// The rule, as a refusal that says it in its words.
+pub fn rule_forbids_a_window_over_a_widened_value() -> Result<(), Refusal> {
+    Err(Refusal::rule(Rule::WindowInputIsNotWidened))
+}
+
 /// The refusal of a key that the caller has already found repeats a pair of
 /// output names, where `context` holds one of a join's own keys, if the rule
 /// refuses it there. Polars refuses a join that pairs the same two names twice:

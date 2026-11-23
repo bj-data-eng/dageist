@@ -350,6 +350,8 @@ fn polars_words(rule: &str) -> &'static [&'static str] {
         // as a regex error.
         "pattern-is-valid" => &["regex error"],
         "replacement-values-match-in-number" => &["must have the same length as"],
+        // Polars refuses a window the value that a part widened with the length of its output.
+        "window-input-is-not-widened" => &["output length of `map`"],
         _ => &[],
     }
 }

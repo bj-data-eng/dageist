@@ -58,7 +58,8 @@ const fn next_rule(rule: Rule) -> Option<Rule> {
         Rule::PatternIsValid => Some(Rule::PivotAggregateGivesOneValue),
         Rule::PivotAggregateGivesOneValue => Some(Rule::ReplacementValuesMatchInNumber),
         Rule::ReplacementValuesMatchInNumber => Some(Rule::TimeZoneIsValid),
-        Rule::TimeZoneIsValid => None,
+        Rule::TimeZoneIsValid => Some(Rule::WindowInputIsNotWidened),
+        Rule::WindowInputIsNotWidened => None,
     }
 }
 

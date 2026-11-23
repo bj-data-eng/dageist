@@ -46,11 +46,14 @@ pub enum Rule {
     ReplacementValuesMatchInNumber,
     /// A time zone is one Polars reads: a name of the time zone database, or a fixed offset.
     TimeZoneIsValid,
+    /// A window is given a value as long as its input, which a value of one row that a part widens is
+    /// not.
+    WindowInputIsNotWidened,
 }
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::ConditionPredicateIsBoolean,
         Self::DurationIsValid,
         Self::ElementOnlyInPivotAggregate,
@@ -61,6 +64,7 @@ impl Rule {
         Self::PivotAggregateGivesOneValue,
         Self::ReplacementValuesMatchInNumber,
         Self::TimeZoneIsValid,
+        Self::WindowInputIsNotWidened,
     ];
 
     /// The name the tables give the rule.
@@ -77,6 +81,7 @@ impl Rule {
             Self::PatternIsValid => "pattern-is-valid",
             Self::ReplacementValuesMatchInNumber => "replacement-values-match-in-number",
             Self::TimeZoneIsValid => "time-zone-is-valid",
+            Self::WindowInputIsNotWidened => "window-input-is-not-widened",
         }
     }
 
@@ -106,6 +111,9 @@ impl Rule {
             }
             Self::DurationIsValid => "a duration typed in must be a duration string Polars reads",
             Self::TimeZoneIsValid => "a time zone must be one Polars reads",
+            Self::WindowInputIsNotWidened => {
+                "a window takes a value as long as its input, and a value of one row that a part widens, as dt.replace's parts do, is not: Polars refuses the length of its output"
+            }
             Self::PatternIsValid => "a pattern must be a valid regular expression",
             Self::ReplacementValuesMatchInNumber => {
                 "a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one"
@@ -127,7 +135,8 @@ impl Rule {
             Self::DurationIsValid
             | Self::PatternIsValid
             | Self::ReplacementValuesMatchInNumber
-            | Self::TimeZoneIsValid => false,
+            | Self::TimeZoneIsValid
+            | Self::WindowInputIsNotWidened => false,
             Self::ConditionPredicateIsBoolean | Self::FilterPredicateIsBoolean => {
                 self.needs_boolean_end(context)
             }
@@ -225,7 +234,8 @@ impl Rule {
             | Self::DurationIsValid
             | Self::PatternIsValid
             | Self::ReplacementValuesMatchInNumber
-            | Self::TimeZoneIsValid => false,
+            | Self::TimeZoneIsValid
+            | Self::WindowInputIsNotWidened => false,
         }
     }
 }
