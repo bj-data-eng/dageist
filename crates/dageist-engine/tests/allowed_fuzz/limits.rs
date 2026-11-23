@@ -86,7 +86,8 @@ pub enum Limit {
     ///
     /// The reasons the gate accepts, each at a call of the aggregate of a pivot:
     /// - the tables refusing, which Polars allows, with a reason that says a dtype an operation
-    ///   does not support, a comparison, an operation, an evaluation, a cast, a struct field, the
+    ///   does not support or a function that makes a length of time expects numbers, a comparison,
+    ///   an operation, an evaluation, a cast, a struct field, the
     ///   lengths of a window over a group, a replacement pattern per row, duplicates in what a
     ///   replacement replaces, no supertype of two dtypes, a fill by a strategy for a dtype, or
     ///   the plan saying another dtype than the rows give;
@@ -3813,6 +3814,9 @@ fn applies(
                     "cannot perform",
                     "could not evaluate",
                     "casting from",
+                    // A function that makes a length of time reads the dtype of each part where a
+                    // select works out its schema.
+                    "expected integer or float dtype",
                     "lengths don't match",
                     "must specify one field",
                     "cannot cast",
