@@ -294,3 +294,96 @@ pub fn run<E: Evaluator>(settings: &Settings, evaluator: &E) -> Report {
         tally: tally_lines(&tally),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use dageist_fuzz::{FailureClass, PropertyId};
+
+    use super::super::target::ALLOWANCE;
+    use super::*;
+
+    /// Evaluates as the target does, except that a case whose text holds `needle` ends as
+    /// one that missed its deadline: a failure of the class that a process stopped for
+    /// taking too long has, which no in-process evaluation can have.
+    struct Misses<'a> {
+        evaluation: InProcess<'a>,
+        needle: &'a str,
+    }
+
+    impl Evaluator for Misses<'_> {
+        fn observe(&self, canonical: &[u8], within: Duration) -> Result<Observation> {
+            let mut observation = self.evaluation.observe(canonical, within)?;
+            if String::from_utf8_lossy(canonical).contains(self.needle) {
+                observation.outcome = CaseOutcome::failure(
+                    FailureKey::new(
+                        PropertyId::new(ALLOWANCE)?,
+                        FailureClass::Timeout,
+                        Some("case-deadline".to_owned()),
+                    )?,
+                    "the case did not end in time",
+                )?;
+            }
+            Ok(observation)
+        }
+    }
+
+    fn settings(name: &str) -> Settings {
+        let keep = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(name);
+        let _ = std::fs::remove_dir_all(&keep);
+        let mut settings = Settings::new(
+            2_900_100,
+            30,
+            Some(Focus::parse("abs, sqrt").unwrap().unwrap()),
+            keep,
+        );
+        settings.reduction = ReductionLimits::new(120, Duration::from_secs(120), 1 << 24, 2)
+            .expect("limits of a reduction");
+        settings
+    }
+
+    #[test]
+    fn a_campaign_keeps_every_case_that_fails_and_goes_on_to_the_next() {
+        let target = AllowedTarget::new();
+        let needle = "\"entry\":\"Expr.abs\"";
+        let clean = super::super::on_a_large_stack(|| {
+            let never = Misses {
+                evaluation: InProcess::new(&target),
+                needle: "no case holds this",
+            };
+            run(&settings("campaign-clean"), &never)
+        });
+        let failing = super::super::on_a_large_stack(|| {
+            let misses = Misses {
+                evaluation: InProcess::new(&target),
+                needle,
+            };
+            run(&settings("campaign-failing"), &misses)
+        });
+        assert!(clean.findings.is_empty());
+        assert!(
+            failing.findings.len() >= 2,
+            "at least two of the cases of a campaign focused on abs and sqrt hold abs, and \
+             each is kept: {} were",
+            failing.findings.len()
+        );
+        for finding in &failing.findings {
+            let reduced = String::from_utf8_lossy(&finding.reduced);
+            assert!(reduced.contains(needle), "{reduced}");
+            assert!(
+                finding.reduced.len() < finding.original_bytes,
+                "{} bytes are no reduction of {}",
+                finding.reduced.len(),
+                finding.original_bytes
+            );
+            assert_eq!(std::fs::read(&finding.kept).unwrap(), finding.reduced);
+            assert!(
+                finding.detail.starts_with("case-deadline"),
+                "{}",
+                finding.detail
+            );
+        }
+        // The cases are the ones the seed makes, whatever failed before them.
+        assert_eq!(failing.evaluated, clean.evaluated);
+        assert_eq!(failing.tally, clean.tally);
+    }
+}
