@@ -172,6 +172,16 @@ impl Frames {
         column.is_null().get(row)
     }
 
+    /// The dtype of the column `name` of the left table, or of the other; `None` for a name that is
+    /// no column of either.
+    pub fn dtype_of(&self, name: &str) -> Option<&DataType> {
+        self.rows
+            .column(name)
+            .or_else(|_| self.other_rows.column(name))
+            .ok()
+            .map(|column| column.dtype())
+    }
+
     /// The same tables with a column of each class added to each, named by
     /// [`stand_in_column`] in order: values of the dtypes that a probe needs where
     /// the case's own tables have none, which Polars cannot fold as it can a

@@ -134,7 +134,10 @@ pub enum Limit {
     /// `offset_by`, a condition and a window that is not an `explode` keep the
     /// rows in place and leave what they hold unknown, and give the one value that
     /// an aggregate leaves to each of the sample's rows; any other call leaves
-    /// nothing known. The first and the last take a row (the first or last that
+    /// nothing known. A function that makes a date, a time or a moment of parts gives a null in each
+    /// row where a part that is a column is null, and in each row of one that is a column of text,
+    /// which is no number, and a count since 1970 keeps the nulls of what it counts. The first and
+    /// the last take a row (the first or last that
     /// is not null, where they skip nulls), the minimum and the maximum are null
     /// of rows that are all null and a value of any that holds one, and a sum is
     /// not known of rows that are all null. The tables refusing, when they run
@@ -1386,6 +1389,8 @@ fn rows_after(
     // nothing known.
     let mut rows: Vec<Cell> = if receiver && starts_from_a_null_literal(expression) {
         vec![Cell::Null]
+    } else if let Some(made) = rows_made(frames, expression) {
+        made
     } else {
         (0..SAMPLE_ROWS)
             .map(|row| {
@@ -1531,6 +1536,69 @@ fn receiver_nulls_stay(frames: &Frames, rows: &[Cell], link: &Call) -> Vec<Cell>
             _ => Cell::Unknown,
         })
         .collect()
+}
+
+/// The rows of a chain that starts from a function that makes a date, a time or a moment of parts,
+/// or a moment of a count, where the rows are known: a row is null where a part is, and the text of
+/// a column is no number, so a part that is a column of text is null in each row. A count since
+/// 1970 keeps the nulls of the rows it counts. `None` for any other start, or where a part is not a
+/// column or a number typed in.
+fn rows_made(frames: &Frames, expression: &Expression) -> Option<Vec<Cell>> {
+    let Start::Call(start) = expression.start() else {
+        return None;
+    };
+    if is(start, "polars.from_epoch") {
+        return match start.argument("column") {
+            Some(Value::Expression(counted)) => {
+                rows_after(frames, counted, counted.links().len(), false)
+            }
+            _ => None,
+        };
+    }
+    if !(is(start, "polars.date") || is(start, "polars.time") || is(start, "polars.datetime")) {
+        return None;
+    }
+    let mut rows = vec![Cell::Value; SAMPLE_ROWS];
+    for part in PARTS_OF_A_DATE {
+        let Some(given) = start.argument(part) else {
+            continue;
+        };
+        let Value::Expression(part) = given else {
+            return None;
+        };
+        let cells: Vec<Cell> = if part.links().is_empty()
+            && matches!(part.start(), Start::Call(call)
+                if is(call, "polars.lit")
+                    && matches!(call.argument("value"), Some(Value::Integer(_) | Value::Float(_))))
+        {
+            vec![Cell::Value; SAMPLE_ROWS]
+        } else if let Some(name) = starting_column(part).filter(|_| part.links().is_empty()) {
+            if matches!(
+                frames.dtype_of(name),
+                Some(polars::prelude::DataType::String)
+            ) {
+                vec![Cell::Null; SAMPLE_ROWS]
+            } else {
+                (0..SAMPLE_ROWS)
+                    .map(|row| match frames.holds_a_null_at(name, row) {
+                        Some(true) => Cell::Null,
+                        Some(false) => Cell::Value,
+                        None => Cell::Unknown,
+                    })
+                    .collect()
+            }
+        } else {
+            vec![Cell::Unknown; SAMPLE_ROWS]
+        };
+        for (row, cell) in rows.iter_mut().zip(cells) {
+            *row = match (*row, cell) {
+                (Cell::Null, _) | (_, Cell::Null) => Cell::Null,
+                (Cell::Unknown, _) | (_, Cell::Unknown) => Cell::Unknown,
+                (Cell::Value, Cell::Value) => Cell::Value,
+            };
+        }
+    }
+    Some(rows)
 }
 
 /// The name of the one column `expression` starts from, when it starts from one.
