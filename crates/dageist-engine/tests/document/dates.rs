@@ -418,3 +418,73 @@ fn an_empty_zone_converts_to_utc_and_replaces_by_no_zone_as_polars_reads_it() {
         "a moment with no zone has no offsets"
     );
 }
+
+/// What the walk says the last call of the step's expression gives, by its name.
+fn last_result_name(report: &Report) -> String {
+    let walked = report.steps()[0]
+        .walk()
+        .expressions()
+        .iter()
+        .find(|walked| walked.calls().len() > 1)
+        .expect("the step's expression");
+    walked
+        .calls()
+        .last()
+        .and_then(|standing| standing.verdict())
+        .and_then(|verdict| verdict.allowance())
+        .and_then(|allowance| allowance.result())
+        .map(|result| result.name().to_owned())
+        .expect("the walk says what it gives")
+}
+
+fn in_unit(unit: &str) -> Value {
+    call(
+        "Expr.dt.cast_time_unit",
+        json!({ "time_unit": { "choice": unit } }),
+    )
+}
+
+#[test]
+fn the_unit_a_moment_is_held_in_is_the_one_the_walk_says_it_gives_and_asks_polars_with() {
+    // A moment counted in nanoseconds is cut by a length of one nanosecond, which Polars rounds to
+    // where it is counted in microseconds it cannot.
+    let in_ns = selecting(moments_then_all(vec![
+        in_unit("ns"),
+        call("Expr.dt.round", json!({ "every": text("1ns") })),
+    ]));
+    let report = report_of(&in_ns);
+    assert_eq!(report.steps()[0].walk().refusal(), None);
+    assert!(
+        matches!(report.steps()[0].outcome(), Outcome::Valid { .. }),
+        "{:?}",
+        report.steps()[0].outcome()
+    );
+    assert_eq!(last_result_name(&report), "Datetime(ns)");
+    // What keeps the unit says it: a zone and a cut of a moment counted in nanoseconds.
+    let zoned = selecting(moments_then_all(vec![
+        in_unit("ns"),
+        in_zone("Expr.dt.replace_time_zone", Some("UTC")),
+    ]));
+    assert_eq!(last_result_name(&report_of(&zoned)), "Datetime(ns, UTC)");
+    let cut = selecting(moments_then_all(vec![
+        in_unit("ms"),
+        call("Expr.dt.truncate", json!({ "every": text("1d") })),
+    ]));
+    assert_eq!(last_result_name(&report_of(&cut)), "Datetime(ms)");
+    // The same length of a moment counted in microseconds is none Polars can use.
+    let in_us = selecting(moments_then_all(vec![call(
+        "Expr.dt.round",
+        json!({ "every": text("1ns") }),
+    )]));
+    let report = report_of(&in_us);
+    let walked = report.steps()[0]
+        .walk()
+        .refusal()
+        .expect("the walk refuses it");
+    assert!(
+        matches!(walked.refusal().source(), RefusalSource::Rule(rule)
+            if rule.name() == "duration-is-valid"),
+        "{:?}",
+        walked.refusal().source()
+    );
+}
