@@ -416,7 +416,9 @@ pub enum Limit {
     /// value does not convert, which has no place, in a case with a `dt.replace` given a part: the
     /// case run again with each part made the number 1 is not refused for it. The tables refusing
     /// a call at the rows for invalid components that Polars allows, in a case with a `dt.replace`
-    /// given a part: the tables then no longer refuse it for them with each part made the number 1.
+    /// given a part: the tables then no longer refuse it for them with each part made the number 1,
+    /// and Polars refuses it for them with each part made `false`, which shows that it evaluates the
+    /// part and does not skip it.
     APartOfADateThatDependsOnTheRows,
 }
 
@@ -2063,6 +2065,53 @@ fn refused_for_a_part_of_a_date_with_ones(case: &Case) -> Option<bool> {
     })
 }
 
+/// The case with each part that a `dt.replace` is given made the Boolean `false`, which is a day
+/// and a month of 0, that no date has, where Polars evaluates the part.
+fn case_with_false_as_the_parts(case: &Case) -> Option<Case> {
+    let zero = Expression::new(
+        Start::Call(
+            Call::new(
+                catalog::entry("polars.lit")?,
+                vec![("value", Value::Flag(Some(false)))],
+            )
+            .ok()?,
+        ),
+        Vec::new(),
+    )
+    .ok()?;
+    case_changed(case, &|call| {
+        if !is_a_replacement_given_a_part(call) {
+            return None;
+        }
+        let given: Vec<(&str, Value)> = call
+            .arguments()
+            .iter()
+            .map(|given| {
+                let value = if PARTS_OF_A_DATE.contains(&given.parameter()) {
+                    Value::Expression(zero.clone())
+                } else {
+                    given.value().clone()
+                };
+                (given.parameter(), value)
+            })
+            .collect();
+        Call::new(call.entry(), given).ok()
+    })
+}
+
+/// Whether Polars refuses the case for invalid components with each part `false`: it then evaluates
+/// the part, and the part is a cause. Polars that never evaluates a part allows it. `None` where no
+/// `dt.replace` is given a part.
+fn refused_for_components_with_false_as_the_parts(case: &Case) -> Option<bool> {
+    changed(case_with_false_as_the_parts(case), case).map(|control| {
+        (0..RUNS).any(|_| {
+            observe(&control)
+                .refusal
+                .is_some_and(|refusal| is_a_refusal_of_the_components_of_a_date(&refusal.reason))
+        })
+    })
+}
+
 /// Whether the tables stop refusing the case for invalid components once each part of a date is the
 /// number 1, which they then judge as the column of whole numbers they measured. The case may be
 /// refused for another reason still, as a pivot's aggregate is by its rule.
@@ -3408,6 +3457,7 @@ fn applies(
                     .call
                     .is_some_and(is_a_replacement_given_a_part)
                 && the_tables_allow_the_parts_as_ones(case)
+                && refused_for_components_with_false_as_the_parts(case) == Some(true)
         }
         (Limit::AFormatTheDtypeCannotWrite, Disagreement::PolarsRefuses(refusal)) => {
             // The format is the cause where Polars stops refusing the dtype once each format is
