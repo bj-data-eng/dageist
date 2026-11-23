@@ -8766,6 +8766,122 @@ mod tests {
         }
     }
 
+    /// `when(f).then(k)` and further links, with `predicate` the predicate of the first `when`
+    /// (`first`), of the second (`second`) or of the third (`third`), the others being the column
+    /// `f`, and every value the column `k`.
+    fn conditioned_by(predicate: Expression, place: &str) -> Case {
+        let value = |id: &str| {
+            call(
+                id,
+                vec![("statement", Value::Expression(chain(column("k"), &[])))],
+            )
+        };
+        let when = |id: &str, given: Expression| call(id, vec![("predicates", many(vec![given]))]);
+        let truth = || chain(column("f"), &[]);
+        let start = call(
+            "polars.when",
+            vec![(
+                "predicates",
+                many(vec![if place == "first" {
+                    predicate.clone()
+                } else {
+                    truth()
+                }]),
+            )],
+        );
+        let mut links = vec![value("When.then")];
+        if place != "first" {
+            links.push(when(
+                "Then.when",
+                if place == "second" {
+                    predicate.clone()
+                } else {
+                    truth()
+                },
+            ));
+            links.push(value("ChainedWhen.then"));
+        }
+        if place == "third" {
+            links.push(when("ChainedThen.when", predicate));
+            links.push(value("ChainedWhen.then"));
+        }
+        links.push(value(if place == "third" {
+            "ChainedThen.otherwise"
+        } else if place == "second" {
+            "ChainedThen.otherwise"
+        } else {
+            "Then.otherwise"
+        }));
+        select(vec![chain_of(start, links)])
+    }
+
+    /// `lit(2.0).approx_quantile(1.0) != k.n_unique()`, or the same from the column `k`.
+    fn a_quantile_compared(start: Call) -> Expression {
+        chain_of(
+            start,
+            vec![
+                call(
+                    "Expr.approx_quantile",
+                    vec![("quantile", Value::Expression(a_share_of_one()))],
+                ),
+                compared_with("Expr.ne", chain(column("k"), &["Expr.n_unique"])),
+            ],
+        )
+    }
+
+    #[test]
+    fn a_null_quantile_is_excused_for_a_literal_in_a_predicate_after_the_first_and_in_no_other() {
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-an-approximate-quantile-of-a-literal-in-a-branch--in-a-chained-predicate.case"
+            ),
+            vec![Limit::AnApproximateQuantileOfALiteralInABranch]
+        );
+        let literal = || {
+            let dtype = Dtype::new(Representative::Float64.dtype()).expect("a dtype");
+            call(
+                "polars.lit",
+                vec![("value", Value::Float(2.0)), ("dtype", Value::Dtype(dtype))],
+            )
+        };
+        // The predicates of the second and the third `when` are evaluated with the branches.
+        for place in ["second", "third"] {
+            assert_eq!(
+                refused_for_a_bound(
+                    &conditioned_by(a_quantile_compared(literal()), place),
+                    None,
+                    Stage::Rows,
+                    NULL_QUANTILE
+                ),
+                vec![Limit::AnApproximateQuantileOfALiteralInABranch],
+                "{place}"
+            );
+        }
+        // The predicate of the first `when` is a position Polars does not refuse it in.
+        assert_eq!(
+            refused_for_a_bound(
+                &conditioned_by(a_quantile_compared(literal()), "first"),
+                None,
+                Stage::Rows,
+                NULL_QUANTILE
+            ),
+            vec![]
+        );
+        // A column receiver is no literal, in any of them.
+        for place in ["second", "third"] {
+            assert_eq!(
+                refused_for_a_bound(
+                    &conditioned_by(a_quantile_compared(column("k")), place),
+                    None,
+                    Stage::Rows,
+                    NULL_QUANTILE
+                ),
+                vec![],
+                "{place}"
+            );
+        }
+    }
+
     #[test]
     fn a_null_quantile_is_not_excused_outside_a_branch_nor_for_a_column_nor_at_a_place() {
         // The approximate quantile stands in a select, where Polars meets it: no branch holds it.
