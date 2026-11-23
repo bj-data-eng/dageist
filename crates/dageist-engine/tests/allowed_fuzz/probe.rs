@@ -2568,6 +2568,26 @@ mod tests {
     }
 
     #[test]
+    fn a_start_given_a_condition_that_no_row_takes_is_settled_by_polars_refusing_a_column() {
+        // `with_columns(from_epoch(when(h <= a).then(time()), "ns"))` of a column `a` that is all
+        // null: no row takes the condition, which has no `otherwise`, so the count meets only nulls
+        // and Polars allows what the tables refuse for the dtype of a time of day. Given a column of
+        // that dtype, Polars refuses the count as the tables do.
+        let case = kept("stricter-a-start-given-a-condition-that-no-row-takes.case");
+        let refused = refusal(&case);
+        assert_eq!(settle(&case, &refused), None);
+        let found = settle_apart(&case, &refused, &predict(&case), &observe(&case))
+            .expect("a count that Polars refuses of a column");
+        assert!(found.probe.contains("polars.from_epoch"), "{}", found.probe);
+        assert!(
+            found.reason.contains("Time to Datetime"),
+            "{}",
+            found.reason
+        );
+        assert_eq!(found.showing, Showing::TheSameReason);
+    }
+
+    #[test]
     fn a_start_is_not_settled_where_polars_allows_it_given_a_column_too() {
         // The tables refused a count of a whole number that Polars allows for a column of whole
         // numbers as well, so the literal is no reason, and the part is evaluated and accepted.
