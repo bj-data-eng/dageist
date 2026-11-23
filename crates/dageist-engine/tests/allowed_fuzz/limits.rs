@@ -8143,6 +8143,79 @@ mod tests {
         assert_eq!(refused_for_a_part_of_a_date_with_ones(&none), None);
     }
 
+    const INVALID_DATE: &str = "Invalid date components (1, 1, 0) supplied";
+
+    /// `select(polars.date(year=1, month=1, day=day))`, the parts of a date that a function makes
+    /// of them.
+    fn making_a_date(day: Expression) -> Case {
+        let date = call(
+            "polars.date",
+            vec![
+                ("year", Value::Expression(whole(1))),
+                ("month", Value::Expression(whole(1))),
+                ("day", Value::Expression(day)),
+            ],
+        );
+        select(vec![chain_of(date, Vec::new())])
+    }
+
+    /// `select(polars.time(hour=hour))`.
+    fn making_a_time(hour: Expression) -> Case {
+        let time = call("polars.time", vec![("hour", Value::Expression(hour))]);
+        select(vec![chain_of(time, Vec::new())])
+    }
+
+    #[test]
+    fn a_part_a_function_makes_a_date_of_is_excused_whether_polars_refuses_it_or_the_tables_do() {
+        assert_eq!(
+            excused_by_kept(
+                "uncovered-a-part-of-a-date-that-depends-on-the-rows--a-function-that-makes-a-date.case"
+            ),
+            vec![Limit::APartOfADateThatDependsOnTheRows]
+        );
+        let day = chain(column("k"), &["Expr.not_"]);
+        for (case, said) in [
+            (making_a_date(day.clone()), INVALID_DATE),
+            (making_a_time(day), INVALID_TIME),
+        ] {
+            assert_eq!(
+                refused_for_a_bound(&case, None, Stage::Rows, said),
+                vec![Limit::APartOfADateThatDependsOnTheRows],
+                "{said}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_part_a_function_makes_a_date_of_is_not_excused_where_the_number_1_is_refused_too() {
+        // Each part is already the number 1: the control is the case itself, which shows nothing.
+        let ones = making_a_date(whole(1));
+        assert_eq!(
+            refused_for_a_bound(&ones, None, Stage::Rows, INVALID_DATE),
+            vec![]
+        );
+        assert_eq!(refused_for_a_part_of_a_date_with_ones(&ones), None);
+        // A refusal at a place, in the schema or for another reason is not this one.
+        let case = making_a_date(chain(column("k"), &["Expr.not_"]));
+        assert_eq!(
+            refused_for_a_bound(
+                &case,
+                Some(link_of("exprs", 0, 1)),
+                Stage::Rows,
+                INVALID_DATE
+            ),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Schema, INVALID_DATE),
+            vec![]
+        );
+        assert_eq!(
+            refused_for_a_bound(&case, None, Stage::Rows, "invalid series dtype"),
+            vec![]
+        );
+    }
+
     /// `sort(by=[when(a.is_null()).then(a.dt.replace(day = lit(false))), len()])` over dates: a sort key
     /// of one value, whose part Polars never evaluates.
     fn a_part_that_a_sort_key_of_one_value_skips() -> Case {
