@@ -384,6 +384,53 @@ fn a_case_reads_back_as_the_bytes_it_was_written_as() {
 }
 
 #[test]
+fn every_case_a_focused_campaign_makes_holds_a_method_in_focus() {
+    // What each focus names, from the catalogue: a method, a namespace and two methods.
+    let methods = |chosen: &dyn Fn(&str) -> bool| -> Vec<String> {
+        dageist_engine::catalog::entries()
+            .iter()
+            .filter(|entry| entry.applies() == dageist_engine::catalog::Applies::Expression)
+            .map(|entry| entry.id().as_str().to_owned())
+            .filter(|id| chosen(id))
+            .collect()
+    };
+    let focuses = [
+        ("dt.replace", methods(&|id| id == "Expr.dt.replace")),
+        ("dt.", methods(&|id| id.starts_with("Expr.dt."))),
+        (
+            "replace_strict, over",
+            methods(&|id| id == "Expr.replace_strict" || id == "Expr.over"),
+        ),
+    ];
+    for (text, ids) in focuses {
+        let target = AllowedTarget::new().with_focus(Focus::parse(text).unwrap());
+        let mut made = 0;
+        for offset in 0..600_u64 {
+            let entropy: Vec<u8> = (0..512_u64)
+                .map(|at| {
+                    let mut mixed = (offset << 16 | at).wrapping_add(0x9e37_79b9_7f4a_7c15);
+                    mixed = (mixed ^ (mixed >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+                    mixed = (mixed ^ (mixed >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+                    (mixed ^ (mixed >> 31)) as u8
+                })
+                .collect();
+            let dageist_fuzz::Generation::Generated(case) = target.generate(&entropy).unwrap()
+            else {
+                continue;
+            };
+            let written = case.document.write();
+            assert!(
+                ids.iter()
+                    .any(|id| written.contains(&format!("\"entry\":\"{id}\""))),
+                "a case focused on {text} holds none of {ids:?}:\n{written}"
+            );
+            made += 1;
+        }
+        assert!(made >= 100, "only {made} cases focused on {text} were made");
+    }
+}
+
+#[test]
 fn a_case_of_another_revision_or_not_written_canonically_is_refused() {
     let target = AllowedTarget::new();
     let kept = br#"{"a":"Int64","b":"Int64","revision":1}
