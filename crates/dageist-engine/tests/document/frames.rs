@@ -430,3 +430,73 @@ fn the_walk_refuses_a_column_drop_nans_looks_at_where_a_test_for_a_nan_is_refuse
         .is_none()
     );
 }
+
+#[test]
+fn first_and_last_keep_one_row() {
+    assert_eq!(
+        rows(&one("LazyFrame.first", json!({}))),
+        all_rows()[..1].to_vec()
+    );
+    assert_eq!(
+        rows(&one("LazyFrame.last", json!({}))),
+        all_rows()[3..].to_vec()
+    );
+    assert_eq!(kept_of(&one("LazyFrame.first", json!({}))), (4, 1));
+    assert_eq!(names(&one("LazyFrame.last", json!({}))), A_F_S);
+    // A table with no rows has none to keep.
+    for entry in ["LazyFrame.first", "LazyFrame.last"] {
+        let text = document(vec![
+            step("t", "LazyFrame.head", json!({ "n": whole(0) })),
+            step("s", entry, json!({})),
+        ]);
+        assert!(
+            rows_through(&text, "s").expect("rows").is_empty(),
+            "{entry}"
+        );
+    }
+}
+
+#[test]
+fn gather_every_keeps_each_nth_row_from_an_offset() {
+    let every = |n: i64, offset: Option<i64>| {
+        let mut arguments = json!({ "n": whole(n) });
+        if let Some(offset) = offset {
+            arguments["offset"] = whole(offset);
+        }
+        one("LazyFrame.gather_every", arguments)
+    };
+    assert_eq!(
+        rows(&every(2, None)),
+        [all_rows()[0].clone(), all_rows()[2].clone()]
+    );
+    assert_eq!(
+        rows(&every(2, Some(1))),
+        [all_rows()[1].clone(), all_rows()[3].clone()]
+    );
+    assert_eq!(rows(&every(9, None)), all_rows()[..1].to_vec());
+    assert!(rows(&every(2, Some(9))).is_empty());
+    assert_eq!(kept_of(&every(2, None)), (4, 2));
+    assert_eq!(names(&every(2, None)), A_F_S);
+    // Python: `gather_every(n): n should be positive`.
+    assert!(gives_no_table(&every(0, None)));
+    // Python's binding takes both as unsigned numbers: `OverflowError`.
+    assert!(gives_no_table(&every(-1, None)));
+    assert!(gives_no_table(&every(2, Some(-1))));
+    // `n` has no default.
+    assert!(gives_no_table(&one("LazyFrame.gather_every", json!({}))));
+}
+
+#[test]
+fn gather_every_of_a_table_without_columns_keeps_the_height_it_gathers() {
+    // Python keeps the height of a table that has no column, which `select` of every column does
+    // not, by selecting beside a column of its own that it drops: `(2, 0)` for four rows.
+    let text = document(vec![
+        step(
+            "t",
+            "LazyFrame.drop",
+            json!({ "columns": many(vec![columns(&["a", "f", "s"])]) }),
+        ),
+        step("s", "LazyFrame.gather_every", json!({ "n": whole(2) })),
+    ]);
+    assert_eq!(rows_through(&text, "s").expect("rows").len(), 2);
+}
