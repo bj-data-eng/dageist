@@ -5565,6 +5565,161 @@
       ]
     },
     {
+      "id": "LazyFrame.drop",
+      "applies": "frame",
+      "family": "steps",
+      "name": "drop",
+      "hint": "some columns removed",
+      "head": "Drop columns",
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "columns",
+          "shown": "columns",
+          "label": "columns",
+          "kind": {
+            "kind": "column"
+          },
+          "shape": {
+            "shape": "many"
+          },
+          "default": {
+            "kind": "empty"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "list",
+            "items": [
+              {
+                "kind": "unset"
+              }
+            ]
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "strict",
+          "shown": "strict",
+          "label": "fail on unknown column",
+          "kind": {
+            "kind": "flag"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "flag",
+            "value": true
+          },
+          "defaultSetting": {
+            "kind": "flag",
+            "value": true
+          },
+          "start": {
+            "kind": "flag",
+            "value": false
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "LazyFrame.drop_nans",
+      "applies": "frame",
+      "family": "steps",
+      "name": "drop_nans",
+      "hint": "the rows that hold a NaN left out",
+      "head": "Drop NaN rows",
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "subset",
+          "shown": "subset",
+          "label": "columns looked at",
+          "kind": {
+            "kind": "column"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "LazyFrame.drop_nulls",
+      "applies": "frame",
+      "family": "steps",
+      "name": "drop_nulls",
+      "hint": "the rows that hold an empty value left out",
+      "head": "Drop empty rows",
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "subset",
+          "shown": "subset",
+          "label": "columns looked at",
+          "kind": {
+            "kind": "column"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "LazyFrame.fill_nan",
+      "applies": "frame",
+      "family": "steps",
+      "name": "fill_nan",
+      "hint": "NaN replaced by a value in every float column",
+      "head": "Fill NaN",
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "value",
+          "shown": "value",
+          "label": "replace NaN with",
+          "kind": {
+            "kind": "value",
+            "type": "any"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "LazyFrame.filter",
       "applies": "frame",
       "family": "steps",
@@ -5624,6 +5779,111 @@
           "start": {
             "kind": "pairs",
             "entries": []
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "LazyFrame.first",
+      "applies": "frame",
+      "family": "steps",
+      "name": "first",
+      "hint": "the first row",
+      "head": "First row",
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "LazyFrame.gather_every",
+      "applies": "frame",
+      "family": "steps",
+      "name": "gather_every",
+      "hint": "every nth row",
+      "head": "Every nth row",
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "n",
+          "shown": "n",
+          "label": "every",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "offset",
+          "shown": "offset",
+          "label": "start at",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 0
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 0,
+            "shown": "0"
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "LazyFrame.head",
+      "applies": "frame",
+      "family": "steps",
+      "name": "head",
+      "hint": "the first rows",
+      "head": "First rows",
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "n",
+          "shown": "n",
+          "label": "rows",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 5
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 5,
+            "shown": "5"
+          },
+          "start": {
+            "kind": "unset"
           },
           "position": null,
           "offered": true
@@ -6056,6 +6316,53 @@
       ]
     },
     {
+      "id": "LazyFrame.last",
+      "applies": "frame",
+      "family": "steps",
+      "name": "last",
+      "hint": "the last row",
+      "head": "Last row",
+      "lazy": true,
+      "parameters": []
+    },
+    {
+      "id": "LazyFrame.limit",
+      "applies": "frame",
+      "family": "steps",
+      "name": "limit",
+      "hint": "the first rows, as head",
+      "head": "First rows",
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "n",
+          "shown": "n",
+          "label": "rows",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 5
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 5,
+            "shown": "5"
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "LazyFrame.pivot",
       "applies": "frame",
       "family": "steps",
@@ -6320,6 +6627,16 @@
       ]
     },
     {
+      "id": "LazyFrame.reverse",
+      "applies": "frame",
+      "family": "steps",
+      "name": "reverse",
+      "hint": "the rows from the last to the first",
+      "head": "Reverse",
+      "lazy": true,
+      "parameters": []
+    },
+    {
       "id": "LazyFrame.select",
       "applies": "frame",
       "family": "steps",
@@ -6384,6 +6701,59 @@
             "kind": "outer",
             "name": "select"
           },
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "LazyFrame.slice",
+      "applies": "frame",
+      "family": "steps",
+      "name": "slice",
+      "hint": "some rows from a place on",
+      "head": "Rows from a place",
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "offset",
+          "shown": "offset",
+          "label": "start at",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "required"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "length",
+          "shown": "length",
+          "label": "rows",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "none"
+          },
+          "defaultSetting": null,
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
           "offered": true
         }
       ]
@@ -6558,6 +6928,43 @@
       ]
     },
     {
+      "id": "LazyFrame.tail",
+      "applies": "frame",
+      "family": "steps",
+      "name": "tail",
+      "hint": "the last rows",
+      "head": "Last rows",
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "n",
+          "shown": "n",
+          "label": "rows",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 5
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 5,
+            "shown": "5"
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        }
+      ]
+    },
+    {
       "id": "LazyFrame.with_columns",
       "applies": "frame",
       "family": "steps",
@@ -6622,6 +7029,69 @@
             "kind": "outer",
             "name": "select"
           },
+          "offered": true
+        }
+      ]
+    },
+    {
+      "id": "LazyFrame.with_row_index",
+      "applies": "frame",
+      "family": "steps",
+      "name": "with_row_index",
+      "hint": "a count of the rows as the first column",
+      "head": "Number rows",
+      "lazy": true,
+      "parameters": [
+        {
+          "name": "name",
+          "shown": "name",
+          "label": "name of the count",
+          "kind": {
+            "kind": "value",
+            "type": "string"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "text",
+            "value": "index"
+          },
+          "defaultSetting": {
+            "kind": "text",
+            "value": "index",
+            "shown": "index"
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
+          "offered": true
+        },
+        {
+          "name": "offset",
+          "shown": "offset",
+          "label": "start counting at",
+          "kind": {
+            "kind": "value",
+            "type": "integer"
+          },
+          "shape": {
+            "shape": "one"
+          },
+          "default": {
+            "kind": "integer",
+            "value": 0
+          },
+          "defaultSetting": {
+            "kind": "integer",
+            "value": 0,
+            "shown": "0"
+          },
+          "start": {
+            "kind": "unset"
+          },
+          "position": null,
           "offered": true
         }
       ]
