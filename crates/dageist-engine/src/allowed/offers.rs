@@ -86,6 +86,7 @@ pub struct Chosen<'a> {
     durations: &'a [(&'a str, &'a str, DurationUse)],
     time_zones: &'a [(&'a str, Option<&'a str>)],
     unit: Option<TimeUnit>,
+    zone_clash: Option<(&'a str, &'a str)>,
     gives: Option<Representative>,
     many: bool,
 }
@@ -147,6 +148,15 @@ impl<'a> Chosen<'a> {
     #[must_use]
     pub const fn with_time_zones(mut self, time_zones: &'a [(&'a str, Option<&'a str>)]) -> Self {
         self.time_zones = time_zones;
+        self
+    }
+
+    /// The two zones of the moments a method is given, where they differ: the one it follows and the
+    /// one of an operand it is compared with, subtracted by, filled with or bound by. Polars finds
+    /// no dtype that they have in common, which is refused whatever follows.
+    #[must_use]
+    pub const fn with_zone_clash(mut self, clash: Option<(&'a str, &'a str)>) -> Self {
+        self.zone_clash = clash;
         self
     }
 
@@ -841,6 +851,13 @@ fn judge(entry: &'static Entry, place: &Place, chosen: &Chosen<'_>) -> Result<Al
         {
             return Err(Refusal::rule_because(Rule::TimeZoneIsValid, &said));
         }
+    }
+    // Moments in two zones are no operands of one another, whatever follows.
+    if let Some((first, second)) = chosen.zone_clash {
+        return Err(Refusal::rule_because(
+            Rule::MomentsShareAZone,
+            &format!("{first} and {second}"),
+        ));
     }
     // What the options set are refused for, on the dtype of the value the method follows.
     if is_method(entry) {

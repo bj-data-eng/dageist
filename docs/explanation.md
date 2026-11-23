@@ -754,6 +754,14 @@ meant, which is not about the text.
   zone `UTC`, say only that a moment is given, so the walk says the rest: the dtype of the call is
   not known until the zone is, for a method that takes none, and is then a `Datetime` with the
   zone as Polars reads it, or without one.
+- Polars finds no dtype that a moment in one zone and a moment in another have in common, so it refuses to
+  compare them (`eq`, `ne`, `lt`, `le`, `gt`, `ge`, `eq_missing`, `ne_missing`), to subtract them, to fill one
+  with the other (`fill_null`), to bound one by the other (`is_between`) and to give both as the values of a
+  condition. It refuses a moment in a zone and one in none too, which the tables, measured on `UTC` and on
+  no zone, say. The tables cannot say the rest, so the walk follows the zone of a moment along its chain,
+  from the column or the literal to each call that gives one or keeps it, and refuses an operand that is in
+  another zone than the value it is met with, by the named rule `moments-share-a-zone`, with the two zones.
+  `clip` and `replace` are not refused it: Polars keeps the zone of what they follow.
 - `base_utc_offset` and `dst_offset` read the offsets of the zone a moment has, so Polars refuses
   a moment that has none, when the rows run.
 - `ambiguous` of `replace_time_zone` says which of the two times a clock that is read twice stands

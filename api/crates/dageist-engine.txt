@@ -116,13 +116,14 @@ pub dageist_engine::allowed::Rule::ElementOnlyInPivotAggregate
 pub dageist_engine::allowed::Rule::FilterPredicateIsBoolean
 pub dageist_engine::allowed::Rule::JoinKeyNamesAreNotRepeated
 pub dageist_engine::allowed::Rule::KeyIsElementwise
+pub dageist_engine::allowed::Rule::MomentsShareAZone
 pub dageist_engine::allowed::Rule::PatternIsValid
 pub dageist_engine::allowed::Rule::PivotAggregateGivesOneValue
 pub dageist_engine::allowed::Rule::ReplacementValuesMatchInNumber
 pub dageist_engine::allowed::Rule::TimeZoneIsValid
 pub dageist_engine::allowed::Rule::WindowInputIsNotWidened
 impl dageist_engine::allowed::Rule
-pub const dageist_engine::allowed::Rule::ALL: [Self; 11]
+pub const dageist_engine::allowed::Rule::ALL: [Self; 12]
 pub fn dageist_engine::allowed::Rule::from_name(name: &str) -> core::option::Option<Self>
 pub const fn dageist_engine::allowed::Rule::name(self) -> &'static str
 pub const fn dageist_engine::allowed::Rule::statement(self) -> &'static str
@@ -189,6 +190,7 @@ pub const fn dageist_engine::allowed::Chosen<'a>::with_options(self, options: &'
 pub const fn dageist_engine::allowed::Chosen<'a>::with_patterns(self, patterns: &'a [(&'a str, &'a str)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_time_zones(self, time_zones: &'a [(&'a str, core::option::Option<&'a str>)]) -> Self
 pub const fn dageist_engine::allowed::Chosen<'a>::with_unclassed(self, unclassed: &'a [&'a str]) -> Self
+pub const fn dageist_engine::allowed::Chosen<'a>::with_zone_clash(self, clash: core::option::Option<(&'a str, &'a str)>) -> Self
 pub struct dageist_engine::allowed::Context
 impl dageist_engine::allowed::Context
 pub fn dageist_engine::allowed::Context::all() -> alloc::vec::Vec<Self>

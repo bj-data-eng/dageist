@@ -51,6 +51,7 @@
 #   filter-predicate-is-boolean: a filter's predicate must be Boolean.
 #   join-key-names-are-not-repeated: a join may not pair the same two output column names twice: where two keys on one side are named alike, the keys they are paired with must be named differently.
 #   key-is-elementwise: a join's key must be elementwise: an aggregate may not stand in it beside a column, nor a column be compared with a null, nor a replacement take a value that reads a column.
+#   moments-share-a-zone: moments that are compared, subtracted, filled or bound by one another must be in one time zone: Polars finds no dtype that two zones have in common.
 #   pattern-is-valid: a pattern must be a valid regular expression.
 #   pivot-aggregate-gives-one-value: a pivot's aggregate must give one value for each group.
 #   replacement-values-match-in-number: a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one.

@@ -46,6 +46,9 @@ pub enum Rule {
     ReplacementValuesMatchInNumber,
     /// A time zone is one Polars reads: a name of the time zone database, or a fixed offset.
     TimeZoneIsValid,
+    /// The operands of a comparison, a difference, a fill and the bounds of an interval, where they are
+    /// moments, are in one time zone: Polars finds no dtype that two zones have in common.
+    MomentsShareAZone,
     /// A window is given a value as long as its input, which a value of one row that a part widens is
     /// not.
     WindowInputIsNotWidened,
@@ -53,13 +56,14 @@ pub enum Rule {
 
 impl Rule {
     /// Every rule, in the order the tables list them.
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 12] = [
         Self::ConditionPredicateIsBoolean,
         Self::DurationIsValid,
         Self::ElementOnlyInPivotAggregate,
         Self::FilterPredicateIsBoolean,
         Self::JoinKeyNamesAreNotRepeated,
         Self::KeyIsElementwise,
+        Self::MomentsShareAZone,
         Self::PatternIsValid,
         Self::PivotAggregateGivesOneValue,
         Self::ReplacementValuesMatchInNumber,
@@ -78,6 +82,7 @@ impl Rule {
             Self::FilterPredicateIsBoolean => "filter-predicate-is-boolean",
             Self::JoinKeyNamesAreNotRepeated => "join-key-names-are-not-repeated",
             Self::KeyIsElementwise => "key-is-elementwise",
+            Self::MomentsShareAZone => "moments-share-a-zone",
             Self::PatternIsValid => "pattern-is-valid",
             Self::ReplacementValuesMatchInNumber => "replacement-values-match-in-number",
             Self::TimeZoneIsValid => "time-zone-is-valid",
@@ -114,6 +119,9 @@ impl Rule {
             Self::WindowInputIsNotWidened => {
                 "a window takes a value as long as its input, and a value of one row that a part widens, as dt.replace's parts do, is not: Polars refuses the length of its output"
             }
+            Self::MomentsShareAZone => {
+                "moments that are compared, subtracted, filled or bound by one another must be in one time zone: Polars finds no dtype that two zones have in common"
+            }
             Self::PatternIsValid => "a pattern must be a valid regular expression",
             Self::ReplacementValuesMatchInNumber => {
                 "a replacement takes as many new values as old ones, or one, and a strict one a default of as many values as what it follows, or one"
@@ -133,6 +141,7 @@ impl Rule {
             Self::JoinKeyNamesAreNotRepeated | Self::KeyIsElementwise => context.is_join_key(),
             // A matter of the values a call is given, whatever context it stands in.
             Self::DurationIsValid
+            | Self::MomentsShareAZone
             | Self::PatternIsValid
             | Self::ReplacementValuesMatchInNumber
             | Self::TimeZoneIsValid
@@ -234,6 +243,7 @@ impl Rule {
             | Self::DurationIsValid
             | Self::PatternIsValid
             | Self::ReplacementValuesMatchInNumber
+            | Self::MomentsShareAZone
             | Self::TimeZoneIsValid
             | Self::WindowInputIsNotWidened => false,
         }

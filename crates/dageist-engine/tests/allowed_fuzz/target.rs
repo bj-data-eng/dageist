@@ -350,6 +350,9 @@ fn polars_words(rule: &str) -> &'static [&'static str] {
         // as a regex error.
         "pattern-is-valid" => &["regex error"],
         "replacement-values-match-in-number" => &["must have the same length as"],
+        // Polars finds no dtype that two zones have in common, and says it of a comparison as it
+        // does of a difference or a fill.
+        "moments-share-a-zone" => &["could not evaluate", "failed to determine supertype"],
         // Polars refuses a window the value that a part widened with the length of its output.
         "window-input-is-not-widened" => &["output length of `map`"],
         _ => &[],

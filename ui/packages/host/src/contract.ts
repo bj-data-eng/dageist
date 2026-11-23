@@ -461,6 +461,7 @@ export const RULE_NAMES = [
   'filter-predicate-is-boolean',
   'join-key-names-are-not-repeated',
   'key-is-elementwise',
+  'moments-share-a-zone',
   'pattern-is-valid',
   'replacement-values-match-in-number',
   'time-zone-is-valid',
