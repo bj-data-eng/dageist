@@ -594,7 +594,10 @@ What Polars does with each is what the tables say, and some of it is not what a 
   is an expression of one value: Polars refuses many values with "polars does not support varying quantiles yet",
   and a value outside 0 to 1 or a null when the rows run, so the tables measure it as the number 1 of the dtype it
   has, as they do `shift`'s rows, and the fuzz target draws it so. A number typed in is the number it is,
-  whatever the value the method follows is, so the share has a role of its own. It takes numbers and the
+  whatever the value the method follows is, so the share has a role of its own. It takes the numeric dtypes
+  only: Polars reads a text or a moment as the share it writes in a select, and refuses it where a window or a
+  pivot's aggregate evaluates the values of a group, which the tables do not measure, so the editor offers a
+  number and the fuzz target draws one. It takes numbers and the
   temporal dtypes, gives a `Float64` or the narrow float it follows, and gives a moment, a time of day or a length of time for
   one, and refuses a `Boolean` and text. A quantile of a `Date` panics in Polars when the table has no rows,
   which the tables run too, so they refuse it. Python also takes a list of shares, for which the quantile is a
