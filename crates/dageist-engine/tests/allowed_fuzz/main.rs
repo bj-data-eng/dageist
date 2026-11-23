@@ -108,7 +108,10 @@ fn on_a_large_stack<T: Send>(work: impl FnOnce() -> T + Send) -> T {
 /// disagrees, reduces it and keeps the result under the directory for kept evidence.
 fn campaign(seed: u64, cases: u32, focus: Option<Focus>) -> (Result<u64, Finding>, Vec<String>) {
     let target = AllowedTarget::new().with_focus(focus);
-    let strategy = property::bytes(512, target.descriptor().limits());
+    // A draw reads more than a byte where a count needs more, and again where it rejects what it
+    // read, so a case that is made from entropy of up to this many bytes runs out of it about as
+    // seldom as one did of 512 when each draw was one byte.
+    let strategy = property::bytes(1024, target.descriptor().limits());
     let config = PropertyConfig {
         cases,
         max_rejections: 1_000_000,

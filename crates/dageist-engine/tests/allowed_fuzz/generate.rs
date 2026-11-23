@@ -30,8 +30,8 @@ use super::frames::{ON_COLUMNS, OTHER, key_column};
 /// for what it lacks would be read as zeros, the same choice every time.
 pub const LEAST_ENTROPY: usize = 96;
 
-/// Draws small numbers from entropy, one byte for each. Past its end it gives
-/// zeros, the first choice of everything.
+/// Draws numbers from entropy, each below a count that may be of any size. Past its end, or
+/// too near it to hold the bytes a draw needs, it gives zeros, the first choice of everything.
 struct Draw<'a> {
     entropy: Entropy<'a>,
 }
@@ -43,14 +43,30 @@ impl<'a> Draw<'a> {
         }
     }
 
-    /// A number below `count`, which is at most 256.
+    /// A number below `count`, each as likely as any other. It reads as many bytes as `count`
+    /// needs, as one number, and reads again where that number is at or above the largest
+    /// multiple of `count` that the bytes can hold, since reducing it would give the numbers
+    /// below the remainder once more than the rest. A count of one or of a power of two that a
+    /// byte holds reads one byte and keeps its low bits.
     fn below(&mut self, count: usize) -> usize {
-        debug_assert!((1..=256).contains(&count));
-        let byte = self
-            .entropy
-            .take(1)
-            .map_or(0, |bytes| usize::from(bytes[0]));
-        byte % count
+        debug_assert!(count > 0);
+        let width = (usize::BITS - (count - 1).leading_zeros())
+            .div_ceil(8)
+            .max(1) as usize;
+        let span = 1_u128 << (8 * width);
+        let count = count as u128;
+        let limit = span - span % count;
+        loop {
+            let Ok(bytes) = self.entropy.take(width) else {
+                return 0;
+            };
+            let value = bytes
+                .iter()
+                .fold(0_u128, |number, byte| number << 8 | u128::from(*byte));
+            if value < limit {
+                return (value % count) as usize;
+            }
+        }
     }
 
     fn chance(&mut self, percent: usize) -> bool {
@@ -64,7 +80,7 @@ impl<'a> Draw<'a> {
     /// One of `items`, the first more often: the weights say how often.
     fn weighted<T: Copy>(&mut self, items: &[(usize, T)]) -> T {
         let total: usize = items.iter().map(|(weight, _)| weight).sum();
-        let mut left = self.below(total.min(256));
+        let mut left = self.below(total);
         for (weight, item) in items {
             if left < *weight {
                 return *item;
