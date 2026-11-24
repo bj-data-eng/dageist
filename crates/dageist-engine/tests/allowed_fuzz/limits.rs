@@ -5621,6 +5621,30 @@ mod tests {
                 "{id}"
             );
         }
+        // A cast of the nulls is a column of nulls of the dtype it casts to, which a conversion that
+        // follows meets as nulls.
+        assert_eq!(
+            excused_by_kept("uncovered-a-group-aggregate--text-made-of-a-column-of-nulls.case"),
+            vec![Limit::AGroupAggregate]
+        );
+        let text_of_nulls = pivot_of(
+            Representative::Null,
+            chain_of(
+                call("polars.element", Vec::new()),
+                vec![
+                    cast_to(Representative::String, Vec::new()),
+                    call("Expr.skew", Vec::new()),
+                ],
+            ),
+        );
+        assert_eq!(
+            refused_by_the_tables_at(
+                &text_of_nulls,
+                at(&[parameter("aggregate_function"), Segment::Link(1)]),
+                "conversion from `str` to `f64` failed in column 'a' for 2 out of 3 values: [\"1d\", \"2d\"]"
+            ),
+            vec![Limit::AGroupAggregate]
+        );
         // A call that counts them leaves a number, which is no null to keep.
         let counted = pivot_of(
             Representative::Null,
