@@ -440,3 +440,34 @@ fn the_start_that_reads_a_field_is_the_start_of_the_expression_that_reads_it() {
     );
     assert_eq!(Expression::input(String::from("t")), Expression::input("t"));
 }
+
+#[test]
+fn swapping_a_method_where_the_tables_say_where_it_stands_gives_the_new_method_polars_default() {
+    let document = read(vec![select(field_then(
+        "a",
+        vec![call("Expr.abs", json!({}))],
+    ))]);
+    // Nothing is carried from a method that takes no argument, so the new one starts as one added
+    // there does: `shift` shifts by one row unless it is asked otherwise.
+    let edited = document
+        .swap_link(&link(0), "Expr.shift", Some(&after_whole_numbers()))
+        .expect("swapped");
+    assert_steps(
+        &edited,
+        vec![select(field_then(
+            "a",
+            vec![call("Expr.shift", json!({ "n": whole(1) }))],
+        ))],
+    );
+    // Where nothing is known of the place, the argument is a hole.
+    let unknown = document
+        .swap_link(&link(0), "Expr.shift", None)
+        .expect("swapped");
+    assert_steps(
+        &unknown,
+        vec![select(field_then(
+            "a",
+            vec![call("Expr.shift", json!({ "n": hole() }))],
+        ))],
+    );
+}
