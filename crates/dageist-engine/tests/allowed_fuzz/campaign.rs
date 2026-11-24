@@ -554,4 +554,30 @@ mod tests {
         untimed.deadline = Some(Duration::ZERO);
         assert!(refused(untimed).contains("DAGEIST_FUZZ_DEADLINE_MS"));
     }
+
+    #[test]
+    fn settings_that_overflow_or_are_beyond_the_cases_are_refused_without_a_panic() {
+        let mut settings = settings("campaign-overflow");
+        settings.cases = 5;
+        settings.start = u64::MAX;
+        settings.counted = Some(0);
+        let refusal = settings.check().expect_err("refused");
+        assert!(refusal.contains("DAGEIST_FUZZ_START"), "{refusal}");
+        // A count above the cases of the campaign: it had made them all.
+        let mut settings = self::settings("campaign-counted");
+        settings.cases = 5;
+        settings.start = 20;
+        settings.counted = Some(6);
+        let refusal = settings.check().expect_err("refused");
+        assert!(refusal.contains("DAGEIST_FUZZ_COUNTED"), "{refusal}");
+        settings.counted = Some(5);
+        assert!(settings.check().is_ok());
+        let mut none = self::settings("campaign-none");
+        none.cases = 0;
+        assert!(
+            none.check()
+                .expect_err("refused")
+                .contains("DAGEIST_FUZZ_CASES")
+        );
+    }
 }

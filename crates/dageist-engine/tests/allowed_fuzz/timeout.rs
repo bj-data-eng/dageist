@@ -39,6 +39,12 @@ fn unhex(text: &str) -> Vec<u8> {
         .collect()
 }
 
+/// Whether the case written as `canonical` is one of those that check nothing, which depends
+/// on the case alone.
+fn is_quiet(canonical: &[u8]) -> bool {
+    canonical.iter().map(|byte| u64::from(*byte)).sum::<u64>() % 4 == 0
+}
+
 /// An evaluator that writes down each case it is given, blocks for ever in the case named
 /// by `block`, and makes a thread panic in the case named by `panics`; otherwise it
 /// evaluates as the target does.
@@ -83,6 +89,11 @@ impl Evaluator for Scripted<'_> {
             let _ = std::thread::spawn(|| panic!("a thread of Polars panics")).join();
         }
         let mut observation = self.evaluation.observe(canonical, within)?;
+        // About a quarter of the cases, whichever the run, check nothing, so that cases
+        // before a case that hangs are not all counted.
+        if is_quiet(canonical) {
+            observation.outcome = CaseOutcome::unsupported("a scripted case that checks nothing")?;
+        }
         if self.disagrees.as_deref() == Some(canonical) {
             self.disagreed.set(true);
             observation.outcome = CaseOutcome::failure(
@@ -173,6 +184,11 @@ struct Ran {
 /// Runs the child in `directory`, with `settings` as variables, and waits for it to end for
 /// no longer than [`PARENT_WAIT`].
 fn run_child(directory: &Path, settings: &[(&str, String)]) -> Ran {
+    run_child_as(directory, settings, true)
+}
+
+/// As [`run_child`], with the output of the test shown, or left to the test harness to capture.
+fn run_child_as(directory: &Path, settings: &[(&str, String)], nocapture: bool) -> Ran {
     let said = directory.join("said");
     let output = std::fs::File::create(&said).expect("the output");
     let mut command = Command::new(std::env::current_exe().expect("this binary"));
@@ -181,9 +197,9 @@ fn run_child(directory: &Path, settings: &[(&str, String)]) -> Ran {
             "--exact",
             "timeout::a_campaign_for_a_parent_to_watch",
             "--ignored",
-            "--nocapture",
             "--test-threads=1",
         ])
+        .args(nocapture.then_some("--nocapture"))
         // Nothing of the settings the tests run under reaches the campaign, but what they give.
         .env_remove("DAGEIST_FUZZ_START")
         .env_remove("DAGEIST_FUZZ_COUNTED")
@@ -498,4 +514,36 @@ fn a_replay_of_a_reduction_that_does_not_end_is_kept_as_one_and_counts_the_case_
         Some(before + 1),
         "{env}"
     );
+}
+
+/// What a campaign says when a case does not end reaches whoever runs it whether or not the
+/// test harness shows the output of tests.
+#[test]
+fn the_report_of_a_case_that_does_not_end_is_shown_without_nocapture() {
+    let whole = run_child(&fresh("timeout-shown-whole"), &[]);
+    let directory = fresh("timeout-shown");
+    std::fs::write(directory.join("block"), hex(&whole.log[5])).unwrap();
+    let stopped = run_child_as(
+        &directory,
+        &[("DAGEIST_FUZZ_DEADLINE_MS", "3000".to_owned())],
+        false,
+    );
+    assert_eq!(stopped.status, Some(TIMEOUT_STATUS), "{}", stopped.said);
+    assert!(
+        stopped.said.contains("DAGEIST_FUZZ_START="),
+        "{}",
+        stopped.said
+    );
+}
+
+/// A `timeout.env` that an earlier run left is not left for a run that ends well to be found
+/// as if it were that run's.
+#[test]
+fn a_campaign_that_ends_well_leaves_no_timeout_env_of_an_earlier_run() {
+    let directory = fresh("timeout-stale");
+    std::fs::create_dir_all(directory.join("kept")).unwrap();
+    std::fs::write(directory.join("kept/timeout.env"), "DAGEIST_FUZZ_START=3\n").unwrap();
+    let whole = run_child(&directory, &[]);
+    assert_eq!(whole.status, Some(0), "{}", whole.said);
+    assert!(!directory.join("kept/timeout.env").exists());
 }
