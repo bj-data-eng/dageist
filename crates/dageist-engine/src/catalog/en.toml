@@ -2638,10 +2638,6 @@ hint = "smallest value of each array"
 name = "arr.n_unique"
 hint = "number of different values in each array"
 
-[entries."Expr.arr.reverse"]
-name = "arr.reverse"
-hint = "the values of each array in reverse order"
-
 [entries."Expr.arr.sort"]
 name = "arr.sort"
 hint = "the values of each array in order"

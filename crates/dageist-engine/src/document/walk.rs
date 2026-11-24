@@ -23,7 +23,7 @@ use polars::prelude::{DataType, Schema, SchemaRef, TimeUnit};
 use crate::allowed::{
     self, After, Chosen, ConditionState, Context, Count, Ending, Literal, Nested, Outer,
     Place as OfferPlace, Position as Slot, Refusal, RefusalSource, Representative, Rule, Shape,
-    Unknown, Verdict,
+    Stage, Unknown, Verdict,
 };
 use crate::allowed::{
     Loose, Receiver, adapted_dtype, adapts_numbers_only, broadcasts, could_be_taken_by_a_number,
@@ -1003,6 +1003,28 @@ impl Walker<'_> {
         }
         if self.refusal.is_none() {
             self.refusal = Some(found);
+        }
+    }
+
+    /// Notes a call that is not to be run in Polars though it is refused only by what the tables
+    /// recorded: a method of lists or arrays, or one that follows a list or an array, whose schema
+    /// and whose rows differ in dtype or on which Polars panicked. A call after it that trusts the
+    /// schema, as an aggregate or a cut does, panics, and a panic on a thread of Polars' own may not
+    /// be recovered from.
+    fn note_danger(&mut self, entry: &Entry, after: After, refusal: &Refusal) {
+        let in_lists = entry.id().as_str().starts_with("Expr.list.")
+            || entry.id().as_str().starts_with("Expr.arr.")
+            || matches!(after, After::Value { dtype, .. } if dtype.is_nested());
+        let recorded = matches!(refusal.source(), RefusalSource::Polars(Stage::Rows))
+            && (refusal.reason().starts_with("the schema says")
+                || refusal.reason().starts_with("Polars panicked"));
+        if in_lists && recorded && self.unsafe_to_run.is_none() {
+            self.unsafe_to_run = Some(WalkRefusal {
+                place: self.here(),
+                refusal: refusal.clone(),
+                at_end: false,
+                argument_unknown: false,
+            });
         }
     }
 
@@ -2364,6 +2386,7 @@ impl Walker<'_> {
                 verdict: Some(verdict.clone()),
             };
             if let Verdict::Refused(refusal) = &verdict {
+                self.note_danger(entry, after, refusal);
                 self.refuse_blind(refusal);
                 return (Cur::Dead, standing);
             }
@@ -2474,6 +2497,7 @@ impl Walker<'_> {
         };
         let allowance = match &verdict {
             Verdict::Refused(refusal) => {
+                self.note_danger(entry, after, refusal);
                 self.refuse(refusal, false);
                 return (Cur::Dead, standing);
             }

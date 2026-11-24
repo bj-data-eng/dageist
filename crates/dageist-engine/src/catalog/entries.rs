@@ -2716,14 +2716,6 @@ pub(super) const ENTRIES: &[Entry] = &[
         build: Build::Expression(nested::arr_n_unique),
     },
     Entry {
-        id: EntryId("Expr.arr.reverse"),
-        family: Family::Order,
-        accepts: ARRAY,
-        parameters: &[],
-        laziness: Laziness::Lazy,
-        build: Build::Expression(nested::arr_reverse),
-    },
-    Entry {
         id: EntryId("Expr.arr.sort"),
         family: Family::Order,
         accepts: ARRAY,

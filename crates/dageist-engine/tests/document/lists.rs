@@ -35,9 +35,14 @@ fn methods() -> Vec<(&'static str, &'static str, Value)> {
     for namespace in ["list", "arr"] {
         for name in [
             "len", "sum", "mean", "median", "min", "max", "first", "last", "n_unique", "arg_max",
-            "arg_min", "reverse",
+            "arg_min",
         ] {
             all.push((namespace, name, json!({})));
+        }
+        // Polars panics on an array reversed where an aggregate follows, so `arr.reverse` is left
+        // out of the catalogue with its reason.
+        if namespace == "list" {
+            all.push((namespace, "reverse", json!({})));
         }
         for name in ["std", "var"] {
             all.push((namespace, name, json!({})));
@@ -66,7 +71,7 @@ fn methods() -> Vec<(&'static str, &'static str, Value)> {
     all
 }
 
-/// The 38 methods, by the identifiers of the catalogue.
+/// The 37 methods, by the identifiers of the catalogue.
 fn identifiers() -> Vec<String> {
     let mut ids: Vec<String> = methods()
         .into_iter()
@@ -805,9 +810,9 @@ fn report(found: &[Disagreement], asked: usize, what: &str) {
 // The sweeps
 
 #[test]
-fn the_catalogue_holds_the_thirty_eight_methods() {
+fn the_catalogue_holds_the_thirty_seven_methods() {
     let ids = identifiers();
-    assert_eq!(ids.len(), 38, "{ids:?}");
+    assert_eq!(ids.len(), 37, "{ids:?}");
     let missing: Vec<&String> = ids
         .iter()
         .filter(|id| catalog::entry(id).is_none())

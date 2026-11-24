@@ -1723,13 +1723,17 @@ read is written for the class that was asked: the first of a list of `Float64` i
 
 A method of the `list` or the `arr` namespace is measured on every class, for what it gives is
 the element's: the sum of a list of `Int8` is an `Int64`, of a list of `Boolean` a `UInt32`, the
-mean of a list of `Date` a `Datetime`, and a list of text has no sum. The catalogue holds the 38 of them
+mean of a list of `Date` a `Datetime`, and a list of text has no sum. The catalogue holds the 37 of them
 that take no expression argument, as Python Polars 2.1.0 builds them, with the groups `List` and
 `Array` for what they accept: `len`, `sum`, `mean`, `median`, `std`, `var`, `min`, `max`, `first`,
-`last`, `n_unique`, `arg_max`, `arg_min`, `any`, `all`, `sort`, `reverse` and `unique` of each, and
-`list.drop_nulls` and `arr.to_list`. `first` and `last` are the value at the first and the last place,
+`last`, `n_unique`, `arg_max`, `arg_min`, `any`, `all`, `sort` and `unique` of each, `list.reverse`, and
+`list.drop_nulls` and `arr.to_list`. `arr.reverse` is left out: Polars panics where an aggregate, a cut or a
+window follows it. `first` and `last` are the value at the first and the last place,
 which is a null where a list has none, and `n_unique`, `any`, `all`, `reverse` and `unique` are built
-as Python builds them, as an evaluation over the elements of one list. A method gives a value for each
+as Python builds them, as an evaluation over the elements of one list. A call that the walk refuses for what the tables recorded of
+a method of lists or arrays or of a method that follows one, that its schema and its rows differ in dtype or that
+Polars panicked, is not run either, for an aggregate or a cut that follows it trusts the schema and panics. A
+method gives a value for each
 list, so a column of lists stays as many values as it had rows, and none of them is an aggregate for the
 rules that hold a join's key. An array that a call gives is written at the width the array it follows
 has: `sort` of an array of three is an array of three, which the tables, measured at two, write only as

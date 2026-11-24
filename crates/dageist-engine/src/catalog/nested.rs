@@ -1,7 +1,7 @@
 //! The methods of the `list` and the `arr` namespaces that take no expression argument, built as
 //! Python Polars 2.1.0 builds them: the ones that Python gives to Rust directly are the
 //! namespace's own, and the rest are an evaluation of a method of one list's elements, over
-//! `element()`: `n_unique`, `any`, `all`, `reverse` and `unique`; `first` and `last` are the value
+//! `element()`: `n_unique`, `any`, `all`, `reverse` of a list and `unique`; `first` and `last` are the value
 //! at the first and the last place, which is a null where a list has none.
 
 use polars::prelude::{Expr, SortOptions, element, lit};
@@ -175,10 +175,6 @@ pub(super) fn arr_all(expr: Expr, arguments: &Arguments) -> Built {
     Ok(expr
         .arr()
         .agg(element().all(arguments.flag("ignore_nulls", true)?)))
-}
-
-pub(super) fn arr_reverse(expr: Expr, _arguments: &Arguments) -> Built {
-    Ok(expr.arr().eval(element().reverse(), false))
 }
 
 pub(super) fn arr_unique(expr: Expr, arguments: &Arguments) -> Built {

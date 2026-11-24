@@ -159,6 +159,10 @@ pub fn left_out() -> &'static [LeftOut] {
 //     own element dtype, and a list of literals typed in is a kind that does not exist yet.
 //     `list.__getitem__` is Python's subscript for `get`. The `set_*` methods also panic on a list
 //     of `Null`;
+//   - `arr.reverse`, which Python builds as an evaluation of `element().reverse()` over each array,
+//     makes an array that Polars panics on where an aggregate, a cut or a window follows it, with
+//     "not all elements have the specified width", for every element dtype, so it is left out until
+//     Polars evaluates it; `Expr.reverse` of an array reverses it as it does a list;
 //   - `list.explode` and `arr.explode` give a value for each element, so how many values there
 //     are is no longer what the table has, nor what the receiver has, which no count of the walk
 //     says yet;
@@ -216,6 +220,7 @@ const LEFT_OUT: &[LeftOut] = &[
     LeftOut::new("Expr.arr.get", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.head", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.join", Reason::NotYetCatalogued),
+    LeftOut::new("Expr.arr.reverse", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.shift", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.slice", Reason::NotYetCatalogued),
     LeftOut::new("Expr.arr.tail", Reason::NotYetCatalogued),

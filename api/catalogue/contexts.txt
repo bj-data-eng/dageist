@@ -73,7 +73,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 16620 combinations: 11117 allowed; 3202 refused when Polars resolved the schema, 2301 when it ran the rows, 0 when it ran the empty table.
+# 16560 combinations: 11082 allowed; 3182 refused when Polars resolved the schema, 2296 when it ran the rows, 0 when it ran the empty table.
 #
 ChainedThen.otherwise | filter > condition.predicate | continues | - | - | condition-predicate-is-boolean | allowed -
 ChainedThen.otherwise | filter > condition.predicate | ends | - | - | condition-predicate-is-boolean | allowed -
@@ -1995,66 +1995,6 @@ Expr.arr.n_unique | sort > over.partition_by | continues | Array(Int64, 2) | - |
 Expr.arr.n_unique | sort > over.partition_by | ends | Array(Int64, 2) | - | - | allowed UInt32 many
 Expr.arr.n_unique | sort | continues | Array(Int64, 2) | - | - | allowed UInt32 many
 Expr.arr.n_unique | sort | ends | Array(Int64, 2) | - | - | allowed UInt32 many
-Expr.arr.reverse | filter > condition.predicate | continues | Array(Int64, 2) | - | condition-predicate-is-boolean | allowed Array(Int64, 2) many
-Expr.arr.reverse | filter > condition.predicate | ends | Array(Int64, 2) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `array[i64, 2]` for series with name `a`
-Expr.arr.reverse | filter > condition.value | continues | Array(Int64, 2) | - | filter-predicate-is-boolean | allowed Array(Int64, 2) many
-Expr.arr.reverse | filter > condition.value | ends | Array(Int64, 2) | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Array(Int64, 2)`
-Expr.arr.reverse | filter > over.order_by | continues | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | filter > over.order_by | ends | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | filter > over.partition_by | continues | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | filter > over.partition_by | ends | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | filter | continues | Array(Int64, 2) | - | filter-predicate-is-boolean | allowed Array(Int64, 2) many
-Expr.arr.reverse | filter | ends | Array(Int64, 2) | - | filter-predicate-is-boolean | refused schema: filter predicate must be of type `Boolean`, got `Array(Int64, 2)`
-Expr.arr.reverse | join_left > condition.predicate | continues | Array(Int64, 2) | - | condition-predicate-is-boolean | allowed Array(Int64, 2) many
-Expr.arr.reverse | join_left > condition.predicate | ends | Array(Int64, 2) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `array[i64, 2]` for series with name `a`
-Expr.arr.reverse | join_left > condition.value | continues | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | join_left > condition.value | ends | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | join_left > over.order_by | continues | Array(Int64, 2) | - | - | refused schema: all join key expressions must be elementwise.
-Expr.arr.reverse | join_left > over.order_by | ends | Array(Int64, 2) | - | - | refused schema: all join key expressions must be elementwise.
-Expr.arr.reverse | join_left > over.partition_by | continues | Array(Int64, 2) | - | - | refused schema: all join key expressions must be elementwise.
-Expr.arr.reverse | join_left > over.partition_by | ends | Array(Int64, 2) | - | - | refused schema: all join key expressions must be elementwise.
-Expr.arr.reverse | join_left | continues | Array(Int64, 2) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Array(Int64, 2) many
-Expr.arr.reverse | join_left | ends | Array(Int64, 2) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Array(Int64, 2) many
-Expr.arr.reverse | join_right > condition.predicate | continues | Array(Int64, 2) | - | condition-predicate-is-boolean | allowed Array(Int64, 2) many
-Expr.arr.reverse | join_right > condition.predicate | ends | Array(Int64, 2) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `array[i64, 2]` for series with name `ra`
-Expr.arr.reverse | join_right > condition.value | continues | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | join_right > condition.value | ends | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | join_right > over.order_by | continues | Array(Int64, 2) | - | - | refused schema: all join key expressions must be elementwise.
-Expr.arr.reverse | join_right > over.order_by | ends | Array(Int64, 2) | - | - | refused schema: all join key expressions must be elementwise.
-Expr.arr.reverse | join_right > over.partition_by | continues | Array(Int64, 2) | - | - | refused schema: all join key expressions must be elementwise.
-Expr.arr.reverse | join_right > over.partition_by | ends | Array(Int64, 2) | - | - | refused schema: all join key expressions must be elementwise.
-Expr.arr.reverse | join_right | continues | Array(Int64, 2) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Array(Int64, 2) many
-Expr.arr.reverse | join_right | ends | Array(Int64, 2) | - | join-key-names-are-not-repeated,key-is-elementwise | allowed Array(Int64, 2) many
-Expr.arr.reverse | pivot_aggregate > condition.predicate | continues | Array(Int64, 2) | - | condition-predicate-is-boolean | refused schema: named columns are not allowed in `eval` functions; consider using `element`
-Expr.arr.reverse | pivot_aggregate > condition.predicate | ends | Array(Int64, 2) | - | condition-predicate-is-boolean | refused schema: named columns are not allowed in `eval` functions; consider using `element`
-Expr.arr.reverse | pivot_aggregate > condition.value | continues | Array(Int64, 2) | - | - | refused schema: named columns are not allowed in `eval` functions; consider using `element`
-Expr.arr.reverse | pivot_aggregate > condition.value | ends | Array(Int64, 2) | - | - | refused schema: named columns are not allowed in `eval` functions; consider using `element`
-Expr.arr.reverse | pivot_aggregate > over.order_by | continues | Array(Int64, 2) | - | - | refused schema: named columns are not allowed in `eval` functions; consider using `element`
-Expr.arr.reverse | pivot_aggregate > over.order_by | ends | Array(Int64, 2) | - | - | refused schema: named columns are not allowed in `eval` functions; consider using `element`
-Expr.arr.reverse | pivot_aggregate > over.partition_by | continues | Array(Int64, 2) | - | - | refused schema: named columns are not allowed in `eval` functions; consider using `element`
-Expr.arr.reverse | pivot_aggregate > over.partition_by | ends | Array(Int64, 2) | - | - | refused schema: named columns are not allowed in `eval` functions; consider using `element`
-Expr.arr.reverse | pivot_aggregate | continues | Array(Int64, 2) | - | pivot-aggregate-gives-one-value | refused schema: named columns are not allowed in `eval` functions; consider using `element`
-Expr.arr.reverse | pivot_aggregate | ends | Array(Int64, 2) | - | pivot-aggregate-gives-one-value | refused schema: named columns are not allowed in `eval` functions; consider using `element`
-Expr.arr.reverse | select > condition.predicate | continues | Array(Int64, 2) | - | condition-predicate-is-boolean | allowed Array(Int64, 2) many
-Expr.arr.reverse | select > condition.predicate | ends | Array(Int64, 2) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `array[i64, 2]` for series with name `a`
-Expr.arr.reverse | select > condition.value | continues | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | select > condition.value | ends | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | select > over.order_by | continues | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | select > over.order_by | ends | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | select > over.partition_by | continues | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | select > over.partition_by | ends | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | select | continues | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | select | ends | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | sort > condition.predicate | continues | Array(Int64, 2) | - | condition-predicate-is-boolean | allowed Array(Int64, 2) many
-Expr.arr.reverse | sort > condition.predicate | ends | Array(Int64, 2) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `array[i64, 2]` for series with name `a`
-Expr.arr.reverse | sort > condition.value | continues | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | sort > condition.value | ends | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | sort > over.order_by | continues | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | sort > over.order_by | ends | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | sort > over.partition_by | continues | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | sort > over.partition_by | ends | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | sort | continues | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | sort | ends | Array(Int64, 2) | - | - | allowed Array(Int64, 2) many
 Expr.arr.sort | filter > condition.predicate | continues | Array(Int64, 2) | - | condition-predicate-is-boolean | allowed Array(Int64, 2) many
 Expr.arr.sort | filter > condition.predicate | ends | Array(Int64, 2) | - | condition-predicate-is-boolean | refused rows: invalid series dtype: expected `Boolean`, got `array[i64, 2]` for series with name `a`
 Expr.arr.sort | filter > condition.value | continues | Array(Int64, 2) | - | filter-predicate-is-boolean | allowed Array(Int64, 2) many

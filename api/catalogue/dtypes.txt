@@ -32,7 +32,7 @@
 # value for the three rows together, `many` any other number. A reason is Polars' message
 # up to its first blank line, on one line.
 #
-# 75605 combinations: 25799 allowed; 18460 refused when Polars resolved the schema, 31346 when it ran the rows, 0 when it ran the empty table.
+# 75538 combinations: 25777 allowed; 18415 refused when Polars resolved the schema, 31346 when it ran the rows, 0 when it ran the empty table.
 #
 Expr.abs | - | Array(Int64, 2) | - | refused rows: `abs` operation not supported for dtype `array[i64, 2]`
 Expr.abs | - | Boolean | - | refused rows: `abs` operation not supported for dtype `bool`
@@ -4328,73 +4328,6 @@ Expr.arr.n_unique | - | UInt16 | - | refused schema: expected Array datatype for
 Expr.arr.n_unique | - | UInt32 | - | refused schema: expected Array datatype for array operation, got: UInt32
 Expr.arr.n_unique | - | UInt64 | - | refused schema: expected Array datatype for array operation, got: UInt64
 Expr.arr.n_unique | - | UInt8 | - | refused schema: expected Array datatype for array operation, got: UInt8
-Expr.arr.reverse | - | Array(Boolean, 2) | - | allowed Array(Boolean, 2) many
-Expr.arr.reverse | - | Array(Date, 2) | - | allowed Array(Date, 2) many
-Expr.arr.reverse | - | Array(Datetime(us), 2) | - | allowed Array(Datetime(us), 2) many
-Expr.arr.reverse | - | Array(Datetime(us, UTC), 2) | - | allowed Array(Datetime(us, UTC), 2) many
-Expr.arr.reverse | - | Array(Decimal(10, 2), 2) | - | allowed Array(Decimal(10, 2), 2) many
-Expr.arr.reverse | - | Array(Duration(us), 2) | - | allowed Array(Duration(us), 2) many
-Expr.arr.reverse | - | Array(Float16, 2) | - | allowed Array(Float16, 2) many
-Expr.arr.reverse | - | Array(Float32, 2) | - | allowed Array(Float32, 2) many
-Expr.arr.reverse | - | Array(Float64, 2) | - | allowed Array(Float64, 2) many
-Expr.arr.reverse | - | Array(Int128, 2) | - | allowed Array(Int128, 2) many
-Expr.arr.reverse | - | Array(Int16, 2) | - | allowed Array(Int16, 2) many
-Expr.arr.reverse | - | Array(Int32, 2) | - | allowed Array(Int32, 2) many
-Expr.arr.reverse | - | Array(Int64, 2) | - | allowed Array(Int64, 2) many
-Expr.arr.reverse | - | Array(Int8, 2) | - | allowed Array(Int8, 2) many
-Expr.arr.reverse | - | Array(Null, 2) | - | allowed Array(Null, 2) many
-Expr.arr.reverse | - | Array(String, 2) | - | allowed Array(String, 2) many
-Expr.arr.reverse | - | Array(Time, 2) | - | allowed Array(Time, 2) many
-Expr.arr.reverse | - | Array(UInt128, 2) | - | allowed Array(UInt128, 2) many
-Expr.arr.reverse | - | Array(UInt16, 2) | - | allowed Array(UInt16, 2) many
-Expr.arr.reverse | - | Array(UInt32, 2) | - | allowed Array(UInt32, 2) many
-Expr.arr.reverse | - | Array(UInt64, 2) | - | allowed Array(UInt64, 2) many
-Expr.arr.reverse | - | Array(UInt8, 2) | - | allowed Array(UInt8, 2) many
-Expr.arr.reverse | - | Boolean | - | refused schema: expected Array datatype for array operation, got: Boolean
-Expr.arr.reverse | - | Date | - | refused schema: expected Array datatype for array operation, got: Date
-Expr.arr.reverse | - | Datetime(us) | - | refused schema: expected Array datatype for array operation, got: Datetime('μs')
-Expr.arr.reverse | - | Datetime(us, UTC) | - | refused schema: expected Array datatype for array operation, got: Datetime('μs', 'UTC')
-Expr.arr.reverse | - | Decimal(10, 2) | - | refused schema: expected Array datatype for array operation, got: Decimal(10, 2)
-Expr.arr.reverse | - | Duration(us) | - | refused schema: expected Array datatype for array operation, got: Duration('μs')
-Expr.arr.reverse | - | Float16 | - | refused schema: expected Array datatype for array operation, got: Float16
-Expr.arr.reverse | - | Float32 | - | refused schema: expected Array datatype for array operation, got: Float32
-Expr.arr.reverse | - | Float64 | - | refused schema: expected Array datatype for array operation, got: Float64
-Expr.arr.reverse | - | Int128 | - | refused schema: expected Array datatype for array operation, got: Int128
-Expr.arr.reverse | - | Int16 | - | refused schema: expected Array datatype for array operation, got: Int16
-Expr.arr.reverse | - | Int32 | - | refused schema: expected Array datatype for array operation, got: Int32
-Expr.arr.reverse | - | Int64 | - | refused schema: expected Array datatype for array operation, got: Int64
-Expr.arr.reverse | - | Int8 | - | refused schema: expected Array datatype for array operation, got: Int8
-Expr.arr.reverse | - | List(Boolean) | - | refused schema: expected Array datatype for array operation, got: List(Boolean)
-Expr.arr.reverse | - | List(Date) | - | refused schema: expected Array datatype for array operation, got: List(Date)
-Expr.arr.reverse | - | List(Datetime(us)) | - | refused schema: expected Array datatype for array operation, got: List(Datetime('μs'))
-Expr.arr.reverse | - | List(Datetime(us, UTC)) | - | refused schema: expected Array datatype for array operation, got: List(Datetime('μs', 'UTC'))
-Expr.arr.reverse | - | List(Decimal(10, 2)) | - | refused schema: expected Array datatype for array operation, got: List(Decimal(10, 2))
-Expr.arr.reverse | - | List(Duration(us)) | - | refused schema: expected Array datatype for array operation, got: List(Duration('μs'))
-Expr.arr.reverse | - | List(Float16) | - | refused schema: expected Array datatype for array operation, got: List(Float16)
-Expr.arr.reverse | - | List(Float32) | - | refused schema: expected Array datatype for array operation, got: List(Float32)
-Expr.arr.reverse | - | List(Float64) | - | refused schema: expected Array datatype for array operation, got: List(Float64)
-Expr.arr.reverse | - | List(Int128) | - | refused schema: expected Array datatype for array operation, got: List(Int128)
-Expr.arr.reverse | - | List(Int16) | - | refused schema: expected Array datatype for array operation, got: List(Int16)
-Expr.arr.reverse | - | List(Int32) | - | refused schema: expected Array datatype for array operation, got: List(Int32)
-Expr.arr.reverse | - | List(Int64) | - | refused schema: expected Array datatype for array operation, got: List(Int64)
-Expr.arr.reverse | - | List(Int8) | - | refused schema: expected Array datatype for array operation, got: List(Int8)
-Expr.arr.reverse | - | List(Null) | - | refused schema: expected Array datatype for array operation, got: List(Null)
-Expr.arr.reverse | - | List(String) | - | refused schema: expected Array datatype for array operation, got: List(String)
-Expr.arr.reverse | - | List(Time) | - | refused schema: expected Array datatype for array operation, got: List(Time)
-Expr.arr.reverse | - | List(UInt128) | - | refused schema: expected Array datatype for array operation, got: List(UInt128)
-Expr.arr.reverse | - | List(UInt16) | - | refused schema: expected Array datatype for array operation, got: List(UInt16)
-Expr.arr.reverse | - | List(UInt32) | - | refused schema: expected Array datatype for array operation, got: List(UInt32)
-Expr.arr.reverse | - | List(UInt64) | - | refused schema: expected Array datatype for array operation, got: List(UInt64)
-Expr.arr.reverse | - | List(UInt8) | - | refused schema: expected Array datatype for array operation, got: List(UInt8)
-Expr.arr.reverse | - | Null | - | refused schema: expected Array datatype for array operation, got: Null
-Expr.arr.reverse | - | String | - | refused schema: expected Array datatype for array operation, got: String
-Expr.arr.reverse | - | Struct(x: Int64, y: String) | - | refused schema: expected Array datatype for array operation, got: Struct({'x': Int64, 'y': String})
-Expr.arr.reverse | - | Time | - | refused schema: expected Array datatype for array operation, got: Time
-Expr.arr.reverse | - | UInt128 | - | refused schema: expected Array datatype for array operation, got: UInt128
-Expr.arr.reverse | - | UInt16 | - | refused schema: expected Array datatype for array operation, got: UInt16
-Expr.arr.reverse | - | UInt32 | - | refused schema: expected Array datatype for array operation, got: UInt32
-Expr.arr.reverse | - | UInt64 | - | refused schema: expected Array datatype for array operation, got: UInt64
-Expr.arr.reverse | - | UInt8 | - | refused schema: expected Array datatype for array operation, got: UInt8
 Expr.arr.sort | - | Array(Boolean, 2) | - | allowed Array(Boolean, 2) many
 Expr.arr.sort | - | Array(Date, 2) | - | allowed Array(Date, 2) many
 Expr.arr.sort | - | Array(Datetime(us), 2) | - | allowed Array(Datetime(us), 2) many
