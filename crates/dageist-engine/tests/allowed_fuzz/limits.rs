@@ -433,8 +433,8 @@ pub enum Limit {
     /// is not a valid one, which has no place, in a case that holds a method that writes a moment as
     /// text, given a format: the case run again with each format made `iso` is not refused for it.
     AFormatTheDtypeCannotWrite,
-    /// `dt.replace`, and the functions that make a date, a moment or a time of parts, convert each
-    /// part they are given to a whole number of the width of the part and refuse a value outside
+    /// `dt.replace`, and the functions that make a date, a moment, a time or a length of time of
+    /// parts, convert each part they are given to a whole number of the width of the part and refuse a value outside
     /// the calendar's range, and one that does not convert, when the rows run, so what they do
     /// with a part that is no number written in depends on the values of the rows. The tables measured the column that stands for an argument, whose values are 1 and 3, or
     /// true and false, of which false is a day of 0 that no date has. Polars refusing the rows or the
@@ -2536,6 +2536,32 @@ const PARTS_OF_A_DATE: [&str; 7] = [
     "microsecond",
 ];
 
+/// The parts `duration` is given, which it converts to whole numbers as the calendar's are.
+const PARTS_OF_A_LENGTH_OF_TIME: [&str; 8] = [
+    "weeks",
+    "days",
+    "hours",
+    "minutes",
+    "seconds",
+    "milliseconds",
+    "microseconds",
+    "nanoseconds",
+];
+
+/// The parts that the call is given to convert: a length of time's, or a date's.
+fn parts_of(call: &Call) -> &'static [&'static str] {
+    if is(call, "polars.duration") {
+        &PARTS_OF_A_LENGTH_OF_TIME
+    } else {
+        &PARTS_OF_A_DATE
+    }
+}
+
+/// Whether the parameter of the call holds a part that it converts.
+fn is_a_part_of(call: &Call, parameter: &str) -> bool {
+    parts_of(call).contains(&parameter)
+}
+
 /// Whether the reason is that the components of a date or of a time are invalid, as a day of 0 or
 /// a minute below zero are.
 fn is_a_refusal_of_the_components_of_a_date(reason: &str) -> bool {
@@ -2549,13 +2575,15 @@ fn is_a_refusal_of_a_part_of_a_date(reason: &str) -> bool {
 }
 
 /// Whether the call is given a part of a date or a time to convert: a `dt.replace`, or one of the
-/// functions that make a date, a moment or a time of parts, which convert each as it does.
+/// functions that make a date, a moment, a time or a length of time of parts, which convert each
+/// as it does.
 fn is_given_a_part_of_a_date(call: &Call) -> bool {
     (is(call, "Expr.dt.replace")
         || is(call, "polars.date")
         || is(call, "polars.datetime")
-        || is(call, "polars.time"))
-        && PARTS_OF_A_DATE
+        || is(call, "polars.time")
+        || is(call, "polars.duration"))
+        && parts_of(call)
             .iter()
             .any(|part| call.argument(part).is_some())
 }
@@ -2581,7 +2609,7 @@ fn case_with_ones_as_the_parts(case: &Case) -> Option<Case> {
             .arguments()
             .iter()
             .map(|given| {
-                let value = if PARTS_OF_A_DATE.contains(&given.parameter()) {
+                let value = if is_a_part_of(call, given.parameter()) {
                     Value::Expression(one.clone())
                 } else {
                     given.value().clone()
@@ -2665,8 +2693,7 @@ fn case_with_the_text_parts_as(case: &Case, value: Value) -> Option<Case> {
             .map(|given| {
                 let value = match given.value() {
                     Value::Expression(part)
-                        if PARTS_OF_A_DATE.contains(&given.parameter())
-                            && is_a_literal_of_text(part) =>
+                        if is_a_part_of(call, given.parameter()) && is_a_literal_of_text(part) =>
                     {
                         Value::Expression(literal.clone())
                     }
@@ -2711,7 +2738,7 @@ fn case_with_the_parts_as(case: &Case, value: Value) -> Option<Case> {
             .arguments()
             .iter()
             .map(|given| {
-                let value = if PARTS_OF_A_DATE.contains(&given.parameter()) {
+                let value = if is_a_part_of(call, given.parameter()) {
                     Value::Expression(literal.clone())
                 } else {
                     given.value().clone()
