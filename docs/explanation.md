@@ -613,8 +613,9 @@ What Polars does with each is what the tables say, and some of it is not what a 
   exact one's. On the streaming engine the approximate quantile of a literal is refused, with a null quantile, where
   it stands in a value of a condition's branch or in the predicate of a `when` after the first, and not in a select, a
   filter, a sort key, a join key, a window or the predicate of the first `when`: a limit covers it.
-- `arg_max` and `arg_min` give the row of the first largest or smallest value as a `UInt32` and take every
-  dtype; a null is neither. `nan_max` and `nan_min` give what `max` and `min` give, except that a NaN is the
+- `arg_max` and `arg_min` give the row of a largest or smallest value as a `UInt32` and take every
+  dtype; where several rows hold it Polars does not say which it gives, and gives another one at another
+  number of threads and for text in memory; a null is neither. `nan_max` and `nan_min` give what `max` and `min` give, except that a NaN is the
   largest or the smallest where the values hold one. `any` and `all` give a `Boolean`
   and take numbers, which are true where they are not zero, and booleans; `ignore_nulls`, true unless it is not,
   skips the nulls, and without it a null is unknown, so an `all` of values that are true and null is null.
