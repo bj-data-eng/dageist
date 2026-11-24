@@ -2384,6 +2384,44 @@ mod tests {
     }
 
     #[test]
+    fn a_call_is_refused_on_a_value_with_an_argument_of_no_known_dtype_left_at_its_default() {
+        // `lit("1d").log(base=1 // null)`: Polars drops the sort key, which is one value. The
+        // base is refused first as written, and its dtype is not known, so no column stands in
+        // for it. The log of a column of text, given no base, is refused as the tables say.
+        let name = "stricter-a-call-given-an-argument-of-no-known-dtype.case";
+        let case = kept(name);
+        let refused = refusal(&case);
+        assert_eq!(settle(&case, &refused), None);
+        let found =
+            on_a_value(&case, &refused).expect("a probe that Polars refuses as the tables do");
+        assert!(found.reason.contains("log"), "{}", found.reason);
+        assert!(!found.probe.contains("base"), "{}", found.probe);
+        assert!(!found.probe.contains("floordiv"), "{}", found.probe);
+        // A receiver that a log takes is allowed with the default base: nothing shows the tables
+        // right.
+        let text = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/allowed_fuzz/regressions")
+                .join(name),
+        )
+        .expect("a kept case");
+        let number = Case::decode(
+            text.replace("{\"string\":\"1d\"}", "{\"integer\":4}")
+                .as_bytes(),
+        )
+        .expect("a case");
+        assert_eq!(on_a_value(&number, &refusal(&case)), None);
+        // An argument that the call cannot go without is not left out.
+        let required = Case::decode(
+            text.replace("Expr.log", "Expr.add")
+                .replace("\"base\"", "\"other\"")
+                .as_bytes(),
+        )
+        .expect("a case");
+        assert_eq!(on_a_value(&required, &refusal(&case)), None);
+    }
+
+    #[test]
     fn a_value_of_another_dtype_than_the_tables_predict_settles_nothing() {
         // The probe takes the dtype that reaches the call from Polars and the
         // tables together: where they differ it asks nothing, and the case is a
