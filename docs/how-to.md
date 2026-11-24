@@ -581,25 +581,43 @@ DAGEIST_FUZZ_START=4013 DAGEIST_FUZZ_COUNTED=3980
 ```
 
 Read the two kept cases, replay them if you like, and run again from the next case.
-`DAGEIST_FUZZ_START` makes the cases before it and passes them over without running them,
-so the cases from it on are those of a run that began at the first, and
-`DAGEIST_FUZZ_COUNTED`, how many of the cases before it counted towards the number of
-cases, makes the run end where that run would have; without it every case before the
-start counts. A case that does not end counts as one that was checked. This loop goes on
-until a campaign ends by itself, and leaves every timeout in the kept directory:
+A case's number counts every case the seed makes that is run, including ones that checked
+nothing; the cases a focused campaign draws again for holding no method in focus are not
+cases and have no number. `DAGEIST_FUZZ_COUNTED` counts only the cases that checked something,
+so it is below the number of the case that did not end: in the example 32 of the 4011 cases
+before it checked nothing. A case that did not end counts as one that was checked. `DAGEIST_FUZZ_START` makes the cases before it and
+passes them over without running them, so the cases from it on are those of a run that began
+at the first, and `DAGEIST_FUZZ_COUNTED` makes the run end where that run would have;
+without it every case before the start counts, which ends the run a little earlier. A
+setting that is no whole number, a deadline of 0, a count above the cases before the start,
+and a start that makes more cases than a campaign counts are refused, with the variable
+named.
+
+A timeout that happens while a case that disagrees is being reduced is kept as
+`<seed>-<place>-reduction-timeout.case`, with the case that disagreed kept as it was,
+as `<seed>-<place>-unreduced.case`, and told of in the findings so far.
+
+This loop goes on until a campaign ends by itself. It runs in a subshell, so the settings
+do not stay in yours, and it follows `DAGEIST_FUZZ_KEEP` if that is set. It stops at any end
+that leaves no `timeout.env`, which is a campaign that ran to its last case or one that failed
+for another reason, such as a case that disagrees, and leaves every timeout in the kept
+directory:
 
 ```sh
-keep=$PWD/target/tmp/allowed-fuzz
-rm -f "$keep/timeout.env"
-while :; do
-  if [ -f "$keep/timeout.env" ]; then
-    set -a; . "$keep/timeout.env"; set +a
-    mv "$keep/timeout.env" "$keep/timeout.env.$(date +%s)"
-  fi
-  DAGEIST_FUZZ_SEED=7 DAGEIST_FUZZ_CASES=8000 cargo test --offline --locked -p dageist-engine \
-    --test allowed_fuzz a_campaign -- --ignored --nocapture --test-threads=1
-  [ -f "$keep/timeout.env" ] || break
-done
+(
+  keep=${DAGEIST_FUZZ_KEEP:-$PWD/target/tmp/allowed-fuzz}
+  export DAGEIST_FUZZ_KEEP=$keep DAGEIST_FUZZ_SEED=7 DAGEIST_FUZZ_CASES=8000
+  rm -f "$keep/timeout.env"
+  while :; do
+    if [ -f "$keep/timeout.env" ]; then
+      set -a; . "$keep/timeout.env"; set +a
+      mv "$keep/timeout.env" "$keep/timeout.env.$(date +%s)"
+    fi
+    cargo test --offline --locked -p dageist-engine --test allowed_fuzz a_campaign \
+      -- --ignored --nocapture --test-threads=1
+    [ -f "$keep/timeout.env" ] || break
+  done
+)
 ```
 
 The case that is about to run is written to `current.case` in that directory
