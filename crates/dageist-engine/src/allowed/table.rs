@@ -910,6 +910,34 @@ impl Tables {
     }
 }
 
+impl Tables {
+    /// The first thing the tables record of `entry` on a receiver of the class `receiver`, whatever
+    /// it is given, that no call may be run after: a line where Polars refused the rows though its
+    /// schema was fine, or panicked. A call after one that trusts the schema, as an aggregate or a
+    /// cut does, panics on a thread of Polars' own, which may not be recovered from.
+    pub(super) fn recorded_danger(
+        &self,
+        entry: &'static str,
+        receiver: Representative,
+    ) -> Option<Reason> {
+        let read = read_as(entry, receiver)?;
+        self.dtypes
+            .iter()
+            .filter(|((line, _, class, _), _)| *line == entry && *class == Some(read))
+            .filter_map(|(_, outcome)| match outcome {
+                Outcome::Refused(reason)
+                    if reason.stage == Stage::Rows
+                        && (reason.text.starts_with("the schema says")
+                            || reason.text.starts_with("Polars panicked")) =>
+                {
+                    Some(reason.clone())
+                }
+                _ => None,
+            })
+            .min_by(|first, second| first.text.cmp(&second.text))
+    }
+}
+
 /// The first expression parameter of a function that starts an expression, which what the
 /// options of the function are measured on, if it has one.
 pub(super) fn subject_of(entry: &catalog::Entry) -> Option<&'static str> {

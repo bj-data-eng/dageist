@@ -12,8 +12,8 @@ use super::context::Context;
 use super::dtype::{Representative, ResultDtype, dtype_name, unit_name};
 use super::rules::Rule;
 use super::table::{
-    LIST_FORM, Looked, OptionValue, Outcome, Produces, Reason, Shape, Stage, Tables, has_a_subject,
-    is_a_list, is_method, read_as, restored, subject_of,
+    LIST_FORM, Looked, OptionValue, Outcome, Produces, Reason, SENSITIVE, Shape, Stage, Tables,
+    has_a_subject, is_a_list, is_method, is_of_nested_dtypes, read_as, restored, subject_of,
 };
 use crate::catalog::DefaultValue;
 
@@ -1338,6 +1338,49 @@ pub fn rule_forbids_a_receiver(entry: &Entry, receiver: &DataType) -> Result<(),
         Some((rule, said)) => Err(Refusal::rule_because(rule, &said)),
         None => Ok(()),
     }
+}
+
+/// The refusal of a call that follows a value of the dtype `receiver`, where the tables are not
+/// asked of the call another way: the dtype of the value was not known before Polars built it, as
+/// where it follows a value of lists of lists, and the call is one that Polars panics on or that
+/// the tables do not measure. A method that depends on the element dtype is refused after a
+/// list, an array or a value of a dtype with no class that it is not measured on, and a method of
+/// lists or arrays, or one that follows a list or an array, is refused after one where the tables
+/// record that its schema and its rows differ or that Polars panicked, whatever the call is given.
+///
+/// # Errors
+/// The rule or the recorded refusal, said as the tables would say it of the call.
+pub fn refuse_a_receiver_not_judged(
+    entry: &'static Entry,
+    receiver: &DataType,
+) -> Result<(), Refusal> {
+    let id = entry.id().as_str();
+    let depends_on_the_element = SENSITIVE.contains(&id) || is_of_nested_dtypes(id);
+    let not_measured = || {
+        Refusal::rule_because(
+            Rule::ElementDtypeIsMeasured,
+            &format!("{id} is not measured on {}", dtype_name(receiver)),
+        )
+    };
+    let Some(class) = Representative::of(receiver) else {
+        // A list or an array of what has no class: of lists, of arrays, of structs.
+        return if depends_on_the_element
+            && matches!(receiver, DataType::List(_) | DataType::Array(..))
+        {
+            Err(not_measured())
+        } else {
+            Ok(())
+        };
+    };
+    if read_as(id, class).is_none() {
+        return Err(not_measured());
+    }
+    if (is_of_nested_dtypes(id) || class.is_nested())
+        && let Some(reason) = Tables::committed().recorded_danger(id, class)
+    {
+        return Err(Refusal::polars(&reason));
+    }
+    Ok(())
 }
 
 /// The refusal of a rule that forbids `entry` to start or continue a chain in
