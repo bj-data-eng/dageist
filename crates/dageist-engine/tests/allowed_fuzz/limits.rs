@@ -9781,10 +9781,16 @@ mod tests {
         // The control makes the literal a column, which a join key reads as the column both tables
         // hold, and which the call after the quantile need not be given the dtype of: a method of
         // text after the quantile of a column of numbers is refused for it, not for the quantile.
-        for kept in [
-            "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--in-a-join-key.case",
+        // On one thread Polars allows the join key, where the tables allow it too.
+        let mut kept_cases = vec![
             "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--before-a-call-of-text.case",
-        ] {
+        ];
+        if !crate::one_thread() {
+            kept_cases.push(
+                "uncovered-an-approximate-quantile-of-a-literal-in-a-condition--in-a-join-key.case",
+            );
+        }
+        for kept in kept_cases {
             assert_eq!(
                 excused_by_kept(kept),
                 vec![Limit::AnApproximateQuantileOfALiteralInACondition],
